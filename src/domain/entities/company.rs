@@ -2,10 +2,10 @@ use serde::Serialize;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize)]
-pub struct User {
+pub struct Company {
     pub id: Uuid,
-    pub username: String,
-    pub email: String,
-    pub password_hash: String,
+    pub user_id: Uuid,
+    pub name: String,
+    pub slug: String,
     pub created_at: chrono::NaiveDateTime,
 }

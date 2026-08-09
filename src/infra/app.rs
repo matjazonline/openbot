@@ -22,7 +22,7 @@ pub fn create_app(app_state: AppState) -> Router {
         .allow_credentials(true);
 
     Router::new()
-        .nest("/api", adapters::http::routes::router())
+        .merge(adapters::http::routes::router())
         .with_state(app_state)
         .layer(cors)
         .layer(

@@ -1,0 +1,223 @@
+use std::sync::Arc;
+
+use axum::{
+    Form, Json, Router,
+    extract::{Path, State},
+    http::StatusCode,
+    response::{Html, IntoResponse},
+    routing::{get, put},
+};
+use serde::{Deserialize, Serialize};
+use tracing::instrument;
+use uuid::Uuid;
+
+use crate::{
+    adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
+    app_error::AppResult,
+    entities::company::Company,
+    use_cases::company::CompanyUseCases,
+};
+
+pub fn router() -> Router<AppState> {
+    Router::new()
+        .route("/companies", get(list_companies).post(create_company))
+        .route("/companies/{id}", put(update_company).delete(delete_company))
+        .route("/companies/{id}/edit", get(edit_company_form))
+        .route("/companies/{id}/cancel", get(cancel_company_edit))
+        .route("/api/companies", get(list_companies_json).post(create_company_json))
+        .route("/api/companies/{id}", put(update_company_json).delete(delete_company_json))
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CompanyForm {
+    pub name: String,
+    pub slug: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CompanyResponse {
+    pub success: bool,
+    pub company: Company,
+}
+
+/// GET /companies - Full HTML page listing all user companies (Protected).
+#[instrument(skip(company_use_cases, user))]
+async fn list_companies(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+) -> impl IntoResponse {
+    let companies = company_use_cases
+        .list_user_companies(user.id)
+        .await
+        .unwrap_or_default();
+
+    Html(pages::companies_page(&companies))
+}
+
+/// POST /companies - HTMX create company form submission (Protected).
+#[instrument(skip(company_use_cases, user, form))]
+async fn create_company(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+    Form(form): Form<CompanyForm>,
+) -> impl IntoResponse {
+    match company_use_cases
+        .create_company(user.id, &form.name, &form.slug)
+        .await
+    {
+        Ok(_) => {
+            let companies = company_use_cases
+                .list_user_companies(user.id)
+                .await
+                .unwrap_or_default();
+            Html(pages::company_list_fragment(&companies))
+        }
+        Err(err) => {
+            let error_html = pages::error_alert(&format!("Failed to create company: {err}"));
+            let companies = company_use_cases
+                .list_user_companies(user.id)
+                .await
+                .unwrap_or_default();
+            Html(format!("{}{}", error_html, pages::company_list_fragment(&companies)))
+        }
+    }
+}
+
+/// GET /companies/{id}/edit - Returns inline edit form fragment (Protected).
+#[instrument(skip(company_use_cases, _user))]
+async fn edit_company_form(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    if let Ok(Some(company)) = company_use_cases.get_company(id).await {
+        Html(pages::company_edit_fragment(&company))
+    } else {
+        Html(pages::error_alert("Company not found."))
+    }
+}
+
+/// GET /companies/{id}/cancel - Cancels edit and returns single row fragment (Protected).
+#[instrument(skip(company_use_cases, _user))]
+async fn cancel_company_edit(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    if let Ok(Some(company)) = company_use_cases.get_company(id).await {
+        Html(pages::company_row_fragment(&company))
+    } else {
+        Html(String::new())
+    }
+}
+
+/// PUT /companies/{id} - Handles HTMX company update form submission (Protected).
+#[instrument(skip(company_use_cases, _user, form))]
+async fn update_company(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+    Form(form): Form<CompanyForm>,
+) -> impl IntoResponse {
+    match company_use_cases
+        .update_company(id, &form.name, &form.slug)
+        .await
+    {
+        Ok(company) => Html(pages::company_row_fragment(&company)),
+        Err(err) => Html(pages::error_alert(&format!("Update failed: {err}"))),
+    }
+}
+
+/// DELETE /companies/{id} - Handles HTMX company deletion (Protected).
+#[instrument(skip(company_use_cases, _user))]
+async fn delete_company(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let _ = company_use_cases.delete_company(id).await;
+    Html(String::new())
+}
+
+/// JSON API: List companies for active user (Protected).
+async fn list_companies_json(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+) -> AppResult<impl IntoResponse> {
+    let companies = company_use_cases.list_user_companies(user.id).await?;
+    Ok((StatusCode::OK, Json(companies)))
+}
+
+/// JSON API: Create company (Protected).
+async fn create_company_json(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+    Json(payload): Json<CompanyForm>,
+) -> AppResult<impl IntoResponse> {
+    let company = company_use_cases
+        .create_company(user.id, &payload.name, &payload.slug)
+        .await?;
+    Ok((
+        StatusCode::CREATED,
+        Json(CompanyResponse {
+            success: true,
+            company,
+        }),
+    ))
+}
+
+/// JSON API: Update company (Protected).
+async fn update_company_json(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<CompanyForm>,
+) -> AppResult<impl IntoResponse> {
+    let company = company_use_cases
+        .update_company(id, &payload.name, &payload.slug)
+        .await?;
+    Ok((
+        StatusCode::OK,
+        Json(CompanyResponse {
+            success: true,
+            company,
+        }),
+    ))
+}
+
+/// JSON API: Delete company (Protected).
+async fn delete_company_json(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<impl IntoResponse> {
+    company_use_cases.delete_company(id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+
+    use super::*;
+
+    #[test]
+    fn companies_page_renders_htmx_crud_elements() {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Test Corp".to_string(),
+            slug: "test-corp".to_string(),
+            created_at: Utc::now().naive_utc(),
+        };
+
+        let page_html = pages::companies_page(&[company.clone()]);
+        assert!(page_html.contains("Test Corp"));
+        assert!(page_html.contains("/test-corp"));
+        assert!(page_html.contains("hx-post=\"/companies\""));
+
+        let edit_fragment = pages::company_edit_fragment(&company);
+        assert!(edit_fragment.contains("hx-put="));
+        assert!(edit_fragment.contains("value=\"Test Corp\""));
+    }
+}

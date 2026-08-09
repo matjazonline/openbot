@@ -11,9 +11,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = create_app(app_state);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3001")
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
 
     info!("Backend listening at {}", &listener.local_addr().unwrap());
 

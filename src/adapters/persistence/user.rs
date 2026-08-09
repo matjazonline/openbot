@@ -15,6 +15,7 @@ use crate::{
 pub struct UserDb {
     pub id: Uuid,
     pub username: String,
+    pub email: String,
     pub password_hash: String,
     pub created_at: NaiveDateTime,
 }
@@ -24,6 +25,7 @@ impl From<UserDb> for User {
         User {
             id: user_db.id,
             username: user_db.username,
+            email: user_db.email,
             password_hash: user_db.password_hash,
             created_at: user_db.created_at,
         }
@@ -47,5 +49,31 @@ impl UserPersistence for PostgresPersistence {
         .map_err(AppError::from)?;
 
         Ok(())
+    }
+
+    async fn get_by_email(&self, email: &str) -> AppResult<Option<User>> {
+        let result = sqlx::query_as!(
+            UserDb,
+            r#"SELECT id, username, email, password_hash, created_at as "created_at!" FROM users WHERE email = $1"#,
+            email
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(result.map(Into::into))
+    }
+
+    async fn get_by_username(&self, username: &str) -> AppResult<Option<User>> {
+        let result = sqlx::query_as!(
+            UserDb,
+            r#"SELECT id, username, email, password_hash, created_at as "created_at!" FROM users WHERE username = $1"#,
+            username
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(result.map(Into::into))
     }
 }

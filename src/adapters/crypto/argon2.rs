@@ -1,5 +1,5 @@
 use argon2::{
-    Argon2,
+    Argon2, PasswordHash, PasswordVerifier,
     password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
 };
 
@@ -23,5 +23,12 @@ impl UserCredentialsHasher for ArgonPasswordHasher {
             .to_string();
 
         Ok(hash)
+    }
+
+    fn verify_password(&self, password: &str, hash: &str) -> AppResult<bool> {
+        let parsed_hash = PasswordHash::new(hash)
+            .map_err(|_| AppError::Internal("Invalid password hash format.".into()))?;
+
+        Ok(self.hasher.verify_password(password.as_bytes(), &parsed_hash).is_ok())
     }
 }

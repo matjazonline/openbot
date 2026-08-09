@@ -6,6 +6,7 @@ pub struct AppConfig {
     pub jwt_secret: String,
     pub access_token_ttl: Duration,
     pub refresh_token_ttl: Duration,
+    pub app_domain_name: String,
 }
 
 impl AppConfig {
@@ -22,10 +23,14 @@ impl AppConfig {
             .parse()
             .expect("ACCESS_TOKEN_TTL_SECS must be a valid number");
 
+        let app_domain_name = env::var("APP_DOMAIN_NAME")
+            .unwrap_or_else(|_| "localhost".to_string());
+
         Self {
             jwt_secret,
             access_token_ttl: Duration::seconds(access_token_ttl_secs),
             refresh_token_ttl: Duration::days(refresh_token_ttl_days),
+            app_domain_name,
         }
     }
 }
