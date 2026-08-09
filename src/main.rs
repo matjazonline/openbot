@@ -1,7 +1,7 @@
 use dotenvy::dotenv;
 use tracing::info;
 
-use clean_architecture::infra::{app::create_app, setup::init_app_state};
+use mail_agents::infra::{app::create_app, setup::init_app_state};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

@@ -39,3 +39,30 @@ Email clients append the entire historical thread below newly typed text. Feedin
 
 - **Logic:** Implement heuristics to truncate the message at common splitters (e.g., `On <date>, <user> wrote:`, `-----Original Message-----`, or `>` blockquotes).
 - **Fallback:** Compare the raw text against the stored DB history for that thread and perform a diff subtraction to isolate the net-new tokens.
+
+## Development Setup
+
+### Database Setup
+
+To start the local PostgreSQL database:
+
+```bash
+LC_ALL="en_US.UTF-8" /opt/homebrew/opt/postgresql@16/bin/postgres -D /opt/homebrew/var/postgresql@16
+```
+
+### Database Migrations
+
+Migrations are automatically executed on server startup via `sqlx::migrate!()`.
+
+To run migrations manually using `psql`:
+
+```bash
+/opt/homebrew/opt/postgresql@16/bin/psql -d <database_name> -f migrations/20250819195936_create_users.sql
+```
+
+Alternatively, install `sqlx-cli` to run migrations:
+
+```bash
+cargo install sqlx-cli --no-default-features --features postgres
+sqlx migrate run
+```
