@@ -34,3 +34,20 @@ impl AppConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_app_config_from_env() {
+        unsafe {
+            env::set_var("JWT_SECRET", "test_secret");
+            env::set_var("APP_DOMAIN_NAME", "example.com");
+        }
+
+        let config = AppConfig::from_env();
+        assert_eq!(config.jwt_secret, "test_secret");
+        assert_eq!(config.app_domain_name, "example.com");
+    }
+}

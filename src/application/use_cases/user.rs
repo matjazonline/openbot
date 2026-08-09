@@ -4,6 +4,8 @@ use async_trait::async_trait;
 use secrecy::{ExposeSecret, SecretString};
 use tracing::{info, instrument};
 
+use uuid::Uuid;
+
 use crate::{
     app_error::{AppError, AppResult},
     entities::user::User,
@@ -14,6 +16,7 @@ pub trait UserPersistence: Send + Sync {
     async fn create_user(&self, username: &str, email: &str, password_hash: &str) -> AppResult<()>;
     async fn get_by_email(&self, email: &str) -> AppResult<Option<User>>;
     async fn get_by_username(&self, username: &str) -> AppResult<Option<User>>;
+    async fn get_by_id(&self, id: Uuid) -> AppResult<Option<User>>;
 }
 
 pub trait UserCredentialsHasher: Send + Sync {
@@ -73,6 +76,11 @@ impl UserUseCases {
         info!("User login successful for {}", user.username);
         Ok(user)
     }
+
+    #[instrument(skip(self))]
+    pub async fn get_user_by_id(&self, id: Uuid) -> AppResult<Option<User>> {
+        self.persistence.get_by_id(id).await
+    }
 }
 
 #[cfg(test)]
@@ -124,6 +132,16 @@ mod test {
             } else {
                 Ok(None)
             }
+        }
+
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<User>> {
+            Ok(Some(User {
+                id: Uuid::new_v4(),
+                username: "testuser".to_string(),
+                email: "testuser@gmail.com".to_string(),
+                password_hash: "secret_hash".to_string(),
+                created_at: chrono::Utc::now().naive_utc(),
+            }))
         }
     }
 

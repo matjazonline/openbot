@@ -3,7 +3,9 @@ use sqlx::PgPool;
 use crate::app_error::AppError;
 
 pub mod company;
+pub mod company_invite;
 pub mod user;
+pub mod workflow;
 
 #[derive(Clone)]
 pub struct PostgresPersistence {

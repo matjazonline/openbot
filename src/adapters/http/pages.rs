@@ -1,4 +1,10 @@
-use crate::entities::company::Company;
+use uuid::Uuid;
+
+use crate::entities::{
+    company::Company, company_invite::CompanyInvite, company_member::CompanyMember,
+    workflow::Workflow,
+};
+use crate::use_cases::workflow::InboundEmailResult;
 
 pub fn base_layout(title: &str, content: &str) -> String {
     format!(
@@ -19,6 +25,7 @@ pub fn base_layout(title: &str, content: &str) -> String {
             </a>
             <div class="flex items-center gap-4 text-sm font-medium">
                 <a href="/companies" class="text-slate-300 hover:text-white transition">Companies</a>
+                <a href="/invites" class="text-slate-300 hover:text-white transition">My Invites</a>
                 <a href="/login" class="text-slate-300 hover:text-white transition">Sign In</a>
                 <a href="/register" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition">Sign Up</a>
             </div>
@@ -202,6 +209,14 @@ pub fn company_row_fragment(company: &Company) -> String {
                 <p class="text-xs text-slate-400 mt-1">Added {created_at_str}</p>
             </div>
             <div class="flex items-center gap-2">
+                <a href="/companies/{id}/workflows"
+                    class="px-3 py-1.5 text-xs font-medium bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/50 rounded-lg transition">
+                    Workflows
+                </a>
+                <a href="/companies/{id}/invites"
+                    class="px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
+                    Invites & Team
+                </a>
                 <button hx-get="/companies/{id}/edit" hx-target="#company-{id}" hx-swap="outerHTML"
                     class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
                     Edit
@@ -281,5 +296,676 @@ pub fn error_alert(message: &str) -> String {
             <svg class="w-5 h-5 text-rose-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 19 9 0 0118 0z"></path></svg>
             <span>{message}</span>
         </div>"##
+    )
+}
+
+pub fn company_invites_page(
+    company: &Company,
+    invites: &[CompanyInvite],
+    members: &[CompanyMember],
+) -> String {
+    let invites_html = company_invite_list_fragment(company.id, invites);
+    let team_html = company_team_list_fragment(company.id, members);
+
+    let content = format!(
+        r##"
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <a href="/companies" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Companies</a>
+                <h2 class="text-2xl font-bold text-white">{company_name} Management</h2>
+                <p class="text-slate-400 text-sm mt-0.5">Manage email invites and view team members for <span class="font-mono text-indigo-300">/{slug}</span></p>
+            </div>
+        </div>
+
+        <div id="response-message" class="mb-6"></div>
+
+        <!-- Create Invite Card -->
+        <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-8">
+            <h3 class="text-md font-semibold text-white mb-3 flex items-center gap-2">
+                <span class="text-indigo-400">+</span> Invite User by Email
+            </h3>
+            <form hx-post="/companies/{company_id}/invites" hx-target="#invite-list" hx-swap="innerHTML" class="flex gap-3"
+                hx-on::after-request="if(event.detail.successful) this.reset();">
+                <input type="email" name="email" required placeholder="colleague@example.com"
+                    class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button type="submit"
+                    class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer">
+                    Send Invite
+                </button>
+            </form>
+        </div>
+
+        <!-- Invites List Section -->
+        <div class="mb-10">
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Email Invites</h3>
+            <div id="invite-list" class="space-y-3">
+                {invites_html}
+            </div>
+        </div>
+
+        <!-- Team Members Section -->
+        <div>
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Company Team</h3>
+            <div id="team-list" class="space-y-3">
+                {team_html}
+            </div>
+        </div>
+        "##,
+        company_name = company.name,
+        slug = company.slug,
+        company_id = company.id,
+        invites_html = invites_html,
+        team_html = team_html,
+    );
+
+    base_layout(&format!("Manage {}", company.name), &content)
+}
+
+pub fn company_invite_list_fragment(company_id: Uuid, invites: &[CompanyInvite]) -> String {
+    if invites.is_empty() {
+        return r##"
+            <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-6 text-center">
+                <p class="text-slate-400 text-sm">No email invites sent yet.</p>
+            </div>
+        "##
+        .to_string();
+    }
+
+    invites
+        .iter()
+        .map(|inv| company_invite_row_fragment(company_id, inv))
+        .collect()
+}
+
+pub fn company_invite_row_fragment(company_id: Uuid, invite: &CompanyInvite) -> String {
+    let created_at_str = invite.created_at.format("%b %d, %Y").to_string();
+    let status_badge = match invite.status.as_str() {
+        "accepted" => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950 text-emerald-300 border border-emerald-700/50">Accepted</span>"#,
+        "declined" => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-950 text-rose-300 border border-rose-700/50">Declined</span>"#,
+        _ => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-950 text-amber-300 border border-amber-700/50">Pending</span>"#,
+    };
+
+    format!(
+        r##"
+        <div id="invite-{invite_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-slate-600 transition shadow-sm">
+            <div>
+                <div class="flex items-center gap-3">
+                    <span class="text-md font-semibold text-white">{email}</span>
+                    {status_badge}
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Invited on {created_at_str}</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button hx-get="/companies/{company_id}/invites/{invite_id}/edit" hx-target="#invite-{invite_id}" hx-swap="outerHTML"
+                    class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
+                    Edit
+                </button>
+                <button hx-delete="/companies/{company_id}/invites/{invite_id}" hx-target="#invite-{invite_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to cancel invite for '{email}'?"
+                    class="px-3 py-1.5 text-xs font-medium bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
+                    Delete
+                </button>
+            </div>
+        </div>
+        "##,
+        company_id = company_id,
+        invite_id = invite.id,
+        email = invite.email,
+        status_badge = status_badge,
+        created_at_str = created_at_str,
+    )
+}
+
+pub fn company_invite_edit_fragment(company_id: Uuid, invite: &CompanyInvite) -> String {
+    format!(
+        r##"
+        <form id="invite-{invite_id}" hx-put="/companies/{company_id}/invites/{invite_id}" hx-target="#invite-{invite_id}" hx-swap="outerHTML"
+            class="bg-slate-900 border border-indigo-500/60 rounded-xl p-4 md:p-5 flex items-center gap-3 shadow-lg">
+            <input type="email" name="email" value="{email}" required
+                class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <div class="flex items-center gap-2">
+                <button type="button" hx-get="/companies/{company_id}/invites/{invite_id}/cancel" hx-target="#invite-{invite_id}" hx-swap="outerHTML"
+                    class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
+                    Cancel
+                </button>
+                <button type="submit"
+                    class="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition cursor-pointer">
+                    Save
+                </button>
+            </div>
+        </form>
+        "##,
+        company_id = company_id,
+        invite_id = invite.id,
+        email = invite.email,
+    )
+}
+
+pub fn company_team_list_fragment(company_id: Uuid, members: &[CompanyMember]) -> String {
+    if members.is_empty() {
+        return r##"
+            <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-6 text-center">
+                <p class="text-slate-400 text-sm">No team members joined yet.</p>
+            </div>
+        "##
+        .to_string();
+    }
+
+    members
+        .iter()
+        .map(|m| company_team_row_fragment(company_id, m))
+        .collect()
+}
+
+pub fn company_team_row_fragment(company_id: Uuid, member: &CompanyMember) -> String {
+    let created_at_str = member.created_at.format("%b %d, %Y").to_string();
+    let username_display = member.username.as_deref().unwrap_or("Unknown User");
+    let email_display = member.email.as_deref().unwrap_or("");
+
+    format!(
+        r##"
+        <div id="member-{user_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-slate-600 transition shadow-sm">
+            <div>
+                <div class="flex items-center gap-3">
+                    <h4 class="text-md font-semibold text-white">{username}</h4>
+                    <span class="text-xs text-slate-400">({email})</span>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-950 text-indigo-300 border border-indigo-700/50 uppercase">{role}</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Joined {created_at_str}</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button hx-delete="/companies/{company_id}/team/{user_id}" hx-target="#member-{user_id}" hx-swap="outerHTML" hx-confirm="Remove '{username}' from company team?"
+                    class="px-3 py-1.5 text-xs font-medium bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
+                    Remove
+                </button>
+            </div>
+        </div>
+        "##,
+        company_id = company_id,
+        user_id = member.user_id,
+        username = username_display,
+        email = email_display,
+        role = member.role,
+        created_at_str = created_at_str,
+    )
+}
+
+pub fn user_invites_page(user_email: &str, invites: &[CompanyInvite]) -> String {
+    let list_html = user_invite_list_fragment(invites);
+
+    let content = format!(
+        r##"
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h2 class="text-2xl font-bold text-white">Your Invitations</h2>
+                <p class="text-slate-400 text-sm mt-1">Company invitations sent to <span class="font-mono text-indigo-300">{user_email}</span></p>
+            </div>
+        </div>
+
+        <div id="response-message" class="mb-6"></div>
+
+        <div>
+            <div id="user-invites-list" class="space-y-3">
+                {list_html}
+            </div>
+        </div>
+        "##,
+        user_email = user_email,
+        list_html = list_html,
+    );
+
+    base_layout("My Invites", &content)
+}
+
+pub fn user_invite_list_fragment(invites: &[CompanyInvite]) -> String {
+    if invites.is_empty() {
+        return r##"
+            <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-8 text-center">
+                <p class="text-slate-400 text-sm">You have no pending or past company invitations.</p>
+            </div>
+        "##
+        .to_string();
+    }
+
+    invites.iter().map(user_invite_row_fragment).collect()
+}
+
+pub fn user_invite_row_fragment(invite: &CompanyInvite) -> String {
+    let company_name = invite
+        .company_name
+        .as_deref()
+        .unwrap_or("Unknown Company");
+    let created_at_str = invite.created_at.format("%b %d, %Y").to_string();
+
+    let action_buttons = match invite.status.as_str() {
+        "accepted" => r#"<span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700/50">Accepted</span>"#.to_string(),
+        "declined" => r#"<span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-950 text-rose-300 border border-rose-700/50">Declined</span>"#.to_string(),
+        _ => format!(
+            r##"
+            <button hx-post="/invites/{invite_id}/accept" hx-target="#user-invite-{invite_id}" hx-swap="outerHTML"
+                class="px-3.5 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition cursor-pointer shadow-md shadow-emerald-600/30">
+                Accept
+            </button>
+            <button hx-post="/invites/{invite_id}/decline" hx-target="#user-invite-{invite_id}" hx-swap="outerHTML"
+                class="px-3.5 py-1.5 text-xs font-semibold bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
+                Decline
+            </button>
+            "##,
+            invite_id = invite.id
+        ),
+    };
+
+    format!(
+        r##"
+        <div id="user-invite-{invite_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-slate-600 transition shadow-sm">
+            <div>
+                <div class="flex items-center gap-3">
+                    <h4 class="text-md font-semibold text-white">{company_name}</h4>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Invited to {email} on {created_at_str}</p>
+            </div>
+            <div class="flex items-center gap-2">
+                {action_buttons}
+            </div>
+        </div>
+        "##,
+        invite_id = invite.id,
+        company_name = company_name,
+        email = invite.email,
+        created_at_str = created_at_str,
+        action_buttons = action_buttons,
+    )
+}
+
+pub fn workflows_page(
+    company: &Company,
+    app_domain_name: &str,
+    workflows: &[Workflow],
+) -> String {
+    let list_html = workflow_list_fragment(company, app_domain_name, workflows);
+
+    let content = format!(
+        r##"
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <a href="/companies" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Companies</a>
+                <h2 class="text-2xl font-bold text-white">{company_name} Workflows</h2>
+                <p class="text-slate-400 text-sm mt-0.5">Manage automated workflows for <span class="font-mono text-indigo-300">@{slug}.{app_domain_name}</span></p>
+            </div>
+        </div>
+
+        <div id="response-message" class="mb-6"></div>
+
+        <!-- Create Workflow Card -->
+        <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-8">
+            <h3 class="text-md font-semibold text-white mb-3 flex items-center gap-2">
+                <span class="text-emerald-400">+</span> Add New Workflow
+            </h3>
+            <form hx-post="/companies/{company_id}/workflows" hx-target="#workflow-list" hx-swap="innerHTML" class="space-y-4"
+                hx-on::after-request="if(event.detail.successful) this.reset();">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="workflow_name" class="block text-xs font-medium text-slate-300 mb-1">Workflow Name</label>
+                        <input type="text" id="workflow_name" name="name" required
+                            oninput="document.getElementById('workflow_slug').value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            placeholder="Inbound Email Handler">
+                    </div>
+                    <div>
+                        <label for="workflow_slug" class="block text-xs font-medium text-slate-300 mb-1">Slug (@{slug}.{app_domain_name})</label>
+                        <input type="text" id="workflow_slug" name="slug" required
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                            placeholder="inbound-email-handler">
+                    </div>
+                </div>
+                <div>
+                    <label for="participant_emails" class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Comma-separated, Optional)</label>
+                    <input type="text" id="participant_emails" name="participant_emails"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder="agent1@example.com, agent2@example.com">
+                </div>
+                <div>
+                    <label for="workflow_config" class="block text-xs font-medium text-slate-300 mb-1">Workflow Config (JSON, Optional)</label>
+                    <textarea id="workflow_config" name="workflow_config" rows="3"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder='&#123; "trigger": "email", "action": "ai_reply" &#125;'></textarea>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit"
+                        class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/30 transition cursor-pointer">
+                        Create Workflow
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Workflows List Section -->
+        <div>
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Workflows</h3>
+            <div id="workflow-list" class="space-y-3">
+                {list_html}
+            </div>
+        </div>
+        "##,
+        company_name = company.name,
+        slug = company.slug,
+        app_domain_name = app_domain_name,
+        company_id = company.id,
+        list_html = list_html,
+    );
+
+    base_layout(&format!("{} Workflows", company.name), &content)
+}
+
+pub fn workflow_list_fragment(
+    company: &Company,
+    app_domain_name: &str,
+    workflows: &[Workflow],
+) -> String {
+    if workflows.is_empty() {
+        return r##"
+            <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-8 text-center">
+                <p class="text-slate-400 text-sm">No workflows configured yet. Create your first workflow above!</p>
+            </div>
+        "##
+        .to_string();
+    }
+
+    workflows
+        .iter()
+        .map(|wf| workflow_row_fragment(company, app_domain_name, wf))
+        .collect()
+}
+
+pub fn workflow_row_fragment(
+    company: &Company,
+    app_domain_name: &str,
+    workflow: &Workflow,
+) -> String {
+    let created_at_str = workflow.created_at.format("%b %d, %Y").to_string();
+    let emails_str = match &workflow.participant_emails {
+        Some(emails) if !emails.is_empty() => emails.join(", "),
+        _ => "None".to_string(),
+    };
+    let config_str = match &workflow.workflow_config {
+        Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
+        None => "None".to_string(),
+    };
+    let display_slug = format!("{}@{}.{}", workflow.slug, company.slug, app_domain_name);
+
+    format!(
+        r##"
+        <div id="workflow-{workflow_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex flex-col gap-3 hover:border-slate-600 transition shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-3">
+                        <h4 class="text-md font-semibold text-white">{name}</h4>
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-emerald-950/90 text-emerald-300 border border-emerald-700/50">{display_slug}</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">Created on {created_at_str}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                        class="px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
+                        Simulate
+                    </a>
+                    <button hx-get="/companies/{company_id}/workflows/{workflow_id}/edit" hx-target="#workflow-{workflow_id}" hx-swap="outerHTML"
+                        class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
+                        Edit
+                    </button>
+                    <button hx-delete="/companies/{company_id}/workflows/{workflow_id}" hx-target="#workflow-{workflow_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete workflow '{name}'?"
+                        class="px-3 py-1.5 text-xs font-medium bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
+                        Delete
+                    </button>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs bg-slate-950/60 p-3 rounded-lg border border-slate-800 font-mono">
+                <div>
+                    <span class="text-slate-500 block font-sans text-[11px] font-semibold uppercase">Participants:</span>
+                    <span class="text-slate-300">{emails_str}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block font-sans text-[11px] font-semibold uppercase">Config:</span>
+                    <pre class="text-slate-300 whitespace-pre-wrap text-[11px]">{config_str}</pre>
+                </div>
+            </div>
+        </div>
+        "##,
+        company_id = company.id,
+        workflow_id = workflow.id,
+        name = workflow.name,
+        display_slug = display_slug,
+        created_at_str = created_at_str,
+        emails_str = emails_str,
+        config_str = config_str,
+    )
+}
+
+pub fn workflow_edit_fragment(
+    company: &Company,
+    app_domain_name: &str,
+    workflow: &Workflow,
+) -> String {
+    let emails_str = match &workflow.participant_emails {
+        Some(emails) => emails.join(", "),
+        None => String::new(),
+    };
+    let config_str = match &workflow.workflow_config {
+        Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
+        None => String::new(),
+    };
+
+    format!(
+        r##"
+        <form id="workflow-{workflow_id}" hx-put="/companies/{company_id}/workflows/{workflow_id}" hx-target="#workflow-{workflow_id}" hx-swap="outerHTML"
+            class="bg-slate-900 border border-emerald-500/60 rounded-xl p-4 md:p-5 space-y-4 shadow-lg">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Workflow Name</label>
+                    <input type="text" name="name" value="{name}" required
+                        oninput="this.form.slug.value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Slug (@{company_slug}.{app_domain_name})</label>
+                    <input type="text" name="slug" value="{slug}" required
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Comma-separated)</label>
+                <input type="text" name="participant_emails" value="{emails_str}"
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Workflow Config (JSON)</label>
+                <textarea name="workflow_config" rows="3"
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500">{config_str}</textarea>
+            </div>
+            <div class="flex items-center justify-end gap-2">
+                <button type="button" hx-get="/companies/{company_id}/workflows/{workflow_id}/cancel" hx-target="#workflow-{workflow_id}" hx-swap="outerHTML"
+                    class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
+                    Cancel
+                </button>
+                <button type="submit"
+                    class="px-4 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition cursor-pointer">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+        "##,
+        company_id = company.id,
+        company_slug = company.slug,
+        app_domain_name = app_domain_name,
+        workflow_id = workflow.id,
+        name = workflow.name,
+        slug = workflow.slug,
+        emails_str = emails_str,
+        config_str = config_str,
+    )
+}
+
+pub fn workflow_simulation_page(
+    company: &Company,
+    app_domain_name: &str,
+    workflow: &Workflow,
+) -> String {
+    let target_recipient = format!("{}@{}.{}", workflow.slug, company.slug, app_domain_name);
+
+    let default_sender = match &workflow.participant_emails {
+        Some(emails) if !emails.is_empty() => emails[0].clone(),
+        _ => "sender@example.com".to_string(),
+    };
+
+    let content = format!(
+        r##"
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <a href="/companies/{company_id}/workflows" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Workflows</a>
+                <h2 class="text-2xl font-bold text-white">Simulate Webhook: {workflow_name}</h2>
+                <p class="text-slate-400 text-sm mt-0.5">Test incoming email webhook resolution for <span class="font-mono text-emerald-300">{target_recipient}</span></p>
+            </div>
+        </div>
+
+        <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-6 shadow-md">
+            <h3 class="text-md font-semibold text-white mb-4 flex items-center gap-2">
+                <span class="text-indigo-400">⚡</span> Simulated Webhook Payload
+            </h3>
+            <form hx-post="/companies/{company_id}/workflows/{workflow_id}/simulate" hx-target="#simulation-result" hx-swap="innerHTML" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="to" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
+                        <input type="text" id="to" name="to" value="{target_recipient}" required
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label for="from" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
+                        <input type="text" id="from" name="from" value="{default_sender}" required
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+                <div>
+                    <label for="subject" class="block text-xs font-medium text-slate-300 mb-1">Subject</label>
+                    <input type="text" id="subject" name="subject" value="Simulated Webhook Trigger" required
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="text_body" class="block text-xs font-medium text-slate-300 mb-1">Text Body</label>
+                    <textarea id="text_body" name="text_body" rows="3"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">This is a simulated inbound email payload for testing workflow execution.</textarea>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit"
+                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2">
+                        <span>Trigger Webhook Simulation</span>
+                        <span>&rarr;</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div id="simulation-result"></div>
+        "##,
+        company_id = company.id,
+        workflow_id = workflow.id,
+        workflow_name = workflow.name,
+        target_recipient = target_recipient,
+        default_sender = default_sender,
+    );
+
+    base_layout(&format!("Simulate {}", workflow.name), &content)
+}
+
+pub fn workflow_simulation_result_fragment(result: &InboundEmailResult) -> String {
+    let status_banner = if result.resolved {
+        r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-600/60 text-emerald-200 text-sm font-semibold flex items-center gap-2">
+            <span class="text-emerald-400 text-lg">✓</span>
+            <span>Webhook Triggered & Workflow Resolved Successfully!</span>
+        </div>"#
+    } else if !result.sender_authorized {
+        r#"<div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
+            <span class="text-rose-400 text-lg">✕</span>
+            <span>Unauthorized Sender: Email 'from' address is not listed in workflow participant_emails.</span>
+        </div>"#
+    } else {
+        r#"<div class="p-4 rounded-xl bg-amber-950/80 border border-amber-600/60 text-amber-200 text-sm font-semibold flex items-center gap-2">
+            <span class="text-amber-400 text-lg">⚠</span>
+            <span>Workflow or Company Not Found for recipient address.</span>
+        </div>"#
+    };
+
+    let company_name = result
+        .company
+        .as_ref()
+        .map(|c| format!("{} (/{})", c.name, c.slug))
+        .unwrap_or_else(|| result.company_slug.clone().unwrap_or_else(|| "N/A".to_string()));
+
+    let workflow_name = result
+        .workflow
+        .as_ref()
+        .map(|w| format!("{} (/{})", w.name, w.slug))
+        .unwrap_or_else(|| result.workflow_slug.clone().unwrap_or_else(|| "N/A".to_string()));
+
+    let subject_str = result.email.subject.as_deref().unwrap_or("(No subject)");
+    let body_str = result.email.text_body.as_deref().unwrap_or("(No text body)");
+
+    let workflow_config_str = match &result.workflow {
+        Some(wf) => match &wf.workflow_config {
+            Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
+            None => "None".to_string(),
+        },
+        None => "None".to_string(),
+    };
+
+    format!(
+        r##"
+        <div class="space-y-4">
+            {status_banner}
+
+            <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
+                <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2">Simulation Execution Details</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
+                        <span class="text-indigo-300">{to}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Sender ('from'):</span>
+                        <span class="text-indigo-300">{from}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Company:</span>
+                        <span class="text-slate-200">{company_name}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Workflow:</span>
+                        <span class="text-slate-200">{workflow_name}</span>
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-800">
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Email Subject:</span>
+                    <span class="text-slate-200 font-sans font-medium text-sm">{subject_str}</span>
+                </div>
+
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Email Text Body:</span>
+                    <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800">{body_str}</div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-800">
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Workflow Config:</span>
+                    <pre class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-[11px]">{workflow_config_str}</pre>
+                </div>
+            </div>
+        </div>
+        "##,
+        status_banner = status_banner,
+        to = result.email.to,
+        from = result.email.from,
+        company_name = company_name,
+        workflow_name = workflow_name,
+        subject_str = subject_str,
+        body_str = body_str,
+        workflow_config_str = workflow_config_str,
     )
 }

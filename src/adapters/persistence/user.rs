@@ -76,4 +76,17 @@ impl UserPersistence for PostgresPersistence {
 
         Ok(result.map(Into::into))
     }
+
+    async fn get_by_id(&self, id: Uuid) -> AppResult<Option<User>> {
+        let result = sqlx::query_as!(
+            UserDb,
+            r#"SELECT id, username, email, password_hash, created_at as "created_at!" FROM users WHERE id = $1"#,
+            id
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(result.map(Into::into))
+    }
 }

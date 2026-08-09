@@ -67,6 +67,20 @@ impl CompanyPersistence for PostgresPersistence {
         Ok(db.map(Into::into))
     }
 
+    async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
+        let db = sqlx::query_as!(
+            CompanyDb,
+            r#"SELECT id, user_id, name, slug, created_at as "created_at!" 
+               FROM companies WHERE LOWER(slug) = LOWER($1)"#,
+            slug
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(db.map(Into::into))
+    }
+
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         let db_list = sqlx::query_as!(
             CompanyDb,

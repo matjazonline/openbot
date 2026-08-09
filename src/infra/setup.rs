@@ -1,7 +1,10 @@
 use crate::{
     adapters::http::app_state::AppState,
     infra::{argon2_password_hasher, config::AppConfig, postgres_persistence},
-    use_cases::{company::CompanyUseCases, user::UserUseCases},
+    use_cases::{
+        company::CompanyUseCases, company_invite::CompanyInviteUseCases, user::UserUseCases,
+        workflow::WorkflowUseCases,
+    },
 };
 use std::fs::File;
 use std::sync::Arc;
@@ -15,11 +18,15 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
 
     let user_use_cases = UserUseCases::new(Arc::new(argon_hasher), postgres_arc.clone());
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
+    let company_invite_use_cases = CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());
+    let workflow_use_cases = WorkflowUseCases::new(postgres_arc.clone(), postgres_arc.clone());
 
     Ok(AppState {
         config: Arc::new(config),
         user_use_cases: Arc::new(user_use_cases),
         company_use_cases: Arc::new(company_use_cases),
+        company_invite_use_cases: Arc::new(company_invite_use_cases),
+        workflow_use_cases: Arc::new(workflow_use_cases),
     })
 }
 

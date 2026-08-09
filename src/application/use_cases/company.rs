@@ -13,6 +13,7 @@ use crate::{
 pub trait CompanyPersistence: Send + Sync {
     async fn create(&self, user_id: Uuid, name: &str, slug: &str) -> AppResult<Company>;
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>>;
+    async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>>;
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>>;
     async fn update(&self, id: Uuid, name: &str, slug: &str) -> AppResult<Company>;
     async fn delete(&self, id: Uuid) -> AppResult<()>;
@@ -51,6 +52,11 @@ impl CompanyUseCases {
     #[instrument(skip(self))]
     pub async fn get_company(&self, id: Uuid) -> AppResult<Option<Company>> {
         self.persistence.get_by_id(id).await
+    }
+
+    #[instrument(skip(self))]
+    pub async fn get_company_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
+        self.persistence.get_by_slug(slug.trim()).await
     }
 
     #[instrument(skip(self))]
@@ -108,6 +114,16 @@ mod tests {
                 .unwrap()
                 .iter()
                 .find(|c| c.id == id)
+                .cloned())
+        }
+
+        async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
+            Ok(self
+                .companies
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|c| c.slug.eq_ignore_ascii_case(slug))
                 .cloned())
         }
 

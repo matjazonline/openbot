@@ -1,5 +1,8 @@
 pub mod company;
+pub mod company_invite;
 pub mod user;
+pub mod webhooks;
+pub mod workflow;
 
 use axum::Router;
 
@@ -9,4 +12,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .merge(user::router())
         .merge(company::router())
+        .merge(company_invite::router())
+        .merge(workflow::router())
+        .merge(webhooks::router())
 }
