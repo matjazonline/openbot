@@ -264,7 +264,7 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> {
+        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -292,7 +292,7 @@ mod tests {
             unimplemented!()
         }
 
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> {
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -423,6 +423,9 @@ mod tests {
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
                 slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });

@@ -395,13 +395,41 @@ impl ThreadUseCases {
             .list_messages_by_thread_id(thread.id)
             .await?;
 
+        let api_key = workflow
+            .api_key
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| company.api_key.as_deref().filter(|s| !s.trim().is_empty()));
+
+        let provider = workflow
+            .provider
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| company.provider.as_deref().filter(|s| !s.trim().is_empty()));
+
+        let model = workflow
+            .model
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| company.model.as_deref().filter(|s| !s.trim().is_empty()));
+
         // Execute AI Agent
-        let agent_response = AgentRunner::execute(
-            workflow.workflow_config.as_ref(),
-            &parsed.prompt_text,
-            &history_messages,
-        )
-        .await?;
+        let runner_res = AgentRunner::new(&parsed.prompt_text)
+            .history(&history_messages)
+            .workflow_config(workflow.workflow_config.as_ref())
+            .api_key(api_key)
+            .provider(provider)
+            .model(model)
+            .execute()
+            .await;
+
+        let (agent_response, execution_error) = match runner_res {
+            Ok(res) => (res, None),
+            Err(err) => {
+                let err_msg = format!("Agent execution failed: {err}");
+                (err_msg.clone(), Some(err_msg))
+            }
+        };
 
         let (
             sent_message_id,
@@ -512,6 +540,10 @@ impl ThreadUseCases {
             .thread_persistence
             .create_message(&outbound_message)
             .await?;
+
+        if let Some(err_msg) = execution_error {
+            return Err(crate::app_error::AppError::Internal(err_msg));
+        }
 
         Ok(Some(AgentExecutionResult {
             outbound_message_id: Some(sent_message_id),
@@ -670,7 +702,7 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> {
+        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> {
             unimplemented!()
         }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> {
@@ -688,7 +720,7 @@ mod tests {
         async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
             unimplemented!()
         }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> {
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
@@ -707,6 +739,9 @@ mod tests {
             _company_id: Uuid,
             _name: &str,
             _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
             _participant_emails: Option<Vec<String>>,
             _workflow_config: Option<serde_json::Value>,
         ) -> AppResult<Workflow> {
@@ -736,6 +771,9 @@ mod tests {
             _id: Uuid,
             _name: &str,
             _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
             _participant_emails: Option<Vec<String>>,
             _workflow_config: Option<serde_json::Value>,
         ) -> AppResult<Workflow> {
@@ -1003,6 +1041,9 @@ mod tests {
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
                 slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -1013,6 +1054,9 @@ mod tests {
                 company_id,
                 name: "Inbound Flow".to_string(),
                 slug: "inbound".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
                 participant_emails: None,
                 workflow_config: None,
                 created_at: Utc::now().naive_utc(),
@@ -1082,6 +1126,9 @@ mod tests {
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
                 slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -1092,6 +1139,9 @@ mod tests {
                 company_id,
                 name: "Restricted Flow".to_string(),
                 slug: "restricted".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
                 participant_emails: Some(vec!["agent@example.com".to_string()]),
                 workflow_config: None,
                 created_at: Utc::now().naive_utc(),

@@ -32,6 +32,9 @@ pub fn router() -> Router<AppState> {
 pub struct CompanyForm {
     pub name: String,
     pub slug: String,
+    pub api_key: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -62,7 +65,14 @@ async fn create_company(
     Form(form): Form<CompanyForm>,
 ) -> impl IntoResponse {
     match company_use_cases
-        .create_company(user.id, &form.name, &form.slug)
+        .create_company(
+            user.id,
+            &form.name,
+            &form.slug,
+            form.api_key.as_deref(),
+            form.provider.as_deref(),
+            form.model.as_deref(),
+        )
         .await
     {
         Ok(_) => {
@@ -120,7 +130,14 @@ async fn update_company(
     Form(form): Form<CompanyForm>,
 ) -> impl IntoResponse {
     match company_use_cases
-        .update_company(id, &form.name, &form.slug)
+        .update_company(
+            id,
+            &form.name,
+            &form.slug,
+            form.api_key.as_deref(),
+            form.provider.as_deref(),
+            form.model.as_deref(),
+        )
         .await
     {
         Ok(company) => Html(pages::company_row_fragment(&company)),
@@ -155,7 +172,14 @@ async fn create_company_json(
     Json(payload): Json<CompanyForm>,
 ) -> AppResult<impl IntoResponse> {
     let company = company_use_cases
-        .create_company(user.id, &payload.name, &payload.slug)
+        .create_company(
+            user.id,
+            &payload.name,
+            &payload.slug,
+            payload.api_key.as_deref(),
+            payload.provider.as_deref(),
+            payload.model.as_deref(),
+        )
         .await?;
     Ok((
         StatusCode::CREATED,
@@ -174,7 +198,14 @@ async fn update_company_json(
     Json(payload): Json<CompanyForm>,
 ) -> AppResult<impl IntoResponse> {
     let company = company_use_cases
-        .update_company(id, &payload.name, &payload.slug)
+        .update_company(
+            id,
+            &payload.name,
+            &payload.slug,
+            payload.api_key.as_deref(),
+            payload.provider.as_deref(),
+            payload.model.as_deref(),
+        )
         .await?;
     Ok((
         StatusCode::OK,
@@ -208,6 +239,9 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test Corp".to_string(),
             slug: "test-corp".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
             created_at: Utc::now().naive_utc(),
         };
 

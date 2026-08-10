@@ -282,7 +282,7 @@ mod tests {
 
         // Create company
         let company = persistence
-            .create(owner.id, "Test Corp", "test-corp")
+            .create(owner.id, "Test Corp", "test-corp", None, None, None)
             .await
             .unwrap();
 

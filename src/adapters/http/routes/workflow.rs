@@ -62,6 +62,9 @@ pub fn router() -> Router<AppState> {
 pub struct WorkflowForm {
     pub name: String,
     pub slug: String,
+    pub api_key: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
     pub participant_emails: Option<String>,
     pub workflow_config: Option<String>,
 }
@@ -70,6 +73,9 @@ pub struct WorkflowForm {
 pub struct WorkflowJsonPayload {
     pub name: String,
     pub slug: String,
+    pub api_key: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
     pub participant_emails: Option<Vec<String>>,
     pub workflow_config: Option<serde_json::Value>,
 }
@@ -164,6 +170,9 @@ async fn create_workflow_handler(
             company_id,
             &form.name,
             &form.slug,
+            form.api_key.as_deref(),
+            form.provider.as_deref(),
+            form.model.as_deref(),
             emails,
             workflow_config,
         )
@@ -279,6 +288,9 @@ async fn update_workflow_handler(
             workflow_id,
             &form.name,
             &form.slug,
+            form.api_key.as_deref(),
+            form.provider.as_deref(),
+            form.model.as_deref(),
             emails,
             workflow_config,
         )
@@ -424,6 +436,9 @@ async fn create_workflow_json(
             company_id,
             &payload.name,
             &payload.slug,
+            payload.api_key.as_deref(),
+            payload.provider.as_deref(),
+            payload.model.as_deref(),
             payload.participant_emails,
             payload.workflow_config,
         )
@@ -466,6 +481,9 @@ async fn update_workflow_json(
             workflow_id,
             &payload.name,
             &payload.slug,
+            payload.api_key.as_deref(),
+            payload.provider.as_deref(),
+            payload.model.as_deref(),
             payload.participant_emails,
             payload.workflow_config,
         )
@@ -508,6 +526,9 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
             slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
             created_at: Utc::now().naive_utc(),
         };
 
@@ -516,6 +537,9 @@ mod tests {
             company_id: company.id,
             name: "Auto Dispatcher".to_string(),
             slug: "auto-dispatcher".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
             participant_emails: Some(vec!["agent@test.com".to_string()]),
             workflow_config: Some(json!({ "mode": "async" })),
             created_at: Utc::now().naive_utc(),

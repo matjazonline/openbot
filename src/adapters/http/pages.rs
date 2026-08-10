@@ -1,8 +1,11 @@
 use uuid::Uuid;
 
 use crate::entities::{
-    company::Company, company_invite::CompanyInvite, company_member::CompanyMember,
-    task::{BackgroundTask, TaskStatus}, workflow::Workflow,
+    company::Company,
+    company_invite::CompanyInvite,
+    company_member::CompanyMember,
+    task::{BackgroundTask, TaskStatus},
+    workflow::Workflow,
 };
 use crate::use_cases::thread::{SimulationExecutionResult, SimulationMode};
 use crate::use_cases::workflow::InboundEmailResult;
@@ -43,7 +46,7 @@ pub fn base_layout(title: &str, content: &str) -> String {
 pub fn login_page() -> String {
     let content = r##"
         <h2 class="text-2xl font-bold text-white mb-6 text-center">Welcome back</h2>
-        
+
         <div id="response-message" class="mb-4"></div>
 
         <form hx-post="/api/user/login" hx-target="#response-message" hx-swap="innerHTML" class="space-y-5 max-w-md mx-auto">
@@ -68,7 +71,7 @@ pub fn login_page() -> String {
         </form>
 
         <div class="mt-6 text-center text-sm text-slate-400">
-            Don't have an account? 
+            Don't have an account?
             <a href="/register" class="text-indigo-400 hover:text-indigo-300 font-medium ml-1 transition">Sign up</a>
         </div>
     "##;
@@ -118,7 +121,7 @@ pub fn register_page() -> String {
         </form>
 
         <div class="mt-6 text-center text-sm text-slate-400">
-            Already have an account? 
+            Already have an account?
             <a href="/login" class="text-indigo-400 hover:text-indigo-300 font-medium ml-1 transition">Sign in</a>
         </div>
     "##;
@@ -147,7 +150,7 @@ pub fn companies_page(companies: &[Company]) -> String {
             </h3>
             <form hx-post="/companies" hx-target="#company-list" hx-swap="innerHTML" class="space-y-4"
                 hx-on::after-request="if(event.detail.successful) this.reset();">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label for="company_name" class="block text-xs font-medium text-slate-300 mb-1">Company Name</label>
                         <input type="text" id="company_name" name="name" required
@@ -160,6 +163,26 @@ pub fn companies_page(companies: &[Company]) -> String {
                         <input type="text" id="company_slug" name="slug" required
                             class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                             placeholder="acme-corporation">
+                    </div>
+                    <div>
+                        <label for="company_api_key" class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional)</label>
+                        <input type="password" id="company_api_key" name="api_key"
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                            placeholder="AIzaSy... / sk-...">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="company_provider" class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional)</label>
+                        <input type="text" id="company_provider" name="provider"
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder="e.g. google, openai, anthropic">
+                    </div>
+                    <div>
+                        <label for="company_model" class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional)</label>
+                        <input type="text" id="company_model" name="model"
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                            placeholder="e.g. gemini-2.5-flash, gpt-4o">
                     </div>
                 </div>
                 <div class="flex justify-end">
@@ -241,11 +264,14 @@ pub fn company_row_fragment(company: &Company) -> String {
 }
 
 pub fn company_edit_fragment(company: &Company) -> String {
+    let api_key_val = company.api_key.as_deref().unwrap_or("");
+    let provider_val = company.provider.as_deref().unwrap_or("");
+    let model_val = company.model.as_deref().unwrap_or("");
     format!(
         r##"
         <form id="company-{id}" hx-put="/companies/{id}" hx-target="#company-{id}" hx-swap="outerHTML"
             class="bg-slate-900 border border-indigo-500/60 rounded-xl p-4 md:p-5 space-y-4 shadow-lg">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Company Name</label>
                     <input type="text" name="name" value="{name}" required
@@ -256,6 +282,26 @@ pub fn company_edit_fragment(company: &Company) -> String {
                     <label class="block text-xs font-medium text-slate-300 mb-1">Slug (Indexed)</label>
                     <input type="text" name="slug" value="{slug}" required
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional)</label>
+                    <input type="password" name="api_key" value="{api_key}"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                        placeholder="AIzaSy... / sk-...">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional)</label>
+                    <input type="text" name="provider" value="{provider}"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="e.g. google, openai">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional)</label>
+                    <input type="text" name="model" value="{model}"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                        placeholder="e.g. gemini-2.5-flash">
                 </div>
             </div>
             <div class="flex items-center justify-end gap-2">
@@ -273,6 +319,9 @@ pub fn company_edit_fragment(company: &Company) -> String {
         id = company.id,
         name = company.name,
         slug = company.slug,
+        api_key = api_key_val,
+        provider = provider_val,
+        model = model_val,
     )
 }
 
@@ -385,9 +434,15 @@ pub fn company_invite_list_fragment(company_id: Uuid, invites: &[CompanyInvite])
 pub fn company_invite_row_fragment(company_id: Uuid, invite: &CompanyInvite) -> String {
     let created_at_str = invite.created_at.format("%b %d, %Y").to_string();
     let status_badge = match invite.status.as_str() {
-        "accepted" => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950 text-emerald-300 border border-emerald-700/50">Accepted</span>"#,
-        "declined" => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-950 text-rose-300 border border-rose-700/50">Declined</span>"#,
-        _ => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-950 text-amber-300 border border-amber-700/50">Pending</span>"#,
+        "accepted" => {
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950 text-emerald-300 border border-emerald-700/50">Accepted</span>"#
+        }
+        "declined" => {
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-950 text-rose-300 border border-rose-700/50">Declined</span>"#
+        }
+        _ => {
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-950 text-amber-300 border border-amber-700/50">Pending</span>"#
+        }
     };
 
     format!(
@@ -535,10 +590,7 @@ pub fn user_invite_list_fragment(invites: &[CompanyInvite]) -> String {
 }
 
 pub fn user_invite_row_fragment(invite: &CompanyInvite) -> String {
-    let company_name = invite
-        .company_name
-        .as_deref()
-        .unwrap_or("Unknown Company");
+    let company_name = invite.company_name.as_deref().unwrap_or("Unknown Company");
     let created_at_str = invite.created_at.format("%b %d, %Y").to_string();
 
     let action_buttons = match invite.status.as_str() {
@@ -581,11 +633,7 @@ pub fn user_invite_row_fragment(invite: &CompanyInvite) -> String {
     )
 }
 
-pub fn workflows_page(
-    company: &Company,
-    app_domain_name: &str,
-    workflows: &[Workflow],
-) -> String {
+pub fn workflows_page(company: &Company, app_domain_name: &str, workflows: &[Workflow]) -> String {
     let list_html = workflow_list_fragment(company, app_domain_name, workflows);
 
     let content = format!(
@@ -627,6 +675,26 @@ pub fn workflows_page(
                     <input type="text" id="participant_emails" name="participant_emails"
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder="agent1@example.com, agent2@example.com">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="workflow_provider" class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional Override)</label>
+                        <input type="text" id="workflow_provider" name="provider"
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                            placeholder="google, openai, anthropic">
+                    </div>
+                    <div>
+                        <label for="workflow_model" class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional Override)</label>
+                        <input type="text" id="workflow_model" name="model"
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                            placeholder="gemini-2.5-flash, gpt-4o">
+                    </div>
+                    <div>
+                        <label for="workflow_api_key" class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional Override)</label>
+                        <input type="password" id="workflow_api_key" name="api_key"
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                            placeholder="Overrides company key">
+                    </div>
                 </div>
                 <div>
                     <label for="workflow_config" class="block text-xs font-medium text-slate-300 mb-1">Workflow Config (JSON, Optional)</label>
@@ -695,6 +763,13 @@ pub fn workflow_row_fragment(
         Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
         None => "None".to_string(),
     };
+    let provider_str = workflow.provider.as_deref().unwrap_or("Default (Company)");
+    let model_str = workflow.model.as_deref().unwrap_or("Default (Company)");
+    let api_key_str = if workflow.api_key.is_some() {
+        "Configured (Workflow Override)"
+    } else {
+        "Default (Company)"
+    };
     let display_slug = format!("{}@{}.{}", workflow.slug, company.slug, app_domain_name);
 
     format!(
@@ -723,6 +798,20 @@ pub fn workflow_row_fragment(
                     </button>
                 </div>
             </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs bg-slate-950/60 p-3 rounded-lg border border-slate-800 font-mono">
+                <div>
+                    <span class="text-slate-500 block font-sans text-[11px] font-semibold uppercase">Provider:</span>
+                    <span class="text-slate-300">{provider_str}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block font-sans text-[11px] font-semibold uppercase">Model:</span>
+                    <span class="text-slate-300">{model_str}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block font-sans text-[11px] font-semibold uppercase">API Key:</span>
+                    <span class="text-slate-300">{api_key_str}</span>
+                </div>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs bg-slate-950/60 p-3 rounded-lg border border-slate-800 font-mono">
                 <div>
                     <span class="text-slate-500 block font-sans text-[11px] font-semibold uppercase">Participants:</span>
@@ -740,6 +829,9 @@ pub fn workflow_row_fragment(
         name = workflow.name,
         display_slug = display_slug,
         created_at_str = created_at_str,
+        provider_str = provider_str,
+        model_str = model_str,
+        api_key_str = api_key_str,
         emails_str = emails_str,
         config_str = config_str,
     )
@@ -758,6 +850,9 @@ pub fn workflow_edit_fragment(
         Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
         None => String::new(),
     };
+    let provider_val = workflow.provider.as_deref().unwrap_or("");
+    let model_val = workflow.model.as_deref().unwrap_or("");
+    let api_key_val = workflow.api_key.as_deref().unwrap_or("");
 
     format!(
         r##"
@@ -780,6 +875,26 @@ pub fn workflow_edit_fragment(
                 <label class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Comma-separated)</label>
                 <input type="text" name="participant_emails" value="{emails_str}"
                     class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional Override)</label>
+                    <input type="text" name="provider" value="{provider}"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                        placeholder="google, openai, anthropic">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional Override)</label>
+                    <input type="text" name="model" value="{model}"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                        placeholder="gemini-2.5-flash, gpt-4o">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional Override)</label>
+                    <input type="password" name="api_key" value="{api_key}"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                        placeholder="Leave empty to use Company key">
+                </div>
             </div>
             <div>
                 <label class="block text-xs font-medium text-slate-300 mb-1">Workflow Config (JSON)</label>
@@ -805,6 +920,9 @@ pub fn workflow_edit_fragment(
         name = workflow.name,
         slug = workflow.slug,
         emails_str = emails_str,
+        provider = provider_val,
+        model = model_val,
+        api_key = api_key_val,
         config_str = config_str,
     )
 }
@@ -856,7 +974,7 @@ pub fn workflow_simulation_page(
                 <div>
                     <label for="text_body" class="block text-xs font-medium text-slate-300 mb-1">Text Body</label>
                     <textarea id="text_body" name="text_body" rows="3"
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">This is a simulated inbound email payload for testing workflow execution.</textarea>
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">Who are you?</textarea>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
@@ -928,16 +1046,30 @@ pub fn workflow_simulation_result_fragment(result: &InboundEmailResult) -> Strin
         .company
         .as_ref()
         .map(|c| format!("{} (/{})", c.name, c.slug))
-        .unwrap_or_else(|| result.company_slug.clone().unwrap_or_else(|| "N/A".to_string()));
+        .unwrap_or_else(|| {
+            result
+                .company_slug
+                .clone()
+                .unwrap_or_else(|| "N/A".to_string())
+        });
 
     let workflow_name = result
         .workflow
         .as_ref()
         .map(|w| format!("{} (/{})", w.name, w.slug))
-        .unwrap_or_else(|| result.workflow_slug.clone().unwrap_or_else(|| "N/A".to_string()));
+        .unwrap_or_else(|| {
+            result
+                .workflow_slug
+                .clone()
+                .unwrap_or_else(|| "N/A".to_string())
+        });
 
     let subject_str = result.email.subject.as_deref().unwrap_or("(No subject)");
-    let body_str = result.email.text_body.as_deref().unwrap_or("(No text body)");
+    let body_str = result
+        .email
+        .text_body
+        .as_deref()
+        .unwrap_or("(No text body)");
 
     let workflow_config_str = match &result.workflow {
         Some(wf) => match &wf.workflow_config {
@@ -1072,10 +1204,14 @@ pub fn workflow_simulation_execution_result_fragment(
         .unwrap_or_else(|| "N/A".to_string());
 
     let parsed = ingest.parsed_email.as_ref();
-    let to_str = parsed.and_then(|p| p.recipients_to.first().map(|s| s.as_str())).unwrap_or("N/A");
+    let to_str = parsed
+        .and_then(|p| p.recipients_to.first().map(|s| s.as_str()))
+        .unwrap_or("N/A");
     let from_str = parsed.map(|p| p.sender.as_str()).unwrap_or("N/A");
     let subject_str = parsed.map(|p| p.subject.as_str()).unwrap_or("(No subject)");
-    let text_body_str = parsed.map(|p| p.clean_text_body.as_str()).unwrap_or("(No text body)");
+    let text_body_str = parsed
+        .map(|p| p.clean_text_body.as_str())
+        .unwrap_or("(No text body)");
 
     let agent_exec = sim_res.agent_execution.as_ref();
     let outbound_msg_id = agent_exec
@@ -1185,7 +1321,11 @@ pub fn company_tasks_page(
 
     let mut wf_options = String::from("<option value=\"\">All Workflows</option>");
     for wf in workflows {
-        let selected = if current_wf == Some(wf.id) { "selected" } else { "" };
+        let selected = if current_wf == Some(wf.id) {
+            "selected"
+        } else {
+            ""
+        };
         wf_options.push_str(&format!(
             "<option value=\"{}\" {}>{} (/{})</option>",
             wf.id, selected, wf.name, wf.slug
@@ -1205,7 +1345,11 @@ pub fn company_tasks_page(
     let mut status_options = String::new();
     let current_status_str = current_status.as_ref().map(|s| s.as_str()).unwrap_or("");
     for (val, label) in status_options_vec {
-        let selected = if current_status_str == val { "selected" } else { "" };
+        let selected = if current_status_str == val {
+            "selected"
+        } else {
+            ""
+        };
         status_options.push_str(&format!(
             "<option value=\"{}\" {}>{}</option>",
             val, selected, label
@@ -1286,18 +1430,33 @@ pub fn task_list_fragment(company_id: Uuid, tasks: &[BackgroundTask]) -> String 
         .to_string();
     }
 
-    tasks.iter().map(|t| task_row_fragment(company_id, t)).collect()
+    tasks
+        .iter()
+        .map(|t| task_row_fragment(company_id, t))
+        .collect()
 }
 
 pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
     let created_at_str = task.created_at.format("%b %d, %H:%M:%S").to_string();
     let status_badge = match task.status {
-        TaskStatus::Pending => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-950 text-amber-300 border border-amber-700/50">Pending</span>"#,
-        TaskStatus::Processing => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-950 text-indigo-300 border border-indigo-700/50 animate-pulse">Processing</span>"#,
-        TaskStatus::Completed => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700/50">Completed</span>"#,
-        TaskStatus::Failed => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-950 text-rose-300 border border-rose-700/50">Failed</span>"#,
-        TaskStatus::DeadLetter => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-950 text-purple-300 border border-purple-700/50">Dead Letter</span>"#,
-        TaskStatus::Stopped => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-600">Stopped</span>"#,
+        TaskStatus::Pending => {
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-950 text-amber-300 border border-amber-700/50">Pending</span>"#
+        }
+        TaskStatus::Processing => {
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-950 text-indigo-300 border border-indigo-700/50 animate-pulse">Processing</span>"#
+        }
+        TaskStatus::Completed => {
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700/50">Completed</span>"#
+        }
+        TaskStatus::Failed => {
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-950 text-rose-300 border border-rose-700/50">Failed</span>"#
+        }
+        TaskStatus::DeadLetter => {
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-950 text-purple-300 border border-purple-700/50">Dead Letter</span>"#
+        }
+        TaskStatus::Stopped => {
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-600">Stopped</span>"#
+        }
     };
 
     let action_button = match task.status {

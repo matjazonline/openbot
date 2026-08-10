@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use axum::{
     Router,
@@ -25,9 +25,24 @@ pub fn router() -> Router<AppState> {
         .route("/companies/{id}/tasks/{task_id}/resume", post(resume_company_task))
 }
 
+fn deserialize_empty_string_as_none<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: FromStr,
+    T::Err: std::fmt::Display,
+{
+    let opt = Option::<String>::deserialize(deserializer)?;
+    match opt {
+        Some(s) if !s.trim().is_empty() => s.parse::<T>().map(Some).map_err(serde::de::Error::custom),
+        _ => Ok(None),
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct TaskFilterQuery {
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub workflow_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub status: Option<String>,
     pub sort: Option<String>,
 }
@@ -122,5 +137,39 @@ async fn resume_company_task(
         Html(pages::task_row_fragment(company_id, &updated_task))
     } else {
         Html(pages::error_alert("Failed to resume task."))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_task_filter_query_deserialization_empty_workflow() {
+        let uri: axum::http::Uri = "/companies/123/tasks/filter?workflow_id=&status=completed&sort=desc".parse().unwrap();
+        let Query(query) = Query::<TaskFilterQuery>::try_from_uri(&uri).expect("Should deserialize");
+        assert_eq!(query.workflow_id, None);
+        assert_eq!(query.status, Some("completed".to_string()));
+        assert_eq!(query.sort, Some("desc".to_string()));
+    }
+
+    #[test]
+    fn test_task_filter_query_deserialization_with_workflow() {
+        let wf_id = Uuid::new_v4();
+        let uri_str = format!("/companies/123/tasks/filter?workflow_id={}&status=pending&sort=asc", wf_id);
+        let uri: axum::http::Uri = uri_str.parse().unwrap();
+        let Query(query) = Query::<TaskFilterQuery>::try_from_uri(&uri).expect("Should deserialize");
+        assert_eq!(query.workflow_id, Some(wf_id));
+        assert_eq!(query.status, Some("pending".to_string()));
+        assert_eq!(query.sort, Some("asc".to_string()));
+    }
+
+    #[test]
+    fn test_task_filter_query_deserialization_all_empty() {
+        let uri: axum::http::Uri = "/companies/123/tasks/filter?workflow_id=&status=&sort=".parse().unwrap();
+        let Query(query) = Query::<TaskFilterQuery>::try_from_uri(&uri).expect("Should deserialize");
+        assert_eq!(query.workflow_id, None);
+        assert_eq!(query.status, None);
+        assert_eq!(query.sort, Some("".to_string()));
     }
 }

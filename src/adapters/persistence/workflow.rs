@@ -16,6 +16,9 @@ pub struct WorkflowDb {
     pub company_id: Uuid,
     pub name: String,
     pub slug: String,
+    pub api_key: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
     pub participant_emails: Option<Vec<String>>,
     pub workflow_config: Option<serde_json::Value>,
     pub created_at: NaiveDateTime,
@@ -28,6 +31,9 @@ impl From<WorkflowDb> for Workflow {
             company_id: db.company_id,
             name: db.name,
             slug: db.slug,
+            api_key: db.api_key,
+            provider: db.provider,
+            model: db.model,
             participant_emails: db.participant_emails,
             workflow_config: db.workflow_config,
             created_at: db.created_at,
@@ -42,6 +48,9 @@ impl WorkflowPersistence for PostgresPersistence {
         company_id: Uuid,
         name: &str,
         slug: &str,
+        api_key: Option<&str>,
+        provider: Option<&str>,
+        model: Option<&str>,
         participant_emails: Option<Vec<String>>,
         workflow_config: Option<serde_json::Value>,
     ) -> AppResult<Workflow> {
@@ -49,13 +58,16 @@ impl WorkflowPersistence for PostgresPersistence {
 
         let db = sqlx::query_as!(
             WorkflowDb,
-            r#"INSERT INTO workflows (id, company_id, name, slug, participant_emails, workflow_config)
-               VALUES ($1, $2, $3, $4, $5, $6)
-               RETURNING id, company_id, name, slug, participant_emails, workflow_config, created_at as "created_at!""#,
+            r#"INSERT INTO workflows (id, company_id, name, slug, api_key, provider, model, participant_emails, workflow_config)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+               RETURNING id, company_id, name, slug, api_key, provider, model, participant_emails, workflow_config, created_at as "created_at!""#,
             uuid,
             company_id,
             name,
             slug,
+            api_key,
+            provider,
+            model,
             participant_emails.as_deref(),
             workflow_config
         )
@@ -69,7 +81,7 @@ impl WorkflowPersistence for PostgresPersistence {
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Workflow>> {
         let db = sqlx::query_as!(
             WorkflowDb,
-            r#"SELECT id, company_id, name, slug, participant_emails, workflow_config, created_at as "created_at!"
+            r#"SELECT id, company_id, name, slug, api_key, provider, model, participant_emails, workflow_config, created_at as "created_at!"
                FROM workflows WHERE id = $1"#,
             id
         )
@@ -87,7 +99,7 @@ impl WorkflowPersistence for PostgresPersistence {
     ) -> AppResult<Option<Workflow>> {
         let db = sqlx::query_as!(
             WorkflowDb,
-            r#"SELECT w.id, w.company_id, w.name, w.slug, w.participant_emails, w.workflow_config, w.created_at as "created_at!"
+            r#"SELECT w.id, w.company_id, w.name, w.slug, w.api_key, w.provider, w.model, w.participant_emails, w.workflow_config, w.created_at as "created_at!"
                FROM workflows w
                JOIN companies c ON c.id = w.company_id
                WHERE LOWER(c.slug) = LOWER($1) AND LOWER(w.slug) = LOWER($2)"#,
@@ -104,7 +116,7 @@ impl WorkflowPersistence for PostgresPersistence {
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Workflow>> {
         let db_list = sqlx::query_as!(
             WorkflowDb,
-            r#"SELECT id, company_id, name, slug, participant_emails, workflow_config, created_at as "created_at!"
+            r#"SELECT id, company_id, name, slug, api_key, provider, model, participant_emails, workflow_config, created_at as "created_at!"
                FROM workflows WHERE company_id = $1 ORDER BY created_at DESC"#,
             company_id
         )
@@ -120,17 +132,23 @@ impl WorkflowPersistence for PostgresPersistence {
         id: Uuid,
         name: &str,
         slug: &str,
+        api_key: Option<&str>,
+        provider: Option<&str>,
+        model: Option<&str>,
         participant_emails: Option<Vec<String>>,
         workflow_config: Option<serde_json::Value>,
     ) -> AppResult<Workflow> {
         let db = sqlx::query_as!(
             WorkflowDb,
             r#"UPDATE workflows
-               SET name = $1, slug = $2, participant_emails = $3, workflow_config = $4
-               WHERE id = $5
-               RETURNING id, company_id, name, slug, participant_emails, workflow_config, created_at as "created_at!""#,
+               SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5, participant_emails = $6, workflow_config = $7
+               WHERE id = $8
+               RETURNING id, company_id, name, slug, api_key, provider, model, participant_emails, workflow_config, created_at as "created_at!""#,
             name,
             slug,
+            api_key,
+            provider,
+            model,
             participant_emails.as_deref(),
             workflow_config,
             id
@@ -179,7 +197,7 @@ mod tests {
         let _ = persistence.create_user(&owner_username, &owner_email, "hash").await;
         let owner = persistence.get_by_email(&owner_email).await.unwrap().unwrap();
 
-        let company = CompanyPersistence::create(&persistence, owner.id, "Workflow Corp", "wf-corp")
+        let company = CompanyPersistence::create(&persistence, owner.id, "Workflow Corp", "wf-corp", None, None, None)
             .await
             .unwrap();
 
@@ -187,12 +205,25 @@ mod tests {
         let emails = vec!["a@example.com".to_string(), "b@example.com".to_string()];
         let config = json!({ "key": "value" });
 
-        let workflow = WorkflowPersistence::create(&persistence, company.id, "Inbound Email", "inbound-email", Some(emails.clone()), Some(config.clone()))
-            .await
-            .unwrap();
+        let workflow = WorkflowPersistence::create(
+            &persistence,
+            company.id,
+            "Inbound Email",
+            "inbound-email",
+            Some("wf_key_123"),
+            Some("openai"),
+            Some("gpt-4o"),
+            Some(emails.clone()),
+            Some(config.clone()),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(workflow.name, "Inbound Email");
         assert_eq!(workflow.slug, "inbound-email");
+        assert_eq!(workflow.api_key.as_deref(), Some("wf_key_123"));
+        assert_eq!(workflow.provider.as_deref(), Some("openai"));
+        assert_eq!(workflow.model.as_deref(), Some("gpt-4o"));
         assert_eq!(workflow.participant_emails, Some(emails));
         assert_eq!(workflow.workflow_config, Some(config));
 
@@ -205,10 +236,21 @@ mod tests {
         assert_eq!(list.len(), 1);
 
         // 4. Update
-        let updated = WorkflowPersistence::update(&persistence, workflow.id, "Inbound Email V2", "inbound-email-v2", None, None)
-            .await
-            .unwrap();
+        let updated = WorkflowPersistence::update(
+            &persistence,
+            workflow.id,
+            "Inbound Email V2",
+            "inbound-email-v2",
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(updated.name, "Inbound Email V2");
+        assert_eq!(updated.api_key, None);
         assert_eq!(updated.participant_emails, None);
 
         // 5. Delete

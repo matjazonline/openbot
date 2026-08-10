@@ -111,14 +111,19 @@ impl TaskWorker {
             .await
             .map_err(|e| e.to_string())?;
 
-        let already_replied = thread_messages.iter().any(|m| {
+        let outbound_reply = thread_messages.iter().find(|m| {
             m.direction == crate::entities::message::MessageDirection::Outbound
                 && m.in_reply_to.as_deref() == Some(&inbound_msg.message_id)
         });
 
-        if already_replied {
-            info!("Idempotency Guard: Outbound reply already sent for message {}, completing task", inbound_msg.message_id);
-            return Ok(());
+        if let Some(outbound) = outbound_reply {
+            if outbound.clean_text_body.starts_with("Agent execution failed:") {
+                info!("Idempotency Guard: Agent execution previously failed for message {}, failing task", inbound_msg.message_id);
+                return Err(outbound.clean_text_body.clone());
+            } else {
+                info!("Idempotency Guard: Outbound reply already sent for message {}, completing task", inbound_msg.message_id);
+                return Ok(());
+            }
         }
 
         // Execute Agent and Dispatch Outbound Email
@@ -203,22 +208,22 @@ mod tests {
     struct MockCompanyPersistence;
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> { unimplemented!() }
+        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> { unimplemented!() }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> { unimplemented!() }
         async fn get_by_slug(&self, _slug: &str) -> AppResult<Option<Company>> { unimplemented!() }
         async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> { unimplemented!() }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
     struct MockWorkflowPersistence;
     #[async_trait]
     impl WorkflowPersistence for MockWorkflowPersistence {
-        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> { unimplemented!() }
         async fn get_by_company_slug_and_workflow_slug(&self, _company_slug: &str, _workflow_slug: &str) -> AppResult<Option<Workflow>> { unimplemented!() }
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
@@ -366,5 +371,123 @@ mod tests {
         worker.resume_task(task.id).await.unwrap();
         let resumed_task = task_persistence.get_task_by_id(task.id).await.unwrap().unwrap();
         assert_eq!(resumed_task.status, TaskStatus::Pending);
+    }
+
+    #[tokio::test]
+    async fn test_task_worker_marks_task_failed_on_agent_runner_failure() {
+        let company_id = Uuid::new_v4();
+        let workflow_id = Uuid::new_v4();
+        let thread_id = Uuid::new_v4();
+
+        let task_persistence = Arc::new(MockTaskPersistence { tasks: Mutex::new(Vec::new()) });
+        let thread_persistence = Arc::new(MockThreadPersistence { messages: Mutex::new(Vec::new()) });
+
+        let company = crate::entities::company::Company {
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Test Corp".to_string(),
+            slug: "test".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let workflow = crate::entities::workflow::Workflow {
+            id: workflow_id,
+            company_id,
+            name: "Support".to_string(),
+            slug: "support".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            workflow_config: None,
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let company_persistence = Arc::new(MockCompanyPersistence);
+        let workflow_persistence = Arc::new(MockWorkflowPersistence);
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+        });
+
+        let thread_use_cases = Arc::new(ThreadUseCases::new(
+            thread_persistence,
+            workflow_persistence,
+            company_persistence,
+            task_persistence.clone(),
+            config.clone(),
+        ));
+
+        let worker = TaskWorker::new(task_persistence.clone(), thread_use_cases, config);
+
+        let raw = crate::services::email_parser::RawInboundPayload {
+            headers: Some("Message-ID: <msg1@test.com>\n".to_string()),
+            subject: Some("Help".to_string()),
+            text: Some("Need help".to_string()),
+            html: None,
+            from: "user@test.com".to_string(),
+            to: "support@test.mailagents.com".to_string(),
+            cc: None,
+            spam_score: None,
+            attachments_data: vec![],
+            spf: None,
+            dkim: None,
+        };
+        let parsed_email = crate::services::email_parser::EmailParser::parse(raw, "mailagents.com");
+
+        let ingest = crate::use_cases::thread::InboundIngestResult {
+            accepted: true,
+            reason: None,
+            thread: Some(crate::entities::thread::Thread {
+                id: thread_id,
+                workflow_id,
+                subject: "Help".to_string(),
+                participant_emails: vec!["user@test.com".to_string()],
+                created_at: chrono::Utc::now().naive_utc(),
+                updated_at: chrono::Utc::now().naive_utc(),
+            }),
+            inbound_message: Some(crate::entities::message::Message {
+                id: Uuid::new_v4(),
+                thread_id,
+                message_id: "<msg1@test.com>".to_string(),
+                in_reply_to: None,
+                references_list: vec![],
+                sender: "user@test.com".to_string(),
+                recipients_to: vec!["support@test.mailagents.com".to_string()],
+                recipients_cc: vec![],
+                subject: "Help".to_string(),
+                clean_text_body: "Need help".to_string(),
+                raw_text_body: None,
+                raw_html_body: None,
+                attachments: None,
+                direction: crate::entities::message::MessageDirection::Inbound,
+                role: crate::entities::message::MessageRole::Human,
+                thread_index: Some("1".to_string()),
+                created_at: chrono::Utc::now().naive_utc(),
+            }),
+            company: Some(company),
+            workflow: Some(workflow),
+            parsed_email: Some(parsed_email),
+        };
+
+        let payload_json = serde_json::to_value(&ingest).unwrap();
+        let task = task_persistence.enqueue_task(company_id, workflow_id, Some(thread_id), "email_agent_dispatch", payload_json).await.unwrap();
+
+        worker.process_next_batch().await.unwrap();
+
+        let failed_task = task_persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        assert_eq!(failed_task.status, TaskStatus::Failed);
+        assert!(failed_task.last_error.unwrap().contains("API key is missing"));
     }
 }

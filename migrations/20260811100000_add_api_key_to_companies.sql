@@ -1,0 +1,2 @@
+-- up
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS api_key VARCHAR(255);

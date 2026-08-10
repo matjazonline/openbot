@@ -29,5 +29,6 @@ htmd = "0.1"
 mail-parser = "0.9"
 sha2 = "0.10"
 serde_yaml = "0.9"
+regex = "1"
 
 

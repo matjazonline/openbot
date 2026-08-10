@@ -18,6 +18,9 @@ pub trait WorkflowPersistence: Send + Sync {
         company_id: Uuid,
         name: &str,
         slug: &str,
+        api_key: Option<&str>,
+        provider: Option<&str>,
+        model: Option<&str>,
         participant_emails: Option<Vec<String>>,
         workflow_config: Option<serde_json::Value>,
     ) -> AppResult<Workflow>;
@@ -37,6 +40,9 @@ pub trait WorkflowPersistence: Send + Sync {
         id: Uuid,
         name: &str,
         slug: &str,
+        api_key: Option<&str>,
+        provider: Option<&str>,
+        model: Option<&str>,
         participant_emails: Option<Vec<String>>,
         workflow_config: Option<serde_json::Value>,
     ) -> AppResult<Workflow>;
@@ -84,6 +90,9 @@ impl WorkflowUseCases {
         company_id: Uuid,
         name: &str,
         slug: &str,
+        api_key: Option<&str>,
+        provider: Option<&str>,
+        model: Option<&str>,
         participant_emails: Option<Vec<String>>,
         workflow_config: Option<serde_json::Value>,
     ) -> AppResult<Workflow> {
@@ -97,6 +106,10 @@ impl WorkflowUseCases {
                 "Workflow name and slug cannot be empty.".into(),
             ));
         }
+
+        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
+        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
+        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
 
         let cleaned_emails = participant_emails.map(|emails| {
             emails
@@ -116,6 +129,9 @@ impl WorkflowUseCases {
                 company_id,
                 name_trimmed,
                 &slug_clean,
+                api_key_clean,
+                provider_clean,
+                model_clean,
                 cleaned_emails,
                 workflow_config,
             )
@@ -157,6 +173,9 @@ impl WorkflowUseCases {
         workflow_id: Uuid,
         name: &str,
         slug: &str,
+        api_key: Option<&str>,
+        provider: Option<&str>,
+        model: Option<&str>,
         participant_emails: Option<Vec<String>>,
         workflow_config: Option<serde_json::Value>,
     ) -> AppResult<Workflow> {
@@ -183,6 +202,10 @@ impl WorkflowUseCases {
             ));
         }
 
+        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
+        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
+        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
+
         let cleaned_emails = participant_emails.map(|emails| {
             emails
                 .into_iter()
@@ -201,6 +224,9 @@ impl WorkflowUseCases {
                 workflow_id,
                 name_trimmed,
                 &slug_clean,
+                api_key_clean,
+                provider_clean,
+                model_clean,
                 cleaned_emails,
                 workflow_config,
             )
@@ -408,7 +434,7 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> {
+        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -436,7 +462,7 @@ mod tests {
             unimplemented!()
         }
 
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> {
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -456,6 +482,9 @@ mod tests {
             company_id: Uuid,
             name: &str,
             slug: &str,
+            api_key: Option<&str>,
+            provider: Option<&str>,
+            model: Option<&str>,
             participant_emails: Option<Vec<String>>,
             workflow_config: Option<serde_json::Value>,
         ) -> AppResult<Workflow> {
@@ -464,6 +493,9 @@ mod tests {
                 company_id,
                 name: name.to_string(),
                 slug: slug.to_string(),
+                api_key: api_key.map(|s| s.to_string()),
+                provider: provider.map(|s| s.to_string()),
+                model: model.map(|s| s.to_string()),
                 participant_emails,
                 workflow_config,
                 created_at: Utc::now().naive_utc(),
@@ -512,6 +544,9 @@ mod tests {
             id: Uuid,
             name: &str,
             slug: &str,
+            api_key: Option<&str>,
+            provider: Option<&str>,
+            model: Option<&str>,
             participant_emails: Option<Vec<String>>,
             workflow_config: Option<serde_json::Value>,
         ) -> AppResult<Workflow> {
@@ -523,6 +558,9 @@ mod tests {
 
             workflow.name = name.to_string();
             workflow.slug = slug.to_string();
+            workflow.api_key = api_key.map(|s| s.to_string());
+            workflow.provider = provider.map(|s| s.to_string());
+            workflow.model = model.map(|s| s.to_string());
             workflow.participant_emails = participant_emails;
             workflow.workflow_config = workflow_config;
             Ok(workflow.clone())
@@ -545,6 +583,9 @@ mod tests {
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
                 slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -565,6 +606,9 @@ mod tests {
                 company_id,
                 "Support Flow",
                 "support-flow",
+                Some("key_123"),
+                Some("openai"),
+                Some("gpt-4o"),
                 Some(emails.clone()),
                 Some(config.clone()),
             )
@@ -573,6 +617,9 @@ mod tests {
 
         assert_eq!(workflow.name, "Support Flow");
         assert_eq!(workflow.slug, "support-flow");
+        assert_eq!(workflow.api_key.as_deref(), Some("key_123"));
+        assert_eq!(workflow.provider.as_deref(), Some("openai"));
+        assert_eq!(workflow.model.as_deref(), Some("gpt-4o"));
         assert_eq!(workflow.participant_emails, Some(emails));
         assert_eq!(workflow.workflow_config, Some(config));
 
@@ -584,6 +631,9 @@ mod tests {
                 company_id,
                 "Hacker Flow",
                 "hacker-flow",
+                None,
+                None,
+                None,
                 None,
                 None,
             )
@@ -606,6 +656,9 @@ mod tests {
                 workflow.id,
                 "Updated Flow",
                 "updated-flow",
+                None,
+                None,
+                None,
                 None,
                 Some(updated_config.clone()),
             )
@@ -670,6 +723,9 @@ mod tests {
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
                 slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -681,7 +737,7 @@ mod tests {
         let use_cases = WorkflowUseCases::new(company_persistence, workflow_persistence);
 
         let _ = use_cases
-            .create_workflow(owner_id, company_id, "Support Flow", "support", None, None)
+            .create_workflow(owner_id, company_id, "Support Flow", "support", None, None, None, None, None)
             .await
             .unwrap();
 
@@ -713,6 +769,9 @@ mod tests {
                 company_id,
                 "Restricted Flow",
                 "restricted",
+                None,
+                None,
+                None,
                 Some(vec!["agent@example.com".to_string()]),
                 None,
             )

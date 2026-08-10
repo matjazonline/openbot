@@ -215,13 +215,13 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> { unimplemented!() }
+        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> { unimplemented!() }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> { unimplemented!() }
         async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
             Ok(self.companies.lock().unwrap().iter().find(|c| c.slug == slug).cloned())
         }
         async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> { unimplemented!() }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
@@ -231,13 +231,13 @@ mod tests {
 
     #[async_trait]
     impl WorkflowPersistence for MockWorkflowPersistence {
-        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> { unimplemented!() }
         async fn get_by_company_slug_and_workflow_slug(&self, _company_slug: &str, workflow_slug: &str) -> AppResult<Option<Workflow>> {
             Ok(self.workflows.lock().unwrap().iter().find(|w| w.slug == workflow_slug).cloned())
         }
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
@@ -428,6 +428,9 @@ mod tests {
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
                 slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -438,6 +441,9 @@ mod tests {
                 company_id,
                 name: "Inbound Flow".to_string(),
                 slug: "inbound".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
                 participant_emails: None,
                 workflow_config: None,
                 created_at: Utc::now().naive_utc(),

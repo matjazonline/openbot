@@ -16,6 +16,9 @@ pub struct CompanyDb {
     pub user_id: Uuid,
     pub name: String,
     pub slug: String,
+    pub api_key: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
     pub created_at: NaiveDateTime,
 }
 
@@ -26,6 +29,9 @@ impl From<CompanyDb> for Company {
             user_id: db.user_id,
             name: db.name,
             slug: db.slug,
+            api_key: db.api_key,
+            provider: db.provider,
+            model: db.model,
             created_at: db.created_at,
         }
     }
@@ -33,18 +39,29 @@ impl From<CompanyDb> for Company {
 
 #[async_trait]
 impl CompanyPersistence for PostgresPersistence {
-    async fn create(&self, user_id: Uuid, name: &str, slug: &str) -> AppResult<Company> {
+    async fn create(
+        &self,
+        user_id: Uuid,
+        name: &str,
+        slug: &str,
+        api_key: Option<&str>,
+        provider: Option<&str>,
+        model: Option<&str>,
+    ) -> AppResult<Company> {
         let uuid = Uuid::new_v4();
 
         let db = sqlx::query_as!(
             CompanyDb,
-            r#"INSERT INTO companies (id, user_id, name, slug) 
-               VALUES ($1, $2, $3, $4) 
-               RETURNING id, user_id, name, slug, created_at as "created_at!""#,
+            r#"INSERT INTO companies (id, user_id, name, slug, api_key, provider, model) 
+               VALUES ($1, $2, $3, $4, $5, $6, $7) 
+               RETURNING id, user_id, name, slug, api_key, provider, model, created_at as "created_at!""#,
             uuid,
             user_id,
             name,
-            slug
+            slug,
+            api_key,
+            provider,
+            model
         )
         .fetch_one(&self.pool)
         .await
@@ -56,7 +73,7 @@ impl CompanyPersistence for PostgresPersistence {
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
         let db = sqlx::query_as!(
             CompanyDb,
-            r#"SELECT id, user_id, name, slug, created_at as "created_at!" 
+            r#"SELECT id, user_id, name, slug, api_key, provider, model, created_at as "created_at!" 
                FROM companies WHERE id = $1"#,
             id
         )
@@ -70,7 +87,7 @@ impl CompanyPersistence for PostgresPersistence {
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
         let db = sqlx::query_as!(
             CompanyDb,
-            r#"SELECT id, user_id, name, slug, created_at as "created_at!" 
+            r#"SELECT id, user_id, name, slug, api_key, provider, model, created_at as "created_at!" 
                FROM companies WHERE LOWER(slug) = LOWER($1)"#,
             slug
         )
@@ -84,7 +101,7 @@ impl CompanyPersistence for PostgresPersistence {
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         let db_list = sqlx::query_as!(
             CompanyDb,
-            r#"SELECT id, user_id, name, slug, created_at as "created_at!" 
+            r#"SELECT id, user_id, name, slug, api_key, provider, model, created_at as "created_at!" 
                FROM companies WHERE user_id = $1 ORDER BY created_at DESC"#,
             user_id
         )
@@ -95,14 +112,25 @@ impl CompanyPersistence for PostgresPersistence {
         Ok(db_list.into_iter().map(Into::into).collect())
     }
 
-    async fn update(&self, id: Uuid, name: &str, slug: &str) -> AppResult<Company> {
+    async fn update(
+        &self,
+        id: Uuid,
+        name: &str,
+        slug: &str,
+        api_key: Option<&str>,
+        provider: Option<&str>,
+        model: Option<&str>,
+    ) -> AppResult<Company> {
         let db = sqlx::query_as!(
             CompanyDb,
-            r#"UPDATE companies SET name = $1, slug = $2 
-               WHERE id = $3 
-               RETURNING id, user_id, name, slug, created_at as "created_at!""#,
+            r#"UPDATE companies SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5 
+               WHERE id = $6 
+               RETURNING id, user_id, name, slug, api_key, provider, model, created_at as "created_at!""#,
             name,
             slug,
+            api_key,
+            provider,
+            model,
             id
         )
         .fetch_one(&self.pool)

@@ -7,6 +7,9 @@ pub struct Workflow {
     pub company_id: Uuid,
     pub name: String,
     pub slug: String,
+    pub api_key: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
     pub participant_emails: Option<Vec<String>>,
     pub workflow_config: Option<serde_json::Value>,
     pub created_at: chrono::NaiveDateTime,
@@ -19,7 +22,8 @@ impl Workflow {
             "system_prompt": "You are a helpful assistant.",
             "llm": {
               "provider": "google",
-              "model": "gemini-2.0-flash"
+              "model": "gemini-2.5-flash",
+              "api_key": null
             }
         })
     }

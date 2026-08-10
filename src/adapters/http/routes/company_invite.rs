@@ -425,6 +425,9 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test Company".to_string(),
             slug: "test-company".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
             created_at: Utc::now().naive_utc(),
         };
 

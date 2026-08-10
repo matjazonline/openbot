@@ -1751,6 +1751,7 @@ dependencies = [
  "htmd",
  "lettre",
  "mail-parser",
+ "regex",
  "secrecy",
  "serde",
  "serde_json",
