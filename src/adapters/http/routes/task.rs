@@ -84,6 +84,29 @@ async fn list_company_tasks_page(
     ))
 }
 
+fn build_tasks_push_url(company_id: Uuid, query: &TaskFilterQuery) -> String {
+    let mut params = Vec::new();
+    if let Some(wf_id) = query.workflow_id {
+        params.push(format!("workflow_id={}", wf_id));
+    }
+    if let Some(ref st) = query.status {
+        if !st.trim().is_empty() {
+            params.push(format!("status={}", st));
+        }
+    }
+    if let Some(ref s) = query.sort {
+        if !s.trim().is_empty() {
+            params.push(format!("sort={}", s));
+        }
+    }
+
+    if params.is_empty() {
+        format!("/companies/{company_id}/tasks")
+    } else {
+        format!("/companies/{company_id}/tasks?{}", params.join("&"))
+    }
+}
+
 #[instrument(skip(thread_use_cases, _user))]
 async fn filter_company_tasks(
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
@@ -99,7 +122,9 @@ async fn filter_company_tasks(
         .await
         .unwrap_or_default();
 
-    Html(pages::task_list_fragment(company_id, &tasks))
+    let push_url = build_tasks_push_url(company_id, &query);
+
+    ([("HX-Push-Url", push_url)], Html(pages::task_list_fragment(company_id, &tasks)))
 }
 
 #[instrument(skip(thread_use_cases, config, _user))]
@@ -198,5 +223,65 @@ mod tests {
         let html = pages::task_row_fragment(company_id, &task);
         assert!(html.contains("Open Simulation"));
         assert!(html.contains(&format!("/companies/{company_id}/workflows/{workflow_id}/simulate?thread_id={thread_id}")));
+    }
+
+    #[test]
+    fn test_build_tasks_push_url() {
+        let company_id = Uuid::new_v4();
+        let wf_id = Uuid::new_v4();
+
+        let query_empty = TaskFilterQuery {
+            workflow_id: None,
+            status: None,
+            sort: None,
+        };
+        assert_eq!(
+            build_tasks_push_url(company_id, &query_empty),
+            format!("/companies/{company_id}/tasks")
+        );
+
+        let query_wf = TaskFilterQuery {
+            workflow_id: Some(wf_id),
+            status: Some("pending".to_string()),
+            sort: Some("desc".to_string()),
+        };
+        assert_eq!(
+            build_tasks_push_url(company_id, &query_wf),
+            format!("/companies/{company_id}/tasks?workflow_id={wf_id}&status=pending&sort=desc")
+        );
+    }
+
+    #[test]
+    fn test_workflow_row_fragment_renders_tasks_link() {
+        let company_id = Uuid::new_v4();
+        let workflow_id = Uuid::new_v4();
+
+        let company = crate::entities::company::Company {
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Test Co".to_string(),
+            slug: "test-co".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let workflow = crate::entities::workflow::Workflow {
+            id: workflow_id,
+            company_id,
+            name: "Test WF".to_string(),
+            slug: "test-wf".to_string(),
+            provider: None,
+            model: None,
+            api_key: None,
+            participant_emails: None,
+            workflow_config: None,
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let html = pages::workflow_row_fragment(&company, "example.com", &workflow);
+        assert!(html.contains("Tasks"));
+        assert!(html.contains(&format!("/companies/{company_id}/tasks?workflow_id={workflow_id}")));
     }
 }

@@ -249,9 +249,35 @@ mod tests {
         assert!(page_html.contains("Test Corp"));
         assert!(page_html.contains("/test-corp"));
         assert!(page_html.contains("hx-post=\"/companies\""));
+        assert!(page_html.contains("id=\"nav-workflows\""));
+        assert!(page_html.contains("selectCompany"));
 
         let edit_fragment = pages::company_edit_fragment(&company);
         assert!(edit_fragment.contains("hx-put="));
         assert!(edit_fragment.contains("value=\"Test Corp\""));
+    }
+
+    #[test]
+    fn cached_company_client_nav_and_row_rendering() {
+        let cid = Uuid::new_v4();
+        let company = Company {
+            id: cid,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme-corp".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            created_at: Utc::now().naive_utc(),
+        };
+
+        let row_html = pages::company_row_fragment(&company);
+        assert!(row_html.contains(&format!("selectCompany('{}')", cid)));
+        assert!(row_html.contains(&format!("selected-badge-{}", cid)));
+
+        let base_html = pages::base_layout("Test Title", "<p>Test Content</p>");
+        assert!(base_html.contains("id=\"nav-workflows\""));
+        assert!(base_html.contains("localStorage.getItem('cached_company_id')"));
+        assert!(base_html.contains("autoDetectAndSyncCompany"));
     }
 }

@@ -31,6 +31,7 @@ pub fn base_layout(title: &str, content: &str) -> String {
             </a>
             <div class="flex items-center gap-4 text-sm font-medium">
                 <a href="/companies" class="text-slate-300 hover:text-white transition">Companies</a>
+                <a id="nav-workflows" href="#" class="hidden text-slate-300 hover:text-white transition">Workflows</a>
                 <a href="/invites" class="text-slate-300 hover:text-white transition">My Invites</a>
                 <a href="/login" class="text-slate-300 hover:text-white transition">Sign In</a>
                 <a href="/register" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition">Sign Up</a>
@@ -40,6 +41,57 @@ pub fn base_layout(title: &str, content: &str) -> String {
             {content}
         </div>
     </div>
+    <script>
+        function getCachedCompanyId() {{
+            return localStorage.getItem('cached_company_id');
+        }}
+
+        function selectCompany(companyId) {{
+            if (!companyId) return;
+            localStorage.setItem('cached_company_id', companyId);
+            updateNavWorkflows();
+        }}
+
+        function clearCachedCompanyIfMatch(companyId) {{
+            if (getCachedCompanyId() === companyId) {{
+                localStorage.removeItem('cached_company_id');
+                updateNavWorkflows();
+            }}
+        }}
+
+        function updateNavWorkflows() {{
+            const navWorkflows = document.getElementById('nav-workflows');
+            const companyId = getCachedCompanyId();
+            if (navWorkflows) {{
+                if (companyId) {{
+                    navWorkflows.href = '/companies/' + companyId + '/workflows';
+                    navWorkflows.classList.remove('hidden');
+                }} else {{
+                    navWorkflows.classList.add('hidden');
+                }}
+            }}
+            document.querySelectorAll('[id^="selected-badge-"]').forEach(el => {{
+                if (el.id === 'selected-badge-' + companyId) {{
+                    el.classList.remove('hidden');
+                }} else {{
+                    el.classList.add('hidden');
+                }}
+            }});
+        }}
+
+        function autoDetectAndSyncCompany() {{
+            const match = window.location.pathname.match(/\/companies\/([a-f0-9\-]{{36}})/i);
+            if (match && match[1]) {{
+                selectCompany(match[1]);
+            }} else {{
+                updateNavWorkflows();
+            }}
+        }}
+
+        document.addEventListener('DOMContentLoaded', autoDetectAndSyncCompany);
+        document.addEventListener('htmx:afterSettle', autoDetectAndSyncCompany);
+        autoDetectAndSyncCompany();
+    </script>
 </body>
 </html>"##
     )
@@ -226,32 +278,34 @@ pub fn company_row_fragment(company: &Company) -> String {
     let created_at_str = company.created_at.format("%b %d, %Y").to_string();
     format!(
         r##"
-        <div id="company-{id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-slate-600 transition shadow-sm">
+        <div id="company-{id}" onclick="selectCompany('{id}')" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-slate-600 transition shadow-sm cursor-pointer">
             <div>
                 <div class="flex items-center gap-3">
                     <h4 class="text-md font-semibold text-white">{name}</h4>
                     <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-indigo-950/90 text-indigo-300 border border-indigo-700/50">/{slug}</span>
+                    <span id="selected-badge-{id}" class="hidden px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950 text-emerald-400 border border-emerald-700/60 uppercase tracking-wider">Active</span>
                 </div>
                 <p class="text-xs text-slate-400 mt-1">Added {created_at_str}</p>
             </div>
             <div class="flex items-center gap-2">
-                <a href="/companies/{id}/tasks"
+                <a href="/companies/{id}/tasks" onclick="selectCompany('{id}')"
                     class="px-3 py-1.5 text-xs font-medium bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/50 rounded-lg transition">
                     Tasks
                 </a>
-                <a href="/companies/{id}/workflows"
+                <a href="/companies/{id}/workflows" onclick="selectCompany('{id}')"
                     class="px-3 py-1.5 text-xs font-medium bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/50 rounded-lg transition">
                     Workflows
                 </a>
-                <a href="/companies/{id}/invites"
+                <a href="/companies/{id}/invites" onclick="selectCompany('{id}')"
                     class="px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
                     Invites & Team
                 </a>
-                <button hx-get="/companies/{id}/edit" hx-target="#company-{id}" hx-swap="outerHTML"
+                <button hx-get="/companies/{id}/edit" hx-target="#company-{id}" hx-swap="outerHTML" onclick="event.stopPropagation()"
                     class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
                     Edit
                 </button>
-                <button hx-delete="/companies/{id}" hx-target="#company-{id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete '{name}'?"
+                <button hx-delete="/companies/{id}" hx-target="#company-{id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete '{name}'?" onclick="event.stopPropagation()"
+                    hx-on::after-request="if(event.detail.successful) clearCachedCompanyIfMatch('{id}');"
                     class="px-3 py-1.5 text-xs font-medium bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
                     Delete
                 </button>
@@ -786,6 +840,10 @@ pub fn workflow_row_fragment(
                     <p class="text-xs text-slate-400 mt-1">Created on {created_at_str}</p>
                 </div>
                 <div class="flex items-center gap-2">
+                    <a href="/companies/{company_id}/tasks?workflow_id={workflow_id}"
+                        class="px-3 py-1.5 text-xs font-medium bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/50 rounded-lg transition">
+                        Tasks
+                    </a>
                     <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
                         class="px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
                         Simulate
