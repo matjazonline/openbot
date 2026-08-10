@@ -2,8 +2,8 @@ use crate::{
     adapters::http::app_state::AppState,
     infra::{argon2_password_hasher, config::AppConfig, postgres_persistence},
     use_cases::{
-        company::CompanyUseCases, company_invite::CompanyInviteUseCases, user::UserUseCases,
-        workflow::WorkflowUseCases,
+        company::CompanyUseCases, company_invite::CompanyInviteUseCases, thread::ThreadUseCases,
+        user::UserUseCases, workflow::WorkflowUseCases,
     },
 };
 use std::fs::File;
@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 pub async fn init_app_state() -> anyhow::Result<AppState> {
-    let config = AppConfig::from_env();
+    let config = Arc::new(AppConfig::from_env());
 
     let postgres_arc = Arc::new(postgres_persistence().await?);
     let argon_hasher = argon2_password_hasher();
@@ -20,13 +20,20 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
     let company_invite_use_cases = CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());
     let workflow_use_cases = WorkflowUseCases::new(postgres_arc.clone(), postgres_arc.clone());
+    let thread_use_cases = ThreadUseCases::new(
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        config.clone(),
+    );
 
     Ok(AppState {
-        config: Arc::new(config),
+        config,
         user_use_cases: Arc::new(user_use_cases),
         company_use_cases: Arc::new(company_use_cases),
         company_invite_use_cases: Arc::new(company_invite_use_cases),
         workflow_use_cases: Arc::new(workflow_use_cases),
+        thread_use_cases: Arc::new(thread_use_cases),
     })
 }
 

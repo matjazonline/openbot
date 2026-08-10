@@ -23,4 +23,11 @@ thiserror = "2.0"
 async-trait = "0.1.89"
 axum-extra = { version = "0.10", features = ["cookie"] }
 time = "0.3"
+ai-agents = { git = "https://github.com/geminik23/ai-agents.git" }
+lettre = { version = "0.11", default-features = false, features = ["tokio1", "tokio1-rustls-tls", "builder", "smtp-transport"] }
+htmd = "0.1"
+mail-parser = "0.9"
+sha2 = "0.10"
+serde_yaml = "0.9"
+
 
