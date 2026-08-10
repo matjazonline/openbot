@@ -568,7 +568,14 @@ impl ThreadUseCases {
         }
 
         let send_email = mode == SimulationMode::Run;
-        let agent_execution = self.execute_agent_and_dispatch(&ingest, send_email).await?;
+        let agent_execution = match self.execute_agent_and_dispatch(&ingest, send_email).await {
+            Ok(exec) => exec,
+            Err(err) => Some(AgentExecutionResult {
+                outbound_message_id: None,
+                agent_response: format!("{err}"),
+                email_sent: false,
+            }),
+        };
 
         Ok(SimulationExecutionResult {
             ingest_result: ingest,
@@ -608,6 +615,10 @@ impl ThreadUseCases {
             inbound_message_id,
             outbound_message_id: outbound_msg_id,
         })
+    }
+
+    pub async fn get_thread(&self, thread_id: Uuid) -> AppResult<Option<Thread>> {
+        self.thread_persistence.get_thread_by_id(thread_id).await
     }
 
     pub async fn get_thread_history(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {

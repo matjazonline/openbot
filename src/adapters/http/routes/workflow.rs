@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     Form, Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{Html, IntoResponse},
     routing::{get, put},
@@ -45,6 +45,10 @@ pub fn router() -> Router<AppState> {
         .route(
             "/companies/{company_id}/workflows/{id}/simulate",
             get(simulate_workflow_page).post(simulate_workflow_handler),
+        )
+        .route(
+            "/companies/{company_id}/workflows/{id}/simulate/thread",
+            get(open_simulated_thread_get).post(open_simulated_thread_post),
         )
         .route(
             "/api/companies/{company_id}/workflows",
@@ -326,20 +330,33 @@ pub struct SimulationForm {
     pub text_body: Option<String>,
     pub html_body: Option<String>,
     pub simulation_mode: Option<String>,
+    pub in_reply_to: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SimulateQuery {
+    pub thread_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OpenThreadParams {
+    pub thread_id: Option<String>,
 }
 
 /// GET /companies/{company_id}/workflows/{id}/simulate - Simulation page (Protected).
-#[instrument(skip(company_use_cases, workflow_use_cases, config, user))]
+#[instrument(skip(company_use_cases, workflow_use_cases, thread_use_cases, config, user))]
 async fn simulate_workflow_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(workflow_use_cases): State<Arc<WorkflowUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, workflow_id)): Path<(Uuid, Uuid)>,
+    Query(query): Query<SimulateQuery>,
 ) -> impl IntoResponse {
     let company = match company_use_cases.get_company(company_id).await {
         Ok(Some(c)) => c,
-        _ => return Html(pages::error_alert("Company not found.")),
+        _ => return Html(pages::error_alert("Company not found.")).into_response(),
     };
 
     let workflow = match workflow_use_cases
@@ -347,24 +364,91 @@ async fn simulate_workflow_page(
         .await
     {
         Ok(Some(wf)) => wf,
-        _ => return Html(pages::error_alert("Workflow not found.")),
+        _ => return Html(pages::error_alert("Workflow not found.")).into_response(),
     };
+
+    let mut initial_thread_id: Option<String> = None;
+    let mut initial_result_html: Option<String> = None;
+
+    if let Some(ref tid_str) = query.thread_id {
+        let trimmed = tid_str.trim();
+        if !trimmed.is_empty() {
+            initial_thread_id = Some(trimmed.to_string());
+            match Uuid::parse_str(trimmed) {
+                Ok(tid) => match thread_use_cases.get_thread(tid).await {
+                    Ok(Some(thread)) if thread.workflow_id == workflow_id => {
+                        let messages = thread_use_cases
+                            .get_thread_history(thread.id)
+                            .await
+                            .unwrap_or_default();
+                        initial_result_html = Some(pages::workflow_simulation_loaded_thread_fragment(
+                            &company,
+                            &workflow,
+                            &config.app_domain_name,
+                            &thread,
+                            &messages,
+                            false,
+                        ));
+                    }
+                    Ok(Some(_)) => {
+                        initial_result_html = Some(pages::workflow_simulation_thread_error_fragment(
+                            company_id,
+                            workflow_id,
+                            trimmed,
+                            "Thread does not belong to this workflow",
+                            false,
+                        ));
+                    }
+                    Ok(None) => {
+                        initial_result_html = Some(pages::workflow_simulation_thread_error_fragment(
+                            company_id,
+                            workflow_id,
+                            trimmed,
+                            "Thread not found",
+                            false,
+                        ));
+                    }
+                    Err(err) => {
+                        initial_result_html = Some(pages::workflow_simulation_thread_error_fragment(
+                            company_id,
+                            workflow_id,
+                            trimmed,
+                            &format!("Failed to retrieve thread: {err}"),
+                            false,
+                        ));
+                    }
+                },
+                Err(_) => {
+                    initial_result_html = Some(pages::workflow_simulation_thread_error_fragment(
+                        company_id,
+                        workflow_id,
+                        trimmed,
+                        "Invalid Thread ID format (must be a valid UUID)",
+                        false,
+                    ));
+                }
+            }
+        }
+    }
 
     Html(pages::workflow_simulation_page(
         &company,
         &config.app_domain_name,
         &workflow,
-    ))
+        initial_thread_id.as_deref(),
+        initial_result_html.as_deref(),
+    )).into_response()
 }
 
 /// POST /companies/{company_id}/workflows/{id}/simulate - Submit simulation form (Protected).
-#[instrument(skip(workflow_use_cases, thread_use_cases, config, _user, form))]
+#[instrument(skip(company_use_cases, workflow_use_cases, thread_use_cases, config, user, form))]
 async fn simulate_workflow_handler(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(workflow_use_cases): State<Arc<WorkflowUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(config): State<Arc<AppConfig>>,
-    _user: AuthenticatedUser,
-    Path((_company_id, _workflow_id)): Path<(Uuid, Uuid)>,
+    user: AuthenticatedUser,
+    Path((company_id, workflow_id)): Path<(Uuid, Uuid)>,
     Form(form): Form<SimulationForm>,
 ) -> impl IntoResponse {
     let mode_str = form.simulation_mode.as_deref().unwrap_or("verify");
@@ -377,11 +461,11 @@ async fn simulate_workflow_handler(
     match mode {
         SimulationMode::Verify => {
             let inbound_email = crate::use_cases::workflow::InboundEmail {
-                to: form.to,
-                from: form.from,
-                subject: form.subject,
-                text_body: form.text_body,
-                html_body: form.html_body,
+                to: form.to.clone(),
+                from: form.from.clone(),
+                subject: form.subject.clone(),
+                text_body: form.text_body.clone(),
+                html_body: form.html_body.clone(),
                 raw_payload: None,
             };
 
@@ -389,26 +473,244 @@ async fn simulate_workflow_handler(
                 .process_inbound_email("simulation", inbound_email, &config.app_domain_name)
                 .await
             {
-                Ok(result) => Html(pages::workflow_simulation_result_fragment(&result)),
-                Err(err) => Html(pages::error_alert(&format!("Simulation failed: {err}"))),
+                Ok(result) => Html(pages::workflow_simulation_result_fragment(
+                    company_id,
+                    workflow_id,
+                    &result,
+                )).into_response(),
+                Err(err) => {
+                    let company = company_use_cases.get_company(company_id).await.ok().flatten();
+                    let workflow = workflow_use_cases
+                        .get_company_workflow(user.id, company_id, workflow_id)
+                        .await
+                        .ok()
+                        .flatten();
+
+                    Html(pages::workflow_simulation_failure_fragment(
+                        company_id,
+                        workflow_id,
+                        company.as_ref(),
+                        workflow.as_ref(),
+                        &form.to,
+                        &form.from,
+                        form.subject.as_deref().unwrap_or("(No subject)"),
+                        &format!("Simulation failed: {err}"),
+                    )).into_response()
+                }
             }
         }
         SimulationMode::RunTest | SimulationMode::Run => {
+            let mut headers = String::new();
+            if let Some(ref reply_to) = form.in_reply_to {
+                let trimmed = reply_to.trim();
+                if !trimmed.is_empty() {
+                    headers.push_str(&format!("In-Reply-To: {}\nReferences: {}\n", trimmed, trimmed));
+                }
+            }
+
             let raw_payload = RawInboundPayload {
-                to: form.to,
-                from: form.from,
-                subject: form.subject,
-                text: form.text_body,
-                html: form.html_body,
+                to: form.to.clone(),
+                from: form.from.clone(),
+                subject: form.subject.clone(),
+                text: form.text_body.clone(),
+                html: form.html_body.clone(),
+                headers: if headers.is_empty() { None } else { Some(headers) },
                 ..Default::default()
             };
 
             match thread_use_cases.execute_simulation(raw_payload, mode).await {
-                Ok(sim_res) => Html(pages::workflow_simulation_execution_result_fragment(&sim_res)),
-                Err(err) => Html(pages::error_alert(&format!("Simulation execution failed: {err}"))),
+                Ok(sim_res) => {
+                    let messages = if let Some(ref thread) = sim_res.ingest_result.thread {
+                        thread_use_cases
+                            .get_thread_history(thread.id)
+                            .await
+                            .unwrap_or_default()
+                    } else {
+                        Vec::new()
+                    };
+
+                    let html_res = pages::workflow_simulation_execution_result_fragment(
+                        company_id,
+                        workflow_id,
+                        &sim_res,
+                        &messages,
+                    );
+
+                    if let Some(ref thread) = sim_res.ingest_result.thread {
+                        let push_url = format!(
+                            "/companies/{company_id}/workflows/{workflow_id}/simulate?thread_id={}",
+                            thread.id
+                        );
+                        ([("HX-Push-Url", push_url)], Html(html_res)).into_response()
+                    } else {
+                        Html(html_res).into_response()
+                    }
+                }
+                Err(err) => {
+                    let company = company_use_cases.get_company(company_id).await.ok().flatten();
+                    let workflow = workflow_use_cases
+                        .get_company_workflow(user.id, company_id, workflow_id)
+                        .await
+                        .ok()
+                        .flatten();
+
+                    Html(pages::workflow_simulation_failure_fragment(
+                        company_id,
+                        workflow_id,
+                        company.as_ref(),
+                        workflow.as_ref(),
+                        &form.to,
+                        &form.from,
+                        form.subject.as_deref().unwrap_or("(No subject)"),
+                        &format!("Simulation execution failed: {err}"),
+                    )).into_response()
+                }
             }
         }
     }
+}
+
+async fn open_simulated_thread_logic(
+    company_use_cases: Arc<CompanyUseCases>,
+    workflow_use_cases: Arc<WorkflowUseCases>,
+    thread_use_cases: Arc<ThreadUseCases>,
+    config: Arc<AppConfig>,
+    user: AuthenticatedUser,
+    company_id: Uuid,
+    workflow_id: Uuid,
+    thread_id_input: &str,
+) -> axum::response::Response {
+    let company = match company_use_cases.get_company(company_id).await {
+        Ok(Some(c)) => c,
+        _ => return Html(pages::error_alert("Company not found.")).into_response(),
+    };
+
+    let workflow = match workflow_use_cases
+        .get_company_workflow(user.id, company_id, workflow_id)
+        .await
+    {
+        Ok(Some(wf)) => wf,
+        _ => return Html(pages::error_alert("Workflow not found.")).into_response(),
+    };
+
+    let trimmed = thread_id_input.trim();
+    if trimmed.is_empty() {
+        return Html(pages::workflow_simulation_thread_error_fragment(
+            company_id,
+            workflow_id,
+            "",
+            "Thread ID cannot be empty",
+            true,
+        )).into_response();
+    }
+
+    let tid = match Uuid::parse_str(trimmed) {
+        Ok(id) => id,
+        Err(_) => {
+            return Html(pages::workflow_simulation_thread_error_fragment(
+                company_id,
+                workflow_id,
+                trimmed,
+                "Invalid Thread ID format (must be a valid UUID)",
+                true,
+            )).into_response();
+        }
+    };
+
+    match thread_use_cases.get_thread(tid).await {
+        Ok(Some(thread)) => {
+            if thread.workflow_id != workflow_id {
+                return Html(pages::workflow_simulation_thread_error_fragment(
+                    company_id,
+                    workflow_id,
+                    trimmed,
+                    "Thread does not belong to this workflow",
+                    true,
+                )).into_response();
+            }
+
+            let messages = thread_use_cases
+                .get_thread_history(thread.id)
+                .await
+                .unwrap_or_default();
+
+            let fragment_html = pages::workflow_simulation_loaded_thread_fragment(
+                &company,
+                &workflow,
+                &config.app_domain_name,
+                &thread,
+                &messages,
+                true,
+            );
+
+            let push_url = format!(
+                "/companies/{company_id}/workflows/{workflow_id}/simulate?thread_id={}",
+                thread.id
+            );
+
+            ([("HX-Push-Url", push_url)], Html(fragment_html)).into_response()
+        }
+        Ok(None) => Html(pages::workflow_simulation_thread_error_fragment(
+            company_id,
+            workflow_id,
+            trimmed,
+            "Thread not found",
+            true,
+        )).into_response(),
+        Err(err) => Html(pages::workflow_simulation_thread_error_fragment(
+            company_id,
+            workflow_id,
+            trimmed,
+            &format!("Failed to retrieve thread: {err}"),
+            true,
+        )).into_response(),
+    }
+}
+
+#[instrument(skip(company_use_cases, workflow_use_cases, thread_use_cases, config, user))]
+async fn open_simulated_thread_get(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(workflow_use_cases): State<Arc<WorkflowUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(config): State<Arc<AppConfig>>,
+    user: AuthenticatedUser,
+    Path((company_id, workflow_id)): Path<(Uuid, Uuid)>,
+    Query(params): Query<OpenThreadParams>,
+) -> impl IntoResponse {
+    let tid_str = params.thread_id.as_deref().unwrap_or("");
+    open_simulated_thread_logic(
+        company_use_cases,
+        workflow_use_cases,
+        thread_use_cases,
+        config,
+        user,
+        company_id,
+        workflow_id,
+        tid_str,
+    ).await
+}
+
+#[instrument(skip(company_use_cases, workflow_use_cases, thread_use_cases, config, user))]
+async fn open_simulated_thread_post(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(workflow_use_cases): State<Arc<WorkflowUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(config): State<Arc<AppConfig>>,
+    user: AuthenticatedUser,
+    Path((company_id, workflow_id)): Path<(Uuid, Uuid)>,
+    Form(params): Form<OpenThreadParams>,
+) -> impl IntoResponse {
+    let tid_str = params.thread_id.as_deref().unwrap_or("");
+    open_simulated_thread_logic(
+        company_use_cases,
+        workflow_use_cases,
+        thread_use_cases,
+        config,
+        user,
+        company_id,
+        workflow_id,
+        tid_str,
+    ).await
 }
 
 /// JSON API: List company workflows (Protected).
@@ -555,12 +857,19 @@ mod tests {
         assert!(edit_html.contains("hx-put="));
         assert!(edit_html.contains("value=\"Auto Dispatcher\""));
 
-        let sim_html = pages::workflow_simulation_page(&company, "example.com", &workflow);
+        let sim_html = pages::workflow_simulation_page(&company, "example.com", &workflow, None, None);
         assert!(sim_html.contains("Simulate Webhook: Auto Dispatcher"));
         assert!(sim_html.contains("auto-dispatcher@acme.example.com"));
         assert!(sim_html.contains("value=\"verify\""));
         assert!(sim_html.contains("value=\"run_test\""));
         assert!(sim_html.contains("value=\"run\""));
+        assert!(sim_html.contains("Open Existing Thread by ID"));
+        assert!(sim_html.contains("Simulated Webhook Payload"));
+
+        let sim_html_with_thread = pages::workflow_simulation_page(&company, "example.com", &workflow, Some("0f5421b8-9e78-4f21-ac52-3af494c3f344"), None);
+        assert!(sim_html_with_thread.contains("Thread Loaded & Active"));
+        assert!(sim_html_with_thread.contains("0f5421b8-9e78-4f21-ac52-3af494c3f344"));
+        assert!(!sim_html_with_thread.contains("Simulated Webhook Payload"));
 
         let sim_result = crate::use_cases::workflow::InboundEmailResult {
             resolved: true,
@@ -578,7 +887,7 @@ mod tests {
                 raw_payload: None,
             },
         };
-        let sim_result_html = pages::workflow_simulation_result_fragment(&sim_result);
+        let sim_result_html = pages::workflow_simulation_result_fragment(company.id, workflow.id, &sim_result);
         assert!(sim_result_html.contains("Webhook Triggered & Workflow Resolved Successfully!"));
 
         let full_sim_res = crate::use_cases::thread::SimulationExecutionResult {
@@ -587,8 +896,8 @@ mod tests {
                 reason: None,
                 thread: None,
                 inbound_message: None,
-                company: Some(company),
-                workflow: Some(workflow),
+                company: Some(company.clone()),
+                workflow: Some(workflow.clone()),
                 parsed_email: Some(crate::services::email_parser::ParsedEmail {
                     message_id: "<msg1@test>".to_string(),
                     in_reply_to: None,
@@ -620,9 +929,85 @@ mod tests {
             }),
             simulation_mode: crate::use_cases::thread::SimulationMode::RunTest,
         };
-        let run_test_html = pages::workflow_simulation_execution_result_fragment(&full_sim_res);
-        assert!(run_test_html.contains("Run_Test Mode"));
+        let test_message = crate::entities::message::Message {
+            id: Uuid::new_v4(),
+            thread_id: Uuid::new_v4(),
+            message_id: "<msg1@test>".to_string(),
+            in_reply_to: None,
+            references_list: vec![],
+            sender: "agent@test.com".to_string(),
+            recipients_to: vec!["auto-dispatcher@acme.example.com".to_string()],
+            recipients_cc: vec![],
+            subject: "Test".to_string(),
+            clean_text_body: "Body text".to_string(),
+            raw_text_body: None,
+            raw_html_body: None,
+            attachments: None,
+            direction: crate::entities::message::MessageDirection::Inbound,
+            role: crate::entities::message::MessageRole::Human,
+            thread_index: None,
+            created_at: Utc::now().naive_utc(),
+        };
+
+        let run_test_html = pages::workflow_simulation_execution_result_fragment(company.id, workflow.id, &full_sim_res, &[test_message.clone()]);
+        assert!(run_test_html.contains("Run_Test"));
         assert!(run_test_html.contains("Skipped (Run_Test Dry-Run)"));
         assert!(run_test_html.contains("Hello from Agent"));
+        assert!(run_test_html.contains("LLM Provider:"));
+        assert!(run_test_html.contains("LLM Model:"));
+        assert!(run_test_html.contains("API Key Status:"));
+        assert!(run_test_html.contains("hx-swap-oob=\"outerHTML\""));
+        assert!(run_test_html.contains("Simulate New Thread"));
+        assert!(run_test_html.contains("Simulate Reply Webhook Call"));
+        assert!(run_test_html.contains("value=\"<msg1@test>\""));
+        assert!(run_test_html.contains("Thread History"));
+
+        let fail_html = pages::workflow_simulation_failure_fragment(
+            company.id,
+            workflow.id,
+            Some(&company),
+            Some(&workflow),
+            "test@recip.com",
+            "sender@test.com",
+            "Test Subject",
+            "Anthropic API key is missing",
+        );
+        assert!(fail_html.contains("Simulation Execution Error"));
+        assert!(fail_html.contains("Anthropic API key is missing"));
+        assert!(fail_html.contains("LLM Provider:"));
+        assert!(fail_html.contains("LLM Model:"));
+        assert!(fail_html.contains("API Key Status:"));
+        assert!(fail_html.contains("Simulate New Thread"));
+
+        let sample_thread = crate::entities::thread::Thread {
+            id: Uuid::new_v4(),
+            workflow_id: workflow.id,
+            subject: "Existing Thread Subject".to_string(),
+            participant_emails: vec!["user@test.com".to_string()],
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+        };
+
+        let loaded_thread_html = pages::workflow_simulation_loaded_thread_fragment(
+            &company,
+            &workflow,
+            "example.com",
+            &sample_thread,
+            &[test_message],
+            true,
+        );
+        assert!(loaded_thread_html.contains("Thread Loaded & Active"));
+        assert!(loaded_thread_html.contains("Existing Thread Subject"));
+        assert!(loaded_thread_html.contains("Simulate Reply Webhook Call"));
+
+        let error_thread_html = pages::workflow_simulation_thread_error_fragment(
+            company.id,
+            workflow.id,
+            "invalid-uuid",
+            "Thread not found",
+            true,
+        );
+        assert!(error_thread_html.contains("Failed to Load Thread"));
+        assert!(error_thread_html.contains("Thread not found"));
     }
 }

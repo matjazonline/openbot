@@ -172,4 +172,31 @@ mod tests {
         assert_eq!(query.status, None);
         assert_eq!(query.sort, Some("".to_string()));
     }
+
+    #[test]
+    fn test_task_row_fragment_renders_simulation_link() {
+        let company_id = Uuid::new_v4();
+        let workflow_id = Uuid::new_v4();
+        let thread_id = Uuid::new_v4();
+
+        let task = crate::entities::task::BackgroundTask {
+            id: Uuid::new_v4(),
+            company_id,
+            workflow_id,
+            thread_id: Some(thread_id),
+            task_type: "agent_execution".to_string(),
+            status: TaskStatus::Completed,
+            payload: serde_json::json!({}),
+            retry_count: 0,
+            max_retries: 3,
+            last_error: None,
+            run_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now().naive_utc(),
+            updated_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let html = pages::task_row_fragment(company_id, &task);
+        assert!(html.contains("Open Simulation"));
+        assert!(html.contains(&format!("/companies/{company_id}/workflows/{workflow_id}/simulate?thread_id={thread_id}")));
+    }
 }

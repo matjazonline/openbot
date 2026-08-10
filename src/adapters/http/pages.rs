@@ -4,7 +4,9 @@ use crate::entities::{
     company::Company,
     company_invite::CompanyInvite,
     company_member::CompanyMember,
+    message::{Message, MessageDirection, MessageRole},
     task::{BackgroundTask, TaskStatus},
+    thread::Thread,
     workflow::Workflow,
 };
 use crate::use_cases::thread::{SimulationExecutionResult, SimulationMode};
@@ -931,12 +933,136 @@ pub fn workflow_simulation_page(
     company: &Company,
     app_domain_name: &str,
     workflow: &Workflow,
+    initial_thread_id: Option<&str>,
+    initial_result_html: Option<&str>,
 ) -> String {
     let target_recipient = format!("{}@{}.{}", workflow.slug, company.slug, app_domain_name);
 
     let default_sender = match &workflow.participant_emails {
         Some(emails) if !emails.is_empty() => emails[0].clone(),
         _ => "sender@example.com".to_string(),
+    };
+
+    let initial_result_val = initial_result_html.unwrap_or("");
+
+    let form_container_content = if let Some(tid) = initial_thread_id.filter(|s| !s.trim().is_empty()) {
+        format!(
+            r##"
+            <div id="simulation-form-container">
+                <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>Thread Loaded & Active</span>
+                        <span class="text-xs text-slate-400 font-mono">({tid})</span>
+                    </div>
+                    <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                       class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                        <span>🔄 Simulate New Thread</span>
+                    </a>
+                </div>
+            </div>
+            "##,
+            company_id = company.id,
+            workflow_id = workflow.id,
+            tid = tid,
+        )
+    } else {
+        format!(
+            r##"
+            <div id="simulation-form-container">
+                <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-6 shadow-md space-y-6">
+                    <div>
+                        <h3 class="text-md font-semibold text-white mb-4 flex items-center gap-2">
+                            <span class="text-indigo-400">⚡</span> Simulated Webhook Payload
+                        </h3>
+                        <form hx-post="/companies/{company_id}/workflows/{workflow_id}/simulate" hx-target="#simulation-result" hx-swap="innerHTML" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="to" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
+                                    <input type="text" id="to" name="to" value="{target_recipient}" required
+                                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                </div>
+                                <div>
+                                    <label for="from" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
+                                    <input type="text" id="from" name="from" value="{default_sender}" required
+                                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                </div>
+                            </div>
+                            <div>
+                                <label for="subject" class="block text-xs font-medium text-slate-300 mb-1">Subject</label>
+                                <input type="text" id="subject" name="subject" value="Simulated Webhook Trigger" required
+                                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label for="text_body" class="block text-xs font-medium text-slate-300 mb-1">Text Body</label>
+                                <textarea id="text_body" name="text_body" rows="3"
+                                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">Who are you?</textarea>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-indigo-500 transition">
+                                        <input type="radio" name="simulation_mode" value="verify" checked class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                                        <div class="ml-2.5">
+                                            <span class="block text-xs font-bold text-white">Verify</span>
+                                            <span class="block text-[11px] text-slate-400 mt-0.5">Verification only (Recipient & Sender ACL check)</span>
+                                        </div>
+                                    </label>
+                                    <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
+                                        <input type="radio" name="simulation_mode" value="run_test" class="mt-0.5 text-amber-500 focus:ring-amber-500">
+                                        <div class="ml-2.5">
+                                            <span class="block text-xs font-bold text-amber-300">Run_Test</span>
+                                            <span class="block text-[11px] text-slate-400 mt-0.5">Execute full workflow & agent, skip email dispatch</span>
+                                        </div>
+                                    </label>
+                                    <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
+                                        <input type="radio" name="simulation_mode" value="run" class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
+                                        <div class="ml-2.5">
+                                            <span class="block text-xs font-bold text-emerald-400">Run</span>
+                                            <span class="block text-[11px] text-slate-400 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="flex justify-end">
+                                <button type="submit"
+                                    class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2">
+                                    <span>Trigger Webhook Simulation</span>
+                                    <span>&rarr;</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="relative flex py-2 items-center">
+                        <div class="flex-grow border-t border-slate-800"></div>
+                        <span class="flex-shrink mx-4 text-xs font-semibold text-slate-500 uppercase">OR</span>
+                        <div class="flex-grow border-t border-slate-800"></div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-md font-semibold text-white mb-2 flex items-center gap-2">
+                            <span class="text-indigo-400">🔍</span> Open Existing Thread by ID
+                        </h3>
+                        <p class="text-slate-400 text-xs mb-3">Inspect thread history and simulate follow-up reply messages for an existing thread.</p>
+                        <form hx-get="/companies/{company_id}/workflows/{workflow_id}/simulate/thread" hx-target="#simulation-result" hx-swap="innerHTML" class="flex flex-col sm:flex-row gap-3">
+                            <input type="text" id="open_thread_id" name="thread_id" placeholder="Enter Thread ID (e.g. 550e8400-e29b-41d4-a716-446655440000)" required
+                                class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button type="submit"
+                                class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                <span>Open Thread</span>
+                                <span>&rarr;</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            "##,
+            company_id = company.id,
+            workflow_id = workflow.id,
+            target_recipient = target_recipient,
+            default_sender = default_sender,
+        )
     };
 
     let content = format!(
@@ -949,82 +1075,278 @@ pub fn workflow_simulation_page(
             </div>
         </div>
 
-        <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-6 shadow-md">
-            <h3 class="text-md font-semibold text-white mb-4 flex items-center gap-2">
-                <span class="text-indigo-400">⚡</span> Simulated Webhook Payload
-            </h3>
-            <form hx-post="/companies/{company_id}/workflows/{workflow_id}/simulate" hx-target="#simulation-result" hx-swap="innerHTML" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="to" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
-                        <input type="text" id="to" name="to" value="{target_recipient}" required
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                    <div>
-                        <label for="from" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
-                        <input type="text" id="from" name="from" value="{default_sender}" required
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                </div>
-                <div>
-                    <label for="subject" class="block text-xs font-medium text-slate-300 mb-1">Subject</label>
-                    <input type="text" id="subject" name="subject" value="Simulated Webhook Trigger" required
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div>
-                    <label for="text_body" class="block text-xs font-medium text-slate-300 mb-1">Text Body</label>
-                    <textarea id="text_body" name="text_body" rows="3"
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">Who are you?</textarea>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-indigo-500 transition">
-                            <input type="radio" name="simulation_mode" value="verify" checked class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
-                            <div class="ml-2.5">
-                                <span class="block text-xs font-bold text-white">Verify</span>
-                                <span class="block text-[11px] text-slate-400 mt-0.5">Verification only (Recipient & Sender ACL check)</span>
-                            </div>
-                        </label>
-                        <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
-                            <input type="radio" name="simulation_mode" value="run_test" class="mt-0.5 text-amber-500 focus:ring-amber-500">
-                            <div class="ml-2.5">
-                                <span class="block text-xs font-bold text-amber-300">Run_Test</span>
-                                <span class="block text-[11px] text-slate-400 mt-0.5">Execute full workflow & agent, skip email dispatch</span>
-                            </div>
-                        </label>
-                        <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
-                            <input type="radio" name="simulation_mode" value="run" class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
-                            <div class="ml-2.5">
-                                <span class="block text-xs font-bold text-emerald-400">Run</span>
-                                <span class="block text-[11px] text-slate-400 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-                <div class="flex justify-end">
-                    <button type="submit"
-                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2">
-                        <span>Trigger Webhook Simulation</span>
-                        <span>&rarr;</span>
-                    </button>
-                </div>
-            </form>
-        </div>
+        {form_container_content}
 
-        <div id="simulation-result"></div>
+        <div id="simulation-result">{initial_result_val}</div>
         "##,
         company_id = company.id,
-        workflow_id = workflow.id,
         workflow_name = workflow.name,
         target_recipient = target_recipient,
-        default_sender = default_sender,
+        form_container_content = form_container_content,
+        initial_result_val = initial_result_val,
     );
 
     base_layout(&format!("Simulate {}", workflow.name), &content)
 }
 
-pub fn workflow_simulation_result_fragment(result: &InboundEmailResult) -> String {
+pub fn resolve_llm_info(
+    workflow: Option<&Workflow>,
+    company: Option<&Company>,
+) -> (String, String, String) {
+    match (workflow, company) {
+        (Some(wf), Some(comp)) => {
+            let wf_cfg = wf.workflow_config.as_ref();
+            let wf_llm = wf_cfg.and_then(|c| c.get("llm"));
+
+            let provider_opt = wf
+                .provider
+                .as_deref()
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| comp.provider.as_deref().filter(|s| !s.trim().is_empty()))
+                .or_else(|| {
+                    wf_llm
+                        .and_then(|l| l.get("provider"))
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.trim().is_empty())
+                });
+
+            let provider_name = provider_opt.unwrap_or("google").to_lowercase();
+            let provider_label = provider_opt
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "google (default)".to_string());
+
+            let model_opt = wf
+                .model
+                .as_deref()
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| comp.model.as_deref().filter(|s| !s.trim().is_empty()))
+                .or_else(|| {
+                    wf_llm
+                        .and_then(|l| l.get("model"))
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.trim().is_empty())
+                });
+
+            let model_label = model_opt
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "gemini-2.5-flash (default)".to_string());
+
+            let key_status = if wf
+                .api_key
+                .as_deref()
+                .filter(|s| !s.trim().is_empty())
+                .is_some()
+            {
+                "<span class=\"text-emerald-400 font-bold\">Configured (Workflow)</span>".to_string()
+            } else if comp
+                .api_key
+                .as_deref()
+                .filter(|s| !s.trim().is_empty())
+                .is_some()
+            {
+                "<span class=\"text-emerald-400 font-bold\">Configured (Company)</span>".to_string()
+            } else if wf_llm
+                .and_then(|l| l.get("api_key"))
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.trim().is_empty())
+                .is_some()
+            {
+                "<span class=\"text-emerald-400 font-bold\">Configured (Workflow Config)</span>".to_string()
+            } else {
+                let env_vars = match provider_name.as_str() {
+                    "google" | "gemini" => "GEMINI_API_KEY / GOOGLE_API_KEY",
+                    "openai" => "OPENAI_API_KEY",
+                    "anthropic" => "ANTHROPIC_API_KEY",
+                    "groq" => "GROQ_API_KEY",
+                    "mistral" => "MISTRAL_API_KEY",
+                    _ => "LLM_API_KEY / API_KEY",
+                };
+
+                let has_env = match provider_name.as_str() {
+                    "google" | "gemini" => {
+                        std::env::var("GEMINI_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some()
+                            || std::env::var("GOOGLE_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some()
+                    }
+                    "openai" => std::env::var("OPENAI_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some(),
+                    "anthropic" => std::env::var("ANTHROPIC_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some(),
+                    "groq" => std::env::var("GROQ_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some(),
+                    "mistral" => std::env::var("MISTRAL_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some(),
+                    _ => {
+                        std::env::var("LLM_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some()
+                            || std::env::var("API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some()
+                    }
+                };
+
+                if has_env {
+                    format!("<span class=\"text-indigo-300 font-bold\">Env Var ({env_vars})</span>")
+                } else {
+                    format!("<span class=\"text-rose-400 font-bold\">Missing / Unset ⚠️ ({env_vars})</span>")
+                }
+            };
+
+            (provider_label, model_label, key_status)
+        }
+        (Some(wf), None) => {
+            let provider = wf.provider.as_deref().unwrap_or("google (default)");
+            let model = wf.model.as_deref().unwrap_or("gemini-2.5-flash (default)");
+            let key_status = if wf.api_key.as_deref().filter(|s| !s.trim().is_empty()).is_some() {
+                "<span class=\"text-emerald-400 font-bold\">Configured (Workflow)</span>".to_string()
+            } else {
+                "<span class=\"text-rose-400 font-bold\">Missing / Unset ⚠️</span>".to_string()
+            };
+            (provider.to_string(), model.to_string(), key_status)
+        }
+        (None, Some(comp)) => {
+            let provider = comp.provider.as_deref().unwrap_or("google (default)");
+            let model = comp.model.as_deref().unwrap_or("gemini-2.5-flash (default)");
+            let key_status = if comp.api_key.as_deref().filter(|s| !s.trim().is_empty()).is_some() {
+                "<span class=\"text-emerald-400 font-bold\">Configured (Company)</span>".to_string()
+            } else {
+                "<span class=\"text-rose-400 font-bold\">Missing / Unset ⚠️</span>".to_string()
+            };
+            (provider.to_string(), model.to_string(), key_status)
+        }
+        _ => (
+            "N/A".to_string(),
+            "N/A".to_string(),
+            "<span class=\"text-slate-400\">Unknown</span>".to_string(),
+        ),
+    }
+}
+
+pub fn workflow_simulation_failure_fragment(
+    company_id: Uuid,
+    workflow_id: Uuid,
+    company: Option<&Company>,
+    workflow: Option<&Workflow>,
+    to_str: &str,
+    from_str: &str,
+    subject_str: &str,
+    error_msg: &str,
+) -> String {
+    let (provider_str, model_str, api_key_status) = resolve_llm_info(workflow, company);
+
+    let company_name = company
+        .map(|c| format!("{} (/{})", c.name, c.slug))
+        .unwrap_or_else(|| "N/A".to_string());
+
+    let workflow_name = workflow
+        .map(|w| format!("{} (/{})", w.name, w.slug))
+        .unwrap_or_else(|| "N/A".to_string());
+
+    let oob_form_swap = format!(
+        r##"
+        <div id="simulation-form-container" hx-swap-oob="outerHTML">
+            <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
+                <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                    <span class="text-rose-400 font-semibold">Simulation Execution Failed</span>
+                </div>
+                <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                   class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                    <span>🔄 Simulate New Thread</span>
+                </a>
+            </div>
+        </div>
+        "##,
+        company_id = company_id,
+        workflow_id = workflow_id,
+    );
+
+    format!(
+        r##"
+        {oob_form_swap}
+        <div class="space-y-4">
+            <div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
+                <span class="text-rose-400 text-lg">✕</span>
+                <span>Simulation Execution Error: {error_msg}</span>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
+                <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2">Failure Execution Details</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Provider:</span>
+                        <span class="text-indigo-300 font-bold">{provider_str}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Model:</span>
+                        <span class="text-indigo-300 font-bold">{model_str}</span>
+                    </div>
+                    <div class="md:col-span-2">
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">API Key Status:</span>
+                        <span>{api_key_status}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
+                        <span class="text-indigo-300">{to_str}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Sender ('from'):</span>
+                        <span class="text-indigo-300">{from_str}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Company:</span>
+                        <span class="text-slate-200">{company_name}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Workflow:</span>
+                        <span class="text-slate-200">{workflow_name}</span>
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-800">
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Subject:</span>
+                    <span class="text-slate-200 font-sans font-medium text-sm">{subject_str}</span>
+                </div>
+
+                <div class="pt-2 border-t border-slate-800">
+                    <span class="text-rose-400 font-sans block text-[11px] uppercase font-semibold mb-1">Error Message:</span>
+                    <div class="bg-slate-950 p-3 rounded-lg text-rose-300 whitespace-pre-wrap border border-rose-800/80 font-mono text-xs">{error_msg}</div>
+                </div>
+            </div>
+        </div>
+        "##,
+        oob_form_swap = oob_form_swap,
+        error_msg = error_msg,
+        provider_str = provider_str,
+        model_str = model_str,
+        api_key_status = api_key_status,
+        to_str = to_str,
+        from_str = from_str,
+        company_name = company_name,
+        workflow_name = workflow_name,
+        subject_str = subject_str,
+    )
+}
+
+pub fn workflow_simulation_result_fragment(
+    company_id: Uuid,
+    workflow_id: Uuid,
+    result: &InboundEmailResult,
+) -> String {
+    let oob_form_swap = format!(
+        r##"
+        <div id="simulation-form-container" hx-swap-oob="outerHTML">
+            <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
+                <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse"></span>
+                    <span>Simulation Completed</span>
+                </div>
+                <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                   class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                    <span>🔄 Simulate New Thread</span>
+                </a>
+            </div>
+        </div>
+        "##,
+        company_id = company_id,
+        workflow_id = workflow_id,
+    );
+
+    let (provider_str, model_str, api_key_status) =
+        resolve_llm_info(result.workflow.as_ref(), result.company.as_ref());
+
     let status_banner = if result.resolved {
         r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-600/60 text-emerald-200 text-sm font-semibold flex items-center gap-2">
             <span class="text-emerald-400 text-lg">✓</span>
@@ -1079,7 +1401,7 @@ pub fn workflow_simulation_result_fragment(result: &InboundEmailResult) -> Strin
         None => "None".to_string(),
     };
 
-    format!(
+    let body_fragment = format!(
         r##"
         <div class="space-y-4">
             {status_banner}
@@ -1087,6 +1409,18 @@ pub fn workflow_simulation_result_fragment(result: &InboundEmailResult) -> Strin
             <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
                 <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2">Simulation Execution Details</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Provider:</span>
+                        <span class="text-indigo-300 font-bold">{provider_str}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Model:</span>
+                        <span class="text-indigo-300 font-bold">{model_str}</span>
+                    </div>
+                    <div class="md:col-span-2">
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">API Key Status:</span>
+                        <span>{api_key_status}</span>
+                    </div>
                     <div>
                         <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
                         <span class="text-indigo-300">{to}</span>
@@ -1123,6 +1457,9 @@ pub fn workflow_simulation_result_fragment(result: &InboundEmailResult) -> Strin
         </div>
         "##,
         status_banner = status_banner,
+        provider_str = provider_str,
+        model_str = model_str,
+        api_key_status = api_key_status,
         to = result.email.to,
         from = result.email.from,
         company_name = company_name,
@@ -1130,13 +1467,47 @@ pub fn workflow_simulation_result_fragment(result: &InboundEmailResult) -> Strin
         subject_str = subject_str,
         body_str = body_str,
         workflow_config_str = workflow_config_str,
-    )
+    );
+
+    format!("{oob_form_swap}\n{body_fragment}")
 }
 
 pub fn workflow_simulation_execution_result_fragment(
+    company_id: Uuid,
+    workflow_id: Uuid,
     sim_res: &SimulationExecutionResult,
+    messages: &[Message],
 ) -> String {
     let ingest = &sim_res.ingest_result;
+    let (provider_str, model_str, api_key_status) =
+        resolve_llm_info(ingest.workflow.as_ref(), ingest.company.as_ref());
+
+    let thread_id_str = ingest
+        .thread
+        .as_ref()
+        .map(|t| t.id.to_string())
+        .unwrap_or_else(|| "N/A".to_string());
+
+    let oob_form_swap = format!(
+        r##"
+        <div id="simulation-form-container" hx-swap-oob="outerHTML">
+            <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
+                <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Simulation Thread Active</span>
+                    <span class="text-xs text-slate-400 font-mono">({thread_id_str})</span>
+                </div>
+                <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                   class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                    <span>🔄 Simulate New Thread</span>
+                </a>
+            </div>
+        </div>
+        "##,
+        company_id = company_id,
+        workflow_id = workflow_id,
+        thread_id_str = thread_id_str,
+    );
 
     if !ingest.accepted {
         let reason = ingest
@@ -1144,13 +1515,50 @@ pub fn workflow_simulation_execution_result_fragment(
             .as_deref()
             .unwrap_or("Ingestion failed / unauthorized");
         return format!(
-            r#"<div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
-                <span class="text-rose-400 text-lg">✕</span>
-                <span>Webhook Ingestion Rejected: {}</span>
-            </div>"#,
-            reason
+            r##"
+            {oob_form_swap}
+            <div class="space-y-4">
+                <div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
+                    <span class="text-rose-400 text-lg">✕</span>
+                    <span>Webhook Ingestion Rejected: {reason}</span>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
+                    <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2">Rejection Execution Details</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Provider:</span>
+                            <span class="text-indigo-300 font-bold">{provider_str}</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Model:</span>
+                            <span class="text-indigo-300 font-bold">{model_str}</span>
+                        </div>
+                        <div class="md:col-span-2">
+                            <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">API Key Status:</span>
+                            <span>{api_key_status}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            "##,
+            oob_form_swap = oob_form_swap,
+            reason = reason,
+            provider_str = provider_str,
+            model_str = model_str,
+            api_key_status = api_key_status,
         );
     }
+
+    let agent_exec = sim_res.agent_execution.as_ref();
+    let agent_response_text = agent_exec
+        .map(|a| a.agent_response.as_str())
+        .unwrap_or("(No response generated)");
+
+    let agent_lower = agent_response_text.to_lowercase();
+    let is_agent_error = agent_lower.contains("failed")
+        || agent_lower.contains("error")
+        || agent_lower.contains("missing");
 
     let mode_label = match sim_res.simulation_mode {
         SimulationMode::Verify => "Verify",
@@ -1158,32 +1566,33 @@ pub fn workflow_simulation_execution_result_fragment(
         SimulationMode::Run => "Run (Live)",
     };
 
-    let status_banner = match sim_res.simulation_mode {
-        SimulationMode::RunTest => {
-            r#"<div class="p-4 rounded-xl bg-amber-950/80 border border-amber-600/60 text-amber-200 text-sm font-semibold flex items-center gap-2">
-                <span class="text-amber-400 text-lg">⚡</span>
-                <span>Workflow Executed Successfully in Run_Test Mode! (Outbound email send was skipped / dry-run)</span>
-            </div>"#
-        }
-        SimulationMode::Run => {
-            r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-600/60 text-emerald-200 text-sm font-semibold flex items-center gap-2">
-                <span class="text-emerald-400 text-lg">✓</span>
-                <span>Workflow Executed & Outbound Email Dispatched Successfully!</span>
-            </div>"#
-        }
-        SimulationMode::Verify => {
-            r#"<div class="p-4 rounded-xl bg-indigo-950/80 border border-indigo-600/60 text-indigo-200 text-sm font-semibold flex items-center gap-2">
-                <span class="text-indigo-400 text-lg">✓</span>
-                <span>Verification Check Passed!</span>
-            </div>"#
+    let status_banner = if is_agent_error {
+        r#"<div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
+            <span class="text-rose-400 text-lg">✕</span>
+            <span>Workflow Simulation Execution Failed! (Agent Error)</span>
+        </div>"#
+    } else {
+        match sim_res.simulation_mode {
+            SimulationMode::RunTest => {
+                r#"<div class="p-4 rounded-xl bg-amber-950/80 border border-amber-600/60 text-amber-200 text-sm font-semibold flex items-center gap-2">
+                    <span class="text-amber-400 text-lg">⚡</span>
+                    <span>Workflow Executed Successfully in Run_Test Mode! (Outbound email send was skipped / dry-run)</span>
+                </div>"#
+            }
+            SimulationMode::Run => {
+                r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-600/60 text-emerald-200 text-sm font-semibold flex items-center gap-2">
+                    <span class="text-emerald-400 text-lg">✓</span>
+                    <span>Workflow Executed & Outbound Email Dispatched Successfully!</span>
+                </div>"#
+            }
+            SimulationMode::Verify => {
+                r#"<div class="p-4 rounded-xl bg-indigo-950/80 border border-indigo-600/60 text-indigo-200 text-sm font-semibold flex items-center gap-2">
+                    <span class="text-indigo-400 text-lg">✓</span>
+                    <span>Verification Check Passed!</span>
+                </div>"#
+            }
         }
     };
-
-    let thread_id_str = ingest
-        .thread
-        .as_ref()
-        .map(|t| t.id.to_string())
-        .unwrap_or_else(|| "N/A".to_string());
 
     let inbound_msg_id = ingest
         .inbound_message
@@ -1213,16 +1622,13 @@ pub fn workflow_simulation_execution_result_fragment(
         .map(|p| p.clean_text_body.as_str())
         .unwrap_or("(No text body)");
 
-    let agent_exec = sim_res.agent_execution.as_ref();
     let outbound_msg_id = agent_exec
         .and_then(|a| a.outbound_message_id.clone())
         .unwrap_or_else(|| "N/A".to_string());
 
-    let agent_response_text = agent_exec
-        .map(|a| a.agent_response.as_str())
-        .unwrap_or("(No response generated)");
-
-    let email_status = if sim_res.simulation_mode == SimulationMode::RunTest {
+    let email_status = if is_agent_error {
+        "<span class=\"text-rose-400 font-bold\">Failed (Execution Error)</span>"
+    } else if sim_res.simulation_mode == SimulationMode::RunTest {
         "<span class=\"text-amber-400 font-bold\">Skipped (Run_Test Dry-Run)</span>"
     } else if sim_res.simulation_mode == SimulationMode::Run {
         "<span class=\"text-emerald-400 font-bold\">Dispatched via SMTP</span>"
@@ -1230,72 +1636,94 @@ pub fn workflow_simulation_execution_result_fragment(
         "<span class=\"text-slate-400 font-bold\">None (Verify Only)</span>"
     };
 
-    format!(
+    let response_label = if is_agent_error {
+        "<span class=\"text-rose-400 font-sans block text-[11px] uppercase font-semibold mb-1\">Execution Error Details:</span>"
+    } else {
+        "<span class=\"text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1\">Generated AI Agent Response:</span>"
+    };
+
+    let response_style = if is_agent_error {
+        "bg-slate-950 p-3 rounded-lg text-rose-300 whitespace-pre-wrap border border-rose-800/80 font-mono text-xs"
+    } else {
+        "bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 font-sans text-xs"
+    };
+
+    let exec_details = format!(
         r##"
-        <div class="space-y-4">
-            {status_banner}
-
-            <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
-                <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2">Full Execution Details</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Mode:</span>
-                        <span class="text-indigo-300 font-bold">{mode_label}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Email Dispatch Status:</span>
-                        <span>{email_status}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
-                        <span class="text-indigo-300">{to_str}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Sender ('from'):</span>
-                        <span class="text-indigo-300">{from_str}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Company:</span>
-                        <span class="text-slate-200">{company_name}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Workflow:</span>
-                        <span class="text-slate-200">{workflow_name}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Thread ID:</span>
-                        <span class="text-emerald-300 font-mono">{thread_id_str}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Inbound Message ID:</span>
-                        <span class="text-slate-300 font-mono">{inbound_msg_id}</span>
-                    </div>
-                    <div class="md:col-span-2">
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Outbound Agent Message ID:</span>
-                        <span class="text-indigo-300 font-mono">{outbound_msg_id}</span>
-                    </div>
-                </div>
-
-                <div class="pt-2 border-t border-slate-800">
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Subject:</span>
-                    <span class="text-slate-200 font-sans font-medium text-sm">{subject_str}</span>
-                </div>
-
+        <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
+            <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2">Full Execution Details</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Inbound Text Body:</span>
-                    <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800">{text_body_str}</div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Mode:</span>
+                    <span class="text-indigo-300 font-bold">{mode_label}</span>
                 </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Email Dispatch Status:</span>
+                    <span>{email_status}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Provider:</span>
+                    <span class="text-indigo-300 font-bold">{provider_str}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Model:</span>
+                    <span class="text-indigo-300 font-bold">{model_str}</span>
+                </div>
+                <div class="md:col-span-2">
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">API Key Status:</span>
+                    <span>{api_key_status}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
+                    <span class="text-indigo-300">{to_str}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Sender ('from'):</span>
+                    <span class="text-indigo-300">{from_str}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Company:</span>
+                    <span class="text-slate-200">{company_name}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Workflow:</span>
+                    <span class="text-slate-200">{workflow_name}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Thread ID:</span>
+                    <span class="text-emerald-300 font-mono">{thread_id_str}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Inbound Message ID:</span>
+                    <span class="text-slate-300 font-mono">{inbound_msg_id}</span>
+                </div>
+                <div class="md:col-span-2">
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Outbound Agent Message ID:</span>
+                    <span class="text-indigo-300 font-mono">{outbound_msg_id}</span>
+                </div>
+            </div>
 
-                <div class="pt-2 border-t border-slate-800">
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Generated AI Agent Response:</span>
-                    <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 font-sans">{agent_response_text}</div>
-                </div>
+            <div class="pt-2 border-t border-slate-800">
+                <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Subject:</span>
+                <span class="text-slate-200 font-sans font-medium text-sm">{subject_str}</span>
+            </div>
+
+            <div>
+                <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Inbound Text Body:</span>
+                <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800">{text_body_str}</div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-800">
+                {response_label}
+                <div class="{response_style}">{agent_response_text}</div>
             </div>
         </div>
         "##,
-        status_banner = status_banner,
         mode_label = mode_label,
         email_status = email_status,
+        provider_str = provider_str,
+        model_str = model_str,
+        api_key_status = api_key_status,
         to_str = to_str,
         from_str = from_str,
         company_name = company_name,
@@ -1305,8 +1733,546 @@ pub fn workflow_simulation_execution_result_fragment(
         outbound_msg_id = outbound_msg_id,
         subject_str = subject_str,
         text_body_str = text_body_str,
+        response_label = response_label,
+        response_style = response_style,
         agent_response_text = agent_response_text,
-    )
+    );
+
+    let messages_section = if messages.is_empty() {
+        String::new()
+    } else {
+        let mut msgs_html = String::new();
+        for msg in messages {
+            let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
+            let created_at_fmt = msg.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+
+            if is_agent {
+                msgs_html.push_str(&format!(
+                    r##"
+                    <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 space-y-2 shadow-sm">
+                        <div class="flex items-center justify-between border-b border-indigo-500/20 pb-2 text-xs">
+                            <div class="flex items-center gap-2 font-semibold text-indigo-300">
+                                <span>🤖</span>
+                                <span>AI Agent Response</span>
+                                <span class="px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-200 text-[10px] uppercase font-mono">Outbound</span>
+                            </div>
+                            <span class="text-slate-400 font-mono text-[11px]">{created_at}</span>
+                        </div>
+                        <div class="text-xs font-mono text-slate-400">
+                            <span>Message ID: </span><span class="text-indigo-200">{msg_id}</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-xs font-sans">
+                            {body}
+                        </div>
+                    </div>
+                    "##,
+                    created_at = created_at_fmt,
+                    msg_id = msg.message_id,
+                    body = msg.clean_text_body,
+                ));
+            } else {
+                msgs_html.push_str(&format!(
+                    r##"
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow-sm">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2 text-xs">
+                            <div class="flex items-center gap-2 font-semibold text-slate-200">
+                                <span>👤</span>
+                                <span>Inbound Email</span>
+                                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] uppercase font-mono">Inbound</span>
+                            </div>
+                            <span class="text-slate-400 font-mono text-[11px]">{created_at}</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono text-slate-400">
+                            <div>From: <span class="text-indigo-300">{sender}</span></div>
+                            <div>Message ID: <span class="text-slate-300">{msg_id}</span></div>
+                        </div>
+                        <div class="text-xs font-medium text-slate-200 pt-1">
+                            Subject: <span class="font-normal text-slate-300">{subject}</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800 text-xs">
+                            {body}
+                        </div>
+                    </div>
+                    "##,
+                    created_at = created_at_fmt,
+                    sender = msg.sender,
+                    msg_id = msg.message_id,
+                    subject = msg.subject,
+                    body = msg.clean_text_body,
+                ));
+            }
+        }
+
+        let msg_count = messages.len();
+        let label = if msg_count == 1 { "message" } else { "messages" };
+        format!(
+            r##"
+            <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 space-y-4 shadow-lg">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h4 class="text-sm font-sans font-bold text-white flex items-center gap-2">
+                        <span>💬</span> Thread History ({msg_count} {label})
+                    </h4>
+                    <span class="text-xs font-mono text-emerald-400">Thread ID: {thread_id_str}</span>
+                </div>
+                <div class="space-y-3">
+                    {msgs_html}
+                </div>
+            </div>
+            "##,
+            msg_count = msg_count,
+            label = label,
+            thread_id_str = thread_id_str,
+            msgs_html = msgs_html,
+        )
+    };
+
+    let last_msg_id = messages
+        .last()
+        .map(|m| m.message_id.clone())
+        .or_else(|| {
+            sim_res
+                .agent_execution
+                .as_ref()
+                .and_then(|a| a.outbound_message_id.clone())
+        })
+        .or_else(|| {
+            ingest
+                .inbound_message
+                .as_ref()
+                .map(|m| m.message_id.clone())
+        })
+        .unwrap_or_default();
+
+    let reply_subject = if subject_str.to_lowercase().starts_with("re:") {
+        subject_str.to_string()
+    } else {
+        format!("Re: {}", subject_str)
+    };
+
+    let run_test_checked = if sim_res.simulation_mode == SimulationMode::RunTest {
+        "checked"
+    } else {
+        ""
+    };
+    let run_checked = if sim_res.simulation_mode == SimulationMode::Run {
+        "checked"
+    } else {
+        ""
+    };
+
+    let reply_form = format!(
+        r##"
+        <div class="bg-slate-900/90 border border-indigo-500/40 rounded-xl p-5 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span class="text-indigo-400 text-base">↩️</span> Simulate Reply Webhook Call
+                </h3>
+                <span class="text-xs text-slate-400">Simulate next message in Thread <span class="font-mono text-indigo-300">{thread_id_str}</span></span>
+            </div>
+
+            <form hx-post="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                  hx-target="#simulation-result"
+                  hx-swap="innerHTML"
+                  class="space-y-4">
+                <input type="hidden" name="in_reply_to" value="{last_msg_id}">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="to_reply" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
+                        <input type="text" id="to_reply" name="to" value="{to_str}" required
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label for="from_reply" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
+                        <input type="text" id="from_reply" name="from" value="{from_str}" required
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="subject_reply" class="block text-xs font-medium text-slate-300 mb-1">Subject</label>
+                    <input type="text" id="subject_reply" name="subject" value="{reply_subject}" required
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div>
+                    <label for="text_body_reply" class="block text-xs font-medium text-slate-300 mb-1">Reply Text Body</label>
+                    <textarea id="text_body_reply" name="text_body" rows="3" required placeholder="Type your reply message here..."
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
+                            <input type="radio" name="simulation_mode" value="run_test" {run_test_checked} class="mt-0.5 text-amber-500 focus:ring-amber-500">
+                            <div class="ml-2.5">
+                                <span class="block text-xs font-bold text-amber-300">Run_Test</span>
+                                <span class="block text-[11px] text-slate-400 mt-0.5">Execute full workflow & agent, skip email dispatch</span>
+                            </div>
+                        </label>
+                        <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
+                            <input type="radio" name="simulation_mode" value="run" {run_checked} class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
+                            <div class="ml-2.5">
+                                <span class="block text-xs font-bold text-emerald-400">Run</span>
+                                <span class="block text-[11px] text-slate-400 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-1">
+                    <button type="submit"
+                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2">
+                        <span>Trigger Reply Webhook Simulation</span>
+                        <span>&rarr;</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+        "##,
+        company_id = company_id,
+        workflow_id = workflow_id,
+        thread_id_str = thread_id_str,
+        last_msg_id = last_msg_id,
+        to_str = to_str,
+        from_str = from_str,
+        reply_subject = reply_subject,
+        run_test_checked = run_test_checked,
+        run_checked = run_checked,
+    );
+
+    format!("{oob_form_swap}\n<div class=\"space-y-6\">\n{status_banner}\n{exec_details}\n{messages_section}\n{reply_form}\n</div>")
+}
+
+pub fn workflow_simulation_loaded_thread_fragment(
+    company: &Company,
+    workflow: &Workflow,
+    app_domain_name: &str,
+    thread: &Thread,
+    messages: &[Message],
+    include_oob: bool,
+) -> String {
+    let company_id = company.id;
+    let workflow_id = workflow.id;
+    let thread_id_str = thread.id.to_string();
+    let target_recipient = format!("{}@{}.{}", workflow.slug, company.slug, app_domain_name);
+
+    let default_sender = thread
+        .participant_emails
+        .first()
+        .cloned()
+        .or_else(|| {
+            workflow
+                .participant_emails
+                .as_ref()
+                .and_then(|e| e.first().cloned())
+        })
+        .unwrap_or_else(|| "sender@example.com".to_string());
+
+    let oob_form_swap = format!(
+        r##"
+        <div id="simulation-form-container" hx-swap-oob="outerHTML">
+            <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
+                <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Thread Loaded & Active</span>
+                    <span class="text-xs text-slate-400 font-mono">({thread_id_str})</span>
+                </div>
+                <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                   class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                    <span>🔄 Simulate New Thread</span>
+                </a>
+            </div>
+        </div>
+        "##,
+        company_id = company_id,
+        workflow_id = workflow_id,
+        thread_id_str = thread_id_str,
+    );
+
+    let created_at_fmt = thread.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+    let updated_at_fmt = thread.updated_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+    let participants_str = if thread.participant_emails.is_empty() {
+        "None recorded".to_string()
+    } else {
+        thread.participant_emails.join(", ")
+    };
+
+    let overview_card = format!(
+        r##"
+        <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg mb-6">
+            <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2 flex items-center justify-between">
+                <span>Loaded Thread Details</span>
+                <span class="text-emerald-400 text-xs font-mono">ID: {thread_id_str}</span>
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Subject:</span>
+                    <span class="text-slate-200 font-bold">{subject}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Workflow Address:</span>
+                    <span class="text-indigo-300">{target_recipient}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Participants:</span>
+                    <span class="text-slate-300">{participants_str}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Total Messages:</span>
+                    <span class="text-emerald-300 font-bold">{msg_count}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Created At:</span>
+                    <span class="text-slate-400">{created_at_fmt}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Last Updated:</span>
+                    <span class="text-slate-400">{updated_at_fmt}</span>
+                </div>
+            </div>
+        </div>
+        "##,
+        thread_id_str = thread_id_str,
+        subject = thread.subject,
+        target_recipient = target_recipient,
+        participants_str = participants_str,
+        msg_count = messages.len(),
+        created_at_fmt = created_at_fmt,
+        updated_at_fmt = updated_at_fmt,
+    );
+
+    let messages_section = if messages.is_empty() {
+        r#"<div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 shadow-lg text-slate-400 text-xs text-center mb-6">No messages recorded in this thread yet.</div>"#.to_string()
+    } else {
+        let mut msgs_html = String::new();
+        for msg in messages {
+            let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
+            let msg_created_at = msg.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+
+            if is_agent {
+                msgs_html.push_str(&format!(
+                    r##"
+                    <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 space-y-2 shadow-sm">
+                        <div class="flex items-center justify-between border-b border-indigo-500/20 pb-2 text-xs">
+                            <div class="flex items-center gap-2 font-semibold text-indigo-300">
+                                <span>🤖</span>
+                                <span>AI Agent Response</span>
+                                <span class="px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-200 text-[10px] uppercase font-mono">Outbound</span>
+                            </div>
+                            <span class="text-slate-400 font-mono text-[11px]">{created_at}</span>
+                        </div>
+                        <div class="text-xs font-mono text-slate-400">
+                            <span>Message ID: </span><span class="text-indigo-200">{msg_id}</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-xs font-sans">
+                            {body}
+                        </div>
+                    </div>
+                    "##,
+                    created_at = msg_created_at,
+                    msg_id = msg.message_id,
+                    body = msg.clean_text_body,
+                ));
+            } else {
+                msgs_html.push_str(&format!(
+                    r##"
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow-sm">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2 text-xs">
+                            <div class="flex items-center gap-2 font-semibold text-slate-200">
+                                <span>👤</span>
+                                <span>Inbound Email</span>
+                                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] uppercase font-mono">Inbound</span>
+                            </div>
+                            <span class="text-slate-400 font-mono text-[11px]">{created_at}</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono text-slate-400">
+                            <div>From: <span class="text-indigo-300">{sender}</span></div>
+                            <div>Message ID: <span class="text-slate-300">{msg_id}</span></div>
+                        </div>
+                        <div class="text-xs font-medium text-slate-200 pt-1">
+                            Subject: <span class="font-normal text-slate-300">{subject}</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800 text-xs">
+                            {body}
+                        </div>
+                    </div>
+                    "##,
+                    created_at = msg_created_at,
+                    sender = msg.sender,
+                    msg_id = msg.message_id,
+                    subject = msg.subject,
+                    body = msg.clean_text_body,
+                ));
+            }
+        }
+
+        let msg_count = messages.len();
+        let label = if msg_count == 1 { "message" } else { "messages" };
+        format!(
+            r##"
+            <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 space-y-4 shadow-lg mb-6">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h4 class="text-sm font-sans font-bold text-white flex items-center gap-2">
+                        <span>💬</span> Thread History ({msg_count} {label})
+                    </h4>
+                    <span class="text-xs font-mono text-emerald-400">Thread ID: {thread_id_str}</span>
+                </div>
+                <div class="space-y-3">
+                    {msgs_html}
+                </div>
+            </div>
+            "##,
+            msg_count = msg_count,
+            label = label,
+            thread_id_str = thread_id_str,
+            msgs_html = msgs_html,
+        )
+    };
+
+    let last_msg_id = messages
+        .last()
+        .map(|m| m.message_id.clone())
+        .unwrap_or_default();
+
+    let reply_subject = if thread.subject.to_lowercase().starts_with("re:") {
+        thread.subject.clone()
+    } else {
+        format!("Re: {}", thread.subject)
+    };
+
+    let reply_form = format!(
+        r##"
+        <div class="bg-slate-900/90 border border-indigo-500/40 rounded-xl p-5 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span class="text-indigo-400 text-base">↩️</span> Simulate Reply Webhook Call
+                </h3>
+                <span class="text-xs text-slate-400">Simulate next message in Thread <span class="font-mono text-indigo-300">{thread_id_str}</span></span>
+            </div>
+
+            <form hx-post="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                  hx-target="#simulation-result"
+                  hx-swap="innerHTML"
+                  class="space-y-4">
+                <input type="hidden" name="in_reply_to" value="{last_msg_id}">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="to_reply" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
+                        <input type="text" id="to_reply" name="to" value="{target_recipient}" required
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label for="from_reply" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
+                        <input type="text" id="from_reply" name="from" value="{default_sender}" required
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="subject_reply" class="block text-xs font-medium text-slate-300 mb-1">Subject</label>
+                    <input type="text" id="subject_reply" name="subject" value="{reply_subject}" required
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div>
+                    <label for="text_body_reply" class="block text-xs font-medium text-slate-300 mb-1">Reply Text Body</label>
+                    <textarea id="text_body_reply" name="text_body" rows="3" required placeholder="Type your reply message here..."
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
+                            <input type="radio" name="simulation_mode" value="run_test" checked class="mt-0.5 text-amber-500 focus:ring-amber-500">
+                            <div class="ml-2.5">
+                                <span class="block text-xs font-bold text-amber-300">Run_Test</span>
+                                <span class="block text-[11px] text-slate-400 mt-0.5">Execute full workflow & agent, skip email dispatch</span>
+                            </div>
+                        </label>
+                        <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
+                            <input type="radio" name="simulation_mode" value="run" class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
+                            <div class="ml-2.5">
+                                <span class="block text-xs font-bold text-emerald-400">Run</span>
+                                <span class="block text-[11px] text-slate-400 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="submit"
+                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2">
+                        <span>Simulate Reply Webhook Call</span>
+                        <span>&rarr;</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+        "##,
+        company_id = company_id,
+        workflow_id = workflow_id,
+        thread_id_str = thread_id_str,
+        last_msg_id = last_msg_id,
+        target_recipient = target_recipient,
+        default_sender = default_sender,
+        reply_subject = reply_subject,
+    );
+
+    if include_oob {
+        format!("{oob_form_swap}\n{overview_card}\n{messages_section}\n{reply_form}")
+    } else {
+        format!("{overview_card}\n{messages_section}\n{reply_form}")
+    }
+}
+
+pub fn workflow_simulation_thread_error_fragment(
+    company_id: Uuid,
+    workflow_id: Uuid,
+    thread_id_input: &str,
+    error_msg: &str,
+    include_oob: bool,
+) -> String {
+    let oob_form_swap = format!(
+        r##"
+        <div id="simulation-form-container" hx-swap-oob="outerHTML">
+            <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
+                <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                    <span class="text-rose-400 font-semibold">Failed to Load Thread</span>
+                </div>
+                <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                   class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                    <span>🔄 Simulate New Thread</span>
+                </a>
+            </div>
+        </div>
+        "##,
+        company_id = company_id,
+        workflow_id = workflow_id,
+    );
+
+    let error_body = format!(
+        r##"
+        <div class="space-y-4">
+            <div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
+                <span class="text-rose-400 text-lg">✕</span>
+                <span>Error Loading Thread ({thread_id_input}): {error_msg}</span>
+            </div>
+        </div>
+        "##,
+        thread_id_input = thread_id_input,
+        error_msg = error_msg,
+    );
+
+    if include_oob {
+        format!("{oob_form_swap}\n{error_body}")
+    } else {
+        error_body
+    }
 }
 
 pub fn company_tasks_page(
@@ -1479,6 +2445,29 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
         _ => String::new(),
     };
 
+    let simulation_link = match task.thread_id {
+        Some(tid) => format!(
+            r##"<a href="/companies/{company_id}/workflows/{workflow_id}/simulate?thread_id={tid}"
+                class="px-3 py-1.5 text-xs font-semibold bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-lg transition flex items-center gap-1 shadow-sm whitespace-nowrap">
+                <span>⚡ Open Simulation</span>
+            </a>"##,
+            company_id = company_id,
+            workflow_id = task.workflow_id,
+            tid = tid
+        ),
+        None => String::new(),
+    };
+
+    let thread_info = match task.thread_id {
+        Some(tid) => format!(
+            r##" • Thread: <a href="/companies/{company_id}/workflows/{workflow_id}/simulate?thread_id={tid}" class="font-mono text-emerald-400 hover:text-emerald-300 underline font-medium">{tid}</a>"##,
+            company_id = company_id,
+            workflow_id = task.workflow_id,
+            tid = tid
+        ),
+        None => String::new(),
+    };
+
     let error_html = match &task.last_error {
         Some(err) if !err.is_empty() => format!(
             r##"<div class="mt-2 text-xs font-mono bg-slate-950/80 p-2 rounded border border-rose-900/50 text-rose-300">Error: {err}</div>"##
@@ -1496,9 +2485,10 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
                         {status_badge}
                         <span class="text-xs text-slate-400 font-mono">Retries: {retry_count}/{max_retries}</span>
                     </div>
-                    <p class="text-xs text-slate-400 mt-1">Type: <span class="font-mono text-indigo-300">{task_type}</span> • Enqueued {created_at_str}</p>
+                    <p class="text-xs text-slate-400 mt-1">Type: <span class="font-mono text-indigo-300">{task_type}</span> • Enqueued {created_at_str}{thread_info}</p>
                 </div>
                 <div class="flex items-center gap-2">
+                    {simulation_link}
                     {action_button}
                 </div>
             </div>
@@ -1511,6 +2501,8 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
         max_retries = task.max_retries,
         task_type = task.task_type,
         created_at_str = created_at_str,
+        thread_info = thread_info,
+        simulation_link = simulation_link,
         action_button = action_button,
         error_html = error_html,
     )
