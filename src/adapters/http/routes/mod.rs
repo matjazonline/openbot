@@ -1,5 +1,6 @@
 pub mod company;
 pub mod company_invite;
+pub mod task;
 pub mod user;
 pub mod webhooks;
 pub mod workflow;
@@ -13,6 +14,7 @@ pub fn router() -> Router<AppState> {
         .merge(user::router())
         .merge(company::router())
         .merge(company_invite::router())
+        .merge(task::router())
         .merge(workflow::router())
         .merge(webhooks::router())
 }

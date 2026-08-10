@@ -87,5 +87,6 @@ pub struct Message {
     pub attachments: Option<Vec<AttachmentMetadata>>,
     pub direction: MessageDirection,
     pub role: MessageRole,
+    pub thread_index: Option<String>,
     pub created_at: chrono::NaiveDateTime,
 }

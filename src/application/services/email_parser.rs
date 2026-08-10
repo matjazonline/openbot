@@ -1,14 +1,20 @@
 use htmd::HtmlToMarkdown;
 use sha2::{Digest, Sha256};
+use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::entities::message::AttachmentMetadata;
 
-#[derive(Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+pub const MAX_WORKFLOW_HOPS: u32 = 5;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedEmail {
     pub message_id: String,
     pub in_reply_to: Option<String>,
     pub references: Vec<String>,
+    pub thread_index: Option<String>,
     pub sender: String,
     pub recipients_to: Vec<String>,
     pub recipients_cc: Vec<String>,
@@ -18,6 +24,14 @@ pub struct ParsedEmail {
     pub raw_html_body: Option<String>,
     pub attachments: Vec<AttachmentMetadata>,
     pub prompt_text: String,
+    pub is_auto_reply: bool,
+    pub is_forwarded: bool,
+    pub workflow_id_header: Option<Uuid>,
+    pub hop_count: u32,
+    pub trace_workflows: Vec<Uuid>,
+    pub spf_status: Option<String>,
+    pub dkim_status: Option<String>,
+    pub spam_score: Option<f64>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -29,6 +43,9 @@ pub struct RawInboundPayload {
     pub text: Option<String>,
     pub html: Option<String>,
     pub headers: Option<String>,
+    pub spf: Option<String>,
+    pub dkim: Option<String>,
+    pub spam_score: Option<f64>,
     pub attachments_data: Vec<RawAttachmentData>,
 }
 
@@ -43,10 +60,19 @@ pub struct EmailParser;
 
 impl EmailParser {
     pub fn parse(payload: RawInboundPayload, app_domain: &str) -> ParsedEmail {
-        let (extracted_msg_id, in_reply_to, references) = if let Some(ref hdrs) = payload.headers {
+        let (
+            extracted_msg_id,
+            in_reply_to,
+            references,
+            thread_index,
+            is_auto_reply_from_headers,
+            workflow_id_header,
+            hop_count,
+            trace_workflows,
+        ) = if let Some(ref hdrs) = payload.headers {
             Self::parse_headers(hdrs)
         } else {
-            (None, None, Vec::new())
+            (None, None, Vec::new(), None, false, None, 0, Vec::new())
         };
 
         let message_id = extracted_msg_id.unwrap_or_else(|| {
@@ -62,8 +88,14 @@ impl EmailParser {
             .unwrap_or_default();
 
         let subject = payload.subject.unwrap_or_else(|| "No Subject".to_string());
+        let is_auto_reply_from_subject = Self::is_auto_reply_subject(&subject);
+        let is_auto_reply = is_auto_reply_from_headers || is_auto_reply_from_subject;
+
         let raw_text = payload.text.clone();
         let raw_html = payload.html.clone();
+
+        // Check if forwarded email
+        let is_forwarded = Self::is_forwarded_email(&subject, raw_text.as_deref().unwrap_or_default());
 
         // Convert HTML to Markdown if text is missing or as fallback
         let base_text = if let Some(ref text) = raw_text {
@@ -80,18 +112,24 @@ impl EmailParser {
             String::new()
         };
 
-        // Strip quotes via heuristic
-        let clean_text_body = Self::strip_quotes_heuristic(&base_text);
+        // If email is forwarded, bypass quote stripping so original forwarded content is kept
+        let clean_text_body = if is_forwarded {
+            base_text.trim().to_string()
+        } else {
+            Self::strip_quotes_heuristic(&base_text)
+        };
 
-        // Process attachments
+        // Process attachments - Filter small inline signature images (< 10KB images)
         let mut attachments = Vec::new();
         let mut attachment_prompts = Vec::new();
 
         for att in payload.attachments_data {
+            let size = att.content.len();
+            let is_small_image = att.content_type.to_lowercase().starts_with("image/") && size < 10_000;
+
             let mut hasher = Sha256::new();
             hasher.update(&att.content);
             let hash_hex = format!("{:x}", hasher.finalize());
-            let size = att.content.len();
 
             let meta = AttachmentMetadata {
                 filename: att.filename.clone(),
@@ -101,12 +139,15 @@ impl EmailParser {
                 storage_url: None,
             };
 
-            attachment_prompts.push(format!(
-                "[Attachment: {}, Type: {}, SHA256: {}, Size: {} bytes]",
-                meta.filename, meta.content_type, hash_hex, size
-            ));
+            attachments.push(meta.clone());
 
-            attachments.push(meta);
+            // Only add document/significant attachments to prompt context
+            if !is_small_image {
+                attachment_prompts.push(format!(
+                    "[Attachment: {}, Type: {}, SHA256: {}, Size: {} bytes]",
+                    meta.filename, meta.content_type, hash_hex, size
+                ));
+            }
         }
 
         let prompt_text = if attachment_prompts.is_empty() {
@@ -123,6 +164,7 @@ impl EmailParser {
             message_id,
             in_reply_to,
             references,
+            thread_index,
             sender,
             recipients_to,
             recipients_cc,
@@ -132,6 +174,14 @@ impl EmailParser {
             raw_html_body: raw_html,
             attachments,
             prompt_text,
+            is_auto_reply,
+            is_forwarded,
+            workflow_id_header,
+            hop_count,
+            trace_workflows,
+            spf_status: payload.spf,
+            dkim_status: payload.dkim,
+            spam_score: payload.spam_score,
         }
     }
 
@@ -140,10 +190,26 @@ impl EmailParser {
         converter.convert(html).unwrap_or_else(|_| html.to_string())
     }
 
-    pub fn parse_headers(headers_str: &str) -> (Option<String>, Option<String>, Vec<String>) {
+    pub fn parse_headers(
+        headers_str: &str,
+    ) -> (
+        Option<String>,
+        Option<String>,
+        Vec<String>,
+        Option<String>,
+        bool,
+        Option<Uuid>,
+        u32,
+        Vec<Uuid>,
+    ) {
         let mut message_id = None;
         let mut in_reply_to = None;
         let mut references = Vec::new();
+        let mut thread_index = None;
+        let mut is_auto_reply = false;
+        let mut workflow_id_header = None;
+        let mut hop_count = 0u32;
+        let mut trace_workflows = Vec::new();
 
         for line in headers_str.lines() {
             let line = line.trim();
@@ -151,21 +217,83 @@ impl EmailParser {
                 continue;
             }
 
-            if line.to_lowercase().starts_with("message-id:") {
+            let lower = line.to_lowercase();
+
+            if lower.starts_with("message-id:") {
                 message_id = Some(line["message-id:".len()..].trim().to_string());
-            } else if line.to_lowercase().starts_with("in-reply-to:") {
+            } else if lower.starts_with("in-reply-to:") {
                 in_reply_to = Some(line["in-reply-to:".len()..].trim().to_string());
-            } else if line.to_lowercase().starts_with("references:") {
+            } else if lower.starts_with("references:") {
                 let refs_str = line["references:".len()..].trim();
                 references = refs_str
                     .split_whitespace()
                     .map(|s| s.trim().to_string())
                     .filter(|s| !s.is_empty())
                     .collect();
+            } else if lower.starts_with("thread-index:") {
+                thread_index = Some(line["thread-index:".len()..].trim().to_string());
+            } else if lower.starts_with("x-mailagents-workflow-id:") {
+                let val = line["x-mailagents-workflow-id:".len()..].trim();
+                workflow_id_header = Uuid::from_str(val).ok();
+            } else if lower.starts_with("x-mailagents-hop-count:") {
+                let val = line["x-mailagents-hop-count:".len()..].trim();
+                hop_count = val.parse().unwrap_or(0);
+            } else if lower.starts_with("x-mailagents-trace:") {
+                let val = line["x-mailagents-trace:".len()..].trim();
+                trace_workflows = val
+                    .split(',')
+                    .filter_map(|s| Uuid::from_str(s.trim()).ok())
+                    .collect();
+            } else if lower.starts_with("auto-submitted:") {
+                let val = line["auto-submitted:".len()..].trim().to_lowercase();
+                if val != "no" {
+                    is_auto_reply = true;
+                }
+            } else if lower.starts_with("x-autoreply:")
+                || lower.starts_with("x-autorespond:")
+            {
+                is_auto_reply = true;
+            } else if lower.starts_with("precedence:") || lower.starts_with("x-precedence:") {
+                let val = line.split(':').nth(1).unwrap_or_default().trim().to_lowercase();
+                if val == "bulk" || val == "junk" || val == "auto_reply" {
+                    is_auto_reply = true;
+                }
+            } else if lower.starts_with("x-auto-response-suppress:") {
+                is_auto_reply = true;
             }
         }
 
-        (message_id, in_reply_to, references)
+        (
+            message_id,
+            in_reply_to,
+            references,
+            thread_index,
+            is_auto_reply,
+            workflow_id_header,
+            hop_count,
+            trace_workflows,
+        )
+    }
+
+    pub fn is_auto_reply_subject(subject: &str) -> bool {
+        let lower = subject.trim().to_lowercase();
+        lower.starts_with("auto-reply:")
+            || lower.starts_with("autoreply:")
+            || lower.starts_with("out of office:")
+            || lower.starts_with("automatic reply:")
+            || lower.starts_with("autoresponse:")
+            || lower.contains("out of office response")
+    }
+
+    pub fn is_forwarded_email(subject: &str, body: &str) -> bool {
+        let lower_subj = subject.trim().to_lowercase();
+        if lower_subj.starts_with("fwd:") || lower_subj.starts_with("fw:") || lower_subj.starts_with("forward:") {
+            return true;
+        }
+
+        let lower_body = body.to_lowercase();
+        lower_body.contains("---------- forwarded message ---------")
+            || lower_body.contains("-----original message-----")
     }
 
     pub fn strip_quotes_heuristic(text: &str) -> String {
@@ -263,19 +391,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_headers() {
+    fn test_parse_headers_and_auto_reply() {
         let headers = r#"
 Host: in.sendgrid.net
 Message-ID: <CAGX123@mail.gmail.com>
 In-Reply-To: <ORIGINAL456@mailagents.com>
 References: <REF1@mailagents.com> <REF2@mailagents.com>
+Auto-Submitted: auto-replied
+X-MailAgents-Workflow-ID: 00000000-0000-0000-0000-000000000001
+X-MailAgents-Hop-Count: 2
 Subject: Test Email
 "#;
 
-        let (msg_id, in_reply, refs) = EmailParser::parse_headers(headers);
+        let (msg_id, in_reply, refs, thread_idx, is_auto, wf_id, hop, trace) = EmailParser::parse_headers(headers);
         assert_eq!(msg_id.as_deref(), Some("<CAGX123@mail.gmail.com>"));
         assert_eq!(in_reply.as_deref(), Some("<ORIGINAL456@mailagents.com>"));
         assert_eq!(refs, vec!["<REF1@mailagents.com>", "<REF2@mailagents.com>"]);
+        assert!(thread_idx.is_none());
+        assert!(is_auto);
+        assert_eq!(wf_id, Some(Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()));
+        assert_eq!(hop, 2);
+        assert!(trace.is_empty());
+    }
+
+    #[test]
+    fn test_forwarded_email_detection() {
+        assert!(EmailParser::is_forwarded_email("Fwd: Customer Issue", "Original message text"));
+        assert!(EmailParser::is_forwarded_email("FW: Urgent", "Original text"));
+        assert!(!EmailParser::is_forwarded_email("Normal Subject", "Hello agent"));
     }
 
     #[test]

@@ -24,6 +24,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         postgres_arc.clone(),
         postgres_arc.clone(),
         postgres_arc.clone(),
+        postgres_arc.clone(),
         config.clone(),
     );
 

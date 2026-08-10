@@ -2,7 +2,7 @@ use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message as LettreMessage, Tokio1Executor,
     message::{
         Mailbox,
-        header::{ContentType, InReplyTo, MessageId, References},
+        header::{ContentType, Header, HeaderName, HeaderValue, InReplyTo, MessageId, References},
     },
     transport::smtp::authentication::Credentials,
 };
@@ -14,8 +14,29 @@ use crate::{
     infra::config::AppConfig,
 };
 
+#[derive(Clone, Debug)]
+struct CustomHeader {
+    name: HeaderName,
+    value: String,
+}
+
+impl Header for CustomHeader {
+    fn name() -> HeaderName {
+        HeaderName::new_from_ascii_str("X-Custom")
+    }
+
+    fn parse(_: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        Err("Parsing custom header not supported".into())
+    }
+
+    fn display(&self) -> HeaderValue {
+        HeaderValue::new(self.name.clone(), self.value.clone())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct OutboundEmail {
+    pub workflow_id: Uuid,
     pub workflow_name: String,
     pub workflow_slug: String,
     pub company_slug: String,
@@ -25,6 +46,8 @@ pub struct OutboundEmail {
     pub recipients_cc: Vec<String>,
     pub subject: String,
     pub body_text: String,
+    pub hop_count: u32,
+    pub trace_workflows: Vec<Uuid>,
 }
 
 #[derive(Debug, Clone)]
@@ -100,6 +123,37 @@ impl OutboundDispatcher {
         builder = builder.header(InReplyTo::from(in_reply_to.clone()));
         builder = builder.header(References::from(references.join(" ")));
 
+        // RFC 3834 Auto-Reply and Exchange Loop Prevention headers
+        builder = builder.header(CustomHeader {
+            name: HeaderName::new_from_ascii_str("Auto-Submitted"),
+            value: "auto-replied".to_string(),
+        });
+        builder = builder.header(CustomHeader {
+            name: HeaderName::new_from_ascii_str("X-Auto-Response-Suppress"),
+            value: "All".to_string(),
+        });
+
+        // Platform Inter-Workflow Tracking Headers
+        let mut trace = email.trace_workflows.clone();
+        if !trace.contains(&email.workflow_id) {
+            trace.push(email.workflow_id);
+        }
+        let trace_str = trace.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
+        let next_hop = email.hop_count + 1;
+
+        builder = builder.header(CustomHeader {
+            name: HeaderName::new_from_ascii_str("X-MailAgents-Workflow-ID"),
+            value: email.workflow_id.to_string(),
+        });
+        builder = builder.header(CustomHeader {
+            name: HeaderName::new_from_ascii_str("X-MailAgents-Hop-Count"),
+            value: next_hop.to_string(),
+        });
+        builder = builder.header(CustomHeader {
+            name: HeaderName::new_from_ascii_str("X-MailAgents-Trace"),
+            value: trace_str,
+        });
+
         let lettre_msg = builder
             .body(email.body_text.clone())
             .map_err(|e| AppError::Internal(format!("Failed to build MIME message: {}", e)))?;
@@ -167,6 +221,7 @@ mod tests {
         };
 
         let outbound_email = OutboundEmail {
+            workflow_id: Uuid::new_v4(),
             workflow_name: "Support Bot".into(),
             workflow_slug: "support".into(),
             company_slug: "acme".into(),
@@ -176,6 +231,8 @@ mod tests {
             recipients_cc: vec!["manager@example.com".into()],
             subject: "Help needed".into(),
             body_text: "Hello! I am your AI assistant.".into(),
+            hop_count: 0,
+            trace_workflows: Vec::new(),
         };
 
         let result = OutboundDispatcher::send(&config, outbound_email).await.unwrap();

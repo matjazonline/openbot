@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS messages (
     attachments JSONB,
     direction VARCHAR(20) NOT NULL,
     role VARCHAR(20) NOT NULL,
+    thread_index VARCHAR(255),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

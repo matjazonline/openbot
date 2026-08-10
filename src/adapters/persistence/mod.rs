@@ -4,9 +4,11 @@ use crate::app_error::AppError;
 
 pub mod company;
 pub mod company_invite;
+pub mod task;
 pub mod thread;
 pub mod user;
 pub mod workflow;
+
 
 
 #[derive(Clone)]

@@ -54,6 +54,7 @@ pub struct MessageDb {
     pub attachments: Option<Value>,
     pub direction: String,
     pub role: String,
+    pub thread_index: Option<String>,
     pub created_at: NaiveDateTime,
 }
 
@@ -91,6 +92,7 @@ impl TryFrom<MessageDb> for Message {
             attachments,
             direction,
             role,
+            thread_index: db.thread_index,
             created_at: db.created_at,
         })
     }
@@ -178,6 +180,42 @@ impl ThreadPersistence for PostgresPersistence {
         Ok(db.map(Into::into))
     }
 
+    async fn find_thread_by_thread_index(&self, thread_index_prefix: &str) -> AppResult<Option<Thread>> {
+        if thread_index_prefix.trim().is_empty() {
+            return Ok(None);
+        }
+
+        let prefix_match = format!("{}%", thread_index_prefix.trim());
+        let db = sqlx::query_as!(
+            ThreadDb,
+            r#"SELECT t.id, t.workflow_id, t.subject, t.participant_emails, t.created_at as "created_at!", t.updated_at as "updated_at!"
+               FROM threads t
+               JOIN messages m ON m.thread_id = t.id
+               WHERE m.thread_index LIKE $1
+               LIMIT 1"#,
+            prefix_match
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(db.map(Into::into))
+    }
+
+    async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize> {
+        let count = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) FROM messages
+               WHERE thread_id = $1 AND created_at >= NOW() - ($2 || ' seconds')::INTERVAL"#,
+            thread_id,
+            duration_secs.to_string()
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(count.unwrap_or(0) as usize)
+    }
+
     async fn create_message(&self, message: &Message) -> AppResult<Message> {
         let attachments_json = message
             .attachments
@@ -189,12 +227,12 @@ impl ThreadPersistence for PostgresPersistence {
             r#"INSERT INTO messages (
                     id, thread_id, message_id, in_reply_to, references_list,
                     sender, recipients_to, recipients_cc, subject, clean_text_body,
-                    raw_text_body, raw_html_body, attachments, direction, role
+                    raw_text_body, raw_html_body, attachments, direction, role, thread_index
                )
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                RETURNING id, thread_id, message_id, in_reply_to, references_list,
                          sender, recipients_to, recipients_cc, subject, clean_text_body,
-                         raw_text_body, raw_html_body, attachments, direction, role,
+                         raw_text_body, raw_html_body, attachments, direction, role, thread_index,
                          created_at as "created_at!""#,
             message.id,
             message.thread_id,
@@ -210,7 +248,8 @@ impl ThreadPersistence for PostgresPersistence {
             message.raw_html_body.as_deref(),
             attachments_json,
             message.direction.as_str(),
-            message.role.as_str()
+            message.role.as_str(),
+            message.thread_index.as_deref()
         )
         .fetch_one(&self.pool)
         .await
@@ -232,7 +271,7 @@ impl ThreadPersistence for PostgresPersistence {
             MessageDb,
             r#"SELECT id, thread_id, message_id, in_reply_to, references_list,
                       sender, recipients_to, recipients_cc, subject, clean_text_body,
-                      raw_text_body, raw_html_body, attachments, direction, role,
+                      raw_text_body, raw_html_body, attachments, direction, role, thread_index,
                       created_at as "created_at!"
                FROM messages WHERE message_id = $1"#,
             message_id
@@ -252,7 +291,7 @@ impl ThreadPersistence for PostgresPersistence {
             MessageDb,
             r#"SELECT id, thread_id, message_id, in_reply_to, references_list,
                       sender, recipients_to, recipients_cc, subject, clean_text_body,
-                      raw_text_body, raw_html_body, attachments, direction, role,
+                      raw_text_body, raw_html_body, attachments, direction, role, thread_index,
                       created_at as "created_at!"
                FROM messages WHERE thread_id = $1 ORDER BY created_at ASC"#,
             thread_id

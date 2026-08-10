@@ -2,7 +2,7 @@ use uuid::Uuid;
 
 use crate::entities::{
     company::Company, company_invite::CompanyInvite, company_member::CompanyMember,
-    workflow::Workflow,
+    task::{BackgroundTask, TaskStatus}, workflow::Workflow,
 };
 use crate::use_cases::workflow::InboundEmailResult;
 
@@ -18,7 +18,7 @@ pub fn base_layout(title: &str, content: &str) -> String {
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </head>
 <body class="h-full font-sans antialiased text-slate-100 flex flex-col items-center p-4 md:p-8">
-    <div class="w-full max-w-3xl">
+    <div class="w-full max-w-4xl">
         <nav class="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
             <a href="/companies" class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
                 <span class="text-indigo-500">❖</span> Mail Agents
@@ -209,6 +209,10 @@ pub fn company_row_fragment(company: &Company) -> String {
                 <p class="text-xs text-slate-400 mt-1">Added {created_at_str}</p>
             </div>
             <div class="flex items-center gap-2">
+                <a href="/companies/{id}/tasks"
+                    class="px-3 py-1.5 text-xs font-medium bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/50 rounded-lg transition">
+                    Tasks
+                </a>
                 <a href="/companies/{id}/workflows"
                     class="px-3 py-1.5 text-xs font-medium bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/50 rounded-lg transition">
                     Workflows
@@ -967,5 +971,189 @@ pub fn workflow_simulation_result_fragment(result: &InboundEmailResult) -> Strin
         subject_str = subject_str,
         body_str = body_str,
         workflow_config_str = workflow_config_str,
+    )
+}
+
+pub fn company_tasks_page(
+    company: &Company,
+    workflows: &[Workflow],
+    tasks: &[BackgroundTask],
+    current_wf: Option<Uuid>,
+    current_status: Option<TaskStatus>,
+    sort_asc: bool,
+) -> String {
+    let task_list_html = task_list_fragment(company.id, tasks);
+
+    let mut wf_options = String::from("<option value=\"\">All Workflows</option>");
+    for wf in workflows {
+        let selected = if current_wf == Some(wf.id) { "selected" } else { "" };
+        wf_options.push_str(&format!(
+            "<option value=\"{}\" {}>{} (/{})</option>",
+            wf.id, selected, wf.name, wf.slug
+        ));
+    }
+
+    let status_options_vec = vec![
+        ("", "All Statuses"),
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+        ("dead_letter", "Dead Letter"),
+        ("stopped", "Stopped"),
+    ];
+
+    let mut status_options = String::new();
+    let current_status_str = current_status.as_ref().map(|s| s.as_str()).unwrap_or("");
+    for (val, label) in status_options_vec {
+        let selected = if current_status_str == val { "selected" } else { "" };
+        status_options.push_str(&format!(
+            "<option value=\"{}\" {}>{}</option>",
+            val, selected, label
+        ));
+    }
+
+    let sort_desc_selected = if !sort_asc { "selected" } else { "" };
+    let sort_asc_selected = if sort_asc { "selected" } else { "" };
+
+    let content = format!(
+        r##"
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <a href="/companies" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Companies</a>
+                <h2 class="text-2xl font-bold text-white">{company_name} Background Tasks</h2>
+                <p class="text-slate-400 text-sm mt-0.5">Monitor, stop, or resume background processing tasks for <span class="font-mono text-indigo-300">/{slug}</span></p>
+            </div>
+        </div>
+
+        <div id="response-message" class="mb-6"></div>
+
+        <!-- Filter & Sort Bar -->
+        <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6">
+            <form hx-get="/companies/{company_id}/tasks/filter" hx-target="#task-list" hx-swap="innerHTML" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Filter by Workflow</label>
+                    <select name="workflow_id" onchange="this.form.requestSubmit()"
+                        class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        {wf_options}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Filter by Status</label>
+                    <select name="status" onchange="this.form.requestSubmit()"
+                        class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        {status_options}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Sort by Time</label>
+                    <select name="sort" onchange="this.form.requestSubmit()"
+                        class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="desc" {sort_desc_selected}>Newest First</option>
+                        <option value="asc" {sort_asc_selected}>Oldest First</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+
+        <!-- Task List Section -->
+        <div>
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Tasks</h3>
+            <div id="task-list" class="space-y-3">
+                {task_list_html}
+            </div>
+        </div>
+        "##,
+        company_name = company.name,
+        slug = company.slug,
+        company_id = company.id,
+        wf_options = wf_options,
+        status_options = status_options,
+        sort_desc_selected = sort_desc_selected,
+        sort_asc_selected = sort_asc_selected,
+        task_list_html = task_list_html,
+    );
+
+    base_layout(&format!("{} Tasks", company.name), &content)
+}
+
+pub fn task_list_fragment(company_id: Uuid, tasks: &[BackgroundTask]) -> String {
+    if tasks.is_empty() {
+        return r##"
+            <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-8 text-center">
+                <p class="text-slate-400 text-sm">No tasks matching the selected filters.</p>
+            </div>
+        "##
+        .to_string();
+    }
+
+    tasks.iter().map(|t| task_row_fragment(company_id, t)).collect()
+}
+
+pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
+    let created_at_str = task.created_at.format("%b %d, %H:%M:%S").to_string();
+    let status_badge = match task.status {
+        TaskStatus::Pending => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-950 text-amber-300 border border-amber-700/50">Pending</span>"#,
+        TaskStatus::Processing => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-950 text-indigo-300 border border-indigo-700/50 animate-pulse">Processing</span>"#,
+        TaskStatus::Completed => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700/50">Completed</span>"#,
+        TaskStatus::Failed => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-950 text-rose-300 border border-rose-700/50">Failed</span>"#,
+        TaskStatus::DeadLetter => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-950 text-purple-300 border border-purple-700/50">Dead Letter</span>"#,
+        TaskStatus::Stopped => r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-600">Stopped</span>"#,
+    };
+
+    let action_button = match task.status {
+        TaskStatus::Pending | TaskStatus::Processing | TaskStatus::Failed => format!(
+            r##"<button hx-post="/companies/{company_id}/tasks/{task_id}/stop" hx-target="#task-{task_id}" hx-swap="outerHTML"
+                class="px-3 py-1.5 text-xs font-semibold bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
+                Stop Task
+            </button>"##,
+            company_id = company_id,
+            task_id = task.id
+        ),
+        TaskStatus::Stopped | TaskStatus::DeadLetter => format!(
+            r##"<button hx-post="/companies/{company_id}/tasks/{task_id}/resume" hx-target="#task-{task_id}" hx-swap="outerHTML"
+                class="px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition cursor-pointer shadow-md shadow-emerald-600/30">
+                Resume Task
+            </button>"##,
+            company_id = company_id,
+            task_id = task.id
+        ),
+        _ => String::new(),
+    };
+
+    let error_html = match &task.last_error {
+        Some(err) if !err.is_empty() => format!(
+            r##"<div class="mt-2 text-xs font-mono bg-slate-950/80 p-2 rounded border border-rose-900/50 text-rose-300">Error: {err}</div>"##
+        ),
+        _ => String::new(),
+    };
+
+    format!(
+        r##"
+        <div id="task-{task_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 hover:border-slate-600 transition shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono text-xs text-slate-300 font-semibold">{task_id}</span>
+                        {status_badge}
+                        <span class="text-xs text-slate-400 font-mono">Retries: {retry_count}/{max_retries}</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">Type: <span class="font-mono text-indigo-300">{task_type}</span> • Enqueued {created_at_str}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    {action_button}
+                </div>
+            </div>
+            {error_html}
+        </div>
+        "##,
+        task_id = task.id,
+        status_badge = status_badge,
+        retry_count = task.retry_count,
+        max_retries = task.max_retries,
+        task_type = task.task_type,
+        created_at_str = created_at_str,
+        action_button = action_button,
+        error_html = error_html,
     )
 }

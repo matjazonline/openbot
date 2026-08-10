@@ -30,6 +30,9 @@ pub struct SendGridPayload {
     pub html: Option<String>,
     pub headers: Option<String>,
     pub envelope: Option<String>,
+    pub spf: Option<String>,
+    pub dkim: Option<String>,
+    pub spam_score: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -84,6 +87,9 @@ async fn sendgrid_inbound_webhook(
                         "text" => raw_payload.text = Some(value),
                         "html" => raw_payload.html = Some(value),
                         "headers" => raw_payload.headers = Some(value),
+                        "spf" => raw_payload.spf = Some(value),
+                        "dkim" => raw_payload.dkim = Some(value),
+                        "spam_score" => raw_payload.spam_score = value.parse().ok(),
                         "envelope" => {
                             if let Ok(env) = serde_json::from_str::<SendGridEnvelope>(&value) {
                                 if let Some(recipients) = env.to {
@@ -111,14 +117,35 @@ async fn sendgrid_inbound_webhook(
         }
     }
 
-    let result = thread_use_cases
-        .process_and_dispatch_email(raw_payload)
+    // Synchronous Ingestion: Parse MIME, resolve thread, verify ACL, and save inbound message
+    let ingest = thread_use_cases
+        .ingest_and_save_inbound_message(raw_payload)
         .await
         .map_err(|err| {
-            warn!("Error processing inbound email thread: {err}");
+            warn!("Error ingesting inbound email: {err}");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
+    if ingest.accepted {
+        let thread_use_cases_bg = thread_use_cases.clone();
+        let ingest_bg = ingest.clone();
+
+        // Offload Agent Execution and Outbound SMTP Dispatch to background task
+        tokio::spawn(async move {
+            if let Err(err) = thread_use_cases_bg.execute_agent_and_dispatch(ingest_bg).await {
+                warn!("Background agent execution failed: {err}");
+            }
+        });
+    }
+
+    let result = serde_json::json!({
+        "processed": ingest.accepted,
+        "reason": ingest.reason,
+        "thread_id": ingest.thread.as_ref().map(|t| t.id),
+        "inbound_message_id": ingest.inbound_message.as_ref().map(|m| m.message_id.clone()),
+    });
+
+    // Return HTTP 200 OK immediately to prevent SendGrid webhook timeouts
     Ok((StatusCode::OK, Json(result)))
 }
 
@@ -128,6 +155,9 @@ fn extract_from_payload(payload: SendGridPayload, raw: &mut RawInboundPayload) {
     raw.html = payload.html;
     raw.headers = payload.headers;
     raw.cc = payload.cc;
+    raw.spf = payload.spf;
+    raw.dkim = payload.dkim;
+    raw.spam_score = payload.spam_score;
 
     if let Some(ref env_str) = payload.envelope {
         if let Ok(env) = serde_json::from_str::<SendGridEnvelope>(env_str) {
@@ -255,6 +285,24 @@ mod tests {
             Ok(None)
         }
 
+        async fn find_thread_by_thread_index(&self, thread_index_prefix: &str) -> AppResult<Option<Thread>> {
+            let thread_id = {
+                let msgs = self.messages.lock().unwrap();
+                msgs.iter()
+                    .find(|m| m.thread_index.as_deref().unwrap_or_default().starts_with(thread_index_prefix))
+                    .map(|m| m.thread_id)
+            };
+            if let Some(tid) = thread_id {
+                return self.get_thread_by_id(tid).await;
+            }
+            Ok(None)
+        }
+
+        async fn count_recent_messages(&self, thread_id: Uuid, _duration_secs: i64) -> AppResult<usize> {
+            let msgs = self.messages.lock().unwrap();
+            Ok(msgs.iter().filter(|m| m.thread_id == thread_id).count())
+        }
+
         async fn create_message(&self, message: &Message) -> AppResult<Message> {
             self.messages.lock().unwrap().push(message.clone());
             Ok(message.clone())
@@ -266,6 +314,84 @@ mod tests {
 
         async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
             Ok(self.messages.lock().unwrap().iter().filter(|m| m.thread_id == thread_id).cloned().collect())
+        }
+    }
+
+    struct MockTaskPersistence {
+        tasks: Mutex<Vec<crate::entities::task::BackgroundTask>>,
+    }
+
+    #[async_trait]
+    impl crate::adapters::persistence::task::TaskPersistence for MockTaskPersistence {
+        async fn enqueue_task(&self, company_id: Uuid, workflow_id: Uuid, thread_id: Option<Uuid>, task_type: &str, payload: serde_json::Value) -> AppResult<crate::entities::task::BackgroundTask> {
+            let task = crate::entities::task::BackgroundTask {
+                id: Uuid::new_v4(),
+                company_id,
+                workflow_id,
+                thread_id,
+                task_type: task_type.to_string(),
+                status: crate::entities::task::TaskStatus::Pending,
+                payload,
+                retry_count: 0,
+                max_retries: 3,
+                last_error: None,
+                run_at: Utc::now().naive_utc(),
+                created_at: Utc::now().naive_utc(),
+                updated_at: Utc::now().naive_utc(),
+            };
+            self.tasks.lock().unwrap().push(task.clone());
+            Ok(task)
+        }
+
+        async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<crate::entities::task::BackgroundTask>> {
+            Ok(self.tasks.lock().unwrap().iter().find(|t| t.id == id).cloned())
+        }
+
+        async fn poll_next_pending_tasks(&self, _limit: i64) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            Ok(self.tasks.lock().unwrap().iter().filter(|t| t.status == crate::entities::task::TaskStatus::Pending).cloned().collect())
+        }
+
+        async fn mark_task_processing(&self, id: Uuid) -> AppResult<()> {
+            let mut list = self.tasks.lock().unwrap();
+            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+                t.status = crate::entities::task::TaskStatus::Processing;
+            }
+            Ok(())
+        }
+
+        async fn mark_task_completed(&self, id: Uuid) -> AppResult<()> {
+            let mut list = self.tasks.lock().unwrap();
+            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+                t.status = crate::entities::task::TaskStatus::Completed;
+            }
+            Ok(())
+        }
+
+        async fn mark_task_failed(&self, id: Uuid, error_msg: &str, _next_run_at: chrono::NaiveDateTime, is_dead_letter: bool) -> AppResult<()> {
+            let mut list = self.tasks.lock().unwrap();
+            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+                t.last_error = Some(error_msg.to_string());
+                t.status = if is_dead_letter { crate::entities::task::TaskStatus::DeadLetter } else { crate::entities::task::TaskStatus::Failed };
+            }
+            Ok(())
+        }
+
+        async fn stop_task(&self, id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
+            let mut list = self.tasks.lock().unwrap();
+            let t = list.iter_mut().find(|t| t.id == id).unwrap();
+            t.status = crate::entities::task::TaskStatus::Stopped;
+            Ok(t.clone())
+        }
+
+        async fn resume_task(&self, id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
+            let mut list = self.tasks.lock().unwrap();
+            let t = list.iter_mut().find(|t| t.id == id).unwrap();
+            t.status = crate::entities::task::TaskStatus::Pending;
+            Ok(t.clone())
+        }
+
+        async fn list_company_tasks(&self, company_id: Uuid, _workflow_id: Option<Uuid>, _status: Option<crate::entities::task::TaskStatus>, _sort_asc: bool) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            Ok(self.tasks.lock().unwrap().iter().filter(|t| t.company_id == company_id).cloned().collect())
         }
     }
 
@@ -335,10 +461,15 @@ mod tests {
             smtp_from_address: "noreply@mailagents.com".to_string(),
         });
 
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+
         let thread_use_cases = Arc::new(ThreadUseCases::new(
             thread_persistence.clone(),
             workflow_persistence.clone(),
             company_persistence.clone(),
+            task_persistence,
             config.clone(),
         ));
 
@@ -387,6 +518,9 @@ mod tests {
         let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
         assert!(body_str.contains("\"processed\":true"));
         assert!(body_str.contains("\"inbound_message_id\":\"<MSG123@external.com>\""));
+
+        // Allow async background task to run
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         // Verify message and thread persistence
         let threads = thread_persistence.threads.lock().unwrap();
