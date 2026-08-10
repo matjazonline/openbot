@@ -16,12 +16,12 @@ use crate::{
     infra::config::AppConfig,
     services::{
         agent_runner::AgentRunner,
-        email_parser::{EmailParser, ParsedEmail, RawInboundPayload, MAX_WORKFLOW_HOPS},
+        email_parser::{EmailParser, MAX_WORKFLOW_HOPS, ParsedEmail, RawInboundPayload},
         outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
     },
     use_cases::{
         company::CompanyPersistence,
-        workflow::{parse_recipient_address, WorkflowPersistence},
+        workflow::{WorkflowPersistence, parse_recipient_address},
     },
 };
 
@@ -44,9 +44,13 @@ pub trait ThreadPersistence: Send + Sync {
         participant_emails: &[String],
     ) -> AppResult<Thread>;
 
-    async fn find_thread_by_message_ids(&self, message_ids: &[String]) -> AppResult<Option<Thread>>;
+    async fn find_thread_by_message_ids(&self, message_ids: &[String])
+    -> AppResult<Option<Thread>>;
 
-    async fn find_thread_by_thread_index(&self, thread_index_prefix: &str) -> AppResult<Option<Thread>>;
+    async fn find_thread_by_thread_index(
+        &self,
+        thread_index_prefix: &str,
+    ) -> AppResult<Option<Thread>>;
 
     async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize>;
 
@@ -96,9 +100,18 @@ impl ThreadUseCases {
         );
 
         // SendGrid Webhook Redelivery Idempotency Check
-        if let Ok(Some(_)) = self.thread_persistence.get_message_by_message_id(&parsed.message_id).await {
-            warn!("SendGrid Webhook Redelivery: Duplicate Message-ID '{}' already processed", parsed.message_id);
-            return Ok(InboundIngestResult::rejected("Duplicate Message-ID already processed"));
+        if let Ok(Some(_)) = self
+            .thread_persistence
+            .get_message_by_message_id(&parsed.message_id)
+            .await
+        {
+            warn!(
+                "SendGrid Webhook Redelivery: Duplicate Message-ID '{}' already processed",
+                parsed.message_id
+            );
+            return Ok(InboundIngestResult::rejected(
+                "Duplicate Message-ID already processed",
+            ));
         }
         let recipient_str = parsed.recipients_to.first().cloned().unwrap_or_default();
         let recipient_parse = parse_recipient_address(&recipient_str, &self.config.app_domain_name);
@@ -107,7 +120,9 @@ impl ThreadUseCases {
             Some(res) => res,
             None => {
                 warn!("Invalid recipient address format: '{}'", recipient_str);
-                return Ok(InboundIngestResult::rejected("Invalid recipient address format"));
+                return Ok(InboundIngestResult::rejected(
+                    "Invalid recipient address format",
+                ));
             }
         };
 
@@ -120,21 +135,35 @@ impl ThreadUseCases {
         let (company, workflow) = match (company, workflow) {
             (Some(c), Some(w)) => (c, w),
             _ => {
-                warn!("Company '{}' or Workflow '{}' not found", company_slug, workflow_slug);
-                return Ok(InboundIngestResult::rejected("Company or Workflow not found"));
+                warn!(
+                    "Company '{}' or Workflow '{}' not found",
+                    company_slug, workflow_slug
+                );
+                return Ok(InboundIngestResult::rejected(
+                    "Company or Workflow not found",
+                ));
             }
         };
 
         // ACL Check with SPF/DKIM verification when participants are restricted
         let is_inter_workflow = parsed.workflow_id_header.is_some()
-            || parsed.sender.ends_with(&format!(".{}", self.config.app_domain_name));
+            || parsed
+                .sender
+                .ends_with(&format!(".{}", self.config.app_domain_name));
 
         if let Some(ref allowed) = workflow.participant_emails {
             if !allowed.is_empty() {
-                let sender_allowed = allowed.iter().any(|e| e.eq_ignore_ascii_case(&parsed.sender));
+                let sender_allowed = allowed
+                    .iter()
+                    .any(|e| e.eq_ignore_ascii_case(&parsed.sender));
                 if !sender_allowed && !is_inter_workflow {
-                    warn!("Sender '{}' unauthorized for workflow '{}'", parsed.sender, workflow.slug);
-                    return Ok(InboundIngestResult::rejected("Sender unauthorized for workflow"));
+                    warn!(
+                        "Sender '{}' unauthorized for workflow '{}'",
+                        parsed.sender, workflow.slug
+                    );
+                    return Ok(InboundIngestResult::rejected(
+                        "Sender unauthorized for workflow",
+                    ));
                 }
 
                 // Check SPF / DKIM verification failure
@@ -161,7 +190,9 @@ impl ThreadUseCases {
                     "Max inter-workflow hop count ({}) reached for Message-ID: {}",
                     parsed.hop_count, parsed.message_id
                 );
-                return Ok(InboundIngestResult::rejected("Max inter-workflow hop count reached"));
+                return Ok(InboundIngestResult::rejected(
+                    "Max inter-workflow hop count reached",
+                ));
             }
 
             // Cycle detection
@@ -170,11 +201,18 @@ impl ThreadUseCases {
                     "Inter-workflow cycle detected for workflow '{}' in Message-ID: {}",
                     workflow.id, parsed.message_id
                 );
-                return Ok(InboundIngestResult::rejected("Inter-workflow loop cycle detected"));
+                return Ok(InboundIngestResult::rejected(
+                    "Inter-workflow loop cycle detected",
+                ));
             }
         } else if parsed.is_auto_reply {
-            warn!("External auto-reply loop detected for Message-ID: {}, dropping message", parsed.message_id);
-            return Ok(InboundIngestResult::rejected("External auto-reply loop detected"));
+            warn!(
+                "External auto-reply loop detected for Message-ID: {}, dropping message",
+                parsed.message_id
+            );
+            return Ok(InboundIngestResult::rejected(
+                "External auto-reply loop detected",
+            ));
         }
 
         // Thread Resolution (RFC 5322 Message-ID / References OR Outlook Thread-Index)
@@ -185,7 +223,9 @@ impl ThreadUseCases {
         lookup_ids.extend(parsed.references.clone());
 
         let mut existing_thread = if !lookup_ids.is_empty() {
-            self.thread_persistence.find_thread_by_message_ids(&lookup_ids).await?
+            self.thread_persistence
+                .find_thread_by_message_ids(&lookup_ids)
+                .await?
         } else {
             None
         };
@@ -193,7 +233,10 @@ impl ThreadUseCases {
         // Fallback to Outlook Thread-Index
         if existing_thread.is_none() {
             if let Some(ref idx) = parsed.thread_index {
-                existing_thread = self.thread_persistence.find_thread_by_thread_index(idx).await?;
+                existing_thread = self
+                    .thread_persistence
+                    .find_thread_by_thread_index(idx)
+                    .await?;
             }
         }
 
@@ -211,7 +254,10 @@ impl ThreadUseCases {
         };
 
         // Thread Turn Limit Check (Max 20 messages / hour per thread)
-        let recent_count = self.thread_persistence.count_recent_messages(thread.id, 3600).await?;
+        let recent_count = self
+            .thread_persistence
+            .count_recent_messages(thread.id, 3600)
+            .await?;
         if recent_count >= MAX_THREAD_MESSAGES_PER_HOUR {
             warn!(
                 "Thread turn limit ({}/hr) exceeded for thread_id {}, dropping response to prevent ping-pong loop",
@@ -223,12 +269,18 @@ impl ThreadUseCases {
         // Update thread participants
         let mut current_participants = thread.participant_emails.clone();
         let mut participant_added = false;
-        if !current_participants.iter().any(|p| p.eq_ignore_ascii_case(&parsed.sender)) {
+        if !current_participants
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case(&parsed.sender))
+        {
             current_participants.push(parsed.sender.clone());
             participant_added = true;
         }
         for cc in &parsed.recipients_cc {
-            if !current_participants.iter().any(|p| p.eq_ignore_ascii_case(cc)) {
+            if !current_participants
+                .iter()
+                .any(|p| p.eq_ignore_ascii_case(cc))
+            {
                 current_participants.push(cc.clone());
                 participant_added = true;
             }
@@ -242,7 +294,10 @@ impl ThreadUseCases {
         };
 
         // Fetch thread history for quote stripping fallback
-        let history_messages = self.thread_persistence.list_messages_by_thread_id(thread.id).await?;
+        let history_messages = self
+            .thread_persistence
+            .list_messages_by_thread_id(thread.id)
+            .await?;
         let history_clean_bodies: Vec<String> = history_messages
             .iter()
             .map(|m| m.clean_text_body.clone())
@@ -278,14 +333,21 @@ impl ThreadUseCases {
             clean_text_body,
             raw_text_body: parsed.raw_text_body.clone(),
             raw_html_body: parsed.raw_html_body.clone(),
-            attachments: if parsed.attachments.is_empty() { None } else { Some(parsed.attachments.clone()) },
+            attachments: if parsed.attachments.is_empty() {
+                None
+            } else {
+                Some(parsed.attachments.clone())
+            },
             direction: MessageDirection::Inbound,
             role: inbound_role,
             thread_index: parsed.thread_index.clone(),
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let saved_inbound = self.thread_persistence.create_message(&inbound_message).await?;
+        let saved_inbound = self
+            .thread_persistence
+            .create_message(&inbound_message)
+            .await?;
 
         let ingest_result = InboundIngestResult {
             accepted: true,
@@ -301,7 +363,13 @@ impl ThreadUseCases {
         let payload_json = serde_json::to_value(&ingest_result).unwrap_or_default();
         let _ = self
             .task_persistence
-            .enqueue_task(company.id, workflow.id, Some(thread.id), "email_agent_dispatch", payload_json)
+            .enqueue_task(
+                company.id,
+                workflow.id,
+                Some(thread.id),
+                "email_agent_dispatch",
+                payload_json,
+            )
             .await;
 
         Ok(ingest_result)
@@ -322,7 +390,10 @@ impl ThreadUseCases {
             _ => return Ok(None),
         };
 
-        let history_messages = self.thread_persistence.list_messages_by_thread_id(thread.id).await?;
+        let history_messages = self
+            .thread_persistence
+            .list_messages_by_thread_id(thread.id)
+            .await?;
 
         // Execute AI Agent
         let agent_response = AgentRunner::execute(
@@ -330,9 +401,18 @@ impl ThreadUseCases {
             &parsed.prompt_text,
             &history_messages,
         )
-        .await;
+        .await?;
 
-        let (sent_message_id, in_reply_to, references, from_address, recipients_to, recipients_cc, subject, email_sent) = if send_email {
+        let (
+            sent_message_id,
+            in_reply_to,
+            references,
+            from_address,
+            recipients_to,
+            recipients_cc,
+            subject,
+            email_sent,
+        ) = if send_email {
             // Construct Outbound Email
             let mut references_for_outbound = parsed.references.clone();
             if let Some(ref reply_to) = parsed.in_reply_to {
@@ -378,12 +458,18 @@ impl ThreadUseCases {
             )
         } else {
             let outbound_uuid = Uuid::new_v4();
-            let simulated_msg_id = format!("<simulated-test-{}@{}>", outbound_uuid, self.config.app_domain_name);
+            let simulated_msg_id = format!(
+                "<simulated-test-{}@{}>",
+                outbound_uuid, self.config.app_domain_name
+            );
             let from_email = format!(
                 "{}@{}.{}",
                 workflow.slug, company.slug, self.config.app_domain_name
             );
-            info!("Simulation test mode (Run_Test): Skipped SMTP email dispatch for Message-ID {}", simulated_msg_id);
+            info!(
+                "Simulation test mode (Run_Test): Skipped SMTP email dispatch for Message-ID {}",
+                simulated_msg_id
+            );
             (
                 simulated_msg_id,
                 parsed.message_id.clone(),
@@ -422,7 +508,10 @@ impl ThreadUseCases {
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let _ = self.thread_persistence.create_message(&outbound_message).await?;
+        let _ = self
+            .thread_persistence
+            .create_message(&outbound_message)
+            .await?;
 
         Ok(Some(AgentExecutionResult {
             outbound_message_id: Some(sent_message_id),
@@ -472,7 +561,10 @@ impl ThreadUseCases {
         }
 
         let thread_id = ingest.thread.as_ref().map(|t| t.id);
-        let inbound_message_id = ingest.inbound_message.as_ref().map(|m| m.message_id.clone());
+        let inbound_message_id = ingest
+            .inbound_message
+            .as_ref()
+            .map(|m| m.message_id.clone());
 
         let agent_res = self.execute_agent_and_dispatch(&ingest, true).await?;
         let outbound_msg_id = agent_res.and_then(|r| r.outbound_message_id);
@@ -487,7 +579,9 @@ impl ThreadUseCases {
     }
 
     pub async fn get_thread_history(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-        self.thread_persistence.list_messages_by_thread_id(thread_id).await
+        self.thread_persistence
+            .list_messages_by_thread_id(thread_id)
+            .await
     }
 
     pub async fn list_company_tasks(
@@ -576,14 +670,30 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> { unimplemented!() }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> { unimplemented!() }
-        async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
-            Ok(self.companies.lock().unwrap().iter().find(|c| c.slug == slug).cloned())
+        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> {
+            unimplemented!()
         }
-        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> { unimplemented!() }
-        async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> {
+            unimplemented!()
+        }
+        async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
+            Ok(self
+                .companies
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|c| c.slug == slug)
+                .cloned())
+        }
+        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
+            unimplemented!()
+        }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str) -> AppResult<Company> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
     }
 
     struct MockWorkflowPersistence {
@@ -592,14 +702,48 @@ mod tests {
 
     #[async_trait]
     impl WorkflowPersistence for MockWorkflowPersistence {
-        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> { unimplemented!() }
-        async fn get_by_company_slug_and_workflow_slug(&self, _company_slug: &str, workflow_slug: &str) -> AppResult<Option<Workflow>> {
-            Ok(self.workflows.lock().unwrap().iter().find(|w| w.slug == workflow_slug).cloned())
+        async fn create(
+            &self,
+            _company_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _participant_emails: Option<Vec<String>>,
+            _workflow_config: Option<serde_json::Value>,
+        ) -> AppResult<Workflow> {
+            unimplemented!()
         }
-        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
-        async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> {
+            unimplemented!()
+        }
+        async fn get_by_company_slug_and_workflow_slug(
+            &self,
+            _company_slug: &str,
+            workflow_slug: &str,
+        ) -> AppResult<Option<Workflow>> {
+            Ok(self
+                .workflows
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|w| w.slug == workflow_slug)
+                .cloned())
+        }
+        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> {
+            unimplemented!()
+        }
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _participant_emails: Option<Vec<String>>,
+            _workflow_config: Option<serde_json::Value>,
+        ) -> AppResult<Workflow> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
     }
 
     struct MockThreadPersistence {
@@ -609,7 +753,12 @@ mod tests {
 
     #[async_trait]
     impl ThreadPersistence for MockThreadPersistence {
-        async fn create_thread(&self, workflow_id: Uuid, subject: &str, participant_emails: &[String]) -> AppResult<Thread> {
+        async fn create_thread(
+            &self,
+            workflow_id: Uuid,
+            subject: &str,
+            participant_emails: &[String],
+        ) -> AppResult<Thread> {
             let thread = Thread {
                 id: Uuid::new_v4(),
                 workflow_id,
@@ -623,32 +772,34 @@ mod tests {
         }
 
         async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>> {
-            Ok(self.threads.lock().unwrap().iter().find(|t| t.id == id).cloned())
+            Ok(self
+                .threads
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|t| t.id == id)
+                .cloned())
         }
 
-        async fn update_thread_participants(&self, id: Uuid, participant_emails: &[String]) -> AppResult<Thread> {
+        async fn update_thread_participants(
+            &self,
+            id: Uuid,
+            participant_emails: &[String],
+        ) -> AppResult<Thread> {
             let mut list = self.threads.lock().unwrap();
             let thread = list.iter_mut().find(|t| t.id == id).unwrap();
             thread.participant_emails = participant_emails.to_vec();
             Ok(thread.clone())
         }
 
-        async fn find_thread_by_message_ids(&self, message_ids: &[String]) -> AppResult<Option<Thread>> {
-            let thread_id = {
-                let msgs = self.messages.lock().unwrap();
-                msgs.iter().find(|m| message_ids.contains(&m.message_id)).map(|m| m.thread_id)
-            };
-            if let Some(tid) = thread_id {
-                return self.get_thread_by_id(tid).await;
-            }
-            Ok(None)
-        }
-
-        async fn find_thread_by_thread_index(&self, thread_index_prefix: &str) -> AppResult<Option<Thread>> {
+        async fn find_thread_by_message_ids(
+            &self,
+            message_ids: &[String],
+        ) -> AppResult<Option<Thread>> {
             let thread_id = {
                 let msgs = self.messages.lock().unwrap();
                 msgs.iter()
-                    .find(|m| m.thread_index.as_deref().unwrap_or_default().starts_with(thread_index_prefix))
+                    .find(|m| message_ids.contains(&m.message_id))
                     .map(|m| m.thread_id)
             };
             if let Some(tid) = thread_id {
@@ -657,7 +808,32 @@ mod tests {
             Ok(None)
         }
 
-        async fn count_recent_messages(&self, thread_id: Uuid, _duration_secs: i64) -> AppResult<usize> {
+        async fn find_thread_by_thread_index(
+            &self,
+            thread_index_prefix: &str,
+        ) -> AppResult<Option<Thread>> {
+            let thread_id = {
+                let msgs = self.messages.lock().unwrap();
+                msgs.iter()
+                    .find(|m| {
+                        m.thread_index
+                            .as_deref()
+                            .unwrap_or_default()
+                            .starts_with(thread_index_prefix)
+                    })
+                    .map(|m| m.thread_id)
+            };
+            if let Some(tid) = thread_id {
+                return self.get_thread_by_id(tid).await;
+            }
+            Ok(None)
+        }
+
+        async fn count_recent_messages(
+            &self,
+            thread_id: Uuid,
+            _duration_secs: i64,
+        ) -> AppResult<usize> {
             let msgs = self.messages.lock().unwrap();
             Ok(msgs.iter().filter(|m| m.thread_id == thread_id).count())
         }
@@ -668,11 +844,24 @@ mod tests {
         }
 
         async fn get_message_by_message_id(&self, message_id: &str) -> AppResult<Option<Message>> {
-            Ok(self.messages.lock().unwrap().iter().find(|m| m.message_id == message_id).cloned())
+            Ok(self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|m| m.message_id == message_id)
+                .cloned())
         }
 
         async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-            Ok(self.messages.lock().unwrap().iter().filter(|m| m.thread_id == thread_id).cloned().collect())
+            Ok(self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m| m.thread_id == thread_id)
+                .cloned()
+                .collect())
         }
     }
 
@@ -682,7 +871,14 @@ mod tests {
 
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
-        async fn enqueue_task(&self, company_id: Uuid, workflow_id: Uuid, thread_id: Option<Uuid>, task_type: &str, payload: serde_json::Value) -> AppResult<crate::entities::task::BackgroundTask> {
+        async fn enqueue_task(
+            &self,
+            company_id: Uuid,
+            workflow_id: Uuid,
+            thread_id: Option<Uuid>,
+            task_type: &str,
+            payload: serde_json::Value,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
             let task = crate::entities::task::BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
@@ -702,12 +898,31 @@ mod tests {
             Ok(task)
         }
 
-        async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<crate::entities::task::BackgroundTask>> {
-            Ok(self.tasks.lock().unwrap().iter().find(|t| t.id == id).cloned())
+        async fn get_task_by_id(
+            &self,
+            id: Uuid,
+        ) -> AppResult<Option<crate::entities::task::BackgroundTask>> {
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|t| t.id == id)
+                .cloned())
         }
 
-        async fn poll_next_pending_tasks(&self, _limit: i64) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            Ok(self.tasks.lock().unwrap().iter().filter(|t| t.status == crate::entities::task::TaskStatus::Pending).cloned().collect())
+        async fn poll_next_pending_tasks(
+            &self,
+            _limit: i64,
+        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|t| t.status == crate::entities::task::TaskStatus::Pending)
+                .cloned()
+                .collect())
         }
 
         async fn mark_task_processing(&self, id: Uuid) -> AppResult<()> {
@@ -726,11 +941,21 @@ mod tests {
             Ok(())
         }
 
-        async fn mark_task_failed(&self, id: Uuid, error_msg: &str, _next_run_at: chrono::NaiveDateTime, is_dead_letter: bool) -> AppResult<()> {
+        async fn mark_task_failed(
+            &self,
+            id: Uuid,
+            error_msg: &str,
+            _next_run_at: chrono::NaiveDateTime,
+            is_dead_letter: bool,
+        ) -> AppResult<()> {
             let mut list = self.tasks.lock().unwrap();
             if let Some(t) = list.iter_mut().find(|t| t.id == id) {
                 t.last_error = Some(error_msg.to_string());
-                t.status = if is_dead_letter { crate::entities::task::TaskStatus::DeadLetter } else { crate::entities::task::TaskStatus::Failed };
+                t.status = if is_dead_letter {
+                    crate::entities::task::TaskStatus::DeadLetter
+                } else {
+                    crate::entities::task::TaskStatus::Failed
+                };
             }
             Ok(())
         }
@@ -749,8 +974,21 @@ mod tests {
             Ok(t.clone())
         }
 
-        async fn list_company_tasks(&self, company_id: Uuid, _workflow_id: Option<Uuid>, _status: Option<crate::entities::task::TaskStatus>, _sort_asc: bool) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            Ok(self.tasks.lock().unwrap().iter().filter(|t| t.company_id == company_id).cloned().collect())
+        async fn list_company_tasks(
+            &self,
+            company_id: Uuid,
+            _workflow_id: Option<Uuid>,
+            _status: Option<crate::entities::task::TaskStatus>,
+            _sort_asc: bool,
+        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|t| t.company_id == company_id)
+                .cloned()
+                .collect())
         }
     }
 
@@ -822,9 +1060,15 @@ mod tests {
             ..Default::default()
         };
 
-        let result = thread_use_cases.ingest_and_save_inbound_message(raw_payload).await.unwrap();
+        let result = thread_use_cases
+            .ingest_and_save_inbound_message(raw_payload)
+            .await
+            .unwrap();
         assert!(!result.accepted);
-        assert_eq!(result.reason.as_deref(), Some("Max inter-workflow hop count reached"));
+        assert_eq!(
+            result.reason.as_deref(),
+            Some("Max inter-workflow hop count reached")
+        );
     }
 
     #[tokio::test]
@@ -892,7 +1136,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = thread_use_cases.ingest_and_save_inbound_message(raw_payload).await.unwrap();
+        let result = thread_use_cases
+            .ingest_and_save_inbound_message(raw_payload)
+            .await
+            .unwrap();
         assert!(!result.accepted);
         assert_eq!(result.reason.as_deref(), Some("SPF authentication failed"));
     }

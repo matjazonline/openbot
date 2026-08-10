@@ -15,9 +15,12 @@ pub struct Workflow {
 impl Workflow {
     pub fn default_config() -> serde_json::Value {
         serde_json::json!({
-            "trigger": "email_received",
-            "action": "ai_agent_reply",
-            "mode": "auto"
+            "name": "MinimalAgent",
+            "system_prompt": "You are a helpful assistant.",
+            "llm": {
+              "provider": "google",
+              "model": "gemini-2.0-flash"
+            }
         })
     }
 }
