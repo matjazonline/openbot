@@ -120,43 +120,47 @@ impl<'a> AgentRunner<'a> {
 
         let raw_full_prompt = format!("{}{}", history_str, self.prompt);
 
-        // Parse workflow_config, fallback to default config if None
-        let default_config = Self::default_config();
-        let config = self.workflow_config.unwrap_or(&default_config);
-        let config_yaml = serde_yaml::to_string(config).unwrap_or_default();
-
         // Resolution order:
-        // 1. Explicit `llm.*` in workflow config
-        // 2. Runtime entity overrides (`api_key`, `provider`, `model`)
-        // 3. Environment variables matching provider
+        // 1. Runtime entity overrides (`api_key`, `provider`, `model`)
+        // 2. Explicit `llm.*` in workflow config
+        // 3. Environment variables matching provider (for api_key)
         // 4. System defaults
-        let provider_name = config
-            .get("llm")
-            .and_then(|llm| llm.get("provider"))
-            .and_then(|v| v.as_str())
-            .filter(|s| !s.trim().is_empty())
-            .or(self.provider.filter(|s| !s.trim().is_empty()))
+        let provider_clean = self.provider.map(|s| s.trim()).filter(|s| !s.is_empty());
+        let model_clean = self.model.map(|s| s.trim()).filter(|s| !s.is_empty());
+        let api_key_clean = self.api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
+
+        let wf_llm = self.workflow_config.and_then(|c| c.get("llm"));
+
+        let provider_name = provider_clean
+            .or_else(|| {
+                wf_llm
+                    .and_then(|llm| llm.get("provider"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })
             .unwrap_or("google")
             .to_lowercase();
 
-        let model_name = config
-            .get("llm")
-            .and_then(|llm| llm.get("model"))
-            .and_then(|v| v.as_str())
-            .filter(|s| !s.trim().is_empty())
-            .or(self.model.filter(|s| !s.trim().is_empty()))
+        let model_name = model_clean
+            .or_else(|| {
+                wf_llm
+                    .and_then(|llm| llm.get("model"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })
             .unwrap_or("gemini-2.5-flash")
             .to_string();
 
-        let resolved_api_key = config
-            .get("llm")
-            .and_then(|llm| llm.get("api_key"))
-            .and_then(|v| v.as_str())
-            .filter(|s| !s.trim().is_empty())
+        let resolved_api_key = api_key_clean
             .map(|s| s.to_string())
             .or_else(|| {
-                self.api_key
-                    .filter(|s| !s.trim().is_empty())
+                wf_llm
+                    .and_then(|llm| llm.get("api_key"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
                     .map(|s| s.to_string())
             })
             .or_else(|| {
@@ -184,6 +188,37 @@ impl<'a> AgentRunner<'a> {
                 ));
             }
         };
+
+        // Construct final configuration with resolved provider, model, and api_key
+        let mut final_config = self
+            .workflow_config
+            .cloned()
+            .unwrap_or_else(Self::default_config);
+
+        if !final_config.is_object() {
+            final_config = serde_json::json!({});
+        }
+
+        if final_config.get("name").is_none() {
+            final_config["name"] = serde_json::json!("MinimalAgent");
+        }
+        if final_config.get("system_prompt").is_none() {
+            final_config["system_prompt"] = serde_json::json!("You are a helpful assistant.");
+        }
+
+        let llm_obj = final_config
+            .as_object_mut()
+            .unwrap()
+            .entry("llm")
+            .or_insert_with(|| serde_json::json!({}));
+
+        if let Some(llm_map) = llm_obj.as_object_mut() {
+            llm_map.insert("provider".to_string(), serde_json::json!(provider_name));
+            llm_map.insert("model".to_string(), serde_json::json!(model_name));
+            llm_map.insert("api_key".to_string(), serde_json::json!(key));
+        }
+
+        let config_yaml = serde_yaml::to_string(&final_config).unwrap_or_default();
 
         let full_prompt = sanitize_text(&raw_full_prompt, Some(&key));
         info!("Full prompt context length: {}", full_prompt.len());
@@ -299,6 +334,17 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn test_agent_runner_uses_entity_model_override() -> anyhow::Result<()> {
+        let result = AgentRunner::new("Hello world")
+            .api_key(Some("fake_key_123"))
+            .model(Some("invalid-custom-model-xyz"))
+            .execute()
+            .await;
+        assert!(result.is_err());
+        Ok(())
+    }
+
     #[test]
     fn test_sanitize_text_hides_keys_in_urls_configs_and_messages() {
         let raw_url = "Fetched https://api.service.com/v1/data?key=12345SECRET&other=val and https://other.org/ep?api_key=98765SECRET";
@@ -321,5 +367,15 @@ mod tests {
         let msg_with_secret = "The secret token is secret_abc_123.";
         let sanitized_msg = sanitize_text(msg_with_secret, Some("secret_abc_123"));
         assert_eq!(sanitized_msg, "The secret token is [REDACTED].");
+
+        let err_with_url_key = "Failed to fetch URL https://api.service.com/v1/exec?api_key=SECRET_API_KEY_999: HTTP 500 Internal Server Error";
+        let sanitized_err = sanitize_text(err_with_url_key, Some("SECRET_API_KEY_999"));
+        assert!(!sanitized_err.contains("SECRET_API_KEY_999"));
+        assert!(sanitized_err.contains("api_key=[REDACTED]"));
+
+        let err_with_raw_key = "Authentication failed for key sk-proj-SECRET123456789";
+        let sanitized_raw_err = sanitize_text(err_with_raw_key, Some("sk-proj-SECRET123456789"));
+        assert!(!sanitized_raw_err.contains("sk-proj-SECRET123456789"));
+        assert_eq!(sanitized_raw_err, "Authentication failed for key [REDACTED]");
     }
 }
