@@ -1,5 +1,6 @@
 use tracing::info;
 use crate::entities::message::{Message, MessageRole};
+use crate::entities::workflow::Workflow;
 
 pub struct AgentRunner;
 
@@ -28,10 +29,10 @@ impl AgentRunner {
         let full_prompt = format!("{}{}", history_str, prompt);
         info!("Full prompt context length: {}", full_prompt.len());
 
-        // Parse workflow_config if present
-        let config_yaml = workflow_config.map(|cfg| {
-            serde_yaml::to_string(cfg).unwrap_or_default()
-        }).unwrap_or_default();
+        // Parse workflow_config, fallback to default config if None
+        let default_config = Workflow::default_config();
+        let config = workflow_config.unwrap_or(&default_config);
+        let config_yaml = serde_yaml::to_string(config).unwrap_or_default();
 
         if !config_yaml.is_empty() {
             info!("Running agent with workflow config YAML:\n{}", config_yaml);
@@ -42,5 +43,16 @@ impl AgentRunner {
             "Thank you for contacting us. We received your request:\n\n> {}\n\nOur team/agent is processing this ticket under workflow rules.",
             prompt.lines().next().unwrap_or(prompt)
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_agent_runner_uses_default_config_when_none() {
+        let response = AgentRunner::execute(None, "Hello world", &[]).await;
+        assert!(response.contains("Thank you for contacting us"));
     }
 }

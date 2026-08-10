@@ -132,7 +132,7 @@ async fn sendgrid_inbound_webhook(
 
         // Offload Agent Execution and Outbound SMTP Dispatch to background task
         tokio::spawn(async move {
-            if let Err(err) = thread_use_cases_bg.execute_agent_and_dispatch(ingest_bg).await {
+            if let Err(err) = thread_use_cases_bg.execute_agent_and_dispatch(&ingest_bg, true).await {
                 warn!("Background agent execution failed: {err}");
             }
         });

@@ -4,6 +4,7 @@ use crate::entities::{
     company::Company, company_invite::CompanyInvite, company_member::CompanyMember,
     task::{BackgroundTask, TaskStatus}, workflow::Workflow,
 };
+use crate::use_cases::thread::{SimulationExecutionResult, SimulationMode};
 use crate::use_cases::workflow::InboundEmailResult;
 
 pub fn base_layout(title: &str, content: &str) -> String {
@@ -857,6 +858,32 @@ pub fn workflow_simulation_page(
                     <textarea id="text_body" name="text_body" rows="3"
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">This is a simulated inbound email payload for testing workflow execution.</textarea>
                 </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-indigo-500 transition">
+                            <input type="radio" name="simulation_mode" value="verify" checked class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                            <div class="ml-2.5">
+                                <span class="block text-xs font-bold text-white">Verify</span>
+                                <span class="block text-[11px] text-slate-400 mt-0.5">Verification only (Recipient & Sender ACL check)</span>
+                            </div>
+                        </label>
+                        <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
+                            <input type="radio" name="simulation_mode" value="run_test" class="mt-0.5 text-amber-500 focus:ring-amber-500">
+                            <div class="ml-2.5">
+                                <span class="block text-xs font-bold text-amber-300">Run_Test</span>
+                                <span class="block text-[11px] text-slate-400 mt-0.5">Execute full workflow & agent, skip email dispatch</span>
+                            </div>
+                        </label>
+                        <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
+                            <input type="radio" name="simulation_mode" value="run" class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
+                            <div class="ml-2.5">
+                                <span class="block text-xs font-bold text-emerald-400">Run</span>
+                                <span class="block text-[11px] text-slate-400 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
                 <div class="flex justify-end">
                     <button type="submit"
                         class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2">
@@ -971,6 +998,178 @@ pub fn workflow_simulation_result_fragment(result: &InboundEmailResult) -> Strin
         subject_str = subject_str,
         body_str = body_str,
         workflow_config_str = workflow_config_str,
+    )
+}
+
+pub fn workflow_simulation_execution_result_fragment(
+    sim_res: &SimulationExecutionResult,
+) -> String {
+    let ingest = &sim_res.ingest_result;
+
+    if !ingest.accepted {
+        let reason = ingest
+            .reason
+            .as_deref()
+            .unwrap_or("Ingestion failed / unauthorized");
+        return format!(
+            r#"<div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
+                <span class="text-rose-400 text-lg">✕</span>
+                <span>Webhook Ingestion Rejected: {}</span>
+            </div>"#,
+            reason
+        );
+    }
+
+    let mode_label = match sim_res.simulation_mode {
+        SimulationMode::Verify => "Verify",
+        SimulationMode::RunTest => "Run_Test (Dry-Run)",
+        SimulationMode::Run => "Run (Live)",
+    };
+
+    let status_banner = match sim_res.simulation_mode {
+        SimulationMode::RunTest => {
+            r#"<div class="p-4 rounded-xl bg-amber-950/80 border border-amber-600/60 text-amber-200 text-sm font-semibold flex items-center gap-2">
+                <span class="text-amber-400 text-lg">⚡</span>
+                <span>Workflow Executed Successfully in Run_Test Mode! (Outbound email send was skipped / dry-run)</span>
+            </div>"#
+        }
+        SimulationMode::Run => {
+            r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-600/60 text-emerald-200 text-sm font-semibold flex items-center gap-2">
+                <span class="text-emerald-400 text-lg">✓</span>
+                <span>Workflow Executed & Outbound Email Dispatched Successfully!</span>
+            </div>"#
+        }
+        SimulationMode::Verify => {
+            r#"<div class="p-4 rounded-xl bg-indigo-950/80 border border-indigo-600/60 text-indigo-200 text-sm font-semibold flex items-center gap-2">
+                <span class="text-indigo-400 text-lg">✓</span>
+                <span>Verification Check Passed!</span>
+            </div>"#
+        }
+    };
+
+    let thread_id_str = ingest
+        .thread
+        .as_ref()
+        .map(|t| t.id.to_string())
+        .unwrap_or_else(|| "N/A".to_string());
+
+    let inbound_msg_id = ingest
+        .inbound_message
+        .as_ref()
+        .map(|m| m.message_id.clone())
+        .unwrap_or_else(|| "N/A".to_string());
+
+    let company_name = ingest
+        .company
+        .as_ref()
+        .map(|c| format!("{} (/{})", c.name, c.slug))
+        .unwrap_or_else(|| "N/A".to_string());
+
+    let workflow_name = ingest
+        .workflow
+        .as_ref()
+        .map(|w| format!("{} (/{})", w.name, w.slug))
+        .unwrap_or_else(|| "N/A".to_string());
+
+    let parsed = ingest.parsed_email.as_ref();
+    let to_str = parsed.and_then(|p| p.recipients_to.first().map(|s| s.as_str())).unwrap_or("N/A");
+    let from_str = parsed.map(|p| p.sender.as_str()).unwrap_or("N/A");
+    let subject_str = parsed.map(|p| p.subject.as_str()).unwrap_or("(No subject)");
+    let text_body_str = parsed.map(|p| p.clean_text_body.as_str()).unwrap_or("(No text body)");
+
+    let agent_exec = sim_res.agent_execution.as_ref();
+    let outbound_msg_id = agent_exec
+        .and_then(|a| a.outbound_message_id.clone())
+        .unwrap_or_else(|| "N/A".to_string());
+
+    let agent_response_text = agent_exec
+        .map(|a| a.agent_response.as_str())
+        .unwrap_or("(No response generated)");
+
+    let email_status = if sim_res.simulation_mode == SimulationMode::RunTest {
+        "<span class=\"text-amber-400 font-bold\">Skipped (Run_Test Dry-Run)</span>"
+    } else if sim_res.simulation_mode == SimulationMode::Run {
+        "<span class=\"text-emerald-400 font-bold\">Dispatched via SMTP</span>"
+    } else {
+        "<span class=\"text-slate-400 font-bold\">None (Verify Only)</span>"
+    };
+
+    format!(
+        r##"
+        <div class="space-y-4">
+            {status_banner}
+
+            <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
+                <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2">Full Execution Details</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Mode:</span>
+                        <span class="text-indigo-300 font-bold">{mode_label}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Email Dispatch Status:</span>
+                        <span>{email_status}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
+                        <span class="text-indigo-300">{to_str}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Sender ('from'):</span>
+                        <span class="text-indigo-300">{from_str}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Company:</span>
+                        <span class="text-slate-200">{company_name}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Workflow:</span>
+                        <span class="text-slate-200">{workflow_name}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Thread ID:</span>
+                        <span class="text-emerald-300 font-mono">{thread_id_str}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Inbound Message ID:</span>
+                        <span class="text-slate-300 font-mono">{inbound_msg_id}</span>
+                    </div>
+                    <div class="md:col-span-2">
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Outbound Agent Message ID:</span>
+                        <span class="text-indigo-300 font-mono">{outbound_msg_id}</span>
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-800">
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Subject:</span>
+                    <span class="text-slate-200 font-sans font-medium text-sm">{subject_str}</span>
+                </div>
+
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Inbound Text Body:</span>
+                    <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800">{text_body_str}</div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-800">
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Generated AI Agent Response:</span>
+                    <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 font-sans">{agent_response_text}</div>
+                </div>
+            </div>
+        </div>
+        "##,
+        status_banner = status_banner,
+        mode_label = mode_label,
+        email_status = email_status,
+        to_str = to_str,
+        from_str = from_str,
+        company_name = company_name,
+        workflow_name = workflow_name,
+        thread_id_str = thread_id_str,
+        inbound_msg_id = inbound_msg_id,
+        outbound_msg_id = outbound_msg_id,
+        subject_str = subject_str,
+        text_body_str = text_body_str,
+        agent_response_text = agent_response_text,
     )
 }
 

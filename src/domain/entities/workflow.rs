@@ -11,3 +11,13 @@ pub struct Workflow {
     pub workflow_config: Option<serde_json::Value>,
     pub created_at: chrono::NaiveDateTime,
 }
+
+impl Workflow {
+    pub fn default_config() -> serde_json::Value {
+        serde_json::json!({
+            "trigger": "email_received",
+            "action": "ai_agent_reply",
+            "mode": "auto"
+        })
+    }
+}

@@ -123,7 +123,7 @@ impl TaskWorker {
 
         // Execute Agent and Dispatch Outbound Email
         self.thread_use_cases
-            .execute_agent_and_dispatch(ingest)
+            .execute_agent_and_dispatch(&ingest, true)
             .await
             .map_err(|e| e.to_string())?;
 

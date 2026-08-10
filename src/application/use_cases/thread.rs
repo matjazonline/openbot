@@ -307,12 +307,16 @@ impl ThreadUseCases {
         Ok(ingest_result)
     }
 
-    pub async fn execute_agent_and_dispatch(&self, ingest: InboundIngestResult) -> AppResult<Option<String>> {
+    pub async fn execute_agent_and_dispatch(
+        &self,
+        ingest: &InboundIngestResult,
+        send_email: bool,
+    ) -> AppResult<Option<AgentExecutionResult>> {
         let (thread, company, workflow, parsed) = match (
-            ingest.thread,
-            ingest.company,
-            ingest.workflow,
-            ingest.parsed_email,
+            &ingest.thread,
+            &ingest.company,
+            &ingest.workflow,
+            &ingest.parsed_email,
         ) {
             (Some(t), Some(c), Some(w), Some(p)) => (t, c, w, p),
             _ => return Ok(None),
@@ -328,53 +332,87 @@ impl ThreadUseCases {
         )
         .await;
 
-        // Construct Outbound Email
-        let mut references_for_outbound = parsed.references.clone();
-        if let Some(ref reply_to) = parsed.in_reply_to {
-            if !references_for_outbound.contains(reply_to) {
-                references_for_outbound.push(reply_to.clone());
-            }
-        }
-
-        let mut outbound_cc = parsed.recipients_cc.clone();
-        if let Some(ref wf_participants) = workflow.participant_emails {
-            for p in wf_participants {
-                if !p.eq_ignore_ascii_case(&parsed.sender) && !outbound_cc.contains(p) {
-                    outbound_cc.push(p.clone());
+        let (sent_message_id, in_reply_to, references, from_address, recipients_to, recipients_cc, subject, email_sent) = if send_email {
+            // Construct Outbound Email
+            let mut references_for_outbound = parsed.references.clone();
+            if let Some(ref reply_to) = parsed.in_reply_to {
+                if !references_for_outbound.contains(reply_to) {
+                    references_for_outbound.push(reply_to.clone());
                 }
             }
-        }
 
-        let outbound_email = OutboundEmail {
-            workflow_id: workflow.id,
-            workflow_name: workflow.name.clone(),
-            workflow_slug: workflow.slug.clone(),
-            company_slug: company.slug.clone(),
-            trigger_message_id: parsed.message_id.clone(),
-            thread_references: references_for_outbound,
-            recipient_to: parsed.sender.clone(),
-            recipients_cc: outbound_cc,
-            subject: parsed.subject.clone(),
-            body_text: agent_response,
-            hop_count: parsed.hop_count,
-            trace_workflows: parsed.trace_workflows,
+            let mut outbound_cc = parsed.recipients_cc.clone();
+            if let Some(ref wf_participants) = workflow.participant_emails {
+                for p in wf_participants {
+                    if !p.eq_ignore_ascii_case(&parsed.sender) && !outbound_cc.contains(p) {
+                        outbound_cc.push(p.clone());
+                    }
+                }
+            }
+
+            let outbound_email = OutboundEmail {
+                workflow_id: workflow.id,
+                workflow_name: workflow.name.clone(),
+                workflow_slug: workflow.slug.clone(),
+                company_slug: company.slug.clone(),
+                trigger_message_id: parsed.message_id.clone(),
+                thread_references: references_for_outbound,
+                recipient_to: parsed.sender.clone(),
+                recipients_cc: outbound_cc,
+                subject: parsed.subject.clone(),
+                body_text: agent_response.clone(),
+                hop_count: parsed.hop_count,
+                trace_workflows: parsed.trace_workflows.clone(),
+            };
+
+            let sent_result = OutboundDispatcher::send(&self.config, outbound_email).await?;
+            (
+                sent_result.outbound_message_id,
+                sent_result.in_reply_to,
+                sent_result.references,
+                sent_result.from_address,
+                sent_result.recipients_to,
+                sent_result.recipients_cc,
+                sent_result.subject,
+                true,
+            )
+        } else {
+            let outbound_uuid = Uuid::new_v4();
+            let simulated_msg_id = format!("<simulated-test-{}@{}>", outbound_uuid, self.config.app_domain_name);
+            let from_email = format!(
+                "{}@{}.{}",
+                workflow.slug, company.slug, self.config.app_domain_name
+            );
+            info!("Simulation test mode (Run_Test): Skipped SMTP email dispatch for Message-ID {}", simulated_msg_id);
+            (
+                simulated_msg_id,
+                parsed.message_id.clone(),
+                parsed.references.clone(),
+                from_email,
+                vec![parsed.sender.clone()],
+                parsed.recipients_cc.clone(),
+                if parsed.subject.to_lowercase().starts_with("re:") {
+                    parsed.subject.clone()
+                } else {
+                    format!("Re: {}", parsed.subject)
+                },
+                false,
+            )
         };
-
-        let sent_result = OutboundDispatcher::send(&self.config, outbound_email).await?;
 
         // Save Outbound Agent Message
         let outbound_msg_id = Uuid::new_v4();
         let outbound_message = Message {
             id: outbound_msg_id,
             thread_id: thread.id,
-            message_id: sent_result.outbound_message_id.clone(),
-            in_reply_to: Some(sent_result.in_reply_to),
-            references_list: sent_result.references,
-            sender: sent_result.from_address,
-            recipients_to: sent_result.recipients_to,
-            recipients_cc: sent_result.recipients_cc,
-            subject: sent_result.subject,
-            clean_text_body: sent_result.body_text,
+            message_id: sent_message_id.clone(),
+            in_reply_to: Some(in_reply_to),
+            references_list: references,
+            sender: from_address,
+            recipients_to,
+            recipients_cc,
+            subject,
+            clean_text_body: agent_response.clone(),
             raw_text_body: None,
             raw_html_body: None,
             attachments: None,
@@ -386,7 +424,36 @@ impl ThreadUseCases {
 
         let _ = self.thread_persistence.create_message(&outbound_message).await?;
 
-        Ok(Some(sent_result.outbound_message_id))
+        Ok(Some(AgentExecutionResult {
+            outbound_message_id: Some(sent_message_id),
+            agent_response,
+            email_sent,
+        }))
+    }
+
+    pub async fn execute_simulation(
+        &self,
+        raw_payload: RawInboundPayload,
+        mode: SimulationMode,
+    ) -> AppResult<SimulationExecutionResult> {
+        let ingest = self.ingest_and_save_inbound_message(raw_payload).await?;
+
+        if !ingest.accepted {
+            return Ok(SimulationExecutionResult {
+                ingest_result: ingest,
+                agent_execution: None,
+                simulation_mode: mode,
+            });
+        }
+
+        let send_email = mode == SimulationMode::Run;
+        let agent_execution = self.execute_agent_and_dispatch(&ingest, send_email).await?;
+
+        Ok(SimulationExecutionResult {
+            ingest_result: ingest,
+            agent_execution,
+            simulation_mode: mode,
+        })
     }
 
     pub async fn process_and_dispatch_email(
@@ -407,7 +474,8 @@ impl ThreadUseCases {
         let thread_id = ingest.thread.as_ref().map(|t| t.id);
         let inbound_message_id = ingest.inbound_message.as_ref().map(|m| m.message_id.clone());
 
-        let outbound_msg_id = self.execute_agent_and_dispatch(ingest).await?;
+        let agent_res = self.execute_agent_and_dispatch(&ingest, true).await?;
+        let outbound_msg_id = agent_res.and_then(|r| r.outbound_message_id);
 
         Ok(ProcessEmailResult {
             processed: true,
@@ -464,6 +532,27 @@ impl InboundIngestResult {
             parsed_email: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SimulationMode {
+    Verify,
+    RunTest,
+    Run,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentExecutionResult {
+    pub outbound_message_id: Option<String>,
+    pub agent_response: String,
+    pub email_sent: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimulationExecutionResult {
+    pub ingest_result: InboundIngestResult,
+    pub agent_execution: Option<AgentExecutionResult>,
+    pub simulation_mode: SimulationMode,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

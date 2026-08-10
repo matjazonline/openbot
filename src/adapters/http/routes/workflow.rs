@@ -16,7 +16,12 @@ use crate::{
     app_error::AppResult,
     entities::workflow::Workflow,
     infra::config::AppConfig,
-    use_cases::{company::CompanyUseCases, workflow::WorkflowUseCases},
+    services::email_parser::RawInboundPayload,
+    use_cases::{
+        company::CompanyUseCases,
+        thread::{SimulationMode, ThreadUseCases},
+        workflow::WorkflowUseCases,
+    },
 };
 
 pub fn router() -> Router<AppState> {
@@ -308,6 +313,7 @@ pub struct SimulationForm {
     pub subject: Option<String>,
     pub text_body: Option<String>,
     pub html_body: Option<String>,
+    pub simulation_mode: Option<String>,
 }
 
 /// GET /companies/{company_id}/workflows/{id}/simulate - Simulation page (Protected).
@@ -340,29 +346,56 @@ async fn simulate_workflow_page(
 }
 
 /// POST /companies/{company_id}/workflows/{id}/simulate - Submit simulation form (Protected).
-#[instrument(skip(workflow_use_cases, config, _user, form))]
+#[instrument(skip(workflow_use_cases, thread_use_cases, config, _user, form))]
 async fn simulate_workflow_handler(
     State(workflow_use_cases): State<Arc<WorkflowUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(config): State<Arc<AppConfig>>,
     _user: AuthenticatedUser,
     Path((_company_id, _workflow_id)): Path<(Uuid, Uuid)>,
     Form(form): Form<SimulationForm>,
 ) -> impl IntoResponse {
-    let inbound_email = crate::use_cases::workflow::InboundEmail {
-        to: form.to,
-        from: form.from,
-        subject: form.subject,
-        text_body: form.text_body,
-        html_body: form.html_body,
-        raw_payload: None,
+    let mode_str = form.simulation_mode.as_deref().unwrap_or("verify");
+    let mode = match mode_str.to_lowercase().as_str() {
+        "run_test" => SimulationMode::RunTest,
+        "run" => SimulationMode::Run,
+        _ => SimulationMode::Verify,
     };
 
-    match workflow_use_cases
-        .process_inbound_email("simulation", inbound_email, &config.app_domain_name)
-        .await
-    {
-        Ok(result) => Html(pages::workflow_simulation_result_fragment(&result)),
-        Err(err) => Html(pages::error_alert(&format!("Simulation failed: {err}"))),
+    match mode {
+        SimulationMode::Verify => {
+            let inbound_email = crate::use_cases::workflow::InboundEmail {
+                to: form.to,
+                from: form.from,
+                subject: form.subject,
+                text_body: form.text_body,
+                html_body: form.html_body,
+                raw_payload: None,
+            };
+
+            match workflow_use_cases
+                .process_inbound_email("simulation", inbound_email, &config.app_domain_name)
+                .await
+            {
+                Ok(result) => Html(pages::workflow_simulation_result_fragment(&result)),
+                Err(err) => Html(pages::error_alert(&format!("Simulation failed: {err}"))),
+            }
+        }
+        SimulationMode::RunTest | SimulationMode::Run => {
+            let raw_payload = RawInboundPayload {
+                to: form.to,
+                from: form.from,
+                subject: form.subject,
+                text: form.text_body,
+                html: form.html_body,
+                ..Default::default()
+            };
+
+            match thread_use_cases.execute_simulation(raw_payload, mode).await {
+                Ok(sim_res) => Html(pages::workflow_simulation_execution_result_fragment(&sim_res)),
+                Err(err) => Html(pages::error_alert(&format!("Simulation execution failed: {err}"))),
+            }
+        }
     }
 }
 
@@ -501,6 +534,9 @@ mod tests {
         let sim_html = pages::workflow_simulation_page(&company, "example.com", &workflow);
         assert!(sim_html.contains("Simulate Webhook: Auto Dispatcher"));
         assert!(sim_html.contains("auto-dispatcher@acme.example.com"));
+        assert!(sim_html.contains("value=\"verify\""));
+        assert!(sim_html.contains("value=\"run_test\""));
+        assert!(sim_html.contains("value=\"run\""));
 
         let sim_result = crate::use_cases::workflow::InboundEmailResult {
             resolved: true,
@@ -520,5 +556,49 @@ mod tests {
         };
         let sim_result_html = pages::workflow_simulation_result_fragment(&sim_result);
         assert!(sim_result_html.contains("Webhook Triggered & Workflow Resolved Successfully!"));
+
+        let full_sim_res = crate::use_cases::thread::SimulationExecutionResult {
+            ingest_result: crate::use_cases::thread::InboundIngestResult {
+                accepted: true,
+                reason: None,
+                thread: None,
+                inbound_message: None,
+                company: Some(company),
+                workflow: Some(workflow),
+                parsed_email: Some(crate::services::email_parser::ParsedEmail {
+                    message_id: "<msg1@test>".to_string(),
+                    in_reply_to: None,
+                    references: vec![],
+                    thread_index: None,
+                    sender: "agent@test.com".to_string(),
+                    recipients_to: vec!["auto-dispatcher@acme.example.com".to_string()],
+                    recipients_cc: vec![],
+                    subject: "Test".to_string(),
+                    clean_text_body: "Body text".to_string(),
+                    raw_text_body: None,
+                    raw_html_body: None,
+                    attachments: vec![],
+                    prompt_text: "Body text".to_string(),
+                    is_auto_reply: false,
+                    is_forwarded: false,
+                    workflow_id_header: None,
+                    hop_count: 0,
+                    trace_workflows: vec![],
+                    spf_status: Some("pass".to_string()),
+                    dkim_status: Some("pass".to_string()),
+                    spam_score: None,
+                }),
+            },
+            agent_execution: Some(crate::use_cases::thread::AgentExecutionResult {
+                outbound_message_id: Some("<out1@test>".to_string()),
+                agent_response: "Hello from Agent".to_string(),
+                email_sent: false,
+            }),
+            simulation_mode: crate::use_cases::thread::SimulationMode::RunTest,
+        };
+        let run_test_html = pages::workflow_simulation_execution_result_fragment(&full_sim_res);
+        assert!(run_test_html.contains("Run_Test Mode"));
+        assert!(run_test_html.contains("Skipped (Run_Test Dry-Run)"));
+        assert!(run_test_html.contains("Hello from Agent"));
     }
 }
