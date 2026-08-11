@@ -45,6 +45,23 @@ impl FromStr for TaskStatus {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct TokenUsage {
+    pub prompt_tokens: usize,
+    pub completion_tokens: usize,
+    pub total_tokens: usize,
+}
+
+impl TokenUsage {
+    pub fn new(prompt_tokens: usize, completion_tokens: usize) -> Self {
+        Self {
+            prompt_tokens,
+            completion_tokens,
+            total_tokens: prompt_tokens + completion_tokens,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BackgroundTask {
     pub id: Uuid,
@@ -60,4 +77,20 @@ pub struct BackgroundTask {
     pub run_at: chrono::NaiveDateTime,
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
+}
+
+impl BackgroundTask {
+    pub fn token_usage(&self) -> Option<TokenUsage> {
+        let usage_val = self
+            .payload
+            .get("execution_result")
+            .and_then(|res| res.get("token_usage"))
+            .or_else(|| self.payload.get("token_usage"));
+
+        if let Some(val) = usage_val {
+            serde_json::from_value(val.clone()).ok()
+        } else {
+            None
+        }
+    }
 }

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tracing::info;
 
 use mail_agents::{
+    adapters::smtp::SmtpServer,
     infra::{app::create_app, setup::init_app_state},
     services::task_worker::TaskWorker,
 };
@@ -23,7 +24,15 @@ async fn main() -> anyhow::Result<()> {
         app_state.config.clone(),
     ));
 
-    tokio::spawn(task_worker.start_worker_loop(shutdown_rx));
+    tokio::spawn(task_worker.start_worker_loop(shutdown_rx.resubscribe()));
+
+    // Initialize Incoming SMTP Server loop
+    let smtp_server = Arc::new(SmtpServer::new(
+        app_state.thread_use_cases.clone(),
+        app_state.config.clone(),
+    ));
+
+    tokio::spawn(smtp_server.start_server_loop(shutdown_rx.resubscribe()));
 
     let app = create_app(app_state);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();

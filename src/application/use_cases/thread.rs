@@ -10,6 +10,7 @@ use crate::{
     entities::{
         company::Company,
         message::{Message, MessageDirection, MessageRole},
+        task::TokenUsage,
         thread::Thread,
         workflow::Workflow,
     },
@@ -480,11 +481,11 @@ impl ThreadUseCases {
             Err(err) => Err(anyhow::anyhow!("{err}")),
         };
 
-        let (agent_response, execution_error) = match runner_res {
-            Ok(res) => (res, None),
+        let (agent_response, token_usage, execution_error) = match runner_res {
+            Ok(output) => (output.content, Some(output.token_usage), None),
             Err(err) => {
                 let err_msg = format!("Agent execution failed: {err}");
-                (err_msg.clone(), Some(err_msg))
+                (err_msg.clone(), None, Some(err_msg))
             }
         };
 
@@ -636,6 +637,7 @@ impl ThreadUseCases {
                     "email_sent": email_sent,
                     "outbound_message_id": sent_message_id.clone(),
                     "error": execution_error.clone(),
+                    "token_usage": token_usage.clone(),
                 }));
             }
             let _ = self.task_persistence.update_task_payload(task_id, updated_payload).await;
@@ -660,6 +662,7 @@ impl ThreadUseCases {
             outbound_message_id: Some(sent_message_id),
             agent_response,
             email_sent,
+            token_usage,
         }))
     }
 
@@ -685,6 +688,7 @@ impl ThreadUseCases {
                 outbound_message_id: None,
                 agent_response: format!("{err}"),
                 email_sent: false,
+                token_usage: None,
             }),
         };
 
@@ -796,6 +800,7 @@ pub struct AgentExecutionResult {
     pub outbound_message_id: Option<String>,
     pub agent_response: String,
     pub email_sent: bool,
+    pub token_usage: Option<TokenUsage>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1219,6 +1224,9 @@ mod tests {
             smtp_username: "".to_string(),
             smtp_password: "".to_string(),
             smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
         });
 
         let task_persistence = Arc::new(MockTaskPersistence {
@@ -1305,6 +1313,9 @@ mod tests {
             smtp_username: "".to_string(),
             smtp_password: "".to_string(),
             smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
         });
 
         let task_persistence = Arc::new(MockTaskPersistence {

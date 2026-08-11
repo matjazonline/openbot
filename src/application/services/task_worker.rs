@@ -364,6 +364,9 @@ mod tests {
             smtp_username: "".to_string(),
             smtp_password: "".to_string(),
             smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
@@ -440,6 +443,9 @@ mod tests {
             smtp_username: "".to_string(),
             smtp_password: "".to_string(),
             smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(

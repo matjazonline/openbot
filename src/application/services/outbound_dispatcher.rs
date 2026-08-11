@@ -218,6 +218,9 @@ mod tests {
             smtp_username: "".into(),
             smtp_password: "".into(),
             smtp_from_address: "noreply@mailagents.com".into(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".into(),
+            incoming_smtp_port: 2525,
         };
 
         let outbound_email = OutboundEmail {

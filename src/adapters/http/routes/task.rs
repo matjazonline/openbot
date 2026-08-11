@@ -328,4 +328,67 @@ mod tests {
         assert!(html.contains("Tasks"));
         assert!(html.contains(&format!("/companies/{company_id}/tasks?workflow_id={workflow_id}")));
     }
+
+    #[test]
+    fn test_task_row_and_company_page_renders_token_meter() {
+        let company_id = Uuid::new_v4();
+        let workflow_id = Uuid::new_v4();
+
+        let company = crate::entities::company::Company {
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Token Test Co".to_string(),
+            slug: "token-co".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let task = BackgroundTask {
+            id: Uuid::new_v4(),
+            company_id,
+            workflow_id,
+            thread_id: None,
+            task_type: "email_agent_dispatch".to_string(),
+            status: TaskStatus::Completed,
+            payload: serde_json::json!({
+                "execution_result": {
+                    "response": "Hello world",
+                    "email_sent": true,
+                    "token_usage": {
+                        "prompt_tokens": 120,
+                        "completion_tokens": 45,
+                        "total_tokens": 165
+                    }
+                }
+            }),
+            retry_count: 0,
+            max_retries: 3,
+            last_error: None,
+            run_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now().naive_utc(),
+            updated_at: chrono::Utc::now().naive_utc(),
+        };
+
+        assert_eq!(
+            task.token_usage(),
+            Some(crate::entities::task::TokenUsage {
+                prompt_tokens: 120,
+                completion_tokens: 45,
+                total_tokens: 165
+            })
+        );
+
+        let row_html = pages::task_row_fragment(company_id, &task);
+        assert!(row_html.contains("Token Meter:"));
+        assert!(row_html.contains("165 total"));
+        assert!(row_html.contains("Prompt: 120 • Completion: 45"));
+
+        let page_html = pages::company_tasks_page(&company, &[], &[task], None, None, false);
+        assert!(page_html.contains("Token Meter Summary"));
+        assert!(page_html.contains("120"));
+        assert!(page_html.contains("45"));
+        assert!(page_html.contains("165"));
+    }
 }

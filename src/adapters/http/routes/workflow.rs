@@ -1004,6 +1004,7 @@ mod tests {
                 outbound_message_id: Some("<out1@test>".to_string()),
                 agent_response: "Hello from Agent".to_string(),
                 email_sent: false,
+                token_usage: Some(crate::entities::task::TokenUsage::new(10, 5)),
             }),
             simulation_mode: crate::use_cases::thread::SimulationMode::RunTest,
         };

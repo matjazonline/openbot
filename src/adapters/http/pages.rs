@@ -1809,6 +1809,23 @@ pub fn workflow_simulation_execution_result_fragment(
         "bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 font-sans text-xs"
     };
 
+    let simulation_token_meter_html = if let Some(ref tu) = agent_exec.and_then(|a| a.token_usage.as_ref()) {
+        format!(
+            r#"
+            <div class="md:col-span-2 pt-2 border-t border-slate-800">
+                <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">📊 Token Meter:</span>
+                <div class="flex items-center gap-2 text-xs font-mono">
+                    <span class="bg-indigo-950/80 text-indigo-300 border border-indigo-800/80 px-2 py-0.5 rounded font-bold">Total: {}</span>
+                    <span class="text-slate-400">(Prompt: {} • Completion: {})</span>
+                </div>
+            </div>
+            "#,
+            tu.total_tokens, tu.prompt_tokens, tu.completion_tokens
+        )
+    } else {
+        String::new()
+    };
+
     let exec_details = format!(
         r##"
         <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
@@ -1834,6 +1851,7 @@ pub fn workflow_simulation_execution_result_fragment(
                     <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">API Key Status:</span>
                     <span>{api_key_status}</span>
                 </div>
+                {simulation_token_meter_html}
                 <div>
                     <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
                     <span class="text-indigo-300">{to_str}</span>
@@ -1885,6 +1903,7 @@ pub fn workflow_simulation_execution_result_fragment(
         provider_str = provider_str,
         model_str = model_str,
         api_key_status = api_key_status,
+        simulation_token_meter_html = simulation_token_meter_html,
         to_str = to_str,
         from_str = from_str,
         company_name = company_name,
@@ -2574,6 +2593,13 @@ pub fn company_tasks_page(
 ) -> String {
     let task_list_html = task_list_fragment(company.id, tasks);
 
+    let (total_prompt_tokens, total_completion_tokens, total_tokens_meter) = tasks
+        .iter()
+        .filter_map(|t| t.token_usage())
+        .fold((0, 0, 0), |(p_acc, c_acc, t_acc), tu| {
+            (p_acc + tu.prompt_tokens, c_acc + tu.completion_tokens, t_acc + tu.total_tokens)
+        });
+
     let mut wf_options = String::from("<option value=\"\">All Workflows</option>");
     for wf in workflows {
         let selected = if current_wf == Some(wf.id) {
@@ -2625,6 +2651,33 @@ pub fn company_tasks_page(
         </div>
 
         <div id="response-message" class="mb-6"></div>
+
+        <!-- Token Meter Summary Card -->
+        <div class="bg-slate-900/80 border border-indigo-900/60 rounded-xl p-4 mb-6 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-indigo-950/80 border border-indigo-700/50 rounded-lg text-indigo-400 text-lg">
+                    📊
+                </div>
+                <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-300">Token Meter Summary</h4>
+                    <p class="text-xs text-slate-400">Total tokens consumed across filtered task executions</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 text-xs font-mono">
+                <div class="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
+                    <span class="text-slate-400">Prompt Tokens:</span>
+                    <span class="text-indigo-300 font-bold ml-1.5">{total_prompt_tokens}</span>
+                </div>
+                <div class="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
+                    <span class="text-slate-400">Completion Tokens:</span>
+                    <span class="text-indigo-300 font-bold ml-1.5">{total_completion_tokens}</span>
+                </div>
+                <div class="bg-indigo-950/90 px-3.5 py-1.5 rounded-lg border border-indigo-700/80">
+                    <span class="text-indigo-200 font-semibold">Total Tokens:</span>
+                    <span class="text-white font-extrabold text-sm ml-1.5">{total_tokens_meter}</span>
+                </div>
+            </div>
+        </div>
 
         <!-- Filter & Sort Bar -->
         <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6">
@@ -2764,6 +2817,23 @@ pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> Strin
         badges.push(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-800/50">Config: Present</span>"#.to_string());
     }
 
+    if let Some(tu) = sanitized_payload
+        .get("execution_result")
+        .and_then(|r| r.get("token_usage"))
+        .or_else(|| sanitized_payload.get("token_usage"))
+    {
+        if let (Some(prompt), Some(comp), Some(total)) = (
+            tu.get("prompt_tokens").and_then(|v| v.as_u64()),
+            tu.get("completion_tokens").and_then(|v| v.as_u64()),
+            tu.get("total_tokens").and_then(|v| v.as_u64()),
+        ) {
+            badges.push(format!(
+                r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-indigo-950/90 text-indigo-200 border border-indigo-700/60 font-semibold">📊 Token Meter: {} tokens (Prompt: {} | Completion: {})</span>"#,
+                total, prompt, comp
+            ));
+        }
+    }
+
     let summary_badges_html = if !badges.is_empty() {
         format!(r#"<div class="flex flex-wrap gap-1.5 mb-2">{}</div>"#, badges.join(""))
     } else {
@@ -2864,6 +2934,19 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
         _ => String::new(),
     };
 
+    let token_meter_badge = if let Some(tu) = task.token_usage() {
+        format!(
+            r##"<div class="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-950/80 border border-indigo-800/70 text-indigo-300 font-mono text-xs shadow-sm">
+                <span class="text-indigo-400 font-semibold">📊 Token Meter:</span>
+                <span class="text-white font-bold">{} total</span>
+                <span class="text-slate-400 text-[11px]">(Prompt: {} • Completion: {})</span>
+            </div>"##,
+            tu.total_tokens, tu.prompt_tokens, tu.completion_tokens
+        )
+    } else {
+        String::new()
+    };
+
     let parameters_html = render_message_task_parameters_html(&task.payload);
 
     format!(
@@ -2877,6 +2960,7 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
                         <span class="text-xs text-slate-400 font-mono">Retries: {retry_count}/{max_retries}</span>
                     </div>
                     <p class="text-xs text-slate-400 mt-1">Type: <span class="font-mono text-indigo-300">{task_type}</span> • Enqueued {created_at_str}{thread_info}</p>
+                    {token_meter_badge}
                 </div>
                 <div class="flex items-center gap-2">
                     {simulation_link}
@@ -2894,6 +2978,7 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
         task_type = task.task_type,
         created_at_str = created_at_str,
         thread_info = thread_info,
+        token_meter_badge = token_meter_badge,
         simulation_link = simulation_link,
         action_button = action_button,
         error_html = error_html,

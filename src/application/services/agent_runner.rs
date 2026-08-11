@@ -2,6 +2,7 @@ use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::approval::ApprovalStatus;
 use crate::entities::company::Company;
 use crate::entities::message::{Message, MessageRole};
+use crate::entities::task::TokenUsage;
 use crate::entities::workflow::Workflow;
 use crate::use_cases::approval::ApprovalUseCases;
 use ai_agents::{Agent, AgentBuilder};
@@ -26,6 +27,21 @@ static YAML_KEY_QUOTED_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 static YAML_KEY_UNQUOTED_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)(\b(?:api_key|apikey|access_token|token|secret|secret_key|private_key|app_secret|password)\s*:\s*)([^\s\n"']+)"#).unwrap()
 });
+
+pub fn estimate_tokens(text: &str) -> usize {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        0
+    } else {
+        (trimmed.len() + 3) / 4
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct AgentExecutionOutput {
+    pub content: String,
+    pub token_usage: TokenUsage,
+}
 
 pub fn sanitize_text(input: &str, secret_key: Option<&str>) -> String {
     let mut result = URL_KEY_REGEX
@@ -480,7 +496,7 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
-    pub async fn execute(self) -> anyhow::Result<String> {
+    pub async fn execute(self) -> anyhow::Result<AgentExecutionOutput> {
         info!(
             "Executing AI Agent with prompt length {} and history count {}",
             self.prompt.len(),
@@ -577,12 +593,54 @@ impl<'a> AgentRunner<'a> {
             info!("{}", safe_response_log);
 
             let clean_content = sanitize_text(&response.content, Some(&key_for_task));
-            Ok::<String, anyhow::Error>(clean_content)
+
+            let mut prompt_tokens = 0;
+            let mut completion_tokens = 0;
+
+            if let Some(ref meta) = response.metadata {
+                let parse_val = |v: &serde_json::Value| -> Option<usize> {
+                    v.as_u64()
+                        .map(|n| n as usize)
+                        .or_else(|| v.as_str().and_then(|s| s.parse::<usize>().ok()))
+                };
+
+                if let Some(p) = meta.get("prompt_tokens").or_else(|| meta.get("input_tokens")).and_then(parse_val) {
+                    prompt_tokens = p;
+                }
+                if let Some(c) = meta.get("completion_tokens").or_else(|| meta.get("output_tokens")).and_then(parse_val) {
+                    completion_tokens = c;
+                }
+
+                if prompt_tokens == 0 && completion_tokens == 0 {
+                    if let Some(usage) = meta.get("usage") {
+                        if let Some(p) = usage.get("prompt_tokens").or_else(|| usage.get("input_tokens")).and_then(parse_val) {
+                            prompt_tokens = p;
+                        }
+                        if let Some(c) = usage.get("completion_tokens").or_else(|| usage.get("output_tokens")).and_then(parse_val) {
+                            completion_tokens = c;
+                        }
+                    }
+                }
+            }
+
+            if prompt_tokens == 0 {
+                prompt_tokens = estimate_tokens(&full_prompt);
+            }
+            if completion_tokens == 0 {
+                completion_tokens = estimate_tokens(&clean_content);
+            }
+
+            let token_usage = TokenUsage::new(prompt_tokens, completion_tokens);
+
+            Ok::<AgentExecutionOutput, anyhow::Error>(AgentExecutionOutput {
+                content: clean_content,
+                token_usage,
+            })
         })
         .await;
 
         match task_result {
-            Ok(Ok(content)) => Ok(content),
+            Ok(Ok(output)) => Ok(output),
             Ok(Err(err)) => {
                 let err_msg = sanitize_text(&err.to_string(), Some(&key));
                 tracing::warn!("AI Agent execution failed ({err_msg})");
@@ -1084,5 +1142,17 @@ mod tests {
         assert_eq!(llm.get("model").unwrap().as_str().unwrap(), "gpt-4o");
         assert_eq!(llm.get("api_key").unwrap().as_str().unwrap(), "sk-test-123");
         assert_eq!(config.get("temperature").unwrap().as_f64().unwrap(), 0.5);
+    }
+
+    #[test]
+    fn test_estimate_tokens_and_token_usage() {
+        assert_eq!(estimate_tokens(""), 0);
+        assert_eq!(estimate_tokens("   "), 0);
+        assert_eq!(estimate_tokens("Hello world"), 3); // 11 chars -> (11+3)/4 = 3
+        
+        let usage = TokenUsage::new(100, 50);
+        assert_eq!(usage.prompt_tokens, 100);
+        assert_eq!(usage.completion_tokens, 50);
+        assert_eq!(usage.total_tokens, 150);
     }
 }

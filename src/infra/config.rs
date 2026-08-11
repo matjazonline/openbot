@@ -12,6 +12,9 @@ pub struct AppConfig {
     pub smtp_username: String,
     pub smtp_password: String,
     pub smtp_from_address: String,
+    pub incoming_smtp_enabled: bool,
+    pub incoming_smtp_host: String,
+    pub incoming_smtp_port: u16,
 }
 
 impl AppConfig {
@@ -40,6 +43,16 @@ impl AppConfig {
         let smtp_password = env::var("SMTP_PASSWORD").unwrap_or_default();
         let smtp_from_address = env::var("SMTP_FROM_ADDRESS").unwrap_or_else(|_| "noreply@localhost".to_string());
 
+        let incoming_smtp_enabled: bool = env::var("INCOMING_SMTP_ENABLED")
+            .unwrap_or_else(|_| "true".to_string())
+            .parse()
+            .unwrap_or(true);
+        let incoming_smtp_host = env::var("INCOMING_SMTP_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+        let incoming_smtp_port: u16 = env::var("INCOMING_SMTP_PORT")
+            .unwrap_or_else(|_| "2525".to_string())
+            .parse()
+            .unwrap_or(2525);
+
         Self {
             jwt_secret,
             access_token_ttl: Duration::seconds(access_token_ttl_secs),
@@ -50,6 +63,9 @@ impl AppConfig {
             smtp_username,
             smtp_password,
             smtp_from_address,
+            incoming_smtp_enabled,
+            incoming_smtp_host,
+            incoming_smtp_port,
         }
     }
 }
