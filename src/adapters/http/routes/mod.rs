@@ -1,3 +1,4 @@
+pub mod approval;
 pub mod company;
 pub mod company_invite;
 pub mod task;
@@ -17,4 +18,5 @@ pub fn router() -> Router<AppState> {
         .merge(task::router())
         .merge(workflow::router())
         .merge(webhooks::router())
+        .merge(approval::router())
 }

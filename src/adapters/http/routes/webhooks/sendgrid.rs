@@ -419,6 +419,16 @@ mod tests {
         async fn remove_member(&self, _company_id: Uuid, _user_id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
+    struct MockApprovalPersistence;
+    #[async_trait]
+    impl crate::adapters::persistence::approval::ApprovalPersistence for MockApprovalPersistence {
+        async fn create_approval(&self, _company_id: Uuid, _workflow_id: Uuid, _thread_id: Option<Uuid>, _task_id: Option<Uuid>, _step_key: &str, _approver_email: &str, _action_type: &str, _action_title: &str, _action_summary: &str, _payload: serde_json::Value, _token: &str, _expires_at: chrono::NaiveDateTime) -> AppResult<crate::entities::approval::HumanApproval> { unimplemented!() }
+        async fn find_approval_by_step_key(&self, _thread_id: Option<Uuid>, _step_key: &str) -> AppResult<Option<crate::entities::approval::HumanApproval>> { Ok(None) }
+        async fn get_approval_by_token(&self, _token: &str) -> AppResult<Option<crate::entities::approval::HumanApproval>> { Ok(None) }
+        async fn update_approval_status(&self, _id: Uuid, _status: crate::entities::approval::ApprovalStatus) -> AppResult<crate::entities::approval::HumanApproval> { unimplemented!() }
+        async fn list_approvals_by_workflow(&self, _company_id: Uuid, _workflow_id: Uuid) -> AppResult<Vec<crate::entities::approval::HumanApproval>> { Ok(vec![]) }
+    }
+
     #[tokio::test]
     async fn sendgrid_webhook_processes_email_creates_thread_and_dispatches() {
         let company_id = Uuid::new_v4();
@@ -475,7 +485,14 @@ mod tests {
             thread_persistence.clone(),
             workflow_persistence.clone(),
             company_persistence.clone(),
-            task_persistence,
+            task_persistence.clone(),
+            config.clone(),
+        ));
+
+        let approval_use_cases = Arc::new(crate::use_cases::approval::ApprovalUseCases::new(
+            Arc::new(MockApprovalPersistence),
+            task_persistence.clone(),
+            thread_persistence.clone(),
             config.clone(),
         ));
 
@@ -494,6 +511,7 @@ mod tests {
             )),
             workflow_use_cases: Arc::new(WorkflowUseCases::new(company_persistence, workflow_persistence)),
             thread_use_cases,
+            approval_use_cases,
         };
 
         let app = router().with_state(app_state);

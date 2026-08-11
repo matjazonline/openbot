@@ -1,8 +1,12 @@
+use crate::entities::approval::ApprovalStatus;
 use crate::entities::message::{Message, MessageRole};
+use crate::use_cases::approval::ApprovalUseCases;
 use ai_agents::{Agent, AgentBuilder};
 use regex::Regex;
-use std::sync::LazyLock;
+use sha2::{Digest, Sha256};
+use std::sync::{Arc, LazyLock};
 use tracing::info;
+use uuid::Uuid;
 
 static URL_KEY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)([\?&](?:api_key|apikey|key|access_token|token|secret|secret_key|private_key|app_key|app_secret|auth|authorization|password|bearer)=)([^&\s"'`<>\)]+)"#).unwrap()
@@ -21,10 +25,18 @@ static YAML_KEY_UNQUOTED_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 pub fn sanitize_text(input: &str, secret_key: Option<&str>) -> String {
-    let mut result = URL_KEY_REGEX.replace_all(input, "${1}[REDACTED]").into_owned();
-    result = JSON_KEY_REGEX.replace_all(&result, "${1}[REDACTED]${3}").into_owned();
-    result = YAML_KEY_QUOTED_REGEX.replace_all(&result, "${1}[REDACTED]${3}").into_owned();
-    result = YAML_KEY_UNQUOTED_REGEX.replace_all(&result, "${1}[REDACTED]").into_owned();
+    let mut result = URL_KEY_REGEX
+        .replace_all(input, "${1}[REDACTED]")
+        .into_owned();
+    result = JSON_KEY_REGEX
+        .replace_all(&result, "${1}[REDACTED]${3}")
+        .into_owned();
+    result = YAML_KEY_QUOTED_REGEX
+        .replace_all(&result, "${1}[REDACTED]${3}")
+        .into_owned();
+    result = YAML_KEY_UNQUOTED_REGEX
+        .replace_all(&result, "${1}[REDACTED]")
+        .into_owned();
 
     if let Some(key) = secret_key {
         let trimmed = key.trim();
@@ -36,6 +48,112 @@ pub fn sanitize_text(input: &str, secret_key: Option<&str>) -> String {
     result
 }
 
+#[derive(Clone, Debug)]
+pub struct ApprovalContext {
+    pub company_id: Uuid,
+    pub workflow_id: Uuid,
+    pub workflow_name: String,
+    pub workflow_slug: String,
+    pub company_slug: String,
+    pub thread_id: Option<Uuid>,
+    pub task_id: Option<Uuid>,
+    pub approver_email: String,
+}
+
+pub struct AgentApprovalHandler {
+    pub approval_use_cases: Arc<ApprovalUseCases>,
+    pub context: ApprovalContext,
+}
+
+#[async_trait::async_trait]
+impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
+    async fn request_approval(
+        &self,
+        req: ai_agents::hitl::ApprovalRequest,
+    ) -> ai_agents::hitl::ApprovalResult {
+        let step_raw = match &req.trigger {
+            ai_agents::hitl::ApprovalTrigger::Tool { name, args } => {
+                format!("tool:{}:{}", name, serde_json::to_string(args).unwrap_or_default())
+            }
+            ai_agents::hitl::ApprovalTrigger::Condition { name, matched } => {
+                format!("condition:{}:{}", name, matched)
+            }
+            ai_agents::hitl::ApprovalTrigger::State { from, to } => {
+                format!("state:{:?}:{}", from, to)
+            }
+        };
+
+        let thread_str = self.context.thread_id.map(|t| t.to_string()).unwrap_or_default();
+        let step_key = format!(
+            "{:x}",
+            Sha256::digest(format!("{}:{}", thread_str, step_raw).as_bytes())
+        );
+
+        // Check if DB already has approval or rejection
+        if let Ok(Some(status)) = self
+            .approval_use_cases
+            .check_step_approval(self.context.thread_id, &step_key)
+            .await
+        {
+            match status {
+                ApprovalStatus::Approved => return ai_agents::hitl::ApprovalResult::Approved,
+                ApprovalStatus::Rejected => {
+                    return ai_agents::hitl::ApprovalResult::rejected_with_reason(
+                        "Approval previously rejected by human",
+                    )
+                }
+                _ => {}
+            }
+        }
+
+        // New HITL Step: Create DB record & send email with links
+        let action_title = match &req.trigger {
+            ai_agents::hitl::ApprovalTrigger::Tool { name, .. } => format!("Tool Execution: {}", name),
+            ai_agents::hitl::ApprovalTrigger::Condition { name, .. } => {
+                format!("Condition Approval: {}", name)
+            }
+            ai_agents::hitl::ApprovalTrigger::State { to, .. } => format!("State Transition: {}", to),
+        };
+
+        let action_summary = if !req.message.is_empty() {
+            req.message.clone()
+        } else {
+            step_raw.clone()
+        };
+
+        let payload = serde_json::json!({
+            "trigger": req.trigger,
+            "context": req.context
+        });
+
+        let res = self
+            .approval_use_cases
+            .create_and_send_approval_request(
+                self.context.company_id,
+                self.context.workflow_id,
+                &self.context.workflow_name,
+                &self.context.workflow_slug,
+                &self.context.company_slug,
+                self.context.thread_id,
+                self.context.task_id,
+                &step_key,
+                &self.context.approver_email,
+                req.trigger.trigger_type(),
+                &action_title,
+                &action_summary,
+                payload,
+            )
+            .await;
+
+        match res {
+            Ok(_) => ai_agents::hitl::ApprovalResult::rejected_with_reason(
+                "Approval requested via email link; task paused waiting for human decision.",
+            ),
+            Err(e) => ai_agents::hitl::ApprovalResult::rejected_with_reason(e.to_string()),
+        }
+    }
+}
+
 pub struct AgentRunner<'a> {
     prompt: &'a str,
     history: &'a [Message],
@@ -43,6 +161,8 @@ pub struct AgentRunner<'a> {
     api_key: Option<&'a str>,
     provider: Option<&'a str>,
     model: Option<&'a str>,
+    approval_use_cases: Option<Arc<ApprovalUseCases>>,
+    approval_context: Option<ApprovalContext>,
 }
 
 impl<'a> AgentRunner<'a> {
@@ -54,6 +174,8 @@ impl<'a> AgentRunner<'a> {
             api_key: None,
             provider: None,
             model: None,
+            approval_use_cases: None,
+            approval_context: None,
         }
     }
 
@@ -79,6 +201,16 @@ impl<'a> AgentRunner<'a> {
 
     pub fn model(mut self, model: Option<&'a str>) -> Self {
         self.model = model;
+        self
+    }
+
+    pub fn approval_use_cases(mut self, use_cases: Option<Arc<ApprovalUseCases>>) -> Self {
+        self.approval_use_cases = use_cases;
+        self
+    }
+
+    pub fn approval_context(mut self, ctx: Option<ApprovalContext>) -> Self {
+        self.approval_context = ctx;
         self
     }
 
@@ -232,8 +364,19 @@ impl<'a> AgentRunner<'a> {
 
         // Spawn on a separate Tokio task to prevent stack frame overflow on the caller thread
         let key_for_task = key.clone();
+        let approval_use_cases = self.approval_use_cases.clone();
+        let approval_context = self.approval_context.clone();
+
         let task_result = tokio::spawn(async move {
             let mut builder = AgentBuilder::from_yaml(&config_yaml)?;
+
+            if let (Some(use_cases), Some(ctx)) = (approval_use_cases, approval_context) {
+                let handler = Arc::new(AgentApprovalHandler {
+                    approval_use_cases: use_cases,
+                    context: ctx,
+                });
+                builder = builder.approval_handler(handler);
+            }
 
             if let Ok(provider_type) = std::str::FromStr::from_str(&provider_name) {
                 let provider = ai_agents::UnifiedLLMProvider::new(
@@ -376,6 +519,9 @@ mod tests {
         let err_with_raw_key = "Authentication failed for key sk-proj-SECRET123456789";
         let sanitized_raw_err = sanitize_text(err_with_raw_key, Some("sk-proj-SECRET123456789"));
         assert!(!sanitized_raw_err.contains("sk-proj-SECRET123456789"));
-        assert_eq!(sanitized_raw_err, "Authentication failed for key [REDACTED]");
+        assert_eq!(
+            sanitized_raw_err,
+            "Authentication failed for key [REDACTED]"
+        );
     }
 }

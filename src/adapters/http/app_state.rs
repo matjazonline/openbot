@@ -5,8 +5,8 @@ use axum::extract::FromRef;
 use crate::{
     infra::config::AppConfig,
     use_cases::{
-        company::CompanyUseCases, company_invite::CompanyInviteUseCases, thread::ThreadUseCases,
-        user::UserUseCases, workflow::WorkflowUseCases,
+        approval::ApprovalUseCases, company::CompanyUseCases, company_invite::CompanyInviteUseCases,
+        thread::ThreadUseCases, user::UserUseCases, workflow::WorkflowUseCases,
     },
 };
 
@@ -18,6 +18,7 @@ pub struct AppState {
     pub company_invite_use_cases: Arc<CompanyInviteUseCases>,
     pub workflow_use_cases: Arc<WorkflowUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
+    pub approval_use_cases: Arc<ApprovalUseCases>,
 }
 
 impl FromRef<AppState> for Arc<AppConfig> {
@@ -53,6 +54,12 @@ impl FromRef<AppState> for Arc<WorkflowUseCases> {
 impl FromRef<AppState> for Arc<ThreadUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.thread_use_cases.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<ApprovalUseCases> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.approval_use_cases.clone()
     }
 }
 

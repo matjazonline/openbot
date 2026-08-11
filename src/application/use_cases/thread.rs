@@ -15,11 +15,12 @@ use crate::{
     },
     infra::config::AppConfig,
     services::{
-        agent_runner::AgentRunner,
+        agent_runner::{AgentRunner, ApprovalContext as AgentRunnerApprovalContext},
         email_parser::{EmailParser, MAX_WORKFLOW_HOPS, ParsedEmail, RawInboundPayload},
         outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
     },
     use_cases::{
+        approval::ApprovalUseCases,
         company::CompanyPersistence,
         workflow::{WorkflowPersistence, parse_recipient_address},
     },
@@ -67,6 +68,7 @@ pub struct ThreadUseCases {
     workflow_persistence: Arc<dyn WorkflowPersistence>,
     company_persistence: Arc<dyn CompanyPersistence>,
     task_persistence: Arc<dyn TaskPersistence>,
+    approval_use_cases: Option<Arc<ApprovalUseCases>>,
     config: Arc<AppConfig>,
 }
 
@@ -83,8 +85,17 @@ impl ThreadUseCases {
             workflow_persistence,
             company_persistence,
             task_persistence,
+            approval_use_cases: None,
             config,
         }
+    }
+
+    pub fn with_approval_use_cases(
+        mut self,
+        approval_use_cases: Arc<ApprovalUseCases>,
+    ) -> Self {
+        self.approval_use_cases = Some(approval_use_cases);
+        self
     }
 
     #[instrument(skip(self, raw_payload))]
@@ -413,6 +424,23 @@ impl ThreadUseCases {
             .filter(|s| !s.trim().is_empty())
             .or_else(|| company.model.as_deref().filter(|s| !s.trim().is_empty()));
 
+        let approver_email = workflow
+            .participant_emails
+            .as_ref()
+            .and_then(|p| p.first().cloned())
+            .unwrap_or_else(|| parsed.sender.clone());
+
+        let approval_ctx = AgentRunnerApprovalContext {
+            company_id: company.id,
+            workflow_id: workflow.id,
+            workflow_name: workflow.name.clone(),
+            workflow_slug: workflow.slug.clone(),
+            company_slug: company.slug.clone(),
+            thread_id: Some(thread.id),
+            task_id: None,
+            approver_email,
+        };
+
         // Execute AI Agent
         let runner_res = AgentRunner::new(&parsed.prompt_text)
             .history(&history_messages)
@@ -420,6 +448,8 @@ impl ThreadUseCases {
             .api_key(api_key)
             .provider(provider)
             .model(model)
+            .approval_use_cases(self.approval_use_cases.clone())
+            .approval_context(Some(approval_ctx))
             .execute()
             .await;
 

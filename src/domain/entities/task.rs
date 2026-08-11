@@ -7,6 +7,7 @@ use uuid::Uuid;
 pub enum TaskStatus {
     Pending,
     Processing,
+    PendingApproval,
     Completed,
     Failed,
     DeadLetter,
@@ -18,6 +19,7 @@ impl TaskStatus {
         match self {
             TaskStatus::Pending => "pending",
             TaskStatus::Processing => "processing",
+            TaskStatus::PendingApproval => "pending_approval",
             TaskStatus::Completed => "completed",
             TaskStatus::Failed => "failed",
             TaskStatus::DeadLetter => "dead_letter",
@@ -33,6 +35,7 @@ impl FromStr for TaskStatus {
         match s.to_lowercase().as_str() {
             "pending" => Ok(TaskStatus::Pending),
             "processing" => Ok(TaskStatus::Processing),
+            "pending_approval" | "pendingapproval" => Ok(TaskStatus::PendingApproval),
             "completed" => Ok(TaskStatus::Completed),
             "failed" => Ok(TaskStatus::Failed),
             "dead_letter" => Ok(TaskStatus::DeadLetter),
