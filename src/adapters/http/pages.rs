@@ -1,6 +1,7 @@
 use uuid::Uuid;
 
 use crate::entities::{
+    agent::Agent,
     approval::{ApprovalStatus, HumanApproval},
     company::Company,
     company_invite::CompanyInvite,
@@ -32,6 +33,7 @@ pub fn base_layout(title: &str, content: &str) -> String {
             </a>
             <div class="flex items-center gap-4 text-sm font-medium">
                 <a href="/companies" class="text-slate-300 hover:text-white transition">Companies</a>
+                <a id="nav-agents" href="#" class="hidden text-slate-300 hover:text-white transition">Agents</a>
                 <a id="nav-workflows" href="#" class="hidden text-slate-300 hover:text-white transition">Workflows</a>
                 <a href="/invites" class="text-slate-300 hover:text-white transition">My Invites</a>
                 <a href="/login" class="text-slate-300 hover:text-white transition">Sign In</a>
@@ -62,6 +64,7 @@ pub fn base_layout(title: &str, content: &str) -> String {
 
         function updateNavWorkflows() {{
             const navWorkflows = document.getElementById('nav-workflows');
+            const navAgents = document.getElementById('nav-agents');
             const companyId = getCachedCompanyId();
             if (navWorkflows) {{
                 if (companyId) {{
@@ -69,6 +72,14 @@ pub fn base_layout(title: &str, content: &str) -> String {
                     navWorkflows.classList.remove('hidden');
                 }} else {{
                     navWorkflows.classList.add('hidden');
+                }}
+            }}
+            if (navAgents) {{
+                if (companyId) {{
+                    navAgents.href = '/companies/' + companyId + '/agents';
+                    navAgents.classList.remove('hidden');
+                }} else {{
+                    navAgents.classList.add('hidden');
                 }}
             }}
             document.querySelectorAll('[id^="selected-badge-"]').forEach(el => {{
@@ -292,6 +303,10 @@ pub fn company_row_fragment(company: &Company) -> String {
                 <a href="/companies/{id}/tasks" onclick="selectCompany('{id}')"
                     class="px-3 py-1.5 text-xs font-medium bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/50 rounded-lg transition">
                     Tasks
+                </a>
+                <a href="/companies/{id}/agents" onclick="selectCompany('{id}')"
+                    class="px-3 py-1.5 text-xs font-medium bg-sky-900/80 hover:bg-sky-800 text-sky-200 border border-sky-700/50 rounded-lg transition">
+                    Agents
                 </a>
                 <a href="/companies/{id}/workflows" onclick="selectCompany('{id}')"
                     class="px-3 py-1.5 text-xs font-medium bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/50 rounded-lg transition">
@@ -690,8 +705,56 @@ pub fn user_invite_row_fragment(invite: &CompanyInvite) -> String {
     )
 }
 
-pub fn workflows_page(company: &Company, app_domain_name: &str, workflows: &[Workflow]) -> String {
-    let list_html = workflow_list_fragment(company, app_domain_name, workflows);
+fn render_agents_selection(company_id: Uuid, agents: &[Agent], selected_ids: Option<&[Uuid]>) -> String {
+    if agents.is_empty() {
+        return format!(
+            r#"<p class="text-xs text-slate-400">No agents available for this company. <a href="/companies/{company_id}/agents" class="text-indigo-400 hover:text-indigo-300 underline font-medium">Manage Agents &rarr;</a></p>"#
+        );
+    }
+
+    let initial_ids = match selected_ids {
+        Some(ids) => ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(","),
+        None => String::new(),
+    };
+
+    let items: String = agents
+        .iter()
+        .map(|agent| {
+            let checked = match selected_ids {
+                Some(ids) => if ids.contains(&agent.id) { "checked" } else { "" },
+                None => "",
+            };
+            format!(
+                r#"
+                <label class="flex items-center gap-2 p-2 bg-slate-800/80 border border-slate-700/80 rounded-lg cursor-pointer hover:bg-slate-700/60 transition">
+                    <input type="checkbox" data-agent-checkbox value="{id}" {checked}
+                        onchange="let form = this.closest('form'); if (form) {{ let checked = Array.from(form.querySelectorAll('input[data-agent-checkbox]:checked')).map(c => c.value); let target = form.querySelector('input[name=agent_ids]'); if (target) target.value = checked.join(','); }}"
+                        class="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500">
+                    <div class="text-xs flex flex-col">
+                        <span class="font-medium text-white">{name}</span>
+                        <span class="text-slate-400 font-mono text-[10px]">@{slug}</span>
+                    </div>
+                </label>
+                "#,
+                id = agent.id,
+                name = agent.name,
+                slug = agent.slug,
+                checked = checked
+            )
+        })
+        .collect();
+
+    format!(
+        r#"<div>
+            <input type="hidden" name="agent_ids" value="{initial_ids}">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-1">{items}</div>
+        </div>"#
+    )
+}
+
+pub fn workflows_page(company: &Company, app_domain_name: &str, workflows: &[Workflow], agents: &[Agent]) -> String {
+    let list_html = workflow_list_fragment(company, app_domain_name, workflows, agents);
+    let agents_selection_html = render_agents_selection(company.id, agents, None);
 
     let content = format!(
         r##"
@@ -727,6 +790,12 @@ pub fn workflows_page(company: &Company, app_domain_name: &str, workflows: &[Wor
                             placeholder="inbound-email-handler">
                     </div>
                 </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Select Agents (Multiple allowed)</label>
+                    {agents_selection_html}
+                </div>
+
                 <div>
                     <label for="participant_emails" class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Comma-separated, Optional)</label>
                     <input type="text" id="participant_emails" name="participant_emails"
@@ -780,6 +849,7 @@ pub fn workflows_page(company: &Company, app_domain_name: &str, workflows: &[Wor
         slug = company.slug,
         app_domain_name = app_domain_name,
         company_id = company.id,
+        agents_selection_html = agents_selection_html,
         list_html = list_html,
     );
 
@@ -790,6 +860,7 @@ pub fn workflow_list_fragment(
     company: &Company,
     app_domain_name: &str,
     workflows: &[Workflow],
+    agents: &[Agent],
 ) -> String {
     if workflows.is_empty() {
         return r##"
@@ -802,7 +873,7 @@ pub fn workflow_list_fragment(
 
     workflows
         .iter()
-        .map(|wf| workflow_row_fragment(company, app_domain_name, wf))
+        .map(|wf| workflow_row_fragment(company, app_domain_name, wf, agents))
         .collect()
 }
 
@@ -810,10 +881,26 @@ pub fn workflow_row_fragment(
     company: &Company,
     app_domain_name: &str,
     workflow: &Workflow,
+    agents: &[Agent],
 ) -> String {
     let created_at_str = workflow.created_at.format("%b %d, %Y").to_string();
     let emails_str = match &workflow.participant_emails {
         Some(emails) if !emails.is_empty() => emails.join(", "),
+        _ => "None".to_string(),
+    };
+    let assigned_agents_str = match &workflow.agent_ids {
+        Some(ids) if !ids.is_empty() => {
+            let matches: Vec<String> = agents
+                .iter()
+                .filter(|a| ids.contains(&a.id))
+                .map(|a| format!("{} (@{})", a.name, a.slug))
+                .collect();
+            if matches.is_empty() {
+                format!("{} agent(s)", ids.len())
+            } else {
+                matches.join(", ")
+            }
+        }
         _ => "None".to_string(),
     };
     let config_str = match &workflow.workflow_config {
@@ -873,7 +960,11 @@ pub fn workflow_row_fragment(
                     <span class="text-slate-300">{api_key_str}</span>
                 </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs bg-slate-950/60 p-3 rounded-lg border border-slate-800 font-mono">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs bg-slate-950/60 p-3 rounded-lg border border-slate-800 font-mono">
+                <div>
+                    <span class="text-slate-500 block font-sans text-[11px] font-semibold uppercase">Assigned Agents:</span>
+                    <span class="text-indigo-300">{assigned_agents_str}</span>
+                </div>
                 <div>
                     <span class="text-slate-500 block font-sans text-[11px] font-semibold uppercase">Participants:</span>
                     <span class="text-slate-300">{emails_str}</span>
@@ -893,6 +984,7 @@ pub fn workflow_row_fragment(
         provider_str = provider_str,
         model_str = model_str,
         api_key_str = api_key_str,
+        assigned_agents_str = assigned_agents_str,
         emails_str = emails_str,
         config_str = config_str,
     )
@@ -902,6 +994,7 @@ pub fn workflow_edit_fragment(
     company: &Company,
     app_domain_name: &str,
     workflow: &Workflow,
+    agents: &[Agent],
 ) -> String {
     let emails_str = match &workflow.participant_emails {
         Some(emails) => emails.join(", "),
@@ -914,6 +1007,7 @@ pub fn workflow_edit_fragment(
     let provider_val = workflow.provider.as_deref().unwrap_or("");
     let model_val = workflow.model.as_deref().unwrap_or("");
     let api_key_val = workflow.api_key.as_deref().unwrap_or("");
+    let agents_selection_html = render_agents_selection(company.id, agents, workflow.agent_ids.as_deref());
 
     format!(
         r##"
@@ -932,6 +1026,12 @@ pub fn workflow_edit_fragment(
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
                 </div>
             </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Select Agents (Multiple allowed)</label>
+                {agents_selection_html}
+            </div>
+
             <div>
                 <label class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Comma-separated)</label>
                 <input type="text" name="participant_emails" value="{emails_str}"
@@ -940,19 +1040,19 @@ pub fn workflow_edit_fragment(
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional Override)</label>
-                    <input type="text" name="provider" value="{provider}"
+                    <input type="text" name="provider" value="{provider_val}"
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                         placeholder="google, openai, anthropic">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional Override)</label>
-                    <input type="text" name="model" value="{model}"
+                    <input type="text" name="model" value="{model_val}"
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                         placeholder="gemini-2.5-flash, gpt-4o">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional Override)</label>
-                    <input type="password" name="api_key" value="{api_key}"
+                    <input type="password" name="api_key" value="{api_key_val}"
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                         placeholder="Leave empty to use Company key">
                 </div>
@@ -974,17 +1074,18 @@ pub fn workflow_edit_fragment(
             </div>
         </form>
         "##,
-        company_id = company.id,
-        company_slug = company.slug,
-        app_domain_name = app_domain_name,
         workflow_id = workflow.id,
+        company_id = company.id,
         name = workflow.name,
         slug = workflow.slug,
+        company_slug = company.slug,
+        app_domain_name = app_domain_name,
         emails_str = emails_str,
-        provider = provider_val,
-        model = model_val,
-        api_key = api_key_val,
+        provider_val = provider_val,
+        model_val = model_val,
+        api_key_val = api_key_val,
         config_str = config_str,
+        agents_selection_html = agents_selection_html,
     )
 }
 
@@ -1536,6 +1637,7 @@ pub fn workflow_simulation_execution_result_fragment(
     workflow_id: Uuid,
     sim_res: &SimulationExecutionResult,
     messages: &[Message],
+    tasks: &[BackgroundTask],
 ) -> String {
     let ingest = &sim_res.ingest_result;
     let (provider_str, model_str, api_key_status) =
@@ -1797,6 +1899,22 @@ pub fn workflow_simulation_execution_result_fragment(
         agent_response_text = agent_response_text,
     );
 
+    let resolved_config = crate::services::agent_runner::ResolvedAgentParams::new(
+        ingest.company.as_ref(),
+        ingest.workflow.as_ref(),
+        None,
+    )
+    .map(|p| p.config().clone())
+    .ok()
+    .or_else(|| ingest.workflow.as_ref().and_then(|w| w.workflow_config.clone()))
+    .unwrap_or_else(|| serde_json::json!({}));
+
+    let thread_id_opt = ingest.thread.as_ref().map(|t| t.id);
+    let matched_task = tasks.iter().find(|t| {
+        (ingest.task_id.is_some() && t.id == ingest.task_id.unwrap())
+            || (thread_id_opt.is_some() && t.thread_id == thread_id_opt)
+    });
+
     let messages_section = if messages.is_empty() {
         String::new()
     } else {
@@ -1804,6 +1922,50 @@ pub fn workflow_simulation_execution_result_fragment(
         for msg in messages {
             let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
             let created_at_fmt = msg.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+
+            let msg_task_payload = match matched_task {
+                Some(t) => t.payload.clone(),
+                None => {
+                    if is_agent {
+                        serde_json::json!({
+                            "task_type": "email_agent_dispatch",
+                            "execution_parameters": {
+                                "provider": provider_str,
+                                "model": model_str,
+                                "prompt": parsed.map(|p| p.prompt_text.as_str()).unwrap_or(""),
+                                "config": resolved_config.clone(),
+                                "executed_at": created_at_fmt
+                            },
+                            "execution_result": {
+                                "response": msg.clean_text_body,
+                                "outbound_message_id": msg.message_id
+                            },
+                            "workflow": ingest.workflow,
+                            "company": ingest.company
+                        })
+                    } else {
+                        serde_json::json!({
+                            "task_type": "email_agent_dispatch",
+                            "parsed_email": {
+                                "sender": msg.sender,
+                                "subject": msg.subject,
+                                "prompt_text": msg.clean_text_body,
+                                "message_id": msg.message_id
+                            },
+                            "inbound_message": {
+                                "id": msg.id,
+                                "message_id": msg.message_id,
+                                "direction": "inbound",
+                                "role": "human",
+                                "clean_text_body": msg.clean_text_body
+                            },
+                            "workflow": ingest.workflow,
+                            "company": ingest.company
+                        })
+                    }
+                }
+            };
+            let params_html = render_message_task_parameters_html(&msg_task_payload);
 
             if is_agent {
                 msgs_html.push_str(&format!(
@@ -1823,11 +1985,13 @@ pub fn workflow_simulation_execution_result_fragment(
                         <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-xs font-sans">
                             {body}
                         </div>
+                        {params_html}
                     </div>
                     "##,
                     created_at = created_at_fmt,
                     msg_id = msg.message_id,
                     body = msg.clean_text_body,
+                    params_html = params_html,
                 ));
             } else {
                 msgs_html.push_str(&format!(
@@ -1851,6 +2015,7 @@ pub fn workflow_simulation_execution_result_fragment(
                         <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800 text-xs">
                             {body}
                         </div>
+                        {params_html}
                     </div>
                     "##,
                     created_at = created_at_fmt,
@@ -1858,6 +2023,7 @@ pub fn workflow_simulation_execution_result_fragment(
                     msg_id = msg.message_id,
                     subject = msg.subject,
                     body = msg.clean_text_body,
+                    params_html = params_html,
                 ));
             }
         }
@@ -2010,6 +2176,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
     app_domain_name: &str,
     thread: &Thread,
     messages: &[Message],
+    tasks: &[BackgroundTask],
     include_oob: bool,
 ) -> String {
     let company_id = company.id;
@@ -2102,6 +2269,21 @@ pub fn workflow_simulation_loaded_thread_fragment(
         updated_at_fmt = updated_at_fmt,
     );
 
+    let (provider_str, model_str, _api_key_status) =
+        resolve_llm_info(Some(workflow), Some(company));
+
+    let resolved_config = crate::services::agent_runner::ResolvedAgentParams::new(
+        Some(company),
+        Some(workflow),
+        None,
+    )
+    .map(|p| p.config().clone())
+    .ok()
+    .or_else(|| workflow.workflow_config.clone())
+    .unwrap_or_else(|| serde_json::json!({}));
+
+    let matched_task = tasks.iter().find(|t| t.thread_id == Some(thread.id));
+
     let messages_section = if messages.is_empty() {
         r#"<div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 shadow-lg text-slate-400 text-xs text-center mb-6">No messages recorded in this thread yet.</div>"#.to_string()
     } else {
@@ -2109,6 +2291,50 @@ pub fn workflow_simulation_loaded_thread_fragment(
         for msg in messages {
             let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
             let msg_created_at = msg.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+
+            let msg_task_payload = match matched_task {
+                Some(t) => t.payload.clone(),
+                None => {
+                    if is_agent {
+                        serde_json::json!({
+                            "task_type": "email_agent_dispatch",
+                            "execution_parameters": {
+                                "provider": provider_str,
+                                "model": model_str,
+                                "prompt": msg.clean_text_body,
+                                "config": resolved_config.clone(),
+                                "executed_at": msg_created_at
+                            },
+                            "execution_result": {
+                                "response": msg.clean_text_body,
+                                "outbound_message_id": msg.message_id
+                            },
+                            "workflow": workflow,
+                            "company": company
+                        })
+                    } else {
+                        serde_json::json!({
+                            "task_type": "email_agent_dispatch",
+                            "parsed_email": {
+                                "sender": msg.sender,
+                                "subject": msg.subject,
+                                "prompt_text": msg.clean_text_body,
+                                "message_id": msg.message_id
+                            },
+                            "inbound_message": {
+                                "id": msg.id,
+                                "message_id": msg.message_id,
+                                "direction": "inbound",
+                                "role": "human",
+                                "clean_text_body": msg.clean_text_body
+                            },
+                            "workflow": workflow,
+                            "company": company
+                        })
+                    }
+                }
+            };
+            let params_html = render_message_task_parameters_html(&msg_task_payload);
 
             if is_agent {
                 msgs_html.push_str(&format!(
@@ -2128,11 +2354,13 @@ pub fn workflow_simulation_loaded_thread_fragment(
                         <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-xs font-sans">
                             {body}
                         </div>
+                        {params_html}
                     </div>
                     "##,
                     created_at = msg_created_at,
                     msg_id = msg.message_id,
                     body = msg.clean_text_body,
+                    params_html = params_html,
                 ));
             } else {
                 msgs_html.push_str(&format!(
@@ -2156,6 +2384,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
                         <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800 text-xs">
                             {body}
                         </div>
+                        {params_html}
                     </div>
                     "##,
                     created_at = msg_created_at,
@@ -2163,6 +2392,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
                     msg_id = msg.message_id,
                     subject = msg.subject,
                     body = msg.clean_text_body,
+                    params_html = params_html,
                 ));
             }
         }
@@ -2461,6 +2691,103 @@ pub fn task_list_fragment(company_id: Uuid, tasks: &[BackgroundTask]) -> String 
         .collect()
 }
 
+fn sanitize_json_payload(value: &serde_json::Value) -> serde_json::Value {
+    let mut cloned = value.clone();
+    sanitize_json_mut(&mut cloned);
+    cloned
+}
+
+fn sanitize_json_mut(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (k, v) in map.iter_mut() {
+                if k.eq_ignore_ascii_case("api_key")
+                    || k.eq_ignore_ascii_case("apikey")
+                    || k.eq_ignore_ascii_case("secret")
+                {
+                    if let serde_json::Value::String(s) = v {
+                        if !s.is_empty() {
+                            *v = serde_json::Value::String("***masked***".to_string());
+                        }
+                    }
+                } else {
+                    sanitize_json_mut(v);
+                }
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for v in arr {
+                sanitize_json_mut(v);
+            }
+        }
+        _ => {}
+    }
+}
+
+pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> String {
+    let sanitized_payload = sanitize_json_payload(payload);
+    let payload_str = serde_json::to_string_pretty(&sanitized_payload)
+        .unwrap_or_else(|_| payload.to_string());
+
+    let mut badges = Vec::new();
+    if let Some(exec_params) = sanitized_payload.get("execution_parameters") {
+        if let Some(p) = exec_params.get("provider").and_then(|v| v.as_str()) {
+            badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-indigo-950/80 text-indigo-300 border border-indigo-800/50">Provider: {}</span>"#, p));
+        }
+        if let Some(m) = exec_params.get("model").and_then(|v| v.as_str()) {
+            badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-indigo-950/80 text-indigo-300 border border-indigo-800/50">Model: {}</span>"#, m));
+        }
+        if let Some(a) = exec_params.get("agent_name").and_then(|v| v.as_str()) {
+            badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-950/80 text-purple-300 border border-purple-800/50">Agent: {}</span>"#, a));
+        }
+    } else {
+        if let Some(p) = sanitized_payload.get("workflow").and_then(|w| w.get("provider")).and_then(|v| v.as_str()).or_else(|| sanitized_payload.get("company").and_then(|c| c.get("provider")).and_then(|v| v.as_str())) {
+            badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-indigo-950/80 text-indigo-300 border border-indigo-800/50">Provider: {}</span>"#, p));
+        }
+        if let Some(m) = sanitized_payload.get("workflow").and_then(|w| w.get("model")).and_then(|v| v.as_str()).or_else(|| sanitized_payload.get("company").and_then(|c| c.get("model")).and_then(|v| v.as_str())) {
+            badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-indigo-950/80 text-indigo-300 border border-indigo-800/50">Model: {}</span>"#, m));
+        }
+    }
+
+    if let Some(parsed) = sanitized_payload.get("parsed_email") {
+        if let Some(s) = parsed.get("sender").and_then(|v| v.as_str()) {
+            badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700">Sender: {}</span>"#, s));
+        }
+        if let Some(subj) = parsed.get("subject").and_then(|v| v.as_str()) {
+            badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700">Subject: {}</span>"#, subj));
+        }
+    }
+
+    let has_config = sanitized_payload.get("execution_parameters").and_then(|e| e.get("config")).map_or(false, |c| !c.is_null() && c != &serde_json::json!({}))
+        || sanitized_payload.get("workflow").and_then(|w| w.get("workflow_config")).map_or(false, |c| !c.is_null() && c != &serde_json::json!({}));
+    if has_config {
+        badges.push(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-800/50">Config: Present</span>"#.to_string());
+    }
+
+    let summary_badges_html = if !badges.is_empty() {
+        format!(r#"<div class="flex flex-wrap gap-1.5 mb-2">{}</div>"#, badges.join(""))
+    } else {
+        String::new()
+    };
+
+    format!(
+        r##"
+        <details class="mt-3 border-t border-slate-800/80 pt-3 group">
+            <summary class="cursor-pointer text-xs font-semibold text-slate-400 hover:text-indigo-300 transition flex items-center gap-1.5 select-none">
+                <span class="text-indigo-400 font-mono text-[11px] group-open:rotate-90 transition-transform">►</span>
+                <span>Task Execution Parameters</span>
+            </summary>
+            <div class="mt-2.5">
+                {summary_badges_html}
+                <pre class="bg-slate-950 p-3 rounded-lg text-emerald-300 font-mono text-[11px] border border-slate-800/80 overflow-x-auto whitespace-pre-wrap max-h-96">{payload_str}</pre>
+            </div>
+        </details>
+        "##,
+        summary_badges_html = summary_badges_html,
+        payload_str = payload_str,
+    )
+}
+
 pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
     let created_at_str = task.created_at.format("%b %d, %H:%M:%S").to_string();
     let status_badge = match task.status {
@@ -2537,6 +2864,8 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
         _ => String::new(),
     };
 
+    let parameters_html = render_message_task_parameters_html(&task.payload);
+
     format!(
         r##"
         <div id="task-{task_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 hover:border-slate-600 transition shadow-sm">
@@ -2555,6 +2884,7 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
                 </div>
             </div>
             {error_html}
+            {parameters_html}
         </div>
         "##,
         task_id = task.id,
@@ -2567,6 +2897,7 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
         simulation_link = simulation_link,
         action_button = action_button,
         error_html = error_html,
+        parameters_html = parameters_html,
     )
 }
 
@@ -2697,4 +3028,258 @@ pub fn workflow_approvals_fragment(approvals: &[HumanApproval]) -> String {
         .collect();
 
     format!(r#"<div class="space-y-2 mt-4">{rows}</div>"#, rows = rows)
+}
+
+pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
+    let list_html = agent_list_fragment(company, agents);
+    let company_name = &company.name;
+    let company_id = company.id;
+
+    let content = format!(
+        r##"
+        <div>
+            <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-700/50">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">{company_name} Agents</h2>
+                    <p class="text-slate-400 text-sm mt-0.5">Manage AI Agents, model providers, and configurations</p>
+                </div>
+                <a href="/companies" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition">
+                    &larr; Back to Companies
+                </a>
+            </div>
+
+            <!-- Create Agent Card -->
+            <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl p-5 mb-8 shadow-lg">
+                <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                    <span class="text-emerald-400">+</span> Add New Agent
+                </h3>
+                <form hx-post="/companies/{company_id}/agents" hx-target="#agent-list" hx-swap="innerHTML" class="space-y-4"
+                      onkeydown="if(event.key==='Enter' && event.target.tagName!=='TEXTAREA') event.preventDefault()">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="agent_name" class="block text-xs font-medium text-slate-300 mb-1">Agent Name</label>
+                            <input type="text" id="agent_name" name="name" required
+                                oninput="document.getElementById('agent_slug').value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                                placeholder="e.g. Triage Bot" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                        </div>
+                        <div>
+                            <label for="agent_slug" class="block text-xs font-medium text-slate-300 mb-1">Slug</label>
+                            <input type="text" id="agent_slug" name="slug" required
+                                placeholder="triage-bot" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label for="agent_provider" class="block text-xs font-medium text-slate-300 mb-1">Provider</label>
+                            <input type="text" id="agent_provider" name="provider"
+                                placeholder="openai, anthropic, google" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                        </div>
+                        <div>
+                            <label for="agent_model" class="block text-xs font-medium text-slate-300 mb-1">Model</label>
+                            <input type="text" id="agent_model" name="model"
+                                placeholder="gpt-4o, claude-3-5-sonnet" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                        </div>
+                        <div>
+                            <label for="agent_api_key" class="block text-xs font-medium text-slate-300 mb-1">API Key</label>
+                            <input type="password" id="agent_api_key" name="api_key"
+                                placeholder="sk-..." class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="agent_system_prompt" class="block text-xs font-medium text-slate-300 mb-1">System Prompt (Optional)</label>
+                        <textarea id="agent_system_prompt" name="system_prompt" rows="2"
+                            placeholder="You are a helpful customer support agent..."
+                            class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"></textarea>
+                    </div>
+
+                    <div>
+                        <label for="agent_config_json" class="block text-xs font-medium text-slate-300 mb-1">Config JSON (Optional)</label>
+                        <textarea id="agent_config_json" name="config_json" rows="2"
+                            placeholder='{{ "system_prompt": "You are a support agent." }}'
+                            class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"></textarea>
+                    </div>
+
+                    <div class="flex justify-end pt-2">
+                        <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-sm transition cursor-pointer shadow-md shadow-emerald-900/20">
+                            Create Agent
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="agent-list">
+                {list_html}
+            </div>
+        </div>
+        "##,
+        company_name = company_name,
+        company_id = company_id,
+        list_html = list_html
+    );
+
+    base_layout(&format!("{company_name} Agents"), &content)
+}
+
+pub fn agent_list_fragment(company: &Company, agents: &[Agent]) -> String {
+    if agents.is_empty() {
+        return format!(
+            r#"<div class="bg-slate-800/20 border border-slate-800 rounded-xl p-8 text-center text-slate-400">
+                <p class="text-sm">No agents configured for <span class="font-semibold text-white">{}</span> yet.</p>
+                <p class="text-xs text-slate-500 mt-1">Create your first agent using the form above.</p>
+            </div>"#,
+            company.name
+        );
+    }
+
+    let rows: String = agents
+        .iter()
+        .map(|agent| agent_row_fragment(company, agent))
+        .collect::<Vec<_>>()
+        .join("");
+
+    format!(
+        r#"<div class="space-y-3">{}</div>"#,
+        rows
+    )
+}
+
+pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
+    let company_id = company.id;
+    let agent_id = agent.id;
+    let name = &agent.name;
+    let slug = &agent.slug;
+    let provider = agent.provider.as_deref().unwrap_or("-");
+    let model = agent.model.as_deref().unwrap_or("-");
+    let system_prompt_display = agent.system_prompt.as_deref().unwrap_or("-");
+    let api_key_badge = if agent.api_key.is_some() {
+        r#"<span class="px-2 py-0.5 text-[10px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded">Key Configured</span>"#
+    } else {
+        r#"<span class="px-2 py-0.5 text-[10px] font-medium bg-slate-700/50 text-slate-400 rounded">No Key</span>"#
+    };
+
+    let config_display = agent
+        .config_json
+        .as_ref()
+        .map(|c| serde_json::to_string(c).unwrap_or_default())
+        .unwrap_or_else(|| "-".to_string());
+
+    format!(
+        r##"
+        <div id="agent-row-{agent_id}" class="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition hover:border-slate-600">
+            <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-white text-base">{name}</span>
+                    <span class="text-xs font-mono text-indigo-300 bg-indigo-950/60 border border-indigo-800/50 px-2 py-0.5 rounded">@{slug}</span>
+                    {api_key_badge}
+                </div>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 font-mono">
+                    <div><span class="text-slate-500">Provider:</span> <span class="text-slate-200">{provider}</span></div>
+                    <div><span class="text-slate-500">Model:</span> <span class="text-slate-200">{model}</span></div>
+                    <div class="max-w-xs truncate"><span class="text-slate-500">System Prompt:</span> <span class="text-slate-300">{system_prompt_display}</span></div>
+                    <div class="max-w-xs truncate"><span class="text-slate-500">Config:</span> <span class="text-slate-300">{config_display}</span></div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button hx-get="/companies/{company_id}/agents/{agent_id}/edit" hx-target="#agent-row-{agent_id}" hx-swap="outerHTML"
+                        class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium rounded-lg transition cursor-pointer">
+                    Edit
+                </button>
+                <button hx-delete="/companies/{company_id}/agents/{agent_id}" hx-target="#agent-row-{agent_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete agent '{name}'?"
+                        class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 text-xs font-medium rounded-lg transition cursor-pointer">
+                    Delete
+                </button>
+            </div>
+        </div>
+        "##,
+        agent_id = agent_id,
+        company_id = company_id,
+        name = name,
+        slug = slug,
+        provider = provider,
+        model = model,
+        api_key_badge = api_key_badge,
+        system_prompt_display = system_prompt_display,
+        config_display = config_display
+    )
+}
+
+pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
+    let company_id = company.id;
+    let agent_id = agent.id;
+    let name = &agent.name;
+    let slug = &agent.slug;
+    let provider = agent.provider.as_deref().unwrap_or("");
+    let model = agent.model.as_deref().unwrap_or("");
+    let api_key = agent.api_key.as_deref().unwrap_or("");
+    let system_prompt = agent.system_prompt.as_deref().unwrap_or("");
+    let config_json_str = agent
+        .config_json
+        .as_ref()
+        .map(|c| serde_json::to_string_pretty(c).unwrap_or_default())
+        .unwrap_or_default();
+
+    format!(
+        r##"
+        <div id="agent-row-{agent_id}" class="bg-slate-800 border border-indigo-500/50 rounded-xl p-5 shadow-xl">
+            <form hx-put="/companies/{company_id}/agents/{agent_id}" hx-target="#agent-row-{agent_id}" hx-swap="outerHTML" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Agent Name</label>
+                        <input type="text" name="name" value="{name}" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Slug</label>
+                        <input type="text" name="slug" value="{slug}" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Provider</label>
+                        <input type="text" name="provider" value="{provider}" placeholder="openai, anthropic" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Model</label>
+                        <input type="text" name="model" value="{model}" placeholder="gpt-4o" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">API Key</label>
+                        <input type="password" name="api_key" value="{api_key}" placeholder="sk-..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">System Prompt</label>
+                    <textarea name="system_prompt" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">{system_prompt}</textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Config JSON</label>
+                    <textarea name="config_json" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 transition">{config_json_str}</textarea>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" hx-get="/companies/{company_id}/agents/{agent_id}/cancel" hx-target="#agent-row-{agent_id}" hx-swap="outerHTML"
+                            class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-lg transition cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg transition cursor-pointer shadow-md shadow-indigo-900/20">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+        "##,
+        agent_id = agent_id,
+        company_id = company_id,
+        name = name,
+        slug = slug,
+        provider = provider,
+        model = model,
+        api_key = api_key,
+        system_prompt = system_prompt,
+        config_json_str = config_json_str
+    )
 }

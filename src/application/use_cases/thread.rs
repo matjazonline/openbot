@@ -15,11 +15,14 @@ use crate::{
     },
     infra::config::AppConfig,
     services::{
-        agent_runner::{AgentRunner, ApprovalContext as AgentRunnerApprovalContext},
+        agent_runner::{
+            AgentRunner, ApprovalContext as AgentRunnerApprovalContext, ResolvedAgentParams,
+        },
         email_parser::{EmailParser, MAX_WORKFLOW_HOPS, ParsedEmail, RawInboundPayload},
         outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
     },
     use_cases::{
+        agent::AgentPersistence,
         approval::ApprovalUseCases,
         company::CompanyPersistence,
         workflow::{WorkflowPersistence, parse_recipient_address},
@@ -68,6 +71,7 @@ pub struct ThreadUseCases {
     workflow_persistence: Arc<dyn WorkflowPersistence>,
     company_persistence: Arc<dyn CompanyPersistence>,
     task_persistence: Arc<dyn TaskPersistence>,
+    agent_persistence: Option<Arc<dyn AgentPersistence>>,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     config: Arc<AppConfig>,
 }
@@ -85,9 +89,18 @@ impl ThreadUseCases {
             workflow_persistence,
             company_persistence,
             task_persistence,
+            agent_persistence: None,
             approval_use_cases: None,
             config,
         }
+    }
+
+    pub fn with_agent_persistence(
+        mut self,
+        agent_persistence: Arc<dyn AgentPersistence>,
+    ) -> Self {
+        self.agent_persistence = Some(agent_persistence);
+        self
     }
 
     pub fn with_approval_use_cases(
@@ -360,7 +373,7 @@ impl ThreadUseCases {
             .create_message(&inbound_message)
             .await?;
 
-        let ingest_result = InboundIngestResult {
+        let mut ingest_result = InboundIngestResult {
             accepted: true,
             reason: None,
             thread: Some(thread.clone()),
@@ -368,11 +381,12 @@ impl ThreadUseCases {
             company: Some(company.clone()),
             workflow: Some(workflow.clone()),
             parsed_email: Some(parsed.clone()),
+            task_id: None,
         };
 
         // Enqueue background task for durable processing & crash recovery
         let payload_json = serde_json::to_value(&ingest_result).unwrap_or_default();
-        let _ = self
+        if let Ok(task) = self
             .task_persistence
             .enqueue_task(
                 company.id,
@@ -381,7 +395,10 @@ impl ThreadUseCases {
                 "email_agent_dispatch",
                 payload_json,
             )
-            .await;
+            .await
+        {
+            ingest_result.task_id = Some(task.id);
+        }
 
         Ok(ingest_result)
     }
@@ -391,6 +408,21 @@ impl ThreadUseCases {
         ingest: &InboundIngestResult,
         send_email: bool,
     ) -> AppResult<Option<AgentExecutionResult>> {
+        if let Some(task_id) = ingest.task_id {
+            match self.task_persistence.mark_task_processing(task_id).await {
+                Ok(true) => {
+                    info!("Successfully claimed task {} for execution", task_id);
+                }
+                Ok(false) => {
+                    info!("Task {} already claimed or completed by another worker, skipping duplicate dispatch", task_id);
+                    return Ok(None);
+                }
+                Err(err) => {
+                    warn!("Failed to mark task {} as processing: {}, continuing with execution", task_id, err);
+                }
+            }
+        }
+
         let (thread, company, workflow, parsed) = match (
             &ingest.thread,
             &ingest.company,
@@ -405,24 +437,6 @@ impl ThreadUseCases {
             .thread_persistence
             .list_messages_by_thread_id(thread.id)
             .await?;
-
-        let api_key = workflow
-            .api_key
-            .as_deref()
-            .filter(|s| !s.trim().is_empty())
-            .or_else(|| company.api_key.as_deref().filter(|s| !s.trim().is_empty()));
-
-        let provider = workflow
-            .provider
-            .as_deref()
-            .filter(|s| !s.trim().is_empty())
-            .or_else(|| company.provider.as_deref().filter(|s| !s.trim().is_empty()));
-
-        let model = workflow
-            .model
-            .as_deref()
-            .filter(|s| !s.trim().is_empty())
-            .or_else(|| company.model.as_deref().filter(|s| !s.trim().is_empty()));
 
         let approver_email = workflow
             .participant_emails
@@ -441,17 +455,30 @@ impl ThreadUseCases {
             approver_email,
         };
 
-        // Execute AI Agent
-        let runner_res = AgentRunner::new(&parsed.prompt_text)
-            .history(&history_messages)
-            .workflow_config(workflow.workflow_config.as_ref())
-            .api_key(api_key)
-            .provider(provider)
-            .model(model)
-            .approval_use_cases(self.approval_use_cases.clone())
-            .approval_context(Some(approval_ctx))
-            .execute()
-            .await;
+        let first_agent = if let Some(ref ap) = self.agent_persistence {
+            if let Some(&agent_id) = workflow.agent_ids.as_ref().and_then(|ids| ids.first()) {
+                ap.get_by_id(agent_id).await.ok().flatten()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Resolve AI Agent parameters and execute
+        let resolved_params_res = ResolvedAgentParams::new(Some(company), Some(workflow), first_agent.as_ref());
+
+        let runner_res = match &resolved_params_res {
+            Ok(resolved_params) => {
+                AgentRunner::new(&parsed.prompt_text, resolved_params)
+                    .history(&history_messages)
+                    .approval_use_cases(self.approval_use_cases.clone())
+                    .approval_context(Some(approval_ctx))
+                    .execute()
+                    .await
+            }
+            Err(err) => Err(anyhow::anyhow!("{err}")),
+        };
 
         let (agent_response, execution_error) = match runner_res {
             Ok(res) => (res, None),
@@ -571,8 +598,62 @@ impl ThreadUseCases {
             .create_message(&outbound_message)
             .await?;
 
-        if let Some(err_msg) = execution_error {
-            return Err(crate::app_error::AppError::Internal(err_msg));
+        if let Some(task_id) = ingest.task_id {
+            let exec_params = match &resolved_params_res {
+                Ok(p) => {
+                    let mut cfg = p.config().clone();
+                    if let Some(obj) = cfg.as_object_mut() {
+                        if obj.contains_key("api_key") {
+                            obj.insert("api_key".to_string(), serde_json::json!("***masked***"));
+                        }
+                        if let Some(llm) = obj.get_mut("llm").and_then(|v| v.as_object_mut()) {
+                            if llm.contains_key("api_key") {
+                                llm.insert("api_key".to_string(), serde_json::json!("***masked***"));
+                            }
+                        }
+                    }
+                    serde_json::json!({
+                        "provider": p.provider(),
+                        "model": p.model(),
+                        "agent_id": first_agent.as_ref().map(|a| a.id),
+                        "agent_name": first_agent.as_ref().map(|a| a.name.as_str()),
+                        "prompt": parsed.prompt_text,
+                        "config": cfg,
+                        "executed_at": chrono::Utc::now().naive_utc().to_string(),
+                    })
+                }
+                Err(_) => serde_json::json!({
+                    "prompt": parsed.prompt_text,
+                    "executed_at": chrono::Utc::now().naive_utc().to_string(),
+                }),
+            };
+
+            let mut updated_payload = serde_json::to_value(ingest).unwrap_or_default();
+            if let Some(obj) = updated_payload.as_object_mut() {
+                obj.insert("execution_parameters".to_string(), exec_params);
+                obj.insert("execution_result".to_string(), serde_json::json!({
+                    "response": agent_response.clone(),
+                    "email_sent": email_sent,
+                    "outbound_message_id": sent_message_id.clone(),
+                    "error": execution_error.clone(),
+                }));
+            }
+            let _ = self.task_persistence.update_task_payload(task_id, updated_payload).await;
+        }
+
+        if let Some(ref err_msg) = execution_error {
+            if let Some(task_id) = ingest.task_id {
+                let next_run = chrono::Utc::now().naive_utc();
+                let _ = self
+                    .task_persistence
+                    .mark_task_failed(task_id, err_msg, next_run, true)
+                    .await;
+            }
+            return Err(crate::app_error::AppError::Internal(err_msg.clone()));
+        }
+
+        if let Some(task_id) = ingest.task_id {
+            let _ = self.task_persistence.mark_task_completed(task_id).await;
         }
 
         Ok(Some(AgentExecutionResult {
@@ -685,6 +766,7 @@ pub struct InboundIngestResult {
     pub company: Option<Company>,
     pub workflow: Option<Workflow>,
     pub parsed_email: Option<ParsedEmail>,
+    pub task_id: Option<Uuid>,
 }
 
 impl InboundIngestResult {
@@ -697,6 +779,7 @@ impl InboundIngestResult {
             company: None,
             workflow: None,
             parsed_email: None,
+            task_id: None,
         }
     }
 }
@@ -784,6 +867,7 @@ mod tests {
             _provider: Option<&str>,
             _model: Option<&str>,
             _participant_emails: Option<Vec<String>>,
+            _agent_ids: Option<Vec<Uuid>>,
             _workflow_config: Option<serde_json::Value>,
         ) -> AppResult<Workflow> {
             unimplemented!()
@@ -816,6 +900,7 @@ mod tests {
             _provider: Option<&str>,
             _model: Option<&str>,
             _participant_emails: Option<Vec<String>>,
+            _agent_ids: Option<Vec<Uuid>>,
             _workflow_config: Option<serde_json::Value>,
         ) -> AppResult<Workflow> {
             unimplemented!()
@@ -990,6 +1075,18 @@ mod tests {
                 .cloned())
         }
 
+        async fn update_task_payload(
+            &self,
+            id: Uuid,
+            payload: serde_json::Value,
+        ) -> AppResult<()> {
+            let mut list = self.tasks.lock().unwrap();
+            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+                t.payload = payload;
+            }
+            Ok(())
+        }
+
         async fn poll_next_pending_tasks(
             &self,
             _limit: i64,
@@ -1004,12 +1101,14 @@ mod tests {
                 .collect())
         }
 
-        async fn mark_task_processing(&self, id: Uuid) -> AppResult<()> {
+        async fn mark_task_processing(&self, id: Uuid) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+            if let Some(t) = list.iter_mut().find(|t| t.id == id && t.status == crate::entities::task::TaskStatus::Pending) {
                 t.status = crate::entities::task::TaskStatus::Processing;
+                Ok(true)
+            } else {
+                Ok(false)
             }
-            Ok(())
         }
 
         async fn mark_task_completed(&self, id: Uuid) -> AppResult<()> {
@@ -1099,6 +1198,7 @@ mod tests {
                 provider: None,
                 model: None,
                 participant_emails: None,
+                agent_ids: None,
                 workflow_config: None,
                 created_at: Utc::now().naive_utc(),
             }]),
@@ -1184,6 +1284,7 @@ mod tests {
                 provider: None,
                 model: None,
                 participant_emails: Some(vec!["agent@example.com".to_string()]),
+                agent_ids: None,
                 workflow_config: None,
                 created_at: Utc::now().naive_utc(),
             }]),

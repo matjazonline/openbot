@@ -22,6 +22,7 @@ pub trait WorkflowPersistence: Send + Sync {
         provider: Option<&str>,
         model: Option<&str>,
         participant_emails: Option<Vec<String>>,
+        agent_ids: Option<Vec<Uuid>>,
         workflow_config: Option<serde_json::Value>,
     ) -> AppResult<Workflow>;
 
@@ -44,6 +45,7 @@ pub trait WorkflowPersistence: Send + Sync {
         provider: Option<&str>,
         model: Option<&str>,
         participant_emails: Option<Vec<String>>,
+        agent_ids: Option<Vec<Uuid>>,
         workflow_config: Option<serde_json::Value>,
     ) -> AppResult<Workflow>;
 
@@ -94,6 +96,7 @@ impl WorkflowUseCases {
         provider: Option<&str>,
         model: Option<&str>,
         participant_emails: Option<Vec<String>>,
+        agent_ids: Option<Vec<Uuid>>,
         workflow_config: Option<serde_json::Value>,
     ) -> AppResult<Workflow> {
         self.verify_company_owner(user_id, company_id).await?;
@@ -133,6 +136,7 @@ impl WorkflowUseCases {
                 provider_clean,
                 model_clean,
                 cleaned_emails,
+                agent_ids,
                 workflow_config,
             )
             .await
@@ -177,6 +181,7 @@ impl WorkflowUseCases {
         provider: Option<&str>,
         model: Option<&str>,
         participant_emails: Option<Vec<String>>,
+        agent_ids: Option<Vec<Uuid>>,
         workflow_config: Option<serde_json::Value>,
     ) -> AppResult<Workflow> {
         self.verify_company_owner(user_id, company_id).await?;
@@ -228,6 +233,7 @@ impl WorkflowUseCases {
                 provider_clean,
                 model_clean,
                 cleaned_emails,
+                agent_ids,
                 workflow_config,
             )
             .await
@@ -486,6 +492,7 @@ mod tests {
             provider: Option<&str>,
             model: Option<&str>,
             participant_emails: Option<Vec<String>>,
+            agent_ids: Option<Vec<Uuid>>,
             workflow_config: Option<serde_json::Value>,
         ) -> AppResult<Workflow> {
             let workflow = Workflow {
@@ -497,6 +504,7 @@ mod tests {
                 provider: provider.map(|s| s.to_string()),
                 model: model.map(|s| s.to_string()),
                 participant_emails,
+                agent_ids,
                 workflow_config,
                 created_at: Utc::now().naive_utc(),
             };
@@ -548,6 +556,7 @@ mod tests {
             provider: Option<&str>,
             model: Option<&str>,
             participant_emails: Option<Vec<String>>,
+            agent_ids: Option<Vec<Uuid>>,
             workflow_config: Option<serde_json::Value>,
         ) -> AppResult<Workflow> {
             let mut list = self.workflows.lock().unwrap();
@@ -562,6 +571,7 @@ mod tests {
             workflow.provider = provider.map(|s| s.to_string());
             workflow.model = model.map(|s| s.to_string());
             workflow.participant_emails = participant_emails;
+            workflow.agent_ids = agent_ids;
             workflow.workflow_config = workflow_config;
             Ok(workflow.clone())
         }
@@ -600,6 +610,10 @@ mod tests {
         let emails = vec!["agent1@example.com".to_string(), "agent2@example.com".to_string()];
         let config = json!({ "trigger": "email_received", "action": "forward" });
 
+        let agent_id1 = Uuid::new_v4();
+        let agent_id2 = Uuid::new_v4();
+        let agent_ids = vec![agent_id1, agent_id2];
+
         let workflow = use_cases
             .create_workflow(
                 owner_id,
@@ -610,6 +624,7 @@ mod tests {
                 Some("openai"),
                 Some("gpt-4o"),
                 Some(emails.clone()),
+                Some(agent_ids.clone()),
                 Some(config.clone()),
             )
             .await
@@ -621,6 +636,7 @@ mod tests {
         assert_eq!(workflow.provider.as_deref(), Some("openai"));
         assert_eq!(workflow.model.as_deref(), Some("gpt-4o"));
         assert_eq!(workflow.participant_emails, Some(emails));
+        assert_eq!(workflow.agent_ids, Some(agent_ids));
         assert_eq!(workflow.workflow_config, Some(config));
 
         // 2. Non-owner cannot create workflow
@@ -631,6 +647,7 @@ mod tests {
                 company_id,
                 "Hacker Flow",
                 "hacker-flow",
+                None,
                 None,
                 None,
                 None,
@@ -660,6 +677,7 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
                 Some(updated_config.clone()),
             )
             .await
@@ -667,6 +685,7 @@ mod tests {
         assert_eq!(updated.name, "Updated Flow");
         assert_eq!(updated.slug, "updated-flow");
         assert_eq!(updated.participant_emails, None);
+        assert_eq!(updated.agent_ids, None);
         assert_eq!(updated.workflow_config, Some(updated_config));
 
         // 5. Delete workflow
@@ -737,7 +756,7 @@ mod tests {
         let use_cases = WorkflowUseCases::new(company_persistence, workflow_persistence);
 
         let _ = use_cases
-            .create_workflow(owner_id, company_id, "Support Flow", "support", None, None, None, None, None)
+            .create_workflow(owner_id, company_id, "Support Flow", "support", None, None, None, None, None, None)
             .await
             .unwrap();
 
@@ -773,6 +792,7 @@ mod tests {
                 None,
                 None,
                 Some(vec!["agent@example.com".to_string()]),
+                None,
                 None,
             )
             .await

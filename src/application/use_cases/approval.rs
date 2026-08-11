@@ -381,8 +381,9 @@ mod tests {
     impl TaskPersistence for MockTaskPersistence {
         async fn enqueue_task(&self, _company_id: Uuid, _workflow_id: Uuid, _thread_id: Option<Uuid>, _task_type: &str, _payload: serde_json::Value) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
         async fn get_task_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::task::BackgroundTask>> { unimplemented!() }
+        async fn update_task_payload(&self, _id: Uuid, _payload: serde_json::Value) -> AppResult<()> { Ok(()) }
         async fn poll_next_pending_tasks(&self, _limit: i64) -> AppResult<Vec<crate::entities::task::BackgroundTask>> { unimplemented!() }
-        async fn mark_task_processing(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
+        async fn mark_task_processing(&self, _id: Uuid) -> AppResult<bool> { Ok(true) }
         async fn mark_task_completed(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
         async fn mark_task_failed(&self, _id: Uuid, _error_msg: &str, _next_run_at: chrono::NaiveDateTime, _is_dead_letter: bool) -> AppResult<()> { Ok(()) }
         async fn stop_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }

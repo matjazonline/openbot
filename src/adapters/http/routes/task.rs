@@ -168,6 +168,7 @@ async fn resume_company_task(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::task::BackgroundTask;
 
     #[test]
     fn test_task_filter_query_deserialization_empty_workflow() {
@@ -226,6 +227,48 @@ mod tests {
     }
 
     #[test]
+    fn test_task_row_fragment_renders_expandable_parameters_and_masks_api_key() {
+        let company_id = Uuid::new_v4();
+        let workflow_id = Uuid::new_v4();
+        let task = BackgroundTask {
+            id: Uuid::new_v4(),
+            company_id,
+            workflow_id,
+            thread_id: None,
+            task_type: "email_agent_dispatch".to_string(),
+            status: TaskStatus::Completed,
+            payload: serde_json::json!({
+                "execution_parameters": {
+                    "provider": "google",
+                    "model": "gemini-2.5-flash",
+                    "config": {
+                        "api_key": "secret-key-12345"
+                    }
+                },
+                "parsed_email": {
+                    "sender": "user@example.com",
+                    "subject": "Need assistance"
+                }
+            }),
+            retry_count: 0,
+            max_retries: 3,
+            last_error: None,
+            run_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now().naive_utc(),
+            updated_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let html = pages::task_row_fragment(company_id, &task);
+        assert!(html.contains("Task Execution Parameters"));
+        assert!(html.contains("Provider: google"));
+        assert!(html.contains("Model: gemini-2.5-flash"));
+        assert!(html.contains("Sender: user@example.com"));
+        assert!(html.contains("Subject: Need assistance"));
+        assert!(html.contains("***masked***"));
+        assert!(!html.contains("secret-key-12345"));
+    }
+
+    #[test]
     fn test_build_tasks_push_url() {
         let company_id = Uuid::new_v4();
         let wf_id = Uuid::new_v4();
@@ -276,11 +319,12 @@ mod tests {
             model: None,
             api_key: None,
             participant_emails: None,
+            agent_ids: None,
             workflow_config: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let html = pages::workflow_row_fragment(&company, "example.com", &workflow);
+        let html = pages::workflow_row_fragment(&company, "example.com", &workflow, &[]);
         assert!(html.contains("Tasks"));
         assert!(html.contains(&format!("/companies/{company_id}/tasks?workflow_id={workflow_id}")));
     }

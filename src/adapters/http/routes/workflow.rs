@@ -18,6 +18,7 @@ use crate::{
     infra::config::AppConfig,
     services::email_parser::RawInboundPayload,
     use_cases::{
+        agent::AgentUseCases,
         company::CompanyUseCases,
         thread::{SimulationMode, ThreadUseCases},
         workflow::WorkflowUseCases,
@@ -70,7 +71,24 @@ pub struct WorkflowForm {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub participant_emails: Option<String>,
+    pub agent_ids: Option<String>,
     pub workflow_config: Option<String>,
+}
+
+fn parse_agent_ids_form(input: Option<String>) -> Option<Vec<Uuid>> {
+    input.and_then(|s| {
+        let list: Vec<Uuid> = s
+            .split(&[',', ' ', ';', '\n'][..])
+            .map(|e| e.trim())
+            .filter(|e| !e.is_empty())
+            .filter_map(|e| Uuid::parse_str(e).ok())
+            .collect();
+        if list.is_empty() {
+            None
+        } else {
+            Some(list)
+        }
+    })
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -81,6 +99,7 @@ pub struct WorkflowJsonPayload {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub participant_emails: Option<Vec<String>>,
+    pub agent_ids: Option<Vec<Uuid>>,
     pub workflow_config: Option<serde_json::Value>,
 }
 
@@ -115,10 +134,11 @@ fn parse_config_form(input: Option<String>) -> Result<Option<serde_json::Value>,
 }
 
 /// GET /companies/{company_id}/workflows - Full HTML page listing workflows (Protected).
-#[instrument(skip(company_use_cases, workflow_use_cases, config, user))]
+#[instrument(skip(company_use_cases, workflow_use_cases, agent_use_cases, config, user))]
 async fn list_workflows_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(workflow_use_cases): State<Arc<WorkflowUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
@@ -133,14 +153,20 @@ async fn list_workflows_page(
         .await
         .unwrap_or_default();
 
-    Html(pages::workflows_page(&company, &config.app_domain_name, &workflows))
+    let agents = agent_use_cases
+        .list_company_agents(user.id, company_id)
+        .await
+        .unwrap_or_default();
+
+    Html(pages::workflows_page(&company, &config.app_domain_name, &workflows, &agents))
 }
 
 /// POST /companies/{company_id}/workflows - HTMX create workflow (Protected).
-#[instrument(skip(company_use_cases, workflow_use_cases, config, user, form))]
+#[instrument(skip(company_use_cases, workflow_use_cases, agent_use_cases, config, user, form))]
 async fn create_workflow_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(workflow_use_cases): State<Arc<WorkflowUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
@@ -151,7 +177,13 @@ async fn create_workflow_handler(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
+    let agents = agent_use_cases
+        .list_company_agents(user.id, company_id)
+        .await
+        .unwrap_or_default();
+
     let emails = parse_emails_form(form.participant_emails);
+    let agent_ids = parse_agent_ids_form(form.agent_ids);
     let workflow_config = match parse_config_form(form.workflow_config) {
         Ok(c) => c,
         Err(err) => {
@@ -163,7 +195,7 @@ async fn create_workflow_handler(
             return Html(format!(
                 "{}{}",
                 error_html,
-                pages::workflow_list_fragment(&company, &config.app_domain_name, &workflows)
+                pages::workflow_list_fragment(&company, &config.app_domain_name, &workflows, &agents)
             ));
         }
     };
@@ -178,6 +210,7 @@ async fn create_workflow_handler(
             form.provider.as_deref(),
             form.model.as_deref(),
             emails,
+            agent_ids,
             workflow_config,
         )
         .await
@@ -191,6 +224,7 @@ async fn create_workflow_handler(
                 &company,
                 &config.app_domain_name,
                 &workflows,
+                &agents,
             ))
         }
         Err(err) => {
@@ -202,17 +236,18 @@ async fn create_workflow_handler(
             Html(format!(
                 "{}{}",
                 error_html,
-                pages::workflow_list_fragment(&company, &config.app_domain_name, &workflows)
+                pages::workflow_list_fragment(&company, &config.app_domain_name, &workflows, &agents)
             ))
         }
     }
 }
 
 /// GET /companies/{company_id}/workflows/{id}/edit - HTMX edit workflow form fragment (Protected).
-#[instrument(skip(company_use_cases, workflow_use_cases, config, user))]
+#[instrument(skip(company_use_cases, workflow_use_cases, agent_use_cases, config, user))]
 async fn edit_workflow_form(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(workflow_use_cases): State<Arc<WorkflowUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, workflow_id)): Path<(Uuid, Uuid)>,
@@ -221,6 +256,11 @@ async fn edit_workflow_form(
         Ok(Some(c)) => c,
         _ => return Html(pages::error_alert("Company not found.")),
     };
+
+    let agents = agent_use_cases
+        .list_company_agents(user.id, company_id)
+        .await
+        .unwrap_or_default();
 
     if let Ok(Some(wf)) = workflow_use_cases
         .get_company_workflow(user.id, company_id, workflow_id)
@@ -230,6 +270,7 @@ async fn edit_workflow_form(
             &company,
             &config.app_domain_name,
             &wf,
+            &agents,
         ))
     } else {
         Html(pages::error_alert("Workflow not found."))
@@ -237,10 +278,11 @@ async fn edit_workflow_form(
 }
 
 /// GET /companies/{company_id}/workflows/{id}/cancel - Cancel workflow edit fragment (Protected).
-#[instrument(skip(company_use_cases, workflow_use_cases, config, user))]
+#[instrument(skip(company_use_cases, workflow_use_cases, agent_use_cases, config, user))]
 async fn cancel_workflow_edit(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(workflow_use_cases): State<Arc<WorkflowUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, workflow_id)): Path<(Uuid, Uuid)>,
@@ -250,6 +292,11 @@ async fn cancel_workflow_edit(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
+    let agents = agent_use_cases
+        .list_company_agents(user.id, company_id)
+        .await
+        .unwrap_or_default();
+
     if let Ok(Some(wf)) = workflow_use_cases
         .get_company_workflow(user.id, company_id, workflow_id)
         .await
@@ -258,6 +305,7 @@ async fn cancel_workflow_edit(
             &company,
             &config.app_domain_name,
             &wf,
+            &agents,
         ))
     } else {
         Html(String::new())
@@ -265,10 +313,11 @@ async fn cancel_workflow_edit(
 }
 
 /// PUT /companies/{company_id}/workflows/{id} - HTMX update workflow (Protected).
-#[instrument(skip(company_use_cases, workflow_use_cases, config, user, form))]
+#[instrument(skip(company_use_cases, workflow_use_cases, agent_use_cases, config, user, form))]
 async fn update_workflow_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(workflow_use_cases): State<Arc<WorkflowUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, workflow_id)): Path<(Uuid, Uuid)>,
@@ -279,7 +328,13 @@ async fn update_workflow_handler(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
+    let agents = agent_use_cases
+        .list_company_agents(user.id, company_id)
+        .await
+        .unwrap_or_default();
+
     let emails = parse_emails_form(form.participant_emails);
+    let agent_ids = parse_agent_ids_form(form.agent_ids);
     let workflow_config = match parse_config_form(form.workflow_config) {
         Ok(c) => c,
         Err(err) => return Html(pages::error_alert(&err)),
@@ -296,6 +351,7 @@ async fn update_workflow_handler(
             form.provider.as_deref(),
             form.model.as_deref(),
             emails,
+            agent_ids,
             workflow_config,
         )
         .await
@@ -304,6 +360,7 @@ async fn update_workflow_handler(
             &company,
             &config.app_domain_name,
             &wf,
+            &agents,
         )),
         Err(err) => Html(pages::error_alert(&format!("Update failed: {err}"))),
     }
@@ -381,12 +438,17 @@ async fn simulate_workflow_page(
                             .get_thread_history(thread.id)
                             .await
                             .unwrap_or_default();
+                        let tasks = thread_use_cases
+                            .list_company_tasks(company_id, Some(workflow_id), None, true)
+                            .await
+                            .unwrap_or_default();
                         initial_result_html = Some(pages::workflow_simulation_loaded_thread_fragment(
                             &company,
                             &workflow,
                             &config.app_domain_name,
                             &thread,
                             &messages,
+                            &tasks,
                             false,
                         ));
                     }
@@ -529,11 +591,17 @@ async fn simulate_workflow_handler(
                         Vec::new()
                     };
 
+                    let tasks = thread_use_cases
+                        .list_company_tasks(company_id, Some(workflow_id), None, true)
+                        .await
+                        .unwrap_or_default();
+
                     let html_res = pages::workflow_simulation_execution_result_fragment(
                         company_id,
                         workflow_id,
                         &sim_res,
                         &messages,
+                        &tasks,
                     );
 
                     if let Some(ref thread) = sim_res.ingest_result.thread {
@@ -634,12 +702,18 @@ async fn open_simulated_thread_logic(
                 .await
                 .unwrap_or_default();
 
+            let tasks = thread_use_cases
+                .list_company_tasks(company_id, Some(workflow_id), None, true)
+                .await
+                .unwrap_or_default();
+
             let fragment_html = pages::workflow_simulation_loaded_thread_fragment(
                 &company,
                 &workflow,
                 &config.app_domain_name,
                 &thread,
                 &messages,
+                &tasks,
                 true,
             );
 
@@ -742,6 +816,7 @@ async fn create_workflow_json(
             payload.provider.as_deref(),
             payload.model.as_deref(),
             payload.participant_emails,
+            payload.agent_ids,
             payload.workflow_config,
         )
         .await?;
@@ -787,6 +862,7 @@ async fn update_workflow_json(
             payload.provider.as_deref(),
             payload.model.as_deref(),
             payload.participant_emails,
+            payload.agent_ids,
             payload.workflow_config,
         )
         .await?;
@@ -843,17 +919,18 @@ mod tests {
             provider: None,
             model: None,
             participant_emails: Some(vec!["agent@test.com".to_string()]),
+            agent_ids: None,
             workflow_config: Some(json!({ "mode": "async" })),
             created_at: Utc::now().naive_utc(),
         };
 
-        let row_html = pages::workflow_row_fragment(&company, "example.com", &workflow);
+        let row_html = pages::workflow_row_fragment(&company, "example.com", &workflow, &[]);
         assert!(row_html.contains("Auto Dispatcher"));
         assert!(row_html.contains("auto-dispatcher@acme.example.com"));
         assert!(row_html.contains("agent@test.com"));
         assert!(row_html.contains("async"));
 
-        let edit_html = pages::workflow_edit_fragment(&company, "example.com", &workflow);
+        let edit_html = pages::workflow_edit_fragment(&company, "example.com", &workflow, &[]);
         assert!(edit_html.contains("hx-put="));
         assert!(edit_html.contains("value=\"Auto Dispatcher\""));
 
@@ -921,6 +998,7 @@ mod tests {
                     dkim_status: Some("pass".to_string()),
                     spam_score: None,
                 }),
+                task_id: None,
             },
             agent_execution: Some(crate::use_cases::thread::AgentExecutionResult {
                 outbound_message_id: Some("<out1@test>".to_string()),
@@ -949,10 +1027,11 @@ mod tests {
             created_at: Utc::now().naive_utc(),
         };
 
-        let run_test_html = pages::workflow_simulation_execution_result_fragment(company.id, workflow.id, &full_sim_res, &[test_message.clone()]);
+        let run_test_html = pages::workflow_simulation_execution_result_fragment(company.id, workflow.id, &full_sim_res, &[test_message.clone()], &[]);
         assert!(run_test_html.contains("Run_Test"));
         assert!(run_test_html.contains("Skipped (Run_Test Dry-Run)"));
         assert!(run_test_html.contains("Hello from Agent"));
+        assert!(run_test_html.contains("Task Execution Parameters"));
         assert!(run_test_html.contains("LLM Provider:"));
         assert!(run_test_html.contains("LLM Model:"));
         assert!(run_test_html.contains("API Key Status:"));
@@ -994,10 +1073,12 @@ mod tests {
             "example.com",
             &sample_thread,
             &[test_message],
+            &[],
             true,
         );
         assert!(loaded_thread_html.contains("Thread Loaded & Active"));
         assert!(loaded_thread_html.contains("Existing Thread Subject"));
+        assert!(loaded_thread_html.contains("Task Execution Parameters"));
         assert!(loaded_thread_html.contains("Simulate Reply Webhook Call"));
 
         let error_thread_html = pages::workflow_simulation_thread_error_fragment(
@@ -1009,5 +1090,39 @@ mod tests {
         );
         assert!(error_thread_html.contains("Failed to Load Thread"));
         assert!(error_thread_html.contains("Thread not found"));
+    }
+
+    #[tokio::test]
+    async fn test_workflow_form_deserialization() {
+        use axum::extract::FromRequest;
+        use axum::http::{header, Request};
+        use axum::body::Body;
+
+        let req_omitted = Request::builder()
+            .method("PUT")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from("name=My+Workflow&slug=my-workflow&agent_ids="))
+            .unwrap();
+        let form_omitted = Form::<WorkflowForm>::from_request(req_omitted, &()).await.unwrap().0;
+        assert_eq!(parse_agent_ids_form(form_omitted.agent_ids), None);
+
+        let req_single = Request::builder()
+            .method("PUT")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from("name=My+Workflow&slug=my-workflow&agent_ids=00000000-0000-0000-0000-000000000001"))
+            .unwrap();
+        let form_single = Form::<WorkflowForm>::from_request(req_single, &()).await.unwrap().0;
+        assert_eq!(parse_agent_ids_form(form_single.agent_ids), Some(vec![Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()]));
+
+        let req_multiple = Request::builder()
+            .method("PUT")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from("name=My+Workflow&slug=my-workflow&agent_ids=00000000-0000-0000-0000-000000000001%2C00000000-0000-0000-0000-000000000002"))
+            .unwrap();
+        let form_multiple = Form::<WorkflowForm>::from_request(req_multiple, &()).await.unwrap().0;
+        assert_eq!(parse_agent_ids_form(form_multiple.agent_ids), Some(vec![
+            Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(),
+            Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap(),
+        ]));
     }
 }

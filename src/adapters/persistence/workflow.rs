@@ -20,6 +20,7 @@ pub struct WorkflowDb {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub participant_emails: Option<Vec<String>>,
+    pub agent_ids: Option<Vec<Uuid>>,
     pub workflow_config: Option<serde_json::Value>,
     pub created_at: NaiveDateTime,
 }
@@ -35,6 +36,7 @@ impl From<WorkflowDb> for Workflow {
             provider: db.provider,
             model: db.model,
             participant_emails: db.participant_emails,
+            agent_ids: db.agent_ids,
             workflow_config: db.workflow_config,
             created_at: db.created_at,
         }
@@ -52,15 +54,16 @@ impl WorkflowPersistence for PostgresPersistence {
         provider: Option<&str>,
         model: Option<&str>,
         participant_emails: Option<Vec<String>>,
+        agent_ids: Option<Vec<Uuid>>,
         workflow_config: Option<serde_json::Value>,
     ) -> AppResult<Workflow> {
         let uuid = Uuid::new_v4();
 
         let db = sqlx::query_as!(
             WorkflowDb,
-            r#"INSERT INTO workflows (id, company_id, name, slug, api_key, provider, model, participant_emails, workflow_config)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-               RETURNING id, company_id, name, slug, api_key, provider, model, participant_emails, workflow_config, created_at as "created_at!""#,
+            r#"INSERT INTO workflows (id, company_id, name, slug, api_key, provider, model, participant_emails, agent_ids, workflow_config)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+               RETURNING id, company_id, name, slug, api_key, provider, model, participant_emails, agent_ids, workflow_config, created_at as "created_at!""#,
             uuid,
             company_id,
             name,
@@ -69,6 +72,7 @@ impl WorkflowPersistence for PostgresPersistence {
             provider,
             model,
             participant_emails.as_deref(),
+            agent_ids.as_deref(),
             workflow_config
         )
         .fetch_one(&self.pool)
@@ -81,7 +85,7 @@ impl WorkflowPersistence for PostgresPersistence {
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Workflow>> {
         let db = sqlx::query_as!(
             WorkflowDb,
-            r#"SELECT id, company_id, name, slug, api_key, provider, model, participant_emails, workflow_config, created_at as "created_at!"
+            r#"SELECT id, company_id, name, slug, api_key, provider, model, participant_emails, agent_ids, workflow_config, created_at as "created_at!"
                FROM workflows WHERE id = $1"#,
             id
         )
@@ -99,7 +103,7 @@ impl WorkflowPersistence for PostgresPersistence {
     ) -> AppResult<Option<Workflow>> {
         let db = sqlx::query_as!(
             WorkflowDb,
-            r#"SELECT w.id, w.company_id, w.name, w.slug, w.api_key, w.provider, w.model, w.participant_emails, w.workflow_config, w.created_at as "created_at!"
+            r#"SELECT w.id, w.company_id, w.name, w.slug, w.api_key, w.provider, w.model, w.participant_emails, w.agent_ids, w.workflow_config, w.created_at as "created_at!"
                FROM workflows w
                JOIN companies c ON c.id = w.company_id
                WHERE LOWER(c.slug) = LOWER($1) AND LOWER(w.slug) = LOWER($2)"#,
@@ -116,7 +120,7 @@ impl WorkflowPersistence for PostgresPersistence {
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Workflow>> {
         let db_list = sqlx::query_as!(
             WorkflowDb,
-            r#"SELECT id, company_id, name, slug, api_key, provider, model, participant_emails, workflow_config, created_at as "created_at!"
+            r#"SELECT id, company_id, name, slug, api_key, provider, model, participant_emails, agent_ids, workflow_config, created_at as "created_at!"
                FROM workflows WHERE company_id = $1 ORDER BY created_at DESC"#,
             company_id
         )
@@ -136,20 +140,22 @@ impl WorkflowPersistence for PostgresPersistence {
         provider: Option<&str>,
         model: Option<&str>,
         participant_emails: Option<Vec<String>>,
+        agent_ids: Option<Vec<Uuid>>,
         workflow_config: Option<serde_json::Value>,
     ) -> AppResult<Workflow> {
         let db = sqlx::query_as!(
             WorkflowDb,
             r#"UPDATE workflows
-               SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5, participant_emails = $6, workflow_config = $7
-               WHERE id = $8
-               RETURNING id, company_id, name, slug, api_key, provider, model, participant_emails, workflow_config, created_at as "created_at!""#,
+               SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5, participant_emails = $6, agent_ids = $7, workflow_config = $8
+               WHERE id = $9
+               RETURNING id, company_id, name, slug, api_key, provider, model, participant_emails, agent_ids, workflow_config, created_at as "created_at!""#,
             name,
             slug,
             api_key,
             provider,
             model,
             participant_emails.as_deref(),
+            agent_ids.as_deref(),
             workflow_config,
             id
         )
@@ -205,6 +211,10 @@ mod tests {
         let emails = vec!["a@example.com".to_string(), "b@example.com".to_string()];
         let config = json!({ "key": "value" });
 
+        let agent_id1 = Uuid::new_v4();
+        let agent_id2 = Uuid::new_v4();
+        let agent_ids = vec![agent_id1, agent_id2];
+
         let workflow = WorkflowPersistence::create(
             &persistence,
             company.id,
@@ -214,6 +224,7 @@ mod tests {
             Some("openai"),
             Some("gpt-4o"),
             Some(emails.clone()),
+            Some(agent_ids.clone()),
             Some(config.clone()),
         )
         .await
@@ -225,6 +236,7 @@ mod tests {
         assert_eq!(workflow.provider.as_deref(), Some("openai"));
         assert_eq!(workflow.model.as_deref(), Some("gpt-4o"));
         assert_eq!(workflow.participant_emails, Some(emails));
+        assert_eq!(workflow.agent_ids, Some(agent_ids));
         assert_eq!(workflow.workflow_config, Some(config));
 
         // 2. Get by ID
@@ -241,6 +253,7 @@ mod tests {
             workflow.id,
             "Inbound Email V2",
             "inbound-email-v2",
+            None,
             None,
             None,
             None,

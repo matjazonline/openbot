@@ -11,6 +11,7 @@ pub struct Workflow {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub participant_emails: Option<Vec<String>>,
+    pub agent_ids: Option<Vec<Uuid>>,
     pub workflow_config: Option<serde_json::Value>,
     pub created_at: chrono::NaiveDateTime,
 }

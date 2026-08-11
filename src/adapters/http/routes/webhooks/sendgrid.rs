@@ -231,13 +231,25 @@ mod tests {
 
     #[async_trait]
     impl WorkflowPersistence for MockWorkflowPersistence {
-        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> { unimplemented!() }
         async fn get_by_company_slug_and_workflow_slug(&self, _company_slug: &str, workflow_slug: &str) -> AppResult<Option<Workflow>> {
             Ok(self.workflows.lock().unwrap().iter().find(|w| w.slug == workflow_slug).cloned())
         }
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
+    }
+
+    struct MockAgentPersistence;
+
+    #[async_trait]
+    impl crate::use_cases::agent::AgentPersistence for MockAgentPersistence {
+        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _provider: Option<&str>, _model: Option<&str>, _api_key: Option<&str>, _system_prompt: Option<&str>, _config_json: Option<serde_json::Value>) -> AppResult<crate::entities::agent::Agent> { unimplemented!() }
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::agent::Agent>> { unimplemented!() }
+        async fn get_by_company_slug_and_agent_slug(&self, _company_slug: &str, _agent_slug: &str) -> AppResult<Option<crate::entities::agent::Agent>> { unimplemented!() }
+        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<crate::entities::agent::Agent>> { Ok(vec![]) }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _provider: Option<&str>, _model: Option<&str>, _api_key: Option<&str>, _system_prompt: Option<&str>, _config_json: Option<serde_json::Value>) -> AppResult<crate::entities::agent::Agent> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
@@ -347,16 +359,26 @@ mod tests {
             Ok(self.tasks.lock().unwrap().iter().find(|t| t.id == id).cloned())
         }
 
+        async fn update_task_payload(&self, id: Uuid, payload: serde_json::Value) -> AppResult<()> {
+            let mut list = self.tasks.lock().unwrap();
+            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+                t.payload = payload;
+            }
+            Ok(())
+        }
+
         async fn poll_next_pending_tasks(&self, _limit: i64) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
             Ok(self.tasks.lock().unwrap().iter().filter(|t| t.status == crate::entities::task::TaskStatus::Pending).cloned().collect())
         }
 
-        async fn mark_task_processing(&self, id: Uuid) -> AppResult<()> {
+        async fn mark_task_processing(&self, id: Uuid) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+            if let Some(t) = list.iter_mut().find(|t| t.id == id && t.status == crate::entities::task::TaskStatus::Pending) {
                 t.status = crate::entities::task::TaskStatus::Processing;
+                Ok(true)
+            } else {
+                Ok(false)
             }
-            Ok(())
         }
 
         async fn mark_task_completed(&self, id: Uuid) -> AppResult<()> {
@@ -455,6 +477,7 @@ mod tests {
                 provider: None,
                 model: None,
                 participant_emails: None,
+                agent_ids: None,
                 workflow_config: None,
                 created_at: Utc::now().naive_utc(),
             }]),
@@ -509,7 +532,11 @@ mod tests {
                 Arc::new(MockCompanyPersistence { companies: Mutex::new(vec![]) }),
                 Arc::new(MockCompanyInvitePersistence {}),
             )),
-            workflow_use_cases: Arc::new(WorkflowUseCases::new(company_persistence, workflow_persistence)),
+            workflow_use_cases: Arc::new(WorkflowUseCases::new(company_persistence.clone(), workflow_persistence)),
+            agent_use_cases: Arc::new(crate::use_cases::agent::AgentUseCases::new(
+                company_persistence,
+                Arc::new(MockAgentPersistence),
+            )),
             thread_use_cases,
             approval_use_cases,
         };

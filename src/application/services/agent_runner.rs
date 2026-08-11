@@ -1,5 +1,8 @@
+use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::approval::ApprovalStatus;
+use crate::entities::company::Company;
 use crate::entities::message::{Message, MessageRole};
+use crate::entities::workflow::Workflow;
 use crate::use_cases::approval::ApprovalUseCases;
 use ai_agents::{Agent, AgentBuilder};
 use regex::Regex;
@@ -48,6 +51,278 @@ pub fn sanitize_text(input: &str, secret_key: Option<&str>) -> String {
     result
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ResolvedAgentParams {
+    provider: String,
+    model: String,
+    api_key: String,
+    config: serde_json::Value,
+}
+
+impl ResolvedAgentParams {
+    /// Resolves LLM execution parameters by combining Company, Workflow, and Agent entities.
+    /// Company values are overridden by Workflow and Workflow values are overridden by Agent.
+    pub fn new(
+        company: Option<&Company>,
+        workflow: Option<&Workflow>,
+        agent: Option<&AgentEntity>,
+    ) -> anyhow::Result<Self> {
+        let mut config = workflow.and_then(|w| w.workflow_config.clone());
+
+        if let Some(agent_cfg) = agent.and_then(|a| a.config_json.as_ref()) {
+            match config.as_mut() {
+                Some(base_cfg) => {
+                    if base_cfg.is_object() && agent_cfg.is_object() {
+                        merge_json(base_cfg, agent_cfg);
+                    } else {
+                        config = Some(agent_cfg.clone());
+                    }
+                }
+                None => {
+                    config = Some(agent_cfg.clone());
+                }
+            }
+        }
+
+        let wf_llm = config.as_ref().and_then(|c| c.get("llm"));
+
+        let provider = agent
+            .and_then(|a| a.provider.as_deref())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                workflow
+                    .and_then(|w| w.provider.as_deref())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })
+            .or_else(|| {
+                company
+                    .and_then(|c| c.provider.as_deref())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })
+            .or_else(|| {
+                wf_llm
+                    .and_then(|llm| llm.get("provider"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })
+            .map(|s| s.to_lowercase())
+            .ok_or_else(|| anyhow::anyhow!("Agent provider is missing"))?;
+
+        if !matches!(
+            provider.as_str(),
+            "google" | "openai" | "anthropic" | "groq"
+        ) {
+            anyhow::bail!(
+                "Unsupported agent provider '{}'. Allowed providers are: google, openai, anthropic, groq",
+                provider
+            );
+        }
+
+        let model = agent
+            .and_then(|a| a.model.as_deref())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                workflow
+                    .and_then(|w| w.model.as_deref())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })
+            .or_else(|| {
+                company
+                    .and_then(|c| c.model.as_deref())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })
+            .or_else(|| {
+                wf_llm
+                    .and_then(|llm| llm.get("model"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Agent model is missing"))?;
+
+        let api_key = agent
+            .and_then(|a| a.api_key.as_deref())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                workflow
+                    .and_then(|w| w.api_key.as_deref())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })
+            .or_else(|| {
+                company
+                    .and_then(|c| c.api_key.as_deref())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })
+            .or_else(|| {
+                wf_llm
+                    .and_then(|llm| llm.get("api_key"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                tracing::warn!("API key is missing for provider '{}'", provider);
+                anyhow::anyhow!(
+                    "API key is missing for provider '{}'. Please configure an API key in workflow or company settings.",
+                    provider
+                )
+            })?;
+
+        let mut config = config.unwrap_or_else(|| serde_json::json!({}));
+        let fallback_sys_prompt = agent.and_then(|a| a.system_prompt.as_deref());
+        let fallback_name = agent
+            .map(|a| a.name.as_str())
+            .or_else(|| workflow.map(|w| w.name.as_str()))
+            .or_else(|| company.map(|c| c.name.as_str()));
+        ensure_config_fields(
+            &mut config,
+            &provider,
+            &model,
+            &api_key,
+            fallback_sys_prompt,
+            fallback_name,
+        );
+
+        Ok(Self {
+            provider,
+            model,
+            api_key,
+            config,
+        })
+    }
+
+    pub fn provider(&self) -> &str {
+        &self.provider
+    }
+
+    pub fn model(&self) -> &str {
+        &self.model
+    }
+
+    pub fn api_key(&self) -> &str {
+        &self.api_key
+    }
+
+    pub fn config(&self) -> &serde_json::Value {
+        &self.config
+    }
+
+    pub fn into_tuple(self) -> (String, String, String, serde_json::Value) {
+        (self.provider, self.model, self.api_key, self.config)
+    }
+}
+
+pub fn merge_json(base: &mut serde_json::Value, override_val: &serde_json::Value) {
+    match (base, override_val) {
+        (serde_json::Value::Object(base_map), serde_json::Value::Object(override_map)) => {
+            for (k, v) in override_map {
+                if let Some(base_val) = base_map.get_mut(k) {
+                    merge_json(base_val, v);
+                } else {
+                    base_map.insert(k.clone(), v.clone());
+                }
+            }
+        }
+        (base_slot, override_val) => {
+            *base_slot = override_val.clone();
+        }
+    }
+}
+
+pub fn ensure_config_fields(
+    config: &mut serde_json::Value,
+    provider: &str,
+    model: &str,
+    api_key: &str,
+    fallback_system_prompt: Option<&str>,
+    fallback_name: Option<&str>,
+) {
+    if !config.is_object() {
+        *config = serde_json::json!({});
+    }
+
+    if let serde_json::Value::Object(map) = config {
+        let has_name = map
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .is_some();
+
+        if !has_name {
+            let name_str = fallback_name
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .unwrap_or("agent");
+            map.insert("name".to_string(), serde_json::json!(name_str));
+        }
+
+        let has_system_prompt = map
+            .get("system_prompt")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .is_some();
+
+        if !has_system_prompt {
+            let sys_prompt = fallback_system_prompt
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .unwrap_or("You are a helpful assistant.");
+            map.insert("system_prompt".to_string(), serde_json::json!(sys_prompt));
+        }
+
+        let llm_val = map.entry("llm").or_insert_with(|| serde_json::json!({}));
+        if !llm_val.is_object() {
+            *llm_val = serde_json::json!({});
+        }
+
+        if let serde_json::Value::Object(llm_map) = llm_val {
+            if llm_map
+                .get("provider")
+                .and_then(|v| v.as_str())
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .is_none()
+            {
+                llm_map.insert("provider".to_string(), serde_json::json!(provider));
+            }
+
+            if llm_map
+                .get("model")
+                .and_then(|v| v.as_str())
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .is_none()
+            {
+                llm_map.insert("model".to_string(), serde_json::json!(model));
+            }
+
+            if llm_map
+                .get("api_key")
+                .and_then(|v| v.as_str())
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .is_none()
+            {
+                llm_map.insert("api_key".to_string(), serde_json::json!(api_key));
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ApprovalContext {
     pub company_id: Uuid,
@@ -73,7 +348,11 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
     ) -> ai_agents::hitl::ApprovalResult {
         let step_raw = match &req.trigger {
             ai_agents::hitl::ApprovalTrigger::Tool { name, args } => {
-                format!("tool:{}:{}", name, serde_json::to_string(args).unwrap_or_default())
+                format!(
+                    "tool:{}:{}",
+                    name,
+                    serde_json::to_string(args).unwrap_or_default()
+                )
             }
             ai_agents::hitl::ApprovalTrigger::Condition { name, matched } => {
                 format!("condition:{}:{}", name, matched)
@@ -83,7 +362,11 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
             }
         };
 
-        let thread_str = self.context.thread_id.map(|t| t.to_string()).unwrap_or_default();
+        let thread_str = self
+            .context
+            .thread_id
+            .map(|t| t.to_string())
+            .unwrap_or_default();
         let step_key = format!(
             "{:x}",
             Sha256::digest(format!("{}:{}", thread_str, step_raw).as_bytes())
@@ -100,7 +383,7 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
                 ApprovalStatus::Rejected => {
                     return ai_agents::hitl::ApprovalResult::rejected_with_reason(
                         "Approval previously rejected by human",
-                    )
+                    );
                 }
                 _ => {}
             }
@@ -108,11 +391,15 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
 
         // New HITL Step: Create DB record & send email with links
         let action_title = match &req.trigger {
-            ai_agents::hitl::ApprovalTrigger::Tool { name, .. } => format!("Tool Execution: {}", name),
+            ai_agents::hitl::ApprovalTrigger::Tool { name, .. } => {
+                format!("Tool Execution: {}", name)
+            }
             ai_agents::hitl::ApprovalTrigger::Condition { name, .. } => {
                 format!("Condition Approval: {}", name)
             }
-            ai_agents::hitl::ApprovalTrigger::State { to, .. } => format!("State Transition: {}", to),
+            ai_agents::hitl::ApprovalTrigger::State { to, .. } => {
+                format!("State Transition: {}", to)
+            }
         };
 
         let action_summary = if !req.message.is_empty() {
@@ -157,23 +444,17 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
 pub struct AgentRunner<'a> {
     prompt: &'a str,
     history: &'a [Message],
-    workflow_config: Option<&'a serde_json::Value>,
-    api_key: Option<&'a str>,
-    provider: Option<&'a str>,
-    model: Option<&'a str>,
+    params: &'a ResolvedAgentParams,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     approval_context: Option<ApprovalContext>,
 }
 
 impl<'a> AgentRunner<'a> {
-    pub fn new(prompt: &'a str) -> Self {
+    pub fn new(prompt: &'a str, params: &'a ResolvedAgentParams) -> Self {
         Self {
             prompt,
             history: &[],
-            workflow_config: None,
-            api_key: None,
-            provider: None,
-            model: None,
+            params,
             approval_use_cases: None,
             approval_context: None,
         }
@@ -184,23 +465,8 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
-    pub fn workflow_config(mut self, config: Option<&'a serde_json::Value>) -> Self {
-        self.workflow_config = config;
-        self
-    }
-
-    pub fn api_key(mut self, key: Option<&'a str>) -> Self {
-        self.api_key = key;
-        self
-    }
-
-    pub fn provider(mut self, provider: Option<&'a str>) -> Self {
-        self.provider = provider;
-        self
-    }
-
-    pub fn model(mut self, model: Option<&'a str>) -> Self {
-        self.model = model;
+    pub fn params(mut self, params: &'a ResolvedAgentParams) -> Self {
+        self.params = params;
         self
     }
 
@@ -212,18 +478,6 @@ impl<'a> AgentRunner<'a> {
     pub fn approval_context(mut self, ctx: Option<ApprovalContext>) -> Self {
         self.approval_context = ctx;
         self
-    }
-
-    fn default_config() -> serde_json::Value {
-        serde_json::json!({
-            "name": "MinimalAgent",
-            "system_prompt": "You are a helpful assistant.",
-            "llm": {
-              "provider": "google",
-              "model": "gemini-2.5-flash",
-              "api_key": null
-            }
-        })
     }
 
     pub async fn execute(self) -> anyhow::Result<String> {
@@ -252,118 +506,29 @@ impl<'a> AgentRunner<'a> {
 
         let raw_full_prompt = format!("{}{}", history_str, self.prompt);
 
-        // Resolution order:
-        // 1. Runtime entity overrides (`api_key`, `provider`, `model`)
-        // 2. Explicit `llm.*` in workflow config
-        // 3. Environment variables matching provider (for api_key)
-        // 4. System defaults
-        let provider_clean = self.provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = self.model.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let api_key_clean = self.api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
+        let provider_name = &self.params.provider;
+        let model_name = &self.params.model;
+        let key = &self.params.api_key;
 
-        let wf_llm = self.workflow_config.and_then(|c| c.get("llm"));
+        let mut config = self.params.config.clone();
+        ensure_config_fields(&mut config, provider_name, model_name, key, None, None);
 
-        let provider_name = provider_clean
-            .or_else(|| {
-                wf_llm
-                    .and_then(|llm| llm.get("provider"))
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            })
-            .unwrap_or("google")
-            .to_lowercase();
+        let config_yaml = serde_yaml::to_string(&config).unwrap_or_default();
 
-        let model_name = model_clean
-            .or_else(|| {
-                wf_llm
-                    .and_then(|llm| llm.get("model"))
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            })
-            .unwrap_or("gemini-2.5-flash")
-            .to_string();
-
-        let resolved_api_key = api_key_clean
-            .map(|s| s.to_string())
-            .or_else(|| {
-                wf_llm
-                    .and_then(|llm| llm.get("api_key"))
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string())
-            })
-            .or_else(|| {
-                let env_keys = match provider_name.as_str() {
-                    "google" | "gemini" => vec!["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-                    "openai" => vec!["OPENAI_API_KEY"],
-                    "anthropic" => vec!["ANTHROPIC_API_KEY"],
-                    "groq" => vec!["GROQ_API_KEY"],
-                    "mistral" => vec!["MISTRAL_API_KEY"],
-                    _ => vec!["LLM_API_KEY", "API_KEY"],
-                };
-                env_keys
-                    .into_iter()
-                    .find_map(|var| std::env::var(var).ok().filter(|s| !s.trim().is_empty()))
-            });
-
-        // Check beforehand if api_key exists
-        let key = match resolved_api_key {
-            Some(k) => k,
-            None => {
-                tracing::warn!("API key is missing for provider '{}'", provider_name);
-                return Err(anyhow::anyhow!(
-                    "API key is missing for provider '{}'. Please configure an API key in workflow or company settings.",
-                    provider_name
-                ));
-            }
-        };
-
-        // Construct final configuration with resolved provider, model, and api_key
-        let mut final_config = self
-            .workflow_config
-            .cloned()
-            .unwrap_or_else(Self::default_config);
-
-        if !final_config.is_object() {
-            final_config = serde_json::json!({});
-        }
-
-        if final_config.get("name").is_none() {
-            final_config["name"] = serde_json::json!("MinimalAgent");
-        }
-        if final_config.get("system_prompt").is_none() {
-            final_config["system_prompt"] = serde_json::json!("You are a helpful assistant.");
-        }
-
-        let llm_obj = final_config
-            .as_object_mut()
-            .unwrap()
-            .entry("llm")
-            .or_insert_with(|| serde_json::json!({}));
-
-        if let Some(llm_map) = llm_obj.as_object_mut() {
-            llm_map.insert("provider".to_string(), serde_json::json!(provider_name));
-            llm_map.insert("model".to_string(), serde_json::json!(model_name));
-            llm_map.insert("api_key".to_string(), serde_json::json!(key));
-        }
-
-        let config_yaml = serde_yaml::to_string(&final_config).unwrap_or_default();
-
-        let full_prompt = sanitize_text(&raw_full_prompt, Some(&key));
+        let full_prompt = sanitize_text(&raw_full_prompt, Some(key));
         info!("Full prompt context length: {}", full_prompt.len());
 
         if !config_yaml.is_empty() {
             info!(
                 "Running agent with workflow config YAML:\n{}",
-                sanitize_text(&config_yaml, Some(&key))
+                sanitize_text(&config_yaml, Some(key))
             );
         }
 
         // Spawn on a separate Tokio task to prevent stack frame overflow on the caller thread
         let key_for_task = key.clone();
+        let provider_name = provider_name.to_string();
+        let model_name = model_name.to_string();
         let approval_use_cases = self.approval_use_cases.clone();
         let approval_context = self.approval_context.clone();
 
@@ -437,8 +602,46 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn test_agent_runner_returns_error_when_provider_missing() -> anyhow::Result<()> {
+        let result = ResolvedAgentParams::new(None, None, None);
+        assert!(result.is_err());
+        let err_str = result.unwrap_err().to_string();
+        assert!(err_str.contains("Agent provider is missing"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_agent_runner_returns_error_when_model_missing() -> anyhow::Result<()> {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Test".to_string(),
+            slug: "test".to_string(),
+            api_key: Some("key".to_string()),
+            provider: Some("google".to_string()),
+            model: None,
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+        let result = ResolvedAgentParams::new(Some(&company), None, None);
+        assert!(result.is_err());
+        let err_str = result.unwrap_err().to_string();
+        assert!(err_str.contains("Agent model is missing"));
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_agent_runner_returns_error_when_api_key_missing() -> anyhow::Result<()> {
-        let result = AgentRunner::new("Hello world").execute().await;
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Test".to_string(),
+            slug: "test".to_string(),
+            api_key: None,
+            provider: Some("google".to_string()),
+            model: Some("gemini-2.5-flash".to_string()),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+        let result = ResolvedAgentParams::new(Some(&company), None, None);
         assert!(result.is_err());
         let err_str = result.unwrap_err().to_string();
         assert!(err_str.contains("API key is missing"));
@@ -456,34 +659,58 @@ mod tests {
                 "api_key": "custom_runtime_test_key"
             }
         });
+        let workflow = Workflow {
+            id: Uuid::new_v4(),
+            company_id: Uuid::new_v4(),
+            name: "Test".to_string(),
+            slug: "test".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: None,
+            workflow_config: Some(custom_config),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+        let params = ResolvedAgentParams::new(None, Some(&workflow), None)?;
 
-        let result = AgentRunner::new("Hello world")
-            .workflow_config(Some(&custom_config))
-            .execute()
-            .await;
+        let result = AgentRunner::new("Hello world", &params).execute().await;
         assert!(result.is_err());
         Ok(())
     }
 
     #[tokio::test]
     async fn test_agent_runner_accepts_api_key_provider_and_model() -> anyhow::Result<()> {
-        let result = AgentRunner::new("Hello world")
-            .api_key(Some("runtime_key"))
-            .provider(Some("openai"))
-            .model(Some("gpt-4o"))
-            .execute()
-            .await;
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Test".to_string(),
+            slug: "test".to_string(),
+            api_key: Some("runtime_key".to_string()),
+            provider: Some("openai".to_string()),
+            model: Some("gpt-4o".to_string()),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+        let params = ResolvedAgentParams::new(Some(&company), None, None)?;
+        let result = AgentRunner::new("Hello world", &params).execute().await;
         assert!(result.is_err());
         Ok(())
     }
 
     #[tokio::test]
     async fn test_agent_runner_uses_entity_model_override() -> anyhow::Result<()> {
-        let result = AgentRunner::new("Hello world")
-            .api_key(Some("fake_key_123"))
-            .model(Some("invalid-custom-model-xyz"))
-            .execute()
-            .await;
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Test".to_string(),
+            slug: "test".to_string(),
+            api_key: Some("fake_key_123".to_string()),
+            provider: Some("google".to_string()),
+            model: Some("invalid-custom-model-xyz".to_string()),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+        let params = ResolvedAgentParams::new(Some(&company), None, None)?;
+        let result = AgentRunner::new("Hello world", &params).execute().await;
         assert!(result.is_err());
         Ok(())
     }
@@ -523,5 +750,339 @@ mod tests {
             sanitized_raw_err,
             "Authentication failed for key [REDACTED]"
         );
+    }
+
+    #[test]
+    fn test_resolve_agent_params_company_only() {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: Some("company-api-key".to_string()),
+            provider: Some("google".to_string()),
+            model: Some("gemini-2.5-flash".to_string()),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let resolved = ResolvedAgentParams::new(Some(&company), None, None).unwrap();
+        assert_eq!(resolved.provider(), "google");
+        assert_eq!(resolved.model(), "gemini-2.5-flash");
+        assert_eq!(resolved.api_key(), "company-api-key");
+        assert_eq!(
+            resolved.config(),
+            &serde_json::json!({
+                "name": "Acme Corp",
+                "system_prompt": "You are a helpful assistant.",
+                "llm": {
+                    "provider": "google",
+                    "model": "gemini-2.5-flash",
+                    "api_key": "company-api-key"
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_resolve_agent_params_workflow_overrides_company() {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: Some("company-api-key".to_string()),
+            provider: Some("google".to_string()),
+            model: Some("gemini-2.5-flash".to_string()),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let workflow = Workflow {
+            id: Uuid::new_v4(),
+            company_id: company.id,
+            name: "Support Workflow".to_string(),
+            slug: "support".to_string(),
+            api_key: Some("workflow-api-key".to_string()),
+            provider: Some("openai".to_string()),
+            model: None, // Should keep company's model
+            participant_emails: None,
+            agent_ids: None,
+            workflow_config: Some(serde_json::json!({
+                "system_prompt": "Workflow prompt",
+                "temperature": 0.2
+            })),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let resolved = ResolvedAgentParams::new(Some(&company), Some(&workflow), None).unwrap();
+        assert_eq!(resolved.provider(), "openai"); // Workflow overridden
+        assert_eq!(resolved.model(), "gemini-2.5-flash"); // Kept company
+        assert_eq!(resolved.api_key(), "workflow-api-key"); // Workflow overridden
+        assert_eq!(
+            resolved.config(),
+            &serde_json::json!({
+                "name": "Support Workflow",
+                "system_prompt": "Workflow prompt",
+                "temperature": 0.2,
+                "llm": {
+                    "provider": "openai",
+                    "model": "gemini-2.5-flash",
+                    "api_key": "workflow-api-key"
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_resolve_agent_params_agent_overrides_workflow_and_company() {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: Some("company-api-key".to_string()),
+            provider: Some("google".to_string()),
+            model: Some("gemini-2.5-flash".to_string()),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let workflow = Workflow {
+            id: Uuid::new_v4(),
+            company_id: company.id,
+            name: "Support Workflow".to_string(),
+            slug: "support".to_string(),
+            api_key: Some("workflow-api-key".to_string()),
+            provider: Some("openai".to_string()),
+            model: Some("gpt-4o".to_string()),
+            participant_emails: None,
+            agent_ids: None,
+            workflow_config: Some(serde_json::json!({
+                "system_prompt": "Workflow prompt",
+                "temperature": 0.2,
+                "workflow_only_field": true
+            })),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let agent = AgentEntity {
+            id: Uuid::new_v4(),
+            company_id: company.id,
+            name: "Tech Agent".to_string(),
+            slug: "tech-agent".to_string(),
+            provider: Some("anthropic".to_string()),
+            model: Some("claude-3-5-sonnet".to_string()),
+            api_key: Some("agent-api-key".to_string()),
+            system_prompt: None,
+            config_json: Some(serde_json::json!({
+                "system_prompt": "Agent prompt",
+                "temperature": 0.7
+            })),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let resolved = ResolvedAgentParams::new(Some(&company), Some(&workflow), Some(&agent)).unwrap();
+        assert_eq!(resolved.provider(), "anthropic"); // Agent overridden
+        assert_eq!(resolved.model(), "claude-3-5-sonnet"); // Agent overridden
+        assert_eq!(resolved.api_key(), "agent-api-key"); // Agent overridden
+        assert_eq!(
+            resolved.config(),
+            &serde_json::json!({
+                "name": "Tech Agent",
+                "system_prompt": "Agent prompt", // Agent overridden
+                "temperature": 0.7,             // Agent overridden
+                "workflow_only_field": true,     // Merged from Workflow
+                "llm": {
+                    "provider": "anthropic",
+                    "model": "claude-3-5-sonnet",
+                    "api_key": "agent-api-key"
+                }
+            })
+        );
+
+        let (p, m, k, c) = resolved.into_tuple();
+        assert_eq!(p, "anthropic");
+        assert_eq!(m, "claude-3-5-sonnet");
+        assert_eq!(k, "agent-api-key");
+        assert!(c.is_object());
+    }
+
+    #[test]
+    fn test_resolve_agent_params_handles_empty_or_whitespace_strings() {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: Some("  ".to_string()),
+            provider: Some("google".to_string()),
+            model: Some("gemini-2.5-flash".to_string()),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let workflow = Workflow {
+            id: Uuid::new_v4(),
+            company_id: company.id,
+            name: "Support Workflow".to_string(),
+            slug: "support".to_string(),
+            api_key: Some("".to_string()),
+            provider: Some("   ".to_string()),
+            model: Some("".to_string()),
+            participant_emails: None,
+            agent_ids: None,
+            workflow_config: None,
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let resolved = ResolvedAgentParams::new(Some(&company), Some(&workflow), None);
+        assert!(resolved.is_err());
+        assert!(
+            resolved
+                .unwrap_err()
+                .to_string()
+                .contains("API key is missing")
+        );
+    }
+
+    #[test]
+    fn test_resolve_agent_params_validates_provider() {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: Some("company-key".to_string()),
+            provider: Some("unsupported_provider".to_string()),
+            model: Some("some-model".to_string()),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let err = ResolvedAgentParams::new(Some(&company), None, None).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("Unsupported agent provider 'unsupported_provider'")
+        );
+
+        let company_groq = Company {
+            provider: Some("groq".to_string()),
+            ..company
+        };
+        let resolved = ResolvedAgentParams::new(Some(&company_groq), None, None).unwrap();
+        assert_eq!(resolved.provider(), "groq");
+    }
+
+    #[test]
+    fn test_resolve_agent_params_populates_missing_config_llm_fields() {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: Some("company-key".to_string()),
+            provider: Some("openai".to_string()),
+            model: Some("gpt-4o".to_string()),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let workflow = Workflow {
+            id: Uuid::new_v4(),
+            company_id: company.id,
+            name: "Support Workflow".to_string(),
+            slug: "support".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: None,
+            workflow_config: Some(serde_json::json!({
+                "llm": {
+                    "provider": "openai"
+                    // model and api_key missing in llm block
+                }
+            })),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let resolved = ResolvedAgentParams::new(Some(&company), Some(&workflow), None).unwrap();
+        let config_llm = resolved.config().get("llm").unwrap().clone();
+        assert_eq!(config_llm.get("provider").unwrap(), "openai");
+        assert_eq!(config_llm.get("model").unwrap(), "gpt-4o");
+        assert_eq!(config_llm.get("api_key").unwrap(), "company-key");
+    }
+
+    #[test]
+    fn test_resolve_agent_params_uses_agent_system_prompt_when_config_system_prompt_empty() {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: Some("company-key".to_string()),
+            provider: Some("openai".to_string()),
+            model: Some("gpt-4o".to_string()),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let agent = AgentEntity {
+            id: Uuid::new_v4(),
+            company_id: company.id,
+            name: "Support Agent".to_string(),
+            slug: "support-agent".to_string(),
+            provider: None,
+            model: None,
+            api_key: None,
+            system_prompt: Some("You are a helpful triage assistant.".to_string()),
+            config_json: None,
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let resolved = ResolvedAgentParams::new(Some(&company), None, Some(&agent)).unwrap();
+        let cfg = resolved.config();
+        assert_eq!(
+            cfg.get("system_prompt").unwrap().as_str().unwrap(),
+            "You are a helpful triage assistant."
+        );
+    }
+
+    #[test]
+    fn test_resolve_agent_params_defaults_system_prompt_when_empty() {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: Some("company-key".to_string()),
+            provider: Some("openai".to_string()),
+            model: Some("gpt-4o".to_string()),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let resolved = ResolvedAgentParams::new(Some(&company), None, None).unwrap();
+        let cfg = resolved.config();
+        assert_eq!(
+            cfg.get("system_prompt").unwrap().as_str().unwrap(),
+            "You are a helpful assistant."
+        );
+    }
+
+    #[test]
+    fn test_ensure_config_fields_populates_missing_keys() {
+        let mut config = serde_json::json!({
+            "temperature": 0.5
+        });
+
+        ensure_config_fields(&mut config, "openai", "gpt-4o", "sk-test-123", Some("Custom prompt"), Some("Custom Agent"));
+
+        assert_eq!(
+            config.get("name").unwrap().as_str().unwrap(),
+            "Custom Agent"
+        );
+        assert_eq!(
+            config.get("system_prompt").unwrap().as_str().unwrap(),
+            "Custom prompt"
+        );
+        let llm = config.get("llm").unwrap();
+        assert_eq!(llm.get("provider").unwrap().as_str().unwrap(), "openai");
+        assert_eq!(llm.get("model").unwrap().as_str().unwrap(), "gpt-4o");
+        assert_eq!(llm.get("api_key").unwrap().as_str().unwrap(), "sk-test-123");
+        assert_eq!(config.get("temperature").unwrap().as_f64().unwrap(), 0.5);
     }
 }

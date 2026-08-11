@@ -65,9 +65,11 @@ pub trait TaskPersistence: Send + Sync {
 
     async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<BackgroundTask>>;
 
+    async fn update_task_payload(&self, id: Uuid, payload: Value) -> AppResult<()>;
+
     async fn poll_next_pending_tasks(&self, limit: i64) -> AppResult<Vec<BackgroundTask>>;
 
-    async fn mark_task_processing(&self, id: Uuid) -> AppResult<()>;
+    async fn mark_task_processing(&self, id: Uuid) -> AppResult<bool>;
 
     async fn mark_task_completed(&self, id: Uuid) -> AppResult<()>;
 
@@ -143,6 +145,19 @@ impl TaskPersistence for PostgresPersistence {
         }
     }
 
+    async fn update_task_payload(&self, id: Uuid, payload: Value) -> AppResult<()> {
+        sqlx::query!(
+            r#"UPDATE background_tasks SET payload = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2"#,
+            payload,
+            id
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(())
+    }
+
     async fn poll_next_pending_tasks(&self, limit: i64) -> AppResult<Vec<BackgroundTask>> {
         let db_list = sqlx::query_as!(
             BackgroundTaskDb,
@@ -166,16 +181,16 @@ impl TaskPersistence for PostgresPersistence {
         Ok(tasks)
     }
 
-    async fn mark_task_processing(&self, id: Uuid) -> AppResult<()> {
-        sqlx::query!(
-            r#"UPDATE background_tasks SET status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = $1"#,
+    async fn mark_task_processing(&self, id: Uuid) -> AppResult<bool> {
+        let res = sqlx::query!(
+            r#"UPDATE background_tasks SET status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND status = 'pending'"#,
             id
         )
         .execute(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        Ok(())
+        Ok(res.rows_affected() > 0)
     }
 
     async fn mark_task_completed(&self, id: Uuid) -> AppResult<()> {

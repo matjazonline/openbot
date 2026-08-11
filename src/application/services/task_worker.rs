@@ -58,9 +58,16 @@ impl TaskWorker {
             let task_id = task.id;
             info!("Processing task {} (type = '{}')", task_id, task.task_type);
 
-            if let Err(err) = self.task_persistence.mark_task_processing(task_id).await {
-                error!("Failed to mark task {} as processing: {}", task_id, err);
-                continue;
+            match self.task_persistence.mark_task_processing(task_id).await {
+                Ok(true) => {}
+                Ok(false) => {
+                    info!("Task {} already claimed by another worker, skipping", task_id);
+                    continue;
+                }
+                Err(err) => {
+                    error!("Failed to mark task {} as processing: {}", task_id, err);
+                    continue;
+                }
             }
 
             let result = self.execute_single_task(&task).await;
@@ -127,8 +134,11 @@ impl TaskWorker {
         }
 
         // Execute Agent and Dispatch Outbound Email
+        let mut ingest_exec = ingest.clone();
+        ingest_exec.task_id = None;
+
         self.thread_use_cases
-            .execute_agent_and_dispatch(&ingest, true)
+            .execute_agent_and_dispatch(&ingest_exec, true)
             .await
             .map_err(|e| e.to_string())?;
 
@@ -219,11 +229,11 @@ mod tests {
     struct MockWorkflowPersistence;
     #[async_trait]
     impl WorkflowPersistence for MockWorkflowPersistence {
-        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> { unimplemented!() }
         async fn get_by_company_slug_and_workflow_slug(&self, _company_slug: &str, _workflow_slug: &str) -> AppResult<Option<Workflow>> { unimplemented!() }
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
@@ -279,16 +289,26 @@ mod tests {
             Ok(self.tasks.lock().unwrap().iter().find(|t| t.id == id).cloned())
         }
 
+        async fn update_task_payload(&self, id: Uuid, payload: serde_json::Value) -> AppResult<()> {
+            let mut list = self.tasks.lock().unwrap();
+            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+                t.payload = payload;
+            }
+            Ok(())
+        }
+
         async fn poll_next_pending_tasks(&self, _limit: i64) -> AppResult<Vec<BackgroundTask>> {
             Ok(self.tasks.lock().unwrap().iter().filter(|t| t.status == TaskStatus::Pending).cloned().collect())
         }
 
-        async fn mark_task_processing(&self, id: Uuid) -> AppResult<()> {
+        async fn mark_task_processing(&self, id: Uuid) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+            if let Some(t) = list.iter_mut().find(|t| t.id == id && t.status == TaskStatus::Pending) {
                 t.status = TaskStatus::Processing;
+                Ok(true)
+            } else {
+                Ok(false)
             }
-            Ok(())
         }
 
         async fn mark_task_completed(&self, id: Uuid) -> AppResult<()> {
@@ -388,8 +408,8 @@ mod tests {
             name: "Test Corp".to_string(),
             slug: "test".to_string(),
             api_key: None,
-            provider: None,
-            model: None,
+            provider: Some("google".to_string()),
+            model: Some("gemini-2.5-flash".to_string()),
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -402,6 +422,7 @@ mod tests {
             provider: None,
             model: None,
             participant_emails: None,
+            agent_ids: None,
             workflow_config: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
@@ -479,6 +500,7 @@ mod tests {
             company: Some(company),
             workflow: Some(workflow),
             parsed_email: Some(parsed_email),
+            task_id: None,
         };
 
         let payload_json = serde_json::to_value(&ingest).unwrap();

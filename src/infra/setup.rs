@@ -2,8 +2,9 @@ use crate::{
     adapters::http::app_state::AppState,
     infra::{argon2_password_hasher, config::AppConfig, postgres_persistence},
     use_cases::{
-        approval::ApprovalUseCases, company::CompanyUseCases, company_invite::CompanyInviteUseCases,
-        thread::ThreadUseCases, user::UserUseCases, workflow::WorkflowUseCases,
+        agent::AgentUseCases, approval::ApprovalUseCases, company::CompanyUseCases,
+        company_invite::CompanyInviteUseCases, thread::ThreadUseCases, user::UserUseCases,
+        workflow::WorkflowUseCases,
     },
 };
 use std::fs::File;
@@ -20,6 +21,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
     let company_invite_use_cases = CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());
     let workflow_use_cases = WorkflowUseCases::new(postgres_arc.clone(), postgres_arc.clone());
+    let agent_use_cases = AgentUseCases::new(postgres_arc.clone(), postgres_arc.clone());
 
     let approval_use_cases = Arc::new(ApprovalUseCases::new(
         postgres_arc.clone(),
@@ -36,6 +38,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             postgres_arc.clone(),
             config.clone(),
         )
+        .with_agent_persistence(postgres_arc.clone())
         .with_approval_use_cases(approval_use_cases.clone()),
     );
 
@@ -45,6 +48,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         company_use_cases: Arc::new(company_use_cases),
         company_invite_use_cases: Arc::new(company_invite_use_cases),
         workflow_use_cases: Arc::new(workflow_use_cases),
+        agent_use_cases: Arc::new(agent_use_cases),
         thread_use_cases,
         approval_use_cases,
     })
