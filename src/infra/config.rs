@@ -15,6 +15,11 @@ pub struct AppConfig {
     pub incoming_smtp_enabled: bool,
     pub incoming_smtp_host: String,
     pub incoming_smtp_port: u16,
+    pub max_spam_score: f64,
+    pub dnsbl_enabled: bool,
+    pub dnsbl_servers: Vec<String>,
+    pub smtp_rate_limit_conns_per_ip: usize,
+    pub reject_self_domain_helo: bool,
 }
 
 impl AppConfig {
@@ -53,6 +58,33 @@ impl AppConfig {
             .parse()
             .unwrap_or(2525);
 
+        let max_spam_score: f64 = env::var("MAX_SPAM_SCORE")
+            .unwrap_or_else(|_| "5.0".to_string())
+            .parse()
+            .unwrap_or(5.0);
+
+        let dnsbl_enabled: bool = env::var("INCOMING_SMTP_DNSBL_ENABLED")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse()
+            .unwrap_or(false);
+
+        let dnsbl_servers = env::var("INCOMING_SMTP_DNSBL_SERVERS")
+            .unwrap_or_else(|_| "zen.spamhaus.org,bl.spamcop.net".to_string())
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let smtp_rate_limit_conns_per_ip: usize = env::var("INCOMING_SMTP_RATE_LIMIT_PER_IP")
+            .unwrap_or_else(|_| "30".to_string())
+            .parse()
+            .unwrap_or(30);
+
+        let reject_self_domain_helo: bool = env::var("INCOMING_SMTP_REJECT_SELF_HELO")
+            .unwrap_or_else(|_| "true".to_string())
+            .parse()
+            .unwrap_or(true);
+
         Self {
             jwt_secret,
             access_token_ttl: Duration::seconds(access_token_ttl_secs),
@@ -66,6 +98,11 @@ impl AppConfig {
             incoming_smtp_enabled,
             incoming_smtp_host,
             incoming_smtp_port,
+            max_spam_score,
+            dnsbl_enabled,
+            dnsbl_servers,
+            smtp_rate_limit_conns_per_ip,
+            reject_self_domain_helo,
         }
     }
 }

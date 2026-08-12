@@ -1,5 +1,9 @@
 use crate::{
-    adapters::http::app_state::AppState,
+    adapters::{
+        http::app_state::AppState,
+        monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
+    },
+    domain::monitoring::MonitoringService,
     infra::{argon2_password_hasher, config::AppConfig, postgres_persistence},
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, company::CompanyUseCases,
@@ -13,6 +17,11 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 
 pub async fn init_app_state() -> anyhow::Result<AppState> {
     let config = Arc::new(AppConfig::from_env());
+
+    let monitoring: Arc<dyn MonitoringService> = Arc::new(CompositeMonitor::new(vec![
+        Arc::new(TracingMonitor::new()),
+        Arc::new(InMemoryMonitor::new()),
+    ]));
 
     let postgres_arc = Arc::new(postgres_persistence().await?);
     let argon_hasher = argon2_password_hasher();
@@ -39,11 +48,13 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             config.clone(),
         )
         .with_agent_persistence(postgres_arc.clone())
-        .with_approval_use_cases(approval_use_cases.clone()),
+        .with_approval_use_cases(approval_use_cases.clone())
+        .with_monitoring(monitoring.clone()),
     );
 
     Ok(AppState {
         config,
+        monitoring,
         user_use_cases: Arc::new(user_use_cases),
         company_use_cases: Arc::new(company_use_cases),
         company_invite_use_cases: Arc::new(company_invite_use_cases),

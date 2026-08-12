@@ -3,6 +3,7 @@ use std::sync::Arc;
 use axum::extract::FromRef;
 
 use crate::{
+    domain::monitoring::MonitoringService,
     infra::config::AppConfig,
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, company::CompanyUseCases,
@@ -14,6 +15,7 @@ use crate::{
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<AppConfig>,
+    pub monitoring: Arc<dyn MonitoringService>,
     pub user_use_cases: Arc<UserUseCases>,
     pub company_use_cases: Arc<CompanyUseCases>,
     pub company_invite_use_cases: Arc<CompanyInviteUseCases>,
@@ -26,6 +28,12 @@ pub struct AppState {
 impl FromRef<AppState> for Arc<AppConfig> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.config.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn MonitoringService> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.monitoring.clone()
     }
 }
 

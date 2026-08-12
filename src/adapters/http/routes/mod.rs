@@ -2,6 +2,7 @@ pub mod agent;
 pub mod approval;
 pub mod company;
 pub mod company_invite;
+pub mod monitoring;
 pub mod task;
 pub mod user;
 pub mod webhooks;
@@ -21,4 +22,5 @@ pub fn router() -> Router<AppState> {
         .merge(agent::router())
         .merge(webhooks::router())
         .merge(approval::router())
+        .merge(monitoring::router())
 }

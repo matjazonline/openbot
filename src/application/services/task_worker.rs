@@ -4,6 +4,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     adapters::persistence::task::TaskPersistence,
+    domain::monitoring::{MonitoringService, TaskExecutionMetrics, TaskStatusMetric},
     infra::config::AppConfig,
     services::outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
     use_cases::thread::{InboundIngestResult, ThreadUseCases},
@@ -13,6 +14,7 @@ pub struct TaskWorker {
     task_persistence: Arc<dyn TaskPersistence>,
     thread_use_cases: Arc<ThreadUseCases>,
     config: Arc<AppConfig>,
+    monitoring: Option<Arc<dyn MonitoringService>>,
 }
 
 impl TaskWorker {
@@ -25,7 +27,13 @@ impl TaskWorker {
             task_persistence,
             thread_use_cases,
             config,
+            monitoring: None,
         }
+    }
+
+    pub fn with_monitoring(mut self, monitoring: Arc<dyn MonitoringService>) -> Self {
+        self.monitoring = Some(monitoring);
+        self
     }
 
     /// Continuous background poller running every 3 seconds
@@ -70,12 +78,24 @@ impl TaskWorker {
                 }
             }
 
+            let start_time = std::time::Instant::now();
             let result = self.execute_single_task(&task).await;
+            let duration_ms = start_time.elapsed().as_millis() as u64;
 
             match result {
                 Ok(_) => {
                     info!("Successfully completed background task {}", task_id);
                     let _ = self.task_persistence.mark_task_completed(task_id).await;
+                    if let Some(ref m) = self.monitoring {
+                        m.record_task_execution(&TaskExecutionMetrics {
+                            company_id: Some(task.company_id),
+                            workflow_id: Some(task.workflow_id),
+                            task_type: task.task_type.clone(),
+                            duration_ms,
+                            status: TaskStatusMetric::Completed,
+                            retry_count: task.retry_count as u32,
+                        });
+                    }
                 }
                 Err(err_msg) => {
                     warn!("Failed background task {}: {}", task_id, err_msg);
@@ -90,6 +110,17 @@ impl TaskWorker {
                         .task_persistence
                         .mark_task_failed(task_id, &err_msg, next_run, is_dead_letter)
                         .await;
+
+                    if let Some(ref m) = self.monitoring {
+                        m.record_task_execution(&TaskExecutionMetrics {
+                            company_id: Some(task.company_id),
+                            workflow_id: Some(task.workflow_id),
+                            task_type: task.task_type.clone(),
+                            duration_ms,
+                            status: TaskStatusMetric::Failed,
+                            retry_count: task.retry_count as u32,
+                        });
+                    }
                 }
             }
         }
@@ -367,6 +398,11 @@ mod tests {
             incoming_smtp_enabled: true,
             incoming_smtp_host: "0.0.0.0".to_string(),
             incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
@@ -446,6 +482,11 @@ mod tests {
             incoming_smtp_enabled: true,
             incoming_smtp_host: "0.0.0.0".to_string(),
             incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(

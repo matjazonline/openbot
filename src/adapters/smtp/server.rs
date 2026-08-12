@@ -1,10 +1,14 @@
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::net::IpAddr;
+use std::sync::{Arc, RwLock};
+use std::time::Instant;
 use mail_parser::MimeHeaders;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tracing::{error, info, warn};
 
 use crate::{
+    domain::monitoring::{MonitoringService, SmtpConnectionMetrics, SmtpStatus},
     application::use_cases::thread::ThreadUseCases,
     infra::config::AppConfig,
     services::email_parser::{extract_email, RawAttachmentData, RawInboundPayload},
@@ -23,9 +27,55 @@ enum SmtpState {
     Data,
 }
 
+pub struct ConnGuard {
+    ip: IpAddr,
+    conns: Arc<RwLock<HashMap<IpAddr, usize>>>,
+}
+
+impl Drop for ConnGuard {
+    fn drop(&mut self) {
+        if let Ok(mut lock) = self.conns.write() {
+            if let Some(count) = lock.get_mut(&self.ip) {
+                if *count > 1 {
+                    *count -= 1;
+                } else {
+                    lock.remove(&self.ip);
+                }
+            }
+        }
+    }
+}
+
+pub async fn check_dnsbl(ip: IpAddr, dnsbl_servers: &[String]) -> Option<String> {
+    if dnsbl_servers.is_empty() || ip.is_loopback() {
+        return None;
+    }
+
+    let ip_reversed = match ip {
+        IpAddr::V4(ipv4) => {
+            let octets = ipv4.octets();
+            format!("{}.{}.{}.{}", octets[3], octets[2], octets[1], octets[0])
+        }
+        IpAddr::V6(_) => return None,
+    };
+
+    for server in dnsbl_servers {
+        let lookup_host = format!("{}.{}", ip_reversed, server);
+        if let Ok(mut addrs) = tokio::net::lookup_host((lookup_host.as_str(), 80)).await {
+            if addrs.next().is_some() {
+                return Some(server.clone());
+            }
+        }
+    }
+
+    None
+}
+
 pub struct SmtpServer {
     thread_use_cases: Arc<ThreadUseCases>,
     config: Arc<AppConfig>,
+    monitoring: Option<Arc<dyn MonitoringService>>,
+    active_conns: Arc<RwLock<HashMap<IpAddr, usize>>>,
 }
 
 impl SmtpServer {
@@ -33,7 +83,14 @@ impl SmtpServer {
         Self {
             thread_use_cases,
             config,
+            monitoring: None,
+            active_conns: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    pub fn with_monitoring(mut self, monitoring: Arc<dyn MonitoringService>) -> Self {
+        self.monitoring = Some(monitoring);
+        self
     }
 
     pub async fn start_server_loop(
@@ -90,6 +147,62 @@ impl SmtpServer {
         mut stream: TcpStream,
         peer_addr: std::net::SocketAddr,
     ) -> anyhow::Result<()> {
+        let start_time = Instant::now();
+        let client_ip = peer_addr.ip();
+
+        // 1. Connection Rate Limiting
+        let rate_limited = {
+            let mut lock = self.active_conns.write().unwrap_or_else(|e| e.into_inner());
+            let current = lock.entry(client_ip).or_insert(0);
+            if *current >= self.config.smtp_rate_limit_conns_per_ip {
+                true
+            } else {
+                *current += 1;
+                false
+            }
+        };
+
+        if rate_limited {
+            warn!("Connection from {} rejected: Rate limit reached", client_ip);
+            if let Some(ref m) = self.monitoring {
+                m.record_smtp_connection(&SmtpConnectionMetrics {
+                    client_ip,
+                    status: SmtpStatus::BlockedRateLimit,
+                    duration_ms: start_time.elapsed().as_millis() as u64,
+                    mail_from: None,
+                    rcpt_to: None,
+                });
+            }
+            stream.write_all(b"421 4.7.0 Too many active connections from your IP address\r\n").await?;
+            stream.flush().await?;
+            return Ok(());
+        }
+
+        let _guard = ConnGuard {
+            ip: client_ip,
+            conns: self.active_conns.clone(),
+        };
+
+        // 2. DNSBL (RBL) Filtering
+        if self.config.dnsbl_enabled {
+            if let Some(rbl) = check_dnsbl(client_ip, &self.config.dnsbl_servers).await {
+                warn!("Connection from {} blocked by DNSBL {}", client_ip, rbl);
+                if let Some(ref m) = self.monitoring {
+                    m.record_smtp_connection(&SmtpConnectionMetrics {
+                        client_ip,
+                        status: SmtpStatus::BlockedDnsbl,
+                        duration_ms: start_time.elapsed().as_millis() as u64,
+                        mail_from: None,
+                        rcpt_to: None,
+                    });
+                }
+                let msg = format!("554 5.7.1 Service unavailable; Client host [{}] blocked using {}\r\n", client_ip, rbl);
+                stream.write_all(msg.as_bytes()).await?;
+                stream.flush().await?;
+                return Ok(());
+            }
+        }
+
         let (reader, mut writer) = stream.split();
         let mut reader = BufReader::new(reader);
 
@@ -124,6 +237,22 @@ impl SmtpServer {
                     match cmd.as_str() {
                         "HELO" | "EHLO" => {
                             if !arg.is_empty() {
+                                let is_self_domain = arg.eq_ignore_ascii_case(&self.config.app_domain_name);
+                                if is_self_domain && self.config.reject_self_domain_helo && !client_ip.is_loopback() {
+                                    warn!("Client {} spoofed local domain {} in EHLO/HELO", client_ip, arg);
+                                    if let Some(ref m) = self.monitoring {
+                                        m.record_smtp_connection(&SmtpConnectionMetrics {
+                                            client_ip,
+                                            status: SmtpStatus::RejectedHelo,
+                                            duration_ms: start_time.elapsed().as_millis() as u64,
+                                            mail_from: None,
+                                            rcpt_to: None,
+                                        });
+                                    }
+                                    writer.write_all(b"550 5.5.2 Helo command rejected: Host name spoofed\r\n").await?;
+                                    writer.flush().await?;
+                                    return Ok(());
+                                }
                                 ehlo_domain = Some(arg.to_string());
                             }
                             let resp = format!(
@@ -233,6 +362,21 @@ impl SmtpServer {
 
                         match self.thread_use_cases.ingest_and_save_inbound_message(raw_payload).await {
                             Ok(ingest) => {
+                                if let Some(ref m) = self.monitoring {
+                                    let status = if ingest.accepted {
+                                        SmtpStatus::Accepted
+                                    } else {
+                                        SmtpStatus::RejectedSpf
+                                    };
+                                    m.record_smtp_connection(&SmtpConnectionMetrics {
+                                        client_ip,
+                                        status,
+                                        duration_ms: start_time.elapsed().as_millis() as u64,
+                                        mail_from: mailfrom.clone(),
+                                        rcpt_to: rcpts.first().cloned(),
+                                    });
+                                }
+
                                 if ingest.accepted {
                                     let thread_use_cases_bg = self.thread_use_cases.clone();
                                     tokio::spawn(async move {
@@ -248,6 +392,15 @@ impl SmtpServer {
                             }
                             Err(err) => {
                                 warn!("Error ingesting SMTP email: {err}");
+                                if let Some(ref m) = self.monitoring {
+                                    m.record_smtp_connection(&SmtpConnectionMetrics {
+                                        client_ip,
+                                        status: SmtpStatus::Error,
+                                        duration_ms: start_time.elapsed().as_millis() as u64,
+                                        mail_from: mailfrom.clone(),
+                                        rcpt_to: rcpts.first().cloned(),
+                                    });
+                                }
                                 writer.write_all(b"451 4.3.0 Local error in processing\r\n").await?;
                             }
                         }
@@ -331,26 +484,24 @@ pub fn parse_raw_mime_to_payload(
 
                 if let Some(val_str) = header.value().as_text() {
                     let val_lower = val_str.to_lowercase();
-                    if spf_status.is_none() {
-                        if name_lower == "authentication-results" {
-                            if val_lower.contains("spf=pass") {
-                                spf_status = Some("pass".to_string());
-                            } else if val_lower.contains("spf=fail") {
-                                spf_status = Some("fail".to_string());
-                            }
-                        } else if name_lower == "received-spf" {
-                            if val_lower.starts_with("pass") {
-                                spf_status = Some("pass".to_string());
-                            } else if val_lower.starts_with("fail") {
-                                spf_status = Some("fail".to_string());
-                            }
+                    if name_lower == "authentication-results" {
+                        if val_lower.contains("spf=pass") {
+                            spf_status = Some("pass".to_string());
+                        } else if val_lower.contains("spf=fail") && spf_status.is_none() {
+                            spf_status = Some("fail".to_string());
+                        }
+                    } else if name_lower == "received-spf" {
+                        if val_lower.starts_with("pass") {
+                            spf_status = Some("pass".to_string());
+                        } else if val_lower.starts_with("fail") && spf_status.is_none() {
+                            spf_status = Some("fail".to_string());
                         }
                     }
 
-                    if dkim_status.is_none() && name_lower == "authentication-results" {
+                    if name_lower == "authentication-results" {
                         if val_lower.contains("dkim=pass") {
                             dkim_status = Some("pass".to_string());
-                        } else if val_lower.contains("dkim=fail") {
+                        } else if val_lower.contains("dkim=fail") && dkim_status.is_none() {
                             dkim_status = Some("fail".to_string());
                         }
                     }
@@ -651,6 +802,11 @@ mod tests {
             incoming_smtp_enabled: true,
             incoming_smtp_host: "127.0.0.1".to_string(),
             incoming_smtp_port: 0, // OS assigns port
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
@@ -719,7 +875,7 @@ mod tests {
         assert!(response.contains("354"));
 
         // Email Body
-        let email_data = b"From: sender@external.com\r\nTo: inbound@acme.mailagents.com\r\nSubject: SMTP Test Order\r\nMessage-ID: <SMTP123@external.com>\r\n\r\nHello agent, please process this order via SMTP.\r\n.\r\n";
+        let email_data = b"From: sender@external.com\r\nTo: inbound@acme.mailagents.com\r\nSubject: SMTP Test Order\r\nMessage-ID: <SMTP123@external.com>\r\nAuthentication-Results: spf=pass dkim=pass\r\n\r\nHello agent, please process this order via SMTP.\r\n.\r\n";
         response.clear();
         writer.write_all(email_data).await.unwrap();
         writer.flush().await.unwrap();
@@ -840,6 +996,11 @@ regis";
             incoming_smtp_enabled: true,
             incoming_smtp_host: "127.0.0.1".to_string(),
             incoming_smtp_port: 0,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
@@ -907,6 +1068,80 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         let messages = thread_persistence.messages.lock().unwrap();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].clean_text_body, "Please register my account.");
+    }
+
+    #[tokio::test]
+    async fn test_smtp_rate_limiting_and_monitoring() {
+        use crate::adapters::monitoring::InMemoryMonitor;
+
+        let company_persistence = Arc::new(MockCompanyPersistence { companies: Mutex::new(Vec::new()) });
+        let workflow_persistence = Arc::new(MockWorkflowPersistence { workflows: Mutex::new(Vec::new()) });
+        let thread_persistence = Arc::new(MockThreadPersistence { threads: Mutex::new(Vec::new()), messages: Mutex::new(Vec::new()) });
+        let task_persistence = Arc::new(MockTaskPersistence);
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "127.0.0.1".to_string(),
+            incoming_smtp_port: 0,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 1, // Limit to 1 connection
+            reject_self_domain_helo: true,
+        });
+
+        let monitor = Arc::new(InMemoryMonitor::new());
+
+        let thread_use_cases = Arc::new(ThreadUseCases::new(
+            thread_persistence,
+            workflow_persistence,
+            company_persistence,
+            task_persistence,
+            config.clone(),
+        ));
+
+        let server = Arc::new(SmtpServer::new(thread_use_cases, config).with_monitoring(monitor.clone()));
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let local_addr = listener.local_addr().unwrap();
+
+        let server_clone = server.clone();
+        tokio::spawn(async move {
+            while let Ok((stream, peer_addr)) = listener.accept().await {
+                let s = server_clone.clone();
+                tokio::spawn(async move {
+                    let _ = s.handle_connection(stream, peer_addr).await;
+                });
+            }
+        });
+
+        // 1st connection (holds the connection open)
+        let mut client1 = TcpStream::connect(local_addr).await.unwrap();
+        let (reader1, _) = client1.split();
+        let mut buf_reader1 = BufReader::new(reader1);
+        let mut response1 = String::new();
+        buf_reader1.read_line(&mut response1).await.unwrap();
+        assert!(response1.contains("220"));
+
+        // 2nd concurrent connection (should be rate-limited)
+        let mut client2 = TcpStream::connect(local_addr).await.unwrap();
+        let (reader2, _) = client2.split();
+        let mut buf_reader2 = BufReader::new(reader2);
+        let mut response2 = String::new();
+        buf_reader2.read_line(&mut response2).await.unwrap();
+        assert!(response2.contains("421"));
+
+        let stats = monitor.get_stats_json();
+        assert_eq!(stats["smtp_connections"]["blocked_rate_limit"], 1);
     }
 }
 

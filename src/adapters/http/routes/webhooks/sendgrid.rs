@@ -501,6 +501,11 @@ mod tests {
             incoming_smtp_enabled: true,
             incoming_smtp_host: "0.0.0.0".to_string(),
             incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
         });
 
         let task_persistence = Arc::new(MockTaskPersistence {
@@ -524,6 +529,7 @@ mod tests {
 
         let app_state = AppState {
             config,
+            monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
             user_use_cases: Arc::new(crate::use_cases::user::UserUseCases::new(
                 Arc::new(crate::infra::argon2_password_hasher()),
                 Arc::new(MockUserPersistence {}),

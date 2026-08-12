@@ -18,19 +18,25 @@ async fn main() -> anyhow::Result<()> {
     let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel(1);
 
     // Initialize Task Worker poller loop
-    let task_worker = Arc::new(TaskWorker::new(
-        app_state.thread_use_cases.get_task_persistence().await,
-        app_state.thread_use_cases.clone(),
-        app_state.config.clone(),
-    ));
+    let task_worker = Arc::new(
+        TaskWorker::new(
+            app_state.thread_use_cases.get_task_persistence().await,
+            app_state.thread_use_cases.clone(),
+            app_state.config.clone(),
+        )
+        .with_monitoring(app_state.monitoring.clone()),
+    );
 
     tokio::spawn(task_worker.start_worker_loop(shutdown_rx.resubscribe()));
 
     // Initialize Incoming SMTP Server loop
-    let smtp_server = Arc::new(SmtpServer::new(
-        app_state.thread_use_cases.clone(),
-        app_state.config.clone(),
-    ));
+    let smtp_server = Arc::new(
+        SmtpServer::new(
+            app_state.thread_use_cases.clone(),
+            app_state.config.clone(),
+        )
+        .with_monitoring(app_state.monitoring.clone()),
+    );
 
     tokio::spawn(smtp_server.start_server_loop(shutdown_rx.resubscribe()));
 

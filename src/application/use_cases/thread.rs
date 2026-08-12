@@ -5,6 +5,7 @@ use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
+    domain::monitoring::MonitoringService,
     adapters::persistence::task::TaskPersistence,
     app_error::AppResult,
     entities::{
@@ -74,6 +75,7 @@ pub struct ThreadUseCases {
     task_persistence: Arc<dyn TaskPersistence>,
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
+    monitoring: Option<Arc<dyn MonitoringService>>,
     config: Arc<AppConfig>,
 }
 
@@ -92,6 +94,7 @@ impl ThreadUseCases {
             task_persistence,
             agent_persistence: None,
             approval_use_cases: None,
+            monitoring: None,
             config,
         }
     }
@@ -109,6 +112,14 @@ impl ThreadUseCases {
         approval_use_cases: Arc<ApprovalUseCases>,
     ) -> Self {
         self.approval_use_cases = Some(approval_use_cases);
+        self
+    }
+
+    pub fn with_monitoring(
+        mut self,
+        monitoring: Arc<dyn MonitoringService>,
+    ) -> Self {
+        self.monitoring = Some(monitoring);
         self
     }
 
@@ -176,6 +187,35 @@ impl ThreadUseCases {
                 .sender
                 .ends_with(&format!(".{}", self.config.app_domain_name));
 
+        // Spam score threshold check
+        if let Some(score) = parsed.spam_score {
+            if score >= self.config.max_spam_score {
+                warn!(
+                    "Message-ID '{}' rejected due to high spam score ({:.2} >= {:.2})",
+                    parsed.message_id, score, self.config.max_spam_score
+                );
+                return Ok(InboundIngestResult::rejected(
+                    "Spam score threshold exceeded",
+                ));
+            }
+        }
+
+        // Global SPF / DKIM authentication verification check
+        if !is_inter_workflow {
+            if let Some(ref spf) = parsed.spf_status {
+                if spf.eq_ignore_ascii_case("fail") {
+                    warn!("SPF authentication failed for sender '{}'", parsed.sender);
+                    return Ok(InboundIngestResult::rejected("SPF authentication failed"));
+                }
+            }
+            if let Some(ref dkim) = parsed.dkim_status {
+                if dkim.eq_ignore_ascii_case("fail") {
+                    warn!("DKIM authentication failed for sender '{}'", parsed.sender);
+                    return Ok(InboundIngestResult::rejected("DKIM authentication failed"));
+                }
+            }
+        }
+
         if let Some(ref allowed) = workflow.participant_emails {
             if !allowed.is_empty() {
                 let sender_allowed = allowed
@@ -189,20 +229,6 @@ impl ThreadUseCases {
                     return Ok(InboundIngestResult::rejected(
                         "Sender unauthorized for workflow",
                     ));
-                }
-
-                // Check SPF / DKIM verification failure
-                if let Some(ref spf) = parsed.spf_status {
-                    if spf.eq_ignore_ascii_case("fail") {
-                        warn!("SPF authentication failed for sender '{}'", parsed.sender);
-                        return Ok(InboundIngestResult::rejected("SPF authentication failed"));
-                    }
-                }
-                if let Some(ref dkim) = parsed.dkim_status {
-                    if dkim.eq_ignore_ascii_case("fail") {
-                        warn!("DKIM authentication failed for sender '{}'", parsed.sender);
-                        return Ok(InboundIngestResult::rejected("DKIM authentication failed"));
-                    }
                 }
             }
         }
@@ -475,6 +501,12 @@ impl ThreadUseCases {
                     .history(&history_messages)
                     .approval_use_cases(self.approval_use_cases.clone())
                     .approval_context(Some(approval_ctx))
+                    .monitoring(self.monitoring.clone())
+                    .ids(
+                        Some(company.id),
+                        Some(workflow.id),
+                        first_agent.as_ref().map(|a| a.id),
+                    )
                     .execute()
                     .await
             }
@@ -1227,6 +1259,11 @@ mod tests {
             incoming_smtp_enabled: true,
             incoming_smtp_host: "0.0.0.0".to_string(),
             incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
         });
 
         let task_persistence = Arc::new(MockTaskPersistence {
@@ -1316,6 +1353,11 @@ mod tests {
             incoming_smtp_enabled: true,
             incoming_smtp_host: "0.0.0.0".to_string(),
             incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
         });
 
         let task_persistence = Arc::new(MockTaskPersistence {
@@ -1345,5 +1387,93 @@ mod tests {
             .unwrap();
         assert!(!result.accepted);
         assert_eq!(result.reason.as_deref(), Some("SPF authentication failed"));
+    }
+
+    #[tokio::test]
+    async fn test_high_spam_score_rejection() {
+        let company_id = Uuid::new_v4();
+        let workflow_id = Uuid::new_v4();
+
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![Company {
+                id: company_id,
+                user_id: Uuid::new_v4(),
+                name: "Acme Corp".to_string(),
+                slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let workflow_persistence = Arc::new(MockWorkflowPersistence {
+            workflows: Mutex::new(vec![Workflow {
+                id: workflow_id,
+                company_id,
+                name: "Inbound Flow".to_string(),
+                slug: "inbound".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                participant_emails: None,
+                agent_ids: None,
+                workflow_config: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+        });
+
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+
+        let thread_use_cases = ThreadUseCases::new(
+            thread_persistence,
+            workflow_persistence,
+            company_persistence,
+            task_persistence,
+            config,
+        );
+
+        let raw_payload = RawInboundPayload {
+            to: "inbound@acme.mailagents.com".to_string(),
+            from: "spammer@external.com".to_string(),
+            subject: Some("Buy Cheap Rolex".to_string()),
+            text: Some("Spam message body".to_string()),
+            spam_score: Some(8.5),
+            ..Default::default()
+        };
+
+        let result = thread_use_cases
+            .ingest_and_save_inbound_message(raw_payload)
+            .await
+            .unwrap();
+        assert!(!result.accepted);
+        assert_eq!(result.reason.as_deref(), Some("Spam score threshold exceeded"));
     }
 }

@@ -425,6 +425,11 @@ mod tests {
             incoming_smtp_enabled: true,
             incoming_smtp_host: "0.0.0.0".into(),
             incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
         });
 
         let use_cases = ApprovalUseCases::new(
@@ -515,6 +520,11 @@ mod tests {
             incoming_smtp_enabled: true,
             incoming_smtp_host: "0.0.0.0".into(),
             incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
         });
 
         let company_id = Uuid::new_v4();

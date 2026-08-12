@@ -1,3 +1,4 @@
+use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService};
 use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::approval::ApprovalStatus;
 use crate::entities::company::Company;
@@ -463,6 +464,10 @@ pub struct AgentRunner<'a> {
     params: &'a ResolvedAgentParams,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     approval_context: Option<ApprovalContext>,
+    monitoring: Option<Arc<dyn MonitoringService>>,
+    company_id: Option<Uuid>,
+    workflow_id: Option<Uuid>,
+    agent_id: Option<Uuid>,
 }
 
 impl<'a> AgentRunner<'a> {
@@ -473,6 +478,10 @@ impl<'a> AgentRunner<'a> {
             params,
             approval_use_cases: None,
             approval_context: None,
+            monitoring: None,
+            company_id: None,
+            workflow_id: None,
+            agent_id: None,
         }
     }
 
@@ -496,7 +505,25 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
+    pub fn monitoring(mut self, monitoring: Option<Arc<dyn MonitoringService>>) -> Self {
+        self.monitoring = monitoring;
+        self
+    }
+
+    pub fn ids(
+        mut self,
+        company_id: Option<Uuid>,
+        workflow_id: Option<Uuid>,
+        agent_id: Option<Uuid>,
+    ) -> Self {
+        self.company_id = company_id;
+        self.workflow_id = workflow_id;
+        self.agent_id = agent_id;
+        self
+    }
+
     pub async fn execute(self) -> anyhow::Result<AgentExecutionOutput> {
+        let start_time = std::time::Instant::now();
         info!(
             "Executing AI Agent with prompt length {} and history count {}",
             self.prompt.len(),
@@ -639,16 +666,65 @@ impl<'a> AgentRunner<'a> {
         })
         .await;
 
+        let duration_ms = start_time.elapsed().as_millis() as u64;
+
         match task_result {
-            Ok(Ok(output)) => Ok(output),
+            Ok(Ok(output)) => {
+                if let Some(ref m) = self.monitoring {
+                    m.record_ai_execution(&AiExecutionMetrics {
+                        company_id: self.company_id,
+                        workflow_id: self.workflow_id,
+                        agent_id: self.agent_id,
+                        provider: self.params.provider.clone(),
+                        model: self.params.model.clone(),
+                        prompt_tokens: output.token_usage.prompt_tokens as usize,
+                        completion_tokens: output.token_usage.completion_tokens as usize,
+                        total_tokens: output.token_usage.total_tokens as usize,
+                        duration_ms,
+                        success: true,
+                        error_type: None,
+                    });
+                }
+                Ok(output)
+            }
             Ok(Err(err)) => {
                 let err_msg = sanitize_text(&err.to_string(), Some(&key));
                 tracing::warn!("AI Agent execution failed ({err_msg})");
+                if let Some(ref m) = self.monitoring {
+                    m.record_ai_execution(&AiExecutionMetrics {
+                        company_id: self.company_id,
+                        workflow_id: self.workflow_id,
+                        agent_id: self.agent_id,
+                        provider: self.params.provider.clone(),
+                        model: self.params.model.clone(),
+                        prompt_tokens: 0,
+                        completion_tokens: 0,
+                        total_tokens: 0,
+                        duration_ms,
+                        success: false,
+                        error_type: Some(err_msg.clone()),
+                    });
+                }
                 Err(anyhow::anyhow!("{err_msg}"))
             }
             Err(join_err) => {
                 let err_msg = sanitize_text(&join_err.to_string(), Some(&key));
                 tracing::warn!("AI Agent task panicked or was cancelled ({err_msg})");
+                if let Some(ref m) = self.monitoring {
+                    m.record_ai_execution(&AiExecutionMetrics {
+                        company_id: self.company_id,
+                        workflow_id: self.workflow_id,
+                        agent_id: self.agent_id,
+                        provider: self.params.provider.clone(),
+                        model: self.params.model.clone(),
+                        prompt_tokens: 0,
+                        completion_tokens: 0,
+                        total_tokens: 0,
+                        duration_ms,
+                        success: false,
+                        error_type: Some(format!("Panicked or cancelled: {}", err_msg)),
+                    });
+                }
                 Err(anyhow::anyhow!("Task failed: {err_msg}"))
             }
         }
