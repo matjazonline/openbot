@@ -35,6 +35,7 @@ pub struct CompanyForm {
     pub api_key: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
+    pub enable_llm_spam_guardrail: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -72,6 +73,7 @@ async fn create_company(
             form.api_key.as_deref(),
             form.provider.as_deref(),
             form.model.as_deref(),
+            form.enable_llm_spam_guardrail,
         )
         .await
     {
@@ -137,6 +139,7 @@ async fn update_company(
             form.api_key.as_deref(),
             form.provider.as_deref(),
             form.model.as_deref(),
+            form.enable_llm_spam_guardrail,
         )
         .await
     {
@@ -179,6 +182,7 @@ async fn create_company_json(
             payload.api_key.as_deref(),
             payload.provider.as_deref(),
             payload.model.as_deref(),
+            payload.enable_llm_spam_guardrail,
         )
         .await?;
     Ok((
@@ -205,6 +209,7 @@ async fn update_company_json(
             payload.api_key.as_deref(),
             payload.provider.as_deref(),
             payload.model.as_deref(),
+            payload.enable_llm_spam_guardrail,
         )
         .await?;
     Ok((
@@ -242,6 +247,7 @@ mod tests {
             api_key: None,
             provider: None,
             model: None,
+            enable_llm_spam_guardrail: None,
             created_at: Utc::now().naive_utc(),
         };
 
@@ -268,6 +274,7 @@ mod tests {
             api_key: None,
             provider: None,
             model: None,
+            enable_llm_spam_guardrail: None,
             created_at: Utc::now().naive_utc(),
         };
 

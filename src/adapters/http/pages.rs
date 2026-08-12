@@ -103,6 +103,211 @@ pub fn base_layout(title: &str, content: &str) -> String {
         document.addEventListener('DOMContentLoaded', autoDetectAndSyncCompany);
         document.addEventListener('htmx:afterSettle', autoDetectAndSyncCompany);
         autoDetectAndSyncCompany();
+
+        function toggleSpamWarning(input) {{
+            var form = input.closest('form');
+            if (!form) return;
+            var box = form.querySelector('.spam-disabled-box');
+            if (!box) return;
+            var checkbox = box.querySelector('input[type="checkbox"]');
+            var hasValue = input.value.trim().length > 0;
+            if (hasValue) {{
+                box.classList.add('opacity-40', 'pointer-events-none', 'grayscale');
+                if (checkbox) {{
+                    checkbox.disabled = true;
+                    checkbox.checked = false;
+                }}
+            }} else {{
+                box.classList.remove('opacity-40', 'pointer-events-none', 'grayscale');
+                if (checkbox) {{
+                    checkbox.disabled = false;
+                }}
+            }}
+        }}
+
+        window.companyTeamCache = window.companyTeamCache || {{}};
+
+        async function fetchCompanyTeam(companyId) {{
+            if (!companyId) return [];
+            if (window.companyTeamCache[companyId]) {{
+                return window.companyTeamCache[companyId];
+            }}
+            try {{
+                const res = await fetch('/api/companies/' + companyId + '/team', {{ credentials: 'same-origin' }});
+                if (!res.ok) return [];
+                const data = await res.json();
+                if (data && data.success && Array.isArray(data.members)) {{
+                    const members = data.members.filter(m => m.email && m.email.trim().length > 0);
+                    window.companyTeamCache[companyId] = members;
+                    return members;
+                }}
+            }} catch (e) {{
+                console.error('Error fetching team members:', e);
+            }}
+            return [];
+        }}
+
+        async function initTeamAutocomplete() {{
+            const inputs = document.querySelectorAll('input[name="participant_emails"]');
+            if (!inputs.length) return;
+
+            for (const input of inputs) {{
+                if (input.dataset.teamAutocompleteInitialized === 'true') continue;
+                input.dataset.teamAutocompleteInitialized = 'true';
+                input.setAttribute('autocomplete', 'off');
+
+                let companyId = input.dataset.companyId ||
+                                input.closest('[data-company-id]')?.dataset.companyId;
+                if (!companyId) {{
+                    const match = window.location.pathname.match(/\/companies\/([a-f0-9\-]{{36}})/i);
+                    if (match && match[1]) companyId = match[1];
+                }}
+                if (!companyId && typeof getCachedCompanyId === 'function') {{
+                    companyId = getCachedCompanyId();
+                }}
+
+                if (!companyId) continue;
+
+                const members = await fetchCompanyTeam(companyId);
+                if (!members.length) continue;
+
+                const parent = input.parentElement;
+                if (!parent) continue;
+
+                let wrapper = parent.querySelector('.team-autocomplete-wrapper');
+                if (!wrapper) {{
+                    wrapper = document.createElement('div');
+                    wrapper.className = 'team-autocomplete-wrapper relative';
+                    input.parentNode.insertBefore(wrapper, input);
+                    wrapper.appendChild(input);
+                }}
+
+                let chipsContainer = parent.querySelector('.team-chips-container');
+                if (!chipsContainer) {{
+                    chipsContainer = document.createElement('div');
+                    chipsContainer.className = 'team-chips-container mt-2 flex flex-wrap items-center gap-1.5 text-xs';
+                    parent.appendChild(chipsContainer);
+                }}
+
+                let dropdown = wrapper.querySelector('.team-dropdown');
+                if (!dropdown) {{
+                    dropdown = document.createElement('div');
+                    dropdown.className = 'team-dropdown absolute left-0 right-0 top-full mt-1 z-50 bg-slate-800 border border-slate-700 rounded-lg shadow-xl hidden max-h-48 overflow-y-auto font-sans';
+                    wrapper.appendChild(dropdown);
+                }}
+
+                function getParsedEmails() {{
+                    return input.value
+                        .split(',')
+                        .map(s => s.trim().toLowerCase())
+                        .filter(Boolean);
+                }}
+
+                function updateChips() {{
+                    const currentEmails = getParsedEmails();
+                    chipsContainer.innerHTML = '<span class="text-[11px] font-medium text-slate-400 mr-1">Team:</span>';
+                    members.forEach(member => {{
+                        const emailLower = member.email.toLowerCase();
+                        const isSelected = currentEmails.includes(emailLower);
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = isSelected
+                            ? 'px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-mono cursor-pointer hover:bg-emerald-500/30 transition flex items-center gap-1'
+                            : 'px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 text-[11px] font-mono cursor-pointer hover:bg-slate-700 hover:text-white transition flex items-center gap-1';
+                        btn.innerHTML = (isSelected ? '✓ ' : '+ ') + member.email;
+                        btn.title = (member.username ? member.username + ' (' + member.role + ')' : member.role);
+                        btn.addEventListener('click', (e) => {{
+                            e.preventDefault();
+                            let emails = input.value.split(',').map(s => s.trim()).filter(Boolean);
+                            if (isSelected) {{
+                                emails = emails.filter(e => e.toLowerCase() !== emailLower);
+                            }} else {{
+                                if (!emails.some(e => e.toLowerCase() === emailLower)) {{
+                                    emails.push(member.email);
+                                }}
+                            }}
+                            input.value = emails.join(', ');
+                            input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            updateChips();
+                        }});
+                        chipsContainer.appendChild(btn);
+                    }});
+                }}
+
+                function getCurrentToken() {{
+                    const val = input.value;
+                    const pos = input.selectionStart || val.length;
+                    const left = val.slice(0, pos);
+                    const lastComma = left.lastIndexOf(',');
+                    const token = lastComma >= 0 ? left.slice(lastComma + 1) : left;
+                    return {{ token: token.trim(), pos, lastComma }};
+                }}
+
+                function renderDropdown() {{
+                    const {{ token, lastComma }} = getCurrentToken();
+                    if (!token) {{
+                        dropdown.classList.add('hidden');
+                        return;
+                    }}
+                    const tokenLower = token.toLowerCase();
+                    const currentEmails = getParsedEmails();
+                    const matches = members.filter(m => {{
+                        const emailLower = m.email.toLowerCase();
+                        const nameLower = (m.username || '').toLowerCase();
+                        return (emailLower.includes(tokenLower) || nameLower.includes(tokenLower)) &&
+                               !currentEmails.includes(emailLower);
+                    }});
+
+                    if (!matches.length) {{
+                        dropdown.classList.add('hidden');
+                        return;
+                    }}
+
+                    dropdown.innerHTML = '';
+                    matches.forEach(m => {{
+                        const item = document.createElement('div');
+                        item.className = 'px-3 py-2 hover:bg-slate-700/80 cursor-pointer text-xs flex items-center justify-between border-b border-slate-700/50 last:border-b-0 text-slate-200';
+                        item.innerHTML = `<span class="font-mono text-emerald-400 font-medium">${{m.email}}</span>` +
+                            (m.username ? `<span class="text-slate-400 text-[11px]">${{m.username}} (${{m.role}})</span>` : `<span class="text-slate-400 text-[11px]">${{m.role}}</span>`);
+
+                        item.addEventListener('mousedown', (e) => {{
+                            e.preventDefault();
+                            const val = input.value;
+                            const before = lastComma >= 0 ? val.slice(0, lastComma + 1) : '';
+                            const after = val.slice(input.selectionStart || val.length);
+                            const afterClean = after.replace(/^[^,]*/, '');
+                            const prefix = before ? before.trim() + ' ' : '';
+                            input.value = prefix + m.email + ', ' + afterClean.trim();
+                            input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            dropdown.classList.add('hidden');
+                            updateChips();
+                        }});
+                        dropdown.appendChild(item);
+                    }});
+
+                    dropdown.classList.remove('hidden');
+                }}
+
+                input.addEventListener('input', () => {{
+                    updateChips();
+                    renderDropdown();
+                }});
+
+                input.addEventListener('focus', () => {{
+                    updateChips();
+                    renderDropdown();
+                }});
+
+                input.addEventListener('blur', () => {{
+                    setTimeout(() => dropdown.classList.add('hidden'), 200);
+                }});
+
+                updateChips();
+            }}
+        }}
+
+        document.addEventListener('DOMContentLoaded', initTeamAutocomplete);
+        document.addEventListener('htmx:afterSettle', initTeamAutocomplete);
     </script>
 </body>
 </html>"##
@@ -752,9 +957,45 @@ fn render_agents_selection(company_id: Uuid, agents: &[Agent], selected_ids: Opt
     )
 }
 
-pub fn workflows_page(company: &Company, app_domain_name: &str, workflows: &[Workflow], agents: &[Agent]) -> String {
+fn render_spam_disabled_warning(spam_scan_enabled: bool, initial_disabled: bool) -> String {
+    if spam_scan_enabled {
+        String::new()
+    } else {
+        let (box_class, checkbox_attr) = if initial_disabled {
+            ("opacity-40 pointer-events-none grayscale", "disabled")
+        } else {
+            ("", "")
+        };
+        format!(
+            r#"
+        <div class="spam-disabled-box p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-300 text-xs space-y-2 transition-all duration-200 {box_class}">
+            <div class="font-semibold flex items-center gap-1.5 text-amber-400">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                Spam scanning is disabled in server configuration
+            </div>
+            <div>Workflows without participant email restrictions will receive incoming emails without spam filtering.</div>
+            <label class="flex items-center gap-2 cursor-pointer mt-1 font-medium text-amber-200">
+                <input type="checkbox" name="confirm_spam_disabled" value="true" {checkbox_attr} class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-amber-500">
+                <span>I am aware that spam scanning is disabled and confirm saving without participant restrictions.</span>
+            </label>
+        </div>
+        "#
+        )
+    }
+}
+
+pub fn workflows_page(
+    company: &Company,
+    app_domain_name: &str,
+    workflows: &[Workflow],
+    agents: &[Agent],
+    spam_scan_enabled: bool,
+) -> String {
     let list_html = workflow_list_fragment(company, app_domain_name, workflows, agents);
     let agents_selection_html = render_agents_selection(company.id, agents, None);
+    let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, false);
 
     let content = format!(
         r##"
@@ -773,7 +1014,7 @@ pub fn workflows_page(company: &Company, app_domain_name: &str, workflows: &[Wor
             <h3 class="text-md font-semibold text-white mb-3 flex items-center gap-2">
                 <span class="text-emerald-400">+</span> Add New Workflow
             </h3>
-            <form hx-post="/companies/{company_id}/workflows" hx-target="#workflow-list" hx-swap="innerHTML" class="space-y-4"
+            <form hx-post="/companies/{company_id}/workflows" hx-target="#workflow-list" hx-swap="innerHTML" class="space-y-4" data-company-id="{company_id}"
                 hx-on::after-request="if(event.detail.successful) this.reset();">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -798,36 +1039,46 @@ pub fn workflows_page(company: &Company, app_domain_name: &str, workflows: &[Wor
 
                 <div>
                     <label for="participant_emails" class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Comma-separated, Optional)</label>
-                    <input type="text" id="participant_emails" name="participant_emails"
+                    <input type="text" id="participant_emails" name="participant_emails" data-company-id="{company_id}" oninput="toggleSpamWarning(this)" autocomplete="off"
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder="agent1@example.com, agent2@example.com">
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label for="workflow_provider" class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional Override)</label>
-                        <input type="text" id="workflow_provider" name="provider"
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                            placeholder="google, openai, anthropic">
-                    </div>
-                    <div>
-                        <label for="workflow_model" class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional Override)</label>
-                        <input type="text" id="workflow_model" name="model"
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                            placeholder="gemini-2.5-flash, gpt-4o">
-                    </div>
-                    <div>
-                        <label for="workflow_api_key" class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional Override)</label>
-                        <input type="password" id="workflow_api_key" name="api_key"
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                            placeholder="Overrides company key">
-                    </div>
-                </div>
                 <div>
-                    <label for="workflow_config" class="block text-xs font-medium text-slate-300 mb-1">Workflow Config (JSON, Optional)</label>
-                    <textarea id="workflow_config" name="workflow_config" rows="3"
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        placeholder='&#123; "trigger": "email", "action": "ai_reply" &#125;'></textarea>
+                    <a href="#" onclick="let el = this.nextElementSibling; if (el) el.classList.toggle('hidden'); return false;"
+                        class="text-xs text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer inline-flex items-center gap-1">
+                        <span>Custom Workflow Agent</span>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </a>
+                    <div class="hidden space-y-4 mt-3">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label for="workflow_provider" class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional Override)</label>
+                                <input type="text" id="workflow_provider" name="provider"
+                                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                                    placeholder="google, openai, anthropic">
+                            </div>
+                            <div>
+                                <label for="workflow_model" class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional Override)</label>
+                                <input type="text" id="workflow_model" name="model"
+                                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                                    placeholder="gemini-2.5-flash, gpt-4o">
+                            </div>
+                            <div>
+                                <label for="workflow_api_key" class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional Override)</label>
+                                <input type="password" id="workflow_api_key" name="api_key"
+                                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                                    placeholder="Overrides company key">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="workflow_config" class="block text-xs font-medium text-slate-300 mb-1">Workflow Config (JSON, Optional)</label>
+                            <textarea id="workflow_config" name="workflow_config" rows="3"
+                                class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                placeholder='&#123; "trigger": "email", "action": "ai_reply" &#125;'></textarea>
+                        </div>
+                    </div>
                 </div>
+                {spam_warning_html}
                 <div class="flex justify-end">
                     <button type="submit"
                         class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/30 transition cursor-pointer">
@@ -995,6 +1246,7 @@ pub fn workflow_edit_fragment(
     app_domain_name: &str,
     workflow: &Workflow,
     agents: &[Agent],
+    spam_scan_enabled: bool,
 ) -> String {
     let emails_str = match &workflow.participant_emails {
         Some(emails) => emails.join(", "),
@@ -1008,10 +1260,21 @@ pub fn workflow_edit_fragment(
     let model_val = workflow.model.as_deref().unwrap_or("");
     let api_key_val = workflow.api_key.as_deref().unwrap_or("");
     let agents_selection_html = render_agents_selection(company.id, agents, workflow.agent_ids.as_deref());
+    let has_participants = workflow
+        .participant_emails
+        .as_ref()
+        .map(|emails| !emails.is_empty() && emails.iter().any(|e| !e.trim().is_empty()))
+        .unwrap_or(false);
+    let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, has_participants);
+    let custom_config_hidden = if !provider_val.is_empty() || !model_val.is_empty() || !api_key_val.is_empty() || !config_str.is_empty() {
+        ""
+    } else {
+        "hidden"
+    };
 
     format!(
         r##"
-        <form id="workflow-{workflow_id}" hx-put="/companies/{company_id}/workflows/{workflow_id}" hx-target="#workflow-{workflow_id}" hx-swap="outerHTML"
+        <form id="workflow-{workflow_id}" hx-put="/companies/{company_id}/workflows/{workflow_id}" hx-target="#workflow-{workflow_id}" hx-swap="outerHTML" data-company-id="{company_id}"
             class="bg-slate-900 border border-emerald-500/60 rounded-xl p-4 md:p-5 space-y-4 shadow-lg">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1034,34 +1297,44 @@ pub fn workflow_edit_fragment(
 
             <div>
                 <label class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Comma-separated)</label>
-                <input type="text" name="participant_emails" value="{emails_str}"
+                <input type="text" name="participant_emails" value="{emails_str}" data-company-id="{company_id}" oninput="toggleSpamWarning(this)" autocomplete="off"
                     class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional Override)</label>
-                    <input type="text" name="provider" value="{provider_val}"
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                        placeholder="google, openai, anthropic">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional Override)</label>
-                    <input type="text" name="model" value="{model_val}"
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                        placeholder="gemini-2.5-flash, gpt-4o">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional Override)</label>
-                    <input type="password" name="api_key" value="{api_key_val}"
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                        placeholder="Leave empty to use Company key">
-                </div>
-            </div>
             <div>
-                <label class="block text-xs font-medium text-slate-300 mb-1">Workflow Config (JSON)</label>
-                <textarea name="workflow_config" rows="3"
-                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500">{config_str}</textarea>
+                <a href="#" onclick="let el = this.nextElementSibling; if (el) el.classList.toggle('hidden'); return false;"
+                    class="text-xs text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer inline-flex items-center gap-1">
+                    <span>Custom Workflow Agent</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </a>
+                <div class="{custom_config_hidden} space-y-4 mt-3">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional Override)</label>
+                            <input type="text" name="provider" value="{provider_val}"
+                                class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                                placeholder="google, openai, anthropic">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional Override)</label>
+                            <input type="text" name="model" value="{model_val}"
+                                class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                                placeholder="gemini-2.5-flash, gpt-4o">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional Override)</label>
+                            <input type="password" name="api_key" value="{api_key_val}"
+                                class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                                placeholder="Leave empty to use Company key">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Workflow Config (JSON)</label>
+                        <textarea name="workflow_config" rows="3"
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500">{config_str}</textarea>
+                    </div>
+                </div>
             </div>
+            {spam_warning_html}
             <div class="flex items-center justify-end gap-2">
                 <button type="button" hx-get="/companies/{company_id}/workflows/{workflow_id}/cancel" hx-target="#workflow-{workflow_id}" hx-swap="outerHTML"
                     class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
@@ -1086,6 +1359,7 @@ pub fn workflow_edit_fragment(
         api_key_val = api_key_val,
         config_str = config_str,
         agents_selection_html = agents_selection_html,
+        custom_config_hidden = custom_config_hidden,
     )
 }
 

@@ -20,6 +20,11 @@ pub struct AppConfig {
     pub dnsbl_servers: Vec<String>,
     pub smtp_rate_limit_conns_per_ip: usize,
     pub reject_self_domain_helo: bool,
+    pub enable_heuristic_scanner: bool,
+    pub enable_spam_scanner: bool,
+    pub spam_scanner_type: String,
+    pub spam_scanner_url: String,
+    pub enable_llm_spam_guardrail: bool,
 }
 
 impl AppConfig {
@@ -85,6 +90,27 @@ impl AppConfig {
             .parse()
             .unwrap_or(true);
 
+        let enable_heuristic_scanner: bool = env::var("ENABLE_HEURISTIC_SCANNER")
+            .unwrap_or_else(|_| "true".to_string())
+            .parse()
+            .unwrap_or(true);
+
+        let enable_spam_scanner: bool = env::var("ENABLE_SPAM_SCANNER")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse()
+            .unwrap_or(false);
+
+        let spam_scanner_type = env::var("SPAM_SCANNER_TYPE")
+            .unwrap_or_else(|_| "rspamd".to_string());
+
+        let spam_scanner_url = env::var("SPAM_SCANNER_URL")
+            .unwrap_or_else(|_| "http://localhost:11333/checkv2".to_string());
+
+        let enable_llm_spam_guardrail: bool = env::var("ENABLE_LLM_SPAM_GUARDRAIL")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse()
+            .unwrap_or(false);
+
         Self {
             jwt_secret,
             access_token_ttl: Duration::seconds(access_token_ttl_secs),
@@ -103,7 +129,16 @@ impl AppConfig {
             dnsbl_servers,
             smtp_rate_limit_conns_per_ip,
             reject_self_domain_helo,
+            enable_heuristic_scanner,
+            enable_spam_scanner,
+            spam_scanner_type,
+            spam_scanner_url,
+            enable_llm_spam_guardrail,
         }
+    }
+
+    pub fn is_spam_scan_enabled(&self) -> bool {
+        self.enable_heuristic_scanner || self.enable_spam_scanner || self.enable_llm_spam_guardrail
     }
 }
 

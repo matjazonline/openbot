@@ -430,6 +430,11 @@ mod tests {
             dnsbl_servers: vec![],
             smtp_rate_limit_conns_per_ip: 30,
             reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
         });
 
         let use_cases = ApprovalUseCases::new(
@@ -525,6 +530,11 @@ mod tests {
             dnsbl_servers: vec![],
             smtp_rate_limit_conns_per_ip: 30,
             reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
         });
 
         let company_id = Uuid::new_v4();

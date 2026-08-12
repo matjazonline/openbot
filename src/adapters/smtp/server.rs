@@ -10,6 +10,7 @@ use tracing::{error, info, warn};
 use crate::{
     domain::monitoring::{MonitoringService, SmtpConnectionMetrics, SmtpStatus},
     application::use_cases::thread::ThreadUseCases,
+    application::use_cases::workflow::parse_recipient_address,
     infra::config::AppConfig,
     services::email_parser::{extract_email, RawAttachmentData, RawInboundPayload},
 };
@@ -315,8 +316,10 @@ impl SmtpServer {
                     if trimmed == "." {
                         let mut spf_status: Option<String> = None;
                         let mut dkim_status: Option<String> = None;
+                        let mut dmarc_status: Option<String> = None;
+                        let mut spf_output_obj: Option<mail_auth::SpfOutput> = None;
 
-                        // Perform active DNS SPF & DKIM verification via mail-auth
+                        // Perform active DNS SPF, DKIM & DMARC verification via mail-auth
                         if let Ok(resolver) = mail_auth::MessageAuthenticator::new_quad9() {
                             if let Some(ref sender) = mailfrom {
                                 let domain = sender.split('@').nth(1).unwrap_or(sender);
@@ -335,30 +338,84 @@ impl SmtpServer {
                                     mail_auth::SpfResult::Neutral => "neutral".to_string(),
                                     _ => "none".to_string(),
                                 });
+                                spf_output_obj = Some(spf_res);
                             }
 
                             if let Some(auth_msg) = mail_auth::AuthenticatedMessage::parse(data_buffer.as_bytes()) {
-                                let dkim_results = resolver.verify_dkim(&auth_msg).await;
-                                if !dkim_results.is_empty() {
-                                    if dkim_results.iter().all(|s| matches!(s.result(), mail_auth::DkimResult::Pass)) {
+                                let dkim_outputs_obj = resolver.verify_dkim(&auth_msg).await;
+                                if !dkim_outputs_obj.is_empty() {
+                                    if dkim_outputs_obj.iter().all(|s| matches!(s.result(), mail_auth::DkimResult::Pass)) {
                                         dkim_status = Some("pass".to_string());
-                                    } else if dkim_results.iter().any(|s| matches!(s.result(), mail_auth::DkimResult::Fail(_))) {
+                                    } else if dkim_outputs_obj.iter().any(|s| matches!(s.result(), mail_auth::DkimResult::Fail(_))) {
                                         dkim_status = Some("fail".to_string());
                                     } else {
                                         dkim_status = Some("none".to_string());
                                     }
                                 }
+
+                                if let Some(ref spf_output) = spf_output_obj {
+                                    if let Some(ref sender) = mailfrom {
+                                        let domain = sender.split('@').nth(1).unwrap_or(sender);
+                                        let dmarc_params = mail_auth::dmarc::verify::DmarcParameters::new(
+                                            &auth_msg,
+                                            &dkim_outputs_obj,
+                                            domain,
+                                            spf_output,
+                                        );
+                                        let dmarc_output = resolver.verify_dmarc(dmarc_params).await;
+                                        let dmarc_dkim_pass = matches!(dmarc_output.dkim_result(), mail_auth::DmarcResult::Pass);
+                                        let dmarc_spf_pass = matches!(dmarc_output.spf_result(), mail_auth::DmarcResult::Pass);
+                                        dmarc_status = Some(if dmarc_dkim_pass || dmarc_spf_pass {
+                                            "pass".to_string()
+                                        } else {
+                                            "fail".to_string()
+                                        });
+                                    }
+                                }
                             }
                         }
 
-                        let raw_payload = parse_raw_mime_to_payload(
+                        let mut raw_payload = parse_raw_mime_to_payload(
                             data_buffer.as_bytes(),
                             mailfrom.as_deref(),
                             rcpts.first().map(|s| s.as_str()),
                             &rcpts,
                             spf_status,
                             dkim_status,
+                            dmarc_status,
                         );
+
+                        // Stage 1 & Stage 2 Spam Scanner (Only run for public workflows where participant_emails is not set)
+                        let mut should_scan_spam = true;
+                        let recipient_str = raw_payload.to.clone();
+                        if let Some((company_slug, workflow_slug)) = parse_recipient_address(&recipient_str, &self.config.app_domain_name) {
+                            if let Ok(Some(workflow)) = self.thread_use_cases.workflow_persistence().get_by_company_slug_and_workflow_slug(&company_slug, &workflow_slug).await {
+                                if let Some(ref allowed) = workflow.participant_emails {
+                                    if !allowed.is_empty() {
+                                        // Workflow defines participants -> Skip Stage 1 & Stage 2 spam scanner
+                                        should_scan_spam = false;
+                                    }
+                                }
+                            }
+                        }
+
+                        if should_scan_spam {
+                            let spam_scanner = crate::services::spam_scanner::SpamScannerService::new(self.config.clone());
+                            let scan_res = spam_scanner.scan(
+                                data_buffer.as_bytes(),
+                                raw_payload.subject.as_deref(),
+                                Some(&raw_payload.from),
+                                raw_payload.text.as_deref(),
+                                raw_payload.html.as_deref(),
+                            ).await;
+
+                            if scan_res.score > 0.0 {
+                                raw_payload.spam_score = Some(scan_res.score);
+                                if let Some(ref m) = self.monitoring {
+                                    m.record_histogram("smtp_spam_score", scan_res.score, &[]);
+                                }
+                            }
+                        }
 
                         match self.thread_use_cases.ingest_and_save_inbound_message(raw_payload).await {
                             Ok(ingest) => {
@@ -366,7 +423,15 @@ impl SmtpServer {
                                     let status = if ingest.accepted {
                                         SmtpStatus::Accepted
                                     } else {
-                                        SmtpStatus::RejectedSpf
+                                        match ingest.reason.as_deref() {
+                                            Some("SPF authentication failed") => SmtpStatus::RejectedSpf,
+                                            Some("DKIM authentication failed") => SmtpStatus::RejectedDkim,
+                                            Some("DMARC authentication failed") => SmtpStatus::RejectedDmarc,
+                                            Some("Spam score threshold exceeded") => SmtpStatus::RejectedSpamScore,
+                                            Some(r) if r.contains("rate limit") => SmtpStatus::BlockedRateLimit,
+                                            Some(r) if r.contains("DNSBL") => SmtpStatus::BlockedDnsbl,
+                                            _ => SmtpStatus::Error,
+                                        }
                                     };
                                     m.record_smtp_connection(&SmtpConnectionMetrics {
                                         client_ip,
@@ -449,6 +514,7 @@ pub fn parse_raw_mime_to_payload(
     _all_rcpts: &[String],
     mut spf_status: Option<String>,
     mut dkim_status: Option<String>,
+    mut dmarc_status: Option<String>,
 ) -> RawInboundPayload {
     if let Some(msg) = mail_parser::MessageParser::new().parse(raw_mime) {
         // Extract sender
@@ -504,6 +570,12 @@ pub fn parse_raw_mime_to_payload(
                         } else if val_lower.contains("dkim=fail") && dkim_status.is_none() {
                             dkim_status = Some("fail".to_string());
                         }
+
+                        if val_lower.contains("dmarc=pass") {
+                            dmarc_status = Some("pass".to_string());
+                        } else if val_lower.contains("dmarc=fail") && dmarc_status.is_none() {
+                            dmarc_status = Some("fail".to_string());
+                        }
                     }
 
                     hdrs.push_str(name);
@@ -553,6 +625,7 @@ pub fn parse_raw_mime_to_payload(
             headers,
             spf: spf_status,
             dkim: dkim_status,
+            dmarc: dmarc_status,
             spam_score: None,
             attachments_data,
         }
@@ -564,6 +637,7 @@ pub fn parse_raw_mime_to_payload(
             text: Some(raw_text),
             spf: spf_status,
             dkim: dkim_status,
+            dmarc: dmarc_status,
             ..Default::default()
         }
     }
@@ -594,13 +668,13 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> { unimplemented!() }
+        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> { unimplemented!() }
         async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
             Ok(self.companies.lock().unwrap().iter().find(|c| c.slug == slug).cloned())
         }
         async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> { unimplemented!() }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
@@ -739,6 +813,7 @@ mod tests {
             &["inbound@acme.mailagents.com".to_string()],
             None,
             None,
+            None,
         );
 
         assert_eq!(payload.from, "sender@external.com");
@@ -762,6 +837,7 @@ mod tests {
                 api_key: None,
                 provider: None,
                 model: None,
+                enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -807,6 +883,11 @@ mod tests {
             dnsbl_servers: vec![],
             smtp_rate_limit_conns_per_ip: 30,
             reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
@@ -875,7 +956,7 @@ mod tests {
         assert!(response.contains("354"));
 
         // Email Body
-        let email_data = b"From: sender@external.com\r\nTo: inbound@acme.mailagents.com\r\nSubject: SMTP Test Order\r\nMessage-ID: <SMTP123@external.com>\r\nAuthentication-Results: spf=pass dkim=pass\r\n\r\nHello agent, please process this order via SMTP.\r\n.\r\n";
+        let email_data = b"From: sender@external.com\r\nTo: inbound@acme.mailagents.com\r\nSubject: SMTP Test Order\r\nMessage-ID: <SMTP123@external.com>\r\nAuthentication-Results: spf=pass dkim=pass dmarc=pass\r\n\r\nHello agent, please process this order via SMTP.\r\n.\r\n";
         response.clear();
         writer.write_all(email_data).await.unwrap();
         writer.flush().await.unwrap();
@@ -956,6 +1037,7 @@ regis";
                 api_key: None,
                 provider: None,
                 model: None,
+                enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -1001,6 +1083,11 @@ regis";
             dnsbl_servers: vec![],
             smtp_rate_limit_conns_per_ip: 30,
             reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
@@ -1048,7 +1135,7 @@ regis";
 
         let raw_msg = "Received: by mail-pj1-f42.google.com with SMTP id 98e67ed59e1d1-2f83a8afcbbso7421825a91.1for <network@populus.mailagents.com>; Mon, 17 Feb 2025 15:18:31 -0800 (PST)\r\n\
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;d=gmail.com; s=20230601; t=1739834309; x=1740439109; darn=populus.network; h=to:subject:message-id:date:from:mime-version:from:to:cc:subject:date:message-id:reply-to; bh=x19wIji+Z4l9gErNFMJoiHzL6DQXpodslSPSAwR1YBY=; b=GAEwDJgLvTeL0qx6uJiUcEm/jUeoaP8bkDyToJnmOAG5uMssxa9ZSUqF1TbF6vZHcp7/VwrZvazoVgs3jb+0u70/99y6oGtv6JoGz+tDxIAVZNzufE2ZaXeWO1SDAkdEWRRQr4GAssq0Ht3DnDs3ck6h0YwIjUbspDYTgutQ3/e1d5tRG3VwjOa1pJQqwU0lfFTYZe1RJad1Ag9iw1KvceyMSB4lduGQ9/TxxvrEqbomqZ04xwY+cSYEmx7opp6tCI/LiQh6syLh4q5aay7Sop4KZhNRrhoU4+Q3jqHVzGRpz4pk6RPRjie8I9ZDCuXPCFHLpuL/5PtnQ/vNDrLmDQ==\r\n\
-Authentication-Results: spf=pass dkim=pass\r\n\
+Authentication-Results: spf=pass dkim=pass dmarc=pass\r\n\
 From: Populus <hello.populus@gmail.com>\r\n\
 To: network@populus.mailagents.com\r\n\
 Subject: Registration Request\r\n\
@@ -1097,6 +1184,11 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
             dnsbl_servers: vec![],
             smtp_rate_limit_conns_per_ip: 1, // Limit to 1 connection
             reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
         });
 
         let monitor = Arc::new(InMemoryMonitor::new());

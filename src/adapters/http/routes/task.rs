@@ -307,6 +307,7 @@ mod tests {
             api_key: None,
             provider: None,
             model: None,
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -342,6 +343,7 @@ mod tests {
             api_key: None,
             provider: None,
             model: None,
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 

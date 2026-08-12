@@ -224,7 +224,25 @@ impl CompanyInviteUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<CompanyMember>> {
-        self.verify_company_owner(user_id, company_id).await?;
+        let company = self
+            .company_persistence
+            .get_by_id(company_id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
+
+        if company.user_id != user_id {
+            let members = self
+                .invite_persistence
+                .list_members_by_company(company_id)
+                .await?;
+            if !members.iter().any(|m| m.user_id == user_id) {
+                return Err(AppError::Internal(
+                    "Unauthorized: only company members or owner can view team members.".into(),
+                ));
+            }
+            return Ok(members);
+        }
+
         self.invite_persistence.list_members_by_company(company_id).await
     }
 
@@ -264,7 +282,7 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> {
+        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -292,7 +310,7 @@ mod tests {
             unimplemented!()
         }
 
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> {
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -426,6 +444,7 @@ mod tests {
                 api_key: None,
                 provider: None,
                 model: None,
+                enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -477,6 +496,15 @@ mod tests {
         let members = use_cases.list_company_team_members(owner_id, company_id).await.unwrap();
         assert_eq!(members.len(), 1);
         assert_eq!(members[0].user_id, user.id);
+
+        // Verify member (non-owner) can also list company team members
+        let member_list = use_cases.list_company_team_members(user.id, company_id).await.unwrap();
+        assert_eq!(member_list.len(), 1);
+        assert_eq!(member_list[0].user_id, user.id);
+
+        // Verify random user cannot list company team members
+        let random_user_err = use_cases.list_company_team_members(Uuid::new_v4(), company_id).await;
+        assert!(random_user_err.is_err());
 
         // Owner removes member from team
         use_cases

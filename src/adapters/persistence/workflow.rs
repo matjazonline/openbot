@@ -203,7 +203,7 @@ mod tests {
         let _ = persistence.create_user(&owner_username, &owner_email, "hash").await;
         let owner = persistence.get_by_email(&owner_email).await.unwrap().unwrap();
 
-        let company = CompanyPersistence::create(&persistence, owner.id, "Workflow Corp", "wf-corp", None, None, None)
+        let company = CompanyPersistence::create(&persistence, owner.id, "Workflow Corp", "wf-corp", None, None, None, None)
             .await
             .unwrap();
 

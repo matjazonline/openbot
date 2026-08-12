@@ -29,7 +29,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     let user_use_cases = UserUseCases::new(Arc::new(argon_hasher), postgres_arc.clone());
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
     let company_invite_use_cases = CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());
-    let workflow_use_cases = WorkflowUseCases::new(postgres_arc.clone(), postgres_arc.clone());
+    let workflow_use_cases = WorkflowUseCases::new(postgres_arc.clone(), postgres_arc.clone(), config.clone());
     let agent_use_cases = AgentUseCases::new(postgres_arc.clone(), postgres_arc.clone());
 
     let approval_use_cases = Arc::new(ApprovalUseCases::new(

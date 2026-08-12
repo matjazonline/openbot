@@ -391,6 +391,7 @@ mod tests {
             api_key: None,
             provider: None,
             model: None,
+            enable_llm_spam_guardrail: None,
             created_at: Utc::now().naive_utc(),
         };
 

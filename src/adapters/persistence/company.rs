@@ -19,6 +19,7 @@ pub struct CompanyDb {
     pub api_key: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
+    pub enable_llm_spam_guardrail: Option<bool>,
     pub created_at: NaiveDateTime,
 }
 
@@ -32,6 +33,7 @@ impl From<CompanyDb> for Company {
             api_key: db.api_key,
             provider: db.provider,
             model: db.model,
+            enable_llm_spam_guardrail: db.enable_llm_spam_guardrail,
             created_at: db.created_at,
         }
     }
@@ -47,22 +49,23 @@ impl CompanyPersistence for PostgresPersistence {
         api_key: Option<&str>,
         provider: Option<&str>,
         model: Option<&str>,
+        enable_llm_spam_guardrail: Option<bool>,
     ) -> AppResult<Company> {
         let uuid = Uuid::new_v4();
 
-        let db = sqlx::query_as!(
-            CompanyDb,
-            r#"INSERT INTO companies (id, user_id, name, slug, api_key, provider, model) 
-               VALUES ($1, $2, $3, $4, $5, $6, $7) 
-               RETURNING id, user_id, name, slug, api_key, provider, model, created_at as "created_at!""#,
-            uuid,
-            user_id,
-            name,
-            slug,
-            api_key,
-            provider,
-            model
+        let db = sqlx::query_as::<_, CompanyDb>(
+            r#"INSERT INTO companies (id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail) 
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+               RETURNING id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, created_at"#,
         )
+        .bind(uuid)
+        .bind(user_id)
+        .bind(name)
+        .bind(slug)
+        .bind(api_key)
+        .bind(provider)
+        .bind(model)
+        .bind(enable_llm_spam_guardrail)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -71,12 +74,11 @@ impl CompanyPersistence for PostgresPersistence {
     }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
-        let db = sqlx::query_as!(
-            CompanyDb,
-            r#"SELECT id, user_id, name, slug, api_key, provider, model, created_at as "created_at!" 
+        let db = sqlx::query_as::<_, CompanyDb>(
+            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, created_at 
                FROM companies WHERE id = $1"#,
-            id
         )
+        .bind(id)
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -85,12 +87,11 @@ impl CompanyPersistence for PostgresPersistence {
     }
 
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
-        let db = sqlx::query_as!(
-            CompanyDb,
-            r#"SELECT id, user_id, name, slug, api_key, provider, model, created_at as "created_at!" 
+        let db = sqlx::query_as::<_, CompanyDb>(
+            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, created_at 
                FROM companies WHERE LOWER(slug) = LOWER($1)"#,
-            slug
         )
+        .bind(slug)
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -99,12 +100,11 @@ impl CompanyPersistence for PostgresPersistence {
     }
 
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
-        let db_list = sqlx::query_as!(
-            CompanyDb,
-            r#"SELECT id, user_id, name, slug, api_key, provider, model, created_at as "created_at!" 
+        let db_list = sqlx::query_as::<_, CompanyDb>(
+            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, created_at 
                FROM companies WHERE user_id = $1 ORDER BY created_at DESC"#,
-            user_id
         )
+        .bind(user_id)
         .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -120,19 +120,20 @@ impl CompanyPersistence for PostgresPersistence {
         api_key: Option<&str>,
         provider: Option<&str>,
         model: Option<&str>,
+        enable_llm_spam_guardrail: Option<bool>,
     ) -> AppResult<Company> {
-        let db = sqlx::query_as!(
-            CompanyDb,
-            r#"UPDATE companies SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5 
-               WHERE id = $6 
-               RETURNING id, user_id, name, slug, api_key, provider, model, created_at as "created_at!""#,
-            name,
-            slug,
-            api_key,
-            provider,
-            model,
-            id
+        let db = sqlx::query_as::<_, CompanyDb>(
+            r#"UPDATE companies SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5, enable_llm_spam_guardrail = $6 
+               WHERE id = $7 
+               RETURNING id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, created_at"#,
         )
+        .bind(name)
+        .bind(slug)
+        .bind(api_key)
+        .bind(provider)
+        .bind(model)
+        .bind(enable_llm_spam_guardrail)
+        .bind(id)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;

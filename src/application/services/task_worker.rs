@@ -249,11 +249,11 @@ mod tests {
     struct MockCompanyPersistence;
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> { unimplemented!() }
+        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> { unimplemented!() }
         async fn get_by_slug(&self, _slug: &str) -> AppResult<Option<Company>> { unimplemented!() }
         async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> { unimplemented!() }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
@@ -403,6 +403,11 @@ mod tests {
             dnsbl_servers: vec![],
             smtp_rate_limit_conns_per_ip: 30,
             reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
@@ -449,6 +454,7 @@ mod tests {
             api_key: None,
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -487,6 +493,11 @@ mod tests {
             dnsbl_servers: vec![],
             smtp_rate_limit_conns_per_ip: 30,
             reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
@@ -511,6 +522,7 @@ mod tests {
             attachments_data: vec![],
             spf: None,
             dkim: None,
+            dmarc: None,
         };
         let parsed_email = crate::services::email_parser::EmailParser::parse(raw, "mailagents.com");
 

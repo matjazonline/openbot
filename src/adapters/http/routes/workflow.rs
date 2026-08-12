@@ -73,6 +73,7 @@ pub struct WorkflowForm {
     pub participant_emails: Option<String>,
     pub agent_ids: Option<String>,
     pub workflow_config: Option<String>,
+    pub confirm_spam_disabled: Option<String>,
 }
 
 fn parse_agent_ids_form(input: Option<String>) -> Option<Vec<Uuid>> {
@@ -101,6 +102,7 @@ pub struct WorkflowJsonPayload {
     pub participant_emails: Option<Vec<String>>,
     pub agent_ids: Option<Vec<Uuid>>,
     pub workflow_config: Option<serde_json::Value>,
+    pub confirm_spam_disabled: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -158,7 +160,13 @@ async fn list_workflows_page(
         .await
         .unwrap_or_default();
 
-    Html(pages::workflows_page(&company, &config.app_domain_name, &workflows, &agents))
+    Html(pages::workflows_page(
+        &company,
+        &config.app_domain_name,
+        &workflows,
+        &agents,
+        config.is_spam_scan_enabled(),
+    ))
 }
 
 /// POST /companies/{company_id}/workflows - HTMX create workflow (Protected).
@@ -184,6 +192,9 @@ async fn create_workflow_handler(
 
     let emails = parse_emails_form(form.participant_emails);
     let agent_ids = parse_agent_ids_form(form.agent_ids);
+    let confirm_spam_disabled = form.confirm_spam_disabled.as_deref() == Some("true")
+        || form.confirm_spam_disabled.as_deref() == Some("on");
+
     let workflow_config = match parse_config_form(form.workflow_config) {
         Ok(c) => c,
         Err(err) => {
@@ -212,6 +223,7 @@ async fn create_workflow_handler(
             emails,
             agent_ids,
             workflow_config,
+            confirm_spam_disabled,
         )
         .await
     {
@@ -271,6 +283,7 @@ async fn edit_workflow_form(
             &config.app_domain_name,
             &wf,
             &agents,
+            config.is_spam_scan_enabled(),
         ))
     } else {
         Html(pages::error_alert("Workflow not found."))
@@ -335,6 +348,9 @@ async fn update_workflow_handler(
 
     let emails = parse_emails_form(form.participant_emails);
     let agent_ids = parse_agent_ids_form(form.agent_ids);
+    let confirm_spam_disabled = form.confirm_spam_disabled.as_deref() == Some("true")
+        || form.confirm_spam_disabled.as_deref() == Some("on");
+
     let workflow_config = match parse_config_form(form.workflow_config) {
         Ok(c) => c,
         Err(err) => return Html(pages::error_alert(&err)),
@@ -353,6 +369,7 @@ async fn update_workflow_handler(
             emails,
             agent_ids,
             workflow_config,
+            confirm_spam_disabled,
         )
         .await
     {
@@ -806,6 +823,8 @@ async fn create_workflow_json(
     Path(company_id): Path<Uuid>,
     Json(payload): Json<WorkflowJsonPayload>,
 ) -> AppResult<impl IntoResponse> {
+    let confirm_spam_disabled = payload.confirm_spam_disabled.unwrap_or(false);
+
     let workflow = workflow_use_cases
         .create_workflow(
             user.id,
@@ -818,6 +837,7 @@ async fn create_workflow_json(
             payload.participant_emails,
             payload.agent_ids,
             payload.workflow_config,
+            confirm_spam_disabled,
         )
         .await?;
 
@@ -851,6 +871,8 @@ async fn update_workflow_json(
     Path((company_id, workflow_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<WorkflowJsonPayload>,
 ) -> AppResult<impl IntoResponse> {
+    let confirm_spam_disabled = payload.confirm_spam_disabled.unwrap_or(false);
+
     let workflow = workflow_use_cases
         .update_workflow(
             user.id,
@@ -864,6 +886,7 @@ async fn update_workflow_json(
             payload.participant_emails,
             payload.agent_ids,
             payload.workflow_config,
+            confirm_spam_disabled,
         )
         .await?;
 
@@ -907,6 +930,7 @@ mod tests {
             api_key: None,
             provider: None,
             model: None,
+            enable_llm_spam_guardrail: None,
             created_at: Utc::now().naive_utc(),
         };
 
@@ -924,15 +948,23 @@ mod tests {
             created_at: Utc::now().naive_utc(),
         };
 
+        let page_html = pages::workflows_page(&company, "example.com", &[workflow.clone()], &[], true);
+        assert!(page_html.contains("Custom Workflow Agent"));
+        assert!(page_html.contains("LLM Provider (Optional Override)"));
+        assert!(page_html.contains("LLM Model (Optional Override)"));
+        assert!(page_html.contains("LLM API Key (Optional Override)"));
+        assert!(page_html.contains("Workflow Config (JSON, Optional)"));
+
         let row_html = pages::workflow_row_fragment(&company, "example.com", &workflow, &[]);
         assert!(row_html.contains("Auto Dispatcher"));
         assert!(row_html.contains("auto-dispatcher@acme.example.com"));
         assert!(row_html.contains("agent@test.com"));
         assert!(row_html.contains("async"));
 
-        let edit_html = pages::workflow_edit_fragment(&company, "example.com", &workflow, &[]);
+        let edit_html = pages::workflow_edit_fragment(&company, "example.com", &workflow, &[], true);
         assert!(edit_html.contains("hx-put="));
         assert!(edit_html.contains("value=\"Auto Dispatcher\""));
+        assert!(edit_html.contains("Custom Workflow Agent"));
 
         let sim_html = pages::workflow_simulation_page(&company, "example.com", &workflow, None, None);
         assert!(sim_html.contains("Simulate Webhook: Auto Dispatcher"));
@@ -996,6 +1028,7 @@ mod tests {
                     trace_workflows: vec![],
                     spf_status: Some("pass".to_string()),
                     dkim_status: Some("pass".to_string()),
+                    dmarc_status: Some("pass".to_string()),
                     spam_score: None,
                 }),
                 task_id: None,

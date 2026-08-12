@@ -458,6 +458,8 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
     }
 }
 
+use crate::infra::config::AppConfig;
+
 pub struct AgentRunner<'a> {
     prompt: &'a str,
     history: &'a [Message],
@@ -465,9 +467,12 @@ pub struct AgentRunner<'a> {
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     approval_context: Option<ApprovalContext>,
     monitoring: Option<Arc<dyn MonitoringService>>,
+    app_config: Option<Arc<AppConfig>>,
+    company: Option<Company>,
     company_id: Option<Uuid>,
     workflow_id: Option<Uuid>,
     agent_id: Option<Uuid>,
+    skip_spam_guardrail: bool,
 }
 
 impl<'a> AgentRunner<'a> {
@@ -479,10 +484,23 @@ impl<'a> AgentRunner<'a> {
             approval_use_cases: None,
             approval_context: None,
             monitoring: None,
+            app_config: None,
+            company: None,
             company_id: None,
             workflow_id: None,
             agent_id: None,
+            skip_spam_guardrail: false,
         }
+    }
+
+    pub fn config(mut self, config: Option<Arc<AppConfig>>) -> Self {
+        self.app_config = config;
+        self
+    }
+
+    pub fn company(mut self, company: Option<Company>) -> Self {
+        self.company = company;
+        self
     }
 
     pub fn history(mut self, history: &'a [Message]) -> Self {
@@ -522,6 +540,11 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
+    pub fn skip_spam_guardrail(mut self, skip: bool) -> Self {
+        self.skip_spam_guardrail = skip;
+        self
+    }
+
     pub async fn execute(self) -> anyhow::Result<AgentExecutionOutput> {
         let start_time = std::time::Instant::now();
         info!(
@@ -552,6 +575,22 @@ impl<'a> AgentRunner<'a> {
         let provider_name = &self.params.provider;
         let model_name = &self.params.model;
         let key = &self.params.api_key;
+
+        // Stage 3: Optional LLM Spam & Guardrail Evaluation (skipped for trusted participants)
+        if !self.skip_spam_guardrail {
+            if let Some(ref cfg) = self.app_config {
+                crate::services::llm_guardrail::LlmSpamGuardrail::evaluate(
+                    cfg,
+                    self.company.as_ref(),
+                    self.monitoring.as_ref(),
+                    &raw_full_prompt,
+                    provider_name,
+                    model_name,
+                    key,
+                )
+                .await?;
+            }
+        }
 
         let mut config = self.params.config.clone();
         ensure_config_fields(&mut config, provider_name, model_name, key, None, None);
@@ -754,6 +793,7 @@ mod tests {
             api_key: Some("key".to_string()),
             provider: Some("google".to_string()),
             model: None,
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
         let result = ResolvedAgentParams::new(Some(&company), None, None);
@@ -773,6 +813,7 @@ mod tests {
             api_key: None,
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
         let result = ResolvedAgentParams::new(Some(&company), None, None);
@@ -823,6 +864,7 @@ mod tests {
             api_key: Some("runtime_key".to_string()),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
         let params = ResolvedAgentParams::new(Some(&company), None, None)?;
@@ -841,6 +883,7 @@ mod tests {
             api_key: Some("fake_key_123".to_string()),
             provider: Some("google".to_string()),
             model: Some("invalid-custom-model-xyz".to_string()),
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
         let params = ResolvedAgentParams::new(Some(&company), None, None)?;
@@ -896,6 +939,7 @@ mod tests {
             api_key: Some("company-api-key".to_string()),
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -927,6 +971,7 @@ mod tests {
             api_key: Some("company-api-key".to_string()),
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -976,6 +1021,7 @@ mod tests {
             api_key: Some("company-api-key".to_string()),
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -1049,6 +1095,7 @@ mod tests {
             api_key: Some("  ".to_string()),
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -1086,6 +1133,7 @@ mod tests {
             api_key: Some("company-key".to_string()),
             provider: Some("unsupported_provider".to_string()),
             model: Some("some-model".to_string()),
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -1113,6 +1161,7 @@ mod tests {
             api_key: Some("company-key".to_string()),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -1152,6 +1201,7 @@ mod tests {
             api_key: Some("company-key".to_string()),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -1186,6 +1236,7 @@ mod tests {
             api_key: Some("company-key".to_string()),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
+            enable_llm_spam_guardrail: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 

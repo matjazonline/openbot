@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     app_error::{AppError, AppResult},
     entities::{company::Company, workflow::Workflow},
+    infra::config::AppConfig,
     use_cases::company::CompanyPersistence,
 };
 
@@ -56,16 +57,19 @@ pub trait WorkflowPersistence: Send + Sync {
 pub struct WorkflowUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
     workflow_persistence: Arc<dyn WorkflowPersistence>,
+    config: Arc<AppConfig>,
 }
 
 impl WorkflowUseCases {
     pub fn new(
         company_persistence: Arc<dyn CompanyPersistence>,
         workflow_persistence: Arc<dyn WorkflowPersistence>,
+        config: Arc<AppConfig>,
     ) -> Self {
         Self {
             company_persistence,
             workflow_persistence,
+            config,
         }
     }
 
@@ -98,6 +102,7 @@ impl WorkflowUseCases {
         participant_emails: Option<Vec<String>>,
         agent_ids: Option<Vec<Uuid>>,
         workflow_config: Option<serde_json::Value>,
+        confirm_spam_disabled: bool,
     ) -> AppResult<Workflow> {
         self.verify_company_owner(user_id, company_id).await?;
 
@@ -121,6 +126,17 @@ impl WorkflowUseCases {
                 .filter(|e| !e.is_empty() && e.contains('@'))
                 .collect::<Vec<_>>()
         });
+
+        let has_participants = cleaned_emails
+            .as_ref()
+            .map(|emails| !emails.is_empty())
+            .unwrap_or(false);
+
+        if !has_participants && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
+            return Err(AppError::Internal(
+                "Spam scanning is disabled in server configuration. Saving a workflow without participant email restrictions requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
+            ));
+        }
 
         info!(
             "Creating workflow '{}' ({}) for company {}",
@@ -183,6 +199,7 @@ impl WorkflowUseCases {
         participant_emails: Option<Vec<String>>,
         agent_ids: Option<Vec<Uuid>>,
         workflow_config: Option<serde_json::Value>,
+        confirm_spam_disabled: bool,
     ) -> AppResult<Workflow> {
         self.verify_company_owner(user_id, company_id).await?;
 
@@ -218,6 +235,17 @@ impl WorkflowUseCases {
                 .filter(|e| !e.is_empty() && e.contains('@'))
                 .collect::<Vec<_>>()
         });
+
+        let has_participants = cleaned_emails
+            .as_ref()
+            .map(|emails| !emails.is_empty())
+            .unwrap_or(false);
+
+        if !has_participants && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
+            return Err(AppError::Internal(
+                "Spam scanning is disabled in server configuration. Saving a workflow without participant email restrictions requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
+            ));
+        }
 
         info!(
             "Updating workflow {} for company {}: {} ({})",
@@ -440,7 +468,7 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> {
+        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -468,7 +496,7 @@ mod tests {
             unimplemented!()
         }
 
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> {
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -582,6 +610,33 @@ mod tests {
         }
     }
 
+    fn test_config(spam_enabled: bool) -> Arc<AppConfig> {
+        Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: spam_enabled,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        })
+    }
+
     #[tokio::test]
     async fn company_owner_workflow_crud_flow_works() {
         let owner_id = Uuid::new_v4();
@@ -596,6 +651,7 @@ mod tests {
                 api_key: None,
                 provider: None,
                 model: None,
+                enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -604,7 +660,7 @@ mod tests {
             workflows: Mutex::new(Vec::new()),
         });
 
-        let use_cases = WorkflowUseCases::new(company_persistence, workflow_persistence);
+        let use_cases = WorkflowUseCases::new(company_persistence, workflow_persistence, test_config(true));
 
         // 1. Owner creates workflow with participant emails and config
         let emails = vec!["agent1@example.com".to_string(), "agent2@example.com".to_string()];
@@ -626,6 +682,7 @@ mod tests {
                 Some(emails.clone()),
                 Some(agent_ids.clone()),
                 Some(config.clone()),
+                false,
             )
             .await
             .unwrap();
@@ -653,6 +710,7 @@ mod tests {
                 None,
                 None,
                 None,
+                false,
             )
             .await;
         assert!(err.is_err());
@@ -679,6 +737,7 @@ mod tests {
                 None,
                 None,
                 Some(updated_config.clone()),
+                false,
             )
             .await
             .unwrap();
@@ -745,6 +804,7 @@ mod tests {
                 api_key: None,
                 provider: None,
                 model: None,
+                enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -753,10 +813,10 @@ mod tests {
             workflows: Mutex::new(Vec::new()),
         });
 
-        let use_cases = WorkflowUseCases::new(company_persistence, workflow_persistence);
+        let use_cases = WorkflowUseCases::new(company_persistence, workflow_persistence, test_config(true));
 
         let _ = use_cases
-            .create_workflow(owner_id, company_id, "Support Flow", "support", None, None, None, None, None, None)
+            .create_workflow(owner_id, company_id, "Support Flow", "support", None, None, None, None, None, None, false)
             .await
             .unwrap();
 
@@ -794,6 +854,7 @@ mod tests {
                 Some(vec!["agent@example.com".to_string()]),
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -833,5 +894,63 @@ mod tests {
 
         assert!(!unauth_result.resolved);
         assert!(!unauth_result.sender_authorized);
+    }
+
+    #[tokio::test]
+    async fn test_workflow_creation_spam_disabled_confirmation() {
+        let owner_id = Uuid::new_v4();
+        let company_id = Uuid::new_v4();
+
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![Company {
+                id: company_id,
+                user_id: owner_id,
+                name: "Acme Corp".to_string(),
+                slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                enable_llm_spam_guardrail: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let workflow_persistence = Arc::new(MockWorkflowPersistence {
+            workflows: Mutex::new(Vec::new()),
+        });
+
+        // Config with spam scanning completely disabled
+        let use_cases = WorkflowUseCases::new(company_persistence, workflow_persistence, test_config(false));
+
+        // 1. Trying to create workflow without participants and without confirmation fails
+        let res = use_cases
+            .create_workflow(owner_id, company_id, "Public Flow", "public", None, None, None, None, None, None, false)
+            .await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().to_string().contains("Spam scanning is disabled"));
+
+        // 2. Creating workflow without participants BUT WITH confirm_spam_disabled=true succeeds
+        let res_ok = use_cases
+            .create_workflow(owner_id, company_id, "Public Flow", "public", None, None, None, None, None, None, true)
+            .await;
+        assert!(res_ok.is_ok());
+
+        // 3. Creating workflow WITH participants even without confirmation succeeds
+        let res_participants = use_cases
+            .create_workflow(
+                owner_id,
+                company_id,
+                "Restricted Flow",
+                "restricted",
+                None,
+                None,
+                None,
+                Some(vec!["allowed@example.com".to_string()]),
+                None,
+                None,
+                false,
+            )
+            .await;
+        assert!(res_participants.is_ok());
     }
 }

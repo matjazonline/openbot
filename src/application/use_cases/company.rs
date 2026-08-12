@@ -19,6 +19,7 @@ pub trait CompanyPersistence: Send + Sync {
         api_key: Option<&str>,
         provider: Option<&str>,
         model: Option<&str>,
+        enable_llm_spam_guardrail: Option<bool>,
     ) -> AppResult<Company>;
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>>;
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>>;
@@ -31,6 +32,7 @@ pub trait CompanyPersistence: Send + Sync {
         api_key: Option<&str>,
         provider: Option<&str>,
         model: Option<&str>,
+        enable_llm_spam_guardrail: Option<bool>,
     ) -> AppResult<Company>;
     async fn delete(&self, id: Uuid) -> AppResult<()>;
 }
@@ -54,6 +56,7 @@ impl CompanyUseCases {
         api_key: Option<&str>,
         provider: Option<&str>,
         model: Option<&str>,
+        enable_llm_spam_guardrail: Option<bool>,
     ) -> AppResult<Company> {
         let name_trimmed = name.trim();
         let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
@@ -69,7 +72,7 @@ impl CompanyUseCases {
 
         info!("Creating company: {} ({}) for user {}", name_trimmed, slug_clean, user_id);
         self.persistence
-            .create(user_id, name_trimmed, &slug_clean, api_key_clean, provider_clean, model_clean)
+            .create(user_id, name_trimmed, &slug_clean, api_key_clean, provider_clean, model_clean, enable_llm_spam_guardrail)
             .await
     }
 
@@ -97,6 +100,7 @@ impl CompanyUseCases {
         api_key: Option<&str>,
         provider: Option<&str>,
         model: Option<&str>,
+        enable_llm_spam_guardrail: Option<bool>,
     ) -> AppResult<Company> {
         let name_trimmed = name.trim();
         let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
@@ -112,7 +116,7 @@ impl CompanyUseCases {
 
         info!("Updating company {}: {} ({})", id, name_trimmed, slug_clean);
         self.persistence
-            .update(id, name_trimmed, &slug_clean, api_key_clean, provider_clean, model_clean)
+            .update(id, name_trimmed, &slug_clean, api_key_clean, provider_clean, model_clean, enable_llm_spam_guardrail)
             .await
     }
 
@@ -145,6 +149,7 @@ mod tests {
             api_key: Option<&str>,
             provider: Option<&str>,
             model: Option<&str>,
+            enable_llm_spam_guardrail: Option<bool>,
         ) -> AppResult<Company> {
             let company = Company {
                 id: Uuid::new_v4(),
@@ -154,6 +159,7 @@ mod tests {
                 api_key: api_key.map(|s| s.to_string()),
                 provider: provider.map(|s| s.to_string()),
                 model: model.map(|s| s.to_string()),
+                enable_llm_spam_guardrail,
                 created_at: Utc::now().naive_utc(),
             };
             self.companies.lock().unwrap().push(company.clone());
@@ -199,6 +205,7 @@ mod tests {
             api_key: Option<&str>,
             provider: Option<&str>,
             model: Option<&str>,
+            enable_llm_spam_guardrail: Option<bool>,
         ) -> AppResult<Company> {
             let mut list = self.companies.lock().unwrap();
             let company = list
@@ -211,6 +218,7 @@ mod tests {
             company.api_key = api_key.map(|s| s.to_string());
             company.provider = provider.map(|s| s.to_string());
             company.model = model.map(|s| s.to_string());
+            company.enable_llm_spam_guardrail = enable_llm_spam_guardrail;
             Ok(company.clone())
         }
 
@@ -230,7 +238,7 @@ mod tests {
 
         // Create
         let company = use_cases
-            .create_company(user_id, "Acme Corp", "acme-corp", Some("key123"), Some("google"), Some("gemini-2.5-flash"))
+            .create_company(user_id, "Acme Corp", "acme-corp", Some("key123"), Some("google"), Some("gemini-2.5-flash"), Some(true))
             .await
             .unwrap();
         assert_eq!(company.name, "Acme Corp");
@@ -238,6 +246,7 @@ mod tests {
         assert_eq!(company.api_key.as_deref(), Some("key123"));
         assert_eq!(company.provider.as_deref(), Some("google"));
         assert_eq!(company.model.as_deref(), Some("gemini-2.5-flash"));
+        assert_eq!(company.enable_llm_spam_guardrail, Some(true));
 
         // List
         let list = use_cases.list_user_companies(user_id).await.unwrap();
@@ -245,10 +254,11 @@ mod tests {
 
         // Update
         let updated = use_cases
-            .update_company(company.id, "Acme Inc", "acme-inc", None, None, None)
+            .update_company(company.id, "Acme Inc", "acme-inc", None, None, None, Some(false))
             .await
             .unwrap();
         assert_eq!(updated.name, "Acme Inc");
+        assert_eq!(updated.enable_llm_spam_guardrail, Some(false));
 
         // Delete
         use_cases.delete_company(company.id).await.unwrap();

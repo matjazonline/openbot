@@ -66,6 +66,84 @@ Email clients append the entire historical thread below newly typed text. Feedin
 - **Web Dashboard (`/companies/{id}/tasks`):** Interactive HTMX interface allowing company owners to monitor tasks, filter by workflow or status (`pending`, `processing`, `completed`, `failed`, `dead_letter`, `stopped`), and sort by time.
 - **Stop / Resume Controls:** Allows manual task cancellation (dispatches a stop notification email to thread participants) or task resumption.
 
+### 3.6 Multi-Stage Spam & Content Security Engine
+- **Workflow & Participant Resolution:** Upon email arrival, the target `Company` and `Workflow` are resolved from the recipient address (`workflow-slug@company-slug.domain.com`).
+- **Participant Access Control & Spam Check Bypass:** If a workflow defines `participant_emails`, sender authorization is enforced immediately. Messages from unauthorized senders are blocked. Messages from trusted participants bypass all spam scan layers.
+- **Stage 1 (Local Heuristic Scanner - Option B):** Fast, zero-dependency Rust-native engine analyzing email headers, subject trigger patterns (ALL CAPS, urgency keywords, excess punctuation), link shorteners (`bit.ly`, `tinyurl`), and HTML hidden text tricks (runs for public workflows).
+- **Stage 2 (External `SpamScanner` - Option A):** Integrates with external spam analysis daemons via `SpamScannerService`. Supports both **Rspamd** (via HTTP API) and **SpamAssassin** (via `spamd` TCP protocol). Evaluates combined scores against `MAX_SPAM_SCORE` threshold and records metrics (`SmtpStatus::RejectedSpamScore`).
+- **Stage 3 (LLM Spam Guardrail - Option C):** Pre-execution AI security check before main agent execution controlled per `Company` entity (`Company.enable_llm_spam_guardrail`) with system default fallback (`ENABLE_LLM_SPAM_GUARDRAIL=true`). Scans the prompt context using static pattern matchers and low-cost LLM classification to detect prompt injection attempts or malicious intent (runs for public workflows).
+
+#### Inbound Processing & Spam Check Decision Matrix
+
+| Workflow Type | Sender Email (`from`) | Action | Stage 1 & Stage 2 Spam Scanner | Stage 3 LLM Spam Check (Pre-Agent) |
+|---|---|---|---|---|
+| **Restricted** (`participant_emails` set) | **NOT in** `participant_emails` | **Block / Reject Email** (`"Sender unauthorized for workflow"`) | Bypassed / Not Run | Bypassed / Not Run |
+| **Restricted** (`participant_emails` set) | **IN** `participant_emails` | **Accept & Process** | **Bypassed** | **Bypassed** |
+| **Public** (`participant_emails` empty or `None`) | Any sender | **Scan & Process** | **Executed** (Rejects if score $\ge 5.0$) | **Executed** (Pre-execution AI check) |
+
+### Architectural Flow
+
+```
+Inbound Email (SMTP / Webhook)
+       │
+       ▼
+┌────────────────────────────────────────────────────────┐
+│ 1. Resolve Company & Workflow                          │
+│ - Match recipient email to company_slug & workflow_slug│
+└──────────────────────────┬─────────────────────────────┘
+                           │
+             ┌─────────────┴─────────────┐
+             │ Is Workflow Restricted?   │
+             │ (participant_emails set?) │
+             └─────────────┬─────────────┘
+                YES        │        NO (Public Workflow)
+                 │                  │
+     ┌───────────┴───────────┐      │
+     │ Is 'from' email in    │      │
+     │ participant_emails?   │      │
+     └─────┬───────────┬─────┘      │
+        NO │           │ YES        │
+           │           │            │
+           ▼           │            ▼
+┌──────────────────┐   │   ┌──────────────────────────────────────────────┐
+│ REJECT Email     │   │   │ Stage 1: Rust-Native Heuristic Scanner       │
+│ - Unauthorized   │   │   │ Stage 2: External SpamScanner (Option A)     │
+│   Sender         │   │   └──────────────────────┬───────────────────────┘
+└──────────────────┘   │                          │
+                       │            ┌─────────────┴─────────────┐
+                       │            │ `total_spam_score` >= 5.0?│
+                       │            └─────────────┬─────────────┘
+                       │               YES        │        NO
+                       │                │                  │
+                       │                ▼                  ▼
+                       │     ┌──────────────────┐  ┌──────────────────┐
+                       │     │ REJECT Email     │  │ Ingest Email     │
+                       │     │ - Spam Threshold │  └────────┬─────────┘
+                       │     └──────────────────┘           │
+                       │                                    ▼
+                       │                      ┌──────────────────────────┐
+                       │                      │ Stage 3: LLM Spam Check  │
+                       │                      │ (Pre-Agent Execution)    │
+                       │                      └─────────────┬────────────┘
+                       │                                    │
+                       │                       ┌────────────┴────────────┐
+                       │                       │ Guardrail Flagged Spam? │
+                       │                       └────────────┬────────────┘
+                       │                          YES       │        NO
+                       │                           │                 │
+                       │                           ▼                 ▼
+                       │                 ┌──────────────────┐        │
+                       │                 │ Cancel Execution │        │
+                       │                 └──────────────────┘        │
+                       │                                             │
+                       ├─────────────────────────────────────────────┘
+                       │ (Bypass All Spam Checks)
+                       ▼
+┌────────────────────────────────────────────────────────┐
+│ Execute Agent Prompt & Process Thread                  │
+└────────────────────────────────────────────────────────┘
+```
+
 ## Development Setup
 
 ### Database Setup

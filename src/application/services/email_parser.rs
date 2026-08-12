@@ -31,6 +31,7 @@ pub struct ParsedEmail {
     pub trace_workflows: Vec<Uuid>,
     pub spf_status: Option<String>,
     pub dkim_status: Option<String>,
+    pub dmarc_status: Option<String>,
     pub spam_score: Option<f64>,
 }
 
@@ -45,6 +46,7 @@ pub struct RawInboundPayload {
     pub headers: Option<String>,
     pub spf: Option<String>,
     pub dkim: Option<String>,
+    pub dmarc: Option<String>,
     pub spam_score: Option<f64>,
     pub attachments_data: Vec<RawAttachmentData>,
 }
@@ -181,6 +183,7 @@ impl EmailParser {
             trace_workflows,
             spf_status: payload.spf,
             dkim_status: payload.dkim,
+            dmarc_status: payload.dmarc,
             spam_score: payload.spam_score,
         }
     }

@@ -215,13 +215,13 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> { unimplemented!() }
+        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> { unimplemented!() }
         async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
             Ok(self.companies.lock().unwrap().iter().find(|c| c.slug == slug).cloned())
         }
         async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>) -> AppResult<Company> { unimplemented!() }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
@@ -463,6 +463,7 @@ mod tests {
                 api_key: None,
                 provider: None,
                 model: None,
+                enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -506,6 +507,11 @@ mod tests {
             dnsbl_servers: vec![],
             smtp_rate_limit_conns_per_ip: 30,
             reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
         });
 
         let task_persistence = Arc::new(MockTaskPersistence {
@@ -528,7 +534,7 @@ mod tests {
         ));
 
         let app_state = AppState {
-            config,
+            config: config.clone(),
             monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
             user_use_cases: Arc::new(crate::use_cases::user::UserUseCases::new(
                 Arc::new(crate::infra::argon2_password_hasher()),
@@ -541,7 +547,7 @@ mod tests {
                 Arc::new(MockCompanyPersistence { companies: Mutex::new(vec![]) }),
                 Arc::new(MockCompanyInvitePersistence {}),
             )),
-            workflow_use_cases: Arc::new(WorkflowUseCases::new(company_persistence.clone(), workflow_persistence)),
+            workflow_use_cases: Arc::new(WorkflowUseCases::new(company_persistence.clone(), workflow_persistence, config.clone())),
             agent_use_cases: Arc::new(crate::use_cases::agent::AgentUseCases::new(
                 company_persistence,
                 Arc::new(MockAgentPersistence),

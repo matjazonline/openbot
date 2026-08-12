@@ -10,5 +10,6 @@ pub struct Company {
     pub api_key: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
+    pub enable_llm_spam_guardrail: Option<bool>,
     pub created_at: chrono::NaiveDateTime,
 }
