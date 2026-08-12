@@ -263,7 +263,7 @@ mod tests {
         async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> { unimplemented!() }
         async fn get_by_company_slug_and_workflow_slug(&self, _company_slug: &str, _workflow_slug: &str) -> AppResult<Option<Workflow>> { unimplemented!() }
-        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { unimplemented!() }
+        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { Ok(vec![]) }
         async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
@@ -560,6 +560,8 @@ mod tests {
             workflow: Some(workflow),
             parsed_email: Some(parsed_email),
             task_id: None,
+            workflow_matches: vec![],
+            bounce_info: None,
         };
 
         let payload_json = serde_json::to_value(&ingest).unwrap();

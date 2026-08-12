@@ -410,7 +410,7 @@ pub fn extract_email_address(input: &str) -> String {
     email_addr.trim().to_lowercase()
 }
 
-pub fn parse_recipient_address(to_str: &str, app_domain_name: &str) -> Option<(String, String)> {
+pub fn parse_recipient_address_pipeline(to_str: &str, app_domain_name: &str) -> Option<(String, Vec<String>)> {
     let email_addr = if let (Some(start), Some(end)) = (to_str.find('<'), to_str.rfind('>')) {
         if start < end {
             &to_str[start + 1..end]
@@ -427,10 +427,10 @@ pub fn parse_recipient_address(to_str: &str, app_domain_name: &str) -> Option<(S
         return None;
     }
 
-    let workflow_slug = parts[0].trim();
+    let workflow_part = parts[0].trim();
     let domain_part = parts[1].trim();
 
-    if workflow_slug.is_empty() || domain_part.is_empty() {
+    if workflow_part.is_empty() || domain_part.is_empty() {
         return None;
     }
 
@@ -451,7 +451,65 @@ pub fn parse_recipient_address(to_str: &str, app_domain_name: &str) -> Option<(S
         return None;
     }
 
-    Some((company_slug.to_string(), workflow_slug.to_string()))
+    let workflow_slugs: Vec<String> = workflow_part
+        .split('+')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    if workflow_slugs.is_empty() {
+        return None;
+    }
+
+    Some((company_slug.to_string(), workflow_slugs))
+}
+
+pub fn parse_recipient_address(to_str: &str, app_domain_name: &str) -> Option<(String, String)> {
+    parse_recipient_address_pipeline(to_str, app_domain_name)
+        .map(|(company, workflows)| (company, workflows[0].clone()))
+}
+
+pub fn levenshtein_distance(a: &str, b: &str) -> usize {
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let m = a_chars.len();
+    let n = b_chars.len();
+
+    let mut dp = vec![vec![0; n + 1]; m + 1];
+
+    for i in 0..=m {
+        dp[i][0] = i;
+    }
+    for j in 0..=n {
+        dp[0][j] = j;
+    }
+
+    for i in 1..=m {
+        for j in 1..=n {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            dp[i][j] = (dp[i - 1][j] + 1)
+                .min(dp[i][j - 1] + 1)
+                .min(dp[i - 1][j - 1] + cost);
+        }
+    }
+
+    dp[m][n]
+}
+
+pub fn find_similar_workflow_slugs(target: &str, available: &[Workflow]) -> Vec<String> {
+    let target_clean = target.trim().to_lowercase();
+    let mut matches: Vec<(usize, String)> = Vec::new();
+
+    for wf in available {
+        let dist = levenshtein_distance(&target_clean, &wf.slug.to_lowercase());
+        let max_dist = (wf.slug.len() / 2).max(2);
+        if dist <= max_dist && dist > 0 {
+            matches.push((dist, wf.slug.clone()));
+        }
+    }
+
+    matches.sort_by_key(|(d, _)| *d);
+    matches.into_iter().map(|(_, slug)| slug).collect()
 }
 
 #[cfg(test)]
@@ -779,6 +837,15 @@ mod tests {
         assert_eq!(company_slug, "wf-corp");
         assert_eq!(workflow_slug, "inbound-email");
 
+        // Chained pipeline email format
+        let (company_slug, workflow_slugs) = parse_recipient_address_pipeline(
+            "support+billing+legal@acme.mailagents.com",
+            app_domain,
+        )
+        .unwrap();
+        assert_eq!(company_slug, "acme");
+        assert_eq!(workflow_slugs, vec!["support", "billing", "legal"]);
+
         // Localhost app domain
         let (company_slug, workflow_slug) =
             parse_recipient_address("trigger@my-company.localhost", "localhost").unwrap();
@@ -788,6 +855,48 @@ mod tests {
         // Invalid formats
         assert!(parse_recipient_address("invalid-email", app_domain).is_none());
         assert!(parse_recipient_address("support@mailagents.com", app_domain).is_none());
+    }
+
+    #[test]
+    fn test_levenshtein_and_fuzzy_workflow_suggestions() {
+        assert_eq!(levenshtein_distance("suppport", "support"), 1);
+        assert_eq!(levenshtein_distance("biling", "billing"), 1);
+
+        let company_id = uuid::Uuid::new_v4();
+        let available = vec![
+            Workflow {
+                id: uuid::Uuid::new_v4(),
+                company_id,
+                name: "Support".to_string(),
+                slug: "support".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                participant_emails: None,
+                agent_ids: None,
+                workflow_config: None,
+                created_at: chrono::Utc::now().naive_utc(),
+            },
+            Workflow {
+                id: uuid::Uuid::new_v4(),
+                company_id,
+                name: "Billing".to_string(),
+                slug: "billing".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                participant_emails: None,
+                agent_ids: None,
+                workflow_config: None,
+                created_at: chrono::Utc::now().naive_utc(),
+            },
+        ];
+
+        let suggestions = find_similar_workflow_slugs("suppport", &available);
+        assert_eq!(suggestions, vec!["support"]);
+
+        let suggestions_biling = find_similar_workflow_slugs("biling", &available);
+        assert_eq!(suggestions_biling, vec!["billing"]);
     }
 
     #[tokio::test]

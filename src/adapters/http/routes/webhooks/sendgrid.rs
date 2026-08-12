@@ -136,6 +136,12 @@ async fn sendgrid_inbound_webhook(
                 warn!("Background agent execution failed: {err}");
             }
         });
+    } else {
+        let thread_use_cases_bg = thread_use_cases.clone();
+        let ingest_bg = ingest.clone();
+        tokio::spawn(async move {
+            thread_use_cases_bg.handle_bounce_dispatch(&ingest_bg).await;
+        });
     }
 
     let result = serde_json::json!({
@@ -236,7 +242,7 @@ mod tests {
         async fn get_by_company_slug_and_workflow_slug(&self, _company_slug: &str, workflow_slug: &str) -> AppResult<Option<Workflow>> {
             Ok(self.workflows.lock().unwrap().iter().find(|w| w.slug == workflow_slug).cloned())
         }
-        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { unimplemented!() }
+        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { Ok(self.workflows.lock().unwrap().clone()) }
         async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }

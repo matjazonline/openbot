@@ -27,7 +27,7 @@ use crate::{
         agent::AgentPersistence,
         approval::ApprovalUseCases,
         company::CompanyPersistence,
-        workflow::{WorkflowPersistence, parse_recipient_address},
+        workflow::{WorkflowPersistence, parse_recipient_address_pipeline, find_similar_workflow_slugs},
     },
 };
 
@@ -157,86 +157,11 @@ impl ThreadUseCases {
                 "Duplicate Message-ID already processed",
             ));
         }
-        let recipient_str = parsed.recipients_to.first().cloned().unwrap_or_default();
-        let recipient_parse = parse_recipient_address(&recipient_str, &self.config.app_domain_name);
 
-        let (company_slug, workflow_slug) = match recipient_parse {
-            Some(res) => res,
-            None => {
-                warn!("Invalid recipient address format: '{}'", recipient_str);
-                return Ok(InboundIngestResult::rejected(
-                    "Invalid recipient address format",
-                ));
-            }
-        };
-
-        let company = self.company_persistence.get_by_slug(&company_slug).await?;
-        let workflow = self
-            .workflow_persistence
-            .get_by_company_slug_and_workflow_slug(&company_slug, &workflow_slug)
-            .await?;
-
-        let (company, workflow) = match (company, workflow) {
-            (Some(c), Some(w)) => (c, w),
-            _ => {
-                warn!(
-                    "Company '{}' or Workflow '{}' not found",
-                    company_slug, workflow_slug
-                );
-                return Ok(InboundIngestResult::rejected(
-                    "Company or Workflow not found",
-                ));
-            }
-        };
-
-        // ACL Check & Participant Validation FIRST
         let is_inter_workflow = parsed.workflow_id_header.is_some()
             || parsed
                 .sender
                 .ends_with(&format!(".{}", self.config.app_domain_name));
-
-        let is_participant = if let Some(ref allowed) = workflow.participant_emails {
-            if !allowed.is_empty() {
-                allowed
-                    .iter()
-                    .any(|e| e.eq_ignore_ascii_case(parsed.sender.trim()))
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        let has_participant_restriction = workflow
-            .participant_emails
-            .as_ref()
-            .map(|allowed| !allowed.is_empty())
-            .unwrap_or(false);
-
-        if has_participant_restriction && !is_participant && !is_inter_workflow {
-            warn!(
-                "Sender '{}' unauthorized for workflow '{}'",
-                parsed.sender, workflow.slug
-            );
-            return Ok(InboundIngestResult::rejected(
-                "Sender unauthorized for workflow",
-            ));
-        }
-
-        // Spam score threshold check (skipped for trusted workflow participants)
-        if !is_participant {
-            if let Some(score) = parsed.spam_score {
-                if score >= self.config.max_spam_score {
-                    warn!(
-                        "Message-ID '{}' rejected due to high spam score ({:.2} >= {:.2})",
-                        parsed.message_id, score, self.config.max_spam_score
-                    );
-                    return Ok(InboundIngestResult::rejected(
-                        "Spam score threshold exceeded",
-                    ));
-                }
-            }
-        }
 
         // Global SPF / DKIM / DMARC authentication verification check
         if !is_inter_workflow {
@@ -260,30 +185,18 @@ impl ThreadUseCases {
             }
         }
 
-        // Loop Guard Engine & Inter-Workflow Guards
-        if is_inter_workflow {
-            // Hop limit check
-            if parsed.hop_count >= MAX_WORKFLOW_HOPS {
-                warn!(
-                    "Max inter-workflow hop count ({}) reached for Message-ID: {}",
-                    parsed.hop_count, parsed.message_id
-                );
-                return Ok(InboundIngestResult::rejected(
-                    "Max inter-workflow hop count reached",
-                ));
-            }
+        // Inter-workflow hop limit check
+        if is_inter_workflow && parsed.hop_count >= MAX_WORKFLOW_HOPS {
+            warn!(
+                "Max inter-workflow hop count ({}) reached for Message-ID: {}",
+                parsed.hop_count, parsed.message_id
+            );
+            return Ok(InboundIngestResult::rejected(
+                "Max inter-workflow hop count reached",
+            ));
+        }
 
-            // Cycle detection
-            if parsed.trace_workflows.contains(&workflow.id) {
-                warn!(
-                    "Inter-workflow cycle detected for workflow '{}' in Message-ID: {}",
-                    workflow.id, parsed.message_id
-                );
-                return Ok(InboundIngestResult::rejected(
-                    "Inter-workflow loop cycle detected",
-                ));
-            }
-        } else if parsed.is_auto_reply {
+        if !is_inter_workflow && parsed.is_auto_reply {
             warn!(
                 "External auto-reply loop detected for Message-ID: {}, dropping message",
                 parsed.message_id
@@ -293,149 +206,290 @@ impl ThreadUseCases {
             ));
         }
 
-        // Thread Resolution (RFC 5322 Message-ID / References OR Outlook Thread-Index)
-        let mut lookup_ids = Vec::new();
-        if let Some(ref reply_id) = parsed.in_reply_to {
-            lookup_ids.push(reply_id.clone());
-        }
-        lookup_ids.extend(parsed.references.clone());
-
-        let mut existing_thread = if !lookup_ids.is_empty() {
-            self.thread_persistence
-                .find_thread_by_message_ids(&lookup_ids)
-                .await?
-        } else {
-            None
-        };
-
-        // Fallback to Outlook Thread-Index
-        if existing_thread.is_none() {
-            if let Some(ref idx) = parsed.thread_index {
-                existing_thread = self
-                    .thread_persistence
-                    .find_thread_by_thread_index(idx)
-                    .await?;
-            }
-        }
-
-        let thread = match existing_thread {
-            Some(t) if t.workflow_id == workflow.id => t,
-            _ => {
-                let mut participants = vec![parsed.sender.clone()];
-                participants.extend(parsed.recipients_cc.clone());
-                participants.dedup();
-
-                self.thread_persistence
-                    .create_thread(workflow.id, &parsed.subject, &participants)
-                    .await?
-            }
-        };
-
-        // Thread Turn Limit Check (Max 20 messages / hour per thread)
-        let recent_count = self
-            .thread_persistence
-            .count_recent_messages(thread.id, 3600)
-            .await?;
-        if recent_count >= MAX_THREAD_MESSAGES_PER_HOUR {
-            warn!(
-                "Thread turn limit ({}/hr) exceeded for thread_id {}, dropping response to prevent ping-pong loop",
-                recent_count, thread.id
-            );
-            return Ok(InboundIngestResult::rejected("Thread turn limit exceeded"));
-        }
-
-        // Update thread participants
-        let mut current_participants = thread.participant_emails.clone();
-        let mut participant_added = false;
-        if !current_participants
-            .iter()
-            .any(|p| p.eq_ignore_ascii_case(&parsed.sender))
-        {
-            current_participants.push(parsed.sender.clone());
-            participant_added = true;
+        // Collect all target recipient candidates (To first, then CC)
+        let mut candidates = Vec::new();
+        for to in &parsed.recipients_to {
+            candidates.push((to.clone(), RecipientRole::To));
         }
         for cc in &parsed.recipients_cc {
-            if !current_participants
-                .iter()
-                .any(|p| p.eq_ignore_ascii_case(cc))
-            {
-                current_participants.push(cc.clone());
-                participant_added = true;
+            candidates.push((cc.clone(), RecipientRole::Cc));
+        }
+
+        let mut candidate_matches: Vec<(Company, Workflow, RecipientRole, usize, usize)> = Vec::new();
+        let mut seen_workflows = std::collections::HashSet::new();
+        let mut unauthorized_count = 0;
+
+        let mut invalid_slugs = Vec::new();
+        let mut bounce_suggestions = Vec::new();
+        let mut matched_company_slug: Option<String> = None;
+
+        for (addr, role) in candidates {
+            if let Some((company_slug, workflow_slugs)) = parse_recipient_address_pipeline(&addr, &self.config.app_domain_name) {
+                matched_company_slug = Some(company_slug.clone());
+                let company_opt = self.company_persistence.get_by_slug(&company_slug).await.ok().flatten();
+
+                if let Some(company) = company_opt {
+                    let available_workflows = self.workflow_persistence.list_by_company_id(company.id).await.unwrap_or_default();
+                    let total_steps = workflow_slugs.len();
+
+                    for (step_idx, workflow_slug) in workflow_slugs.into_iter().enumerate() {
+                        let matched_wf = available_workflows.iter().find(|w| w.slug.eq_ignore_ascii_case(&workflow_slug)).cloned();
+
+                        if let Some(workflow) = matched_wf {
+                            if seen_workflows.contains(&workflow.id) {
+                                continue;
+                            }
+
+                            // Inter-workflow cycle detection
+                            if is_inter_workflow && parsed.trace_workflows.contains(&workflow.id) {
+                                warn!(
+                                    "Inter-workflow cycle detected for workflow '{}' in Message-ID: {}",
+                                    workflow.id, parsed.message_id
+                                );
+                                return Ok(InboundIngestResult::rejected(
+                                    "Inter-workflow loop cycle detected",
+                                ));
+                            }
+
+                            // ACL & Participant Restriction Check
+                            let is_participant = if let Some(ref allowed) = workflow.participant_emails {
+                                if !allowed.is_empty() {
+                                    allowed.iter().any(|e| e.eq_ignore_ascii_case(parsed.sender.trim()))
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            };
+
+                            let has_participant_restriction = workflow
+                                .participant_emails
+                                .as_ref()
+                                .map(|allowed| !allowed.is_empty())
+                                .unwrap_or(false);
+
+                            if has_participant_restriction && !is_participant && !is_inter_workflow {
+                                warn!(
+                                    "Sender '{}' unauthorized for workflow '{}'",
+                                    parsed.sender, workflow.slug
+                                );
+                                unauthorized_count += 1;
+                                continue;
+                            }
+
+                            // Spam score check
+                            if !is_participant {
+                                if let Some(score) = parsed.spam_score {
+                                    if score >= self.config.max_spam_score {
+                                        warn!(
+                                            "Message-ID '{}' rejected due to high spam score ({:.2} >= {:.2})",
+                                            parsed.message_id, score, self.config.max_spam_score
+                                        );
+                                        return Ok(InboundIngestResult::rejected(
+                                            "Spam score threshold exceeded",
+                                        ));
+                                    }
+                                }
+                            }
+
+                            seen_workflows.insert(workflow.id);
+                            candidate_matches.push((company.clone(), workflow, role, step_idx, total_steps));
+                        } else {
+                            // Misspelled / Invalid workflow slug found
+                            let suggestions = find_similar_workflow_slugs(&workflow_slug, &available_workflows);
+                            invalid_slugs.push(workflow_slug.clone());
+                            bounce_suggestions.push(BounceSuggestion {
+                                invalid_slug: workflow_slug,
+                                suggestions,
+                            });
+                        }
+                    }
+                }
             }
         }
-        let thread = if participant_added {
-            self.thread_persistence
-                .update_thread_participants(thread.id, &current_participants)
-                .await?
-        } else {
-            thread
-        };
 
-        // Fetch thread history for quote stripping fallback
-        let history_messages = self
-            .thread_persistence
-            .list_messages_by_thread_id(thread.id)
-            .await?;
-        let history_clean_bodies: Vec<String> = history_messages
-            .iter()
-            .map(|m| m.clean_text_body.clone())
-            .collect();
+        // Strict pipeline & address validation: If any invalid workflow slug was encountered
+        if !invalid_slugs.is_empty() {
+            let bounce = BounceInfo {
+                recipient_to: parsed.sender.clone(),
+                company_slug: matched_company_slug,
+                invalid_slugs,
+                suggestions: bounce_suggestions,
+                original_subject: parsed.subject.clone(),
+            };
+            return Ok(InboundIngestResult::rejected_with_bounce(
+                "Workflow address not found or misspelled",
+                bounce,
+            ));
+        }
 
-        let clean_text_body = if parsed.is_forwarded {
-            parsed.clean_text_body.clone()
-        } else {
-            EmailParser::strip_historical_quotes_fallback(
-                &parsed.clean_text_body,
-                &history_clean_bodies,
-            )
-        };
+        if candidate_matches.is_empty() {
+            if unauthorized_count > 0 {
+                return Ok(InboundIngestResult::rejected("Sender unauthorized for workflow"));
+            }
+            warn!("No valid company/workflow matched for To: {:?}, CC: {:?}", parsed.recipients_to, parsed.recipients_cc);
+            return Ok(InboundIngestResult::rejected("Company or Workflow not found"));
+        }
 
-        // Role assignment: Agent if from another workflow, Human otherwise
-        let inbound_role = if is_inter_workflow {
-            MessageRole::Agent
-        } else {
-            MessageRole::Human
-        };
+        let mut workflow_matches = Vec::new();
 
-        let inbound_msg_id = Uuid::new_v4();
-        let inbound_message = Message {
-            id: inbound_msg_id,
-            thread_id: thread.id,
-            message_id: parsed.message_id.clone(),
-            in_reply_to: parsed.in_reply_to.clone(),
-            references_list: parsed.references.clone(),
-            sender: parsed.sender.clone(),
-            recipients_to: parsed.recipients_to.clone(),
-            recipients_cc: parsed.recipients_cc.clone(),
-            subject: parsed.subject.clone(),
-            clean_text_body,
-            raw_text_body: parsed.raw_text_body.clone(),
-            raw_html_body: parsed.raw_html_body.clone(),
-            attachments: if parsed.attachments.is_empty() {
-                None
+        for (company, workflow, role, step_idx, total_steps) in candidate_matches {
+            // Thread Resolution
+            let mut lookup_ids = Vec::new();
+            if let Some(ref reply_id) = parsed.in_reply_to {
+                lookup_ids.push(reply_id.clone());
+            }
+            lookup_ids.extend(parsed.references.clone());
+
+            let mut existing_thread = if !lookup_ids.is_empty() {
+                self.thread_persistence
+                    .find_thread_by_message_ids(&lookup_ids)
+                    .await?
             } else {
-                Some(parsed.attachments.clone())
-            },
-            direction: MessageDirection::Inbound,
-            role: inbound_role,
-            thread_index: parsed.thread_index.clone(),
-            created_at: chrono::Utc::now().naive_utc(),
-        };
+                None
+            };
 
-        let saved_inbound = self
-            .thread_persistence
-            .create_message(&inbound_message)
-            .await?;
+            if existing_thread.is_none() {
+                if let Some(ref idx) = parsed.thread_index {
+                    existing_thread = self
+                        .thread_persistence
+                        .find_thread_by_thread_index(idx)
+                        .await?;
+                }
+            }
+
+            let thread = match existing_thread {
+                Some(t) if t.workflow_id == workflow.id => t,
+                _ => {
+                    let mut participants = vec![parsed.sender.clone()];
+                    participants.extend(parsed.recipients_cc.clone());
+                    participants.dedup();
+
+                    self.thread_persistence
+                        .create_thread(workflow.id, &parsed.subject, &participants)
+                        .await?
+                }
+            };
+
+            // Thread Turn Limit Check
+            let recent_count = self
+                .thread_persistence
+                .count_recent_messages(thread.id, 3600)
+                .await?;
+            if recent_count >= MAX_THREAD_MESSAGES_PER_HOUR {
+                warn!(
+                    "Thread turn limit ({}/hr) exceeded for thread_id {}, dropping response to prevent ping-pong loop",
+                    recent_count, thread.id
+                );
+                return Ok(InboundIngestResult::rejected("Thread turn limit exceeded"));
+            }
+
+            // Update thread participants
+            let mut current_participants = thread.participant_emails.clone();
+            let mut participant_added = false;
+            if !current_participants
+                .iter()
+                .any(|p| p.eq_ignore_ascii_case(&parsed.sender))
+            {
+                current_participants.push(parsed.sender.clone());
+                participant_added = true;
+            }
+            for cc in &parsed.recipients_cc {
+                if !current_participants
+                    .iter()
+                    .any(|p| p.eq_ignore_ascii_case(cc))
+                {
+                    current_participants.push(cc.clone());
+                    participant_added = true;
+                }
+            }
+            let thread = if participant_added {
+                self.thread_persistence
+                    .update_thread_participants(thread.id, &current_participants)
+                    .await?
+            } else {
+                thread
+            };
+
+            // Fetch thread history for quote stripping fallback
+            let history_messages = self
+                .thread_persistence
+                .list_messages_by_thread_id(thread.id)
+                .await?;
+            let history_clean_bodies: Vec<String> = history_messages
+                .iter()
+                .map(|m| m.clean_text_body.clone())
+                .collect();
+
+            let clean_text_body = if parsed.is_forwarded {
+                parsed.clean_text_body.clone()
+            } else {
+                EmailParser::strip_historical_quotes_fallback(
+                    &parsed.clean_text_body,
+                    &history_clean_bodies,
+                )
+            };
+
+            let inbound_role = if is_inter_workflow {
+                MessageRole::Agent
+            } else {
+                MessageRole::Human
+            };
+
+            let inbound_msg_id = Uuid::new_v4();
+            let inbound_message = Message {
+                id: inbound_msg_id,
+                thread_id: thread.id,
+                message_id: parsed.message_id.clone(),
+                in_reply_to: parsed.in_reply_to.clone(),
+                references_list: parsed.references.clone(),
+                sender: parsed.sender.clone(),
+                recipients_to: parsed.recipients_to.clone(),
+                recipients_cc: parsed.recipients_cc.clone(),
+                subject: parsed.subject.clone(),
+                clean_text_body,
+                raw_text_body: parsed.raw_text_body.clone(),
+                raw_html_body: parsed.raw_html_body.clone(),
+                attachments: if parsed.attachments.is_empty() {
+                    None
+                } else {
+                    Some(parsed.attachments.clone())
+                },
+                direction: MessageDirection::Inbound,
+                role: inbound_role,
+                thread_index: parsed.thread_index.clone(),
+                created_at: chrono::Utc::now().naive_utc(),
+            };
+
+            let saved_inbound = self
+                .thread_persistence
+                .create_message(&inbound_message)
+                .await?;
+
+            workflow_matches.push(WorkflowMatch {
+                company,
+                workflow,
+                thread,
+                inbound_message: saved_inbound,
+                recipient_role: role,
+                step_index: step_idx,
+                total_steps,
+            });
+        }
+
+        let first = workflow_matches[0].clone();
 
         let mut ingest_result = InboundIngestResult {
             accepted: true,
             reason: None,
-            thread: Some(thread.clone()),
-            inbound_message: Some(saved_inbound.clone()),
-            company: Some(company.clone()),
-            workflow: Some(workflow.clone()),
+            thread: Some(first.thread.clone()),
+            inbound_message: Some(first.inbound_message.clone()),
+            company: Some(first.company.clone()),
+            workflow: Some(first.workflow.clone()),
             parsed_email: Some(parsed.clone()),
             task_id: None,
+            workflow_matches,
+            bounce_info: None,
         };
 
         // Enqueue background task for durable processing & crash recovery
@@ -443,9 +497,9 @@ impl ThreadUseCases {
         if let Ok(task) = self
             .task_persistence
             .enqueue_task(
-                company.id,
-                workflow.id,
-                Some(thread.id),
+                first.company.id,
+                first.workflow.id,
+                Some(first.thread.id),
                 "email_agent_dispatch",
                 payload_json,
             )
@@ -477,91 +531,175 @@ impl ThreadUseCases {
             }
         }
 
-        let (thread, company, workflow, parsed) = match (
-            &ingest.thread,
+        let parsed = match &ingest.parsed_email {
+            Some(p) => p,
+            None => return Ok(None),
+        };
+
+        let matches: Vec<WorkflowMatch> = if !ingest.workflow_matches.is_empty() {
+            ingest.workflow_matches.clone()
+        } else if let (Some(c), Some(w), Some(t), Some(m)) = (
             &ingest.company,
             &ingest.workflow,
-            &ingest.parsed_email,
+            &ingest.thread,
+            &ingest.inbound_message,
         ) {
-            (Some(t), Some(c), Some(w), Some(p)) => (t, c, w, p),
-            _ => return Ok(None),
+            vec![WorkflowMatch {
+                company: c.clone(),
+                workflow: w.clone(),
+                thread: t.clone(),
+                inbound_message: m.clone(),
+                recipient_role: RecipientRole::To,
+                step_index: 0,
+                total_steps: 1,
+            }]
+        } else {
+            return Ok(None);
         };
 
-        let history_messages = self
-            .thread_persistence
-            .list_messages_by_thread_id(thread.id)
-            .await?;
+        let mut agent_outputs: Vec<(&WorkflowMatch, String, Option<String>)> = Vec::new();
+        let mut total_prompt_tokens = 0usize;
+        let mut total_completion_tokens = 0usize;
+        let mut primary_execution_error = None;
+        let mut primary_resolved_params = None;
+        let mut primary_agent = None;
 
-        let approver_email = workflow
-            .participant_emails
-            .as_ref()
-            .and_then(|p| p.first().cloned())
-            .unwrap_or_else(|| parsed.sender.clone());
+        for (idx, m) in matches.iter().enumerate() {
+            let history_messages = self
+                .thread_persistence
+                .list_messages_by_thread_id(m.thread.id)
+                .await?;
 
-        let approval_ctx = AgentRunnerApprovalContext {
-            company_id: company.id,
-            workflow_id: workflow.id,
-            workflow_name: workflow.name.clone(),
-            workflow_slug: workflow.slug.clone(),
-            company_slug: company.slug.clone(),
-            thread_id: Some(thread.id),
-            task_id: None,
-            approver_email,
-        };
+            let approver_email = m
+                .workflow
+                .participant_emails
+                .as_ref()
+                .and_then(|p| p.first().cloned())
+                .unwrap_or_else(|| parsed.sender.clone());
 
-        let first_agent = if let Some(ref ap) = self.agent_persistence {
-            if let Some(&agent_id) = workflow.agent_ids.as_ref().and_then(|ids| ids.first()) {
-                ap.get_by_id(agent_id).await.ok().flatten()
+            let approval_ctx = AgentRunnerApprovalContext {
+                company_id: m.company.id,
+                workflow_id: m.workflow.id,
+                workflow_name: m.workflow.name.clone(),
+                workflow_slug: m.workflow.slug.clone(),
+                company_slug: m.company.slug.clone(),
+                thread_id: Some(m.thread.id),
+                task_id: None,
+                approver_email,
+            };
+
+            let first_agent = if let Some(ref ap) = self.agent_persistence {
+                if let Some(&agent_id) = m.workflow.agent_ids.as_ref().and_then(|ids| ids.first()) {
+                    ap.get_by_id(agent_id).await.ok().flatten()
+                } else {
+                    None
+                }
             } else {
                 None
+            };
+
+            let resolved_params_res = ResolvedAgentParams::new(Some(&m.company), Some(&m.workflow), first_agent.as_ref());
+            if idx == 0 {
+                primary_resolved_params = resolved_params_res.as_ref().ok().cloned();
+                primary_agent = first_agent.clone();
             }
-        } else {
-            None
-        };
 
-        // Resolve AI Agent parameters and execute
-        let resolved_params_res = ResolvedAgentParams::new(Some(company), Some(workflow), first_agent.as_ref());
-
-        let is_participant = if let Some(ref allowed) = workflow.participant_emails {
-            if !allowed.is_empty() {
-                allowed
-                    .iter()
-                    .any(|e| e.eq_ignore_ascii_case(parsed.sender.trim()))
+            let is_participant = if let Some(ref allowed) = m.workflow.participant_emails {
+                if !allowed.is_empty() {
+                    allowed
+                        .iter()
+                        .any(|e| e.eq_ignore_ascii_case(parsed.sender.trim()))
+                } else {
+                    false
+                }
             } else {
                 false
+            };
+
+            let mut upstream_context = String::new();
+            if !agent_outputs.is_empty() {
+                for (prev_m, prev_content, _) in &agent_outputs {
+                    upstream_context.push_str(&format!(
+                        "--- Step {step_num}: {name} ({slug}) ---\n{content}\n\n",
+                        step_num = prev_m.step_index + 1,
+                        name = prev_m.workflow.name,
+                        slug = prev_m.workflow.slug,
+                        content = prev_content
+                    ));
+                }
             }
+
+            let upstream_ctx_opt = if !upstream_context.is_empty() {
+                Some(upstream_context)
+            } else {
+                None
+            };
+
+            let runner_res = match &resolved_params_res {
+                Ok(resolved_params) => {
+                    AgentRunner::new(&parsed.prompt_text, resolved_params)
+                        .history(&history_messages)
+                        .approval_use_cases(self.approval_use_cases.clone())
+                        .approval_context(Some(approval_ctx))
+                        .monitoring(self.monitoring.clone())
+                        .config(Some(self.config.clone()))
+                        .company(Some(m.company.clone()))
+                        .skip_spam_guardrail(is_participant)
+                        .recipient_role(Some(m.recipient_role))
+                        .upstream_pipeline_context(upstream_ctx_opt)
+                        .ids(
+                            Some(m.company.id),
+                            Some(m.workflow.id),
+                            first_agent.as_ref().map(|a| a.id),
+                        )
+                        .execute()
+                        .await
+                }
+                Err(err) => Err(anyhow::anyhow!("{err}")),
+            };
+
+            match runner_res {
+                Ok(output) => {
+                    total_prompt_tokens += output.token_usage.prompt_tokens;
+                    total_completion_tokens += output.token_usage.completion_tokens;
+                    agent_outputs.push((m, output.content, None::<String>));
+                }
+                Err(err) => {
+                    let err_msg = format!("Agent execution failed: {err}");
+                    if idx == 0 {
+                        primary_execution_error = Some(err_msg.clone());
+                    }
+                    agent_outputs.push((m, err_msg.clone(), Some(err_msg)));
+                }
+            }
+        }
+
+        // Concatenate Responses
+        let combined_agent_response = if agent_outputs.len() == 1 {
+            agent_outputs[0].1.clone()
         } else {
-            false
+            let mut pieces = Vec::new();
+            for (m, resp, _) in &agent_outputs {
+                let role_label = match m.recipient_role {
+                    RecipientRole::To => "TO",
+                    RecipientRole::Cc => "CC",
+                };
+                let header = format!(
+                    "[{name} ({slug}@{comp}.{domain}) - {role_label}]",
+                    name = m.workflow.name,
+                    slug = m.workflow.slug,
+                    comp = m.company.slug,
+                    domain = self.config.app_domain_name,
+                    role_label = role_label
+                );
+                pieces.push(format!("{}\n{}", header, resp));
+            }
+            pieces.join("\n\n--------------------------------------------------\n\n")
         };
 
-        let runner_res = match &resolved_params_res {
-            Ok(resolved_params) => {
-                AgentRunner::new(&parsed.prompt_text, resolved_params)
-                    .history(&history_messages)
-                    .approval_use_cases(self.approval_use_cases.clone())
-                    .approval_context(Some(approval_ctx))
-                    .monitoring(self.monitoring.clone())
-                    .config(Some(self.config.clone()))
-                    .company(Some(company.clone()))
-                    .skip_spam_guardrail(is_participant)
-                    .ids(
-                        Some(company.id),
-                        Some(workflow.id),
-                        first_agent.as_ref().map(|a| a.id),
-                    )
-                    .execute()
-                    .await
-            }
-            Err(err) => Err(anyhow::anyhow!("{err}")),
-        };
-
-        let (agent_response, token_usage, execution_error) = match runner_res {
-            Ok(output) => (output.content, Some(output.token_usage), None),
-            Err(err) => {
-                let err_msg = format!("Agent execution failed: {err}");
-                (err_msg.clone(), None, Some(err_msg))
-            }
-        };
+        let primary_match = &matches[0];
+        let primary_workflow = &primary_match.workflow;
+        let primary_company = &primary_match.company;
 
         let (
             sent_message_id,
@@ -582,7 +720,7 @@ impl ThreadUseCases {
             }
 
             let mut outbound_cc = parsed.recipients_cc.clone();
-            if let Some(ref wf_participants) = workflow.participant_emails {
+            if let Some(ref wf_participants) = primary_workflow.participant_emails {
                 for p in wf_participants {
                     if !p.eq_ignore_ascii_case(&parsed.sender) && !outbound_cc.contains(p) {
                         outbound_cc.push(p.clone());
@@ -591,16 +729,16 @@ impl ThreadUseCases {
             }
 
             let outbound_email = OutboundEmail {
-                workflow_id: workflow.id,
-                workflow_name: workflow.name.clone(),
-                workflow_slug: workflow.slug.clone(),
-                company_slug: company.slug.clone(),
+                workflow_id: primary_workflow.id,
+                workflow_name: primary_workflow.name.clone(),
+                workflow_slug: primary_workflow.slug.clone(),
+                company_slug: primary_company.slug.clone(),
                 trigger_message_id: parsed.message_id.clone(),
                 thread_references: references_for_outbound,
                 recipient_to: parsed.sender.clone(),
                 recipients_cc: outbound_cc,
                 subject: parsed.subject.clone(),
-                body_text: agent_response.clone(),
+                body_text: combined_agent_response.clone(),
                 hop_count: parsed.hop_count,
                 trace_workflows: parsed.trace_workflows.clone(),
             };
@@ -624,7 +762,7 @@ impl ThreadUseCases {
             );
             let from_email = format!(
                 "{}@{}.{}",
-                workflow.slug, company.slug, self.config.app_domain_name
+                primary_workflow.slug, primary_company.slug, self.config.app_domain_name
             );
             info!(
                 "Simulation test mode (Run_Test): Skipped SMTP email dispatch for Message-ID {}",
@@ -646,36 +784,38 @@ impl ThreadUseCases {
             )
         };
 
-        // Save Outbound Agent Message
-        let outbound_msg_id = Uuid::new_v4();
-        let outbound_message = Message {
-            id: outbound_msg_id,
-            thread_id: thread.id,
-            message_id: sent_message_id.clone(),
-            in_reply_to: Some(in_reply_to),
-            references_list: references,
-            sender: from_address,
-            recipients_to,
-            recipients_cc,
-            subject,
-            clean_text_body: agent_response.clone(),
-            raw_text_body: None,
-            raw_html_body: None,
-            attachments: None,
-            direction: MessageDirection::Outbound,
-            role: MessageRole::Agent,
-            thread_index: None,
-            created_at: chrono::Utc::now().naive_utc(),
-        };
+        // Save Outbound Agent Message into each matched thread
+        for m in &matches {
+            let outbound_msg_id = Uuid::new_v4();
+            let outbound_message = Message {
+                id: outbound_msg_id,
+                thread_id: m.thread.id,
+                message_id: sent_message_id.clone(),
+                in_reply_to: Some(in_reply_to.clone()),
+                references_list: references.clone(),
+                sender: from_address.clone(),
+                recipients_to: recipients_to.clone(),
+                recipients_cc: recipients_cc.clone(),
+                subject: subject.clone(),
+                clean_text_body: combined_agent_response.clone(),
+                raw_text_body: None,
+                raw_html_body: None,
+                attachments: None,
+                direction: MessageDirection::Outbound,
+                role: MessageRole::Agent,
+                thread_index: None,
+                created_at: chrono::Utc::now().naive_utc(),
+            };
 
-        let _ = self
-            .thread_persistence
-            .create_message(&outbound_message)
-            .await?;
+            let _ = self
+                .thread_persistence
+                .create_message(&outbound_message)
+                .await?;
+        }
 
         if let Some(task_id) = ingest.task_id {
-            let exec_params = match &resolved_params_res {
-                Ok(p) => {
+            let exec_params = match &primary_resolved_params {
+                Some(p) => {
                     let mut cfg = p.config().clone();
                     if let Some(obj) = cfg.as_object_mut() {
                         if obj.contains_key("api_key") {
@@ -690,14 +830,14 @@ impl ThreadUseCases {
                     serde_json::json!({
                         "provider": p.provider(),
                         "model": p.model(),
-                        "agent_id": first_agent.as_ref().map(|a| a.id),
-                        "agent_name": first_agent.as_ref().map(|a| a.name.as_str()),
+                        "agent_id": primary_agent.as_ref().map(|a| a.id),
+                        "agent_name": primary_agent.as_ref().map(|a| a.name.as_str()),
                         "prompt": parsed.prompt_text,
                         "config": cfg,
                         "executed_at": chrono::Utc::now().naive_utc().to_string(),
                     })
                 }
-                Err(_) => serde_json::json!({
+                None => serde_json::json!({
                     "prompt": parsed.prompt_text,
                     "executed_at": chrono::Utc::now().naive_utc().to_string(),
                 }),
@@ -707,17 +847,17 @@ impl ThreadUseCases {
             if let Some(obj) = updated_payload.as_object_mut() {
                 obj.insert("execution_parameters".to_string(), exec_params);
                 obj.insert("execution_result".to_string(), serde_json::json!({
-                    "response": agent_response.clone(),
+                    "response": combined_agent_response.clone(),
                     "email_sent": email_sent,
                     "outbound_message_id": sent_message_id.clone(),
-                    "error": execution_error.clone(),
-                    "token_usage": token_usage.clone(),
+                    "error": primary_execution_error.clone(),
+                    "token_usage": TokenUsage::new(total_prompt_tokens, total_completion_tokens),
                 }));
             }
             let _ = self.task_persistence.update_task_payload(task_id, updated_payload).await;
         }
 
-        if let Some(ref err_msg) = execution_error {
+        if let Some(ref err_msg) = primary_execution_error {
             if let Some(task_id) = ingest.task_id {
                 let next_run = chrono::Utc::now().naive_utc();
                 let _ = self
@@ -734,9 +874,9 @@ impl ThreadUseCases {
 
         Ok(Some(AgentExecutionResult {
             outbound_message_id: Some(sent_message_id),
-            agent_response,
+            agent_response: combined_agent_response,
             email_sent,
-            token_usage,
+            token_usage: Some(TokenUsage::new(total_prompt_tokens, total_completion_tokens)),
         }))
     }
 
@@ -773,12 +913,26 @@ impl ThreadUseCases {
         })
     }
 
+    pub async fn handle_bounce_dispatch(&self, ingest: &InboundIngestResult) {
+        if let Some(ref bounce) = ingest.bounce_info {
+            let bounce_body = format_bounce_email_body(bounce, &self.config.app_domain_name);
+            let _ = OutboundDispatcher::send_bounce(
+                &self.config,
+                &bounce.recipient_to,
+                &bounce.original_subject,
+                &bounce_body,
+            )
+            .await;
+        }
+    }
+
     pub async fn process_and_dispatch_email(
         &self,
         raw_payload: RawInboundPayload,
     ) -> AppResult<ProcessEmailResult> {
         let ingest = self.ingest_and_save_inbound_message(raw_payload).await?;
         if !ingest.accepted {
+            self.handle_bounce_dispatch(&ingest).await;
             return Ok(ProcessEmailResult {
                 processed: false,
                 reason: ingest.reason,
@@ -835,6 +989,83 @@ impl ThreadUseCases {
 
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RecipientRole {
+    To,
+    Cc,
+}
+
+impl RecipientRole {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RecipientRole::To => "to",
+            RecipientRole::Cc => "cc",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowMatch {
+    pub company: Company,
+    pub workflow: Workflow,
+    pub thread: Thread,
+    pub inbound_message: Message,
+    pub recipient_role: RecipientRole,
+    #[serde(default)]
+    pub step_index: usize,
+    #[serde(default)]
+    pub total_steps: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BounceSuggestion {
+    pub invalid_slug: String,
+    pub suggestions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BounceInfo {
+    pub recipient_to: String,
+    pub company_slug: Option<String>,
+    pub invalid_slugs: Vec<String>,
+    pub suggestions: Vec<BounceSuggestion>,
+    pub original_subject: String,
+}
+
+pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String {
+    let mut body = String::new();
+    body.push_str("Undeliverable Mail Notification\n\n");
+    body.push_str("Your email could not be delivered because one or more workflow addresses were not found or misspelled.\n\n");
+
+    if let Some(ref comp) = bounce.company_slug {
+        body.push_str(&format!("Company Domain: {comp}.{app_domain}\n\n"));
+    }
+
+    body.push_str("Details:\n");
+    for s in &bounce.suggestions {
+        let domain_part = bounce
+            .company_slug
+            .as_deref()
+            .map(|c| format!("{c}.{app_domain}"))
+            .unwrap_or_else(|| app_domain.to_string());
+
+        body.push_str(&format!("  - Invalid Workflow Slug: '{}@{}'\n", s.invalid_slug, domain_part));
+        if !s.suggestions.is_empty() {
+            body.push_str("    Did you mean:\n");
+            for sug in &s.suggestions {
+                body.push_str(&format!("      * {sug}@{domain_part}\n"));
+            }
+        } else {
+            body.push_str("    No similar workflow suggestions found.\n");
+        }
+        body.push('\n');
+    }
+
+    body.push_str("Please check the workflow address and try sending your email again.\n");
+    body
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InboundIngestResult {
     pub accepted: bool,
@@ -845,6 +1076,10 @@ pub struct InboundIngestResult {
     pub workflow: Option<Workflow>,
     pub parsed_email: Option<ParsedEmail>,
     pub task_id: Option<Uuid>,
+    #[serde(default)]
+    pub workflow_matches: Vec<WorkflowMatch>,
+    #[serde(default)]
+    pub bounce_info: Option<BounceInfo>,
 }
 
 impl InboundIngestResult {
@@ -858,6 +1093,23 @@ impl InboundIngestResult {
             workflow: None,
             parsed_email: None,
             task_id: None,
+            workflow_matches: Vec::new(),
+            bounce_info: None,
+        }
+    }
+
+    pub fn rejected_with_bounce(reason: &str, bounce: BounceInfo) -> Self {
+        Self {
+            accepted: false,
+            reason: Some(reason.to_string()),
+            thread: None,
+            inbound_message: None,
+            company: None,
+            workflow: None,
+            parsed_email: None,
+            task_id: None,
+            workflow_matches: Vec::new(),
+            bounce_info: Some(bounce),
         }
     }
 }
@@ -967,8 +1219,15 @@ mod tests {
                 .find(|w| w.slug == workflow_slug)
                 .cloned())
         }
-        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> {
-            unimplemented!()
+        async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Workflow>> {
+            Ok(self
+                .workflows
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|w| w.company_id == company_id)
+                .cloned()
+                .collect())
         }
         async fn update(
             &self,
@@ -1823,5 +2082,491 @@ mod tests {
 
         assert!(result.accepted);
         assert!(result.thread.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_workflow_in_cc_resolves_properly() {
+        let company_id = Uuid::new_v4();
+        let workflow_id = Uuid::new_v4();
+
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![Company {
+                id: company_id,
+                user_id: Uuid::new_v4(),
+                name: "Acme Corp".to_string(),
+                slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                enable_llm_spam_guardrail: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let workflow_persistence = Arc::new(MockWorkflowPersistence {
+            workflows: Mutex::new(vec![Workflow {
+                id: workflow_id,
+                company_id,
+                name: "Support Flow".to_string(),
+                slug: "support".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                participant_emails: None,
+                agent_ids: None,
+                workflow_config: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        });
+
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+
+        let thread_use_cases = ThreadUseCases::new(
+            thread_persistence,
+            workflow_persistence,
+            company_persistence,
+            task_persistence,
+            config,
+        );
+
+        let raw_payload = RawInboundPayload {
+            to: "user@example.com".to_string(),
+            cc: Some("support@acme.mailagents.com".to_string()),
+            from: "customer@client.com".to_string(),
+            subject: Some("Need help".to_string()),
+            text: Some("Can someone assist?".to_string()),
+            ..Default::default()
+        };
+
+        let result = thread_use_cases
+            .ingest_and_save_inbound_message(raw_payload)
+            .await
+            .unwrap();
+
+        assert!(result.accepted);
+        assert_eq!(result.workflow_matches.len(), 1);
+        assert_eq!(result.workflow_matches[0].recipient_role, RecipientRole::Cc);
+    }
+
+    #[tokio::test]
+    async fn test_multi_workflow_to_and_cc_execution() {
+        let company_id = Uuid::new_v4();
+        let wf1_id = Uuid::new_v4();
+        let wf2_id = Uuid::new_v4();
+
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![Company {
+                id: company_id,
+                user_id: Uuid::new_v4(),
+                name: "Acme Corp".to_string(),
+                slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                enable_llm_spam_guardrail: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let workflow_persistence = Arc::new(MockWorkflowPersistence {
+            workflows: Mutex::new(vec![
+                Workflow {
+                    id: wf1_id,
+                    company_id,
+                    name: "Support".to_string(),
+                    slug: "support".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: None,
+                    workflow_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+                Workflow {
+                    id: wf2_id,
+                    company_id,
+                    name: "Billing".to_string(),
+                    slug: "billing".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: None,
+                    workflow_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+            ]),
+        });
+
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        });
+
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+
+        let thread_use_cases = ThreadUseCases::new(
+            thread_persistence.clone(),
+            workflow_persistence,
+            company_persistence,
+            task_persistence,
+            config,
+        );
+
+        let raw_payload = RawInboundPayload {
+            to: "support@acme.mailagents.com".to_string(),
+            cc: Some("billing@acme.mailagents.com".to_string()),
+            from: "customer@client.com".to_string(),
+            subject: Some("Invoice and account question".to_string()),
+            text: Some("Please help with my account and invoice.".to_string()),
+            ..Default::default()
+        };
+
+        let ingest = thread_use_cases
+            .ingest_and_save_inbound_message(raw_payload)
+            .await
+            .unwrap();
+
+        assert!(ingest.accepted);
+        assert_eq!(ingest.workflow_matches.len(), 2);
+        assert_eq!(ingest.workflow_matches[0].workflow.slug, "support");
+        assert_eq!(ingest.workflow_matches[0].recipient_role, RecipientRole::To);
+        assert_eq!(ingest.workflow_matches[1].workflow.slug, "billing");
+        assert_eq!(ingest.workflow_matches[1].recipient_role, RecipientRole::Cc);
+
+        // Verify thread creation for both workflows
+        let threads = thread_persistence.threads.lock().unwrap();
+        assert_eq!(threads.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_address_chaining_execution() {
+        let company_id = Uuid::new_v4();
+        let wf1_id = Uuid::new_v4();
+        let wf2_id = Uuid::new_v4();
+        let wf3_id = Uuid::new_v4();
+
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![Company {
+                id: company_id,
+                user_id: Uuid::new_v4(),
+                name: "Acme Corp".to_string(),
+                slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                enable_llm_spam_guardrail: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let workflow_persistence = Arc::new(MockWorkflowPersistence {
+            workflows: Mutex::new(vec![
+                Workflow {
+                    id: wf1_id,
+                    company_id,
+                    name: "Support".to_string(),
+                    slug: "support".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: None,
+                    workflow_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+                Workflow {
+                    id: wf2_id,
+                    company_id,
+                    name: "Billing".to_string(),
+                    slug: "billing".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: None,
+                    workflow_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+                Workflow {
+                    id: wf3_id,
+                    company_id,
+                    name: "Legal".to_string(),
+                    slug: "legal".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: None,
+                    workflow_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+            ]),
+        });
+
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        });
+
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+
+        let thread_use_cases = ThreadUseCases::new(
+            thread_persistence.clone(),
+            workflow_persistence,
+            company_persistence,
+            task_persistence,
+            config,
+        );
+
+        let raw_payload = RawInboundPayload {
+            to: "support+billing+legal@acme.mailagents.com".to_string(),
+            from: "customer@client.com".to_string(),
+            subject: Some("Pipeline Request".to_string()),
+            text: Some("Please process via support, billing, and legal.".to_string()),
+            ..Default::default()
+        };
+
+        let ingest = thread_use_cases
+            .ingest_and_save_inbound_message(raw_payload)
+            .await
+            .unwrap();
+
+        assert!(ingest.accepted);
+        assert_eq!(ingest.workflow_matches.len(), 3);
+        assert_eq!(ingest.workflow_matches[0].workflow.slug, "support");
+        assert_eq!(ingest.workflow_matches[0].step_index, 0);
+        assert_eq!(ingest.workflow_matches[0].total_steps, 3);
+        assert_eq!(ingest.workflow_matches[1].workflow.slug, "billing");
+        assert_eq!(ingest.workflow_matches[1].step_index, 1);
+        assert_eq!(ingest.workflow_matches[2].workflow.slug, "legal");
+        assert_eq!(ingest.workflow_matches[2].step_index, 2);
+
+        // Verify threads were created for all 3 step workflows
+        let threads = thread_persistence.threads.lock().unwrap();
+        assert_eq!(threads.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_misspelled_workflow_bounce_and_strict_pipeline_validation() {
+        let company_id = Uuid::new_v4();
+
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![Company {
+                id: company_id,
+                user_id: Uuid::new_v4(),
+                name: "Acme Corp".to_string(),
+                slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                enable_llm_spam_guardrail: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let workflow_persistence = Arc::new(MockWorkflowPersistence {
+            workflows: Mutex::new(vec![
+                Workflow {
+                    id: Uuid::new_v4(),
+                    company_id,
+                    name: "Support".to_string(),
+                    slug: "support".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: None,
+                    workflow_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+                Workflow {
+                    id: Uuid::new_v4(),
+                    company_id,
+                    name: "Billing".to_string(),
+                    slug: "billing".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: None,
+                    workflow_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+            ]),
+        });
+
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "".to_string(), // skip external SMTP in test
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        });
+
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+
+        let thread_use_cases = ThreadUseCases::new(
+            thread_persistence.clone(),
+            workflow_persistence,
+            company_persistence,
+            task_persistence,
+            config,
+        );
+
+        // 1. Single misspelled address
+        let raw_payload_single = RawInboundPayload {
+            to: "suppport@acme.mailagents.com".to_string(),
+            from: "customer@client.com".to_string(),
+            subject: Some("Help".to_string()),
+            text: Some("Help please".to_string()),
+            ..Default::default()
+        };
+
+        let ingest_single = thread_use_cases
+            .ingest_and_save_inbound_message(raw_payload_single)
+            .await
+            .unwrap();
+
+        assert!(!ingest_single.accepted);
+        assert_eq!(ingest_single.reason.as_deref(), Some("Workflow address not found or misspelled"));
+        let bounce_single = ingest_single.bounce_info.unwrap();
+        assert_eq!(bounce_single.invalid_slugs, vec!["suppport"]);
+        assert_eq!(bounce_single.suggestions[0].suggestions, vec!["support"]);
+
+        // Verify bounce email body formatting
+        let bounce_body = format_bounce_email_body(&bounce_single, "mailagents.com");
+        assert!(bounce_body.contains("suppport@acme.mailagents.com"));
+        assert!(bounce_body.contains("support@acme.mailagents.com"));
+
+        // 2. Strict pipeline validation with misspelled step 'biling'
+        let raw_payload_pipeline = RawInboundPayload {
+            to: "support+biling@acme.mailagents.com".to_string(),
+            from: "customer@client.com".to_string(),
+            subject: Some("Pipeline Help".to_string()),
+            text: Some("Help please".to_string()),
+            ..Default::default()
+        };
+
+        let ingest_pipeline = thread_use_cases
+            .ingest_and_save_inbound_message(raw_payload_pipeline)
+            .await
+            .unwrap();
+
+        assert!(!ingest_pipeline.accepted);
+        let bounce_pipeline = ingest_pipeline.bounce_info.unwrap();
+        assert_eq!(bounce_pipeline.invalid_slugs, vec!["biling"]);
+        assert_eq!(bounce_pipeline.suggestions[0].suggestions, vec!["billing"]);
     }
 }

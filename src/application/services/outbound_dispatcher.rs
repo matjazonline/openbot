@@ -89,7 +89,14 @@ impl OutboundDispatcher {
         };
 
         let mut cc_list = email.recipients_cc.clone();
-        cc_list.retain(|c| !c.eq_ignore_ascii_case(&email.recipient_to) && !c.eq_ignore_ascii_case(&from_email));
+        let domain_suffix = format!(".{}", config.app_domain_name);
+        cc_list.retain(|c| {
+            let lower = c.trim().to_lowercase();
+            !lower.eq_ignore_ascii_case(&email.recipient_to)
+                && !lower.eq_ignore_ascii_case(&from_email)
+                && !lower.ends_with(&domain_suffix)
+                && lower != config.app_domain_name
+        });
         cc_list.dedup();
 
         info!(
@@ -198,6 +205,75 @@ impl OutboundDispatcher {
             recipients_cc: cc_list,
             subject,
             body_text: email.body_text,
+        })
+    }
+
+    pub async fn send_bounce(
+        config: &AppConfig,
+        recipient_to: &str,
+        subject: &str,
+        bounce_body: &str,
+    ) -> AppResult<SentEmailResult> {
+        let outbound_uuid = Uuid::new_v4();
+        let outbound_message_id = format!("<bounce-{}@{}>", outbound_uuid, config.app_domain_name);
+
+        let from_email = format!("mailer-daemon@{}", config.app_domain_name);
+        let from_header_value = format!("\"Mail Agents Server\" <{}>", from_email);
+
+        let formatted_subject = if subject.to_lowercase().starts_with("[undeliverable]") {
+            subject.to_string()
+        } else {
+            format!("[Undeliverable] {}", subject)
+        };
+
+        let from_mailbox = from_header_value
+            .parse::<Mailbox>()
+            .map_err(|e| AppError::Internal(format!("Invalid From address mailbox: {}", e)))?;
+
+        let to_mailbox = recipient_to
+            .parse::<Mailbox>()
+            .map_err(|e| AppError::Internal(format!("Invalid To address mailbox: {}", e)))?;
+
+        let builder = LettreMessage::builder()
+            .from(from_mailbox)
+            .to(to_mailbox)
+            .subject(&formatted_subject)
+            .header(ContentType::TEXT_PLAIN)
+            .header(CustomHeader {
+                name: HeaderName::new_from_ascii_str("Auto-Submitted"),
+                value: "auto-replied".to_string(),
+            });
+
+        let email_msg = builder
+            .body(bounce_body.to_string())
+            .map_err(|e| AppError::Internal(format!("Failed to build bounce email message: {}", e)))?;
+
+        if !config.smtp_host.is_empty() {
+            let mut mailer_builder = AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&config.smtp_host)
+                .port(config.smtp_port);
+
+            if !config.smtp_username.is_empty() {
+                mailer_builder = mailer_builder.credentials(Credentials::new(
+                    config.smtp_username.clone(),
+                    config.smtp_password.clone(),
+                ));
+            }
+
+            let mailer = mailer_builder.build();
+            if let Err(err) = mailer.send(email_msg).await {
+                warn!("Failed to dispatch bounce email via SMTP: {err}");
+            }
+        }
+
+        Ok(SentEmailResult {
+            outbound_message_id,
+            in_reply_to: String::new(),
+            references: vec![],
+            from_address: from_email,
+            recipients_to: vec![recipient_to.to_string()],
+            recipients_cc: vec![],
+            subject: formatted_subject,
+            body_text: bounce_body.to_string(),
         })
     }
 }

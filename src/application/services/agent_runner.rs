@@ -6,6 +6,7 @@ use crate::entities::message::{Message, MessageRole};
 use crate::entities::task::TokenUsage;
 use crate::entities::workflow::Workflow;
 use crate::use_cases::approval::ApprovalUseCases;
+use crate::use_cases::thread::RecipientRole;
 use ai_agents::{Agent, AgentBuilder};
 use regex::Regex;
 use sha2::{Digest, Sha256};
@@ -473,6 +474,8 @@ pub struct AgentRunner<'a> {
     workflow_id: Option<Uuid>,
     agent_id: Option<Uuid>,
     skip_spam_guardrail: bool,
+    recipient_role: Option<RecipientRole>,
+    upstream_pipeline_context: Option<String>,
 }
 
 impl<'a> AgentRunner<'a> {
@@ -490,6 +493,8 @@ impl<'a> AgentRunner<'a> {
             workflow_id: None,
             agent_id: None,
             skip_spam_guardrail: false,
+            recipient_role: None,
+            upstream_pipeline_context: None,
         }
     }
 
@@ -545,6 +550,16 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
+    pub fn recipient_role(mut self, role: Option<RecipientRole>) -> Self {
+        self.recipient_role = role;
+        self
+    }
+
+    pub fn upstream_pipeline_context(mut self, ctx: Option<String>) -> Self {
+        self.upstream_pipeline_context = ctx;
+        self
+    }
+
     pub async fn execute(self) -> anyhow::Result<AgentExecutionOutput> {
         let start_time = std::time::Instant::now();
         info!(
@@ -552,6 +567,22 @@ impl<'a> AgentRunner<'a> {
             self.prompt.len(),
             self.history.len()
         );
+
+        let delivery_ctx = match self.recipient_role {
+            Some(RecipientRole::To) => "[Delivery Context: Email received via TO field (Primary Target)]\n",
+            Some(RecipientRole::Cc) => "[Delivery Context: Email received via CC field (Secondary / FYI Target)]\n",
+            None => "",
+        };
+
+        let pipeline_ctx_str = if let Some(ref upstream) = self.upstream_pipeline_context {
+            if !upstream.trim().is_empty() {
+                format!("[Upstream Pipeline Context from Prior Step Agents]:\n{}\n\n", upstream.trim())
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
 
         let mut history_str = String::new();
         if !self.history.is_empty() {
@@ -570,7 +601,7 @@ impl<'a> AgentRunner<'a> {
             history_str.push_str("\nLatest Inbound Message:\n");
         }
 
-        let raw_full_prompt = format!("{}{}", history_str, self.prompt);
+        let raw_full_prompt = format!("{}{}{}{}", delivery_ctx, pipeline_ctx_str, history_str, self.prompt);
 
         let provider_name = &self.params.provider;
         let model_name = &self.params.model;
@@ -595,6 +626,20 @@ impl<'a> AgentRunner<'a> {
         let mut config = self.params.config.clone();
         ensure_config_fields(&mut config, provider_name, model_name, key, None, None);
 
+        let role_str = self.recipient_role.map(|r| r.as_str()).unwrap_or("to");
+        let is_to_str = if role_str == "to" { "true" } else { "false" };
+        let is_cc_str = if role_str == "cc" { "true" } else { "false" };
+
+        if let Some(sp) = config.get_mut("system_prompt") {
+            if let Some(s) = sp.as_str() {
+                let replaced = s
+                    .replace("{{recipient_role}}", role_str)
+                    .replace("{{is_to}}", is_to_str)
+                    .replace("{{is_cc}}", is_cc_str);
+                *sp = serde_json::json!(replaced);
+            }
+        }
+
         let config_yaml = serde_yaml::to_string(&config).unwrap_or_default();
 
         let full_prompt = sanitize_text(&raw_full_prompt, Some(key));
@@ -613,6 +658,7 @@ impl<'a> AgentRunner<'a> {
         let model_name = model_name.to_string();
         let approval_use_cases = self.approval_use_cases.clone();
         let approval_context = self.approval_context.clone();
+        let recipient_role = self.recipient_role;
 
         let task_result = tokio::spawn(async move {
             let mut builder = AgentBuilder::from_yaml(&config_yaml)?;
@@ -644,6 +690,14 @@ impl<'a> AgentRunner<'a> {
                 .auto_configure_spawner()
                 .await?
                 .build()?;
+
+            let role_str = recipient_role.map(|r| r.as_str()).unwrap_or("to");
+            let is_to = role_str == "to";
+            let is_cc = role_str == "cc";
+
+            agent.set_context("recipient_role", serde_json::json!(role_str))?;
+            agent.set_context("is_to", serde_json::json!(is_to))?;
+            agent.set_context("is_cc", serde_json::json!(is_cc))?;
 
             let safe_prompt_log = sanitize_text(&full_prompt, Some(&key_for_task));
             info!(
@@ -1281,5 +1335,40 @@ mod tests {
         assert_eq!(usage.prompt_tokens, 100);
         assert_eq!(usage.completion_tokens, 50);
         assert_eq!(usage.total_tokens, 150);
+    }
+
+    #[test]
+    fn test_recipient_role_context_setting() {
+        let config_yaml = r#"
+name: TestAgent
+system_prompt: Hello
+"#;
+        let mut builder = AgentBuilder::from_yaml(config_yaml).unwrap();
+        let provider = ai_agents::UnifiedLLMProvider::new(
+            ai_agents::LLMProviderType::OpenAI,
+            "gpt-4o".to_string(),
+            Some("test_key".to_string()),
+            None,
+        ).unwrap();
+        builder = builder.llm(std::sync::Arc::new(provider));
+        let agent = builder.build().unwrap();
+
+        for (role, expected_role, expected_to, expected_cc) in [
+            (Some(RecipientRole::To), "to", true, false),
+            (Some(RecipientRole::Cc), "cc", false, true),
+            (None, "to", true, false),
+        ] {
+            let role_str = role.map(|r| r.as_str()).unwrap_or("to");
+            let is_to = role_str == "to";
+            let is_cc = role_str == "cc";
+
+            agent.set_context("recipient_role", serde_json::json!(role_str)).unwrap();
+            agent.set_context("is_to", serde_json::json!(is_to)).unwrap();
+            agent.set_context("is_cc", serde_json::json!(is_cc)).unwrap();
+
+            assert_eq!(role_str, expected_role);
+            assert_eq!(is_to, expected_to);
+            assert_eq!(is_cc, expected_cc);
+        }
     }
 }

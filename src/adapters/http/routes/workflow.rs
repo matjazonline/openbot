@@ -1007,6 +1007,8 @@ mod tests {
                 inbound_message: None,
                 company: Some(company.clone()),
                 workflow: Some(workflow.clone()),
+                workflow_matches: vec![],
+                bounce_info: None,
                 parsed_email: Some(crate::services::email_parser::ParsedEmail {
                     message_id: "<msg1@test>".to_string(),
                     in_reply_to: None,

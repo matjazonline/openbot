@@ -451,6 +451,11 @@ impl SmtpServer {
                                     });
                                     writer.write_all(b"250 2.0.0 Message queued for delivery\r\n").await?;
                                 } else {
+                                    let thread_use_cases_bg = self.thread_use_cases.clone();
+                                    let ingest_bg = ingest.clone();
+                                    tokio::spawn(async move {
+                                        thread_use_cases_bg.handle_bounce_dispatch(&ingest_bg).await;
+                                    });
                                     let msg = format!("250 2.0.0 Message processed ({})\r\n", ingest.reason.as_deref().unwrap_or("ok"));
                                     writer.write_all(msg.as_bytes()).await?;
                                 }
@@ -689,7 +694,7 @@ mod tests {
         async fn get_by_company_slug_and_workflow_slug(&self, _company_slug: &str, workflow_slug: &str) -> AppResult<Option<Workflow>> {
             Ok(self.workflows.lock().unwrap().iter().find(|w| w.slug == workflow_slug).cloned())
         }
-        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { unimplemented!() }
+        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { Ok(self.workflows.lock().unwrap().clone()) }
         async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }

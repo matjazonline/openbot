@@ -917,30 +917,33 @@ fn render_agents_selection(company_id: Uuid, agents: &[Agent], selected_ids: Opt
         );
     }
 
-    let initial_ids = match selected_ids {
-        Some(ids) => ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(","),
-        None => String::new(),
+    let initial_id = match selected_ids {
+        Some(ids) if !ids.is_empty() => ids[0].to_string(),
+        _ => String::new(),
     };
+
+    let group_name = format!("agent_radio_{}", Uuid::new_v4().simple());
 
     let items: String = agents
         .iter()
         .map(|agent| {
             let checked = match selected_ids {
-                Some(ids) => if ids.contains(&agent.id) { "checked" } else { "" },
-                None => "",
+                Some(ids) if ids.contains(&agent.id) => "checked",
+                _ => "",
             };
             format!(
                 r#"
                 <label class="flex items-center gap-2 p-2 bg-slate-800/80 border border-slate-700/80 rounded-lg cursor-pointer hover:bg-slate-700/60 transition">
-                    <input type="checkbox" data-agent-checkbox value="{id}" {checked}
-                        onchange="let form = this.closest('form'); if (form) {{ let checked = Array.from(form.querySelectorAll('input[data-agent-checkbox]:checked')).map(c => c.value); let target = form.querySelector('input[name=agent_ids]'); if (target) target.value = checked.join(','); }}"
-                        class="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500">
+                    <input type="radio" name="{group_name}" value="{id}" {checked}
+                        onchange="let form = this.closest('form'); if (form) {{ let target = form.querySelector('input[name=agent_ids]'); if (target) target.value = this.value; }}"
+                        class="border-slate-700 text-indigo-600 focus:ring-indigo-500">
                     <div class="text-xs flex flex-col">
                         <span class="font-medium text-white">{name}</span>
                         <span class="text-slate-400 font-mono text-[10px]">@{slug}</span>
                     </div>
                 </label>
                 "#,
+                group_name = group_name,
                 id = agent.id,
                 name = agent.name,
                 slug = agent.slug,
@@ -951,7 +954,7 @@ fn render_agents_selection(company_id: Uuid, agents: &[Agent], selected_ids: Opt
 
     format!(
         r#"<div>
-            <input type="hidden" name="agent_ids" value="{initial_ids}">
+            <input type="hidden" name="agent_ids" value="{initial_id}">
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-1">{items}</div>
         </div>"#
     )
@@ -1033,7 +1036,7 @@ pub fn workflows_page(
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Select Agents (Multiple allowed)</label>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Select Agent</label>
                     {agents_selection_html}
                 </div>
 
