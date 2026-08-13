@@ -100,7 +100,9 @@ pub fn router() -> Router<AppState> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct WorkflowForm {
     pub name: String,
-    pub slug: String,
+    pub slug: Option<String>,
+    pub system_prompt: Option<String>,
+    pub form_mode: Option<String>,
     pub api_key: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
@@ -112,6 +114,30 @@ pub struct WorkflowForm {
 }
 
 pub type ChannelForm = WorkflowForm;
+
+pub fn slugify(input: &str) -> String {
+    let clean: String = input
+        .trim()
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect();
+
+    let mut result = String::new();
+    let mut last_was_hyphen = false;
+    for c in clean.chars() {
+        if c == '-' {
+            if !last_was_hyphen {
+                result.push('-');
+                last_was_hyphen = true;
+            }
+        } else {
+            result.push(c);
+            last_was_hyphen = false;
+        }
+    }
+    result.trim_matches('-').to_string()
+}
 
 fn parse_agent_ids_form(input: Option<String>) -> Option<Vec<Uuid>> {
     input.and_then(|s| {
@@ -132,7 +158,8 @@ fn parse_agent_ids_form(input: Option<String>) -> Option<Vec<Uuid>> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct WorkflowJsonPayload {
     pub name: String,
-    pub slug: String,
+    pub slug: Option<String>,
+    pub system_prompt: Option<String>,
     pub api_key: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
@@ -227,19 +254,71 @@ async fn create_workflow_handler(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
-    let agents = agent_use_cases
-        .list_company_agents(user.id, company_id)
-        .await
-        .unwrap_or_default();
+    let slug = form
+        .slug
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .unwrap_or_else(|| slugify(&form.name));
 
     let emails = parse_emails_form(form.participant_emails);
-    let agent_ids = parse_agent_ids_form(form.agent_ids);
+    let mut agent_ids = parse_agent_ids_form(form.agent_ids);
     let confirm_spam_disabled = form.confirm_spam_disabled.as_deref() == Some("true")
         || form.confirm_spam_disabled.as_deref() == Some("on");
+
+    let system_prompt_clean = form
+        .system_prompt
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+
+    if let Some(prompt) = system_prompt_clean {
+        match agent_use_cases
+            .create_agent(
+                user.id,
+                company_id,
+                &form.name,
+                &slug,
+                form.provider.as_deref(),
+                form.model.as_deref(),
+                form.api_key.as_deref(),
+                Some(prompt),
+                None,
+            )
+            .await
+        {
+            Ok(agent) => {
+                let mut ids = agent_ids.unwrap_or_default();
+                ids.push(agent.id);
+                agent_ids = Some(ids);
+            }
+            Err(err) => {
+                let agents = agent_use_cases
+                    .list_company_agents(user.id, company_id)
+                    .await
+                    .unwrap_or_default();
+                let workflows = workflow_use_cases
+                    .list_company_workflows(user.id, company_id)
+                    .await
+                    .unwrap_or_default();
+                let error_html = pages::error_alert(&format!("Failed to create agent for channel: {err}"));
+                return Html(format!(
+                    "{}{}",
+                    error_html,
+                    pages::workflow_list_fragment(&company, &config.app_domain_name, &workflows, &agents)
+                ));
+            }
+        }
+    }
 
     let workflow_config = match parse_config_form(form.workflow_config) {
         Ok(c) => c,
         Err(err) => {
+            let agents = agent_use_cases
+                .list_company_agents(user.id, company_id)
+                .await
+                .unwrap_or_default();
             let error_html = pages::error_alert(&err);
             let workflows = workflow_use_cases
                 .list_company_workflows(user.id, company_id)
@@ -258,7 +337,7 @@ async fn create_workflow_handler(
             user.id,
             company_id,
             &form.name,
-            &form.slug,
+            &slug,
             form.api_key.as_deref(),
             form.provider.as_deref(),
             form.model.as_deref(),
@@ -270,6 +349,10 @@ async fn create_workflow_handler(
         .await
     {
         Ok(_) => {
+            let agents = agent_use_cases
+                .list_company_agents(user.id, company_id)
+                .await
+                .unwrap_or_default();
             let workflows = workflow_use_cases
                 .list_company_workflows(user.id, company_id)
                 .await
@@ -282,6 +365,10 @@ async fn create_workflow_handler(
             ))
         }
         Err(err) => {
+            let agents = agent_use_cases
+                .list_company_agents(user.id, company_id)
+                .await
+                .unwrap_or_default();
             let error_html = pages::error_alert(&format!("Failed to create workflow: {err}"));
             let workflows = workflow_use_cases
                 .list_company_workflows(user.id, company_id)
@@ -388,6 +475,14 @@ async fn update_workflow_handler(
         .await
         .unwrap_or_default();
 
+    let slug = form
+        .slug
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .unwrap_or_else(|| slugify(&form.name));
+
     let emails = parse_emails_form(form.participant_emails);
     let agent_ids = parse_agent_ids_form(form.agent_ids);
     let confirm_spam_disabled = form.confirm_spam_disabled.as_deref() == Some("true")
@@ -404,7 +499,7 @@ async fn update_workflow_handler(
             company_id,
             workflow_id,
             &form.name,
-            &form.slug,
+            &slug,
             form.api_key.as_deref(),
             form.provider.as_deref(),
             form.model.as_deref(),
@@ -861,23 +956,55 @@ async fn list_workflows_json(
 /// JSON API: Create company workflow (Protected).
 async fn create_workflow_json(
     State(workflow_use_cases): State<Arc<WorkflowUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
     Json(payload): Json<WorkflowJsonPayload>,
 ) -> AppResult<impl IntoResponse> {
     let confirm_spam_disabled = payload.confirm_spam_disabled.unwrap_or(false);
+    let slug = payload
+        .slug
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .unwrap_or_else(|| slugify(&payload.name));
+
+    let mut agent_ids = payload.agent_ids;
+
+    if let Some(ref prompt) = payload.system_prompt {
+        let prompt_trimmed = prompt.trim();
+        if !prompt_trimmed.is_empty() {
+            let agent = agent_use_cases
+                .create_agent(
+                    user.id,
+                    company_id,
+                    &payload.name,
+                    &slug,
+                    payload.provider.as_deref(),
+                    payload.model.as_deref(),
+                    payload.api_key.as_deref(),
+                    Some(prompt_trimmed),
+                    None,
+                )
+                .await?;
+            let mut ids = agent_ids.unwrap_or_default();
+            ids.push(agent.id);
+            agent_ids = Some(ids);
+        }
+    }
 
     let workflow = workflow_use_cases
         .create_workflow(
             user.id,
             company_id,
             &payload.name,
-            &payload.slug,
+            &slug,
             payload.api_key.as_deref(),
             payload.provider.as_deref(),
             payload.model.as_deref(),
             payload.participant_emails,
-            payload.agent_ids,
+            agent_ids,
             payload.workflow_config,
             confirm_spam_disabled,
         )
@@ -914,6 +1041,13 @@ async fn update_workflow_json(
     Json(payload): Json<WorkflowJsonPayload>,
 ) -> AppResult<impl IntoResponse> {
     let confirm_spam_disabled = payload.confirm_spam_disabled.unwrap_or(false);
+    let slug = payload
+        .slug
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .unwrap_or_else(|| slugify(&payload.name));
 
     let workflow = workflow_use_cases
         .update_workflow(
@@ -921,7 +1055,7 @@ async fn update_workflow_json(
             company_id,
             workflow_id,
             &payload.name,
-            &payload.slug,
+            &slug,
             payload.api_key.as_deref(),
             payload.provider.as_deref(),
             payload.model.as_deref(),
@@ -1172,10 +1306,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_slugify() {
+        assert_eq!(slugify("Support Team"), "support-team");
+        assert_eq!(slugify("  Inbound Email Handler!  "), "inbound-email-handler");
+        assert_eq!(slugify("Customer_Service 101"), "customer-service-101");
+        assert_eq!(slugify("---"), "");
+    }
+
+    #[tokio::test]
     async fn test_workflow_form_deserialization() {
         use axum::extract::FromRequest;
         use axum::http::{header, Request};
         use axum::body::Body;
+
+        let req_simple = Request::builder()
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from("name=Inbound+Support&system_prompt=You+are+a+support+agent.&form_mode=simple"))
+            .unwrap();
+        let form_simple = Form::<WorkflowForm>::from_request(req_simple, &()).await.unwrap().0;
+        assert_eq!(form_simple.name, "Inbound Support");
+        assert_eq!(form_simple.slug, None);
+        assert_eq!(form_simple.system_prompt, Some("You are a support agent.".to_string()));
+        assert_eq!(slugify(&form_simple.name), "inbound-support");
 
         let req_omitted = Request::builder()
             .method("PUT")

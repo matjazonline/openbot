@@ -35,6 +35,8 @@ pub trait CompanyPersistence: Send + Sync {
         enable_llm_spam_guardrail: Option<bool>,
     ) -> AppResult<Company>;
     async fn delete(&self, id: Uuid) -> AppResult<()>;
+    async fn is_company_team_member(&self, company_id: Uuid, email: &str) -> AppResult<bool>;
+    async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>>;
 }
 
 #[derive(Clone)]
@@ -225,6 +227,14 @@ mod tests {
         async fn delete(&self, id: Uuid) -> AppResult<()> {
             self.companies.lock().unwrap().retain(|c| c.id != id);
             Ok(())
+        }
+
+        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
+            Ok(true)
+        }
+
+        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
+            Ok(vec![])
         }
     }
 

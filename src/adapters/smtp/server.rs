@@ -386,14 +386,31 @@ impl SmtpServer {
                             dmarc_status,
                         );
 
-                        // Stage 1 & Stage 2 Spam Scanner (Only run for public workflows where participant_emails is not set)
+                        // Stage 1 & Stage 2 Spam Scanner (Run for external senders on public channels; skip for trusted participants)
                         let mut should_scan_spam = true;
                         let recipient_str = raw_payload.to.clone();
                         if let Some((company_slug, workflow_slug)) = parse_recipient_address(&recipient_str, &self.config.app_domain_name) {
-                            if let Ok(Some(workflow)) = self.thread_use_cases.workflow_persistence().get_by_company_slug_and_channel_slug(&company_slug, &workflow_slug).await {
-                                if let Some(ref allowed) = workflow.participant_emails {
-                                    if !allowed.is_empty() {
-                                        // Workflow defines participants -> Skip Stage 1 & Stage 2 spam scanner
+                            if let Ok(Some(company)) = self.thread_use_cases.company_persistence().get_by_slug(&company_slug).await {
+                                if let Ok(Some(workflow)) = self.thread_use_cases.workflow_persistence().get_by_company_slug_and_channel_slug(&company_slug, &workflow_slug).await {
+                                    let sender_clean = raw_payload.from.trim();
+                                    let is_team_member = self
+                                        .thread_use_cases
+                                        .company_persistence()
+                                        .is_company_team_member(company.id, sender_clean)
+                                        .await
+                                        .unwrap_or(false);
+
+                                    let is_trusted = match &workflow.participant_emails {
+                                        Some(allowed) if !allowed.is_empty() => {
+                                            let explicitly_listed = allowed
+                                                .iter()
+                                                .any(|e| !e.trim().eq_ignore_ascii_case("@public") && e.eq_ignore_ascii_case(sender_clean));
+                                            explicitly_listed || is_team_member
+                                        }
+                                        _ => is_team_member,
+                                    };
+
+                                    if is_trusted {
                                         should_scan_spam = false;
                                     }
                                 }
@@ -683,6 +700,8 @@ mod tests {
         async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> { unimplemented!() }
         async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
+        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> { Ok(true) }
+        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> { Ok(vec![]) }
     }
 
     struct MockWorkflowPersistence {

@@ -317,6 +317,14 @@ mod tests {
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
         }
+
+        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
+            Ok(true)
+        }
+
+        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
+            Ok(vec![])
+        }
     }
 
     struct MockCompanyInvitePersistence {

@@ -133,14 +133,14 @@ impl ChannelUseCases {
                 .collect::<Vec<_>>()
         });
 
-        let has_participants = cleaned_emails
+        let is_public = cleaned_emails
             .as_ref()
-            .map(|emails| !emails.is_empty())
+            .map(|emails| emails.iter().any(|e| e == "@public"))
             .unwrap_or(false);
 
-        if !has_participants && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
+        if is_public && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
             return Err(AppError::Internal(
-                "Spam scanning is disabled in server configuration. Saving a channel without participant email restrictions requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
+                "Spam scanning is disabled in server configuration. Saving a public channel (@public) requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
             ));
         }
 
@@ -284,14 +284,14 @@ impl ChannelUseCases {
                 .collect::<Vec<_>>()
         });
 
-        let has_participants = cleaned_emails
+        let is_public = cleaned_emails
             .as_ref()
-            .map(|emails| !emails.is_empty())
+            .map(|emails| emails.iter().any(|e| e == "@public"))
             .unwrap_or(false);
 
-        if !has_participants && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
+        if is_public && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
             return Err(AppError::Internal(
-                "Spam scanning is disabled in server configuration. Saving a channel without participant email restrictions requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
+                "Spam scanning is disabled in server configuration. Saving a public channel (@public) requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
             ));
         }
 
@@ -398,13 +398,24 @@ impl ChannelUseCases {
 
                 let sender_email = extract_email_address(&email.from);
 
-                let sender_authorized =
-                    match &workflow.as_ref().and_then(|w| w.participant_emails.as_ref()) {
+                let sender_authorized = if let (Some(comp), Some(wf)) = (company.as_ref(), workflow.as_ref()) {
+                    match &wf.participant_emails {
                         Some(allowed_emails) if !allowed_emails.is_empty() => {
-                            allowed_emails.iter().any(|e| e.eq_ignore_ascii_case(&sender_email))
+                            let is_public = allowed_emails.iter().any(|e| e.trim().eq_ignore_ascii_case("@public"));
+                            let explicitly_listed = allowed_emails
+                                .iter()
+                                .any(|e| !e.trim().eq_ignore_ascii_case("@public") && e.eq_ignore_ascii_case(&sender_email));
+                            is_public || explicitly_listed
                         }
-                        _ => true,
-                    };
+                        _ => self
+                            .company_persistence
+                            .is_company_team_member(comp.id, &sender_email)
+                            .await
+                            .unwrap_or(false),
+                    }
+                } else {
+                    false
+                };
 
                 let resolved = company.is_some() && workflow.is_some() && sender_authorized;
 
@@ -639,6 +650,14 @@ mod tests {
 
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
+        }
+
+        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
+            Ok(true)
+        }
+
+        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
+            Ok(vec![])
         }
     }
 
@@ -1110,16 +1129,16 @@ mod tests {
         // Config with spam scanning completely disabled
         let use_cases = WorkflowUseCases::new(company_persistence, workflow_persistence, test_config(false));
 
-        // 1. Trying to create workflow without participants and without confirmation fails
+        // 1. Trying to create public workflow (@public) without confirmation fails when spam scanning is disabled
         let res = use_cases
-            .create_workflow(owner_id, company_id, "Public Flow", "public", None, None, None, None, None, None, false)
+            .create_workflow(owner_id, company_id, "Public Flow", "public", None, None, None, Some(vec!["@public".to_string()]), None, None, false)
             .await;
         assert!(res.is_err());
         assert!(res.unwrap_err().to_string().contains("Spam scanning is disabled"));
 
-        // 2. Creating workflow without participants BUT WITH confirm_spam_disabled=true succeeds
+        // 2. Creating public workflow (@public) BUT WITH confirm_spam_disabled=true succeeds
         let res_ok = use_cases
-            .create_workflow(owner_id, company_id, "Public Flow", "public", None, None, None, None, None, None, true)
+            .create_workflow(owner_id, company_id, "Public Flow", "public", None, None, None, Some(vec!["@public".to_string()]), None, None, true)
             .await;
         assert!(res_ok.is_ok());
 

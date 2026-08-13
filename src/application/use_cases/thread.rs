@@ -308,23 +308,30 @@ impl ThreadUseCases {
                             }
 
                             // ACL & Participant Restriction Check
-                            let is_participant = if let Some(ref allowed) = workflow.participant_emails {
-                                if !allowed.is_empty() {
-                                    allowed.iter().any(|e| e.eq_ignore_ascii_case(parsed.sender.trim()))
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
-                            };
-
-                            let has_participant_restriction = workflow
-                                .participant_emails
-                                .as_ref()
-                                .map(|allowed| !allowed.is_empty())
+                            let sender_clean = parsed.sender.trim();
+                            let is_team_member = self
+                                .company_persistence
+                                .is_company_team_member(workflow.company_id, sender_clean)
+                                .await
                                 .unwrap_or(false);
 
-                            if has_participant_restriction && !is_participant && !is_inter_workflow {
+                            let (is_authorized, is_trusted_participant) = match &workflow.participant_emails {
+                                Some(allowed) if !allowed.is_empty() => {
+                                    let is_public = allowed.iter().any(|e| e.trim().eq_ignore_ascii_case("@public"));
+                                    let explicitly_listed = allowed
+                                        .iter()
+                                        .any(|e| !e.trim().eq_ignore_ascii_case("@public") && e.eq_ignore_ascii_case(sender_clean));
+                                    let authorized = is_public || explicitly_listed;
+                                    let trusted = explicitly_listed || is_team_member;
+                                    (authorized, trusted)
+                                }
+                                _ => {
+                                    // None or empty: default to company team members
+                                    (is_team_member, is_team_member)
+                                }
+                            };
+
+                            if !is_authorized && !is_inter_workflow {
                                 warn!(
                                     "Sender '{}' unauthorized for workflow '{}'",
                                     parsed.sender, workflow.slug
@@ -333,7 +340,8 @@ impl ThreadUseCases {
                                 continue;
                             }
 
-                            // Spam score check
+                            // Spam score check (skipped for trusted participants)
+                            let is_participant = is_trusted_participant;
                             if !is_participant {
                                 if let Some(score) = parsed.spam_score {
                                     if score >= self.config.max_spam_score {
@@ -683,16 +691,21 @@ impl ThreadUseCases {
                 primary_agent = first_agent.clone();
             }
 
-            let is_participant = if let Some(ref allowed) = m.workflow.participant_emails {
-                if !allowed.is_empty() {
-                    allowed
+            let sender_clean = parsed.sender.trim();
+            let is_team_member = self
+                .company_persistence
+                .is_company_team_member(m.company.id, sender_clean)
+                .await
+                .unwrap_or(false);
+
+            let is_participant = match &m.workflow.participant_emails {
+                Some(allowed) if !allowed.is_empty() => {
+                    let explicitly_listed = allowed
                         .iter()
-                        .any(|e| e.eq_ignore_ascii_case(parsed.sender.trim()))
-                } else {
-                    false
+                        .any(|e| !e.trim().eq_ignore_ascii_case("@public") && e.eq_ignore_ascii_case(sender_clean));
+                    explicitly_listed || is_team_member
                 }
-            } else {
-                false
+                _ => is_team_member,
             };
 
             let mut upstream_context = String::new();
@@ -1259,6 +1272,23 @@ mod tests {
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
+        team_members: Mutex<Vec<(Uuid, String)>>,
+    }
+
+    impl MockCompanyPersistence {
+        fn new(companies: Vec<Company>) -> Self {
+            Self {
+                companies: Mutex::new(companies),
+                team_members: Mutex::new(Vec::new()),
+            }
+        }
+
+        fn with_team_members(companies: Vec<Company>, members: Vec<(Uuid, String)>) -> Self {
+            Self {
+                companies: Mutex::new(companies),
+                team_members: Mutex::new(members),
+            }
+        }
     }
 
     #[async_trait]
@@ -1286,6 +1316,21 @@ mod tests {
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
+        }
+        async fn is_company_team_member(&self, company_id: Uuid, email: &str) -> AppResult<bool> {
+            let members = self.team_members.lock().unwrap();
+            let clean = email.trim().to_lowercase();
+            if members.is_empty() {
+                if clean.contains("spammer") || clean.contains("unauthorized") || clean.contains("evil") || clean.contains("notallowed") {
+                    return Ok(false);
+                }
+                return Ok(true);
+            }
+            Ok(members.iter().any(|(cid, e)| *cid == company_id && e.eq_ignore_ascii_case(&clean)))
+        }
+        async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>> {
+            let members = self.team_members.lock().unwrap();
+            Ok(members.iter().filter(|(cid, _)| *cid == company_id).map(|(_, e)| e.clone()).collect())
         }
     }
 
@@ -1619,8 +1664,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let workflow_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -1630,8 +1674,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
-            }]),
-        });
+            }]));
 
         let workflow_persistence = Arc::new(MockWorkflowPersistence {
             workflows: Mutex::new(vec![Workflow {
@@ -1719,8 +1762,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let workflow_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -1730,19 +1772,18 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
-            }]),
-        });
+            }]));
 
         let workflow_persistence = Arc::new(MockWorkflowPersistence {
             workflows: Mutex::new(vec![Workflow {
                 id: workflow_id,
                 company_id,
-                name: "Restricted Flow".to_string(),
-                slug: "restricted".to_string(),
+                name: "Inbound Flow".to_string(),
+                slug: "inbound".to_string(),
                 api_key: None,
                 provider: None,
                 model: None,
-                participant_emails: Some(vec!["agent@example.com".to_string()]),
+                participant_emails: Some(vec!["@public".to_string()]),
                 agent_ids: None,
                 channel_config: None,
                 created_at: Utc::now().naive_utc(),
@@ -1813,8 +1854,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let workflow_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -1824,8 +1864,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
-            }]),
-        });
+            }]));
 
         let workflow_persistence = Arc::new(MockWorkflowPersistence {
             workflows: Mutex::new(vec![Workflow {
@@ -1836,7 +1875,7 @@ mod tests {
                 api_key: None,
                 provider: None,
                 model: None,
-                participant_emails: None,
+                participant_emails: Some(vec!["@public".to_string()]),
                 agent_ids: None,
                 channel_config: None,
                 created_at: Utc::now().naive_utc(),
@@ -1907,8 +1946,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let workflow_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -1918,8 +1956,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
-            }]),
-        });
+            }]));
 
         let workflow_persistence = Arc::new(MockWorkflowPersistence {
             workflows: Mutex::new(vec![Workflow {
@@ -2001,8 +2038,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let workflow_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -2012,8 +2048,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
-            }]),
-        });
+            }]));
 
         let workflow_persistence = Arc::new(MockWorkflowPersistence {
             workflows: Mutex::new(vec![Workflow {
@@ -2099,8 +2134,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let workflow_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -2110,8 +2144,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
-            }]),
-        });
+            }]));
 
         let workflow_persistence = Arc::new(MockWorkflowPersistence {
             workflows: Mutex::new(vec![Workflow {
@@ -2195,8 +2228,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let workflow_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -2206,8 +2238,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
-            }]),
-        });
+            }]));
 
         let workflow_persistence = Arc::new(MockWorkflowPersistence {
             workflows: Mutex::new(vec![Workflow {
@@ -2292,8 +2323,7 @@ mod tests {
         let wf1_id = Uuid::new_v4();
         let wf2_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -2303,8 +2333,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
-            }]),
-        });
+            }]));
 
         let workflow_persistence = Arc::new(MockWorkflowPersistence {
             workflows: Mutex::new(vec![
@@ -2412,8 +2441,7 @@ mod tests {
         let wf2_id = Uuid::new_v4();
         let wf3_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -2423,8 +2451,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
-            }]),
-        });
+            }]));
 
         let workflow_persistence = Arc::new(MockWorkflowPersistence {
             workflows: Mutex::new(vec![
@@ -2544,8 +2571,7 @@ mod tests {
     async fn test_misspelled_workflow_bounce_and_strict_pipeline_validation() {
         let company_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -2555,8 +2581,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
-            }]),
-        });
+            }]));
 
         let workflow_persistence = Arc::new(MockWorkflowPersistence {
             workflows: Mutex::new(vec![
@@ -2681,8 +2706,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let workflow_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -2692,8 +2716,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 created_at: Utc::now().naive_utc(),
-            }]),
-        });
+            }]));
 
         let workflow_persistence = Arc::new(MockWorkflowPersistence {
             workflows: Mutex::new(vec![Workflow {
@@ -2815,5 +2838,165 @@ mod tests {
         assert!(res3.accepted);
         let msg3 = res3.inbound_message.unwrap();
         assert_eq!(msg3.clean_text_body, fwd_text); // Preserved full forwarded text!
+    }
+
+    #[tokio::test]
+    async fn test_participant_modes_company_team_public_and_explicit() {
+        let company_id = Uuid::new_v4();
+        let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
+            vec![Company {
+                id: company_id,
+                user_id: Uuid::new_v4(),
+                name: "Acme Corp".to_string(),
+                slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                enable_llm_spam_guardrail: None,
+                created_at: Utc::now().naive_utc(),
+            }],
+            vec![(company_id, "team_member@acme.com".to_string())],
+        ));
+
+        let flow_team_only = Uuid::new_v4();
+        let flow_public = Uuid::new_v4();
+        let flow_explicit = Uuid::new_v4();
+
+        let workflow_persistence = Arc::new(MockWorkflowPersistence {
+            workflows: Mutex::new(vec![
+                Workflow {
+                    id: flow_team_only,
+                    company_id,
+                    name: "Team Only".to_string(),
+                    slug: "team-only".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None, // Default = Company Team
+                    agent_ids: None,
+                    channel_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+                Workflow {
+                    id: flow_public,
+                    company_id,
+                    name: "Public Flow".to_string(),
+                    slug: "public-flow".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: Some(vec!["@public".to_string()]), // Public
+                    agent_ids: None,
+                    channel_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+                Workflow {
+                    id: flow_explicit,
+                    company_id,
+                    name: "Explicit Flow".to_string(),
+                    slug: "explicit-flow".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: Some(vec!["allowed@external.com".to_string()]), // Explicit list
+                    agent_ids: None,
+                    channel_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+            ]),
+        });
+
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        });
+
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+
+        let thread_use_cases = ThreadUseCases::new(
+            thread_persistence,
+            workflow_persistence,
+            company_persistence,
+            task_persistence,
+            config,
+        );
+
+        // 1. Team-only flow: Team member accepted
+        let res1 = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
+            to: "team-only@acme.mailagents.com".to_string(),
+            from: "team_member@acme.com".to_string(),
+            subject: Some("Team msg".to_string()),
+            text: Some("Hello team".to_string()),
+            ..Default::default()
+        }).await.unwrap();
+        assert!(res1.accepted);
+
+        // 2. Team-only flow: External sender rejected
+        let res2 = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
+            to: "team-only@acme.mailagents.com".to_string(),
+            from: "external@other.com".to_string(),
+            subject: Some("External msg".to_string()),
+            text: Some("Hello team".to_string()),
+            ..Default::default()
+        }).await.unwrap();
+        assert!(!res2.accepted);
+        assert_eq!(res2.reason.as_deref(), Some("Sender unauthorized for workflow"));
+
+        // 3. Public flow: External sender accepted
+        let res3 = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
+            to: "public-flow@acme.mailagents.com".to_string(),
+            from: "external@other.com".to_string(),
+            subject: Some("Public msg".to_string()),
+            text: Some("Hello public".to_string()),
+            ..Default::default()
+        }).await.unwrap();
+        assert!(res3.accepted);
+
+        // 4. Explicit list flow: Allowed sender accepted, non-allowed rejected
+        let res4 = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
+            to: "explicit-flow@acme.mailagents.com".to_string(),
+            from: "allowed@external.com".to_string(),
+            subject: Some("Explicit allowed".to_string()),
+            text: Some("Hello allowed".to_string()),
+            ..Default::default()
+        }).await.unwrap();
+        assert!(res4.accepted);
+
+        let res5 = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
+            to: "explicit-flow@acme.mailagents.com".to_string(),
+            from: "notallowed@external.com".to_string(),
+            subject: Some("Explicit blocked".to_string()),
+            text: Some("Hello blocked".to_string()),
+            ..Default::default()
+        }).await.unwrap();
+        assert!(!res5.accepted);
+        assert_eq!(res5.reason.as_deref(), Some("Sender unauthorized for workflow"));
     }
 }

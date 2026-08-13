@@ -110,17 +110,17 @@ pub fn base_layout(title: &str, content: &str) -> String {
             var box = form.querySelector('.spam-disabled-box');
             if (!box) return;
             var checkbox = box.querySelector('input[type="checkbox"]');
-            var hasValue = input.value.trim().length > 0;
-            if (hasValue) {{
+            var isPublic = input.value.toLowerCase().includes('@public');
+            if (isPublic) {{
+                box.classList.remove('opacity-40', 'pointer-events-none', 'grayscale');
+                if (checkbox) {{
+                    checkbox.disabled = false;
+                }}
+            }} else {{
                 box.classList.add('opacity-40', 'pointer-events-none', 'grayscale');
                 if (checkbox) {{
                     checkbox.disabled = true;
                     checkbox.checked = false;
-                }}
-            }} else {{
-                box.classList.remove('opacity-40', 'pointer-events-none', 'grayscale');
-                if (checkbox) {{
-                    checkbox.disabled = false;
                 }}
             }}
         }}
@@ -420,7 +420,7 @@ pub fn companies_page(companies: &[Company]) -> String {
                 <span class="text-indigo-400">+</span> Add New Company
             </h3>
             <form hx-post="/companies" hx-target="#company-list" hx-swap="innerHTML" class="space-y-4"
-                hx-on::after-request="if(event.detail.successful) this.reset();">
+                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) this.reset();">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label for="company_name" class="block text-xs font-medium text-slate-300 mb-1">Company Name</label>
@@ -656,7 +656,7 @@ pub fn company_invites_page(
                 <span class="text-indigo-400">+</span> Invite User by Email
             </h3>
             <form hx-post="/companies/{company_id}/invites" hx-target="#invite-list" hx-swap="innerHTML" class="flex gap-3"
-                hx-on::after-request="if(event.detail.successful) this.reset();">
+                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) this.reset();">
                 <input type="email" name="email" required placeholder="colleague@example.com"
                     class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <button type="submit"
@@ -910,53 +910,192 @@ pub fn user_invite_row_fragment(invite: &CompanyInvite) -> String {
     )
 }
 
-fn render_agents_selection(company_id: Uuid, agents: &[Agent], selected_ids: Option<&[Uuid]>) -> String {
-    if agents.is_empty() {
-        return format!(
-            r#"<p class="text-xs text-slate-400">No agents available for this company. <a href="/companies/{company_id}/agents" class="text-indigo-400 hover:text-indigo-300 underline font-medium">Manage Agents &rarr;</a></p>"#
-        );
-    }
+pub fn render_agents_selection(
+    company_id: Uuid,
+    agents: &[Agent],
+    selected_ids: Option<&[Uuid]>,
+    container_id: &str,
+) -> String {
+    render_agents_selection_full(company_id, agents, selected_ids, container_id, None)
+}
 
+pub fn render_agents_selection_full(
+    company_id: Uuid,
+    agents: &[Agent],
+    selected_ids: Option<&[Uuid]>,
+    container_id: &str,
+    error_msg: Option<&str>,
+) -> String {
     let initial_id = match selected_ids {
         Some(ids) if !ids.is_empty() => ids[0].to_string(),
         _ => String::new(),
     };
 
-    let group_name = format!("agent_radio_{}", Uuid::new_v4().simple());
+    let group_name = format!("agent_radio_{}_{}", container_id, Uuid::new_v4().simple());
+    let agents_selection_id = format!("agents-selection-{container_id}");
+    let inline_form_id = format!("inline-agent-form-{container_id}");
+    let hx_include_val = format!("#{inline_form_id}");
+    let hx_target_val = format!("#{agents_selection_id}");
+    let hx_post_val = format!("/companies/{company_id}/agents/inline?container_id={container_id}");
 
-    let items: String = agents
-        .iter()
-        .map(|agent| {
-            let checked = match selected_ids {
-                Some(ids) if ids.contains(&agent.id) => "checked",
-                _ => "",
-            };
-            format!(
-                r#"
-                <label class="flex items-center gap-2 p-2 bg-slate-800/80 border border-slate-700/80 rounded-lg cursor-pointer hover:bg-slate-700/60 transition">
-                    <input type="radio" name="{group_name}" value="{id}" {checked}
-                        onchange="let form = this.closest('form'); if (form) {{ let target = form.querySelector('input[name=agent_ids]'); if (target) target.value = this.value; }}"
-                        class="border-slate-700 text-indigo-600 focus:ring-indigo-500">
-                    <div class="text-xs flex flex-col">
-                        <span class="font-medium text-white">{name}</span>
-                        <span class="text-slate-400 font-mono text-[10px]">@{slug}</span>
-                    </div>
-                </label>
-                "#,
-                group_name = group_name,
-                id = agent.id,
-                name = agent.name,
-                slug = agent.slug,
-                checked = checked
-            )
-        })
-        .collect();
+    let none_checked = if initial_id.is_empty() { "checked" } else { "" };
+
+    let mut agent_cards = format!(
+        r#"
+        <label class="flex items-center gap-2 p-2 bg-slate-800/80 border border-slate-700/80 rounded-lg cursor-pointer hover:bg-slate-700/60 transition">
+            <input type="radio" name="{group_name}" value="" {none_checked}
+                onchange="let parent = this.closest('#{agents_selection_id}'); if (parent) {{ let target = parent.querySelector('input[name=agent_ids]'); if (target) target.value = ''; }}"
+                class="border-slate-700 text-indigo-600 focus:ring-indigo-500">
+            <div class="text-xs flex flex-col">
+                <span class="font-medium text-slate-300">None</span>
+                <span class="text-slate-500 font-mono text-[10px]">Use channel fallback / custom agent</span>
+            </div>
+        </label>
+        "#,
+        group_name = group_name,
+        agents_selection_id = agents_selection_id,
+        none_checked = none_checked
+    );
+
+    for agent in agents {
+        let checked = match selected_ids {
+            Some(ids) if ids.contains(&agent.id) => "checked",
+            _ => "",
+        };
+        agent_cards.push_str(&format!(
+            r#"
+            <label class="flex items-center gap-2 p-2 bg-slate-800/80 border border-slate-700/80 rounded-lg cursor-pointer hover:bg-slate-700/60 transition">
+                <input type="radio" name="{group_name}" value="{id}" {checked}
+                    onchange="let parent = this.closest('#{agents_selection_id}'); if (parent) {{ let target = parent.querySelector('input[name=agent_ids]'); if (target) target.value = this.value; }}"
+                    class="border-slate-700 text-indigo-600 focus:ring-indigo-500">
+                <div class="text-xs flex flex-col">
+                    <span class="font-medium text-white">{name}</span>
+                    <span class="text-slate-400 font-mono text-[10px]">@{slug}</span>
+                </div>
+            </label>
+            "#,
+            group_name = group_name,
+            agents_selection_id = agents_selection_id,
+            id = agent.id,
+            name = agent.name,
+            slug = agent.slug,
+            checked = checked
+        ));
+    }
+
+    let form_hidden = if error_msg.is_some() { "" } else { "hidden" };
+    let error_html = match error_msg {
+        Some(msg) => format!(
+            r#"<div class="p-2 mb-2 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-xs">{msg}</div>"#
+        ),
+        None => String::new(),
+    };
+
+    let inline_prompt_gen_html = render_ai_prompt_generator(
+        company_id,
+        &format!("inline_agent_system_prompt_{container_id}"),
+        &format!("inline_prompt_gen_box_{container_id}"),
+        &format!("inline_prompt_gen_input_{container_id}"),
+        &format!("inline_prompt_gen_status_{container_id}"),
+        &format!(
+            ", #inline_agent_provider_{container_id}, #inline_agent_model_{container_id}, #inline_agent_api_key_{container_id}"
+        ),
+    );
 
     format!(
-        r#"<div>
+        r#"
+        <div id="{agents_selection_id}" class="space-y-3">
             <input type="hidden" name="agent_ids" value="{initial_id}">
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-1">{items}</div>
-        </div>"#
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-1">
+                {agent_cards}
+            </div>
+            
+            <div>
+                <button type="button"
+                    onclick="let el = document.getElementById('{inline_form_id}'); if (el) el.classList.toggle('hidden'); return false;"
+                    class="text-xs text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer inline-flex items-center gap-1">
+                    <span>+ Create New Agent Inline</span>
+                </button>
+            </div>
+
+            <div id="{inline_form_id}" class="{form_hidden} bg-slate-800/90 border border-indigo-500/50 p-3.5 rounded-xl space-y-3 mt-2 shadow-inner">
+                <div class="flex items-center justify-between text-xs font-semibold text-indigo-300 border-b border-slate-700/60 pb-1.5">
+                    <span>Create Agent Inline</span>
+                    <span class="text-[10px] font-normal text-slate-400">Selected automatically after creation</span>
+                </div>
+                {error_html}
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-300 mb-0.5">Agent Name</label>
+                        <input type="text" id="inline_agent_name_{container_id}" name="inline_agent_name"
+                            oninput="document.getElementById('inline_agent_slug_{container_id}').value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                            class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            placeholder="Support Specialist">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-300 mb-0.5">Slug</label>
+                        <input type="text" id="inline_agent_slug_{container_id}" name="inline_agent_slug"
+                            class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs font-mono placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            placeholder="support-specialist">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-300 mb-0.5">Provider (Optional)</label>
+                        <input type="text" id="inline_agent_provider_{container_id}" name="inline_agent_provider"
+                            class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs font-mono placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            placeholder="google, openai">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-300 mb-0.5">Model (Optional)</label>
+                        <input type="text" id="inline_agent_model_{container_id}" name="inline_agent_model"
+                            class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs font-mono placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            placeholder="gemini-2.5-flash">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-300 mb-0.5">API Key (Optional)</label>
+                        <input type="password" id="inline_agent_api_key_{container_id}" name="inline_agent_api_key"
+                            class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs font-mono placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            placeholder="Key override">
+                    </div>
+                </div>
+                <div>
+                    {inline_prompt_gen_html}
+                    <textarea id="inline_agent_system_prompt_{container_id}" name="inline_agent_system_prompt" rows="2"
+                        class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        placeholder="You are a helpful support agent..."></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-1">
+                    <button type="button"
+                        onclick="let el = document.getElementById('{inline_form_id}'); if (el) el.classList.add('hidden'); return false;"
+                        class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium rounded transition cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="button"
+                        hx-post="{hx_post_val}"
+                        hx-target="{hx_target_val}"
+                        hx-swap="outerHTML"
+                        hx-include="{hx_include_val}"
+                        hx-novalidate="true"
+                        formnovalidate
+                        class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded shadow transition cursor-pointer">
+                        Create & Select Agent
+                    </button>
+                </div>
+            </div>
+        </div>
+        "#,
+        agents_selection_id = agents_selection_id,
+        inline_form_id = inline_form_id,
+        container_id = container_id,
+        initial_id = initial_id,
+        agent_cards = agent_cards,
+        form_hidden = form_hidden,
+        error_html = error_html,
+        hx_post_val = hx_post_val,
+        hx_target_val = hx_target_val,
+        hx_include_val = hx_include_val,
+        inline_prompt_gen_html = inline_prompt_gen_html
     )
 }
 
@@ -997,8 +1136,8 @@ pub fn channels_page(
     spam_scan_enabled: bool,
 ) -> String {
     let list_html = channel_list_fragment(company, app_domain_name, workflows, agents);
-    let agents_selection_html = render_agents_selection(company.id, agents, None);
-    let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, false);
+    let agents_selection_html = render_agents_selection(company.id, agents, None, "new");
+    let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, true);
 
     let content = format!(
         r##"
@@ -1014,11 +1153,50 @@ pub fn channels_page(
 
         <!-- Create Channel Card -->
         <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-8">
-            <h3 class="text-md font-semibold text-white mb-3 flex items-center gap-2">
-                <span class="text-emerald-400">+</span> Add New Channel
-            </h3>
-            <form hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" class="space-y-4" data-company-id="{company_id}"
-                hx-on::after-request="if(event.detail.successful) this.reset();">
+            <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+                <h3 class="text-md font-semibold text-white flex items-center gap-2">
+                    <span class="text-emerald-400">+</span> Add New Channel
+                </h3>
+                <div class="flex items-center bg-slate-800/80 p-1 rounded-lg border border-slate-700/50 text-xs font-medium">
+                    <button type="button" id="tab-simple-btn" onclick="showChannelFormTab('simple')"
+                        class="px-3 py-1 rounded-md text-white bg-indigo-600 font-semibold transition cursor-pointer">
+                        Simple
+                    </button>
+                    <button type="button" id="tab-advanced-btn" onclick="showChannelFormTab('advanced')"
+                        class="px-3 py-1 rounded-md text-slate-400 hover:text-white transition cursor-pointer">
+                        Advanced
+                    </button>
+                </div>
+            </div>
+
+            <!-- Simple Create Channel Form (Default) -->
+            <form id="simple-channel-form" hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" class="space-y-4" data-company-id="{company_id}"
+                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) this.reset();">
+                <input type="hidden" name="form_mode" value="simple">
+                <div>
+                    <label for="simple_channel_name" class="block text-xs font-medium text-slate-300 mb-1">Channel Name</label>
+                    <input type="text" id="simple_channel_name" name="name" required
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder="Inbound Email Handler">
+                </div>
+                <div>
+                    <label for="simple_system_prompt" class="block text-xs font-medium text-slate-300 mb-1">System Prompt</label>
+                    <textarea id="simple_system_prompt" name="system_prompt" rows="4" required
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs"
+                        placeholder="You are a helpful support agent for this channel. Answer questions accurately and concisely."></textarea>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit"
+                        class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/30 transition cursor-pointer">
+                        Create Channel
+                    </button>
+                </div>
+            </form>
+
+            <!-- Advanced Create Channel Form (Hidden by default) -->
+            <form id="advanced-channel-form" hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" class="hidden space-y-4" data-company-id="{company_id}"
+                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) this.reset();">
+                <input type="hidden" name="form_mode" value="advanced">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label for="channel_name" class="block text-xs font-medium text-slate-300 mb-1">Channel Name</label>
@@ -1041,10 +1219,11 @@ pub fn channels_page(
                 </div>
 
                 <div>
-                    <label for="participant_emails" class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Comma-separated, Optional)</label>
+                    <label for="participant_emails" class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Optional - Defaults to Company Team)</label>
                     <input type="text" id="participant_emails" name="participant_emails" data-company-id="{company_id}" oninput="toggleSpamWarning(this)" autocomplete="off"
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        placeholder="agent1@example.com, agent2@example.com">
+                        placeholder="Leave blank for Company Team, @public for open access, or comma-separated emails">
+                    <p class="text-[11px] text-slate-400 mt-1">Leave blank for Company Team members. Use <code class="text-indigo-300">@public</code> to allow anyone, or specify email addresses.</p>
                 </div>
                 <div>
                     <a href="#" onclick="let el = this.nextElementSibling; if (el) el.classList.toggle('hidden'); return false;"
@@ -1090,6 +1269,26 @@ pub fn channels_page(
                 </div>
             </form>
         </div>
+
+        <script>
+            function showChannelFormTab(mode) {{
+                const simpleForm = document.getElementById('simple-channel-form');
+                const advancedForm = document.getElementById('advanced-channel-form');
+                const simpleBtn = document.getElementById('tab-simple-btn');
+                const advancedBtn = document.getElementById('tab-advanced-btn');
+                if (mode === 'simple') {{
+                    if (simpleForm) simpleForm.classList.remove('hidden');
+                    if (advancedForm) advancedForm.classList.add('hidden');
+                    if (simpleBtn) simpleBtn.className = 'px-3 py-1 rounded-md text-white bg-indigo-600 font-semibold transition cursor-pointer';
+                    if (advancedBtn) advancedBtn.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white transition cursor-pointer';
+                }} else {{
+                    if (simpleForm) simpleForm.classList.add('hidden');
+                    if (advancedForm) advancedForm.classList.remove('hidden');
+                    if (simpleBtn) simpleBtn.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white transition cursor-pointer';
+                    if (advancedBtn) advancedBtn.className = 'px-3 py-1 rounded-md text-white bg-indigo-600 font-semibold transition cursor-pointer';
+                }}
+            }}
+        </script>
 
         <!-- Channels List Section -->
         <div>
@@ -1268,13 +1467,18 @@ pub fn channel_edit_fragment(
     let provider_val = workflow.provider.as_deref().unwrap_or("");
     let model_val = workflow.model.as_deref().unwrap_or("");
     let api_key_val = workflow.api_key.as_deref().unwrap_or("");
-    let agents_selection_html = render_agents_selection(company.id, agents, workflow.agent_ids.as_deref());
-    let has_participants = workflow
+    let agents_selection_html = render_agents_selection(
+        company.id,
+        agents,
+        workflow.agent_ids.as_deref(),
+        &workflow.id.to_string(),
+    );
+    let is_public = workflow
         .participant_emails
         .as_ref()
-        .map(|emails| !emails.is_empty() && emails.iter().any(|e| !e.trim().is_empty()))
+        .map(|emails| emails.iter().any(|e| e.trim().eq_ignore_ascii_case("@public")))
         .unwrap_or(false);
-    let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, has_participants);
+    let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, !is_public);
     let custom_config_hidden = if !provider_val.is_empty() || !model_val.is_empty() || !api_key_val.is_empty() || !config_str.is_empty() {
         ""
     } else {
@@ -1305,9 +1509,11 @@ pub fn channel_edit_fragment(
             </div>
 
             <div>
-                <label class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Comma-separated)</label>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Optional - Defaults to Company Team)</label>
                 <input type="text" name="participant_emails" value="{emails_str}" data-company-id="{company_id}" oninput="toggleSpamWarning(this)" autocomplete="off"
-                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="Leave blank for Company Team, @public for open access, or comma-separated emails">
+                <p class="text-[11px] text-slate-400 mt-1">Leave blank for Company Team members. Use <code class="text-indigo-300">@public</code> to allow anyone, or specify email addresses.</p>
             </div>
             <div>
                 <a href="#" onclick="let el = this.nextElementSibling; if (el) el.classList.toggle('hidden'); return false;"
@@ -3406,10 +3612,92 @@ pub fn channel_approvals_fragment(approvals: &[HumanApproval]) -> String {
 
 pub use channel_approvals_fragment as workflow_approvals_fragment;
 
+pub fn render_ai_prompt_generator(
+    company_id: Uuid,
+    sys_prompt_id: &str,
+    gen_box_id: &str,
+    gen_input_id: &str,
+    gen_status_id: &str,
+    include_form_ids: &str,
+) -> String {
+    let hx_vals = format!(
+        r#"{{"target_id": "{sys_prompt_id}", "gen_box_id": "{gen_box_id}"}}"#
+    );
+    let hx_target = format!("#{gen_status_id}");
+    let hx_include = format!("#{gen_input_id}{include_form_ids}");
+
+    format!(
+        r#"
+        <div class="flex items-center justify-between mb-1">
+            <label for="{sys_prompt_id}" class="block text-xs font-medium text-slate-300">System Prompt</label>
+            <button type="button"
+                onclick="let el = document.getElementById('{gen_box_id}'); if (el) {{ el.classList.toggle('hidden'); if (!el.classList.contains('hidden')) {{ const inp = document.getElementById('{gen_input_id}'); if (inp) inp.focus(); }} }} return false;"
+                class="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition cursor-pointer inline-flex items-center gap-1">
+                <span>✨ Generate with AI</span>
+            </button>
+        </div>
+
+        <div id="{gen_box_id}" class="hidden my-2 p-3 bg-slate-900/90 border border-indigo-500/40 rounded-xl space-y-2.5 shadow-inner">
+            <div class="flex items-center justify-between text-xs font-semibold text-indigo-300">
+                <span class="flex items-center gap-1.5">
+                    <span>✨</span>
+                    <span>Generate System Prompt with AI</span>
+                </span>
+                <button type="button" onclick="document.getElementById('{gen_box_id}').classList.add('hidden')" class="text-slate-400 hover:text-white transition cursor-pointer">&times;</button>
+            </div>
+            <p class="text-[11px] text-slate-400">Describe what you want this agent to do (e.g. role, responsibilities, rules, tone):</p>
+            <textarea id="{gen_input_id}" name="user_instructions" rows="2"
+                placeholder="e.g. A helpful support agent that answers questions about billing and refunds politely..."
+                class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans"></textarea>
+
+            <div id="{gen_status_id}" class="text-xs"></div>
+
+            <div class="flex items-center justify-end gap-2 pt-0.5">
+                <button type="button" onclick="document.getElementById('{gen_box_id}').classList.add('hidden')"
+                    class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium rounded transition cursor-pointer">
+                    Cancel
+                </button>
+                <button type="button"
+                    hx-post="/companies/{company_id}/agents/generate-prompt"
+                    hx-target="{hx_target}"
+                    hx-swap="innerHTML"
+                    hx-include="{hx_include}"
+                    hx-vals='{hx_vals}'
+                    hx-disabled-elt="this"
+                    class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-semibold rounded shadow transition cursor-pointer flex items-center gap-1.5 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
+                    <svg class="animate-spin h-3.5 w-3.5 text-white hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="[.htmx-request_&]:hidden">Generate</span>
+                    <span class="hidden [.htmx-request_&]:inline">Generating...</span>
+                </button>
+            </div>
+        </div>
+        "#,
+        company_id = company_id,
+        sys_prompt_id = sys_prompt_id,
+        gen_box_id = gen_box_id,
+        gen_input_id = gen_input_id,
+        gen_status_id = gen_status_id,
+        hx_target = hx_target,
+        hx_include = hx_include,
+        hx_vals = hx_vals
+    )
+}
+
 pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
     let list_html = agent_list_fragment(company, agents);
     let company_name = &company.name;
     let company_id = company.id;
+    let prompt_gen_html = render_ai_prompt_generator(
+        company_id,
+        "agent_system_prompt",
+        "agent_prompt_gen_box",
+        "agent_prompt_gen_input",
+        "agent_prompt_gen_status",
+        ", #agent_provider, #agent_model, #agent_api_key",
+    );
 
     let content = format!(
         r##"
@@ -3430,6 +3718,7 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                     <span class="text-emerald-400">+</span> Add New Agent
                 </h3>
                 <form hx-post="/companies/{company_id}/agents" hx-target="#agent-list" hx-swap="innerHTML" class="space-y-4"
+                      hx-on::after-request="if(event.detail.successful && event.detail.elt === this) this.reset();"
                       onkeydown="if(event.key==='Enter' && event.target.tagName!=='TEXTAREA') event.preventDefault()">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -3464,7 +3753,7 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                     </div>
 
                     <div>
-                        <label for="agent_system_prompt" class="block text-xs font-medium text-slate-300 mb-1">System Prompt (Optional)</label>
+                        {prompt_gen_html}
                         <textarea id="agent_system_prompt" name="system_prompt" rows="2"
                             placeholder="You are a helpful customer support agent..."
                             class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"></textarea>
@@ -3492,6 +3781,7 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
         "##,
         company_name = company_name,
         company_id = company_id,
+        prompt_gen_html = prompt_gen_html,
         list_html = list_html
     );
 
@@ -3595,6 +3885,16 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
         .as_ref()
         .map(|c| serde_json::to_string_pretty(c).unwrap_or_default())
         .unwrap_or_default();
+    let prompt_gen_html = render_ai_prompt_generator(
+        company_id,
+        &format!("agent_system_prompt_{agent_id}"),
+        &format!("agent_prompt_gen_box_{agent_id}"),
+        &format!("agent_prompt_gen_input_{agent_id}"),
+        &format!("agent_prompt_gen_status_{agent_id}"),
+        &format!(
+            ", #agent-row-{agent_id} input[name=provider], #agent-row-{agent_id} input[name=model], #agent-row-{agent_id} input[name=api_key]"
+        ),
+    );
 
     format!(
         r##"
@@ -3627,8 +3927,8 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">System Prompt</label>
-                    <textarea name="system_prompt" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">{system_prompt}</textarea>
+                    {prompt_gen_html}
+                    <textarea id="agent_system_prompt_{agent_id}" name="system_prompt" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">{system_prompt}</textarea>
                 </div>
 
                 <div>
@@ -3656,6 +3956,7 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
         model = model,
         api_key = api_key,
         system_prompt = system_prompt,
-        config_json_str = config_json_str
+        config_json_str = config_json_str,
+        prompt_gen_html = prompt_gen_html
     )
 }

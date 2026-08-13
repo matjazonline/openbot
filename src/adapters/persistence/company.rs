@@ -149,4 +149,39 @@ impl CompanyPersistence for PostgresPersistence {
 
         Ok(())
     }
+
+    async fn is_company_team_member(&self, company_id: Uuid, email: &str) -> AppResult<bool> {
+        let clean_email = email.trim().to_lowercase();
+        let res = sqlx::query_scalar!(
+            r#"SELECT EXISTS (
+                SELECT 1 FROM companies c JOIN users u ON c.user_id = u.id WHERE c.id = $1 AND LOWER(u.email) = LOWER($2)
+                UNION ALL
+                SELECT 1 FROM company_members m JOIN users u ON m.user_id = u.id WHERE m.company_id = $1 AND LOWER(u.email) = LOWER($2)
+            ) as "exists!""#,
+            company_id,
+            clean_email
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(res)
+    }
+
+    async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>> {
+        let rows = sqlx::query_scalar!(
+            r#"SELECT DISTINCT LOWER(u.email) as "email!"
+               FROM (
+                   SELECT u.email FROM companies c JOIN users u ON c.user_id = u.id WHERE c.id = $1
+                   UNION ALL
+                   SELECT u.email FROM company_members m JOIN users u ON m.user_id = u.id WHERE m.company_id = $1
+               ) u"#,
+            company_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(rows)
+    }
 }
