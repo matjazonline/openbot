@@ -136,7 +136,7 @@ impl ThreadUseCases {
         &self,
         raw_payload: RawInboundPayload,
     ) -> AppResult<InboundIngestResult> {
-        let parsed = EmailParser::parse(raw_payload, &self.config.app_domain_name);
+        let mut parsed = EmailParser::parse(raw_payload, &self.config.app_domain_name);
 
         info!(
             "Ingesting email Message-ID: {}, From: {}, To: {:?}",
@@ -421,14 +421,36 @@ impl ThreadUseCases {
                 .map(|m| m.clean_text_body.clone())
                 .collect();
 
-            let clean_text_body = if parsed.is_forwarded {
+            let clean_text_body = if parsed.is_forwarded || history_messages.is_empty() {
                 parsed.clean_text_body.clone()
             } else {
+                let heuristic_clean = EmailParser::strip_quotes_heuristic(&parsed.clean_text_body);
                 EmailParser::strip_historical_quotes_fallback(
-                    &parsed.clean_text_body,
+                    &heuristic_clean,
                     &history_clean_bodies,
                 )
             };
+
+            if clean_text_body != parsed.clean_text_body {
+                parsed.clean_text_body = clean_text_body.clone();
+                let attachment_prompts: Vec<String> = parsed
+                    .attachments
+                    .iter()
+                    .filter(|att| !(att.content_type.to_lowercase().starts_with("image/") && att.size_bytes < 10_000))
+                    .map(|meta| {
+                        format!(
+                            "[Attachment: {}, Type: {}, SHA256: {}, Size: {} bytes]",
+                            meta.filename, meta.content_type, meta.sha256_hash, meta.size_bytes
+                        )
+                    })
+                    .collect();
+
+                parsed.prompt_text = if attachment_prompts.is_empty() {
+                    parsed.clean_text_body.clone()
+                } else {
+                    format!("{}\n\n{}", parsed.clean_text_body, attachment_prompts.join("\n"))
+                };
+            }
 
             let inbound_role = if is_inter_workflow {
                 MessageRole::Agent
@@ -2568,5 +2590,146 @@ mod tests {
         let bounce_pipeline = ingest_pipeline.bounce_info.unwrap();
         assert_eq!(bounce_pipeline.invalid_slugs, vec!["biling"]);
         assert_eq!(bounce_pipeline.suggestions[0].suggestions, vec!["billing"]);
+    }
+
+    #[tokio::test]
+    async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
+        let company_id = Uuid::new_v4();
+        let workflow_id = Uuid::new_v4();
+
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![Company {
+                id: company_id,
+                user_id: Uuid::new_v4(),
+                name: "Acme Corp".to_string(),
+                slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                enable_llm_spam_guardrail: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let workflow_persistence = Arc::new(MockWorkflowPersistence {
+            workflows: Mutex::new(vec![Workflow {
+                id: workflow_id,
+                company_id,
+                name: "Support".to_string(),
+                slug: "support".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                participant_emails: None,
+                agent_ids: None,
+                workflow_config: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        });
+
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+
+        let thread_use_cases = ThreadUseCases::new(
+            thread_persistence.clone(),
+            workflow_persistence,
+            company_persistence,
+            task_persistence,
+            config,
+        );
+
+        // 1. Initial email in a NEW thread containing blockquotes/header markers.
+        // Quotes MUST NOT be stripped because it is the first email in a new thread.
+        let msg1_text = "Please check this user issue:\n\nOn Mon, Aug 10, 2026 at 10:00 AM User wrote:\n> Blockquoted text here";
+        let raw_first_email = RawInboundPayload {
+            to: "support@acme.mailagents.com".to_string(),
+            from: "customer@client.com".to_string(),
+            subject: Some("New Ticket with Quotes".to_string()),
+            text: Some(msg1_text.to_string()),
+            headers: Some("Message-ID: <msg1@client.com>\n".to_string()),
+            ..Default::default()
+        };
+
+        let res1 = thread_use_cases
+            .ingest_and_save_inbound_message(raw_first_email)
+            .await
+            .unwrap();
+
+        assert!(res1.accepted);
+        let msg1 = res1.inbound_message.unwrap();
+        assert_eq!(msg1.clean_text_body, msg1_text); // Preserved full text!
+
+        // 2. Reply in the EXISTING thread containing repeated quotes from msg1.
+        // Quotes MUST be stripped because this is a subsequent message in an existing thread.
+        let msg2_text = "Thanks for looking into this.\n\nPlease check this user issue:\n\nOn Mon, Aug 10, 2026 at 10:00 AM User wrote:\n> Blockquoted text here";
+        let raw_reply_email = RawInboundPayload {
+            to: "support@acme.mailagents.com".to_string(),
+            from: "customer@client.com".to_string(),
+            subject: Some("Re: New Ticket with Quotes".to_string()),
+            text: Some(msg2_text.to_string()),
+            headers: Some("Message-ID: <msg2@client.com>\nIn-Reply-To: <msg1@client.com>\n".to_string()),
+            ..Default::default()
+        };
+
+        let res2 = thread_use_cases
+            .ingest_and_save_inbound_message(raw_reply_email)
+            .await
+            .unwrap();
+
+        assert!(res2.accepted);
+        let msg2 = res2.inbound_message.unwrap();
+        assert_eq!(msg2.clean_text_body, "Thanks for looking into this."); // Stripped quotes!
+
+        // 3. Forwarded email into existing or new thread.
+        // Quotes MUST NOT be stripped because it is a forwarded email.
+        let fwd_text = "FYI forwarding this:\n\n---------- Forwarded message ---------\nFrom: Alice <alice@other.com>\nDate: Mon, Aug 10, 2026\nSubject: Forwarded Issue\n\nOriginal forwarded body";
+        let raw_fwd_email = RawInboundPayload {
+            to: "support@acme.mailagents.com".to_string(),
+            from: "manager@client.com".to_string(),
+            subject: Some("Fwd: External Report".to_string()),
+            text: Some(fwd_text.to_string()),
+            headers: Some("Message-ID: <msg3@client.com>\n".to_string()),
+            ..Default::default()
+        };
+
+        let res3 = thread_use_cases
+            .ingest_and_save_inbound_message(raw_fwd_email)
+            .await
+            .unwrap();
+
+        assert!(res3.accepted);
+        let msg3 = res3.inbound_message.unwrap();
+        assert_eq!(msg3.clean_text_body, fwd_text); // Preserved full forwarded text!
     }
 }

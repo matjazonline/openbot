@@ -114,12 +114,9 @@ impl EmailParser {
             String::new()
         };
 
-        // If email is forwarded, bypass quote stripping so original forwarded content is kept
-        let clean_text_body = if is_forwarded {
-            base_text.trim().to_string()
-        } else {
-            Self::strip_quotes_heuristic(&base_text)
-        };
+        // Preserve full text in clean_text_body; quote stripping is applied during thread ingestion
+        // if the email is a reply in an existing thread and not forwarded.
+        let clean_text_body = base_text.trim().to_string();
 
         // Process attachments - Filter small inline signature images (< 10KB images)
         let mut attachments = Vec::new();
