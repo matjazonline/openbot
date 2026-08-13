@@ -69,6 +69,26 @@ pub fn sanitize_text(input: &str, secret_key: Option<&str>) -> String {
     result
 }
 
+pub fn base_agent_config() -> serde_json::Value {
+    serde_json::json!({
+        "context": {
+            "time": {
+                "type": "builtin",
+                "source": "datetime",
+                "refresh": "per_turn"
+            },
+            "session": {
+                "type": "builtin",
+                "source": "session"
+            },
+            "agent_info": {
+                "type": "builtin",
+                "source": "agent"
+            }
+        }
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ResolvedAgentParams {
     provider: String,
@@ -85,24 +105,25 @@ impl ResolvedAgentParams {
         workflow: Option<&Workflow>,
         agent: Option<&AgentEntity>,
     ) -> anyhow::Result<Self> {
-        let mut config = workflow.and_then(|w| w.workflow_config.clone());
+        let mut config = base_agent_config();
 
-        if let Some(agent_cfg) = agent.and_then(|a| a.config_json.as_ref()) {
-            match config.as_mut() {
-                Some(base_cfg) => {
-                    if base_cfg.is_object() && agent_cfg.is_object() {
-                        merge_json(base_cfg, agent_cfg);
-                    } else {
-                        config = Some(agent_cfg.clone());
-                    }
-                }
-                None => {
-                    config = Some(agent_cfg.clone());
-                }
+        if let Some(wf_cfg) = workflow.and_then(|w| w.workflow_config.as_ref()) {
+            if config.is_object() && wf_cfg.is_object() {
+                merge_json(&mut config, wf_cfg);
+            } else {
+                config = wf_cfg.clone();
             }
         }
 
-        let wf_llm = config.as_ref().and_then(|c| c.get("llm"));
+        if let Some(agent_cfg) = agent.and_then(|a| a.config_json.as_ref()) {
+            if config.is_object() && agent_cfg.is_object() {
+                merge_json(&mut config, agent_cfg);
+            } else {
+                config = agent_cfg.clone();
+            }
+        }
+
+        let wf_llm = config.get("llm");
 
         let provider = agent
             .and_then(|a| a.provider.as_deref())
@@ -198,7 +219,6 @@ impl ResolvedAgentParams {
                 )
             })?;
 
-        let mut config = config.unwrap_or_else(|| serde_json::json!({}));
         let fallback_sys_prompt = agent.and_then(|a| a.system_prompt.as_deref());
         let fallback_name = agent
             .map(|a| a.name.as_str())
@@ -1001,8 +1021,9 @@ mod tests {
         assert_eq!(resolved.provider(), "google");
         assert_eq!(resolved.model(), "gemini-2.5-flash");
         assert_eq!(resolved.api_key(), "company-api-key");
-        assert_eq!(
-            resolved.config(),
+        let mut expected = base_agent_config();
+        merge_json(
+            &mut expected,
             &serde_json::json!({
                 "name": "Acme Corp",
                 "system_prompt": "You are a helpful assistant.",
@@ -1011,8 +1032,9 @@ mod tests {
                     "model": "gemini-2.5-flash",
                     "api_key": "company-api-key"
                 }
-            })
+            }),
         );
+        assert_eq!(resolved.config(), &expected);
     }
 
     #[test]
@@ -1050,8 +1072,9 @@ mod tests {
         assert_eq!(resolved.provider(), "openai"); // Workflow overridden
         assert_eq!(resolved.model(), "gemini-2.5-flash"); // Kept company
         assert_eq!(resolved.api_key(), "workflow-api-key"); // Workflow overridden
-        assert_eq!(
-            resolved.config(),
+        let mut expected = base_agent_config();
+        merge_json(
+            &mut expected,
             &serde_json::json!({
                 "name": "Support Workflow",
                 "system_prompt": "Workflow prompt",
@@ -1061,8 +1084,9 @@ mod tests {
                     "model": "gemini-2.5-flash",
                     "api_key": "workflow-api-key"
                 }
-            })
+            }),
         );
+        assert_eq!(resolved.config(), &expected);
     }
 
     #[test]
@@ -1117,20 +1141,22 @@ mod tests {
         assert_eq!(resolved.provider(), "anthropic"); // Agent overridden
         assert_eq!(resolved.model(), "claude-3-5-sonnet"); // Agent overridden
         assert_eq!(resolved.api_key(), "agent-api-key"); // Agent overridden
-        assert_eq!(
-            resolved.config(),
+        let mut expected = base_agent_config();
+        merge_json(
+            &mut expected,
             &serde_json::json!({
                 "name": "Tech Agent",
-                "system_prompt": "Agent prompt", // Agent overridden
-                "temperature": 0.7,             // Agent overridden
-                "workflow_only_field": true,     // Merged from Workflow
+                "system_prompt": "Agent prompt",
+                "temperature": 0.7,
+                "workflow_only_field": true,
                 "llm": {
                     "provider": "anthropic",
                     "model": "claude-3-5-sonnet",
                     "api_key": "agent-api-key"
                 }
-            })
+            }),
         );
+        assert_eq!(resolved.config(), &expected);
 
         let (p, m, k, c) = resolved.into_tuple();
         assert_eq!(p, "anthropic");
