@@ -3365,6 +3365,9 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
         TaskStatus::PendingApproval => {
             r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-950 text-sky-300 border border-sky-700/50">⏳ Awaiting Approval</span>"#
         }
+        TaskStatus::WaitingForThirdPartyReply => {
+            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-950 text-cyan-300 border border-cyan-700/50">⏳ Awaiting 3rd Party Reply</span>"#
+        }
         TaskStatus::Completed => {
             r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700/50">Completed</span>"#
         }

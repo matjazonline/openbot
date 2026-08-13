@@ -422,6 +422,82 @@ impl ThreadUseCases {
                 }
             }
 
+            if let Some(ref ext_t) = existing_thread {
+                if ext_t.channel_id == workflow.id {
+                    let sender_clean = parsed.sender.trim();
+                    let is_thread_participant = ext_t
+                        .participant_emails
+                        .iter()
+                        .any(|p| p.trim().eq_ignore_ascii_case(sender_clean));
+
+                    let mut is_delegation_target = false;
+                    let mut matched_waiting_task_id = None;
+
+                    if !is_thread_participant {
+                        if let Ok(active_tasks) = self
+                            .task_persistence
+                            .list_company_tasks(
+                                workflow.company_id,
+                                Some(workflow.id),
+                                Some(crate::entities::task::TaskStatus::WaitingForThirdPartyReply),
+                                false,
+                            )
+                            .await
+                        {
+                            for task in active_tasks {
+                                if task.thread_id == Some(ext_t.id) {
+                                    if let Some(delegations) = task.payload.get("delegations").and_then(|d| d.as_array()) {
+                                        for item in delegations {
+                                            if let Some(target_emails) = item.get("target_emails").and_then(|e| e.as_array()) {
+                                                if target_emails.iter().any(|e_val| {
+                                                    e_val.as_str().map_or(false, |e_str| {
+                                                        e_str.trim().eq_ignore_ascii_case(sender_clean)
+                                                    })
+                                                }) {
+                                                    is_delegation_target = true;
+                                                    matched_waiting_task_id = Some(task.id);
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if is_delegation_target {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if !is_thread_participant && !is_delegation_target {
+                        warn!(
+                            "Unauthorized thread injection attempt by '{}' for thread '{}'. Triggering bounce notification.",
+                            sender_clean, ext_t.id
+                        );
+
+                        let bounce = BounceInfo {
+                            recipient_to: parsed.sender.clone(),
+                            company_slug: Some(company.slug.clone()),
+                            invalid_slugs: vec![format!(
+                                "Thread {} (Unauthorized Sender: {})",
+                                ext_t.id, sender_clean
+                            )],
+                            suggestions: vec![],
+                            original_subject: parsed.subject.clone(),
+                        };
+
+                        return Ok(InboundIngestResult::rejected_with_bounce(
+                            "Sender is not an authorized participant or delegation target for this thread",
+                            bounce,
+                        ));
+                    }
+
+                    if let Some(task_id) = matched_waiting_task_id {
+                        let _ = self.task_persistence.resume_task(task_id).await;
+                    }
+                }
+            }
+
             let thread = match existing_thread {
                 Some(t) if t.channel_id == workflow.id => t,
                 _ => {
@@ -1644,8 +1720,8 @@ mod tests {
         async fn list_company_tasks(
             &self,
             company_id: Uuid,
-            _workflow_id: Option<Uuid>,
-            _status: Option<crate::entities::task::TaskStatus>,
+            workflow_id: Option<Uuid>,
+            status: Option<crate::entities::task::TaskStatus>,
             _sort_asc: bool,
         ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
             Ok(self
@@ -1654,6 +1730,8 @@ mod tests {
                 .unwrap()
                 .iter()
                 .filter(|t| t.company_id == company_id)
+                .filter(|t| workflow_id.map_or(true, |w_id| t.channel_id == w_id))
+                .filter(|t| status.as_ref().map_or(true, |s| t.status == *s))
                 .cloned()
                 .collect())
         }
@@ -2998,5 +3076,148 @@ mod tests {
         }).await.unwrap();
         assert!(!res5.accepted);
         assert_eq!(res5.reason.as_deref(), Some("Sender unauthorized for workflow"));
+    }
+
+    #[tokio::test]
+    async fn test_sender_verification_and_delegation_target_check() {
+        let company_id = Uuid::new_v4();
+        let workflow_id = Uuid::new_v4();
+
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
+
+        let workflow_persistence = Arc::new(MockWorkflowPersistence {
+            workflows: Mutex::new(vec![Workflow {
+                id: workflow_id,
+                company_id,
+                name: "Support".to_string(),
+                slug: "support".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                participant_emails: Some(vec!["@public".to_string()]),
+                agent_ids: None,
+                channel_config: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        });
+
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+
+        let thread_use_cases = ThreadUseCases::new(
+            thread_persistence,
+            workflow_persistence,
+            company_persistence,
+            task_persistence.clone(),
+            config,
+        );
+
+        // 1. Initial email from client creates thread
+        let res1 = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
+            headers: Some("Message-ID: <msg-client-1@external.com>\n".to_string()),
+            to: "support@acme.mailagents.com".to_string(),
+            from: "client@external.com".to_string(),
+            subject: Some("Need quote".to_string()),
+            text: Some("Can I get a quote?".to_string()),
+            ..Default::default()
+        }).await.unwrap();
+        assert!(res1.accepted);
+        let thread_id = res1.thread.unwrap().id;
+
+        // 2. Enqueue task in WaitingForThirdPartyReply state with target_emails: ["vendor@supplier.com"]
+        let delegation_payload = serde_json::json!({
+            "delegations": [
+                {
+                    "delegation_id": "d1",
+                    "target_emails": ["vendor@supplier.com"],
+                    "status": "awaiting_reply"
+                }
+            ]
+        });
+        let task = task_persistence.enqueue_task(
+            company_id,
+            workflow_id,
+            Some(thread_id),
+            "email_agent_dispatch",
+            delegation_payload,
+        ).await.unwrap();
+
+        let mut list = task_persistence.tasks.lock().unwrap();
+        if let Some(t) = list.iter_mut().find(|t| t.id == task.id) {
+            t.status = crate::entities::task::TaskStatus::WaitingForThirdPartyReply;
+        }
+        drop(list);
+
+        // 3. Unauthorized third-party attacker tries to inject message into thread using In-Reply-To
+        let res_attacker = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
+            headers: Some("Message-ID: <msg-attacker-1@evil.com>\nIn-Reply-To: <msg-client-1@external.com>\n".to_string()),
+            to: "support@acme.mailagents.com".to_string(),
+            from: "attacker@evil.com".to_string(),
+            subject: Some("Re: Need quote".to_string()),
+            text: Some("Fake reply".to_string()),
+            ..Default::default()
+        }).await.unwrap();
+        assert!(!res_attacker.accepted);
+        assert!(res_attacker.bounce_info.is_some());
+        assert_eq!(
+            res_attacker.reason.as_deref(),
+            Some("Sender is not an authorized participant or delegation target for this thread")
+        );
+
+        // 4. Authorized vendor replies using In-Reply-To
+        let res_vendor = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
+            headers: Some("Message-ID: <msg-vendor-1@supplier.com>\nIn-Reply-To: <msg-client-1@external.com>\n".to_string()),
+            to: "support@acme.mailagents.com".to_string(),
+            from: "vendor@supplier.com".to_string(),
+            subject: Some("Re: Need quote".to_string()),
+            text: Some("Quote is $500".to_string()),
+            ..Default::default()
+        }).await.unwrap();
+        assert!(res_vendor.accepted);
+
+        // Verify task was resumed to Pending
+        let resumed_task = task_persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        assert_eq!(resumed_task.status, crate::entities::task::TaskStatus::Pending);
     }
 }

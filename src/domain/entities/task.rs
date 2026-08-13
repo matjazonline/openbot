@@ -3,11 +3,12 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
     Pending,
     Processing,
     PendingApproval,
+    WaitingForThirdPartyReply,
     Completed,
     Failed,
     DeadLetter,
@@ -20,6 +21,7 @@ impl TaskStatus {
             TaskStatus::Pending => "pending",
             TaskStatus::Processing => "processing",
             TaskStatus::PendingApproval => "pending_approval",
+            TaskStatus::WaitingForThirdPartyReply => "waiting_for_third_party_reply",
             TaskStatus::Completed => "completed",
             TaskStatus::Failed => "failed",
             TaskStatus::DeadLetter => "dead_letter",
@@ -36,6 +38,9 @@ impl FromStr for TaskStatus {
             "pending" => Ok(TaskStatus::Pending),
             "processing" => Ok(TaskStatus::Processing),
             "pending_approval" | "pendingapproval" => Ok(TaskStatus::PendingApproval),
+            "waiting_for_third_party_reply" | "waitingforthirdpartyreply" => {
+                Ok(TaskStatus::WaitingForThirdPartyReply)
+            }
             "completed" => Ok(TaskStatus::Completed),
             "failed" => Ok(TaskStatus::Failed),
             "dead_letter" => Ok(TaskStatus::DeadLetter),
