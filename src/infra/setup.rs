@@ -2,6 +2,7 @@ use crate::{
     adapters::{
         http::app_state::AppState,
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
+        protocols::{EgressRegistry, email::EmailEgressAdapter},
     },
     domain::monitoring::MonitoringService,
     infra::{argon2_password_hasher, config::AppConfig, postgres_persistence},
@@ -39,6 +40,10 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         config.clone(),
     ));
 
+    let egress_registry = Arc::new(
+        EgressRegistry::new().register(Arc::new(EmailEgressAdapter::new(config.clone()))),
+    );
+
     let thread_use_cases = Arc::new(
         ThreadUseCases::new(
             postgres_arc.clone(),
@@ -47,6 +52,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             postgres_arc.clone(),
             config.clone(),
         )
+        .with_egress_registry(egress_registry)
         .with_agent_persistence(postgres_arc.clone())
         .with_approval_use_cases(approval_use_cases.clone())
         .with_monitoring(monitoring.clone()),

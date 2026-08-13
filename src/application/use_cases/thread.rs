@@ -5,12 +5,18 @@ use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
-    domain::monitoring::MonitoringService,
     adapters::persistence::task::TaskPersistence,
+    adapters::protocols::{
+        EgressRegistry,
+        email::{EmailEgressAdapter, EmailIngressAdapter},
+    },
     app_error::AppResult,
+    domain::monitoring::MonitoringService,
     entities::{
+        channel::{ChannelType, ParticipantIdentity},
         company::Company,
         message::{Message, MessageDirection, MessageRole},
+        message_contract::{NormalizedInboundMessage, NormalizedOutboundMessage},
         task::TokenUsage,
         thread::Thread,
         workflow::Workflow,
@@ -76,6 +82,7 @@ pub struct ThreadUseCases {
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
+    egress_registry: Arc<EgressRegistry>,
     config: Arc<AppConfig>,
 }
 
@@ -87,6 +94,10 @@ impl ThreadUseCases {
         task_persistence: Arc<dyn TaskPersistence>,
         config: Arc<AppConfig>,
     ) -> Self {
+        let egress_registry = Arc::new(
+            EgressRegistry::new().register(Arc::new(EmailEgressAdapter::new(config.clone()))),
+        );
+
         Self {
             thread_persistence,
             workflow_persistence,
@@ -95,8 +106,17 @@ impl ThreadUseCases {
             agent_persistence: None,
             approval_use_cases: None,
             monitoring: None,
+            egress_registry,
             config,
         }
+    }
+
+    pub fn with_egress_registry(
+        mut self,
+        egress_registry: Arc<EgressRegistry>,
+    ) -> Self {
+        self.egress_registry = egress_registry;
+        self
     }
 
     pub fn with_agent_persistence(
@@ -131,12 +151,48 @@ impl ThreadUseCases {
         &self.company_persistence
     }
 
+    pub fn config(&self) -> &Arc<AppConfig> {
+        &self.config
+    }
+
     #[instrument(skip(self, raw_payload))]
     pub async fn ingest_and_save_inbound_message(
         &self,
         raw_payload: RawInboundPayload,
     ) -> AppResult<InboundIngestResult> {
-        let mut parsed = EmailParser::parse(raw_payload, &self.config.app_domain_name);
+        let norm = EmailIngressAdapter::parse(raw_payload, &self.config);
+        self.ingest_normalized_message(norm).await
+    }
+
+    #[instrument(skip(self, norm))]
+    pub async fn ingest_normalized_message(
+        &self,
+        norm: NormalizedInboundMessage,
+    ) -> AppResult<InboundIngestResult> {
+        let mut parsed = ParsedEmail {
+            message_id: norm.message_id.clone(),
+            in_reply_to: norm.thread_ref.clone(),
+            references: norm.references.clone(),
+            thread_index: norm.thread_index.clone(),
+            sender: norm.sender.identity.clone(),
+            recipients_to: norm.recipients_to.iter().map(|p| p.identity.clone()).collect(),
+            recipients_cc: norm.recipients_cc.iter().map(|p| p.identity.clone()).collect(),
+            subject: norm.subject.clone(),
+            clean_text_body: norm.clean_text.clone(),
+            raw_text_body: norm.raw_text.clone(),
+            raw_html_body: norm.raw_html.clone(),
+            attachments: norm.attachments.clone(),
+            prompt_text: norm.clean_text.clone(),
+            is_auto_reply: norm.is_auto_reply,
+            is_forwarded: norm.is_forwarded,
+            workflow_id_header: norm.workflow_id_header,
+            hop_count: norm.hop_count,
+            trace_workflows: norm.trace_workflows.clone(),
+            spf_status: norm.spf_status.clone(),
+            dkim_status: norm.dkim_status.clone(),
+            dmarc_status: norm.dmarc_status.clone(),
+            spam_score: norm.spam_score,
+        };
 
         info!(
             "Ingesting email Message-ID: {}, From: {}, To: {:?}",
@@ -509,6 +565,7 @@ impl ThreadUseCases {
             company: Some(first.company.clone()),
             workflow: Some(first.workflow.clone()),
             parsed_email: Some(parsed.clone()),
+            normalized_message: Some(norm.clone()),
             task_id: None,
             workflow_matches,
             bounce_info: None,
@@ -750,6 +807,21 @@ impl ThreadUseCases {
                 }
             }
 
+            let norm_outbound = NormalizedOutboundMessage {
+                thread_id: matches[0].thread.id,
+                in_reply_to_ref: Some(parsed.message_id.clone()),
+                references: references_for_outbound.clone(),
+                recipients_to: vec![ParticipantIdentity::email(&parsed.sender)],
+                recipients_cc: outbound_cc.iter().map(ParticipantIdentity::email).collect(),
+                subject: parsed.subject.clone(),
+                content: combined_agent_response.clone(),
+                attachments: vec![],
+                protocol: ChannelType::Email,
+                workflow_id: primary_workflow.id,
+                hop_count: parsed.hop_count,
+                trace_workflows: parsed.trace_workflows.clone(),
+            };
+
             let outbound_email = OutboundEmail {
                 workflow_id: primary_workflow.id,
                 workflow_name: primary_workflow.name.clone(),
@@ -766,6 +838,9 @@ impl ThreadUseCases {
             };
 
             let sent_result = OutboundDispatcher::send(&self.config, outbound_email).await?;
+            if let Some(adapter) = self.egress_registry.get(&norm_outbound.protocol) {
+                let _ = adapter; // Registered egress adapter present
+            }
             (
                 sent_result.outbound_message_id,
                 sent_result.in_reply_to,
@@ -937,14 +1012,18 @@ impl ThreadUseCases {
 
     pub async fn handle_bounce_dispatch(&self, ingest: &InboundIngestResult) {
         if let Some(ref bounce) = ingest.bounce_info {
-            let bounce_body = format_bounce_email_body(bounce, &self.config.app_domain_name);
-            let _ = OutboundDispatcher::send_bounce(
-                &self.config,
-                &bounce.recipient_to,
-                &bounce.original_subject,
-                &bounce_body,
-            )
-            .await;
+            if let Some(adapter) = self.egress_registry.get(&ChannelType::Email) {
+                let _ = adapter.dispatch_bounce(bounce).await;
+            } else {
+                let bounce_body = format_bounce_email_body(bounce, &self.config.app_domain_name);
+                let _ = OutboundDispatcher::send_bounce(
+                    &self.config,
+                    &bounce.recipient_to,
+                    &bounce.original_subject,
+                    &bounce_body,
+                )
+                .await;
+            }
         }
     }
 
@@ -1097,6 +1176,7 @@ pub struct InboundIngestResult {
     pub company: Option<Company>,
     pub workflow: Option<Workflow>,
     pub parsed_email: Option<ParsedEmail>,
+    pub normalized_message: Option<NormalizedInboundMessage>,
     pub task_id: Option<Uuid>,
     #[serde(default)]
     pub workflow_matches: Vec<WorkflowMatch>,
@@ -1114,6 +1194,7 @@ impl InboundIngestResult {
             company: None,
             workflow: None,
             parsed_email: None,
+            normalized_message: None,
             task_id: None,
             workflow_matches: Vec::new(),
             bounce_info: None,
@@ -1129,6 +1210,7 @@ impl InboundIngestResult {
             company: None,
             workflow: None,
             parsed_email: None,
+            normalized_message: None,
             task_id: None,
             workflow_matches: Vec::new(),
             bounce_info: Some(bounce),

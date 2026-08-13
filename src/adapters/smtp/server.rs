@@ -8,6 +8,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tracing::{error, info, warn};
 
 use crate::{
+    adapters::protocols::email::EmailIngressAdapter,
     domain::monitoring::{MonitoringService, SmtpConnectionMetrics, SmtpStatus},
     application::use_cases::thread::ThreadUseCases,
     application::use_cases::workflow::parse_recipient_address,
@@ -417,7 +418,8 @@ impl SmtpServer {
                             }
                         }
 
-                        match self.thread_use_cases.ingest_and_save_inbound_message(raw_payload).await {
+                        let norm_payload = EmailIngressAdapter::parse(raw_payload, &self.config);
+                        match self.thread_use_cases.ingest_normalized_message(norm_payload).await {
                             Ok(ingest) => {
                                 if let Some(ref m) = self.monitoring {
                                     let status = if ingest.accepted {

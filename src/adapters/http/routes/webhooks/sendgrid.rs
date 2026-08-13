@@ -12,6 +12,7 @@ use tracing::{instrument, warn};
 
 use crate::{
     adapters::http::app_state::AppState,
+    adapters::protocols::email::EmailIngressAdapter,
     services::email_parser::{RawAttachmentData, RawInboundPayload},
     use_cases::thread::ThreadUseCases,
 };
@@ -117,9 +118,10 @@ async fn sendgrid_inbound_webhook(
         }
     }
 
-    // Synchronous Ingestion: Parse MIME, resolve thread, verify ACL, and save inbound message
+    // Synchronous Ingestion: Parse MIME into normalized message, resolve thread, verify ACL, and save inbound message
+    let norm_payload = EmailIngressAdapter::parse(raw_payload, &thread_use_cases.config());
     let ingest = thread_use_cases
-        .ingest_and_save_inbound_message(raw_payload)
+        .ingest_normalized_message(norm_payload)
         .await
         .map_err(|err| {
             warn!("Error ingesting inbound email: {err}");

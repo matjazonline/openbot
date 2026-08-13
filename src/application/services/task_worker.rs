@@ -559,6 +559,7 @@ mod tests {
             company: Some(company),
             workflow: Some(workflow),
             parsed_email: Some(parsed_email),
+            normalized_message: None,
             task_id: None,
             workflow_matches: vec![],
             bounce_info: None,

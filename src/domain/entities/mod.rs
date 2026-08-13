@@ -1,9 +1,11 @@
 pub mod agent;
 pub mod approval;
+pub mod channel;
 pub mod company;
 pub mod company_invite;
 pub mod company_member;
 pub mod message;
+pub mod message_contract;
 pub mod task;
 pub mod thread;
 pub mod user;
