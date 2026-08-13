@@ -56,6 +56,8 @@ impl TaskWorker {
     }
 
     pub async fn process_next_batch(&self) -> Result<(), String> {
+        let _ = self.check_quorum_timeouts().await;
+
         let tasks = self
             .task_persistence
             .poll_next_pending_tasks(10)
@@ -120,6 +122,80 @@ impl TaskWorker {
                             status: TaskStatusMetric::Failed,
                             retry_count: task.retry_count as u32,
                         });
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn check_quorum_timeouts(&self) -> Result<(), String> {
+        let tasks = self
+            .task_persistence
+            .list_company_tasks(
+                uuid::Uuid::nil(),
+                None,
+                Some(crate::entities::task::TaskStatus::WaitingForThirdPartyReply),
+                true,
+            )
+            .await
+            .unwrap_or_default();
+
+        let now = chrono::Utc::now().naive_utc();
+
+        for task in tasks {
+            if let Some(quorum) = task.payload.get("quorum_outreach") {
+                let status = quorum.get("status").and_then(|s| s.as_str()).unwrap_or_default();
+                if status == "awaiting_quorum" {
+                    let expires_str = quorum.get("expires_at").and_then(|s| s.as_str());
+                    let is_expired = if let Some(exp_s) = expires_str {
+                        chrono::NaiveDateTime::parse_from_str(exp_s, "%Y-%m-%dT%H:%M:%S")
+                            .or_else(|_| chrono::NaiveDateTime::parse_from_str(exp_s, "%Y-%m-%d %H:%M:%S"))
+                            .map_or(false, |exp_dt| now > exp_dt)
+                    } else {
+                        false
+                    };
+
+                    let curr_pct = quorum.get("current_percent").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let req_pct = quorum.get("required_threshold_percent").and_then(|v| v.as_f64()).unwrap_or(50.0);
+
+                    if is_expired && curr_pct < req_pct {
+                        info!("Task {} reached quorum timeout with {:.1}% responses (< {:.1}% required). Triggering HITL timeout approval.", task.id, curr_pct, req_pct);
+                        
+                        let mut payload = task.payload.clone();
+                        if let Some(q) = payload.get_mut("quorum_outreach").and_then(|q| q.as_object_mut()) {
+                            q.insert("status".to_string(), serde_json::json!("timeout_pending_approval"));
+                        }
+                        let _ = self.task_persistence.update_task_payload(task.id, payload).await;
+                        let _ = self.task_persistence.update_task_status(task.id, crate::entities::task::TaskStatus::PendingApproval).await;
+
+                        if let Some(approval_use_cases) = self.thread_use_cases.get_approval_use_cases() {
+                            let curr_cnt = quorum.get("current_count").and_then(|v| v.as_u64()).unwrap_or(0);
+                            let tot_cnt = quorum.get("total_targets").and_then(|v| v.as_u64()).unwrap_or(0);
+                            let step_key = format!("quorum_timeout_{}", task.id);
+                            
+                            let _ = approval_use_cases.create_and_send_approval_request(
+                                task.company_id,
+                                task.channel_id,
+                                "Workflow",
+                                "workflow",
+                                "company",
+                                task.thread_id,
+                                Some(task.id),
+                                &step_key,
+                                "admin@company.com",
+                                "quorum_timeout",
+                                "Partial Quorum Timeout: Action Required",
+                                &format!("Outreach reached timeout with {}/{} responses ({:.1}%). Required: {:.1}%.", curr_cnt, tot_cnt, curr_pct, req_pct),
+                                serde_json::json!({
+                                    "current_percent": curr_pct,
+                                    "required_percent": req_pct,
+                                    "current_count": curr_cnt,
+                                    "total_targets": tot_cnt,
+                                }),
+                            ).await;
+                        }
                     }
                 }
             }
@@ -373,6 +449,13 @@ mod tests {
             let mut list = self.tasks.lock().unwrap();
             let t = list.iter_mut().find(|t| t.id == id).unwrap();
             t.status = TaskStatus::Pending;
+            Ok(t.clone())
+        }
+
+        async fn update_task_status(&self, id: Uuid, status: TaskStatus) -> AppResult<BackgroundTask> {
+            let mut list = self.tasks.lock().unwrap();
+            let t = list.iter_mut().find(|t| t.id == id).unwrap();
+            t.status = status;
             Ok(t.clone())
         }
 

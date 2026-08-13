@@ -825,6 +825,7 @@ mod tests {
         async fn mark_task_failed(&self, _id: Uuid, _error_msg: &str, _next_run_at: chrono::NaiveDateTime, _is_dead_letter: bool) -> AppResult<()> { Ok(()) }
         async fn stop_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
         async fn resume_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
+        async fn update_task_status(&self, _id: Uuid, _status: crate::entities::task::TaskStatus) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
         async fn list_company_tasks(&self, _company_id: Uuid, _workflow_id: Option<Uuid>, _status: Option<crate::entities::task::TaskStatus>, _sort_asc: bool) -> AppResult<Vec<crate::entities::task::BackgroundTask>> { Ok(vec![]) }
     }
 

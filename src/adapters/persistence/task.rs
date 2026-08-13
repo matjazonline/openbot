@@ -85,6 +85,8 @@ pub trait TaskPersistence: Send + Sync {
 
     async fn resume_task(&self, id: Uuid) -> AppResult<BackgroundTask>;
 
+    async fn update_task_status(&self, id: Uuid, status: TaskStatus) -> AppResult<BackgroundTask>;
+
     async fn list_company_tasks(
         &self,
         company_id: Uuid,
@@ -254,6 +256,24 @@ impl TaskPersistence for PostgresPersistence {
                          run_at, created_at, updated_at"#,
         )
         .bind(id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        db.try_into()
+    }
+
+    async fn update_task_status(&self, id: Uuid, status: TaskStatus) -> AppResult<BackgroundTask> {
+        let db = sqlx::query_as::<_, BackgroundTaskDb>(
+            r#"UPDATE background_tasks
+               SET status = $2, updated_at = CURRENT_TIMESTAMP
+               WHERE id = $1
+               RETURNING id, company_id, channel_id, thread_id, task_type, status, payload,
+                         retry_count, max_retries, last_error,
+                         run_at, created_at, updated_at"#,
+        )
+        .bind(id)
+        .bind(status.as_str())
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;

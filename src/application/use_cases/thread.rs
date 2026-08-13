@@ -135,6 +135,10 @@ impl ThreadUseCases {
         self
     }
 
+    pub fn get_approval_use_cases(&self) -> Option<Arc<ApprovalUseCases>> {
+        self.approval_use_cases.clone()
+    }
+
     pub fn with_monitoring(
         mut self,
         monitoring: Arc<dyn MonitoringService>,
@@ -1714,6 +1718,13 @@ mod tests {
             let mut list = self.tasks.lock().unwrap();
             let t = list.iter_mut().find(|t| t.id == id).unwrap();
             t.status = crate::entities::task::TaskStatus::Pending;
+            Ok(t.clone())
+        }
+
+        async fn update_task_status(&self, id: Uuid, status: crate::entities::task::TaskStatus) -> AppResult<crate::entities::task::BackgroundTask> {
+            let mut list = self.tasks.lock().unwrap();
+            let t = list.iter_mut().find(|t| t.id == id).unwrap();
+            t.status = status;
             Ok(t.clone())
         }
 

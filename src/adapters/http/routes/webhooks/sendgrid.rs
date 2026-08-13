@@ -422,6 +422,13 @@ mod tests {
             Ok(t.clone())
         }
 
+        async fn update_task_status(&self, id: Uuid, status: crate::entities::task::TaskStatus) -> AppResult<crate::entities::task::BackgroundTask> {
+            let mut list = self.tasks.lock().unwrap();
+            let t = list.iter_mut().find(|t| t.id == id).unwrap();
+            t.status = status;
+            Ok(t.clone())
+        }
+
         async fn list_company_tasks(&self, company_id: Uuid, _workflow_id: Option<Uuid>, _status: Option<crate::entities::task::TaskStatus>, _sort_asc: bool) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
             Ok(self.tasks.lock().unwrap().iter().filter(|t| t.company_id == company_id).cloned().collect())
         }

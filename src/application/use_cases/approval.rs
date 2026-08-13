@@ -166,12 +166,15 @@ impl ApprovalUseCases {
             ));
         }
 
-        let new_status = match action.to_lowercase().as_str() {
-            "confirm" | "approved" | "approve" => ApprovalStatus::Approved,
+        let normalized_action = action.to_lowercase();
+        let new_status = match normalized_action.as_str() {
+            "confirm" | "approved" | "approve" | "proceed_partial" | "extend_24h" | "extend_48h" | "extend" => {
+                ApprovalStatus::Approved
+            }
             "reject" | "rejected" => ApprovalStatus::Rejected,
             _ => {
                 return Err(AppError::Internal(
-                    "Invalid action (must be 'confirm' or 'reject').".into(),
+                    format!("Invalid action '{}'.", action),
                 ));
             }
         };
@@ -181,28 +184,35 @@ impl ApprovalUseCases {
             .update_approval_status(approval.id, new_status.clone())
             .await?;
 
-        let message_text = match new_status {
-            ApprovalStatus::Approved => {
-                // Re-queue task if associated
+        let message_text = match normalized_action.as_str() {
+            "proceed_partial" => {
                 if let Some(task_id) = approval.task_id {
+                    if let Ok(Some(task)) = self.task_persistence.get_task_by_id(task_id).await {
+                        let mut payload = task.payload.clone();
+                        if let Some(q) = payload.get_mut("quorum_outreach") {
+                            if let Some(obj) = q.as_object_mut() {
+                                obj.insert("status".to_string(), serde_json::json!("proceed_partial"));
+                            }
+                        }
+                        let _ = self.task_persistence.update_task_payload(task_id, payload).await;
+                    }
                     let _ = self.task_persistence.resume_task(task_id).await;
                 }
 
-                // Add system message to thread if associated
                 if let Some(thread_id) = approval.thread_id {
                     let sys_msg = Message {
                         id: Uuid::new_v4(),
                         thread_id,
-                        message_id: format!("<approval-granted-{}@{}>", approval.id, self.config.app_domain_name),
+                        message_id: format!("<quorum-partial-{}@{}>", approval.id, self.config.app_domain_name),
                         in_reply_to: None,
                         references_list: vec![],
                         sender: approval.approver_email.clone(),
                         recipients_to: vec![],
                         recipients_cc: vec![],
-                        subject: format!("[HITL Granted]: {}", approval.action_title),
+                        subject: format!("[HITL Proceed Partial]: {}", approval.action_title),
                         clean_text_body: format!(
-                            "Human approval GRANTED by {} for action '{}'.",
-                            approval.approver_email, approval.action_title
+                            "Human decision by {}: Proceeding with partial quorum responses.",
+                            approval.approver_email
                         ),
                         raw_text_body: None,
                         raw_html_body: None,
@@ -216,31 +226,44 @@ impl ApprovalUseCases {
                 }
 
                 format!(
-                    "✓ Action '{}' has been CONFIRMED successfully. Associated automated workflows have been resumed.",
+                    "✓ Action '{}' confirmed: Proceeding with partial data. Workflows resumed.",
                     approval.action_title
                 )
             }
-            ApprovalStatus::Rejected => {
-                // Stop task if associated
+            "extend_24h" | "extend_48h" | "extend" => {
+                let extend_hours = if normalized_action.contains("48") { 48 } else { 24 };
                 if let Some(task_id) = approval.task_id {
-                    let _ = self.task_persistence.stop_task(task_id).await;
+                    if let Ok(Some(task)) = self.task_persistence.get_task_by_id(task_id).await {
+                        let mut payload = task.payload.clone();
+                        if let Some(q) = payload.get_mut("quorum_outreach") {
+                            if let Some(obj) = q.as_object_mut() {
+                                let new_exp = Utc::now().naive_utc() + chrono::Duration::hours(extend_hours);
+                                obj.insert("expires_at".to_string(), serde_json::json!(new_exp.to_string()));
+                                obj.insert("status".to_string(), serde_json::json!("awaiting_quorum"));
+                            }
+                        }
+                        let _ = self.task_persistence.update_task_payload(task_id, payload).await;
+                    }
+                    let _ = self
+                        .task_persistence
+                        .update_task_status(task_id, crate::entities::task::TaskStatus::WaitingForThirdPartyReply)
+                        .await;
                 }
 
-                // Add system message to thread if associated
                 if let Some(thread_id) = approval.thread_id {
                     let sys_msg = Message {
                         id: Uuid::new_v4(),
                         thread_id,
-                        message_id: format!("<approval-rejected-{}@{}>", approval.id, self.config.app_domain_name),
+                        message_id: format!("<quorum-extended-{}@{}>", approval.id, self.config.app_domain_name),
                         in_reply_to: None,
                         references_list: vec![],
                         sender: approval.approver_email.clone(),
                         recipients_to: vec![],
                         recipients_cc: vec![],
-                        subject: format!("[HITL Rejected]: {}", approval.action_title),
+                        subject: format!("[HITL Timeout Extended]: {}", approval.action_title),
                         clean_text_body: format!(
-                            "Human approval REJECTED by {} for action '{}'.",
-                            approval.approver_email, approval.action_title
+                            "Human decision by {}: Outreach response timeout extended by {} hours.",
+                            approval.approver_email, extend_hours
                         ),
                         raw_text_body: None,
                         raw_html_body: None,
@@ -254,11 +277,89 @@ impl ApprovalUseCases {
                 }
 
                 format!(
-                    "✗ Action '{}' has been REJECTED. The automated workflow task has been cancelled.",
-                    approval.action_title
+                    "✓ Action '{}' confirmed: Outreach timeout extended by {} hours.",
+                    approval.action_title, extend_hours
                 )
             }
-            _ => String::new(),
+            _ => match new_status {
+                ApprovalStatus::Approved => {
+                    // Re-queue task if associated
+                    if let Some(task_id) = approval.task_id {
+                        let _ = self.task_persistence.resume_task(task_id).await;
+                    }
+
+                    // Add system message to thread if associated
+                    if let Some(thread_id) = approval.thread_id {
+                        let sys_msg = Message {
+                            id: Uuid::new_v4(),
+                            thread_id,
+                            message_id: format!("<approval-granted-{}@{}>", approval.id, self.config.app_domain_name),
+                            in_reply_to: None,
+                            references_list: vec![],
+                            sender: approval.approver_email.clone(),
+                            recipients_to: vec![],
+                            recipients_cc: vec![],
+                            subject: format!("[HITL Granted]: {}", approval.action_title),
+                            clean_text_body: format!(
+                                "Human approval GRANTED by {} for action '{}'.",
+                                approval.approver_email, approval.action_title
+                            ),
+                            raw_text_body: None,
+                            raw_html_body: None,
+                            attachments: None,
+                            direction: MessageDirection::Inbound,
+                            role: MessageRole::System,
+                            thread_index: None,
+                            created_at: Utc::now().naive_utc(),
+                        };
+                        let _ = self.thread_persistence.create_message(&sys_msg).await;
+                    }
+
+                    format!(
+                        "✓ Action '{}' has been CONFIRMED successfully. Associated automated workflows have been resumed.",
+                        approval.action_title
+                    )
+                }
+                ApprovalStatus::Rejected => {
+                    // Stop task if associated
+                    if let Some(task_id) = approval.task_id {
+                        let _ = self.task_persistence.stop_task(task_id).await;
+                    }
+
+                    // Add system message to thread if associated
+                    if let Some(thread_id) = approval.thread_id {
+                        let sys_msg = Message {
+                            id: Uuid::new_v4(),
+                            thread_id,
+                            message_id: format!("<approval-rejected-{}@{}>", approval.id, self.config.app_domain_name),
+                            in_reply_to: None,
+                            references_list: vec![],
+                            sender: approval.approver_email.clone(),
+                            recipients_to: vec![],
+                            recipients_cc: vec![],
+                            subject: format!("[HITL Rejected]: {}", approval.action_title),
+                            clean_text_body: format!(
+                                "Human approval REJECTED by {} for action '{}'.",
+                                approval.approver_email, approval.action_title
+                            ),
+                            raw_text_body: None,
+                            raw_html_body: None,
+                            attachments: None,
+                            direction: MessageDirection::Inbound,
+                            role: MessageRole::System,
+                            thread_index: None,
+                            created_at: Utc::now().naive_utc(),
+                        };
+                        let _ = self.thread_persistence.create_message(&sys_msg).await;
+                    }
+
+                    format!(
+                        "✗ Action '{}' has been REJECTED. The automated workflow task has been cancelled.",
+                        approval.action_title
+                    )
+                }
+                _ => String::new(),
+            },
         };
 
         Ok((updated, message_text))
@@ -388,6 +489,7 @@ mod tests {
         async fn mark_task_failed(&self, _id: Uuid, _error_msg: &str, _next_run_at: chrono::NaiveDateTime, _is_dead_letter: bool) -> AppResult<()> { Ok(()) }
         async fn stop_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
         async fn resume_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
+        async fn update_task_status(&self, _id: Uuid, _status: crate::entities::task::TaskStatus) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
         async fn list_company_tasks(&self, _company_id: Uuid, _workflow_id: Option<Uuid>, _status: Option<crate::entities::task::TaskStatus>, _sort_asc: bool) -> AppResult<Vec<crate::entities::task::BackgroundTask>> { unimplemented!() }
     }
 
@@ -634,5 +736,92 @@ mod tests {
         let db_list2 = shared_db.approvals.lock().unwrap();
         assert_eq!(db_list2.len(), 1);
         assert_eq!(db_list2[0].status, ApprovalStatus::Approved);
+    }
+
+    #[tokio::test]
+    async fn test_quorum_timeout_hitl_link_actions() {
+        let approval_persistence = Arc::new(MockApprovalPersistence {
+            approvals: Mutex::new(Vec::new()),
+        });
+        let task_persistence = Arc::new(MockTaskPersistence);
+        let thread_persistence = Arc::new(MockThreadPersistence);
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".into(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".into(),
+            smtp_host: "localhost".into(),
+            smtp_port: 1025,
+            smtp_username: "".into(),
+            smtp_password: "".into(),
+            smtp_from_address: "noreply@mailagents.com".into(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".into(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        });
+
+        let use_cases = ApprovalUseCases::new(
+            approval_persistence,
+            task_persistence,
+            thread_persistence,
+            config,
+        );
+
+        let company_id = Uuid::new_v4();
+        let workflow_id = Uuid::new_v4();
+        let thread_id = Uuid::new_v4();
+
+        // Create approval request for partial quorum timeout
+        let approval = use_cases.create_and_send_approval_request(
+            company_id,
+            workflow_id,
+            "Support",
+            "support",
+            "acme",
+            Some(thread_id),
+            None,
+            "step_quorum_timeout_123",
+            "manager@acme.com",
+            "quorum_timeout",
+            "Partial Quorum Timeout: Action Required",
+            "Received 1/4 responses (25.0%). Required: 50.0%.",
+            serde_json::json!({ "threshold_percent": 50.0 }),
+        ).await.unwrap();
+
+        // 1. Test "proceed_partial" action
+        let (updated, msg) = use_cases.process_link_action(&approval.token, "proceed_partial").await.unwrap();
+        assert_eq!(updated.status, ApprovalStatus::Approved);
+        assert!(msg.contains("Proceeding with partial data"));
+
+        // 2. Create another approval and test "extend_24h" action
+        let approval2 = use_cases.create_and_send_approval_request(
+            company_id,
+            workflow_id,
+            "Support",
+            "support",
+            "acme",
+            Some(thread_id),
+            None,
+            "step_quorum_timeout_456",
+            "manager@acme.com",
+            "quorum_timeout",
+            "Partial Quorum Timeout: Action Required",
+            "Received 1/4 responses (25.0%). Required: 50.0%.",
+            serde_json::json!({ "threshold_percent": 50.0 }),
+        ).await.unwrap();
+
+        let (updated2, msg2) = use_cases.process_link_action(&approval2.token, "extend_24h").await.unwrap();
+        assert_eq!(updated2.status, ApprovalStatus::Approved);
+        assert!(msg2.contains("extended by 24 hours"));
     }
 }
