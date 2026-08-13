@@ -66,7 +66,7 @@ impl TokenUsage {
 pub struct BackgroundTask {
     pub id: Uuid,
     pub company_id: Uuid,
-    pub workflow_id: Uuid,
+    pub channel_id: Uuid,
     pub thread_id: Option<Uuid>,
     pub task_type: String,
     pub status: TaskStatus,

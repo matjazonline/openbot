@@ -305,7 +305,7 @@ mod tests {
             let approval = HumanApproval {
                 id: Uuid::new_v4(),
                 company_id,
-                workflow_id,
+                channel_id: workflow_id,
                 thread_id,
                 task_id,
                 step_key: step_key.to_string(),
@@ -370,7 +370,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .filter(|a| a.company_id == company_id && a.workflow_id == workflow_id)
+                .filter(|a| a.company_id == company_id && a.channel_id == workflow_id)
                 .cloned()
                 .collect())
         }

@@ -48,9 +48,9 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
             .unwrap_or_default();
 
         let outbound = OutboundEmail {
-            workflow_id: message.workflow_id,
-            workflow_name: "Workflow".to_string(),
-            workflow_slug: "workflow".to_string(),
+            workflow_id: message.channel_id,
+            workflow_name: "Channel".to_string(),
+            workflow_slug: "channel".to_string(),
             company_slug: "company".to_string(),
             trigger_message_id,
             thread_references: message.references.clone(),
@@ -59,7 +59,7 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
             subject: message.subject.clone(),
             body_text: message.content.clone(),
             hop_count: message.hop_count,
-            trace_workflows: message.trace_workflows.clone(),
+            trace_workflows: message.trace_channels.clone(),
         };
 
         OutboundDispatcher::send(&self.config, outbound).await?;

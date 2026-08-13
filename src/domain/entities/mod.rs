@@ -9,6 +9,7 @@ pub mod message_contract;
 pub mod task;
 pub mod thread;
 pub mod user;
-pub mod workflow;
+
+pub use channel as workflow;
 
 

@@ -17,7 +17,7 @@ use crate::{
 #[derive(sqlx::FromRow, Debug)]
 pub struct ThreadDb {
     pub id: Uuid,
-    pub workflow_id: Uuid,
+    pub channel_id: Uuid,
     pub subject: String,
     pub participant_emails: Vec<String>,
     pub created_at: NaiveDateTime,
@@ -28,7 +28,7 @@ impl From<ThreadDb> for Thread {
     fn from(db: ThreadDb) -> Self {
         Thread {
             id: db.id,
-            workflow_id: db.workflow_id,
+            channel_id: db.channel_id,
             subject: db.subject,
             participant_emails: db.participant_emails,
             created_at: db.created_at,
@@ -107,16 +107,15 @@ impl ThreadPersistence for PostgresPersistence {
         participant_emails: &[String],
     ) -> AppResult<Thread> {
         let id = Uuid::new_v4();
-        let db = sqlx::query_as!(
-            ThreadDb,
-            r#"INSERT INTO threads (id, workflow_id, subject, participant_emails)
+        let db = sqlx::query_as::<_, ThreadDb>(
+            r#"INSERT INTO threads (id, channel_id, subject, participant_emails)
                VALUES ($1, $2, $3, $4)
-               RETURNING id, workflow_id, subject, participant_emails, created_at as "created_at!", updated_at as "updated_at!""#,
-            id,
-            workflow_id,
-            subject,
-            participant_emails
+               RETURNING id, channel_id, subject, participant_emails, created_at, updated_at"#,
         )
+        .bind(id)
+        .bind(workflow_id)
+        .bind(subject)
+        .bind(participant_emails)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -125,12 +124,11 @@ impl ThreadPersistence for PostgresPersistence {
     }
 
     async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>> {
-        let db = sqlx::query_as!(
-            ThreadDb,
-            r#"SELECT id, workflow_id, subject, participant_emails, created_at as "created_at!", updated_at as "updated_at!"
+        let db = sqlx::query_as::<_, ThreadDb>(
+            r#"SELECT id, channel_id, subject, participant_emails, created_at, updated_at
                FROM threads WHERE id = $1"#,
-            id
         )
+        .bind(id)
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -143,15 +141,14 @@ impl ThreadPersistence for PostgresPersistence {
         id: Uuid,
         participant_emails: &[String],
     ) -> AppResult<Thread> {
-        let db = sqlx::query_as!(
-            ThreadDb,
+        let db = sqlx::query_as::<_, ThreadDb>(
             r#"UPDATE threads
                SET participant_emails = $1, updated_at = CURRENT_TIMESTAMP
                WHERE id = $2
-               RETURNING id, workflow_id, subject, participant_emails, created_at as "created_at!", updated_at as "updated_at!""#,
-            participant_emails,
-            id
+               RETURNING id, channel_id, subject, participant_emails, created_at, updated_at"#,
         )
+        .bind(participant_emails)
+        .bind(id)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -164,15 +161,14 @@ impl ThreadPersistence for PostgresPersistence {
             return Ok(None);
         }
 
-        let db = sqlx::query_as!(
-            ThreadDb,
-            r#"SELECT t.id, t.workflow_id, t.subject, t.participant_emails, t.created_at as "created_at!", t.updated_at as "updated_at!"
+        let db = sqlx::query_as::<_, ThreadDb>(
+            r#"SELECT t.id, t.channel_id, t.subject, t.participant_emails, t.created_at, t.updated_at
                FROM threads t
                JOIN messages m ON m.thread_id = t.id
                WHERE m.message_id = ANY($1)
                LIMIT 1"#,
-            message_ids
         )
+        .bind(message_ids)
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -186,15 +182,14 @@ impl ThreadPersistence for PostgresPersistence {
         }
 
         let prefix_match = format!("{}%", thread_index_prefix.trim());
-        let db = sqlx::query_as!(
-            ThreadDb,
-            r#"SELECT t.id, t.workflow_id, t.subject, t.participant_emails, t.created_at as "created_at!", t.updated_at as "updated_at!"
+        let db = sqlx::query_as::<_, ThreadDb>(
+            r#"SELECT t.id, t.channel_id, t.subject, t.participant_emails, t.created_at, t.updated_at
                FROM threads t
                JOIN messages m ON m.thread_id = t.id
                WHERE m.thread_index LIKE $1
                LIMIT 1"#,
-            prefix_match
         )
+        .bind(prefix_match)
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -203,12 +198,12 @@ impl ThreadPersistence for PostgresPersistence {
     }
 
     async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize> {
-        let count = sqlx::query_scalar!(
+        let count: Option<i64> = sqlx::query_scalar(
             r#"SELECT COUNT(*) FROM messages
                WHERE thread_id = $1 AND created_at >= NOW() - ($2 || ' seconds')::INTERVAL"#,
-            thread_id,
-            duration_secs.to_string()
         )
+        .bind(thread_id)
+        .bind(duration_secs.to_string())
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -222,8 +217,7 @@ impl ThreadPersistence for PostgresPersistence {
             .as_ref()
             .map(|a| serde_json::to_value(a).unwrap_or(Value::Null));
 
-        let db = sqlx::query_as!(
-            MessageDb,
+        let db = sqlx::query_as::<_, MessageDb>(
             r#"INSERT INTO messages (
                     id, thread_id, message_id, in_reply_to, references_list,
                     sender, recipients_to, recipients_cc, subject, clean_text_body,
@@ -233,49 +227,46 @@ impl ThreadPersistence for PostgresPersistence {
                RETURNING id, thread_id, message_id, in_reply_to, references_list,
                          sender, recipients_to, recipients_cc, subject, clean_text_body,
                          raw_text_body, raw_html_body, attachments, direction, role, thread_index,
-                         created_at as "created_at!""#,
-            message.id,
-            message.thread_id,
-            message.message_id,
-            message.in_reply_to.as_deref(),
-            &message.references_list,
-            message.sender,
-            &message.recipients_to,
-            &message.recipients_cc,
-            message.subject,
-            message.clean_text_body,
-            message.raw_text_body.as_deref(),
-            message.raw_html_body.as_deref(),
-            attachments_json,
-            message.direction.as_str(),
-            message.role.as_str(),
-            message.thread_index.as_deref()
+                         created_at"#,
         )
+        .bind(message.id)
+        .bind(message.thread_id)
+        .bind(&message.message_id)
+        .bind(message.in_reply_to.as_deref())
+        .bind(&message.references_list)
+        .bind(&message.sender)
+        .bind(&message.recipients_to)
+        .bind(&message.recipients_cc)
+        .bind(&message.subject)
+        .bind(&message.clean_text_body)
+        .bind(message.raw_text_body.as_deref())
+        .bind(message.raw_html_body.as_deref())
+        .bind(attachments_json)
+        .bind(message.direction.as_str())
+        .bind(message.role.as_str())
+        .bind(message.thread_index.as_deref())
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
 
         // Update thread's updated_at timestamp
-        let _ = sqlx::query!(
-            "UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1",
-            message.thread_id
-        )
-        .execute(&self.pool)
-        .await;
+        let _ = sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
+            .bind(message.thread_id)
+            .execute(&self.pool)
+            .await;
 
         db.try_into()
     }
 
     async fn get_message_by_message_id(&self, message_id: &str) -> AppResult<Option<Message>> {
-        let db = sqlx::query_as!(
-            MessageDb,
+        let db = sqlx::query_as::<_, MessageDb>(
             r#"SELECT id, thread_id, message_id, in_reply_to, references_list,
                       sender, recipients_to, recipients_cc, subject, clean_text_body,
                       raw_text_body, raw_html_body, attachments, direction, role, thread_index,
-                      created_at as "created_at!"
+                      created_at
                FROM messages WHERE message_id = $1"#,
-            message_id
         )
+        .bind(message_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -287,15 +278,14 @@ impl ThreadPersistence for PostgresPersistence {
     }
 
     async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-        let db_list = sqlx::query_as!(
-            MessageDb,
+        let db_list = sqlx::query_as::<_, MessageDb>(
             r#"SELECT id, thread_id, message_id, in_reply_to, references_list,
                       sender, recipients_to, recipients_cc, subject, clean_text_body,
                       raw_text_body, raw_html_body, attachments, direction, role, thread_index,
-                      created_at as "created_at!"
+                      created_at
                FROM messages WHERE thread_id = $1 ORDER BY created_at ASC"#,
-            thread_id
         )
+        .bind(thread_id)
         .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)?;

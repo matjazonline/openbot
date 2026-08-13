@@ -34,7 +34,7 @@ pub fn base_layout(title: &str, content: &str) -> String {
             <div class="flex items-center gap-4 text-sm font-medium">
                 <a href="/companies" class="text-slate-300 hover:text-white transition">Companies</a>
                 <a id="nav-agents" href="#" class="hidden text-slate-300 hover:text-white transition">Agents</a>
-                <a id="nav-workflows" href="#" class="hidden text-slate-300 hover:text-white transition">Workflows</a>
+                <a id="nav-channels" href="#" class="hidden text-slate-300 hover:text-white transition">Channels</a>
                 <a href="/invites" class="text-slate-300 hover:text-white transition">My Invites</a>
                 <a href="/login" class="text-slate-300 hover:text-white transition">Sign In</a>
                 <a href="/register" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition">Sign Up</a>
@@ -52,26 +52,26 @@ pub fn base_layout(title: &str, content: &str) -> String {
         function selectCompany(companyId) {{
             if (!companyId) return;
             localStorage.setItem('cached_company_id', companyId);
-            updateNavWorkflows();
+            updateNavChannels();
         }}
 
         function clearCachedCompanyIfMatch(companyId) {{
             if (getCachedCompanyId() === companyId) {{
                 localStorage.removeItem('cached_company_id');
-                updateNavWorkflows();
+                updateNavChannels();
             }}
         }}
 
-        function updateNavWorkflows() {{
-            const navWorkflows = document.getElementById('nav-workflows');
+        function updateNavChannels() {{
+            const navChannels = document.getElementById('nav-channels');
             const navAgents = document.getElementById('nav-agents');
             const companyId = getCachedCompanyId();
-            if (navWorkflows) {{
+            if (navChannels) {{
                 if (companyId) {{
-                    navWorkflows.href = '/companies/' + companyId + '/workflows';
-                    navWorkflows.classList.remove('hidden');
+                    navChannels.href = '/companies/' + companyId + '/channels';
+                    navChannels.classList.remove('hidden');
                 }} else {{
-                    navWorkflows.classList.add('hidden');
+                    navChannels.classList.add('hidden');
                 }}
             }}
             if (navAgents) {{
@@ -96,7 +96,7 @@ pub fn base_layout(title: &str, content: &str) -> String {
             if (match && match[1]) {{
                 selectCompany(match[1]);
             }} else {{
-                updateNavWorkflows();
+                updateNavChannels();
             }}
         }}
 
@@ -513,9 +513,9 @@ pub fn company_row_fragment(company: &Company) -> String {
                     class="px-3 py-1.5 text-xs font-medium bg-sky-900/80 hover:bg-sky-800 text-sky-200 border border-sky-700/50 rounded-lg transition">
                     Agents
                 </a>
-                <a href="/companies/{id}/workflows" onclick="selectCompany('{id}')"
+                <a href="/companies/{id}/channels" onclick="selectCompany('{id}')"
                     class="px-3 py-1.5 text-xs font-medium bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/50 rounded-lg transition">
-                    Workflows
+                    Channels
                 </a>
                 <a href="/companies/{id}/invites" onclick="selectCompany('{id}')"
                     class="px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
@@ -978,7 +978,7 @@ fn render_spam_disabled_warning(spam_scan_enabled: bool, initial_disabled: bool)
                 </svg>
                 Spam scanning is disabled in server configuration
             </div>
-            <div>Workflows without participant email restrictions will receive incoming emails without spam filtering.</div>
+            <div>Channels without participant email restrictions will receive incoming emails without spam filtering.</div>
             <label class="flex items-center gap-2 cursor-pointer mt-1 font-medium text-amber-200">
                 <input type="checkbox" name="confirm_spam_disabled" value="true" {checkbox_attr} class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-amber-500">
                 <span>I am aware that spam scanning is disabled and confirm saving without participant restrictions.</span>
@@ -989,14 +989,14 @@ fn render_spam_disabled_warning(spam_scan_enabled: bool, initial_disabled: bool)
     }
 }
 
-pub fn workflows_page(
+pub fn channels_page(
     company: &Company,
     app_domain_name: &str,
     workflows: &[Workflow],
     agents: &[Agent],
     spam_scan_enabled: bool,
 ) -> String {
-    let list_html = workflow_list_fragment(company, app_domain_name, workflows, agents);
+    let list_html = channel_list_fragment(company, app_domain_name, workflows, agents);
     let agents_selection_html = render_agents_selection(company.id, agents, None);
     let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, false);
 
@@ -1005,31 +1005,31 @@ pub fn workflows_page(
         <div class="flex items-center justify-between mb-6">
             <div>
                 <a href="/companies" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Companies</a>
-                <h2 class="text-2xl font-bold text-white">{company_name} Workflows</h2>
-                <p class="text-slate-400 text-sm mt-0.5">Manage automated workflows for <span class="font-mono text-indigo-300">@{slug}.{app_domain_name}</span></p>
+                <h2 class="text-2xl font-bold text-white">{company_name} Channels</h2>
+                <p class="text-slate-400 text-sm mt-0.5">Manage channels for <span class="font-mono text-indigo-300">@{slug}.{app_domain_name}</span></p>
             </div>
         </div>
 
         <div id="response-message" class="mb-6"></div>
 
-        <!-- Create Workflow Card -->
+        <!-- Create Channel Card -->
         <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-8">
             <h3 class="text-md font-semibold text-white mb-3 flex items-center gap-2">
-                <span class="text-emerald-400">+</span> Add New Workflow
+                <span class="text-emerald-400">+</span> Add New Channel
             </h3>
-            <form hx-post="/companies/{company_id}/workflows" hx-target="#workflow-list" hx-swap="innerHTML" class="space-y-4" data-company-id="{company_id}"
+            <form hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" class="space-y-4" data-company-id="{company_id}"
                 hx-on::after-request="if(event.detail.successful) this.reset();">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label for="workflow_name" class="block text-xs font-medium text-slate-300 mb-1">Workflow Name</label>
-                        <input type="text" id="workflow_name" name="name" required
-                            oninput="document.getElementById('workflow_slug').value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                        <label for="channel_name" class="block text-xs font-medium text-slate-300 mb-1">Channel Name</label>
+                        <input type="text" id="channel_name" name="name" required
+                            oninput="document.getElementById('channel_slug').value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
                             class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             placeholder="Inbound Email Handler">
                     </div>
                     <div>
-                        <label for="workflow_slug" class="block text-xs font-medium text-slate-300 mb-1">Slug (@{slug}.{app_domain_name})</label>
-                        <input type="text" id="workflow_slug" name="slug" required
+                        <label for="channel_slug" class="block text-xs font-medium text-slate-300 mb-1">Slug (@{slug}.{app_domain_name})</label>
+                        <input type="text" id="channel_slug" name="slug" required
                             class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                             placeholder="inbound-email-handler">
                     </div>
@@ -1049,33 +1049,33 @@ pub fn workflows_page(
                 <div>
                     <a href="#" onclick="let el = this.nextElementSibling; if (el) el.classList.toggle('hidden'); return false;"
                         class="text-xs text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer inline-flex items-center gap-1">
-                        <span>Custom Workflow Agent</span>
+                        <span>Custom Channel Agent</span>
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </a>
                     <div class="hidden space-y-4 mt-3">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label for="workflow_provider" class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional Override)</label>
-                                <input type="text" id="workflow_provider" name="provider"
+                                <label for="channel_provider" class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional Override)</label>
+                                <input type="text" id="channel_provider" name="provider"
                                     class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                                     placeholder="google, openai, anthropic">
                             </div>
                             <div>
-                                <label for="workflow_model" class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional Override)</label>
-                                <input type="text" id="workflow_model" name="model"
+                                <label for="channel_model" class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional Override)</label>
+                                <input type="text" id="channel_model" name="model"
                                     class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                                     placeholder="gemini-2.5-flash, gpt-4o">
                             </div>
                             <div>
-                                <label for="workflow_api_key" class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional Override)</label>
-                                <input type="password" id="workflow_api_key" name="api_key"
+                                <label for="channel_api_key" class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional Override)</label>
+                                <input type="password" id="channel_api_key" name="api_key"
                                     class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                                     placeholder="Overrides company key">
                             </div>
                         </div>
                         <div>
-                            <label for="workflow_config" class="block text-xs font-medium text-slate-300 mb-1">Workflow Config (JSON, Optional)</label>
-                            <textarea id="workflow_config" name="workflow_config" rows="3"
+                            <label for="channel_config" class="block text-xs font-medium text-slate-300 mb-1">Channel Config (JSON, Optional)</label>
+                            <textarea id="channel_config" name="channel_config" rows="3"
                                 class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 placeholder='&#123; "trigger": "email", "action": "ai_reply" &#125;'></textarea>
                         </div>
@@ -1085,16 +1085,16 @@ pub fn workflows_page(
                 <div class="flex justify-end">
                     <button type="submit"
                         class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/30 transition cursor-pointer">
-                        Create Workflow
+                        Create Channel
                     </button>
                 </div>
             </form>
         </div>
 
-        <!-- Workflows List Section -->
+        <!-- Channels List Section -->
         <div>
-            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Workflows</h3>
-            <div id="workflow-list" class="space-y-3">
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Channels</h3>
+            <div id="channel-list" class="space-y-3">
                 {list_html}
             </div>
         </div>
@@ -1107,10 +1107,12 @@ pub fn workflows_page(
         list_html = list_html,
     );
 
-    base_layout(&format!("{} Workflows", company.name), &content)
+    base_layout(&format!("{} Channels", company.name), &content)
 }
 
-pub fn workflow_list_fragment(
+pub use channels_page as workflows_page;
+
+pub fn channel_list_fragment(
     company: &Company,
     app_domain_name: &str,
     workflows: &[Workflow],
@@ -1119,7 +1121,7 @@ pub fn workflow_list_fragment(
     if workflows.is_empty() {
         return r##"
             <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-8 text-center">
-                <p class="text-slate-400 text-sm">No workflows configured yet. Create your first workflow above!</p>
+                <p class="text-slate-400 text-sm">No channels configured yet. Create your first channel above!</p>
             </div>
         "##
         .to_string();
@@ -1127,11 +1129,13 @@ pub fn workflow_list_fragment(
 
     workflows
         .iter()
-        .map(|wf| workflow_row_fragment(company, app_domain_name, wf, agents))
+        .map(|wf| channel_row_fragment(company, app_domain_name, wf, agents))
         .collect()
 }
 
-pub fn workflow_row_fragment(
+pub use channel_list_fragment as workflow_list_fragment;
+
+pub fn channel_row_fragment(
     company: &Company,
     app_domain_name: &str,
     workflow: &Workflow,
@@ -1157,14 +1161,14 @@ pub fn workflow_row_fragment(
         }
         _ => "None".to_string(),
     };
-    let config_str = match &workflow.workflow_config {
+    let config_str = match &workflow.channel_config {
         Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
         None => "None".to_string(),
     };
     let provider_str = workflow.provider.as_deref().unwrap_or("Default (Company)");
     let model_str = workflow.model.as_deref().unwrap_or("Default (Company)");
     let api_key_str = if workflow.api_key.is_some() {
-        "Configured (Workflow Override)"
+        "Configured (Channel Override)"
     } else {
         "Default (Company)"
     };
@@ -1172,7 +1176,7 @@ pub fn workflow_row_fragment(
 
     format!(
         r##"
-        <div id="workflow-{workflow_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex flex-col gap-3 hover:border-slate-600 transition shadow-sm">
+        <div id="channel-{workflow_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex flex-col gap-3 hover:border-slate-600 transition shadow-sm">
             <div class="flex items-center justify-between">
                 <div>
                     <div class="flex items-center gap-3">
@@ -1182,19 +1186,19 @@ pub fn workflow_row_fragment(
                     <p class="text-xs text-slate-400 mt-1">Created on {created_at_str}</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <a href="/companies/{company_id}/tasks?workflow_id={workflow_id}"
+                    <a href="/companies/{company_id}/tasks?channel_id={workflow_id}"
                         class="px-3 py-1.5 text-xs font-medium bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/50 rounded-lg transition">
                         Tasks
                     </a>
-                    <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                    <a href="/companies/{company_id}/channels/{workflow_id}/simulate"
                         class="px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
                         Simulate
                     </a>
-                    <button hx-get="/companies/{company_id}/workflows/{workflow_id}/edit" hx-target="#workflow-{workflow_id}" hx-swap="outerHTML"
+                    <button hx-get="/companies/{company_id}/channels/{workflow_id}/edit" hx-target="#channel-{workflow_id}" hx-swap="outerHTML"
                         class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
                         Edit
                     </button>
-                    <button hx-delete="/companies/{company_id}/workflows/{workflow_id}" hx-target="#workflow-{workflow_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete workflow '{name}'?"
+                    <button hx-delete="/companies/{company_id}/channels/{workflow_id}" hx-target="#channel-{workflow_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete channel '{name}'?"
                         class="px-3 py-1.5 text-xs font-medium bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
                         Delete
                     </button>
@@ -1244,7 +1248,9 @@ pub fn workflow_row_fragment(
     )
 }
 
-pub fn workflow_edit_fragment(
+pub use channel_row_fragment as workflow_row_fragment;
+
+pub fn channel_edit_fragment(
     company: &Company,
     app_domain_name: &str,
     workflow: &Workflow,
@@ -1255,7 +1261,7 @@ pub fn workflow_edit_fragment(
         Some(emails) => emails.join(", "),
         None => String::new(),
     };
-    let config_str = match &workflow.workflow_config {
+    let config_str = match &workflow.channel_config {
         Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
         None => String::new(),
     };
@@ -1277,11 +1283,11 @@ pub fn workflow_edit_fragment(
 
     format!(
         r##"
-        <form id="workflow-{workflow_id}" hx-put="/companies/{company_id}/workflows/{workflow_id}" hx-target="#workflow-{workflow_id}" hx-swap="outerHTML" data-company-id="{company_id}"
+        <form id="channel-{workflow_id}" hx-put="/companies/{company_id}/channels/{workflow_id}" hx-target="#channel-{workflow_id}" hx-swap="outerHTML" data-company-id="{company_id}"
             class="bg-slate-900 border border-emerald-500/60 rounded-xl p-4 md:p-5 space-y-4 shadow-lg">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Workflow Name</label>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Channel Name</label>
                     <input type="text" name="name" value="{name}" required
                         oninput="this.form.slug.value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
@@ -1306,7 +1312,7 @@ pub fn workflow_edit_fragment(
             <div>
                 <a href="#" onclick="let el = this.nextElementSibling; if (el) el.classList.toggle('hidden'); return false;"
                     class="text-xs text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer inline-flex items-center gap-1">
-                    <span>Custom Workflow Agent</span>
+                    <span>Custom Channel Agent</span>
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                 </a>
                 <div class="{custom_config_hidden} space-y-4 mt-3">
@@ -1331,15 +1337,15 @@ pub fn workflow_edit_fragment(
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Workflow Config (JSON)</label>
-                        <textarea name="workflow_config" rows="3"
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Channel Config (JSON)</label>
+                        <textarea name="channel_config" rows="3"
                             class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500">{config_str}</textarea>
                     </div>
                 </div>
             </div>
             {spam_warning_html}
             <div class="flex items-center justify-end gap-2">
-                <button type="button" hx-get="/companies/{company_id}/workflows/{workflow_id}/cancel" hx-target="#workflow-{workflow_id}" hx-swap="outerHTML"
+                <button type="button" hx-get="/companies/{company_id}/channels/{workflow_id}/cancel" hx-target="#channel-{workflow_id}" hx-swap="outerHTML"
                     class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
                     Cancel
                 </button>
@@ -1366,7 +1372,9 @@ pub fn workflow_edit_fragment(
     )
 }
 
-pub fn workflow_simulation_page(
+pub use channel_edit_fragment as workflow_edit_fragment;
+
+pub fn channel_simulation_page(
     company: &Company,
     app_domain_name: &str,
     workflow: &Workflow,
@@ -1392,7 +1400,7 @@ pub fn workflow_simulation_page(
                         <span>Thread Loaded & Active</span>
                         <span class="text-xs text-slate-400 font-mono">({tid})</span>
                     </div>
-                    <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                    <a href="/companies/{company_id}/channels/{workflow_id}/simulate"
                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                         <span>🔄 Simulate New Thread</span>
                     </a>
@@ -1412,7 +1420,7 @@ pub fn workflow_simulation_page(
                         <h3 class="text-md font-semibold text-white mb-4 flex items-center gap-2">
                             <span class="text-indigo-400">⚡</span> Simulated Webhook Payload
                         </h3>
-                        <form hx-post="/companies/{company_id}/workflows/{workflow_id}/simulate" hx-target="#simulation-result" hx-swap="innerHTML" class="space-y-4">
+                        <form hx-post="/companies/{company_id}/channels/{workflow_id}/simulate" hx-target="#simulation-result" hx-swap="innerHTML" class="space-y-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label for="to" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
@@ -1449,7 +1457,7 @@ pub fn workflow_simulation_page(
                                         <input type="radio" name="simulation_mode" value="run_test" class="mt-0.5 text-amber-500 focus:ring-amber-500">
                                         <div class="ml-2.5">
                                             <span class="block text-xs font-bold text-amber-300">Run_Test</span>
-                                            <span class="block text-[11px] text-slate-400 mt-0.5">Execute full workflow & agent, skip email dispatch</span>
+                                            <span class="block text-[11px] text-slate-400 mt-0.5">Execute full channel & agent, skip email dispatch</span>
                                         </div>
                                     </label>
                                     <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
@@ -1482,7 +1490,7 @@ pub fn workflow_simulation_page(
                             <span class="text-indigo-400">🔍</span> Open Existing Thread by ID
                         </h3>
                         <p class="text-slate-400 text-xs mb-3">Inspect thread history and simulate follow-up reply messages for an existing thread.</p>
-                        <form hx-get="/companies/{company_id}/workflows/{workflow_id}/simulate/thread" hx-target="#simulation-result" hx-swap="innerHTML" class="flex flex-col sm:flex-row gap-3">
+                        <form hx-get="/companies/{company_id}/channels/{workflow_id}/simulate/thread" hx-target="#simulation-result" hx-swap="innerHTML" class="flex flex-col sm:flex-row gap-3">
                             <input type="text" id="open_thread_id" name="thread_id" placeholder="Enter Thread ID (e.g. 550e8400-e29b-41d4-a716-446655440000)" required
                                 class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <button type="submit"
@@ -1506,7 +1514,7 @@ pub fn workflow_simulation_page(
         r##"
         <div class="flex items-center justify-between mb-6">
             <div>
-                <a href="/companies/{company_id}/workflows" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Workflows</a>
+                <a href="/companies/{company_id}/channels" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Channels</a>
                 <h2 class="text-2xl font-bold text-white">Simulate Webhook: {workflow_name}</h2>
                 <p class="text-slate-400 text-sm mt-0.5">Test incoming email webhook resolution for <span class="font-mono text-emerald-300">{target_recipient}</span></p>
             </div>
@@ -1526,13 +1534,15 @@ pub fn workflow_simulation_page(
     base_layout(&format!("Simulate {}", workflow.name), &content)
 }
 
+pub use channel_simulation_page as workflow_simulation_page;
+
 pub fn resolve_llm_info(
     workflow: Option<&Workflow>,
     company: Option<&Company>,
 ) -> (String, String, String) {
     match (workflow, company) {
         (Some(wf), Some(comp)) => {
-            let wf_cfg = wf.workflow_config.as_ref();
+            let wf_cfg = wf.channel_config.as_ref();
             let wf_llm = wf_cfg.and_then(|c| c.get("llm"));
 
             let provider_opt = wf
@@ -1831,7 +1841,7 @@ pub fn workflow_simulation_result_fragment(
         .unwrap_or("(No text body)");
 
     let workflow_config_str = match &result.workflow {
-        Some(wf) => match &wf.workflow_config {
+        Some(wf) => match &wf.channel_config {
             Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
             None => "None".to_string(),
         },
@@ -2202,7 +2212,7 @@ pub fn workflow_simulation_execution_result_fragment(
     )
     .map(|p| p.config().clone())
     .ok()
-    .or_else(|| ingest.workflow.as_ref().and_then(|w| w.workflow_config.clone()))
+    .or_else(|| ingest.workflow.as_ref().and_then(|w| w.channel_config.clone()))
     .unwrap_or_else(|| serde_json::json!({}));
 
     let thread_id_opt = ingest.thread.as_ref().map(|t| t.id);
@@ -2575,7 +2585,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
     )
     .map(|p| p.config().clone())
     .ok()
-    .or_else(|| workflow.workflow_config.clone())
+    .or_else(|| workflow.channel_config.clone())
     .unwrap_or_else(|| serde_json::json!({}));
 
     let matched_task = tasks.iter().find(|t| t.thread_id == Some(thread.id));
@@ -2814,7 +2824,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
     }
 }
 
-pub fn workflow_simulation_thread_error_fragment(
+pub fn channel_simulation_thread_error_fragment(
     company_id: Uuid,
     workflow_id: Uuid,
     thread_id_input: &str,
@@ -2829,7 +2839,7 @@ pub fn workflow_simulation_thread_error_fragment(
                     <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
                     <span class="text-rose-400 font-semibold">Failed to Load Thread</span>
                 </div>
-                <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                <a href="/companies/{company_id}/channels/{workflow_id}/simulate"
                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                     <span>🔄 Simulate New Thread</span>
                 </a>
@@ -2860,6 +2870,8 @@ pub fn workflow_simulation_thread_error_fragment(
     }
 }
 
+pub use channel_simulation_thread_error_fragment as workflow_simulation_thread_error_fragment;
+
 pub fn company_tasks_page(
     company: &Company,
     workflows: &[Workflow],
@@ -2877,7 +2889,7 @@ pub fn company_tasks_page(
             (p_acc + tu.prompt_tokens, c_acc + tu.completion_tokens, t_acc + tu.total_tokens)
         });
 
-    let mut wf_options = String::from("<option value=\"\">All Workflows</option>");
+    let mut wf_options = String::from("<option value=\"\">All Channels</option>");
     for wf in workflows {
         let selected = if current_wf == Some(wf.id) {
             "selected"
@@ -2960,8 +2972,8 @@ pub fn company_tasks_page(
         <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6">
             <form hx-get="/companies/{company_id}/tasks/filter" hx-target="#task-list" hx-swap="innerHTML" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Filter by Workflow</label>
-                    <select name="workflow_id" onchange="this.form.requestSubmit()"
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Filter by Channel</label>
+                    <select name="channel_id" onchange="this.form.requestSubmit()"
                         class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         {wf_options}
                     </select>
@@ -3183,12 +3195,12 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
 
     let simulation_link = match task.thread_id {
         Some(tid) => format!(
-            r##"<a href="/companies/{company_id}/workflows/{workflow_id}/simulate?thread_id={tid}"
+            r##"<a href="/companies/{company_id}/channels/{workflow_id}/simulate?thread_id={tid}"
                 class="px-3 py-1.5 text-xs font-semibold bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-lg transition flex items-center gap-1 shadow-sm whitespace-nowrap">
                 <span>⚡ Open Simulation</span>
             </a>"##,
             company_id = company_id,
-            workflow_id = task.workflow_id,
+            workflow_id = task.channel_id,
             tid = tid
         ),
         None => String::new(),
@@ -3196,9 +3208,9 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
 
     let thread_info = match task.thread_id {
         Some(tid) => format!(
-            r##" • Thread: <a href="/companies/{company_id}/workflows/{workflow_id}/simulate?thread_id={tid}" class="font-mono text-emerald-400 hover:text-emerald-300 underline font-medium">{tid}</a>"##,
+            r##" • Thread: <a href="/companies/{company_id}/channels/{workflow_id}/simulate?thread_id={tid}" class="font-mono text-emerald-400 hover:text-emerald-300 underline font-medium">{tid}</a>"##,
             company_id = company_id,
-            workflow_id = task.workflow_id,
+            workflow_id = task.channel_id,
             tid = tid
         ),
         None => String::new(),
@@ -3352,9 +3364,9 @@ pub fn approval_details_page(approval: &HumanApproval) -> String {
     base_layout("Confirm Action", &content)
 }
 
-pub fn workflow_approvals_fragment(approvals: &[HumanApproval]) -> String {
+pub fn channel_approvals_fragment(approvals: &[HumanApproval]) -> String {
     if approvals.is_empty() {
-        return r#"<div class="p-4 text-center text-xs text-slate-400">No human-in-the-loop approvals recorded for this workflow.</div>"#.to_string();
+        return r#"<div class="p-4 text-center text-xs text-slate-400">No human-in-the-loop approvals recorded for this channel.</div>"#.to_string();
     }
 
     let rows: String = approvals
@@ -3391,6 +3403,8 @@ pub fn workflow_approvals_fragment(approvals: &[HumanApproval]) -> String {
 
     format!(r#"<div class="space-y-2 mt-4">{rows}</div>"#, rows = rows)
 }
+
+pub use channel_approvals_fragment as workflow_approvals_fragment;
 
 pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
     let list_html = agent_list_fragment(company, agents);

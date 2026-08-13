@@ -7,9 +7,8 @@ use crate::{
     domain::monitoring::MonitoringService,
     infra::{argon2_password_hasher, config::AppConfig, postgres_persistence},
     use_cases::{
-        agent::AgentUseCases, approval::ApprovalUseCases, company::CompanyUseCases,
+        agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases, company::CompanyUseCases,
         company_invite::CompanyInviteUseCases, thread::ThreadUseCases, user::UserUseCases,
-        workflow::WorkflowUseCases,
     },
 };
 use std::fs::File;
@@ -30,7 +29,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     let user_use_cases = UserUseCases::new(Arc::new(argon_hasher), postgres_arc.clone());
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
     let company_invite_use_cases = CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());
-    let workflow_use_cases = WorkflowUseCases::new(postgres_arc.clone(), postgres_arc.clone(), config.clone());
+    let channel_use_cases = Arc::new(ChannelUseCases::new(postgres_arc.clone(), postgres_arc.clone(), config.clone()));
     let agent_use_cases = AgentUseCases::new(postgres_arc.clone(), postgres_arc.clone());
 
     let approval_use_cases = Arc::new(ApprovalUseCases::new(
@@ -64,7 +63,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         user_use_cases: Arc::new(user_use_cases),
         company_use_cases: Arc::new(company_use_cases),
         company_invite_use_cases: Arc::new(company_invite_use_cases),
-        workflow_use_cases: Arc::new(workflow_use_cases),
+        channel_use_cases: channel_use_cases.clone(),
+        workflow_use_cases: channel_use_cases,
         agent_use_cases: Arc::new(agent_use_cases),
         thread_use_cases,
         approval_use_cases,

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
@@ -49,5 +50,36 @@ impl ParticipantIdentity {
     pub fn matches(&self, other_raw: &str) -> bool {
         let clean = other_raw.trim().to_lowercase();
         self.identity == clean
+    }
+}
+
+pub type Workflow = Channel;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Channel {
+    pub id: Uuid,
+    pub company_id: Uuid,
+    pub name: String,
+    pub slug: String,
+    pub api_key: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub participant_emails: Option<Vec<String>>,
+    pub agent_ids: Option<Vec<Uuid>>,
+    pub channel_config: Option<serde_json::Value>,
+    pub created_at: chrono::NaiveDateTime,
+}
+
+impl Channel {
+    pub fn default_config() -> serde_json::Value {
+        serde_json::json!({
+            "name": "MinimalAgent",
+            "system_prompt": "You are a helpful assistant.",
+            "llm": {
+              "provider": "google",
+              "model": "gemini-2.5-flash",
+              "api_key": null
+            }
+        })
     }
 }

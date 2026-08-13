@@ -255,7 +255,7 @@ mod tests {
         assert!(page_html.contains("Test Corp"));
         assert!(page_html.contains("/test-corp"));
         assert!(page_html.contains("hx-post=\"/companies\""));
-        assert!(page_html.contains("id=\"nav-workflows\""));
+        assert!(page_html.contains("id=\"nav-channels\""));
         assert!(page_html.contains("selectCompany"));
 
         let edit_fragment = pages::company_edit_fragment(&company);
@@ -283,7 +283,7 @@ mod tests {
         assert!(row_html.contains(&format!("selected-badge-{}", cid)));
 
         let base_html = pages::base_layout("Test Title", "<p>Test Content</p>");
-        assert!(base_html.contains("id=\"nav-workflows\""));
+        assert!(base_html.contains("id=\"nav-channels\""));
         assert!(base_html.contains("localStorage.getItem('cached_company_id')"));
         assert!(base_html.contains("autoDetectAndSyncCompany"));
     }

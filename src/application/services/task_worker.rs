@@ -89,7 +89,7 @@ impl TaskWorker {
                     if let Some(ref m) = self.monitoring {
                         m.record_task_execution(&TaskExecutionMetrics {
                             company_id: Some(task.company_id),
-                            workflow_id: Some(task.workflow_id),
+                            workflow_id: Some(task.channel_id),
                             task_type: task.task_type.clone(),
                             duration_ms,
                             status: TaskStatusMetric::Completed,
@@ -114,7 +114,7 @@ impl TaskWorker {
                     if let Some(ref m) = self.monitoring {
                         m.record_task_execution(&TaskExecutionMetrics {
                             company_id: Some(task.company_id),
-                            workflow_id: Some(task.workflow_id),
+                            workflow_id: Some(task.channel_id),
                             task_type: task.task_type.clone(),
                             duration_ms,
                             status: TaskStatusMetric::Failed,
@@ -242,7 +242,6 @@ mod tests {
         use_cases::{
             company::CompanyPersistence,
             thread::ThreadPersistence,
-            workflow::WorkflowPersistence,
         },
     };
 
@@ -257,14 +256,16 @@ mod tests {
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
+    use crate::use_cases::channel::ChannelPersistence;
+
     struct MockWorkflowPersistence;
     #[async_trait]
-    impl WorkflowPersistence for MockWorkflowPersistence {
-        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+    impl ChannelPersistence for MockWorkflowPersistence {
+        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> { unimplemented!() }
-        async fn get_by_company_slug_and_workflow_slug(&self, _company_slug: &str, _workflow_slug: &str) -> AppResult<Option<Workflow>> { unimplemented!() }
+        async fn get_by_company_slug_and_channel_slug(&self, _company_slug: &str, _workflow_slug: &str) -> AppResult<Option<Workflow>> { unimplemented!() }
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { Ok(vec![]) }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
@@ -300,7 +301,7 @@ mod tests {
             let task = BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
-                workflow_id,
+                channel_id: workflow_id,
                 thread_id,
                 task_type: task_type.to_string(),
                 status: TaskStatus::Pending,
@@ -468,7 +469,7 @@ mod tests {
             model: None,
             participant_emails: None,
             agent_ids: None,
-            workflow_config: None,
+            channel_config: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -531,7 +532,7 @@ mod tests {
             reason: None,
             thread: Some(crate::entities::thread::Thread {
                 id: thread_id,
-                workflow_id,
+                channel_id: workflow_id,
                 subject: "Help".to_string(),
                 participant_emails: vec!["user@test.com".to_string()],
                 created_at: chrono::Utc::now().naive_utc(),

@@ -185,9 +185,9 @@ impl ThreadUseCases {
             prompt_text: norm.clean_text.clone(),
             is_auto_reply: norm.is_auto_reply,
             is_forwarded: norm.is_forwarded,
-            workflow_id_header: norm.workflow_id_header,
+            workflow_id_header: norm.channel_id_header,
             hop_count: norm.hop_count,
-            trace_workflows: norm.trace_workflows.clone(),
+            trace_workflows: norm.trace_channels.clone(),
             spf_status: norm.spf_status.clone(),
             dkim_status: norm.dkim_status.clone(),
             dmarc_status: norm.dmarc_status.clone(),
@@ -415,7 +415,7 @@ impl ThreadUseCases {
             }
 
             let thread = match existing_thread {
-                Some(t) if t.workflow_id == workflow.id => t,
+                Some(t) if t.channel_id == workflow.id => t,
                 _ => {
                     let mut participants = vec![parsed.sender.clone()];
                     participants.extend(parsed.recipients_cc.clone());
@@ -817,9 +817,9 @@ impl ThreadUseCases {
                 content: combined_agent_response.clone(),
                 attachments: vec![],
                 protocol: ChannelType::Email,
-                workflow_id: primary_workflow.id,
+                channel_id: primary_workflow.id,
                 hop_count: parsed.hop_count,
-                trace_workflows: parsed.trace_workflows.clone(),
+                trace_channels: parsed.trace_workflows.clone(),
             };
 
             let outbound_email = OutboundEmail {
@@ -1252,6 +1252,8 @@ pub struct ProcessEmailResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::channel::Channel;
+    use crate::use_cases::channel::ChannelPersistence;
     use chrono::Utc;
     use std::sync::Mutex;
 
@@ -1288,11 +1290,11 @@ mod tests {
     }
 
     struct MockWorkflowPersistence {
-        workflows: Mutex<Vec<Workflow>>,
+        workflows: Mutex<Vec<Channel>>,
     }
 
     #[async_trait]
-    impl WorkflowPersistence for MockWorkflowPersistence {
+    impl ChannelPersistence for MockWorkflowPersistence {
         async fn create(
             &self,
             _company_id: Uuid,
@@ -1303,18 +1305,18 @@ mod tests {
             _model: Option<&str>,
             _participant_emails: Option<Vec<String>>,
             _agent_ids: Option<Vec<Uuid>>,
-            _workflow_config: Option<serde_json::Value>,
-        ) -> AppResult<Workflow> {
+            _channel_config: Option<serde_json::Value>,
+        ) -> AppResult<Channel> {
             unimplemented!()
         }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> {
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
             unimplemented!()
         }
-        async fn get_by_company_slug_and_workflow_slug(
+        async fn get_by_company_slug_and_channel_slug(
             &self,
             _company_slug: &str,
             workflow_slug: &str,
-        ) -> AppResult<Option<Workflow>> {
+        ) -> AppResult<Option<Channel>> {
             Ok(self
                 .workflows
                 .lock()
@@ -1323,7 +1325,7 @@ mod tests {
                 .find(|w| w.slug == workflow_slug)
                 .cloned())
         }
-        async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Workflow>> {
+        async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(self
                 .workflows
                 .lock()
@@ -1343,8 +1345,8 @@ mod tests {
             _model: Option<&str>,
             _participant_emails: Option<Vec<String>>,
             _agent_ids: Option<Vec<Uuid>>,
-            _workflow_config: Option<serde_json::Value>,
-        ) -> AppResult<Workflow> {
+            _channel_config: Option<serde_json::Value>,
+        ) -> AppResult<Channel> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
@@ -1367,7 +1369,7 @@ mod tests {
         ) -> AppResult<Thread> {
             let thread = Thread {
                 id: Uuid::new_v4(),
-                workflow_id,
+                channel_id: workflow_id,
                 subject: subject.to_string(),
                 participant_emails: participant_emails.to_vec(),
                 created_at: Utc::now().naive_utc(),
@@ -1488,7 +1490,7 @@ mod tests {
             let task = crate::entities::task::BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
-                workflow_id,
+                channel_id: workflow_id,
                 thread_id,
                 task_type: task_type.to_string(),
                 status: crate::entities::task::TaskStatus::Pending,
@@ -1642,7 +1644,7 @@ mod tests {
                 model: None,
                 participant_emails: None,
                 agent_ids: None,
-                workflow_config: None,
+                channel_config: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -1742,7 +1744,7 @@ mod tests {
                 model: None,
                 participant_emails: Some(vec!["agent@example.com".to_string()]),
                 agent_ids: None,
-                workflow_config: None,
+                channel_config: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -1836,7 +1838,7 @@ mod tests {
                 model: None,
                 participant_emails: None,
                 agent_ids: None,
-                workflow_config: None,
+                channel_config: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -1930,7 +1932,7 @@ mod tests {
                 model: None,
                 participant_emails: None,
                 agent_ids: None,
-                workflow_config: None,
+                channel_config: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -2024,7 +2026,7 @@ mod tests {
                 model: None,
                 participant_emails: Some(vec!["alice@example.com".to_string()]),
                 agent_ids: None,
-                workflow_config: None,
+                channel_config: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -2122,7 +2124,7 @@ mod tests {
                 model: None,
                 participant_emails: Some(vec!["alice@example.com".to_string()]),
                 agent_ids: None,
-                workflow_config: None,
+                channel_config: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -2218,7 +2220,7 @@ mod tests {
                 model: None,
                 participant_emails: None,
                 agent_ids: None,
-                workflow_config: None,
+                channel_config: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -2316,7 +2318,7 @@ mod tests {
                     model: None,
                     participant_emails: None,
                     agent_ids: None,
-                    workflow_config: None,
+                    channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
                 Workflow {
@@ -2329,7 +2331,7 @@ mod tests {
                     model: None,
                     participant_emails: None,
                     agent_ids: None,
-                    workflow_config: None,
+                    channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
             ]),
@@ -2436,7 +2438,7 @@ mod tests {
                     model: None,
                     participant_emails: None,
                     agent_ids: None,
-                    workflow_config: None,
+                    channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
                 Workflow {
@@ -2449,7 +2451,7 @@ mod tests {
                     model: None,
                     participant_emails: None,
                     agent_ids: None,
-                    workflow_config: None,
+                    channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
                 Workflow {
@@ -2462,7 +2464,7 @@ mod tests {
                     model: None,
                     participant_emails: None,
                     agent_ids: None,
-                    workflow_config: None,
+                    channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
             ]),
@@ -2568,7 +2570,7 @@ mod tests {
                     model: None,
                     participant_emails: None,
                     agent_ids: None,
-                    workflow_config: None,
+                    channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
                 Workflow {
@@ -2581,7 +2583,7 @@ mod tests {
                     model: None,
                     participant_emails: None,
                     agent_ids: None,
-                    workflow_config: None,
+                    channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
             ]),
@@ -2704,7 +2706,7 @@ mod tests {
                 model: None,
                 participant_emails: None,
                 agent_ids: None,
-                workflow_config: None,
+                channel_config: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });

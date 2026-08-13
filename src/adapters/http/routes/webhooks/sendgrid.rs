@@ -212,7 +212,7 @@ mod tests {
             company::CompanyPersistence,
             thread::ThreadPersistence,
             user::UserPersistence,
-            workflow::{WorkflowPersistence, WorkflowUseCases},
+            channel::{ChannelPersistence, ChannelUseCases},
             company_invite::CompanyInvitePersistence,
         },
     };
@@ -238,14 +238,14 @@ mod tests {
     }
 
     #[async_trait]
-    impl WorkflowPersistence for MockWorkflowPersistence {
-        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+    impl ChannelPersistence for MockWorkflowPersistence {
+        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> { unimplemented!() }
-        async fn get_by_company_slug_and_workflow_slug(&self, _company_slug: &str, workflow_slug: &str) -> AppResult<Option<Workflow>> {
+        async fn get_by_company_slug_and_channel_slug(&self, _company_slug: &str, workflow_slug: &str) -> AppResult<Option<Workflow>> {
             Ok(self.workflows.lock().unwrap().iter().find(|w| w.slug == workflow_slug).cloned())
         }
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { Ok(self.workflows.lock().unwrap().clone()) }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _workflow_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
@@ -271,7 +271,7 @@ mod tests {
         async fn create_thread(&self, workflow_id: Uuid, subject: &str, participant_emails: &[String]) -> AppResult<Thread> {
             let thread = Thread {
                 id: Uuid::new_v4(),
-                workflow_id,
+                channel_id: workflow_id,
                 subject: subject.to_string(),
                 participant_emails: participant_emails.to_vec(),
                 created_at: Utc::now().naive_utc(),
@@ -347,7 +347,7 @@ mod tests {
             let task = crate::entities::task::BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
-                workflow_id,
+                channel_id: workflow_id,
                 thread_id,
                 task_type: task_type.to_string(),
                 status: crate::entities::task::TaskStatus::Pending,
@@ -487,7 +487,7 @@ mod tests {
                 model: None,
                 participant_emails: None,
                 agent_ids: None,
-                workflow_config: None,
+                channel_config: None,
                 created_at: Utc::now().naive_utc(),
             }]),
         });
@@ -541,6 +541,7 @@ mod tests {
             config.clone(),
         ));
 
+        let channel_use_cases = Arc::new(ChannelUseCases::new(company_persistence.clone(), workflow_persistence, config.clone()));
         let app_state = AppState {
             config: config.clone(),
             monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
@@ -555,7 +556,8 @@ mod tests {
                 Arc::new(MockCompanyPersistence { companies: Mutex::new(vec![]) }),
                 Arc::new(MockCompanyInvitePersistence {}),
             )),
-            workflow_use_cases: Arc::new(WorkflowUseCases::new(company_persistence.clone(), workflow_persistence, config.clone())),
+            channel_use_cases: channel_use_cases.clone(),
+            workflow_use_cases: channel_use_cases,
             agent_use_cases: Arc::new(crate::use_cases::agent::AgentUseCases::new(
                 company_persistence,
                 Arc::new(MockAgentPersistence),

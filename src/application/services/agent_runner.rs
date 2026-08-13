@@ -4,7 +4,7 @@ use crate::entities::approval::ApprovalStatus;
 use crate::entities::company::Company;
 use crate::entities::message::{Message, MessageRole};
 use crate::entities::task::TokenUsage;
-use crate::entities::workflow::Workflow;
+use crate::entities::channel::Channel;
 use crate::use_cases::approval::ApprovalUseCases;
 use crate::use_cases::thread::RecipientRole;
 use ai_agents::{Agent, AgentBuilder};
@@ -102,16 +102,16 @@ impl ResolvedAgentParams {
     /// Company values are overridden by Workflow and Workflow values are overridden by Agent.
     pub fn new(
         company: Option<&Company>,
-        workflow: Option<&Workflow>,
+        workflow: Option<&Channel>,
         agent: Option<&AgentEntity>,
     ) -> anyhow::Result<Self> {
         let mut config = base_agent_config();
 
-        if let Some(wf_cfg) = workflow.and_then(|w| w.workflow_config.as_ref()) {
-            if config.is_object() && wf_cfg.is_object() {
-                merge_json(&mut config, wf_cfg);
+        if let Some(ch_cfg) = workflow.and_then(|w| w.channel_config.as_ref()) {
+            if config.is_object() && ch_cfg.is_object() {
+                merge_json(&mut config, ch_cfg);
             } else {
-                config = wf_cfg.clone();
+                config = ch_cfg.clone();
             }
         }
 
@@ -847,6 +847,7 @@ impl<'a> AgentRunner<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::channel::Workflow;
 
     #[tokio::test]
     async fn test_agent_runner_returns_error_when_provider_missing() -> anyhow::Result<()> {
@@ -918,7 +919,7 @@ mod tests {
             model: None,
             participant_emails: None,
             agent_ids: None,
-            workflow_config: Some(custom_config),
+            channel_config: Some(custom_config),
             created_at: chrono::Utc::now().naive_utc(),
         };
         let params = ResolvedAgentParams::new(None, Some(&workflow), None)?;
@@ -1061,7 +1062,7 @@ mod tests {
             model: None, // Should keep company's model
             participant_emails: None,
             agent_ids: None,
-            workflow_config: Some(serde_json::json!({
+            channel_config: Some(serde_json::json!({
                 "system_prompt": "Workflow prompt",
                 "temperature": 0.2
             })),
@@ -1113,7 +1114,7 @@ mod tests {
             model: Some("gpt-4o".to_string()),
             participant_emails: None,
             agent_ids: None,
-            workflow_config: Some(serde_json::json!({
+            channel_config: Some(serde_json::json!({
                 "system_prompt": "Workflow prompt",
                 "temperature": 0.2,
                 "workflow_only_field": true
@@ -1189,7 +1190,7 @@ mod tests {
             model: Some("".to_string()),
             participant_emails: None,
             agent_ids: None,
-            workflow_config: None,
+            channel_config: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -1255,7 +1256,7 @@ mod tests {
             model: None,
             participant_emails: None,
             agent_ids: None,
-            workflow_config: Some(serde_json::json!({
+            channel_config: Some(serde_json::json!({
                 "llm": {
                     "provider": "openai"
                     // model and api_key missing in llm block

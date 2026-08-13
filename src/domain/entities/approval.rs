@@ -40,7 +40,7 @@ impl FromStr for ApprovalStatus {
 pub struct HumanApproval {
     pub id: Uuid,
     pub company_id: Uuid,
-    pub workflow_id: Uuid,
+    pub channel_id: Uuid,
     pub thread_id: Option<Uuid>,
     pub task_id: Option<Uuid>,
     pub step_key: String,

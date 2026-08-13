@@ -14,7 +14,7 @@ use crate::{
 pub struct HumanApprovalDb {
     pub id: Uuid,
     pub company_id: Uuid,
-    pub workflow_id: Uuid,
+    pub channel_id: Uuid,
     pub thread_id: Option<Uuid>,
     pub task_id: Option<Uuid>,
     pub step_key: String,
@@ -40,7 +40,7 @@ impl TryFrom<HumanApprovalDb> for HumanApproval {
         Ok(HumanApproval {
             id: db.id,
             company_id: db.company_id,
-            workflow_id: db.workflow_id,
+            channel_id: db.channel_id,
             thread_id: db.thread_id,
             task_id: db.task_id,
             step_key: db.step_key,
@@ -118,7 +118,7 @@ impl ApprovalPersistence for PostgresPersistence {
         let db = sqlx::query_as::<_, HumanApprovalDb>(
             r#"
             INSERT INTO human_approvals (
-                id, company_id, workflow_id, thread_id, task_id,
+                id, company_id, channel_id, thread_id, task_id,
                 step_key, approver_email, action_type, action_title,
                 action_summary, payload, token, status, expires_at
             )
@@ -214,7 +214,7 @@ impl ApprovalPersistence for PostgresPersistence {
         let list = sqlx::query_as::<_, HumanApprovalDb>(
             r#"
             SELECT * FROM human_approvals
-            WHERE company_id = $1 AND workflow_id = $2
+            WHERE company_id = $1 AND channel_id = $2
             ORDER BY created_at DESC
             "#,
         )

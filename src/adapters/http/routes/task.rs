@@ -40,7 +40,7 @@ where
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct TaskFilterQuery {
-    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    #[serde(default, alias = "channel_id", deserialize_with = "deserialize_empty_string_as_none")]
     pub workflow_id: Option<Uuid>,
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub status: Option<String>,
@@ -87,7 +87,7 @@ async fn list_company_tasks_page(
 fn build_tasks_push_url(company_id: Uuid, query: &TaskFilterQuery) -> String {
     let mut params = Vec::new();
     if let Some(wf_id) = query.workflow_id {
-        params.push(format!("workflow_id={}", wf_id));
+        params.push(format!("channel_id={}", wf_id));
     }
     if let Some(ref st) = query.status {
         if !st.trim().is_empty() {
@@ -208,7 +208,7 @@ mod tests {
         let task = crate::entities::task::BackgroundTask {
             id: Uuid::new_v4(),
             company_id,
-            workflow_id,
+            channel_id: workflow_id,
             thread_id: Some(thread_id),
             task_type: "agent_execution".to_string(),
             status: TaskStatus::Completed,
@@ -223,7 +223,7 @@ mod tests {
 
         let html = pages::task_row_fragment(company_id, &task);
         assert!(html.contains("Open Simulation"));
-        assert!(html.contains(&format!("/companies/{company_id}/workflows/{workflow_id}/simulate?thread_id={thread_id}")));
+        assert!(html.contains(&format!("/companies/{company_id}/channels/{workflow_id}/simulate?thread_id={thread_id}")));
     }
 
     #[test]
@@ -233,7 +233,7 @@ mod tests {
         let task = BackgroundTask {
             id: Uuid::new_v4(),
             company_id,
-            workflow_id,
+            channel_id: workflow_id,
             thread_id: None,
             task_type: "email_agent_dispatch".to_string(),
             status: TaskStatus::Completed,
@@ -290,7 +290,7 @@ mod tests {
         };
         assert_eq!(
             build_tasks_push_url(company_id, &query_wf),
-            format!("/companies/{company_id}/tasks?workflow_id={wf_id}&status=pending&sort=desc")
+            format!("/companies/{company_id}/tasks?channel_id={wf_id}&status=pending&sort=desc")
         );
     }
 
@@ -321,13 +321,13 @@ mod tests {
             api_key: None,
             participant_emails: None,
             agent_ids: None,
-            workflow_config: None,
+            channel_config: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
 
         let html = pages::workflow_row_fragment(&company, "example.com", &workflow, &[]);
         assert!(html.contains("Tasks"));
-        assert!(html.contains(&format!("/companies/{company_id}/tasks?workflow_id={workflow_id}")));
+        assert!(html.contains(&format!("/companies/{company_id}/tasks?channel_id={workflow_id}")));
     }
 
     #[test]
@@ -350,7 +350,7 @@ mod tests {
         let task = BackgroundTask {
             id: Uuid::new_v4(),
             company_id,
-            workflow_id,
+            channel_id: workflow_id,
             thread_id: None,
             task_type: "email_agent_dispatch".to_string(),
             status: TaskStatus::Completed,

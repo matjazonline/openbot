@@ -6,9 +6,9 @@ use crate::{
     domain::monitoring::MonitoringService,
     infra::config::AppConfig,
     use_cases::{
-        agent::AgentUseCases, approval::ApprovalUseCases, company::CompanyUseCases,
-        company_invite::CompanyInviteUseCases, thread::ThreadUseCases, user::UserUseCases,
-        workflow::WorkflowUseCases,
+        agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
+        company::CompanyUseCases, company_invite::CompanyInviteUseCases, thread::ThreadUseCases,
+        user::UserUseCases, workflow::WorkflowUseCases,
     },
 };
 
@@ -19,6 +19,7 @@ pub struct AppState {
     pub user_use_cases: Arc<UserUseCases>,
     pub company_use_cases: Arc<CompanyUseCases>,
     pub company_invite_use_cases: Arc<CompanyInviteUseCases>,
+    pub channel_use_cases: Arc<ChannelUseCases>,
     pub workflow_use_cases: Arc<WorkflowUseCases>,
     pub agent_use_cases: Arc<AgentUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
@@ -55,9 +56,9 @@ impl FromRef<AppState> for Arc<CompanyInviteUseCases> {
     }
 }
 
-impl FromRef<AppState> for Arc<WorkflowUseCases> {
+impl FromRef<AppState> for Arc<ChannelUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
-        app_state.workflow_use_cases.clone()
+        app_state.channel_use_cases.clone()
     }
 }
 

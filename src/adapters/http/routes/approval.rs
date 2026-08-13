@@ -18,6 +18,10 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/approvals/{token}", get(approval_link_handler))
         .route(
+            "/companies/{company_id}/channels/{workflow_id}/approvals",
+            get(list_workflow_approvals_handler),
+        )
+        .route(
             "/companies/{company_id}/workflows/{workflow_id}/approvals",
             get(list_workflow_approvals_handler),
         )
@@ -65,7 +69,7 @@ async fn list_workflow_approvals_handler(
         .list_workflow_approvals(company_id, workflow_id)
         .await
     {
-        Ok(list) => Html(pages::workflow_approvals_fragment(&list)),
+        Ok(list) => Html(pages::channel_approvals_fragment(&list)),
         Err(err) => Html(pages::error_alert(&format!("Failed to list approvals: {err}"))),
     }
 }

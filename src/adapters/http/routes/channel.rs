@@ -28,6 +28,40 @@ use crate::{
 pub fn router() -> Router<AppState> {
     Router::new()
         .route(
+            "/companies/{company_id}/channels",
+            get(list_workflows_page).post(create_workflow_handler),
+        )
+        .route(
+            "/companies/{company_id}/channels/{id}",
+            put(update_workflow_handler).delete(delete_workflow_handler),
+        )
+        .route(
+            "/companies/{company_id}/channels/{id}/edit",
+            get(edit_workflow_form),
+        )
+        .route(
+            "/companies/{company_id}/channels/{id}/cancel",
+            get(cancel_workflow_edit),
+        )
+        .route(
+            "/companies/{company_id}/channels/{id}/simulate",
+            get(simulate_workflow_page).post(simulate_workflow_handler),
+        )
+        .route(
+            "/companies/{company_id}/channels/{id}/simulate/thread",
+            get(open_simulated_thread_get).post(open_simulated_thread_post),
+        )
+        .route(
+            "/api/companies/{company_id}/channels",
+            get(list_workflows_json).post(create_workflow_json),
+        )
+        .route(
+            "/api/companies/{company_id}/channels/{id}",
+            get(get_workflow_json)
+                .put(update_workflow_json)
+                .delete(delete_workflow_json),
+        )
+        .route(
             "/companies/{company_id}/workflows",
             get(list_workflows_page).post(create_workflow_handler),
         )
@@ -72,9 +106,12 @@ pub struct WorkflowForm {
     pub model: Option<String>,
     pub participant_emails: Option<String>,
     pub agent_ids: Option<String>,
+    #[serde(alias = "channel_config")]
     pub workflow_config: Option<String>,
     pub confirm_spam_disabled: Option<String>,
 }
+
+pub type ChannelForm = WorkflowForm;
 
 fn parse_agent_ids_form(input: Option<String>) -> Option<Vec<Uuid>> {
     input.and_then(|s| {
@@ -101,15 +138,20 @@ pub struct WorkflowJsonPayload {
     pub model: Option<String>,
     pub participant_emails: Option<Vec<String>>,
     pub agent_ids: Option<Vec<Uuid>>,
+    #[serde(alias = "channel_config")]
     pub workflow_config: Option<serde_json::Value>,
     pub confirm_spam_disabled: Option<bool>,
 }
+
+pub type ChannelJsonPayload = WorkflowJsonPayload;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct WorkflowResponse {
     pub success: bool,
     pub workflow: Workflow,
 }
+
+pub type ChannelResponse = WorkflowResponse;
 
 fn parse_emails_form(input: Option<String>) -> Option<Vec<String>> {
     input.and_then(|s| {
@@ -450,7 +492,7 @@ async fn simulate_workflow_page(
             initial_thread_id = Some(trimmed.to_string());
             match Uuid::parse_str(trimmed) {
                 Ok(tid) => match thread_use_cases.get_thread(tid).await {
-                    Ok(Some(thread)) if thread.workflow_id == workflow_id => {
+                    Ok(Some(thread)) if thread.channel_id == workflow_id => {
                         let messages = thread_use_cases
                             .get_thread_history(thread.id)
                             .await
@@ -704,7 +746,7 @@ async fn open_simulated_thread_logic(
 
     match thread_use_cases.get_thread(tid).await {
         Ok(Some(thread)) => {
-            if thread.workflow_id != workflow_id {
+            if thread.channel_id != workflow_id {
                 return Html(pages::workflow_simulation_thread_error_fragment(
                     company_id,
                     workflow_id,
@@ -944,16 +986,16 @@ mod tests {
             model: None,
             participant_emails: Some(vec!["agent@test.com".to_string()]),
             agent_ids: None,
-            workflow_config: Some(json!({ "mode": "async" })),
+            channel_config: Some(json!({ "mode": "async" })),
             created_at: Utc::now().naive_utc(),
         };
 
         let page_html = pages::workflows_page(&company, "example.com", &[workflow.clone()], &[], true);
-        assert!(page_html.contains("Custom Workflow Agent"));
+        assert!(page_html.contains("Custom Channel Agent"));
         assert!(page_html.contains("LLM Provider (Optional Override)"));
         assert!(page_html.contains("LLM Model (Optional Override)"));
         assert!(page_html.contains("LLM API Key (Optional Override)"));
-        assert!(page_html.contains("Workflow Config (JSON, Optional)"));
+        assert!(page_html.contains("Channel Config (JSON, Optional)"));
 
         let row_html = pages::workflow_row_fragment(&company, "example.com", &workflow, &[]);
         assert!(row_html.contains("Auto Dispatcher"));
@@ -964,7 +1006,7 @@ mod tests {
         let edit_html = pages::workflow_edit_fragment(&company, "example.com", &workflow, &[], true);
         assert!(edit_html.contains("hx-put="));
         assert!(edit_html.contains("value=\"Auto Dispatcher\""));
-        assert!(edit_html.contains("Custom Workflow Agent"));
+        assert!(edit_html.contains("Custom Channel Agent"));
 
         let sim_html = pages::workflow_simulation_page(&company, "example.com", &workflow, None, None);
         assert!(sim_html.contains("Simulate Webhook: Auto Dispatcher"));
@@ -1097,7 +1139,7 @@ mod tests {
 
         let sample_thread = crate::entities::thread::Thread {
             id: Uuid::new_v4(),
-            workflow_id: workflow.id,
+            channel_id: workflow.id,
             subject: "Existing Thread Subject".to_string(),
             participant_emails: vec!["user@test.com".to_string()],
             created_at: Utc::now().naive_utc(),
