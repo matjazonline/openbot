@@ -1228,6 +1228,7 @@ mod tests {
                 agent_response: "Hello from Agent".to_string(),
                 email_sent: false,
                 token_usage: Some(crate::entities::task::TokenUsage::new(10, 5)),
+                metadata: None,
             }),
             simulation_mode: crate::use_cases::thread::SimulationMode::RunTest,
         };

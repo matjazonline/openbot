@@ -2361,6 +2361,40 @@ pub fn channel_simulation_execution_result_fragment(
         String::new()
     };
 
+    let simulation_metadata_html = if let Some(meta) = agent_exec.and_then(|a| a.metadata.as_ref()) {
+        let meta_pretty = serde_json::to_string_pretty(meta).unwrap_or_else(|_| meta.to_string());
+        let finish_reason = meta
+            .get("finish_reason")
+            .or_else(|| meta.get("stop_reason"))
+            .and_then(|v| v.as_str());
+
+        let finish_badge = if let Some(reason) = finish_reason {
+            let style = match reason {
+                "length" | "max_tokens" => "bg-amber-950 text-amber-300 border-amber-700 font-bold",
+                "stop" | "end_turn" => "bg-emerald-950 text-emerald-300 border-emerald-700 font-semibold",
+                _ => "bg-slate-800 text-slate-300 border-slate-700 font-semibold",
+            };
+            format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono border {}">Finish Reason: {}</span>"#, style, reason)
+        } else {
+            String::new()
+        };
+
+        format!(
+            r#"
+            <div class="md:col-span-2 pt-2 border-t border-slate-800">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">🔍 Execution Metadata:</span>
+                    {}
+                </div>
+                <pre class="bg-slate-950 p-2.5 rounded-lg text-indigo-300 font-mono text-[11px] border border-slate-800/80 overflow-x-auto whitespace-pre-wrap max-h-48">{}</pre>
+            </div>
+            "#,
+            finish_badge, meta_pretty
+        )
+    } else {
+        String::new()
+    };
+
     let exec_details = format!(
         r##"
         <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
@@ -2387,6 +2421,7 @@ pub fn channel_simulation_execution_result_fragment(
                     <span>{api_key_status}</span>
                 </div>
                 {simulation_token_meter_html}
+                {simulation_metadata_html}
                 <div>
                     <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
                     <span class="text-indigo-300">{to_str}</span>
@@ -3509,6 +3544,41 @@ pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> Strin
                 r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-indigo-950/90 text-indigo-200 border border-indigo-700/60 font-semibold">📊 Token Meter: {} tokens (Prompt: {} | Completion: {})</span>"#,
                 total, prompt, comp
             ));
+        }
+    }
+
+    let meta_val = sanitized_payload
+        .get("execution_result")
+        .and_then(|r| r.get("metadata"))
+        .or_else(|| sanitized_payload.get("metadata"));
+
+    if let Some(m) = meta_val {
+        let finish_reason = m
+            .get("finish_reason")
+            .or_else(|| m.get("stop_reason"))
+            .and_then(|v| v.as_str());
+
+        if let Some(reason) = finish_reason {
+            let (badge_style, reason_label) = match reason {
+                "length" | "max_tokens" => (
+                    r#"bg-amber-950/90 text-amber-300 border border-amber-700/80 font-bold"#,
+                    format!("Finish Reason: {} (TRUNCATED MID-SENTENCE)", reason),
+                ),
+                "stop" | "end_turn" => (
+                    r#"bg-emerald-950/90 text-emerald-300 border border-emerald-700/80 font-semibold"#,
+                    format!("Finish Reason: {}", reason),
+                ),
+                other => (
+                    r#"bg-slate-800 text-slate-300 border border-slate-700 font-semibold"#,
+                    format!("Finish Reason: {}", other),
+                ),
+            };
+            badges.push(format!(
+                r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono {}">🏁 {}</span>"#,
+                badge_style, reason_label
+            ));
+        } else {
+            badges.push(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-950/80 text-purple-300 border border-purple-800/50">Metadata: Present</span>"#.to_string());
         }
     }
 

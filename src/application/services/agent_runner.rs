@@ -43,6 +43,8 @@ pub fn estimate_tokens(text: &str) -> usize {
 pub struct AgentExecutionOutput {
     pub content: String,
     pub token_usage: TokenUsage,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
 }
 
 pub fn sanitize_text(input: &str, secret_key: Option<&str>) -> String {
@@ -798,9 +800,17 @@ impl<'a> AgentRunner<'a> {
 
             let token_usage = TokenUsage::new(prompt_tokens, completion_tokens);
 
+            let clean_meta = response.metadata.as_ref().and_then(|meta| {
+                let val = serde_json::to_value(meta).ok()?;
+                let s = val.to_string();
+                let sanitized = sanitize_text(&s, Some(&key_for_task));
+                serde_json::from_str(&sanitized).ok().or(Some(val))
+            });
+
             Ok::<AgentExecutionOutput, anyhow::Error>(AgentExecutionOutput {
                 content: clean_content,
                 token_usage,
+                metadata: clean_meta,
             })
         })
         .await;

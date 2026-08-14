@@ -910,7 +910,7 @@ impl ThreadUseCases {
             return Ok(None);
         };
 
-        let mut agent_outputs: Vec<(&ChannelMatch, String, Option<String>)> = Vec::new();
+        let mut agent_outputs: Vec<(&ChannelMatch, String, Option<String>, Option<serde_json::Value>)> = Vec::new();
         let mut total_prompt_tokens = 0usize;
         let mut total_completion_tokens = 0usize;
         let mut primary_execution_error = None;
@@ -978,7 +978,7 @@ impl ThreadUseCases {
 
             let mut upstream_context = String::new();
             if !agent_outputs.is_empty() {
-                for (prev_m, prev_content, _) in &agent_outputs {
+                for (prev_m, prev_content, _, _) in &agent_outputs {
                     upstream_context.push_str(&format!(
                         "--- Step {step_num}: {name} ({slug}) ---\n{content}\n\n",
                         step_num = prev_m.step_index + 1,
@@ -1022,14 +1022,14 @@ impl ThreadUseCases {
                 Ok(output) => {
                     total_prompt_tokens += output.token_usage.prompt_tokens;
                     total_completion_tokens += output.token_usage.completion_tokens;
-                    agent_outputs.push((m, output.content, None::<String>));
+                    agent_outputs.push((m, output.content, None::<String>, output.metadata));
                 }
                 Err(err) => {
                     let err_msg = format!("Agent execution failed: {err}");
                     if idx == 0 {
                         primary_execution_error = Some(err_msg.clone());
                     }
-                    agent_outputs.push((m, err_msg.clone(), Some(err_msg)));
+                    agent_outputs.push((m, err_msg.clone(), Some(err_msg), None));
                 }
             }
         }
@@ -1039,7 +1039,7 @@ impl ThreadUseCases {
             agent_outputs[0].1.clone()
         } else {
             let mut pieces = Vec::new();
-            for (m, resp, _) in &agent_outputs {
+            for (m, resp, _, _) in &agent_outputs {
                 let role_label = match m.recipient_role {
                     RecipientRole::To => "TO",
                     RecipientRole::Cc => "CC",
@@ -1055,6 +1055,22 @@ impl ThreadUseCases {
                 pieces.push(format!("{}\n{}", header, resp));
             }
             pieces.join("\n\n--------------------------------------------------\n\n")
+        };
+
+        let combined_metadata = if agent_outputs.len() == 1 {
+            agent_outputs[0].3.clone()
+        } else {
+            let mut map = serde_json::Map::new();
+            for (i, (m, _, _, meta)) in agent_outputs.iter().enumerate() {
+                if let Some(meta_val) = meta {
+                    map.insert(format!("step_{}_{}", i + 1, m.channel.slug), meta_val.clone());
+                }
+            }
+            if map.is_empty() {
+                None
+            } else {
+                Some(serde_json::Value::Object(map))
+            }
         };
 
         let primary_match = &matches[0];
@@ -1227,13 +1243,17 @@ impl ThreadUseCases {
             let mut updated_payload = serde_json::to_value(ingest).unwrap_or_default();
             if let Some(obj) = updated_payload.as_object_mut() {
                 obj.insert("execution_parameters".to_string(), exec_params);
-                obj.insert("execution_result".to_string(), serde_json::json!({
+                let mut exec_res = serde_json::json!({
                     "response": combined_agent_response.clone(),
                     "email_sent": email_sent,
                     "outbound_message_id": sent_message_id.clone(),
                     "error": primary_execution_error.clone(),
                     "token_usage": TokenUsage::new(total_prompt_tokens, total_completion_tokens),
-                }));
+                });
+                if let Some(ref meta) = combined_metadata {
+                    exec_res.as_object_mut().unwrap().insert("metadata".to_string(), meta.clone());
+                }
+                obj.insert("execution_result".to_string(), exec_res);
             }
             let _ = self
                 .task_persistence
@@ -1264,6 +1284,7 @@ impl ThreadUseCases {
                 total_prompt_tokens,
                 total_completion_tokens,
             )),
+            metadata: combined_metadata,
         }))
     }
 
@@ -1290,6 +1311,7 @@ impl ThreadUseCases {
                 agent_response: format!("{err}"),
                 email_sent: false,
                 token_usage: None,
+                metadata: None,
             }),
         };
 
@@ -1524,6 +1546,8 @@ pub struct AgentExecutionResult {
     pub agent_response: String,
     pub email_sent: bool,
     pub token_usage: Option<TokenUsage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
