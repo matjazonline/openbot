@@ -64,13 +64,14 @@ impl TryFrom<MessageDb> for Message {
     fn try_from(db: MessageDb) -> AppResult<Self> {
         let direction = MessageDirection::from_str(&db.direction)
             .map_err(|e| AppError::Internal(e.to_string()))?;
-        let role = MessageRole::from_str(&db.role)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+        let role =
+            MessageRole::from_str(&db.role).map_err(|e| AppError::Internal(e.to_string()))?;
 
         let attachments = match db.attachments {
             Some(v) if !v.is_null() => {
-                let parsed: Vec<AttachmentMetadata> = serde_json::from_value(v)
-                    .map_err(|e| AppError::Internal(format!("Failed to parse attachments JSON: {}", e)))?;
+                let parsed: Vec<AttachmentMetadata> = serde_json::from_value(v).map_err(|e| {
+                    AppError::Internal(format!("Failed to parse attachments JSON: {}", e))
+                })?;
                 Some(parsed)
             }
             _ => None,
@@ -102,7 +103,7 @@ impl TryFrom<MessageDb> for Message {
 impl ThreadPersistence for PostgresPersistence {
     async fn create_thread(
         &self,
-        workflow_id: Uuid,
+        channel_id: Uuid,
         subject: &str,
         participant_emails: &[String],
     ) -> AppResult<Thread> {
@@ -113,7 +114,7 @@ impl ThreadPersistence for PostgresPersistence {
                RETURNING id, channel_id, subject, participant_emails, created_at, updated_at"#,
         )
         .bind(id)
-        .bind(workflow_id)
+        .bind(channel_id)
         .bind(subject)
         .bind(participant_emails)
         .fetch_one(&self.pool)
@@ -156,7 +157,10 @@ impl ThreadPersistence for PostgresPersistence {
         Ok(db.into())
     }
 
-    async fn find_thread_by_message_ids(&self, message_ids: &[String]) -> AppResult<Option<Thread>> {
+    async fn find_thread_by_message_ids(
+        &self,
+        message_ids: &[String],
+    ) -> AppResult<Option<Thread>> {
         if message_ids.is_empty() {
             return Ok(None);
         }
@@ -176,7 +180,10 @@ impl ThreadPersistence for PostgresPersistence {
         Ok(db.map(Into::into))
     }
 
-    async fn find_thread_by_thread_index(&self, thread_index_prefix: &str) -> AppResult<Option<Thread>> {
+    async fn find_thread_by_thread_index(
+        &self,
+        thread_index_prefix: &str,
+    ) -> AppResult<Option<Thread>> {
         if thread_index_prefix.trim().is_empty() {
             return Ok(None);
         }

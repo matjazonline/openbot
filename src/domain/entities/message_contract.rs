@@ -30,6 +30,7 @@ pub struct NormalizedInboundMessage {
     pub dkim_status: Option<String>,
     pub dmarc_status: Option<String>,
     pub spam_score: Option<f64>,
+    pub is_context_only: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

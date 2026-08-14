@@ -53,8 +53,6 @@ impl ParticipantIdentity {
     }
 }
 
-pub type Workflow = Channel;
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Channel {
     pub id: Uuid,

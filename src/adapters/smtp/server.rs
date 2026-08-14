@@ -1,27 +1,26 @@
+use mail_parser::MimeHeaders;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
-use mail_parser::MimeHeaders;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tracing::{error, info, warn};
 
 use crate::{
     adapters::protocols::email::EmailIngressAdapter,
-    domain::monitoring::{MonitoringService, SmtpConnectionMetrics, SmtpStatus},
+    application::use_cases::channel::parse_recipient_address,
     application::use_cases::thread::ThreadUseCases,
-    application::use_cases::workflow::parse_recipient_address,
+    domain::monitoring::{MonitoringService, SmtpConnectionMetrics, SmtpStatus},
     infra::config::AppConfig,
-    services::email_parser::{extract_email, RawAttachmentData, RawInboundPayload},
+    services::email_parser::{RawAttachmentData, RawInboundPayload, extract_email},
 };
 
 static MAIL_FROM_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
     regex::Regex::new(r"(?i)from:\s*<([^>]+)>|from:\s*([^\s]+)").unwrap()
 });
-static RCPT_TO_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-    regex::Regex::new(r"(?i)to:\s*<([^>]+)>|to:\s*([^\s]+)").unwrap()
-});
+static RCPT_TO_RE: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"(?i)to:\s*<([^>]+)>|to:\s*([^\s]+)").unwrap());
 
 #[derive(Debug, PartialEq, Eq)]
 enum SmtpState {
@@ -175,7 +174,9 @@ impl SmtpServer {
                     rcpt_to: None,
                 });
             }
-            stream.write_all(b"421 4.7.0 Too many active connections from your IP address\r\n").await?;
+            stream
+                .write_all(b"421 4.7.0 Too many active connections from your IP address\r\n")
+                .await?;
             stream.flush().await?;
             return Ok(());
         }
@@ -198,7 +199,10 @@ impl SmtpServer {
                         rcpt_to: None,
                     });
                 }
-                let msg = format!("554 5.7.1 Service unavailable; Client host [{}] blocked using {}\r\n", client_ip, rbl);
+                let msg = format!(
+                    "554 5.7.1 Service unavailable; Client host [{}] blocked using {}\r\n",
+                    client_ip, rbl
+                );
                 stream.write_all(msg.as_bytes()).await?;
                 stream.flush().await?;
                 return Ok(());
@@ -209,7 +213,10 @@ impl SmtpServer {
         let mut reader = BufReader::new(reader);
 
         // Initial 220 banner
-        let banner = format!("220 {} ESMTP Service Ready\r\n", self.config.app_domain_name);
+        let banner = format!(
+            "220 {} ESMTP Service Ready\r\n",
+            self.config.app_domain_name
+        );
         writer.write_all(banner.as_bytes()).await?;
         writer.flush().await?;
 
@@ -239,9 +246,16 @@ impl SmtpServer {
                     match cmd.as_str() {
                         "HELO" | "EHLO" => {
                             if !arg.is_empty() {
-                                let is_self_domain = arg.eq_ignore_ascii_case(&self.config.app_domain_name);
-                                if is_self_domain && self.config.reject_self_domain_helo && !client_ip.is_loopback() {
-                                    warn!("Client {} spoofed local domain {} in EHLO/HELO", client_ip, arg);
+                                let is_self_domain =
+                                    arg.eq_ignore_ascii_case(&self.config.app_domain_name);
+                                if is_self_domain
+                                    && self.config.reject_self_domain_helo
+                                    && !client_ip.is_loopback()
+                                {
+                                    warn!(
+                                        "Client {} spoofed local domain {} in EHLO/HELO",
+                                        client_ip, arg
+                                    );
                                     if let Some(ref m) = self.monitoring {
                                         m.record_smtp_connection(&SmtpConnectionMetrics {
                                             client_ip,
@@ -259,30 +273,45 @@ impl SmtpServer {
                             }
                             let resp = format!(
                                 "250-{} Hello {}\r\n250-SIZE 20971520\r\n250 OK\r\n",
-                                self.config.app_domain_name, peer_addr.ip()
+                                self.config.app_domain_name,
+                                peer_addr.ip()
                             );
                             writer.write_all(resp.as_bytes()).await?;
                         }
                         "MAIL" => {
                             if let Some(cap) = MAIL_FROM_RE.captures(arg) {
-                                let raw_addr = cap.get(1).or_else(|| cap.get(2)).map(|m| m.as_str()).unwrap_or_default();
+                                let raw_addr = cap
+                                    .get(1)
+                                    .or_else(|| cap.get(2))
+                                    .map(|m| m.as_str())
+                                    .unwrap_or_default();
                                 let extracted = extract_email(raw_addr);
                                 mailfrom = Some(extracted);
                                 writer.write_all(b"250 2.1.0 Ok\r\n").await?;
                             } else {
-                                writer.write_all(b"501 Syntax: MAIL FROM:<address>\r\n").await?;
+                                writer
+                                    .write_all(b"501 Syntax: MAIL FROM:<address>\r\n")
+                                    .await?;
                             }
                         }
                         "RCPT" => {
                             if mailfrom.is_none() {
-                                writer.write_all(b"503 Error: Send MAIL FROM first\r\n").await?;
+                                writer
+                                    .write_all(b"503 Error: Send MAIL FROM first\r\n")
+                                    .await?;
                             } else if let Some(cap) = RCPT_TO_RE.captures(arg) {
-                                let raw_addr = cap.get(1).or_else(|| cap.get(2)).map(|m| m.as_str()).unwrap_or_default();
+                                let raw_addr = cap
+                                    .get(1)
+                                    .or_else(|| cap.get(2))
+                                    .map(|m| m.as_str())
+                                    .unwrap_or_default();
                                 let extracted = extract_email(raw_addr);
                                 rcpts.push(extracted);
                                 writer.write_all(b"250 2.1.5 Ok\r\n").await?;
                             } else {
-                                writer.write_all(b"501 Syntax: RCPT TO:<address>\r\n").await?;
+                                writer
+                                    .write_all(b"501 Syntax: RCPT TO:<address>\r\n")
+                                    .await?;
                             }
                         }
                         "DATA" => {
@@ -290,7 +319,11 @@ impl SmtpServer {
                                 writer.write_all(b"503 Error: MAIL FROM and RCPT TO must be set before DATA\r\n").await?;
                             } else {
                                 state = SmtpState::Data;
-                                writer.write_all(b"354 Start mail input; end with <CR><LF>.<CR><LF>\r\n").await?;
+                                writer
+                                    .write_all(
+                                        b"354 Start mail input; end with <CR><LF>.<CR><LF>\r\n",
+                                    )
+                                    .await?;
                             }
                         }
                         "RSET" => {
@@ -308,7 +341,9 @@ impl SmtpServer {
                             break;
                         }
                         _ => {
-                            writer.write_all(b"500 5.5.1 Command unrecognized\r\n").await?;
+                            writer
+                                .write_all(b"500 5.5.1 Command unrecognized\r\n")
+                                .await?;
                         }
                     }
                     writer.flush().await?;
@@ -325,12 +360,13 @@ impl SmtpServer {
                             if let Some(ref sender) = mailfrom {
                                 let domain = sender.split('@').nth(1).unwrap_or(sender);
                                 let ehlo = ehlo_domain.as_deref().unwrap_or(domain);
-                                let params = mail_auth::spf::verify::SpfParameters::verify_mail_from(
-                                    peer_addr.ip(),
-                                    ehlo,
-                                    domain,
-                                    sender,
-                                );
+                                let params =
+                                    mail_auth::spf::verify::SpfParameters::verify_mail_from(
+                                        peer_addr.ip(),
+                                        ehlo,
+                                        domain,
+                                        sender,
+                                    );
                                 let spf_res = resolver.verify_spf(params).await;
                                 spf_status = Some(match spf_res.result() {
                                     mail_auth::SpfResult::Pass => "pass".to_string(),
@@ -342,12 +378,19 @@ impl SmtpServer {
                                 spf_output_obj = Some(spf_res);
                             }
 
-                            if let Some(auth_msg) = mail_auth::AuthenticatedMessage::parse(data_buffer.as_bytes()) {
+                            if let Some(auth_msg) =
+                                mail_auth::AuthenticatedMessage::parse(data_buffer.as_bytes())
+                            {
                                 let dkim_outputs_obj = resolver.verify_dkim(&auth_msg).await;
                                 if !dkim_outputs_obj.is_empty() {
-                                    if dkim_outputs_obj.iter().all(|s| matches!(s.result(), mail_auth::DkimResult::Pass)) {
+                                    if dkim_outputs_obj
+                                        .iter()
+                                        .all(|s| matches!(s.result(), mail_auth::DkimResult::Pass))
+                                    {
                                         dkim_status = Some("pass".to_string());
-                                    } else if dkim_outputs_obj.iter().any(|s| matches!(s.result(), mail_auth::DkimResult::Fail(_))) {
+                                    } else if dkim_outputs_obj.iter().any(|s| {
+                                        matches!(s.result(), mail_auth::DkimResult::Fail(_))
+                                    }) {
                                         dkim_status = Some("fail".to_string());
                                     } else {
                                         dkim_status = Some("none".to_string());
@@ -357,15 +400,23 @@ impl SmtpServer {
                                 if let Some(ref spf_output) = spf_output_obj {
                                     if let Some(ref sender) = mailfrom {
                                         let domain = sender.split('@').nth(1).unwrap_or(sender);
-                                        let dmarc_params = mail_auth::dmarc::verify::DmarcParameters::new(
-                                            &auth_msg,
-                                            &dkim_outputs_obj,
-                                            domain,
-                                            spf_output,
+                                        let dmarc_params =
+                                            mail_auth::dmarc::verify::DmarcParameters::new(
+                                                &auth_msg,
+                                                &dkim_outputs_obj,
+                                                domain,
+                                                spf_output,
+                                            );
+                                        let dmarc_output =
+                                            resolver.verify_dmarc(dmarc_params).await;
+                                        let dmarc_dkim_pass = matches!(
+                                            dmarc_output.dkim_result(),
+                                            mail_auth::DmarcResult::Pass
                                         );
-                                        let dmarc_output = resolver.verify_dmarc(dmarc_params).await;
-                                        let dmarc_dkim_pass = matches!(dmarc_output.dkim_result(), mail_auth::DmarcResult::Pass);
-                                        let dmarc_spf_pass = matches!(dmarc_output.spf_result(), mail_auth::DmarcResult::Pass);
+                                        let dmarc_spf_pass = matches!(
+                                            dmarc_output.spf_result(),
+                                            mail_auth::DmarcResult::Pass
+                                        );
                                         dmarc_status = Some(if dmarc_dkim_pass || dmarc_spf_pass {
                                             "pass".to_string()
                                         } else {
@@ -389,9 +440,24 @@ impl SmtpServer {
                         // Stage 1 & Stage 2 Spam Scanner (Run for external senders on public channels; skip for trusted participants)
                         let mut should_scan_spam = true;
                         let recipient_str = raw_payload.to.clone();
-                        if let Some((company_slug, workflow_slug)) = parse_recipient_address(&recipient_str, &self.config.app_domain_name) {
-                            if let Ok(Some(company)) = self.thread_use_cases.company_persistence().get_by_slug(&company_slug).await {
-                                if let Ok(Some(workflow)) = self.thread_use_cases.workflow_persistence().get_by_company_slug_and_channel_slug(&company_slug, &workflow_slug).await {
+                        if let Some((company_slug, channel_slug)) =
+                            parse_recipient_address(&recipient_str, &self.config.app_domain_name)
+                        {
+                            if let Ok(Some(company)) = self
+                                .thread_use_cases
+                                .company_persistence()
+                                .get_by_slug(&company_slug)
+                                .await
+                            {
+                                if let Ok(Some(channel)) = self
+                                    .thread_use_cases
+                                    .channel_persistence()
+                                    .get_by_company_slug_and_channel_slug(
+                                        &company_slug,
+                                        &channel_slug,
+                                    )
+                                    .await
+                                {
                                     let sender_clean = raw_payload.from.trim();
                                     let is_team_member = self
                                         .thread_use_cases
@@ -400,11 +466,12 @@ impl SmtpServer {
                                         .await
                                         .unwrap_or(false);
 
-                                    let is_trusted = match &workflow.participant_emails {
+                                    let is_trusted = match &channel.participant_emails {
                                         Some(allowed) if !allowed.is_empty() => {
-                                            let explicitly_listed = allowed
-                                                .iter()
-                                                .any(|e| !e.trim().eq_ignore_ascii_case("@public") && e.eq_ignore_ascii_case(sender_clean));
+                                            let explicitly_listed = allowed.iter().any(|e| {
+                                                !e.trim().eq_ignore_ascii_case("@public")
+                                                    && e.eq_ignore_ascii_case(sender_clean)
+                                            });
                                             explicitly_listed || is_team_member
                                         }
                                         _ => is_team_member,
@@ -418,14 +485,19 @@ impl SmtpServer {
                         }
 
                         if should_scan_spam {
-                            let spam_scanner = crate::services::spam_scanner::SpamScannerService::new(self.config.clone());
-                            let scan_res = spam_scanner.scan(
-                                data_buffer.as_bytes(),
-                                raw_payload.subject.as_deref(),
-                                Some(&raw_payload.from),
-                                raw_payload.text.as_deref(),
-                                raw_payload.html.as_deref(),
-                            ).await;
+                            let spam_scanner =
+                                crate::services::spam_scanner::SpamScannerService::new(
+                                    self.config.clone(),
+                                );
+                            let scan_res = spam_scanner
+                                .scan(
+                                    data_buffer.as_bytes(),
+                                    raw_payload.subject.as_deref(),
+                                    Some(&raw_payload.from),
+                                    raw_payload.text.as_deref(),
+                                    raw_payload.html.as_deref(),
+                                )
+                                .await;
 
                             if scan_res.score > 0.0 {
                                 raw_payload.spam_score = Some(scan_res.score);
@@ -436,19 +508,35 @@ impl SmtpServer {
                         }
 
                         let norm_payload = EmailIngressAdapter::parse(raw_payload, &self.config);
-                        match self.thread_use_cases.ingest_normalized_message(norm_payload).await {
+                        match self
+                            .thread_use_cases
+                            .ingest_normalized_message(norm_payload)
+                            .await
+                        {
                             Ok(ingest) => {
                                 if let Some(ref m) = self.monitoring {
                                     let status = if ingest.accepted {
                                         SmtpStatus::Accepted
                                     } else {
                                         match ingest.reason.as_deref() {
-                                            Some("SPF authentication failed") => SmtpStatus::RejectedSpf,
-                                            Some("DKIM authentication failed") => SmtpStatus::RejectedDkim,
-                                            Some("DMARC authentication failed") => SmtpStatus::RejectedDmarc,
-                                            Some("Spam score threshold exceeded") => SmtpStatus::RejectedSpamScore,
-                                            Some(r) if r.contains("rate limit") => SmtpStatus::BlockedRateLimit,
-                                            Some(r) if r.contains("DNSBL") => SmtpStatus::BlockedDnsbl,
+                                            Some("SPF authentication failed") => {
+                                                SmtpStatus::RejectedSpf
+                                            }
+                                            Some("DKIM authentication failed") => {
+                                                SmtpStatus::RejectedDkim
+                                            }
+                                            Some("DMARC authentication failed") => {
+                                                SmtpStatus::RejectedDmarc
+                                            }
+                                            Some("Spam score threshold exceeded") => {
+                                                SmtpStatus::RejectedSpamScore
+                                            }
+                                            Some(r) if r.contains("rate limit") => {
+                                                SmtpStatus::BlockedRateLimit
+                                            }
+                                            Some(r) if r.contains("DNSBL") => {
+                                                SmtpStatus::BlockedDnsbl
+                                            }
                                             _ => SmtpStatus::Error,
                                         }
                                     };
@@ -464,18 +552,28 @@ impl SmtpServer {
                                 if ingest.accepted {
                                     let thread_use_cases_bg = self.thread_use_cases.clone();
                                     tokio::spawn(async move {
-                                        if let Err(err) = thread_use_cases_bg.execute_agent_and_dispatch(&ingest, true).await {
+                                        if let Err(err) = thread_use_cases_bg
+                                            .execute_agent_and_dispatch(&ingest, true)
+                                            .await
+                                        {
                                             warn!("SMTP background agent execution failed: {err}");
                                         }
                                     });
-                                    writer.write_all(b"250 2.0.0 Message queued for delivery\r\n").await?;
+                                    writer
+                                        .write_all(b"250 2.0.0 Message queued for delivery\r\n")
+                                        .await?;
                                 } else {
                                     let thread_use_cases_bg = self.thread_use_cases.clone();
                                     let ingest_bg = ingest.clone();
                                     tokio::spawn(async move {
-                                        thread_use_cases_bg.handle_bounce_dispatch(&ingest_bg).await;
+                                        thread_use_cases_bg
+                                            .handle_bounce_dispatch(&ingest_bg)
+                                            .await;
                                     });
-                                    let msg = format!("250 2.0.0 Message processed ({})\r\n", ingest.reason.as_deref().unwrap_or("ok"));
+                                    let msg = format!(
+                                        "250 2.0.0 Message processed ({})\r\n",
+                                        ingest.reason.as_deref().unwrap_or("ok")
+                                    );
                                     writer.write_all(msg.as_bytes()).await?;
                                 }
                             }
@@ -490,7 +588,9 @@ impl SmtpServer {
                                         rcpt_to: rcpts.first().cloned(),
                                     });
                                 }
-                                writer.write_all(b"451 4.3.0 Local error in processing\r\n").await?;
+                                writer
+                                    .write_all(b"451 4.3.0 Local error in processing\r\n")
+                                    .await?;
                             }
                         }
                         writer.flush().await?;
@@ -518,16 +618,15 @@ impl SmtpServer {
 
 fn extract_address_str(addr: &mail_parser::Address) -> Option<String> {
     match addr {
-        mail_parser::Address::List(list) => {
-            list.first().and_then(|a| a.address.as_deref()).map(extract_email)
-        }
-        mail_parser::Address::Group(groups) => {
-            groups
-                .first()
-                .and_then(|g| g.addresses.first())
-                .and_then(|a| a.address.as_deref())
-                .map(extract_email)
-        }
+        mail_parser::Address::List(list) => list
+            .first()
+            .and_then(|a| a.address.as_deref())
+            .map(extract_email),
+        mail_parser::Address::Group(groups) => groups
+            .first()
+            .and_then(|g| g.addresses.first())
+            .and_then(|a| a.address.as_deref())
+            .map(extract_email),
     }
 }
 
@@ -615,11 +714,7 @@ pub fn parse_raw_mime_to_payload(
                     }
                 }
             }
-            if hdrs.is_empty() {
-                None
-            } else {
-                Some(hdrs)
-            }
+            if hdrs.is_empty() { None } else { Some(hdrs) }
         };
 
         // Extract attachments
@@ -678,11 +773,9 @@ mod tests {
 
     use crate::{
         app_error::AppResult,
-        entities::{company::Company, message::Message, thread::Thread, workflow::Workflow},
+        entities::{channel::Channel, company::Company, message::Message, thread::Thread},
         use_cases::{
-            company::CompanyPersistence,
-            thread::ThreadPersistence,
-            channel::ChannelPersistence,
+            channel::ChannelPersistence, company::CompanyPersistence, thread::ThreadPersistence,
         },
     };
 
@@ -692,32 +785,112 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> { unimplemented!() }
-        async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
-            Ok(self.companies.lock().unwrap().iter().find(|c| c.slug == slug).cloned())
+        async fn create(
+            &self,
+            _user_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
+            unimplemented!()
         }
-        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
-        async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> { Ok(true) }
-        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> { Ok(vec![]) }
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> {
+            unimplemented!()
+        }
+        async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
+            Ok(self
+                .companies
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|c| c.slug == slug)
+                .cloned())
+        }
+        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
+            unimplemented!()
+        }
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
+        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
+            Ok(true)
+        }
+        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
+            Ok(vec![])
+        }
     }
 
-    struct MockWorkflowPersistence {
-        workflows: Mutex<Vec<Workflow>>,
+    struct MockChannelPersistence {
+        channels: Mutex<Vec<Channel>>,
     }
 
     #[async_trait]
-    impl ChannelPersistence for MockWorkflowPersistence {
-        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> { unimplemented!() }
-        async fn get_by_company_slug_and_channel_slug(&self, _company_slug: &str, workflow_slug: &str) -> AppResult<Option<Workflow>> {
-            Ok(self.workflows.lock().unwrap().iter().find(|w| w.slug == workflow_slug).cloned())
+    impl ChannelPersistence for MockChannelPersistence {
+        async fn create(
+            &self,
+            _company_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _participant_emails: Option<Vec<String>>,
+            _agent_ids: Option<Vec<Uuid>>,
+            _channel_config: Option<serde_json::Value>,
+        ) -> AppResult<Channel> {
+            unimplemented!()
         }
-        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { Ok(self.workflows.lock().unwrap().clone()) }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
-        async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
+            unimplemented!()
+        }
+        async fn get_by_company_slug_and_channel_slug(
+            &self,
+            _company_slug: &str,
+            channel_slug: &str,
+        ) -> AppResult<Option<Channel>> {
+            Ok(self
+                .channels
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|w| w.slug == channel_slug)
+                .cloned())
+        }
+        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
+            Ok(self.channels.lock().unwrap().clone())
+        }
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _participant_emails: Option<Vec<String>>,
+            _agent_ids: Option<Vec<Uuid>>,
+            _channel_config: Option<serde_json::Value>,
+        ) -> AppResult<Channel> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
     }
 
     struct MockThreadPersistence {
@@ -727,10 +900,15 @@ mod tests {
 
     #[async_trait]
     impl ThreadPersistence for MockThreadPersistence {
-        async fn create_thread(&self, workflow_id: Uuid, subject: &str, participant_emails: &[String]) -> AppResult<Thread> {
+        async fn create_thread(
+            &self,
+            channel_id: Uuid,
+            subject: &str,
+            participant_emails: &[String],
+        ) -> AppResult<Thread> {
             let thread = Thread {
                 id: Uuid::new_v4(),
-                channel_id: workflow_id,
+                channel_id,
                 subject: subject.to_string(),
                 participant_emails: participant_emails.to_vec(),
                 created_at: Utc::now().naive_utc(),
@@ -741,17 +919,30 @@ mod tests {
         }
 
         async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>> {
-            Ok(self.threads.lock().unwrap().iter().find(|t| t.id == id).cloned())
+            Ok(self
+                .threads
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|t| t.id == id)
+                .cloned())
         }
 
-        async fn update_thread_participants(&self, id: Uuid, participant_emails: &[String]) -> AppResult<Thread> {
+        async fn update_thread_participants(
+            &self,
+            id: Uuid,
+            participant_emails: &[String],
+        ) -> AppResult<Thread> {
             let mut list = self.threads.lock().unwrap();
             let thread = list.iter_mut().find(|t| t.id == id).unwrap();
             thread.participant_emails = participant_emails.to_vec();
             Ok(thread.clone())
         }
 
-        async fn find_thread_by_message_ids(&self, message_ids: &[String]) -> AppResult<Option<Thread>> {
+        async fn find_thread_by_message_ids(
+            &self,
+            message_ids: &[String],
+        ) -> AppResult<Option<Thread>> {
             let thread_id = {
                 let msgs = self.messages.lock().unwrap();
                 msgs.iter()
@@ -764,11 +955,19 @@ mod tests {
             Ok(None)
         }
 
-        async fn find_thread_by_thread_index(&self, thread_index_prefix: &str) -> AppResult<Option<Thread>> {
+        async fn find_thread_by_thread_index(
+            &self,
+            thread_index_prefix: &str,
+        ) -> AppResult<Option<Thread>> {
             let thread_id = {
                 let msgs = self.messages.lock().unwrap();
                 msgs.iter()
-                    .find(|m| m.thread_index.as_deref().unwrap_or_default().starts_with(thread_index_prefix))
+                    .find(|m| {
+                        m.thread_index
+                            .as_deref()
+                            .unwrap_or_default()
+                            .starts_with(thread_index_prefix)
+                    })
                     .map(|m| m.thread_id)
             };
             if let Some(tid) = thread_id {
@@ -777,7 +976,11 @@ mod tests {
             Ok(None)
         }
 
-        async fn count_recent_messages(&self, thread_id: Uuid, _duration_secs: i64) -> AppResult<usize> {
+        async fn count_recent_messages(
+            &self,
+            thread_id: Uuid,
+            _duration_secs: i64,
+        ) -> AppResult<usize> {
             let msgs = self.messages.lock().unwrap();
             Ok(msgs.iter().filter(|m| m.thread_id == thread_id).count())
         }
@@ -788,11 +991,24 @@ mod tests {
         }
 
         async fn get_message_by_message_id(&self, message_id: &str) -> AppResult<Option<Message>> {
-            Ok(self.messages.lock().unwrap().iter().find(|m| m.message_id == message_id).cloned())
+            Ok(self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|m| m.message_id == message_id)
+                .cloned())
         }
 
         async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-            Ok(self.messages.lock().unwrap().iter().filter(|m| m.thread_id == thread_id).cloned().collect())
+            Ok(self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m| m.thread_id == thread_id)
+                .cloned()
+                .collect())
         }
     }
 
@@ -800,11 +1016,18 @@ mod tests {
 
     #[async_trait]
     impl crate::adapters::persistence::task::TaskPersistence for MockTaskPersistence {
-        async fn enqueue_task(&self, company_id: Uuid, workflow_id: Uuid, thread_id: Option<Uuid>, task_type: &str, payload: serde_json::Value) -> AppResult<crate::entities::task::BackgroundTask> {
+        async fn enqueue_task(
+            &self,
+            company_id: Uuid,
+            channel_id: Uuid,
+            thread_id: Option<Uuid>,
+            task_type: &str,
+            payload: serde_json::Value,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
             Ok(crate::entities::task::BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
-                channel_id: workflow_id,
+                channel_id,
                 thread_id,
                 task_type: task_type.to_string(),
                 status: crate::entities::task::TaskStatus::Pending,
@@ -817,16 +1040,62 @@ mod tests {
                 updated_at: Utc::now().naive_utc(),
             })
         }
-        async fn get_task_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::task::BackgroundTask>> { Ok(None) }
-        async fn update_task_payload(&self, _id: Uuid, _payload: serde_json::Value) -> AppResult<()> { Ok(()) }
-        async fn poll_next_pending_tasks(&self, _limit: i64) -> AppResult<Vec<crate::entities::task::BackgroundTask>> { Ok(vec![]) }
-        async fn mark_task_processing(&self, _id: Uuid) -> AppResult<bool> { Ok(true) }
-        async fn mark_task_completed(&self, _id: Uuid) -> AppResult<()> { Ok(()) }
-        async fn mark_task_failed(&self, _id: Uuid, _error_msg: &str, _next_run_at: chrono::NaiveDateTime, _is_dead_letter: bool) -> AppResult<()> { Ok(()) }
-        async fn stop_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
-        async fn resume_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
-        async fn update_task_status(&self, _id: Uuid, _status: crate::entities::task::TaskStatus) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
-        async fn list_company_tasks(&self, _company_id: Uuid, _workflow_id: Option<Uuid>, _status: Option<crate::entities::task::TaskStatus>, _sort_asc: bool) -> AppResult<Vec<crate::entities::task::BackgroundTask>> { Ok(vec![]) }
+        async fn get_task_by_id(
+            &self,
+            _id: Uuid,
+        ) -> AppResult<Option<crate::entities::task::BackgroundTask>> {
+            Ok(None)
+        }
+        async fn update_task_payload(
+            &self,
+            _id: Uuid,
+            _payload: serde_json::Value,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn poll_next_pending_tasks(
+            &self,
+            _limit: i64,
+        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            Ok(vec![])
+        }
+        async fn mark_task_processing(&self, _id: Uuid) -> AppResult<bool> {
+            Ok(true)
+        }
+        async fn mark_task_completed(&self, _id: Uuid) -> AppResult<()> {
+            Ok(())
+        }
+        async fn mark_task_failed(
+            &self,
+            _id: Uuid,
+            _error_msg: &str,
+            _next_run_at: chrono::NaiveDateTime,
+            _is_dead_letter: bool,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn stop_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
+            unimplemented!()
+        }
+        async fn resume_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
+            unimplemented!()
+        }
+        async fn update_task_status(
+            &self,
+            _id: Uuid,
+            _status: crate::entities::task::TaskStatus,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
+            unimplemented!()
+        }
+        async fn list_company_tasks(
+            &self,
+            _company_id: Uuid,
+            _channel_id: Option<Uuid>,
+            _status: Option<crate::entities::task::TaskStatus>,
+            _sort_asc: bool,
+        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            Ok(vec![])
+        }
     }
 
     #[test]
@@ -846,8 +1115,20 @@ mod tests {
         assert_eq!(payload.from, "sender@external.com");
         assert_eq!(payload.to, "inbound@acme.mailagents.com");
         assert_eq!(payload.subject.as_deref(), Some("Test Email"));
-        assert!(payload.text.as_deref().unwrap_or_default().contains("Hello from SMTP server!"));
-        assert!(payload.headers.as_deref().unwrap_or_default().contains("Message-ID"));
+        assert!(
+            payload
+                .text
+                .as_deref()
+                .unwrap_or_default()
+                .contains("Hello from SMTP server!")
+        );
+        assert!(
+            payload
+                .headers
+                .as_deref()
+                .unwrap_or_default()
+                .contains("Message-ID")
+        );
         assert_eq!(payload.spf.as_deref(), Some("pass"));
         assert_eq!(payload.dkim.as_deref(), Some("pass"));
     }
@@ -869,8 +1150,8 @@ mod tests {
             }]),
         });
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![Workflow {
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Inbound Flow".to_string(),
@@ -919,7 +1200,7 @@ mod tests {
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
             thread_persistence.clone(),
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config.clone(),
@@ -934,7 +1215,10 @@ mod tests {
         let server_clone = server.clone();
         tokio::spawn(async move {
             let (stream, peer_addr) = listener.accept().await.unwrap();
-            server_clone.handle_connection(stream, peer_addr).await.unwrap();
+            server_clone
+                .handle_connection(stream, peer_addr)
+                .await
+                .unwrap();
         });
 
         // Client connection and SMTP dialog
@@ -949,7 +1233,10 @@ mod tests {
 
         // EHLO
         response.clear();
-        writer.write_all(b"EHLO client.example.com\r\n").await.unwrap();
+        writer
+            .write_all(b"EHLO client.example.com\r\n")
+            .await
+            .unwrap();
         writer.flush().await.unwrap();
         buf_reader.read_line(&mut response).await.unwrap();
         assert!(response.contains("250"));
@@ -963,14 +1250,20 @@ mod tests {
 
         // MAIL FROM
         response.clear();
-        writer.write_all(b"MAIL FROM:<sender@external.com>\r\n").await.unwrap();
+        writer
+            .write_all(b"MAIL FROM:<sender@external.com>\r\n")
+            .await
+            .unwrap();
         writer.flush().await.unwrap();
         buf_reader.read_line(&mut response).await.unwrap();
         assert!(response.contains("250"));
 
         // RCPT TO
         response.clear();
-        writer.write_all(b"RCPT TO:<inbound@acme.mailagents.com>\r\n").await.unwrap();
+        writer
+            .write_all(b"RCPT TO:<inbound@acme.mailagents.com>\r\n")
+            .await
+            .unwrap();
         writer.flush().await.unwrap();
         buf_reader.read_line(&mut response).await.unwrap();
         assert!(response.contains("250"));
@@ -1007,9 +1300,18 @@ mod tests {
 
         let messages = thread_persistence.messages.lock().unwrap();
         assert_eq!(messages.len(), 2); // 1 Inbound Human + 1 Outbound Agent
-        assert_eq!(messages[0].clean_text_body, "Hello agent, please process this order via SMTP.");
-        assert_eq!(messages[0].role, crate::entities::message::MessageRole::Human);
-        assert_eq!(messages[0].direction, crate::entities::message::MessageDirection::Inbound);
+        assert_eq!(
+            messages[0].clean_text_body,
+            "Hello agent, please process this order via SMTP."
+        );
+        assert_eq!(
+            messages[0].role,
+            crate::entities::message::MessageRole::Human
+        );
+        assert_eq!(
+            messages[0].direction,
+            crate::entities::message::MessageDirection::Inbound
+        );
     }
 
     #[tokio::test]
@@ -1027,13 +1329,23 @@ Content-Type: text/plain; charset=\"UTF-8\"\n\n\
 regis";
 
         let msg_crlf = msg.replace("\r\n", "\n").replace('\n', "\r\n");
-        let auth_msg = mail_auth::AuthenticatedMessage::parse(msg_crlf.as_bytes()).expect("Message must be parseable");
+        let auth_msg = mail_auth::AuthenticatedMessage::parse(msg_crlf.as_bytes())
+            .expect("Message must be parseable");
         if let Ok(resolver) = mail_auth::MessageAuthenticator::new_quad9() {
             let dkim_result = resolver.verify_dkim(&auth_msg).await;
             println!("DKIM verification result: {:?}", dkim_result);
-            assert!(!dkim_result.is_empty(), "DKIM signature should be parsed and evaluated");
-            assert_eq!(dkim_result[0].signature().as_ref().unwrap().domain(), "gmail.com");
-            assert_eq!(dkim_result[0].signature().as_ref().unwrap().selector(), "20230601");
+            assert!(
+                !dkim_result.is_empty(),
+                "DKIM signature should be parsed and evaluated"
+            );
+            assert_eq!(
+                dkim_result[0].signature().as_ref().unwrap().domain(),
+                "gmail.com"
+            );
+            assert_eq!(
+                dkim_result[0].signature().as_ref().unwrap().selector(),
+                "20230601"
+            );
         }
     }
 
@@ -1069,11 +1381,11 @@ regis";
             }]),
         });
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![Workflow {
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
                 id: Uuid::new_v4(),
                 company_id,
-                name: "Reg Workflow".to_string(),
+                name: "Reg Channel".to_string(),
                 slug: "network".to_string(),
                 api_key: None,
                 provider: None,
@@ -1119,7 +1431,7 @@ regis";
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
             thread_persistence.clone(),
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config.clone(),
@@ -1133,7 +1445,10 @@ regis";
         let server_clone = server.clone();
         tokio::spawn(async move {
             let (stream, peer_addr) = listener.accept().await.unwrap();
-            server_clone.handle_connection(stream, peer_addr).await.unwrap();
+            server_clone
+                .handle_connection(stream, peer_addr)
+                .await
+                .unwrap();
         });
 
         let mut client = TcpStream::connect(local_addr).await.unwrap();
@@ -1142,17 +1457,28 @@ regis";
         let mut response = String::new();
 
         buf_reader.read_line(&mut response).await.unwrap();
-        writer.write_all(b"EHLO mail-pj1-f42.google.com\r\n").await.unwrap();
+        writer
+            .write_all(b"EHLO mail-pj1-f42.google.com\r\n")
+            .await
+            .unwrap();
         writer.flush().await.unwrap();
         while buf_reader.read_line(&mut response).await.unwrap() > 0 {
-            if response.ends_with("250 OK\r\n") { break; }
+            if response.ends_with("250 OK\r\n") {
+                break;
+            }
         }
 
-        writer.write_all(b"MAIL FROM:<hello.populus@gmail.com>\r\n").await.unwrap();
+        writer
+            .write_all(b"MAIL FROM:<hello.populus@gmail.com>\r\n")
+            .await
+            .unwrap();
         writer.flush().await.unwrap();
         buf_reader.read_line(&mut response).await.unwrap();
 
-        writer.write_all(b"RCPT TO:<network@populus.mailagents.com>\r\n").await.unwrap();
+        writer
+            .write_all(b"RCPT TO:<network@populus.mailagents.com>\r\n")
+            .await
+            .unwrap();
         writer.flush().await.unwrap();
         buf_reader.read_line(&mut response).await.unwrap();
 
@@ -1188,9 +1514,16 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
     async fn test_smtp_rate_limiting_and_monitoring() {
         use crate::adapters::monitoring::InMemoryMonitor;
 
-        let company_persistence = Arc::new(MockCompanyPersistence { companies: Mutex::new(Vec::new()) });
-        let workflow_persistence = Arc::new(MockWorkflowPersistence { workflows: Mutex::new(Vec::new()) });
-        let thread_persistence = Arc::new(MockThreadPersistence { threads: Mutex::new(Vec::new()), messages: Mutex::new(Vec::new()) });
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(Vec::new()),
+        });
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(Vec::new()),
+        });
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
         let task_persistence = Arc::new(MockTaskPersistence);
 
         let config = Arc::new(AppConfig {
@@ -1221,14 +1554,15 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         let monitor = Arc::new(InMemoryMonitor::new());
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
-            thread_persistence,
-            workflow_persistence,
+            thread_persistence.clone(),
+            channel_persistence,
             company_persistence,
             task_persistence,
             config.clone(),
         ));
 
-        let server = Arc::new(SmtpServer::new(thread_use_cases, config).with_monitoring(monitor.clone()));
+        let server =
+            Arc::new(SmtpServer::new(thread_use_cases, config).with_monitoring(monitor.clone()));
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let local_addr = listener.local_addr().unwrap();
@@ -1263,4 +1597,3 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         assert_eq!(stats["smtp_connections"]["blocked_rate_limit"], 1);
     }
 }
-

@@ -23,7 +23,7 @@ impl MonitoringService for TracingMonitor {
         info!(
             target: "monitoring::ai",
             company_id = ?metrics.company_id,
-            workflow_id = ?metrics.workflow_id,
+            channel_id = ?metrics.channel_id,
             agent_id = ?metrics.agent_id,
             provider = %metrics.provider,
             model = %metrics.model,
@@ -53,7 +53,7 @@ impl MonitoringService for TracingMonitor {
         info!(
             target: "monitoring::task",
             company_id = ?metrics.company_id,
-            workflow_id = ?metrics.workflow_id,
+            channel_id = ?metrics.channel_id,
             task_type = %metrics.task_type,
             duration_ms = metrics.duration_ms,
             status = %metrics.status,

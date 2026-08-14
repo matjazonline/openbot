@@ -18,12 +18,8 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/approvals/{token}", get(approval_link_handler))
         .route(
-            "/companies/{company_id}/channels/{workflow_id}/approvals",
-            get(list_workflow_approvals_handler),
-        )
-        .route(
-            "/companies/{company_id}/workflows/{workflow_id}/approvals",
-            get(list_workflow_approvals_handler),
+            "/companies/{company_id}/channels/{channel_id}/approvals",
+            get(list_channel_approvals_handler),
         )
 }
 
@@ -61,12 +57,12 @@ async fn approval_link_handler(
     }
 }
 
-async fn list_workflow_approvals_handler(
+async fn list_channel_approvals_handler(
     State(approval_use_cases): State<Arc<ApprovalUseCases>>,
-    Path((company_id, workflow_id)): Path<(Uuid, Uuid)>,
+    Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
 ) -> impl IntoResponse {
     match approval_use_cases
-        .list_workflow_approvals(company_id, workflow_id)
+        .list_channel_approvals(company_id, channel_id)
         .await
     {
         Ok(list) => Html(pages::channel_approvals_fragment(&list)),

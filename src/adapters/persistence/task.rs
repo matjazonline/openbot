@@ -31,8 +31,8 @@ impl TryFrom<BackgroundTaskDb> for BackgroundTask {
     type Error = AppError;
 
     fn try_from(db: BackgroundTaskDb) -> AppResult<Self> {
-        let status = TaskStatus::from_str(&db.status)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+        let status =
+            TaskStatus::from_str(&db.status).map_err(|e| AppError::Internal(e.to_string()))?;
 
         Ok(BackgroundTask {
             id: db.id,
@@ -57,7 +57,7 @@ pub trait TaskPersistence: Send + Sync {
     async fn enqueue_task(
         &self,
         company_id: Uuid,
-        workflow_id: Uuid,
+        channel_id: Uuid,
         thread_id: Option<Uuid>,
         task_type: &str,
         payload: Value,
@@ -90,7 +90,7 @@ pub trait TaskPersistence: Send + Sync {
     async fn list_company_tasks(
         &self,
         company_id: Uuid,
-        workflow_id: Option<Uuid>,
+        channel_id: Option<Uuid>,
         status: Option<TaskStatus>,
         sort_asc: bool,
     ) -> AppResult<Vec<BackgroundTask>>;
@@ -101,7 +101,7 @@ impl TaskPersistence for PostgresPersistence {
     async fn enqueue_task(
         &self,
         company_id: Uuid,
-        workflow_id: Uuid,
+        channel_id: Uuid,
         thread_id: Option<Uuid>,
         task_type: &str,
         payload: Value,
@@ -116,7 +116,7 @@ impl TaskPersistence for PostgresPersistence {
         )
         .bind(id)
         .bind(company_id)
-        .bind(workflow_id)
+        .bind(channel_id)
         .bind(thread_id)
         .bind(task_type)
         .bind(payload)
@@ -211,7 +211,11 @@ impl TaskPersistence for PostgresPersistence {
         next_run_at: NaiveDateTime,
         is_dead_letter: bool,
     ) -> AppResult<()> {
-        let new_status = if is_dead_letter { "dead_letter" } else { "pending" };
+        let new_status = if is_dead_letter {
+            "dead_letter"
+        } else {
+            "pending"
+        };
 
         sqlx::query(
             r#"UPDATE background_tasks
@@ -284,7 +288,7 @@ impl TaskPersistence for PostgresPersistence {
     async fn list_company_tasks(
         &self,
         company_id: Uuid,
-        workflow_id: Option<Uuid>,
+        channel_id: Option<Uuid>,
         status: Option<TaskStatus>,
         sort_asc: bool,
     ) -> AppResult<Vec<BackgroundTask>> {
@@ -303,7 +307,7 @@ impl TaskPersistence for PostgresPersistence {
                  CASE WHEN NOT $4 THEN created_at END DESC"#,
         )
         .bind(company_id)
-        .bind(workflow_id)
+        .bind(channel_id)
         .bind(status_str)
         .bind(sort_asc)
         .fetch_all(&self.pool)

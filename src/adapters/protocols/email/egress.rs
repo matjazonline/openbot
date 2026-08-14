@@ -48,9 +48,9 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
             .unwrap_or_default();
 
         let outbound = OutboundEmail {
-            workflow_id: message.channel_id,
-            workflow_name: "Channel".to_string(),
-            workflow_slug: "channel".to_string(),
+            channel_id: message.channel_id,
+            channel_name: "Channel".to_string(),
+            channel_slug: "channel".to_string(),
             company_slug: "company".to_string(),
             trigger_message_id,
             thread_references: message.references.clone(),
@@ -59,7 +59,7 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
             subject: message.subject.clone(),
             body_text: message.content.clone(),
             hop_count: message.hop_count,
-            trace_workflows: message.trace_channels.clone(),
+            trace_channels: message.trace_channels.clone(),
         };
 
         OutboundDispatcher::send(&self.config, outbound).await?;
@@ -68,7 +68,7 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
 
     async fn dispatch_bounce(&self, bounce_info: &BounceInfo) -> AppResult<()> {
         let mut bounce_body = format!(
-            "Your email to company '{}' could not be delivered because the requested workflow address(es) were invalid:\n",
+            "Your email to company '{}' could not be delivered because the requested channel address(es) were invalid:\n",
             bounce_info.company_slug.as_deref().unwrap_or("unknown")
         );
 
@@ -77,7 +77,7 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
         }
 
         if !bounce_info.suggestions.is_empty() {
-            bounce_body.push_str("\nDid you mean one of the following valid workflow addresses?\n");
+            bounce_body.push_str("\nDid you mean one of the following valid channel addresses?\n");
             for sug in &bounce_info.suggestions {
                 if !sug.suggestions.is_empty() {
                     bounce_body.push_str(&format!(

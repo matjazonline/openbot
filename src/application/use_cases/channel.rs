@@ -4,13 +4,13 @@ use async_trait::async_trait;
 use tracing::{info, instrument};
 use uuid::Uuid;
 
-use serde::{Deserialize, Serialize};
 use crate::{
     app_error::{AppError, AppResult},
-    entities::{company::Company, channel::Channel},
+    entities::{channel::Channel, company::Company},
     infra::config::AppConfig,
     use_cases::company::CompanyPersistence,
 };
+use serde::{Deserialize, Serialize};
 
 #[async_trait]
 pub trait ChannelPersistence: Send + Sync {
@@ -53,18 +53,12 @@ pub trait ChannelPersistence: Send + Sync {
     async fn delete(&self, id: Uuid) -> AppResult<()>;
 }
 
-pub trait WorkflowPersistence: ChannelPersistence {}
-impl<T: ChannelPersistence + ?Sized> WorkflowPersistence for T {}
-pub type Workflow = Channel;
-
 #[derive(Clone)]
 pub struct ChannelUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
     channel_persistence: Arc<dyn ChannelPersistence>,
     config: Arc<AppConfig>,
 }
-
-pub type WorkflowUseCases = ChannelUseCases;
 
 impl ChannelUseCases {
     pub fn new(
@@ -164,23 +158,6 @@ impl ChannelUseCases {
             .await
     }
 
-    pub async fn create_workflow(
-        &self,
-        user_id: Uuid,
-        company_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        participant_emails: Option<Vec<String>>,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
-        confirm_spam_disabled: bool,
-    ) -> AppResult<Channel> {
-        self.create_channel(user_id, company_id, name, slug, api_key, provider, model, participant_emails, agent_ids, channel_config, confirm_spam_disabled).await
-    }
-
     #[instrument(skip(self))]
     pub async fn list_company_channels(
         &self,
@@ -188,15 +165,9 @@ impl ChannelUseCases {
         company_id: Uuid,
     ) -> AppResult<Vec<Channel>> {
         self.verify_company_owner(user_id, company_id).await?;
-        self.channel_persistence.list_by_company_id(company_id).await
-    }
-
-    pub async fn list_company_workflows(
-        &self,
-        user_id: Uuid,
-        company_id: Uuid,
-    ) -> AppResult<Vec<Channel>> {
-        self.list_company_channels(user_id, company_id).await
+        self.channel_persistence
+            .list_by_company_id(company_id)
+            .await
     }
 
     #[instrument(skip(self))]
@@ -216,20 +187,7 @@ impl ChannelUseCases {
         Ok(channel)
     }
 
-    pub async fn get_company_workflow(
-        &self,
-        user_id: Uuid,
-        company_id: Uuid,
-        workflow_id: Uuid,
-    ) -> AppResult<Option<Channel>> {
-        self.get_company_channel(user_id, company_id, workflow_id).await
-    }
-
     pub fn channel_persistence(&self) -> &Arc<dyn ChannelPersistence> {
-        &self.channel_persistence
-    }
-
-    pub fn workflow_persistence(&self) -> &Arc<dyn ChannelPersistence> {
         &self.channel_persistence
     }
 
@@ -315,24 +273,6 @@ impl ChannelUseCases {
             .await
     }
 
-    pub async fn update_workflow(
-        &self,
-        user_id: Uuid,
-        company_id: Uuid,
-        workflow_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        participant_emails: Option<Vec<String>>,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
-        confirm_spam_disabled: bool,
-    ) -> AppResult<Channel> {
-        self.update_channel(user_id, company_id, workflow_id, name, slug, api_key, provider, model, participant_emails, agent_ids, channel_config, confirm_spam_disabled).await
-    }
-
     #[instrument(skip(self))]
     pub async fn delete_channel(
         &self,
@@ -354,20 +294,8 @@ impl ChannelUseCases {
             ));
         }
 
-        info!(
-            "Deleting channel {} for company {}",
-            channel_id, company_id
-        );
+        info!("Deleting channel {} for company {}", channel_id, company_id);
         self.channel_persistence.delete(channel_id).await
-    }
-
-    pub async fn delete_workflow(
-        &self,
-        user_id: Uuid,
-        company_id: Uuid,
-        workflow_id: Uuid,
-    ) -> AppResult<()> {
-        self.delete_channel(user_id, company_id, workflow_id).await
     }
 
     #[instrument(skip(self, email))]
@@ -384,55 +312,59 @@ impl ChannelUseCases {
 
         let parsed = parse_recipient_address(&email.to, app_domain_name);
         match parsed {
-            Some((company_slug, workflow_slug)) => {
+            Some((company_slug, channel_slug)) => {
                 info!(
-                    "Parsed recipient -> company_slug: '{}', workflow_slug: '{}'",
-                    company_slug, workflow_slug
+                    "Parsed recipient -> company_slug: '{}', channel_slug: '{}'",
+                    company_slug, channel_slug
                 );
 
                 let company = self.company_persistence.get_by_slug(&company_slug).await?;
-                let workflow = self
+                let channel = self
                     .channel_persistence
-                    .get_by_company_slug_and_channel_slug(&company_slug, &workflow_slug)
+                    .get_by_company_slug_and_channel_slug(&company_slug, &channel_slug)
                     .await?;
 
                 let sender_email = extract_email_address(&email.from);
 
-                let sender_authorized = if let (Some(comp), Some(wf)) = (company.as_ref(), workflow.as_ref()) {
-                    match &wf.participant_emails {
-                        Some(allowed_emails) if !allowed_emails.is_empty() => {
-                            let is_public = allowed_emails.iter().any(|e| e.trim().eq_ignore_ascii_case("@public"));
-                            let explicitly_listed = allowed_emails
-                                .iter()
-                                .any(|e| !e.trim().eq_ignore_ascii_case("@public") && e.eq_ignore_ascii_case(&sender_email));
-                            is_public || explicitly_listed
+                let sender_authorized =
+                    if let (Some(comp), Some(ch)) = (company.as_ref(), channel.as_ref()) {
+                        match &ch.participant_emails {
+                            Some(allowed_emails) if !allowed_emails.is_empty() => {
+                                let is_public = allowed_emails
+                                    .iter()
+                                    .any(|e| e.trim().eq_ignore_ascii_case("@public"));
+                                let explicitly_listed = allowed_emails.iter().any(|e| {
+                                    !e.trim().eq_ignore_ascii_case("@public")
+                                        && e.eq_ignore_ascii_case(&sender_email)
+                                });
+                                is_public || explicitly_listed
+                            }
+                            _ => self
+                                .company_persistence
+                                .is_company_team_member(comp.id, &sender_email)
+                                .await
+                                .unwrap_or(false),
                         }
-                        _ => self
-                            .company_persistence
-                            .is_company_team_member(comp.id, &sender_email)
-                            .await
-                            .unwrap_or(false),
-                    }
-                } else {
-                    false
-                };
+                    } else {
+                        false
+                    };
 
-                let resolved = company.is_some() && workflow.is_some() && sender_authorized;
+                let resolved = company.is_some() && channel.is_some() && sender_authorized;
 
                 if resolved {
                     info!(
-                        "Successfully resolved workflow '{}' for company '{}' with authorized sender '{}'",
-                        workflow_slug, company_slug, sender_email
+                        "Successfully resolved channel '{}' for company '{}' with authorized sender '{}'",
+                        channel_slug, company_slug, sender_email
                     );
                 } else if !sender_authorized {
                     info!(
-                        "Unauthorized sender '{}' for workflow '{}@{}' (not in participant_emails)",
-                        sender_email, workflow_slug, company_slug
+                        "Unauthorized sender '{}' for channel '{}@{}' (not in participant_emails)",
+                        sender_email, channel_slug, company_slug
                     );
                 } else {
                     info!(
-                        "Workflow or company not found for '{}@{}'",
-                        workflow_slug, company_slug
+                        "Channel or company not found for '{}@{}'",
+                        channel_slug, company_slug
                     );
                 }
 
@@ -440,9 +372,9 @@ impl ChannelUseCases {
                     resolved,
                     sender_authorized,
                     company_slug: Some(company_slug),
-                    workflow_slug: Some(workflow_slug),
+                    channel_slug: Some(channel_slug),
                     company,
-                    workflow,
+                    channel,
                     email,
                 })
             }
@@ -452,9 +384,9 @@ impl ChannelUseCases {
                     resolved: false,
                     sender_authorized: false,
                     company_slug: None,
-                    workflow_slug: None,
+                    channel_slug: None,
                     company: None,
-                    workflow: None,
+                    channel: None,
                     email,
                 })
             }
@@ -477,9 +409,9 @@ pub struct InboundEmailResult {
     pub resolved: bool,
     pub sender_authorized: bool,
     pub company_slug: Option<String>,
-    pub workflow_slug: Option<String>,
+    pub channel_slug: Option<String>,
     pub company: Option<Company>,
-    pub workflow: Option<Workflow>,
+    pub channel: Option<Channel>,
     pub email: InboundEmail,
 }
 
@@ -496,7 +428,10 @@ pub fn extract_email_address(input: &str) -> String {
     email_addr.trim().to_lowercase()
 }
 
-pub fn parse_recipient_address_pipeline(to_str: &str, app_domain_name: &str) -> Option<(String, Vec<String>)> {
+pub fn parse_recipient_address_pipeline(
+    to_str: &str,
+    app_domain_name: &str,
+) -> Option<(String, Vec<String>)> {
     let email_addr = if let (Some(start), Some(end)) = (to_str.find('<'), to_str.rfind('>')) {
         if start < end {
             &to_str[start + 1..end]
@@ -513,10 +448,10 @@ pub fn parse_recipient_address_pipeline(to_str: &str, app_domain_name: &str) -> 
         return None;
     }
 
-    let workflow_part = parts[0].trim();
+    let channel_part = parts[0].trim();
     let domain_part = parts[1].trim();
 
-    if workflow_part.is_empty() || domain_part.is_empty() {
+    if channel_part.is_empty() || domain_part.is_empty() {
         return None;
     }
 
@@ -537,22 +472,22 @@ pub fn parse_recipient_address_pipeline(to_str: &str, app_domain_name: &str) -> 
         return None;
     }
 
-    let workflow_slugs: Vec<String> = workflow_part
+    let channel_slugs: Vec<String> = channel_part
         .split('+')
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .collect();
 
-    if workflow_slugs.is_empty() {
+    if channel_slugs.is_empty() {
         return None;
     }
 
-    Some((company_slug.to_string(), workflow_slugs))
+    Some((company_slug.to_string(), channel_slugs))
 }
 
 pub fn parse_recipient_address(to_str: &str, app_domain_name: &str) -> Option<(String, String)> {
     parse_recipient_address_pipeline(to_str, app_domain_name)
-        .map(|(company, workflows)| (company, workflows[0].clone()))
+        .map(|(company, channels)| (company, channels[0].clone()))
 }
 
 pub fn levenshtein_distance(a: &str, b: &str) -> usize {
@@ -572,7 +507,11 @@ pub fn levenshtein_distance(a: &str, b: &str) -> usize {
 
     for i in 1..=m {
         for j in 1..=n {
-            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                0
+            } else {
+                1
+            };
             dp[i][j] = (dp[i - 1][j] + 1)
                 .min(dp[i][j - 1] + 1)
                 .min(dp[i - 1][j - 1] + cost);
@@ -598,17 +537,13 @@ pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<St
     matches.into_iter().map(|(_, slug)| slug).collect()
 }
 
-pub fn find_similar_workflow_slugs(target: &str, available: &[Channel]) -> Vec<String> {
-    find_similar_channel_slugs(target, available)
-}
-
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
+    use super::*;
+    use crate::entities::company::Company;
     use chrono::Utc;
     use serde_json::json;
-    use crate::entities::company::Company;
-    use super::*;
+    use std::sync::Mutex;
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
@@ -616,7 +551,16 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> {
+        async fn create(
+            &self,
+            _user_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -644,7 +588,16 @@ mod tests {
             unimplemented!()
         }
 
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> {
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -661,12 +614,12 @@ mod tests {
         }
     }
 
-    struct MockWorkflowPersistence {
-        workflows: Mutex<Vec<Channel>>,
+    struct MockChannelPersistence {
+        channels: Mutex<Vec<Channel>>,
     }
 
     #[async_trait]
-    impl ChannelPersistence for MockWorkflowPersistence {
+    impl ChannelPersistence for MockChannelPersistence {
         async fn create(
             &self,
             company_id: Uuid,
@@ -679,7 +632,7 @@ mod tests {
             agent_ids: Option<Vec<Uuid>>,
             channel_config: Option<serde_json::Value>,
         ) -> AppResult<Channel> {
-            let workflow = Channel {
+            let channel = Channel {
                 id: Uuid::new_v4(),
                 company_id,
                 name: name.to_string(),
@@ -692,13 +645,13 @@ mod tests {
                 channel_config,
                 created_at: Utc::now().naive_utc(),
             };
-            self.workflows.lock().unwrap().push(workflow.clone());
-            Ok(workflow)
+            self.channels.lock().unwrap().push(channel.clone());
+            Ok(channel)
         }
 
         async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>> {
             Ok(self
-                .workflows
+                .channels
                 .lock()
                 .unwrap()
                 .iter()
@@ -709,20 +662,20 @@ mod tests {
         async fn get_by_company_slug_and_channel_slug(
             &self,
             _company_slug: &str,
-            workflow_slug: &str,
+            channel_slug: &str,
         ) -> AppResult<Option<Channel>> {
             Ok(self
-                .workflows
+                .channels
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|w| w.slug.eq_ignore_ascii_case(workflow_slug))
+                .find(|w| w.slug.eq_ignore_ascii_case(channel_slug))
                 .cloned())
         }
 
         async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(self
-                .workflows
+                .channels
                 .lock()
                 .unwrap()
                 .iter()
@@ -743,25 +696,25 @@ mod tests {
             agent_ids: Option<Vec<Uuid>>,
             channel_config: Option<serde_json::Value>,
         ) -> AppResult<Channel> {
-            let mut list = self.workflows.lock().unwrap();
-            let workflow = list
+            let mut list = self.channels.lock().unwrap();
+            let channel = list
                 .iter_mut()
                 .find(|w| w.id == id)
                 .ok_or_else(|| AppError::Internal("Not found".into()))?;
 
-            workflow.name = name.to_string();
-            workflow.slug = slug.to_string();
-            workflow.api_key = api_key.map(|s| s.to_string());
-            workflow.provider = provider.map(|s| s.to_string());
-            workflow.model = model.map(|s| s.to_string());
-            workflow.participant_emails = participant_emails;
-            workflow.agent_ids = agent_ids;
-            workflow.channel_config = channel_config;
-            Ok(workflow.clone())
+            channel.name = name.to_string();
+            channel.slug = slug.to_string();
+            channel.api_key = api_key.map(|s| s.to_string());
+            channel.provider = provider.map(|s| s.to_string());
+            channel.model = model.map(|s| s.to_string());
+            channel.participant_emails = participant_emails;
+            channel.agent_ids = agent_ids;
+            channel.channel_config = channel_config;
+            Ok(channel.clone())
         }
 
         async fn delete(&self, id: Uuid) -> AppResult<()> {
-            self.workflows.lock().unwrap().retain(|w| w.id != id);
+            self.channels.lock().unwrap().retain(|w| w.id != id);
             Ok(())
         }
     }
@@ -794,7 +747,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn company_owner_workflow_crud_flow_works() {
+    async fn company_owner_channel_crud_flow_works() {
         let owner_id = Uuid::new_v4();
         let company_id = Uuid::new_v4();
 
@@ -812,22 +765,26 @@ mod tests {
             }]),
         });
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(Vec::new()),
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(Vec::new()),
         });
 
-        let use_cases = WorkflowUseCases::new(company_persistence, workflow_persistence, test_config(true));
+        let use_cases =
+            ChannelUseCases::new(company_persistence, channel_persistence, test_config(true));
 
-        // 1. Owner creates workflow with participant emails and config
-        let emails = vec!["agent1@example.com".to_string(), "agent2@example.com".to_string()];
+        // 1. Owner creates channel with participant emails and config
+        let emails = vec![
+            "agent1@example.com".to_string(),
+            "agent2@example.com".to_string(),
+        ];
         let config = json!({ "trigger": "email_received", "action": "forward" });
 
         let agent_id1 = Uuid::new_v4();
         let agent_id2 = Uuid::new_v4();
         let agent_ids = vec![agent_id1, agent_id2];
 
-        let workflow = use_cases
-            .create_workflow(
+        let channel = use_cases
+            .create_channel(
                 owner_id,
                 company_id,
                 "Support Flow",
@@ -843,19 +800,19 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(workflow.name, "Support Flow");
-        assert_eq!(workflow.slug, "support-flow");
-        assert_eq!(workflow.api_key.as_deref(), Some("key_123"));
-        assert_eq!(workflow.provider.as_deref(), Some("openai"));
-        assert_eq!(workflow.model.as_deref(), Some("gpt-4o"));
-        assert_eq!(workflow.participant_emails, Some(emails));
-        assert_eq!(workflow.agent_ids, Some(agent_ids));
-        assert_eq!(workflow.channel_config, Some(config));
+        assert_eq!(channel.name, "Support Flow");
+        assert_eq!(channel.slug, "support-flow");
+        assert_eq!(channel.api_key.as_deref(), Some("key_123"));
+        assert_eq!(channel.provider.as_deref(), Some("openai"));
+        assert_eq!(channel.model.as_deref(), Some("gpt-4o"));
+        assert_eq!(channel.participant_emails, Some(emails));
+        assert_eq!(channel.agent_ids, Some(agent_ids));
+        assert_eq!(channel.channel_config, Some(config));
 
-        // 2. Non-owner cannot create workflow
+        // 2. Non-owner cannot create channel
         let non_owner_id = Uuid::new_v4();
         let err = use_cases
-            .create_workflow(
+            .create_channel(
                 non_owner_id,
                 company_id,
                 "Hacker Flow",
@@ -871,20 +828,20 @@ mod tests {
             .await;
         assert!(err.is_err());
 
-        // 3. List workflows for company
+        // 3. List channels for company
         let list = use_cases
-            .list_company_workflows(owner_id, company_id)
+            .list_company_channels(owner_id, company_id)
             .await
             .unwrap();
         assert_eq!(list.len(), 1);
 
-        // 4. Update workflow
+        // 4. Update channel
         let updated_config = json!({ "trigger": "webhook", "action": "notify" });
         let updated = use_cases
-            .update_workflow(
+            .update_channel(
                 owner_id,
                 company_id,
-                workflow.id,
+                channel.id,
                 "Updated Flow",
                 "updated-flow",
                 None,
@@ -903,14 +860,14 @@ mod tests {
         assert_eq!(updated.agent_ids, None);
         assert_eq!(updated.channel_config, Some(updated_config));
 
-        // 5. Delete workflow
+        // 5. Delete channel
         use_cases
-            .delete_workflow(owner_id, company_id, workflow.id)
+            .delete_channel(owner_id, company_id, channel.id)
             .await
             .unwrap();
 
         let list_after = use_cases
-            .list_company_workflows(owner_id, company_id)
+            .list_company_channels(owner_id, company_id)
             .await
             .unwrap();
         assert_eq!(list_after.len(), 0);
@@ -921,34 +878,34 @@ mod tests {
         let app_domain = "mailagents.com";
 
         // Plain email
-        let (company_slug, workflow_slug) =
+        let (company_slug, channel_slug) =
             parse_recipient_address("support@acme.mailagents.com", app_domain).unwrap();
         assert_eq!(company_slug, "acme");
-        assert_eq!(workflow_slug, "support");
+        assert_eq!(channel_slug, "support");
 
         // Named email format
-        let (company_slug, workflow_slug) = parse_recipient_address(
+        let (company_slug, channel_slug) = parse_recipient_address(
             "Inbound Handler <inbound-email@wf-corp.mailagents.com>",
             app_domain,
         )
         .unwrap();
         assert_eq!(company_slug, "wf-corp");
-        assert_eq!(workflow_slug, "inbound-email");
+        assert_eq!(channel_slug, "inbound-email");
 
         // Chained pipeline email format
-        let (company_slug, workflow_slugs) = parse_recipient_address_pipeline(
+        let (company_slug, channel_slugs) = parse_recipient_address_pipeline(
             "support+billing+legal@acme.mailagents.com",
             app_domain,
         )
         .unwrap();
         assert_eq!(company_slug, "acme");
-        assert_eq!(workflow_slugs, vec!["support", "billing", "legal"]);
+        assert_eq!(channel_slugs, vec!["support", "billing", "legal"]);
 
         // Localhost app domain
-        let (company_slug, workflow_slug) =
+        let (company_slug, channel_slug) =
             parse_recipient_address("trigger@my-company.localhost", "localhost").unwrap();
         assert_eq!(company_slug, "my-company");
-        assert_eq!(workflow_slug, "trigger");
+        assert_eq!(channel_slug, "trigger");
 
         // Invalid formats
         assert!(parse_recipient_address("invalid-email", app_domain).is_none());
@@ -956,13 +913,13 @@ mod tests {
     }
 
     #[test]
-    fn test_levenshtein_and_fuzzy_workflow_suggestions() {
+    fn test_levenshtein_and_fuzzy_channel_suggestions() {
         assert_eq!(levenshtein_distance("suppport", "support"), 1);
         assert_eq!(levenshtein_distance("biling", "billing"), 1);
 
         let company_id = uuid::Uuid::new_v4();
         let available = vec![
-            Workflow {
+            Channel {
                 id: uuid::Uuid::new_v4(),
                 company_id,
                 name: "Support".to_string(),
@@ -975,7 +932,7 @@ mod tests {
                 channel_config: None,
                 created_at: chrono::Utc::now().naive_utc(),
             },
-            Workflow {
+            Channel {
                 id: uuid::Uuid::new_v4(),
                 company_id,
                 name: "Billing".to_string(),
@@ -990,15 +947,15 @@ mod tests {
             },
         ];
 
-        let suggestions = find_similar_workflow_slugs("suppport", &available);
+        let suggestions = find_similar_channel_slugs("suppport", &available);
         assert_eq!(suggestions, vec!["support"]);
 
-        let suggestions_biling = find_similar_workflow_slugs("biling", &available);
+        let suggestions_biling = find_similar_channel_slugs("biling", &available);
         assert_eq!(suggestions_biling, vec!["billing"]);
     }
 
     #[tokio::test]
-    async fn process_inbound_email_resolves_company_and_workflow() {
+    async fn process_inbound_email_resolves_company_and_channel() {
         let owner_id = Uuid::new_v4();
         let company_id = Uuid::new_v4();
 
@@ -1016,14 +973,27 @@ mod tests {
             }]),
         });
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(Vec::new()),
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(Vec::new()),
         });
 
-        let use_cases = WorkflowUseCases::new(company_persistence, workflow_persistence, test_config(true));
+        let use_cases =
+            ChannelUseCases::new(company_persistence, channel_persistence, test_config(true));
 
         let _ = use_cases
-            .create_workflow(owner_id, company_id, "Support Flow", "support", None, None, None, None, None, None, false)
+            .create_channel(
+                owner_id,
+                company_id,
+                "Support Flow",
+                "support",
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+            )
             .await
             .unwrap();
 
@@ -1044,13 +1014,13 @@ mod tests {
         assert!(result.resolved);
         assert!(result.sender_authorized);
         assert_eq!(result.company_slug.as_deref(), Some("acme"));
-        assert_eq!(result.workflow_slug.as_deref(), Some("support"));
+        assert_eq!(result.channel_slug.as_deref(), Some("support"));
         assert_eq!(result.company.unwrap().name, "Acme Corp");
-        assert_eq!(result.workflow.unwrap().name, "Support Flow");
+        assert_eq!(result.channel.unwrap().name, "Support Flow");
 
-        // Workflow with participant_emails restriction
+        // Channel with participant_emails restriction
         let _ = use_cases
-            .create_workflow(
+            .create_channel(
                 owner_id,
                 company_id,
                 "Restricted Flow",
@@ -1104,7 +1074,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_workflow_creation_spam_disabled_confirmation() {
+    async fn test_channel_creation_spam_disabled_confirmation() {
         let owner_id = Uuid::new_v4();
         let company_id = Uuid::new_v4();
 
@@ -1122,29 +1092,58 @@ mod tests {
             }]),
         });
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(Vec::new()),
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(Vec::new()),
         });
 
         // Config with spam scanning completely disabled
-        let use_cases = WorkflowUseCases::new(company_persistence, workflow_persistence, test_config(false));
+        let use_cases =
+            ChannelUseCases::new(company_persistence, channel_persistence, test_config(false));
 
-        // 1. Trying to create public workflow (@public) without confirmation fails when spam scanning is disabled
+        // 1. Trying to create public channel (@public) without confirmation fails when spam scanning is disabled
         let res = use_cases
-            .create_workflow(owner_id, company_id, "Public Flow", "public", None, None, None, Some(vec!["@public".to_string()]), None, None, false)
+            .create_channel(
+                owner_id,
+                company_id,
+                "Public Flow",
+                "public",
+                None,
+                None,
+                None,
+                Some(vec!["@public".to_string()]),
+                None,
+                None,
+                false,
+            )
             .await;
         assert!(res.is_err());
-        assert!(res.unwrap_err().to_string().contains("Spam scanning is disabled"));
+        assert!(
+            res.unwrap_err()
+                .to_string()
+                .contains("Spam scanning is disabled")
+        );
 
-        // 2. Creating public workflow (@public) BUT WITH confirm_spam_disabled=true succeeds
+        // 2. Creating public channel (@public) BUT WITH confirm_spam_disabled=true succeeds
         let res_ok = use_cases
-            .create_workflow(owner_id, company_id, "Public Flow", "public", None, None, None, Some(vec!["@public".to_string()]), None, None, true)
+            .create_channel(
+                owner_id,
+                company_id,
+                "Public Flow",
+                "public",
+                None,
+                None,
+                None,
+                Some(vec!["@public".to_string()]),
+                None,
+                None,
+                true,
+            )
             .await;
         assert!(res_ok.is_ok());
 
-        // 3. Creating workflow WITH participants even without confirmation succeeds
+        // 3. Creating channel WITH participants even without confirmation succeeds
         let res_participants = use_cases
-            .create_workflow(
+            .create_channel(
                 owner_id,
                 company_id,
                 "Restricted Flow",

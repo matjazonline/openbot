@@ -14,15 +14,21 @@ use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     entities::task::TaskStatus,
     services::task_worker::TaskWorker,
-    use_cases::{company::CompanyUseCases, thread::ThreadUseCases, workflow::WorkflowUseCases},
+    use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/companies/{id}/tasks", get(list_company_tasks_page))
         .route("/companies/{id}/tasks/filter", get(filter_company_tasks))
-        .route("/companies/{id}/tasks/{task_id}/stop", post(stop_company_task))
-        .route("/companies/{id}/tasks/{task_id}/resume", post(resume_company_task))
+        .route(
+            "/companies/{id}/tasks/{task_id}/stop",
+            post(stop_company_task),
+        )
+        .route(
+            "/companies/{id}/tasks/{task_id}/resume",
+            post(resume_company_task),
+        )
 }
 
 fn deserialize_empty_string_as_none<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
@@ -33,24 +39,26 @@ where
 {
     let opt = Option::<String>::deserialize(deserializer)?;
     match opt {
-        Some(s) if !s.trim().is_empty() => s.parse::<T>().map(Some).map_err(serde::de::Error::custom),
+        Some(s) if !s.trim().is_empty() => {
+            s.parse::<T>().map(Some).map_err(serde::de::Error::custom)
+        }
         _ => Ok(None),
     }
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct TaskFilterQuery {
-    #[serde(default, alias = "channel_id", deserialize_with = "deserialize_empty_string_as_none")]
-    pub workflow_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub channel_id: Option<Uuid>,
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub status: Option<String>,
     pub sort: Option<String>,
 }
 
-#[instrument(skip(company_use_cases, workflow_use_cases, thread_use_cases, _user))]
+#[instrument(skip(company_use_cases, channel_use_cases, thread_use_cases, _user))]
 async fn list_company_tasks_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(workflow_use_cases): State<Arc<WorkflowUseCases>>,
+    State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     _user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
@@ -61,24 +69,27 @@ async fn list_company_tasks_page(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
-    let workflows = workflow_use_cases
-        .list_company_workflows(_user.id, company_id)
+    let channels = channel_use_cases
+        .list_company_channels(_user.id, company_id)
         .await
         .unwrap_or_default();
 
-    let status_enum = query.status.as_deref().and_then(|s| s.parse::<TaskStatus>().ok());
+    let status_enum = query
+        .status
+        .as_deref()
+        .and_then(|s| s.parse::<TaskStatus>().ok());
     let sort_asc = query.sort.as_deref() == Some("asc");
 
     let tasks = thread_use_cases
-        .list_company_tasks(company_id, query.workflow_id, status_enum.clone(), sort_asc)
+        .list_company_tasks(company_id, query.channel_id, status_enum.clone(), sort_asc)
         .await
         .unwrap_or_default();
 
     Html(pages::company_tasks_page(
         &company,
-        &workflows,
+        &channels,
         &tasks,
-        query.workflow_id,
+        query.channel_id,
         status_enum,
         sort_asc,
     ))
@@ -86,8 +97,8 @@ async fn list_company_tasks_page(
 
 fn build_tasks_push_url(company_id: Uuid, query: &TaskFilterQuery) -> String {
     let mut params = Vec::new();
-    if let Some(wf_id) = query.workflow_id {
-        params.push(format!("channel_id={}", wf_id));
+    if let Some(ch_id) = query.channel_id {
+        params.push(format!("channel_id={}", ch_id));
     }
     if let Some(ref st) = query.status {
         if !st.trim().is_empty() {
@@ -114,17 +125,23 @@ async fn filter_company_tasks(
     Path(company_id): Path<Uuid>,
     Query(query): Query<TaskFilterQuery>,
 ) -> impl IntoResponse {
-    let status_enum = query.status.as_deref().and_then(|s| s.parse::<TaskStatus>().ok());
+    let status_enum = query
+        .status
+        .as_deref()
+        .and_then(|s| s.parse::<TaskStatus>().ok());
     let sort_asc = query.sort.as_deref() == Some("asc");
 
     let tasks = thread_use_cases
-        .list_company_tasks(company_id, query.workflow_id, status_enum, sort_asc)
+        .list_company_tasks(company_id, query.channel_id, status_enum, sort_asc)
         .await
         .unwrap_or_default();
 
     let push_url = build_tasks_push_url(company_id, &query);
 
-    ([("HX-Push-Url", push_url)], Html(pages::task_list_fragment(company_id, &tasks)))
+    (
+        [("HX-Push-Url", push_url)],
+        Html(pages::task_list_fragment(company_id, &tasks)),
+    )
 }
 
 #[instrument(skip(thread_use_cases, config, _user))]
@@ -171,30 +188,41 @@ mod tests {
     use crate::entities::task::BackgroundTask;
 
     #[test]
-    fn test_task_filter_query_deserialization_empty_workflow() {
-        let uri: axum::http::Uri = "/companies/123/tasks/filter?workflow_id=&status=completed&sort=desc".parse().unwrap();
-        let Query(query) = Query::<TaskFilterQuery>::try_from_uri(&uri).expect("Should deserialize");
-        assert_eq!(query.workflow_id, None);
+    fn test_task_filter_query_deserialization_empty_channel() {
+        let uri: axum::http::Uri =
+            "/companies/123/tasks/filter?channel_id=&status=completed&sort=desc"
+                .parse()
+                .unwrap();
+        let Query(query) =
+            Query::<TaskFilterQuery>::try_from_uri(&uri).expect("Should deserialize");
+        assert_eq!(query.channel_id, None);
         assert_eq!(query.status, Some("completed".to_string()));
         assert_eq!(query.sort, Some("desc".to_string()));
     }
 
     #[test]
-    fn test_task_filter_query_deserialization_with_workflow() {
-        let wf_id = Uuid::new_v4();
-        let uri_str = format!("/companies/123/tasks/filter?workflow_id={}&status=pending&sort=asc", wf_id);
+    fn test_task_filter_query_deserialization_with_channel() {
+        let ch_id = Uuid::new_v4();
+        let uri_str = format!(
+            "/companies/123/tasks/filter?channel_id={}&status=pending&sort=asc",
+            ch_id
+        );
         let uri: axum::http::Uri = uri_str.parse().unwrap();
-        let Query(query) = Query::<TaskFilterQuery>::try_from_uri(&uri).expect("Should deserialize");
-        assert_eq!(query.workflow_id, Some(wf_id));
+        let Query(query) =
+            Query::<TaskFilterQuery>::try_from_uri(&uri).expect("Should deserialize");
+        assert_eq!(query.channel_id, Some(ch_id));
         assert_eq!(query.status, Some("pending".to_string()));
         assert_eq!(query.sort, Some("asc".to_string()));
     }
 
     #[test]
     fn test_task_filter_query_deserialization_all_empty() {
-        let uri: axum::http::Uri = "/companies/123/tasks/filter?workflow_id=&status=&sort=".parse().unwrap();
-        let Query(query) = Query::<TaskFilterQuery>::try_from_uri(&uri).expect("Should deserialize");
-        assert_eq!(query.workflow_id, None);
+        let uri: axum::http::Uri = "/companies/123/tasks/filter?channel_id=&status=&sort="
+            .parse()
+            .unwrap();
+        let Query(query) =
+            Query::<TaskFilterQuery>::try_from_uri(&uri).expect("Should deserialize");
+        assert_eq!(query.channel_id, None);
         assert_eq!(query.status, None);
         assert_eq!(query.sort, Some("".to_string()));
     }
@@ -202,13 +230,13 @@ mod tests {
     #[test]
     fn test_task_row_fragment_renders_simulation_link() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
 
         let task = crate::entities::task::BackgroundTask {
             id: Uuid::new_v4(),
             company_id,
-            channel_id: workflow_id,
+            channel_id: channel_id,
             thread_id: Some(thread_id),
             task_type: "agent_execution".to_string(),
             status: TaskStatus::Completed,
@@ -223,17 +251,19 @@ mod tests {
 
         let html = pages::task_row_fragment(company_id, &task);
         assert!(html.contains("Open Simulation"));
-        assert!(html.contains(&format!("/companies/{company_id}/channels/{workflow_id}/simulate?thread_id={thread_id}")));
+        assert!(html.contains(&format!(
+            "/companies/{company_id}/channels/{channel_id}/simulate?thread_id={thread_id}"
+        )));
     }
 
     #[test]
     fn test_task_row_fragment_renders_expandable_parameters_and_masks_api_key() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
         let task = BackgroundTask {
             id: Uuid::new_v4(),
             company_id,
-            channel_id: workflow_id,
+            channel_id: channel_id,
             thread_id: None,
             task_type: "email_agent_dispatch".to_string(),
             status: TaskStatus::Completed,
@@ -271,10 +301,10 @@ mod tests {
     #[test]
     fn test_build_tasks_push_url() {
         let company_id = Uuid::new_v4();
-        let wf_id = Uuid::new_v4();
+        let ch_id = Uuid::new_v4();
 
         let query_empty = TaskFilterQuery {
-            workflow_id: None,
+            channel_id: None,
             status: None,
             sort: None,
         };
@@ -284,20 +314,20 @@ mod tests {
         );
 
         let query_wf = TaskFilterQuery {
-            workflow_id: Some(wf_id),
+            channel_id: Some(ch_id),
             status: Some("pending".to_string()),
             sort: Some("desc".to_string()),
         };
         assert_eq!(
             build_tasks_push_url(company_id, &query_wf),
-            format!("/companies/{company_id}/tasks?channel_id={wf_id}&status=pending&sort=desc")
+            format!("/companies/{company_id}/tasks?channel_id={ch_id}&status=pending&sort=desc")
         );
     }
 
     #[test]
-    fn test_workflow_row_fragment_renders_tasks_link() {
+    fn test_channel_row_fragment_renders_tasks_link() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
 
         let company = crate::entities::company::Company {
             id: company_id,
@@ -311,8 +341,8 @@ mod tests {
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let workflow = crate::entities::workflow::Workflow {
-            id: workflow_id,
+        let channel = crate::entities::channel::Channel {
+            id: channel_id,
             company_id,
             name: "Test WF".to_string(),
             slug: "test-wf".to_string(),
@@ -325,15 +355,17 @@ mod tests {
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let html = pages::workflow_row_fragment(&company, "example.com", &workflow, &[]);
+        let html = pages::channel_row_fragment(&company, "example.com", &channel, &[]);
         assert!(html.contains("Tasks"));
-        assert!(html.contains(&format!("/companies/{company_id}/tasks?channel_id={workflow_id}")));
+        assert!(html.contains(&format!(
+            "/companies/{company_id}/tasks?channel_id={channel_id}"
+        )));
     }
 
     #[test]
     fn test_task_row_and_company_page_renders_token_meter() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
 
         let company = crate::entities::company::Company {
             id: company_id,
@@ -350,7 +382,7 @@ mod tests {
         let task = BackgroundTask {
             id: Uuid::new_v4(),
             company_id,
-            channel_id: workflow_id,
+            channel_id: channel_id,
             thread_id: None,
             task_type: "email_agent_dispatch".to_string(),
             status: TaskStatus::Completed,

@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tracing::{error, info, warn};
 
 use crate::{
@@ -37,7 +37,10 @@ impl TaskWorker {
     }
 
     /// Continuous background poller running every 3 seconds
-    pub async fn start_worker_loop(self: Arc<Self>, mut shutdown_rx: tokio::sync::broadcast::Receiver<()>) {
+    pub async fn start_worker_loop(
+        self: Arc<Self>,
+        mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
+    ) {
         info!("Starting Background Task Worker Loop (poll_interval = 3s)...");
 
         loop {
@@ -71,7 +74,10 @@ impl TaskWorker {
             match self.task_persistence.mark_task_processing(task_id).await {
                 Ok(true) => {}
                 Ok(false) => {
-                    info!("Task {} already claimed by another worker, skipping", task_id);
+                    info!(
+                        "Task {} already claimed by another worker, skipping",
+                        task_id
+                    );
                     continue;
                 }
                 Err(err) => {
@@ -91,7 +97,7 @@ impl TaskWorker {
                     if let Some(ref m) = self.monitoring {
                         m.record_task_execution(&TaskExecutionMetrics {
                             company_id: Some(task.company_id),
-                            workflow_id: Some(task.channel_id),
+                            channel_id: Some(task.channel_id),
                             task_type: task.task_type.clone(),
                             duration_ms,
                             status: TaskStatusMetric::Completed,
@@ -106,7 +112,8 @@ impl TaskWorker {
 
                     // Exponential backoff: 30s * 2^retry
                     let backoff_secs = 30 * (1 << next_retry.min(10));
-                    let next_run = chrono::Utc::now().naive_utc() + chrono::Duration::seconds(backoff_secs);
+                    let next_run =
+                        chrono::Utc::now().naive_utc() + chrono::Duration::seconds(backoff_secs);
 
                     let _ = self
                         .task_persistence
@@ -116,7 +123,7 @@ impl TaskWorker {
                     if let Some(ref m) = self.monitoring {
                         m.record_task_execution(&TaskExecutionMetrics {
                             company_id: Some(task.company_id),
-                            workflow_id: Some(task.channel_id),
+                            channel_id: Some(task.channel_id),
                             task_type: task.task_type.clone(),
                             duration_ms,
                             status: TaskStatusMetric::Failed,
@@ -146,40 +153,77 @@ impl TaskWorker {
 
         for task in tasks {
             if let Some(quorum) = task.payload.get("quorum_outreach") {
-                let status = quorum.get("status").and_then(|s| s.as_str()).unwrap_or_default();
+                let status = quorum
+                    .get("status")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or_default();
                 if status == "awaiting_quorum" {
                     let expires_str = quorum.get("expires_at").and_then(|s| s.as_str());
                     let is_expired = if let Some(exp_s) = expires_str {
                         chrono::NaiveDateTime::parse_from_str(exp_s, "%Y-%m-%dT%H:%M:%S")
-                            .or_else(|_| chrono::NaiveDateTime::parse_from_str(exp_s, "%Y-%m-%d %H:%M:%S"))
+                            .or_else(|_| {
+                                chrono::NaiveDateTime::parse_from_str(exp_s, "%Y-%m-%d %H:%M:%S")
+                            })
                             .map_or(false, |exp_dt| now > exp_dt)
                     } else {
                         false
                     };
 
-                    let curr_pct = quorum.get("current_percent").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                    let req_pct = quorum.get("required_threshold_percent").and_then(|v| v.as_f64()).unwrap_or(50.0);
+                    let curr_pct = quorum
+                        .get("current_percent")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0);
+                    let req_pct = quorum
+                        .get("required_threshold_percent")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(50.0);
 
                     if is_expired && curr_pct < req_pct {
-                        info!("Task {} reached quorum timeout with {:.1}% responses (< {:.1}% required). Triggering HITL timeout approval.", task.id, curr_pct, req_pct);
-                        
-                        let mut payload = task.payload.clone();
-                        if let Some(q) = payload.get_mut("quorum_outreach").and_then(|q| q.as_object_mut()) {
-                            q.insert("status".to_string(), serde_json::json!("timeout_pending_approval"));
-                        }
-                        let _ = self.task_persistence.update_task_payload(task.id, payload).await;
-                        let _ = self.task_persistence.update_task_status(task.id, crate::entities::task::TaskStatus::PendingApproval).await;
+                        info!(
+                            "Task {} reached quorum timeout with {:.1}% responses (< {:.1}% required). Triggering HITL timeout approval.",
+                            task.id, curr_pct, req_pct
+                        );
 
-                        if let Some(approval_use_cases) = self.thread_use_cases.get_approval_use_cases() {
-                            let curr_cnt = quorum.get("current_count").and_then(|v| v.as_u64()).unwrap_or(0);
-                            let tot_cnt = quorum.get("total_targets").and_then(|v| v.as_u64()).unwrap_or(0);
+                        let mut payload = task.payload.clone();
+                        if let Some(q) = payload
+                            .get_mut("quorum_outreach")
+                            .and_then(|q| q.as_object_mut())
+                        {
+                            q.insert(
+                                "status".to_string(),
+                                serde_json::json!("timeout_pending_approval"),
+                            );
+                        }
+                        let _ = self
+                            .task_persistence
+                            .update_task_payload(task.id, payload)
+                            .await;
+                        let _ = self
+                            .task_persistence
+                            .update_task_status(
+                                task.id,
+                                crate::entities::task::TaskStatus::PendingApproval,
+                            )
+                            .await;
+
+                        if let Some(approval_use_cases) =
+                            self.thread_use_cases.get_approval_use_cases()
+                        {
+                            let curr_cnt = quorum
+                                .get("current_count")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
+                            let tot_cnt = quorum
+                                .get("total_targets")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
                             let step_key = format!("quorum_timeout_{}", task.id);
-                            
+
                             let _ = approval_use_cases.create_and_send_approval_request(
                                 task.company_id,
                                 task.channel_id,
-                                "Workflow",
-                                "workflow",
+                                "Channel",
+                                "channel",
                                 "company",
                                 task.thread_id,
                                 Some(task.id),
@@ -204,7 +248,10 @@ impl TaskWorker {
         Ok(())
     }
 
-    async fn execute_single_task(&self, task: &crate::entities::task::BackgroundTask) -> Result<(), String> {
+    async fn execute_single_task(
+        &self,
+        task: &crate::entities::task::BackgroundTask,
+    ) -> Result<(), String> {
         // Parse payload
         let ingest: InboundIngestResult = serde_json::from_value(task.payload.clone())
             .map_err(|e| format!("Invalid task payload JSON: {}", e))?;
@@ -231,11 +278,20 @@ impl TaskWorker {
         });
 
         if let Some(outbound) = outbound_reply {
-            if outbound.clean_text_body.starts_with("Agent execution failed:") {
-                info!("Idempotency Guard: Agent execution previously failed for message {}, failing task", inbound_msg.message_id);
+            if outbound
+                .clean_text_body
+                .starts_with("Agent execution failed:")
+            {
+                info!(
+                    "Idempotency Guard: Agent execution previously failed for message {}, failing task",
+                    inbound_msg.message_id
+                );
                 return Err(outbound.clean_text_body.clone());
             } else {
-                info!("Idempotency Guard: Outbound reply already sent for message {}, completing task", inbound_msg.message_id);
+                info!(
+                    "Idempotency Guard: Outbound reply already sent for message {}, completing task",
+                    inbound_msg.message_id
+                );
                 return Ok(());
             }
         }
@@ -261,13 +317,13 @@ impl TaskWorker {
 
         // Parse payload to notify participants
         if let Ok(ingest) = serde_json::from_value::<InboundIngestResult>(task.payload) {
-            if let (Some(workflow), Some(company), Some(parsed)) =
-                (ingest.workflow, ingest.company, ingest.parsed_email)
+            if let (Some(channel), Some(company), Some(parsed)) =
+                (ingest.channel, ingest.company, ingest.parsed_email)
             {
                 let stop_email = OutboundEmail {
-                    workflow_id: workflow.id,
-                    workflow_name: workflow.name.clone(),
-                    workflow_slug: workflow.slug.clone(),
+                    channel_id: channel.id,
+                    channel_name: channel.name.clone(),
+                    channel_slug: channel.slug.clone(),
                     company_slug: company.slug.clone(),
                     trigger_message_id: parsed.message_id.clone(),
                     thread_references: parsed.references.clone(),
@@ -275,11 +331,11 @@ impl TaskWorker {
                     recipients_cc: parsed.recipients_cc.clone(),
                     subject: format!("[STOPPED] Re: {}", parsed.subject),
                     body_text: format!(
-                        "Notice: The automated workflow processing for thread '{}' has been manually stopped by the system administrator.",
+                        "Notice: The automated channel processing for thread '{}' has been manually stopped by the system administrator.",
                         parsed.subject
                     ),
                     hop_count: parsed.hop_count,
-                    trace_workflows: parsed.trace_workflows,
+                    trace_channels: parsed.trace_channels,
                 };
 
                 let _ = OutboundDispatcher::send(&self.config, stop_email).await;
@@ -309,42 +365,111 @@ mod tests {
     use crate::{
         app_error::AppResult,
         entities::{
+            channel::Channel,
             company::Company,
             message::Message,
             task::{BackgroundTask, TaskStatus},
             thread::Thread,
-            workflow::Workflow,
         },
-        use_cases::{
-            company::CompanyPersistence,
-            thread::ThreadPersistence,
-        },
+        use_cases::{company::CompanyPersistence, thread::ThreadPersistence},
     };
 
     struct MockCompanyPersistence;
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> { unimplemented!() }
-        async fn get_by_slug(&self, _slug: &str) -> AppResult<Option<Company>> { unimplemented!() }
-        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
-        async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> { Ok(true) }
-        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> { Ok(vec![]) }
+        async fn create(
+            &self,
+            _user_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
+            unimplemented!()
+        }
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> {
+            unimplemented!()
+        }
+        async fn get_by_slug(&self, _slug: &str) -> AppResult<Option<Company>> {
+            unimplemented!()
+        }
+        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
+            unimplemented!()
+        }
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
+        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
+            Ok(true)
+        }
+        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
+            Ok(vec![])
+        }
     }
 
     use crate::use_cases::channel::ChannelPersistence;
 
-    struct MockWorkflowPersistence;
+    struct MockChannelPersistence;
     #[async_trait]
-    impl ChannelPersistence for MockWorkflowPersistence {
-        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> { unimplemented!() }
-        async fn get_by_company_slug_and_channel_slug(&self, _company_slug: &str, _workflow_slug: &str) -> AppResult<Option<Workflow>> { unimplemented!() }
-        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { Ok(vec![]) }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
-        async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
+    impl ChannelPersistence for MockChannelPersistence {
+        async fn create(
+            &self,
+            _company_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _participant_emails: Option<Vec<String>>,
+            _agent_ids: Option<Vec<Uuid>>,
+            _channel_config: Option<serde_json::Value>,
+        ) -> AppResult<Channel> {
+            unimplemented!()
+        }
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
+            unimplemented!()
+        }
+        async fn get_by_company_slug_and_channel_slug(
+            &self,
+            _company_slug: &str,
+            _channel_slug: &str,
+        ) -> AppResult<Option<Channel>> {
+            unimplemented!()
+        }
+        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
+            Ok(vec![])
+        }
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _participant_emails: Option<Vec<String>>,
+            _agent_ids: Option<Vec<Uuid>>,
+            _channel_config: Option<serde_json::Value>,
+        ) -> AppResult<Channel> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
     }
 
     struct MockThreadPersistence {
@@ -353,19 +478,59 @@ mod tests {
 
     #[async_trait]
     impl ThreadPersistence for MockThreadPersistence {
-        async fn create_thread(&self, _workflow_id: Uuid, _subject: &str, _participant_emails: &[String]) -> AppResult<Thread> { unimplemented!() }
-        async fn get_thread_by_id(&self, _id: Uuid) -> AppResult<Option<Thread>> { unimplemented!() }
-        async fn update_thread_participants(&self, _id: Uuid, _participant_emails: &[String]) -> AppResult<Thread> { unimplemented!() }
-        async fn find_thread_by_message_ids(&self, _message_ids: &[String]) -> AppResult<Option<Thread>> { unimplemented!() }
-        async fn find_thread_by_thread_index(&self, _thread_index_prefix: &str) -> AppResult<Option<Thread>> { unimplemented!() }
-        async fn count_recent_messages(&self, _thread_id: Uuid, _duration_secs: i64) -> AppResult<usize> { unimplemented!() }
+        async fn create_thread(
+            &self,
+            _channel_id: Uuid,
+            _subject: &str,
+            _participant_emails: &[String],
+        ) -> AppResult<Thread> {
+            unimplemented!()
+        }
+        async fn get_thread_by_id(&self, _id: Uuid) -> AppResult<Option<Thread>> {
+            unimplemented!()
+        }
+        async fn update_thread_participants(
+            &self,
+            _id: Uuid,
+            _participant_emails: &[String],
+        ) -> AppResult<Thread> {
+            unimplemented!()
+        }
+        async fn find_thread_by_message_ids(
+            &self,
+            _message_ids: &[String],
+        ) -> AppResult<Option<Thread>> {
+            unimplemented!()
+        }
+        async fn find_thread_by_thread_index(
+            &self,
+            _thread_index_prefix: &str,
+        ) -> AppResult<Option<Thread>> {
+            unimplemented!()
+        }
+        async fn count_recent_messages(
+            &self,
+            _thread_id: Uuid,
+            _duration_secs: i64,
+        ) -> AppResult<usize> {
+            unimplemented!()
+        }
         async fn create_message(&self, message: &Message) -> AppResult<Message> {
             self.messages.lock().unwrap().push(message.clone());
             Ok(message.clone())
         }
-        async fn get_message_by_message_id(&self, _message_id: &str) -> AppResult<Option<Message>> { unimplemented!() }
+        async fn get_message_by_message_id(&self, _message_id: &str) -> AppResult<Option<Message>> {
+            unimplemented!()
+        }
         async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-            Ok(self.messages.lock().unwrap().iter().filter(|m| m.thread_id == thread_id).cloned().collect())
+            Ok(self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m| m.thread_id == thread_id)
+                .cloned()
+                .collect())
         }
     }
 
@@ -375,11 +540,18 @@ mod tests {
 
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
-        async fn enqueue_task(&self, company_id: Uuid, workflow_id: Uuid, thread_id: Option<Uuid>, task_type: &str, payload: serde_json::Value) -> AppResult<BackgroundTask> {
+        async fn enqueue_task(
+            &self,
+            company_id: Uuid,
+            channel_id: Uuid,
+            thread_id: Option<Uuid>,
+            task_type: &str,
+            payload: serde_json::Value,
+        ) -> AppResult<BackgroundTask> {
             let task = BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
-                channel_id: workflow_id,
+                channel_id,
                 thread_id,
                 task_type: task_type.to_string(),
                 status: TaskStatus::Pending,
@@ -396,7 +568,13 @@ mod tests {
         }
 
         async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<BackgroundTask>> {
-            Ok(self.tasks.lock().unwrap().iter().find(|t| t.id == id).cloned())
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|t| t.id == id)
+                .cloned())
         }
 
         async fn update_task_payload(&self, id: Uuid, payload: serde_json::Value) -> AppResult<()> {
@@ -408,12 +586,22 @@ mod tests {
         }
 
         async fn poll_next_pending_tasks(&self, _limit: i64) -> AppResult<Vec<BackgroundTask>> {
-            Ok(self.tasks.lock().unwrap().iter().filter(|t| t.status == TaskStatus::Pending).cloned().collect())
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|t| t.status == TaskStatus::Pending)
+                .cloned()
+                .collect())
         }
 
         async fn mark_task_processing(&self, id: Uuid) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id && t.status == TaskStatus::Pending) {
+            if let Some(t) = list
+                .iter_mut()
+                .find(|t| t.id == id && t.status == TaskStatus::Pending)
+            {
                 t.status = TaskStatus::Processing;
                 Ok(true)
             } else {
@@ -429,11 +617,21 @@ mod tests {
             Ok(())
         }
 
-        async fn mark_task_failed(&self, id: Uuid, error_msg: &str, _next_run_at: chrono::NaiveDateTime, is_dead_letter: bool) -> AppResult<()> {
+        async fn mark_task_failed(
+            &self,
+            id: Uuid,
+            error_msg: &str,
+            _next_run_at: chrono::NaiveDateTime,
+            is_dead_letter: bool,
+        ) -> AppResult<()> {
             let mut list = self.tasks.lock().unwrap();
             if let Some(t) = list.iter_mut().find(|t| t.id == id) {
                 t.last_error = Some(error_msg.to_string());
-                t.status = if is_dead_letter { TaskStatus::DeadLetter } else { TaskStatus::Failed };
+                t.status = if is_dead_letter {
+                    TaskStatus::DeadLetter
+                } else {
+                    TaskStatus::Failed
+                };
             }
             Ok(())
         }
@@ -452,24 +650,45 @@ mod tests {
             Ok(t.clone())
         }
 
-        async fn update_task_status(&self, id: Uuid, status: TaskStatus) -> AppResult<BackgroundTask> {
+        async fn update_task_status(
+            &self,
+            id: Uuid,
+            status: TaskStatus,
+        ) -> AppResult<BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
             let t = list.iter_mut().find(|t| t.id == id).unwrap();
             t.status = status;
             Ok(t.clone())
         }
 
-        async fn list_company_tasks(&self, company_id: Uuid, _workflow_id: Option<Uuid>, _status: Option<TaskStatus>, _sort_asc: bool) -> AppResult<Vec<BackgroundTask>> {
-            Ok(self.tasks.lock().unwrap().iter().filter(|t| t.company_id == company_id).cloned().collect())
+        async fn list_company_tasks(
+            &self,
+            company_id: Uuid,
+            _channel_id: Option<Uuid>,
+            _status: Option<TaskStatus>,
+            _sort_asc: bool,
+        ) -> AppResult<Vec<BackgroundTask>> {
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|t| t.company_id == company_id)
+                .cloned()
+                .collect())
         }
     }
 
     #[tokio::test]
     async fn test_task_worker_stop_and_resume_flow() {
-        let task_persistence = Arc::new(MockTaskPersistence { tasks: Mutex::new(Vec::new()) });
-        let thread_persistence = Arc::new(MockThreadPersistence { messages: Mutex::new(Vec::new()) });
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            messages: Mutex::new(Vec::new()),
+        });
         let company_persistence = Arc::new(MockCompanyPersistence);
-        let workflow_persistence = Arc::new(MockWorkflowPersistence);
+        let channel_persistence = Arc::new(MockChannelPersistence);
 
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
@@ -498,7 +717,7 @@ mod tests {
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
             thread_persistence,
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence.clone(),
             config.clone(),
@@ -507,30 +726,51 @@ mod tests {
         let worker = TaskWorker::new(task_persistence.clone(), thread_use_cases, config);
 
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
 
-        let task = task_persistence.enqueue_task(company_id, workflow_id, None, "email_agent_dispatch", serde_json::json!({})).await.unwrap();
+        let task = task_persistence
+            .enqueue_task(
+                company_id,
+                channel_id,
+                None,
+                "email_agent_dispatch",
+                serde_json::json!({}),
+            )
+            .await
+            .unwrap();
         assert_eq!(task.status, TaskStatus::Pending);
 
         // Stop task
         worker.stop_task_and_notify(task.id).await.unwrap();
-        let stopped_task = task_persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        let stopped_task = task_persistence
+            .get_task_by_id(task.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(stopped_task.status, TaskStatus::Stopped);
 
         // Resume task
         worker.resume_task(task.id).await.unwrap();
-        let resumed_task = task_persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        let resumed_task = task_persistence
+            .get_task_by_id(task.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(resumed_task.status, TaskStatus::Pending);
     }
 
     #[tokio::test]
     async fn test_task_worker_marks_task_failed_on_agent_runner_failure() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
 
-        let task_persistence = Arc::new(MockTaskPersistence { tasks: Mutex::new(Vec::new()) });
-        let thread_persistence = Arc::new(MockThreadPersistence { messages: Mutex::new(Vec::new()) });
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            messages: Mutex::new(Vec::new()),
+        });
 
         let company = crate::entities::company::Company {
             id: company_id,
@@ -544,8 +784,8 @@ mod tests {
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let workflow = crate::entities::workflow::Workflow {
-            id: workflow_id,
+        let channel = Channel {
+            id: channel_id,
             company_id,
             name: "Support".to_string(),
             slug: "support".to_string(),
@@ -559,7 +799,7 @@ mod tests {
         };
 
         let company_persistence = Arc::new(MockCompanyPersistence);
-        let workflow_persistence = Arc::new(MockWorkflowPersistence);
+        let channel_persistence = Arc::new(MockChannelPersistence);
 
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
@@ -588,7 +828,7 @@ mod tests {
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
             thread_persistence,
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence.clone(),
             config.clone(),
@@ -617,7 +857,7 @@ mod tests {
             reason: None,
             thread: Some(crate::entities::thread::Thread {
                 id: thread_id,
-                channel_id: workflow_id,
+                channel_id,
                 subject: "Help".to_string(),
                 participant_emails: vec!["user@test.com".to_string()],
                 created_at: chrono::Utc::now().naive_utc(),
@@ -643,21 +883,39 @@ mod tests {
                 created_at: chrono::Utc::now().naive_utc(),
             }),
             company: Some(company),
-            workflow: Some(workflow),
+            channel: Some(channel),
             parsed_email: Some(parsed_email),
             normalized_message: None,
             task_id: None,
-            workflow_matches: vec![],
+            channel_matches: vec![],
             bounce_info: None,
         };
 
         let payload_json = serde_json::to_value(&ingest).unwrap();
-        let task = task_persistence.enqueue_task(company_id, workflow_id, Some(thread_id), "email_agent_dispatch", payload_json).await.unwrap();
+        let task = task_persistence
+            .enqueue_task(
+                company_id,
+                channel_id,
+                Some(thread_id),
+                "email_agent_dispatch",
+                payload_json,
+            )
+            .await
+            .unwrap();
 
         worker.process_next_batch().await.unwrap();
 
-        let failed_task = task_persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        let failed_task = task_persistence
+            .get_task_by_id(task.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(failed_task.status, TaskStatus::Failed);
-        assert!(failed_task.last_error.unwrap().contains("API key is missing"));
+        assert!(
+            failed_task
+                .last_error
+                .unwrap()
+                .contains("API key is missing")
+        );
     }
 }

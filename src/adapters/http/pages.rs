@@ -3,16 +3,16 @@ use uuid::Uuid;
 use crate::entities::{
     agent::Agent,
     approval::{ApprovalStatus, HumanApproval},
+    channel::Channel,
     company::Company,
     company_invite::CompanyInvite,
     company_member::CompanyMember,
     message::{Message, MessageDirection, MessageRole},
     task::{BackgroundTask, TaskStatus},
     thread::Thread,
-    workflow::Workflow,
 };
+use crate::use_cases::channel::InboundEmailResult;
 use crate::use_cases::thread::{SimulationExecutionResult, SimulationMode};
-use crate::use_cases::workflow::InboundEmailResult;
 
 pub fn base_layout(title: &str, content: &str) -> String {
     format!(
@@ -1009,7 +1009,7 @@ pub fn render_agents_selection_full(
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-1">
                 {agent_cards}
             </div>
-            
+
             <div>
                 <button type="button"
                     onclick="let el = document.getElementById('{inline_form_id}'); if (el) el.classList.toggle('hidden'); return false;"
@@ -1131,11 +1131,11 @@ fn render_spam_disabled_warning(spam_scan_enabled: bool, initial_disabled: bool)
 pub fn channels_page(
     company: &Company,
     app_domain_name: &str,
-    workflows: &[Workflow],
+    channels: &[Channel],
     agents: &[Agent],
     spam_scan_enabled: bool,
 ) -> String {
-    let list_html = channel_list_fragment(company, app_domain_name, workflows, agents);
+    let list_html = channel_list_fragment(company, app_domain_name, channels, agents);
     let agents_selection_html = render_agents_selection(company.id, agents, None, "new");
     let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, true);
 
@@ -1309,15 +1309,13 @@ pub fn channels_page(
     base_layout(&format!("{} Channels", company.name), &content)
 }
 
-pub use channels_page as workflows_page;
-
 pub fn channel_list_fragment(
     company: &Company,
     app_domain_name: &str,
-    workflows: &[Workflow],
+    channels: &[Channel],
     agents: &[Agent],
 ) -> String {
-    if workflows.is_empty() {
+    if channels.is_empty() {
         return r##"
             <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-8 text-center">
                 <p class="text-slate-400 text-sm">No channels configured yet. Create your first channel above!</p>
@@ -1326,26 +1324,24 @@ pub fn channel_list_fragment(
         .to_string();
     }
 
-    workflows
+    channels
         .iter()
         .map(|wf| channel_row_fragment(company, app_domain_name, wf, agents))
         .collect()
 }
 
-pub use channel_list_fragment as workflow_list_fragment;
-
 pub fn channel_row_fragment(
     company: &Company,
     app_domain_name: &str,
-    workflow: &Workflow,
+    channel: &Channel,
     agents: &[Agent],
 ) -> String {
-    let created_at_str = workflow.created_at.format("%b %d, %Y").to_string();
-    let emails_str = match &workflow.participant_emails {
+    let created_at_str = channel.created_at.format("%b %d, %Y").to_string();
+    let emails_str = match &channel.participant_emails {
         Some(emails) if !emails.is_empty() => emails.join(", "),
         _ => "None".to_string(),
     };
-    let assigned_agents_str = match &workflow.agent_ids {
+    let assigned_agents_str = match &channel.agent_ids {
         Some(ids) if !ids.is_empty() => {
             let matches: Vec<String> = agents
                 .iter()
@@ -1360,22 +1356,22 @@ pub fn channel_row_fragment(
         }
         _ => "None".to_string(),
     };
-    let config_str = match &workflow.channel_config {
+    let config_str = match &channel.channel_config {
         Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
         None => "None".to_string(),
     };
-    let provider_str = workflow.provider.as_deref().unwrap_or("Default (Company)");
-    let model_str = workflow.model.as_deref().unwrap_or("Default (Company)");
-    let api_key_str = if workflow.api_key.is_some() {
+    let provider_str = channel.provider.as_deref().unwrap_or("Default (Company)");
+    let model_str = channel.model.as_deref().unwrap_or("Default (Company)");
+    let api_key_str = if channel.api_key.is_some() {
         "Configured (Channel Override)"
     } else {
         "Default (Company)"
     };
-    let display_slug = format!("{}@{}.{}", workflow.slug, company.slug, app_domain_name);
+    let display_slug = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
 
     format!(
         r##"
-        <div id="channel-{workflow_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex flex-col gap-3 hover:border-slate-600 transition shadow-sm">
+        <div id="channel-{channel_id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex flex-col gap-3 hover:border-slate-600 transition shadow-sm">
             <div class="flex items-center justify-between">
                 <div>
                     <div class="flex items-center gap-3">
@@ -1385,19 +1381,19 @@ pub fn channel_row_fragment(
                     <p class="text-xs text-slate-400 mt-1">Created on {created_at_str}</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <a href="/companies/{company_id}/tasks?channel_id={workflow_id}"
+                    <a href="/companies/{company_id}/tasks?channel_id={channel_id}"
                         class="px-3 py-1.5 text-xs font-medium bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/50 rounded-lg transition">
                         Tasks
                     </a>
-                    <a href="/companies/{company_id}/channels/{workflow_id}/simulate"
+                    <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                         class="px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
                         Simulate
                     </a>
-                    <button hx-get="/companies/{company_id}/channels/{workflow_id}/edit" hx-target="#channel-{workflow_id}" hx-swap="outerHTML"
+                    <button hx-get="/companies/{company_id}/channels/{channel_id}/edit" hx-target="#channel-{channel_id}" hx-swap="outerHTML"
                         class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
                         Edit
                     </button>
-                    <button hx-delete="/companies/{company_id}/channels/{workflow_id}" hx-target="#channel-{workflow_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete channel '{name}'?"
+                    <button hx-delete="/companies/{company_id}/channels/{channel_id}" hx-target="#channel-{channel_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete channel '{name}'?"
                         class="px-3 py-1.5 text-xs font-medium bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
                         Delete
                     </button>
@@ -1434,8 +1430,8 @@ pub fn channel_row_fragment(
         </div>
         "##,
         company_id = company.id,
-        workflow_id = workflow.id,
-        name = workflow.name,
+        channel_id = channel.id,
+        name = channel.name,
         display_slug = display_slug,
         created_at_str = created_at_str,
         provider_str = provider_str,
@@ -1447,39 +1443,45 @@ pub fn channel_row_fragment(
     )
 }
 
-pub use channel_row_fragment as workflow_row_fragment;
-
 pub fn channel_edit_fragment(
     company: &Company,
     app_domain_name: &str,
-    workflow: &Workflow,
+    channel: &Channel,
     agents: &[Agent],
     spam_scan_enabled: bool,
 ) -> String {
-    let emails_str = match &workflow.participant_emails {
+    let emails_str = match &channel.participant_emails {
         Some(emails) => emails.join(", "),
         None => String::new(),
     };
-    let config_str = match &workflow.channel_config {
+    let config_str = match &channel.channel_config {
         Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
         None => String::new(),
     };
-    let provider_val = workflow.provider.as_deref().unwrap_or("");
-    let model_val = workflow.model.as_deref().unwrap_or("");
-    let api_key_val = workflow.api_key.as_deref().unwrap_or("");
+    let provider_val = channel.provider.as_deref().unwrap_or("");
+    let model_val = channel.model.as_deref().unwrap_or("");
+    let api_key_val = channel.api_key.as_deref().unwrap_or("");
     let agents_selection_html = render_agents_selection(
         company.id,
         agents,
-        workflow.agent_ids.as_deref(),
-        &workflow.id.to_string(),
+        channel.agent_ids.as_deref(),
+        &channel.id.to_string(),
     );
-    let is_public = workflow
+    let is_public = channel
         .participant_emails
         .as_ref()
-        .map(|emails| emails.iter().any(|e| e.trim().eq_ignore_ascii_case("@public")))
+        .map(|emails| {
+            emails
+                .iter()
+                .any(|e| e.trim().eq_ignore_ascii_case("@public"))
+        })
         .unwrap_or(false);
     let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, !is_public);
-    let custom_config_hidden = if !provider_val.is_empty() || !model_val.is_empty() || !api_key_val.is_empty() || !config_str.is_empty() {
+    let custom_config_hidden = if !provider_val.is_empty()
+        || !model_val.is_empty()
+        || !api_key_val.is_empty()
+        || !config_str.is_empty()
+    {
         ""
     } else {
         "hidden"
@@ -1487,7 +1489,7 @@ pub fn channel_edit_fragment(
 
     format!(
         r##"
-        <form id="channel-{workflow_id}" hx-put="/companies/{company_id}/channels/{workflow_id}" hx-target="#channel-{workflow_id}" hx-swap="outerHTML" data-company-id="{company_id}"
+        <form id="channel-{channel_id}" hx-put="/companies/{company_id}/channels/{channel_id}" hx-target="#channel-{channel_id}" hx-swap="outerHTML" data-company-id="{company_id}"
             class="bg-slate-900 border border-emerald-500/60 rounded-xl p-4 md:p-5 space-y-4 shadow-lg">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1551,7 +1553,7 @@ pub fn channel_edit_fragment(
             </div>
             {spam_warning_html}
             <div class="flex items-center justify-end gap-2">
-                <button type="button" hx-get="/companies/{company_id}/channels/{workflow_id}/cancel" hx-target="#channel-{workflow_id}" hx-swap="outerHTML"
+                <button type="button" hx-get="/companies/{company_id}/channels/{channel_id}/cancel" hx-target="#channel-{channel_id}" hx-swap="outerHTML"
                     class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
                     Cancel
                 </button>
@@ -1562,10 +1564,10 @@ pub fn channel_edit_fragment(
             </div>
         </form>
         "##,
-        workflow_id = workflow.id,
+        channel_id = channel.id,
         company_id = company.id,
-        name = workflow.name,
-        slug = workflow.slug,
+        name = channel.name,
+        slug = channel.slug,
         company_slug = company.slug,
         app_domain_name = app_domain_name,
         emails_str = emails_str,
@@ -1578,25 +1580,25 @@ pub fn channel_edit_fragment(
     )
 }
 
-pub use channel_edit_fragment as workflow_edit_fragment;
-
 pub fn channel_simulation_page(
     company: &Company,
     app_domain_name: &str,
-    workflow: &Workflow,
+    channel: &Channel,
     initial_thread_id: Option<&str>,
     initial_result_html: Option<&str>,
 ) -> String {
-    let target_recipient = format!("{}@{}.{}", workflow.slug, company.slug, app_domain_name);
+    let target_recipient = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
 
-    let default_sender = match &workflow.participant_emails {
+    let default_sender = match &channel.participant_emails {
         Some(emails) if !emails.is_empty() => emails[0].clone(),
         _ => "sender@example.com".to_string(),
     };
 
     let initial_result_val = initial_result_html.unwrap_or("");
 
-    let form_container_content = if let Some(tid) = initial_thread_id.filter(|s| !s.trim().is_empty()) {
+    let form_container_content = if let Some(tid) =
+        initial_thread_id.filter(|s| !s.trim().is_empty())
+    {
         format!(
             r##"
             <div id="simulation-form-container">
@@ -1606,7 +1608,7 @@ pub fn channel_simulation_page(
                         <span>Thread Loaded & Active</span>
                         <span class="text-xs text-slate-400 font-mono">({tid})</span>
                     </div>
-                    <a href="/companies/{company_id}/channels/{workflow_id}/simulate"
+                    <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                         <span>🔄 Simulate New Thread</span>
                     </a>
@@ -1614,7 +1616,7 @@ pub fn channel_simulation_page(
             </div>
             "##,
             company_id = company.id,
-            workflow_id = workflow.id,
+            channel_id = channel.id,
             tid = tid,
         )
     } else {
@@ -1626,7 +1628,7 @@ pub fn channel_simulation_page(
                         <h3 class="text-md font-semibold text-white mb-4 flex items-center gap-2">
                             <span class="text-indigo-400">⚡</span> Simulated Webhook Payload
                         </h3>
-                        <form hx-post="/companies/{company_id}/channels/{workflow_id}/simulate" hx-target="#simulation-result" hx-swap="innerHTML" class="space-y-4">
+                        <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate" hx-target="#simulation-result" hx-swap="innerHTML" class="space-y-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label for="to" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
@@ -1696,7 +1698,7 @@ pub fn channel_simulation_page(
                             <span class="text-indigo-400">🔍</span> Open Existing Thread by ID
                         </h3>
                         <p class="text-slate-400 text-xs mb-3">Inspect thread history and simulate follow-up reply messages for an existing thread.</p>
-                        <form hx-get="/companies/{company_id}/channels/{workflow_id}/simulate/thread" hx-target="#simulation-result" hx-swap="innerHTML" class="flex flex-col sm:flex-row gap-3">
+                        <form hx-get="/companies/{company_id}/channels/{channel_id}/simulate/thread" hx-target="#simulation-result" hx-swap="innerHTML" class="flex flex-col sm:flex-row gap-3">
                             <input type="text" id="open_thread_id" name="thread_id" placeholder="Enter Thread ID (e.g. 550e8400-e29b-41d4-a716-446655440000)" required
                                 class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <button type="submit"
@@ -1710,7 +1712,7 @@ pub fn channel_simulation_page(
             </div>
             "##,
             company_id = company.id,
-            workflow_id = workflow.id,
+            channel_id = channel.id,
             target_recipient = target_recipient,
             default_sender = default_sender,
         )
@@ -1721,7 +1723,7 @@ pub fn channel_simulation_page(
         <div class="flex items-center justify-between mb-6">
             <div>
                 <a href="/companies/{company_id}/channels" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Channels</a>
-                <h2 class="text-2xl font-bold text-white">Simulate Webhook: {workflow_name}</h2>
+                <h2 class="text-2xl font-bold text-white">Simulate Webhook: {channel_name}</h2>
                 <p class="text-slate-400 text-sm mt-0.5">Test incoming email webhook resolution for <span class="font-mono text-emerald-300">{target_recipient}</span></p>
             </div>
         </div>
@@ -1731,22 +1733,20 @@ pub fn channel_simulation_page(
         <div id="simulation-result">{initial_result_val}</div>
         "##,
         company_id = company.id,
-        workflow_name = workflow.name,
+        channel_name = channel.name,
         target_recipient = target_recipient,
         form_container_content = form_container_content,
         initial_result_val = initial_result_val,
     );
 
-    base_layout(&format!("Simulate {}", workflow.name), &content)
+    base_layout(&format!("Simulate {}", channel.name), &content)
 }
 
-pub use channel_simulation_page as workflow_simulation_page;
-
 pub fn resolve_llm_info(
-    workflow: Option<&Workflow>,
+    channel: Option<&Channel>,
     company: Option<&Company>,
 ) -> (String, String, String) {
-    match (workflow, company) {
+    match (channel, company) {
         (Some(wf), Some(comp)) => {
             let wf_cfg = wf.channel_config.as_ref();
             let wf_llm = wf_cfg.and_then(|c| c.get("llm"));
@@ -1790,7 +1790,7 @@ pub fn resolve_llm_info(
                 .filter(|s| !s.trim().is_empty())
                 .is_some()
             {
-                "<span class=\"text-emerald-400 font-bold\">Configured (Workflow)</span>".to_string()
+                "<span class=\"text-emerald-400 font-bold\">Configured (Channel)</span>".to_string()
             } else if comp
                 .api_key
                 .as_deref()
@@ -1804,7 +1804,8 @@ pub fn resolve_llm_info(
                 .filter(|s| !s.trim().is_empty())
                 .is_some()
             {
-                "<span class=\"text-emerald-400 font-bold\">Configured (Workflow Config)</span>".to_string()
+                "<span class=\"text-emerald-400 font-bold\">Configured (Channel Config)</span>"
+                    .to_string()
             } else {
                 let env_vars = match provider_name.as_str() {
                     "google" | "gemini" => "GEMINI_API_KEY / GOOGLE_API_KEY",
@@ -1817,23 +1818,49 @@ pub fn resolve_llm_info(
 
                 let has_env = match provider_name.as_str() {
                     "google" | "gemini" => {
-                        std::env::var("GEMINI_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some()
-                            || std::env::var("GOOGLE_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some()
+                        std::env::var("GEMINI_API_KEY")
+                            .ok()
+                            .filter(|s| !s.trim().is_empty())
+                            .is_some()
+                            || std::env::var("GOOGLE_API_KEY")
+                                .ok()
+                                .filter(|s| !s.trim().is_empty())
+                                .is_some()
                     }
-                    "openai" => std::env::var("OPENAI_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some(),
-                    "anthropic" => std::env::var("ANTHROPIC_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some(),
-                    "groq" => std::env::var("GROQ_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some(),
-                    "mistral" => std::env::var("MISTRAL_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some(),
+                    "openai" => std::env::var("OPENAI_API_KEY")
+                        .ok()
+                        .filter(|s| !s.trim().is_empty())
+                        .is_some(),
+                    "anthropic" => std::env::var("ANTHROPIC_API_KEY")
+                        .ok()
+                        .filter(|s| !s.trim().is_empty())
+                        .is_some(),
+                    "groq" => std::env::var("GROQ_API_KEY")
+                        .ok()
+                        .filter(|s| !s.trim().is_empty())
+                        .is_some(),
+                    "mistral" => std::env::var("MISTRAL_API_KEY")
+                        .ok()
+                        .filter(|s| !s.trim().is_empty())
+                        .is_some(),
                     _ => {
-                        std::env::var("LLM_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some()
-                            || std::env::var("API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some()
+                        std::env::var("LLM_API_KEY")
+                            .ok()
+                            .filter(|s| !s.trim().is_empty())
+                            .is_some()
+                            || std::env::var("API_KEY")
+                                .ok()
+                                .filter(|s| !s.trim().is_empty())
+                                .is_some()
                     }
                 };
 
                 if has_env {
                     format!("<span class=\"text-indigo-300 font-bold\">Env Var ({env_vars})</span>")
                 } else {
-                    format!("<span class=\"text-rose-400 font-bold\">Missing / Unset ⚠️ ({env_vars})</span>")
+                    format!(
+                        "<span class=\"text-rose-400 font-bold\">Missing / Unset ⚠️ ({env_vars})</span>"
+                    )
                 }
             };
 
@@ -1842,8 +1869,13 @@ pub fn resolve_llm_info(
         (Some(wf), None) => {
             let provider = wf.provider.as_deref().unwrap_or("google (default)");
             let model = wf.model.as_deref().unwrap_or("gemini-2.5-flash (default)");
-            let key_status = if wf.api_key.as_deref().filter(|s| !s.trim().is_empty()).is_some() {
-                "<span class=\"text-emerald-400 font-bold\">Configured (Workflow)</span>".to_string()
+            let key_status = if wf
+                .api_key
+                .as_deref()
+                .filter(|s| !s.trim().is_empty())
+                .is_some()
+            {
+                "<span class=\"text-emerald-400 font-bold\">Configured (Channel)</span>".to_string()
             } else {
                 "<span class=\"text-rose-400 font-bold\">Missing / Unset ⚠️</span>".to_string()
             };
@@ -1851,8 +1883,16 @@ pub fn resolve_llm_info(
         }
         (None, Some(comp)) => {
             let provider = comp.provider.as_deref().unwrap_or("google (default)");
-            let model = comp.model.as_deref().unwrap_or("gemini-2.5-flash (default)");
-            let key_status = if comp.api_key.as_deref().filter(|s| !s.trim().is_empty()).is_some() {
+            let model = comp
+                .model
+                .as_deref()
+                .unwrap_or("gemini-2.5-flash (default)");
+            let key_status = if comp
+                .api_key
+                .as_deref()
+                .filter(|s| !s.trim().is_empty())
+                .is_some()
+            {
                 "<span class=\"text-emerald-400 font-bold\">Configured (Company)</span>".to_string()
             } else {
                 "<span class=\"text-rose-400 font-bold\">Missing / Unset ⚠️</span>".to_string()
@@ -1867,23 +1907,23 @@ pub fn resolve_llm_info(
     }
 }
 
-pub fn workflow_simulation_failure_fragment(
+pub fn channel_simulation_failure_fragment(
     company_id: Uuid,
-    workflow_id: Uuid,
+    channel_id: Uuid,
     company: Option<&Company>,
-    workflow: Option<&Workflow>,
+    channel: Option<&Channel>,
     to_str: &str,
     from_str: &str,
     subject_str: &str,
     error_msg: &str,
 ) -> String {
-    let (provider_str, model_str, api_key_status) = resolve_llm_info(workflow, company);
+    let (provider_str, model_str, api_key_status) = resolve_llm_info(channel, company);
 
     let company_name = company
         .map(|c| format!("{} (/{})", c.name, c.slug))
         .unwrap_or_else(|| "N/A".to_string());
 
-    let workflow_name = workflow
+    let channel_name = channel
         .map(|w| format!("{} (/{})", w.name, w.slug))
         .unwrap_or_else(|| "N/A".to_string());
 
@@ -1895,7 +1935,7 @@ pub fn workflow_simulation_failure_fragment(
                     <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
                     <span class="text-rose-400 font-semibold">Simulation Execution Failed</span>
                 </div>
-                <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                     <span>🔄 Simulate New Thread</span>
                 </a>
@@ -1903,7 +1943,7 @@ pub fn workflow_simulation_failure_fragment(
         </div>
         "##,
         company_id = company_id,
-        workflow_id = workflow_id,
+        channel_id = channel_id,
     );
 
     format!(
@@ -1943,8 +1983,8 @@ pub fn workflow_simulation_failure_fragment(
                         <span class="text-slate-200">{company_name}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Workflow:</span>
-                        <span class="text-slate-200">{workflow_name}</span>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Channel:</span>
+                        <span class="text-slate-200">{channel_name}</span>
                     </div>
                 </div>
 
@@ -1968,14 +2008,14 @@ pub fn workflow_simulation_failure_fragment(
         to_str = to_str,
         from_str = from_str,
         company_name = company_name,
-        workflow_name = workflow_name,
+        channel_name = channel_name,
         subject_str = subject_str,
     )
 }
 
-pub fn workflow_simulation_result_fragment(
+pub fn channel_simulation_result_fragment(
     company_id: Uuid,
-    workflow_id: Uuid,
+    channel_id: Uuid,
     result: &InboundEmailResult,
 ) -> String {
     let oob_form_swap = format!(
@@ -1986,7 +2026,7 @@ pub fn workflow_simulation_result_fragment(
                     <span class="inline-block w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse"></span>
                     <span>Simulation Completed</span>
                 </div>
-                <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                     <span>🔄 Simulate New Thread</span>
                 </a>
@@ -1994,26 +2034,26 @@ pub fn workflow_simulation_result_fragment(
         </div>
         "##,
         company_id = company_id,
-        workflow_id = workflow_id,
+        channel_id = channel_id,
     );
 
     let (provider_str, model_str, api_key_status) =
-        resolve_llm_info(result.workflow.as_ref(), result.company.as_ref());
+        resolve_llm_info(result.channel.as_ref(), result.company.as_ref());
 
     let status_banner = if result.resolved {
         r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-600/60 text-emerald-200 text-sm font-semibold flex items-center gap-2">
             <span class="text-emerald-400 text-lg">✓</span>
-            <span>Webhook Triggered & Workflow Resolved Successfully!</span>
+            <span>Webhook Triggered & Channel Resolved Successfully!</span>
         </div>"#
     } else if !result.sender_authorized {
         r#"<div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
             <span class="text-rose-400 text-lg">✕</span>
-            <span>Unauthorized Sender: Email 'from' address is not listed in workflow participant_emails.</span>
+            <span>Unauthorized Sender: Email 'from' address is not listed in channel participant_emails.</span>
         </div>"#
     } else {
         r#"<div class="p-4 rounded-xl bg-amber-950/80 border border-amber-600/60 text-amber-200 text-sm font-semibold flex items-center gap-2">
             <span class="text-amber-400 text-lg">⚠</span>
-            <span>Workflow or Company Not Found for recipient address.</span>
+            <span>Channel or Company Not Found for recipient address.</span>
         </div>"#
     };
 
@@ -2028,13 +2068,13 @@ pub fn workflow_simulation_result_fragment(
                 .unwrap_or_else(|| "N/A".to_string())
         });
 
-    let workflow_name = result
-        .workflow
+    let channel_name = result
+        .channel
         .as_ref()
         .map(|w| format!("{} (/{})", w.name, w.slug))
         .unwrap_or_else(|| {
             result
-                .workflow_slug
+                .channel_slug
                 .clone()
                 .unwrap_or_else(|| "N/A".to_string())
         });
@@ -2046,7 +2086,7 @@ pub fn workflow_simulation_result_fragment(
         .as_deref()
         .unwrap_or("(No text body)");
 
-    let workflow_config_str = match &result.workflow {
+    let channel_config_str = match &result.channel {
         Some(wf) => match &wf.channel_config {
             Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
             None => "None".to_string(),
@@ -2087,8 +2127,8 @@ pub fn workflow_simulation_result_fragment(
                         <span class="text-slate-200">{company_name}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Workflow:</span>
-                        <span class="text-slate-200">{workflow_name}</span>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Channel:</span>
+                        <span class="text-slate-200">{channel_name}</span>
                     </div>
                 </div>
 
@@ -2103,8 +2143,8 @@ pub fn workflow_simulation_result_fragment(
                 </div>
 
                 <div class="pt-2 border-t border-slate-800">
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Workflow Config:</span>
-                    <pre class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-[11px]">{workflow_config_str}</pre>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Channel Config:</span>
+                    <pre class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-[11px]">{channel_config_str}</pre>
                 </div>
             </div>
         </div>
@@ -2116,25 +2156,25 @@ pub fn workflow_simulation_result_fragment(
         to = result.email.to,
         from = result.email.from,
         company_name = company_name,
-        workflow_name = workflow_name,
+        channel_name = channel_name,
         subject_str = subject_str,
         body_str = body_str,
-        workflow_config_str = workflow_config_str,
+        channel_config_str = channel_config_str,
     );
 
     format!("{oob_form_swap}\n{body_fragment}")
 }
 
-pub fn workflow_simulation_execution_result_fragment(
+pub fn channel_simulation_execution_result_fragment(
     company_id: Uuid,
-    workflow_id: Uuid,
+    channel_id: Uuid,
     sim_res: &SimulationExecutionResult,
     messages: &[Message],
     tasks: &[BackgroundTask],
 ) -> String {
     let ingest = &sim_res.ingest_result;
     let (provider_str, model_str, api_key_status) =
-        resolve_llm_info(ingest.workflow.as_ref(), ingest.company.as_ref());
+        resolve_llm_info(ingest.channel.as_ref(), ingest.company.as_ref());
 
     let thread_id_str = ingest
         .thread
@@ -2151,7 +2191,7 @@ pub fn workflow_simulation_execution_result_fragment(
                     <span>Simulation Thread Active</span>
                     <span class="text-xs text-slate-400 font-mono">({thread_id_str})</span>
                 </div>
-                <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                     <span>🔄 Simulate New Thread</span>
                 </a>
@@ -2159,7 +2199,7 @@ pub fn workflow_simulation_execution_result_fragment(
         </div>
         "##,
         company_id = company_id,
-        workflow_id = workflow_id,
+        channel_id = channel_id,
         thread_id_str = thread_id_str,
     );
 
@@ -2223,20 +2263,20 @@ pub fn workflow_simulation_execution_result_fragment(
     let status_banner = if is_agent_error {
         r#"<div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
             <span class="text-rose-400 text-lg">✕</span>
-            <span>Workflow Simulation Execution Failed! (Agent Error)</span>
+            <span>Channel Simulation Execution Failed! (Agent Error)</span>
         </div>"#
     } else {
         match sim_res.simulation_mode {
             SimulationMode::RunTest => {
                 r#"<div class="p-4 rounded-xl bg-amber-950/80 border border-amber-600/60 text-amber-200 text-sm font-semibold flex items-center gap-2">
                     <span class="text-amber-400 text-lg">⚡</span>
-                    <span>Workflow Executed Successfully in Run_Test Mode! (Outbound email send was skipped / dry-run)</span>
+                    <span>Channel Executed Successfully in Run_Test Mode! (Outbound email send was skipped / dry-run)</span>
                 </div>"#
             }
             SimulationMode::Run => {
                 r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-600/60 text-emerald-200 text-sm font-semibold flex items-center gap-2">
                     <span class="text-emerald-400 text-lg">✓</span>
-                    <span>Workflow Executed & Outbound Email Dispatched Successfully!</span>
+                    <span>Channel Executed & Outbound Email Dispatched Successfully!</span>
                 </div>"#
             }
             SimulationMode::Verify => {
@@ -2260,8 +2300,8 @@ pub fn workflow_simulation_execution_result_fragment(
         .map(|c| format!("{} (/{})", c.name, c.slug))
         .unwrap_or_else(|| "N/A".to_string());
 
-    let workflow_name = ingest
-        .workflow
+    let channel_name = ingest
+        .channel
         .as_ref()
         .map(|w| format!("{} (/{})", w.name, w.slug))
         .unwrap_or_else(|| "N/A".to_string());
@@ -2297,12 +2337,14 @@ pub fn workflow_simulation_execution_result_fragment(
     };
 
     let response_style = if is_agent_error {
-        "bg-slate-950 p-3 rounded-lg text-rose-300 whitespace-pre-wrap border border-rose-800/80 font-mono text-xs"
+        "bg-slate-950 p-3 rounded-lg text-rose-300 whitespace-pre-wrap border border-rose-800/80 font-mono text-xs max-h-60 overflow-y-auto"
     } else {
-        "bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 font-sans text-xs"
+        "bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 font-sans text-xs max-h-60 overflow-y-auto"
     };
 
-    let simulation_token_meter_html = if let Some(ref tu) = agent_exec.and_then(|a| a.token_usage.as_ref()) {
+    let simulation_token_meter_html = if let Some(ref tu) =
+        agent_exec.and_then(|a| a.token_usage.as_ref())
+    {
         format!(
             r#"
             <div class="md:col-span-2 pt-2 border-t border-slate-800">
@@ -2358,8 +2400,8 @@ pub fn workflow_simulation_execution_result_fragment(
                     <span class="text-slate-200">{company_name}</span>
                 </div>
                 <div>
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Workflow:</span>
-                    <span class="text-slate-200">{workflow_name}</span>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Channel:</span>
+                    <span class="text-slate-200">{channel_name}</span>
                 </div>
                 <div>
                     <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Thread ID:</span>
@@ -2400,7 +2442,7 @@ pub fn workflow_simulation_execution_result_fragment(
         to_str = to_str,
         from_str = from_str,
         company_name = company_name,
-        workflow_name = workflow_name,
+        channel_name = channel_name,
         thread_id_str = thread_id_str,
         inbound_msg_id = inbound_msg_id,
         outbound_msg_id = outbound_msg_id,
@@ -2413,27 +2455,31 @@ pub fn workflow_simulation_execution_result_fragment(
 
     let resolved_config = crate::services::agent_runner::ResolvedAgentParams::new(
         ingest.company.as_ref(),
-        ingest.workflow.as_ref(),
+        ingest.channel.as_ref(),
         None,
     )
     .map(|p| p.config().clone())
     .ok()
-    .or_else(|| ingest.workflow.as_ref().and_then(|w| w.channel_config.clone()))
+    .or_else(|| {
+        ingest
+            .channel
+            .as_ref()
+            .and_then(|w| w.channel_config.clone())
+    })
     .unwrap_or_else(|| serde_json::json!({}));
 
     let thread_id_opt = ingest.thread.as_ref().map(|t| t.id);
-    let matched_task = tasks.iter().find(|t| {
-        (ingest.task_id.is_some() && t.id == ingest.task_id.unwrap())
-            || (thread_id_opt.is_some() && t.thread_id == thread_id_opt)
-    });
 
     let messages_section = if messages.is_empty() {
         String::new()
     } else {
         let mut msgs_html = String::new();
         for msg in messages {
-            let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
+            let is_agent =
+                msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
             let created_at_fmt = msg.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+
+            let matched_task = find_task_for_message(msg, tasks, ingest.task_id, thread_id_opt);
 
             let msg_task_payload = match matched_task {
                 Some(t) => t.payload.clone(),
@@ -2452,7 +2498,7 @@ pub fn workflow_simulation_execution_result_fragment(
                                 "response": msg.clean_text_body,
                                 "outbound_message_id": msg.message_id
                             },
-                            "workflow": ingest.workflow,
+                            "channel": ingest.channel,
                             "company": ingest.company
                         })
                     } else {
@@ -2471,7 +2517,7 @@ pub fn workflow_simulation_execution_result_fragment(
                                 "role": "human",
                                 "clean_text_body": msg.clean_text_body
                             },
-                            "workflow": ingest.workflow,
+                            "channel": ingest.channel,
                             "company": ingest.company
                         })
                     }
@@ -2494,7 +2540,7 @@ pub fn workflow_simulation_execution_result_fragment(
                         <div class="text-xs font-mono text-slate-400">
                             <span>Message ID: </span><span class="text-indigo-200">{msg_id}</span>
                         </div>
-                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-xs font-sans">
+                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-xs font-sans max-h-60 overflow-y-auto">
                             {body}
                         </div>
                         {params_html}
@@ -2541,7 +2587,11 @@ pub fn workflow_simulation_execution_result_fragment(
         }
 
         let msg_count = messages.len();
-        let label = if msg_count == 1 { "message" } else { "messages" };
+        let label = if msg_count == 1 {
+            "message"
+        } else {
+            "messages"
+        };
         format!(
             r##"
             <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 space-y-4 shadow-lg">
@@ -2607,7 +2657,7 @@ pub fn workflow_simulation_execution_result_fragment(
                 <span class="text-xs text-slate-400">Simulate next message in Thread <span class="font-mono text-indigo-300">{thread_id_str}</span></span>
             </div>
 
-            <form hx-post="/companies/{company_id}/workflows/{workflow_id}/simulate"
+            <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate"
                   hx-target="#simulation-result"
                   hx-swap="innerHTML"
                   class="space-y-4">
@@ -2645,7 +2695,7 @@ pub fn workflow_simulation_execution_result_fragment(
                             <input type="radio" name="simulation_mode" value="run_test" {run_test_checked} class="mt-0.5 text-amber-500 focus:ring-amber-500">
                             <div class="ml-2.5">
                                 <span class="block text-xs font-bold text-amber-300">Run_Test</span>
-                                <span class="block text-[11px] text-slate-400 mt-0.5">Execute full workflow & agent, skip email dispatch</span>
+                                <span class="block text-[11px] text-slate-400 mt-0.5">Execute full channel & agent, skip email dispatch</span>
                             </div>
                         </label>
                         <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
@@ -2669,7 +2719,7 @@ pub fn workflow_simulation_execution_result_fragment(
         </div>
         "##,
         company_id = company_id,
-        workflow_id = workflow_id,
+        channel_id = channel_id,
         thread_id_str = thread_id_str,
         last_msg_id = last_msg_id,
         to_str = to_str,
@@ -2679,12 +2729,14 @@ pub fn workflow_simulation_execution_result_fragment(
         run_checked = run_checked,
     );
 
-    format!("{oob_form_swap}\n<div class=\"space-y-6\">\n{status_banner}\n{exec_details}\n{messages_section}\n{reply_form}\n</div>")
+    format!(
+        "{oob_form_swap}\n<div class=\"space-y-6\">\n{status_banner}\n{exec_details}\n{messages_section}\n{reply_form}\n</div>"
+    )
 }
 
-pub fn workflow_simulation_loaded_thread_fragment(
+pub fn channel_simulation_loaded_thread_fragment(
     company: &Company,
-    workflow: &Workflow,
+    channel: &Channel,
     app_domain_name: &str,
     thread: &Thread,
     messages: &[Message],
@@ -2692,16 +2744,16 @@ pub fn workflow_simulation_loaded_thread_fragment(
     include_oob: bool,
 ) -> String {
     let company_id = company.id;
-    let workflow_id = workflow.id;
+    let channel_id = channel.id;
     let thread_id_str = thread.id.to_string();
-    let target_recipient = format!("{}@{}.{}", workflow.slug, company.slug, app_domain_name);
+    let target_recipient = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
 
     let default_sender = thread
         .participant_emails
         .first()
         .cloned()
         .or_else(|| {
-            workflow
+            channel
                 .participant_emails
                 .as_ref()
                 .and_then(|e| e.first().cloned())
@@ -2717,7 +2769,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
                     <span>Thread Loaded & Active</span>
                     <span class="text-xs text-slate-400 font-mono">({thread_id_str})</span>
                 </div>
-                <a href="/companies/{company_id}/workflows/{workflow_id}/simulate"
+                <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                     <span>🔄 Simulate New Thread</span>
                 </a>
@@ -2725,12 +2777,18 @@ pub fn workflow_simulation_loaded_thread_fragment(
         </div>
         "##,
         company_id = company_id,
-        workflow_id = workflow_id,
+        channel_id = channel_id,
         thread_id_str = thread_id_str,
     );
 
-    let created_at_fmt = thread.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
-    let updated_at_fmt = thread.updated_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+    let created_at_fmt = thread
+        .created_at
+        .format("%Y-%m-%d %H:%M:%S UTC")
+        .to_string();
+    let updated_at_fmt = thread
+        .updated_at
+        .format("%Y-%m-%d %H:%M:%S UTC")
+        .to_string();
     let participants_str = if thread.participant_emails.is_empty() {
         "None recorded".to_string()
     } else {
@@ -2750,7 +2808,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
                     <span class="text-slate-200 font-bold">{subject}</span>
                 </div>
                 <div>
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Workflow Address:</span>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Channel Address:</span>
                     <span class="text-indigo-300">{target_recipient}</span>
                 </div>
                 <div>
@@ -2781,28 +2839,25 @@ pub fn workflow_simulation_loaded_thread_fragment(
         updated_at_fmt = updated_at_fmt,
     );
 
-    let (provider_str, model_str, _api_key_status) =
-        resolve_llm_info(Some(workflow), Some(company));
+    let (provider_str, model_str, _api_key_status) = resolve_llm_info(Some(channel), Some(company));
 
-    let resolved_config = crate::services::agent_runner::ResolvedAgentParams::new(
-        Some(company),
-        Some(workflow),
-        None,
-    )
-    .map(|p| p.config().clone())
-    .ok()
-    .or_else(|| workflow.channel_config.clone())
-    .unwrap_or_else(|| serde_json::json!({}));
-
-    let matched_task = tasks.iter().find(|t| t.thread_id == Some(thread.id));
+    let resolved_config =
+        crate::services::agent_runner::ResolvedAgentParams::new(Some(company), Some(channel), None)
+            .map(|p| p.config().clone())
+            .ok()
+            .or_else(|| channel.channel_config.clone())
+            .unwrap_or_else(|| serde_json::json!({}));
 
     let messages_section = if messages.is_empty() {
         r#"<div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 shadow-lg text-slate-400 text-xs text-center mb-6">No messages recorded in this thread yet.</div>"#.to_string()
     } else {
         let mut msgs_html = String::new();
         for msg in messages {
-            let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
+            let is_agent =
+                msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
             let msg_created_at = msg.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+
+            let matched_task = find_task_for_message(msg, tasks, None, Some(thread.id));
 
             let msg_task_payload = match matched_task {
                 Some(t) => t.payload.clone(),
@@ -2821,7 +2876,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
                                 "response": msg.clean_text_body,
                                 "outbound_message_id": msg.message_id
                             },
-                            "workflow": workflow,
+                            "channel": channel,
                             "company": company
                         })
                     } else {
@@ -2840,7 +2895,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
                                 "role": "human",
                                 "clean_text_body": msg.clean_text_body
                             },
-                            "workflow": workflow,
+                            "channel": channel,
                             "company": company
                         })
                     }
@@ -2863,7 +2918,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
                         <div class="text-xs font-mono text-slate-400">
                             <span>Message ID: </span><span class="text-indigo-200">{msg_id}</span>
                         </div>
-                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-xs font-sans">
+                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-xs font-sans max-h-60 overflow-y-auto">
                             {body}
                         </div>
                         {params_html}
@@ -2910,7 +2965,11 @@ pub fn workflow_simulation_loaded_thread_fragment(
         }
 
         let msg_count = messages.len();
-        let label = if msg_count == 1 { "message" } else { "messages" };
+        let label = if msg_count == 1 {
+            "message"
+        } else {
+            "messages"
+        };
         format!(
             r##"
             <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 space-y-4 shadow-lg mb-6">
@@ -2953,7 +3012,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
                 <span class="text-xs text-slate-400">Simulate next message in Thread <span class="font-mono text-indigo-300">{thread_id_str}</span></span>
             </div>
 
-            <form hx-post="/companies/{company_id}/workflows/{workflow_id}/simulate"
+            <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate"
                   hx-target="#simulation-result"
                   hx-swap="innerHTML"
                   class="space-y-4">
@@ -2991,7 +3050,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
                             <input type="radio" name="simulation_mode" value="run_test" checked class="mt-0.5 text-amber-500 focus:ring-amber-500">
                             <div class="ml-2.5">
                                 <span class="block text-xs font-bold text-amber-300">Run_Test</span>
-                                <span class="block text-[11px] text-slate-400 mt-0.5">Execute full workflow & agent, skip email dispatch</span>
+                                <span class="block text-[11px] text-slate-400 mt-0.5">Execute full channel & agent, skip email dispatch</span>
                             </div>
                         </label>
                         <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
@@ -3015,7 +3074,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
         </div>
         "##,
         company_id = company_id,
-        workflow_id = workflow_id,
+        channel_id = channel_id,
         thread_id_str = thread_id_str,
         last_msg_id = last_msg_id,
         target_recipient = target_recipient,
@@ -3032,7 +3091,7 @@ pub fn workflow_simulation_loaded_thread_fragment(
 
 pub fn channel_simulation_thread_error_fragment(
     company_id: Uuid,
-    workflow_id: Uuid,
+    channel_id: Uuid,
     thread_id_input: &str,
     error_msg: &str,
     include_oob: bool,
@@ -3045,7 +3104,7 @@ pub fn channel_simulation_thread_error_fragment(
                     <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
                     <span class="text-rose-400 font-semibold">Failed to Load Thread</span>
                 </div>
-                <a href="/companies/{company_id}/channels/{workflow_id}/simulate"
+                <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
                     <span>🔄 Simulate New Thread</span>
                 </a>
@@ -3053,7 +3112,7 @@ pub fn channel_simulation_thread_error_fragment(
         </div>
         "##,
         company_id = company_id,
-        workflow_id = workflow_id,
+        channel_id = channel_id,
     );
 
     let error_body = format!(
@@ -3076,11 +3135,9 @@ pub fn channel_simulation_thread_error_fragment(
     }
 }
 
-pub use channel_simulation_thread_error_fragment as workflow_simulation_thread_error_fragment;
-
 pub fn company_tasks_page(
     company: &Company,
-    workflows: &[Workflow],
+    channels: &[Channel],
     tasks: &[BackgroundTask],
     current_wf: Option<Uuid>,
     current_status: Option<TaskStatus>,
@@ -3092,11 +3149,15 @@ pub fn company_tasks_page(
         .iter()
         .filter_map(|t| t.token_usage())
         .fold((0, 0, 0), |(p_acc, c_acc, t_acc), tu| {
-            (p_acc + tu.prompt_tokens, c_acc + tu.completion_tokens, t_acc + tu.total_tokens)
+            (
+                p_acc + tu.prompt_tokens,
+                c_acc + tu.completion_tokens,
+                t_acc + tu.total_tokens,
+            )
         });
 
     let mut wf_options = String::from("<option value=\"\">All Channels</option>");
-    for wf in workflows {
+    for wf in channels {
         let selected = if current_wf == Some(wf.id) {
             "selected"
         } else {
@@ -3272,10 +3333,106 @@ fn sanitize_json_mut(value: &mut serde_json::Value) {
     }
 }
 
+pub fn find_task_for_message<'a>(
+    msg: &Message,
+    tasks: &'a [BackgroundTask],
+    preferred_task_id: Option<Uuid>,
+    thread_id: Option<Uuid>,
+) -> Option<&'a BackgroundTask> {
+    let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
+
+    for task in tasks {
+        if let Some(tid) = thread_id {
+            if task.thread_id.is_some() && task.thread_id != Some(tid) {
+                continue;
+            }
+        }
+
+        let payload = &task.payload;
+
+        if is_agent {
+            if let Some(outbound_id) = payload
+                .get("execution_result")
+                .and_then(|r| r.get("outbound_message_id"))
+                .and_then(|v| v.as_str())
+                .or_else(|| payload.get("outbound_message_id").and_then(|v| v.as_str()))
+            {
+                if outbound_id == msg.message_id {
+                    return Some(task);
+                }
+            }
+
+            if let Some(resp) = payload
+                .get("execution_result")
+                .and_then(|r| r.get("response"))
+                .and_then(|v| v.as_str())
+                .or_else(|| payload.get("response").and_then(|v| v.as_str()))
+            {
+                if !resp.is_empty() && resp == msg.clean_text_body {
+                    return Some(task);
+                }
+            }
+        } else {
+            if let Some(inbound_msg_id) = payload
+                .get("inbound_message")
+                .and_then(|m| m.get("message_id"))
+                .and_then(|v| v.as_str())
+                .or_else(|| {
+                    payload
+                        .get("parsed_email")
+                        .and_then(|p| p.get("message_id"))
+                        .and_then(|v| v.as_str())
+                })
+                .or_else(|| payload.get("inbound_message_id").and_then(|v| v.as_str()))
+            {
+                if inbound_msg_id == msg.message_id {
+                    return Some(task);
+                }
+            }
+
+            if let Some(inbound_id_str) = payload
+                .get("inbound_message")
+                .and_then(|m| m.get("id"))
+                .and_then(|v| v.as_str())
+            {
+                if inbound_id_str == msg.id.to_string() {
+                    return Some(task);
+                }
+            }
+        }
+    }
+
+    if let Some(pref_id) = preferred_task_id {
+        if let Some(task) = tasks.iter().find(|t| t.id == pref_id) {
+            return Some(task);
+        }
+    }
+
+    if let Some(tid) = thread_id {
+        let thread_tasks: Vec<&BackgroundTask> = tasks
+            .iter()
+            .filter(|t| t.thread_id == Some(tid))
+            .collect();
+
+        if thread_tasks.len() == 1 {
+            return Some(thread_tasks[0]);
+        } else if !thread_tasks.is_empty() {
+            let closest = thread_tasks
+                .iter()
+                .min_by_key(|t| (t.created_at - msg.created_at).num_seconds().abs());
+            if let Some(t) = closest {
+                return Some(t);
+            }
+        }
+    }
+
+    tasks.first()
+}
+
 pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> String {
     let sanitized_payload = sanitize_json_payload(payload);
-    let payload_str = serde_json::to_string_pretty(&sanitized_payload)
-        .unwrap_or_else(|_| payload.to_string());
+    let payload_str =
+        serde_json::to_string_pretty(&sanitized_payload).unwrap_or_else(|_| payload.to_string());
 
     let mut badges = Vec::new();
     if let Some(exec_params) = sanitized_payload.get("execution_parameters") {
@@ -3289,10 +3446,30 @@ pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> Strin
             badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-950/80 text-purple-300 border border-purple-800/50">Agent: {}</span>"#, a));
         }
     } else {
-        if let Some(p) = sanitized_payload.get("workflow").and_then(|w| w.get("provider")).and_then(|v| v.as_str()).or_else(|| sanitized_payload.get("company").and_then(|c| c.get("provider")).and_then(|v| v.as_str())) {
+        if let Some(p) = sanitized_payload
+            .get("channel")
+            .and_then(|w| w.get("provider"))
+            .and_then(|v| v.as_str())
+            .or_else(|| {
+                sanitized_payload
+                    .get("company")
+                    .and_then(|c| c.get("provider"))
+                    .and_then(|v| v.as_str())
+            })
+        {
             badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-indigo-950/80 text-indigo-300 border border-indigo-800/50">Provider: {}</span>"#, p));
         }
-        if let Some(m) = sanitized_payload.get("workflow").and_then(|w| w.get("model")).and_then(|v| v.as_str()).or_else(|| sanitized_payload.get("company").and_then(|c| c.get("model")).and_then(|v| v.as_str())) {
+        if let Some(m) = sanitized_payload
+            .get("channel")
+            .and_then(|w| w.get("model"))
+            .and_then(|v| v.as_str())
+            .or_else(|| {
+                sanitized_payload
+                    .get("company")
+                    .and_then(|c| c.get("model"))
+                    .and_then(|v| v.as_str())
+            })
+        {
             badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-indigo-950/80 text-indigo-300 border border-indigo-800/50">Model: {}</span>"#, m));
         }
     }
@@ -3306,8 +3483,14 @@ pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> Strin
         }
     }
 
-    let has_config = sanitized_payload.get("execution_parameters").and_then(|e| e.get("config")).map_or(false, |c| !c.is_null() && c != &serde_json::json!({}))
-        || sanitized_payload.get("workflow").and_then(|w| w.get("workflow_config")).map_or(false, |c| !c.is_null() && c != &serde_json::json!({}));
+    let has_config = sanitized_payload
+        .get("execution_parameters")
+        .and_then(|e| e.get("config"))
+        .map_or(false, |c| !c.is_null() && c != &serde_json::json!({}))
+        || sanitized_payload
+            .get("channel")
+            .and_then(|w| w.get("channel_config"))
+            .map_or(false, |c| !c.is_null() && c != &serde_json::json!({}));
     if has_config {
         badges.push(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-800/50">Config: Present</span>"#.to_string());
     }
@@ -3330,7 +3513,10 @@ pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> Strin
     }
 
     let summary_badges_html = if !badges.is_empty() {
-        format!(r#"<div class="flex flex-wrap gap-1.5 mb-2">{}</div>"#, badges.join(""))
+        format!(
+            r#"<div class="flex flex-wrap gap-1.5 mb-2">{}</div>"#,
+            badges.join("")
+        )
     } else {
         String::new()
     };
@@ -3404,12 +3590,12 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
 
     let simulation_link = match task.thread_id {
         Some(tid) => format!(
-            r##"<a href="/companies/{company_id}/channels/{workflow_id}/simulate?thread_id={tid}"
+            r##"<a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={tid}"
                 class="px-3 py-1.5 text-xs font-semibold bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-lg transition flex items-center gap-1 shadow-sm whitespace-nowrap">
                 <span>⚡ Open Simulation</span>
             </a>"##,
             company_id = company_id,
-            workflow_id = task.channel_id,
+            channel_id = task.channel_id,
             tid = tid
         ),
         None => String::new(),
@@ -3417,9 +3603,9 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
 
     let thread_info = match task.thread_id {
         Some(tid) => format!(
-            r##" • Thread: <a href="/companies/{company_id}/channels/{workflow_id}/simulate?thread_id={tid}" class="font-mono text-emerald-400 hover:text-emerald-300 underline font-medium">{tid}</a>"##,
+            r##" • Thread: <a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={tid}" class="font-mono text-emerald-400 hover:text-emerald-300 underline font-medium">{tid}</a>"##,
             company_id = company_id,
-            workflow_id = task.channel_id,
+            channel_id = task.channel_id,
             tid = tid
         ),
         None => String::new(),
@@ -3613,8 +3799,6 @@ pub fn channel_approvals_fragment(approvals: &[HumanApproval]) -> String {
     format!(r#"<div class="space-y-2 mt-4">{rows}</div>"#, rows = rows)
 }
 
-pub use channel_approvals_fragment as workflow_approvals_fragment;
-
 pub fn render_ai_prompt_generator(
     company_id: Uuid,
     sys_prompt_id: &str,
@@ -3623,9 +3807,7 @@ pub fn render_ai_prompt_generator(
     gen_status_id: &str,
     include_form_ids: &str,
 ) -> String {
-    let hx_vals = format!(
-        r#"{{"target_id": "{sys_prompt_id}", "gen_box_id": "{gen_box_id}"}}"#
-    );
+    let hx_vals = format!(r#"{{"target_id": "{sys_prompt_id}", "gen_box_id": "{gen_box_id}"}}"#);
     let hx_target = format!("#{gen_status_id}");
     let hx_include = format!("#{gen_input_id}{include_form_ids}");
 
@@ -3808,10 +3990,7 @@ pub fn agent_list_fragment(company: &Company, agents: &[Agent]) -> String {
         .collect::<Vec<_>>()
         .join("");
 
-    format!(
-        r#"<div class="space-y-3">{}</div>"#,
-        rows
-    )
+    format!(r#"<div class="space-y-3">{}</div>"#, rows)
 }
 
 pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
@@ -3962,4 +4141,164 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
         config_json_str = config_json_str,
         prompt_gen_html = prompt_gen_html
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use serde_json::json;
+    use uuid::Uuid;
+
+    #[test]
+    fn test_find_task_for_message_multi_task_matching() {
+        let thread_id = Uuid::new_v4();
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+
+        let task1_id = Uuid::new_v4();
+        let task2_id = Uuid::new_v4();
+
+        let task1 = BackgroundTask {
+            id: task1_id,
+            company_id,
+            channel_id,
+            thread_id: Some(thread_id),
+            task_type: "email_agent_dispatch".to_string(),
+            status: TaskStatus::Completed,
+            payload: json!({
+                "inbound_message": {
+                    "message_id": "<in1@test.com>"
+                },
+                "execution_result": {
+                    "outbound_message_id": "<out1@test.com>",
+                    "response": "Response 1"
+                }
+            }),
+            retry_count: 0,
+            max_retries: 3,
+            last_error: None,
+            run_at: Utc::now().naive_utc(),
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+        };
+
+        let task2 = BackgroundTask {
+            id: task2_id,
+            company_id,
+            channel_id,
+            thread_id: Some(thread_id),
+            task_type: "email_agent_dispatch".to_string(),
+            status: TaskStatus::Completed,
+            payload: json!({
+                "inbound_message": {
+                    "message_id": "<in2@test.com>"
+                },
+                "execution_result": {
+                    "outbound_message_id": "<out2@test.com>",
+                    "response": "Response 2"
+                }
+            }),
+            retry_count: 0,
+            max_retries: 3,
+            last_error: None,
+            run_at: Utc::now().naive_utc(),
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+        };
+
+        let tasks = vec![task1, task2];
+
+        let msg_in1 = Message {
+            id: Uuid::new_v4(),
+            thread_id,
+            message_id: "<in1@test.com>".to_string(),
+            in_reply_to: None,
+            references_list: vec![],
+            sender: "user@test.com".to_string(),
+            recipients_to: vec![],
+            recipients_cc: vec![],
+            subject: "Hi".to_string(),
+            clean_text_body: "Inbound 1".to_string(),
+            raw_text_body: None,
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            thread_index: None,
+            created_at: Utc::now().naive_utc(),
+        };
+
+        let msg_out1 = Message {
+            id: Uuid::new_v4(),
+            thread_id,
+            message_id: "<out1@test.com>".to_string(),
+            in_reply_to: Some("<in1@test.com>".to_string()),
+            references_list: vec![],
+            sender: "agent@test.com".to_string(),
+            recipients_to: vec![],
+            recipients_cc: vec![],
+            subject: "Re: Hi".to_string(),
+            clean_text_body: "Response 1".to_string(),
+            raw_text_body: None,
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Outbound,
+            role: MessageRole::Agent,
+            thread_index: None,
+            created_at: Utc::now().naive_utc(),
+        };
+
+        let msg_in2 = Message {
+            id: Uuid::new_v4(),
+            thread_id,
+            message_id: "<in2@test.com>".to_string(),
+            in_reply_to: Some("<out1@test.com>".to_string()),
+            references_list: vec![],
+            sender: "user@test.com".to_string(),
+            recipients_to: vec![],
+            recipients_cc: vec![],
+            subject: "Re: Hi 2".to_string(),
+            clean_text_body: "Inbound 2".to_string(),
+            raw_text_body: None,
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            thread_index: None,
+            created_at: Utc::now().naive_utc(),
+        };
+
+        let msg_out2 = Message {
+            id: Uuid::new_v4(),
+            thread_id,
+            message_id: "<out2@test.com>".to_string(),
+            in_reply_to: Some("<in2@test.com>".to_string()),
+            references_list: vec![],
+            sender: "agent@test.com".to_string(),
+            recipients_to: vec![],
+            recipients_cc: vec![],
+            subject: "Re: Hi 2".to_string(),
+            clean_text_body: "Response 2".to_string(),
+            raw_text_body: None,
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Outbound,
+            role: MessageRole::Agent,
+            thread_index: None,
+            created_at: Utc::now().naive_utc(),
+        };
+
+        let matched_in1 = find_task_for_message(&msg_in1, &tasks, None, Some(thread_id)).unwrap();
+        assert_eq!(matched_in1.id, task1_id);
+
+        let matched_out1 = find_task_for_message(&msg_out1, &tasks, None, Some(thread_id)).unwrap();
+        assert_eq!(matched_out1.id, task1_id);
+
+        let matched_in2 = find_task_for_message(&msg_in2, &tasks, None, Some(thread_id)).unwrap();
+        assert_eq!(matched_in2.id, task2_id);
+
+        let matched_out2 = find_task_for_message(&msg_out2, &tasks, None, Some(thread_id)).unwrap();
+        assert_eq!(matched_out2.id, task2_id);
+    }
 }

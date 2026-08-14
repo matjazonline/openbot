@@ -4,7 +4,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AiExecutionMetrics {
     pub company_id: Option<Uuid>,
-    pub workflow_id: Option<Uuid>,
+    pub channel_id: Option<Uuid>,
     pub agent_id: Option<Uuid>,
     pub provider: String,
     pub model: String,
@@ -76,7 +76,7 @@ impl std::fmt::Display for TaskStatusMetric {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TaskExecutionMetrics {
     pub company_id: Option<Uuid>,
-    pub workflow_id: Option<Uuid>,
+    pub channel_id: Option<Uuid>,
     pub task_type: String,
     pub duration_ms: u64,
     pub status: TaskStatusMetric,

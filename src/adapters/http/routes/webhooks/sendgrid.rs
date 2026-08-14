@@ -206,7 +206,7 @@ mod tests {
 
     use crate::{
         app_error::AppResult,
-        entities::{company::Company, message::Message, thread::Thread, workflow::Workflow},
+        entities::{company::Company, message::Message, thread::Thread, channel::Channel},
         infra::config::AppConfig,
         use_cases::{
             company::CompanyPersistence,
@@ -235,19 +235,19 @@ mod tests {
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> { Ok(vec![]) }
     }
 
-    struct MockWorkflowPersistence {
-        workflows: Mutex<Vec<Workflow>>,
+    struct MockChannelPersistence {
+        channels: Mutex<Vec<Channel>>,
     }
 
     #[async_trait]
-    impl ChannelPersistence for MockWorkflowPersistence {
-        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Workflow>> { unimplemented!() }
-        async fn get_by_company_slug_and_channel_slug(&self, _company_slug: &str, workflow_slug: &str) -> AppResult<Option<Workflow>> {
-            Ok(self.workflows.lock().unwrap().iter().find(|w| w.slug == workflow_slug).cloned())
+    impl ChannelPersistence for MockChannelPersistence {
+        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Channel> { unimplemented!() }
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> { unimplemented!() }
+        async fn get_by_company_slug_and_channel_slug(&self, _company_slug: &str, channel_slug: &str) -> AppResult<Option<Channel>> {
+            Ok(self.channels.lock().unwrap().iter().find(|w| w.slug == channel_slug).cloned())
         }
-        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Workflow>> { Ok(self.workflows.lock().unwrap().clone()) }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Workflow> { unimplemented!() }
+        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> { Ok(self.channels.lock().unwrap().clone()) }
+        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Channel> { unimplemented!() }
         async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
     }
 
@@ -270,10 +270,10 @@ mod tests {
 
     #[async_trait]
     impl ThreadPersistence for MockThreadPersistence {
-        async fn create_thread(&self, workflow_id: Uuid, subject: &str, participant_emails: &[String]) -> AppResult<Thread> {
+        async fn create_thread(&self, channel_id: Uuid, subject: &str, participant_emails: &[String]) -> AppResult<Thread> {
             let thread = Thread {
                 id: Uuid::new_v4(),
-                channel_id: workflow_id,
+                channel_id,
                 subject: subject.to_string(),
                 participant_emails: participant_emails.to_vec(),
                 created_at: Utc::now().naive_utc(),
@@ -345,11 +345,11 @@ mod tests {
 
     #[async_trait]
     impl crate::adapters::persistence::task::TaskPersistence for MockTaskPersistence {
-        async fn enqueue_task(&self, company_id: Uuid, workflow_id: Uuid, thread_id: Option<Uuid>, task_type: &str, payload: serde_json::Value) -> AppResult<crate::entities::task::BackgroundTask> {
+        async fn enqueue_task(&self, company_id: Uuid, channel_id: Uuid, thread_id: Option<Uuid>, task_type: &str, payload: serde_json::Value) -> AppResult<crate::entities::task::BackgroundTask> {
             let task = crate::entities::task::BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
-                channel_id: workflow_id,
+                channel_id,
                 thread_id,
                 task_type: task_type.to_string(),
                 status: crate::entities::task::TaskStatus::Pending,
@@ -429,7 +429,7 @@ mod tests {
             Ok(t.clone())
         }
 
-        async fn list_company_tasks(&self, company_id: Uuid, _workflow_id: Option<Uuid>, _status: Option<crate::entities::task::TaskStatus>, _sort_asc: bool) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+        async fn list_company_tasks(&self, company_id: Uuid, _channel_id: Option<Uuid>, _status: Option<crate::entities::task::TaskStatus>, _sort_asc: bool) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
             Ok(self.tasks.lock().unwrap().iter().filter(|t| t.company_id == company_id).cloned().collect())
         }
     }
@@ -461,11 +461,11 @@ mod tests {
     struct MockApprovalPersistence;
     #[async_trait]
     impl crate::adapters::persistence::approval::ApprovalPersistence for MockApprovalPersistence {
-        async fn create_approval(&self, _company_id: Uuid, _workflow_id: Uuid, _thread_id: Option<Uuid>, _task_id: Option<Uuid>, _step_key: &str, _approver_email: &str, _action_type: &str, _action_title: &str, _action_summary: &str, _payload: serde_json::Value, _token: &str, _expires_at: chrono::NaiveDateTime) -> AppResult<crate::entities::approval::HumanApproval> { unimplemented!() }
+        async fn create_approval(&self, _company_id: Uuid, _channel_id: Uuid, _thread_id: Option<Uuid>, _task_id: Option<Uuid>, _step_key: &str, _approver_email: &str, _action_type: &str, _action_title: &str, _action_summary: &str, _payload: serde_json::Value, _token: &str, _expires_at: chrono::NaiveDateTime) -> AppResult<crate::entities::approval::HumanApproval> { unimplemented!() }
         async fn find_approval_by_step_key(&self, _thread_id: Option<Uuid>, _step_key: &str) -> AppResult<Option<crate::entities::approval::HumanApproval>> { Ok(None) }
         async fn get_approval_by_token(&self, _token: &str) -> AppResult<Option<crate::entities::approval::HumanApproval>> { Ok(None) }
         async fn update_approval_status(&self, _id: Uuid, _status: crate::entities::approval::ApprovalStatus) -> AppResult<crate::entities::approval::HumanApproval> { unimplemented!() }
-        async fn list_approvals_by_workflow(&self, _company_id: Uuid, _workflow_id: Uuid) -> AppResult<Vec<crate::entities::approval::HumanApproval>> { Ok(vec![]) }
+        async fn list_approvals_by_channel(&self, _company_id: Uuid, _channel_id: Uuid) -> AppResult<Vec<crate::entities::approval::HumanApproval>> { Ok(vec![]) }
     }
 
     #[tokio::test]
@@ -485,8 +485,8 @@ mod tests {
             }]),
         });
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![Workflow {
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Inbound Flow".to_string(),
@@ -537,7 +537,7 @@ mod tests {
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
             thread_persistence.clone(),
-            workflow_persistence.clone(),
+            channel_persistence.clone(),
             company_persistence.clone(),
             task_persistence.clone(),
             config.clone(),
@@ -550,7 +550,7 @@ mod tests {
             config.clone(),
         ));
 
-        let channel_use_cases = Arc::new(ChannelUseCases::new(company_persistence.clone(), workflow_persistence, config.clone()));
+        let channel_use_cases = Arc::new(ChannelUseCases::new(company_persistence.clone(), channel_persistence, config.clone()));
         let app_state = AppState {
             config: config.clone(),
             monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
@@ -565,8 +565,7 @@ mod tests {
                 Arc::new(MockCompanyPersistence { companies: Mutex::new(vec![]) }),
                 Arc::new(MockCompanyInvitePersistence {}),
             )),
-            channel_use_cases: channel_use_cases.clone(),
-            workflow_use_cases: channel_use_cases,
+            channel_use_cases,
             agent_use_cases: Arc::new(crate::use_cases::agent::AgentUseCases::new(
                 company_persistence,
                 Arc::new(MockAgentPersistence),

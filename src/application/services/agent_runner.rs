@@ -1,10 +1,10 @@
 use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService};
 use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::approval::ApprovalStatus;
+use crate::entities::channel::Channel;
 use crate::entities::company::Company;
 use crate::entities::message::{Message, MessageRole};
 use crate::entities::task::TokenUsage;
-use crate::entities::channel::Channel;
 use crate::use_cases::approval::ApprovalUseCases;
 use crate::use_cases::thread::RecipientRole;
 use ai_agents::{Agent, AgentBuilder};
@@ -98,16 +98,16 @@ pub struct ResolvedAgentParams {
 }
 
 impl ResolvedAgentParams {
-    /// Resolves LLM execution parameters by combining Company, Workflow, and Agent entities.
-    /// Company values are overridden by Workflow and Workflow values are overridden by Agent.
+    /// Resolves LLM execution parameters by combining Company, Channel, and Agent entities.
+    /// Company values are overridden by Channel and Channel values are overridden by Agent.
     pub fn new(
         company: Option<&Company>,
-        workflow: Option<&Channel>,
+        channel: Option<&Channel>,
         agent: Option<&AgentEntity>,
     ) -> anyhow::Result<Self> {
         let mut config = base_agent_config();
 
-        if let Some(ch_cfg) = workflow.and_then(|w| w.channel_config.as_ref()) {
+        if let Some(ch_cfg) = channel.and_then(|w| w.channel_config.as_ref()) {
             if config.is_object() && ch_cfg.is_object() {
                 merge_json(&mut config, ch_cfg);
             } else {
@@ -130,7 +130,7 @@ impl ResolvedAgentParams {
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .or_else(|| {
-                workflow
+                channel
                     .and_then(|w| w.provider.as_deref())
                     .map(|s| s.trim())
                     .filter(|s| !s.is_empty())
@@ -166,7 +166,7 @@ impl ResolvedAgentParams {
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .or_else(|| {
-                workflow
+                channel
                     .and_then(|w| w.model.as_deref())
                     .map(|s| s.trim())
                     .filter(|s| !s.is_empty())
@@ -192,7 +192,7 @@ impl ResolvedAgentParams {
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .or_else(|| {
-                workflow
+                channel
                     .and_then(|w| w.api_key.as_deref())
                     .map(|s| s.trim())
                     .filter(|s| !s.is_empty())
@@ -214,7 +214,7 @@ impl ResolvedAgentParams {
             .ok_or_else(|| {
                 tracing::warn!("API key is missing for provider '{}'", provider);
                 anyhow::anyhow!(
-                    "API key is missing for provider '{}'. Please configure an API key in workflow or company settings.",
+                    "API key is missing for provider '{}'. Please configure an API key in channel or company settings.",
                     provider
                 )
             })?;
@@ -222,7 +222,7 @@ impl ResolvedAgentParams {
         let fallback_sys_prompt = agent.and_then(|a| a.system_prompt.as_deref());
         let fallback_name = agent
             .map(|a| a.name.as_str())
-            .or_else(|| workflow.map(|w| w.name.as_str()))
+            .or_else(|| channel.map(|w| w.name.as_str()))
             .or_else(|| company.map(|c| c.name.as_str()));
         ensure_config_fields(
             &mut config,
@@ -364,9 +364,9 @@ pub fn ensure_config_fields(
 #[derive(Clone, Debug)]
 pub struct ApprovalContext {
     pub company_id: Uuid,
-    pub workflow_id: Uuid,
-    pub workflow_name: String,
-    pub workflow_slug: String,
+    pub channel_id: Uuid,
+    pub channel_name: String,
+    pub channel_slug: String,
     pub company_slug: String,
     pub thread_id: Option<Uuid>,
     pub task_id: Option<Uuid>,
@@ -455,9 +455,9 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
             .approval_use_cases
             .create_and_send_approval_request(
                 self.context.company_id,
-                self.context.workflow_id,
-                &self.context.workflow_name,
-                &self.context.workflow_slug,
+                self.context.channel_id,
+                &self.context.channel_name,
+                &self.context.channel_slug,
                 &self.context.company_slug,
                 self.context.thread_id,
                 self.context.task_id,
@@ -491,7 +491,7 @@ pub struct AgentRunner<'a> {
     app_config: Option<Arc<AppConfig>>,
     company: Option<Company>,
     company_id: Option<Uuid>,
-    workflow_id: Option<Uuid>,
+    channel_id: Option<Uuid>,
     agent_id: Option<Uuid>,
     skip_spam_guardrail: bool,
     recipient_role: Option<RecipientRole>,
@@ -510,7 +510,7 @@ impl<'a> AgentRunner<'a> {
             app_config: None,
             company: None,
             company_id: None,
-            workflow_id: None,
+            channel_id: None,
             agent_id: None,
             skip_spam_guardrail: false,
             recipient_role: None,
@@ -556,11 +556,11 @@ impl<'a> AgentRunner<'a> {
     pub fn ids(
         mut self,
         company_id: Option<Uuid>,
-        workflow_id: Option<Uuid>,
+        channel_id: Option<Uuid>,
         agent_id: Option<Uuid>,
     ) -> Self {
         self.company_id = company_id;
-        self.workflow_id = workflow_id;
+        self.channel_id = channel_id;
         self.agent_id = agent_id;
         self
     }
@@ -589,14 +589,21 @@ impl<'a> AgentRunner<'a> {
         );
 
         let delivery_ctx = match self.recipient_role {
-            Some(RecipientRole::To) => "[Delivery Context: Email received via TO field (Primary Target)]\n",
-            Some(RecipientRole::Cc) => "[Delivery Context: Email received via CC field (Secondary / FYI Target)]\n",
+            Some(RecipientRole::To) => {
+                "[Delivery Context: Email received via TO field (Primary Target)]\n"
+            }
+            Some(RecipientRole::Cc) => {
+                "[Delivery Context: Email received via CC field (Secondary / FYI Target)]\n"
+            }
             None => "",
         };
 
         let pipeline_ctx_str = if let Some(ref upstream) = self.upstream_pipeline_context {
             if !upstream.trim().is_empty() {
-                format!("[Upstream Pipeline Context from Prior Step Agents]:\n{}\n\n", upstream.trim())
+                format!(
+                    "[Upstream Pipeline Context from Prior Step Agents]:\n{}\n\n",
+                    upstream.trim()
+                )
             } else {
                 String::new()
             }
@@ -621,7 +628,10 @@ impl<'a> AgentRunner<'a> {
             history_str.push_str("\nLatest Inbound Message:\n");
         }
 
-        let raw_full_prompt = format!("{}{}{}{}", delivery_ctx, pipeline_ctx_str, history_str, self.prompt);
+        let raw_full_prompt = format!(
+            "{}{}{}{}",
+            delivery_ctx, pipeline_ctx_str, history_str, self.prompt
+        );
 
         let provider_name = &self.params.provider;
         let model_name = &self.params.model;
@@ -667,7 +677,7 @@ impl<'a> AgentRunner<'a> {
 
         if !config_yaml.is_empty() {
             info!(
-                "Running agent with workflow config YAML:\n{}",
+                "Running agent with channel config YAML:\n{}",
                 sanitize_text(&config_yaml, Some(key))
             );
         }
@@ -744,19 +754,35 @@ impl<'a> AgentRunner<'a> {
                         .or_else(|| v.as_str().and_then(|s| s.parse::<usize>().ok()))
                 };
 
-                if let Some(p) = meta.get("prompt_tokens").or_else(|| meta.get("input_tokens")).and_then(parse_val) {
+                if let Some(p) = meta
+                    .get("prompt_tokens")
+                    .or_else(|| meta.get("input_tokens"))
+                    .and_then(parse_val)
+                {
                     prompt_tokens = p;
                 }
-                if let Some(c) = meta.get("completion_tokens").or_else(|| meta.get("output_tokens")).and_then(parse_val) {
+                if let Some(c) = meta
+                    .get("completion_tokens")
+                    .or_else(|| meta.get("output_tokens"))
+                    .and_then(parse_val)
+                {
                     completion_tokens = c;
                 }
 
                 if prompt_tokens == 0 && completion_tokens == 0 {
                     if let Some(usage) = meta.get("usage") {
-                        if let Some(p) = usage.get("prompt_tokens").or_else(|| usage.get("input_tokens")).and_then(parse_val) {
+                        if let Some(p) = usage
+                            .get("prompt_tokens")
+                            .or_else(|| usage.get("input_tokens"))
+                            .and_then(parse_val)
+                        {
                             prompt_tokens = p;
                         }
-                        if let Some(c) = usage.get("completion_tokens").or_else(|| usage.get("output_tokens")).and_then(parse_val) {
+                        if let Some(c) = usage
+                            .get("completion_tokens")
+                            .or_else(|| usage.get("output_tokens"))
+                            .and_then(parse_val)
+                        {
                             completion_tokens = c;
                         }
                     }
@@ -786,7 +812,7 @@ impl<'a> AgentRunner<'a> {
                 if let Some(ref m) = self.monitoring {
                     m.record_ai_execution(&AiExecutionMetrics {
                         company_id: self.company_id,
-                        workflow_id: self.workflow_id,
+                        channel_id: self.channel_id,
                         agent_id: self.agent_id,
                         provider: self.params.provider.clone(),
                         model: self.params.model.clone(),
@@ -806,7 +832,7 @@ impl<'a> AgentRunner<'a> {
                 if let Some(ref m) = self.monitoring {
                     m.record_ai_execution(&AiExecutionMetrics {
                         company_id: self.company_id,
-                        workflow_id: self.workflow_id,
+                        channel_id: self.channel_id,
                         agent_id: self.agent_id,
                         provider: self.params.provider.clone(),
                         model: self.params.model.clone(),
@@ -826,7 +852,7 @@ impl<'a> AgentRunner<'a> {
                 if let Some(ref m) = self.monitoring {
                     m.record_ai_execution(&AiExecutionMetrics {
                         company_id: self.company_id,
-                        workflow_id: self.workflow_id,
+                        channel_id: self.channel_id,
                         agent_id: self.agent_id,
                         provider: self.params.provider.clone(),
                         model: self.params.model.clone(),
@@ -847,7 +873,7 @@ impl<'a> AgentRunner<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::channel::Workflow;
+    use crate::entities::channel::Channel;
 
     #[tokio::test]
     async fn test_agent_runner_returns_error_when_provider_missing() -> anyhow::Result<()> {
@@ -909,7 +935,7 @@ mod tests {
                 "api_key": "custom_runtime_test_key"
             }
         });
-        let workflow = Workflow {
+        let channel = Channel {
             id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
             name: "Test".to_string(),
@@ -922,7 +948,7 @@ mod tests {
             channel_config: Some(custom_config),
             created_at: chrono::Utc::now().naive_utc(),
         };
-        let params = ResolvedAgentParams::new(None, Some(&workflow), None)?;
+        let params = ResolvedAgentParams::new(None, Some(&channel), None)?;
 
         let result = AgentRunner::new("Hello world", &params).execute().await;
         assert!(result.is_err());
@@ -1039,7 +1065,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_agent_params_workflow_overrides_company() {
+    fn test_resolve_agent_params_channel_overrides_company() {
         let company = Company {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
@@ -1052,38 +1078,38 @@ mod tests {
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let workflow = Workflow {
+        let channel = Channel {
             id: Uuid::new_v4(),
             company_id: company.id,
-            name: "Support Workflow".to_string(),
+            name: "Support Channel".to_string(),
             slug: "support".to_string(),
-            api_key: Some("workflow-api-key".to_string()),
+            api_key: Some("channel-api-key".to_string()),
             provider: Some("openai".to_string()),
             model: None, // Should keep company's model
             participant_emails: None,
             agent_ids: None,
             channel_config: Some(serde_json::json!({
-                "system_prompt": "Workflow prompt",
+                "system_prompt": "Channel prompt",
                 "temperature": 0.2
             })),
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let resolved = ResolvedAgentParams::new(Some(&company), Some(&workflow), None).unwrap();
-        assert_eq!(resolved.provider(), "openai"); // Workflow overridden
+        let resolved = ResolvedAgentParams::new(Some(&company), Some(&channel), None).unwrap();
+        assert_eq!(resolved.provider(), "openai"); // channel overridden
         assert_eq!(resolved.model(), "gemini-2.5-flash"); // Kept company
-        assert_eq!(resolved.api_key(), "workflow-api-key"); // Workflow overridden
+        assert_eq!(resolved.api_key(), "channel-api-key"); // channel overridden
         let mut expected = base_agent_config();
         merge_json(
             &mut expected,
             &serde_json::json!({
-                "name": "Support Workflow",
-                "system_prompt": "Workflow prompt",
+                "name": "Support Channel",
+                "system_prompt": "Channel prompt",
                 "temperature": 0.2,
                 "llm": {
                     "provider": "openai",
                     "model": "gemini-2.5-flash",
-                    "api_key": "workflow-api-key"
+                    "api_key": "channel-api-key"
                 }
             }),
         );
@@ -1091,7 +1117,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_agent_params_agent_overrides_workflow_and_company() {
+    fn test_resolve_agent_params_agent_overrides_channel_and_company() {
         let company = Company {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
@@ -1104,20 +1130,20 @@ mod tests {
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let workflow = Workflow {
+        let channel = Channel {
             id: Uuid::new_v4(),
             company_id: company.id,
-            name: "Support Workflow".to_string(),
+            name: "Support Channel".to_string(),
             slug: "support".to_string(),
-            api_key: Some("workflow-api-key".to_string()),
+            api_key: Some("channel-api-key".to_string()),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             participant_emails: None,
             agent_ids: None,
             channel_config: Some(serde_json::json!({
-                "system_prompt": "Workflow prompt",
+                "system_prompt": "Channel prompt",
                 "temperature": 0.2,
-                "workflow_only_field": true
+                "channel_only_field": true
             })),
             created_at: chrono::Utc::now().naive_utc(),
         };
@@ -1138,7 +1164,8 @@ mod tests {
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let resolved = ResolvedAgentParams::new(Some(&company), Some(&workflow), Some(&agent)).unwrap();
+        let resolved =
+            ResolvedAgentParams::new(Some(&company), Some(&channel), Some(&agent)).unwrap();
         assert_eq!(resolved.provider(), "anthropic"); // Agent overridden
         assert_eq!(resolved.model(), "claude-3-5-sonnet"); // Agent overridden
         assert_eq!(resolved.api_key(), "agent-api-key"); // Agent overridden
@@ -1149,7 +1176,7 @@ mod tests {
                 "name": "Tech Agent",
                 "system_prompt": "Agent prompt",
                 "temperature": 0.7,
-                "workflow_only_field": true,
+                "channel_only_field": true,
                 "llm": {
                     "provider": "anthropic",
                     "model": "claude-3-5-sonnet",
@@ -1180,10 +1207,10 @@ mod tests {
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let workflow = Workflow {
+        let channel = Channel {
             id: Uuid::new_v4(),
             company_id: company.id,
-            name: "Support Workflow".to_string(),
+            name: "Support Channel".to_string(),
             slug: "support".to_string(),
             api_key: Some("".to_string()),
             provider: Some("   ".to_string()),
@@ -1194,7 +1221,7 @@ mod tests {
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let resolved = ResolvedAgentParams::new(Some(&company), Some(&workflow), None);
+        let resolved = ResolvedAgentParams::new(Some(&company), Some(&channel), None);
         assert!(resolved.is_err());
         assert!(
             resolved
@@ -1246,10 +1273,10 @@ mod tests {
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let workflow = Workflow {
+        let channel = Channel {
             id: Uuid::new_v4(),
             company_id: company.id,
-            name: "Support Workflow".to_string(),
+            name: "Support Channel".to_string(),
             slug: "support".to_string(),
             api_key: None,
             provider: None,
@@ -1265,7 +1292,7 @@ mod tests {
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let resolved = ResolvedAgentParams::new(Some(&company), Some(&workflow), None).unwrap();
+        let resolved = ResolvedAgentParams::new(Some(&company), Some(&channel), None).unwrap();
         let config_llm = resolved.config().get("llm").unwrap().clone();
         assert_eq!(config_llm.get("provider").unwrap(), "openai");
         assert_eq!(config_llm.get("model").unwrap(), "gpt-4o");
@@ -1335,7 +1362,14 @@ mod tests {
             "temperature": 0.5
         });
 
-        ensure_config_fields(&mut config, "openai", "gpt-4o", "sk-test-123", Some("Custom prompt"), Some("Custom Agent"));
+        ensure_config_fields(
+            &mut config,
+            "openai",
+            "gpt-4o",
+            "sk-test-123",
+            Some("Custom prompt"),
+            Some("Custom Agent"),
+        );
 
         assert_eq!(
             config.get("name").unwrap().as_str().unwrap(),
@@ -1357,7 +1391,7 @@ mod tests {
         assert_eq!(estimate_tokens(""), 0);
         assert_eq!(estimate_tokens("   "), 0);
         assert_eq!(estimate_tokens("Hello world"), 3); // 11 chars -> (11+3)/4 = 3
-        
+
         let usage = TokenUsage::new(100, 50);
         assert_eq!(usage.prompt_tokens, 100);
         assert_eq!(usage.completion_tokens, 50);
@@ -1376,7 +1410,8 @@ system_prompt: Hello
             "gpt-4o".to_string(),
             Some("test_key".to_string()),
             None,
-        ).unwrap();
+        )
+        .unwrap();
         builder = builder.llm(std::sync::Arc::new(provider));
         let agent = builder.build().unwrap();
 
@@ -1389,9 +1424,15 @@ system_prompt: Hello
             let is_to = role_str == "to";
             let is_cc = role_str == "cc";
 
-            agent.set_context("recipient_role", serde_json::json!(role_str)).unwrap();
-            agent.set_context("is_to", serde_json::json!(is_to)).unwrap();
-            agent.set_context("is_cc", serde_json::json!(is_cc)).unwrap();
+            agent
+                .set_context("recipient_role", serde_json::json!(role_str))
+                .unwrap();
+            agent
+                .set_context("is_to", serde_json::json!(is_to))
+                .unwrap();
+            agent
+                .set_context("is_cc", serde_json::json!(is_cc))
+                .unwrap();
 
             assert_eq!(role_str, expected_role);
             assert_eq!(is_to, expected_to);

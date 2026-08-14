@@ -7,7 +7,7 @@ use crate::entities::message::AttachmentMetadata;
 
 use serde::{Deserialize, Serialize};
 
-pub const MAX_WORKFLOW_HOPS: u32 = 5;
+pub const MAX_CHANNEL_HOPS: u32 = 5;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedEmail {
@@ -26,9 +26,9 @@ pub struct ParsedEmail {
     pub prompt_text: String,
     pub is_auto_reply: bool,
     pub is_forwarded: bool,
-    pub workflow_id_header: Option<Uuid>,
+    pub channel_id_header: Option<Uuid>,
     pub hop_count: u32,
-    pub trace_workflows: Vec<Uuid>,
+    pub trace_channels: Vec<Uuid>,
     pub spf_status: Option<String>,
     pub dkim_status: Option<String>,
     pub dmarc_status: Option<String>,
@@ -68,18 +68,17 @@ impl EmailParser {
             references,
             thread_index,
             is_auto_reply_from_headers,
-            workflow_id_header,
+            channel_id_header,
             hop_count,
-            trace_workflows,
+            trace_channels,
         ) = if let Some(ref hdrs) = payload.headers {
             Self::parse_headers(hdrs)
         } else {
             (None, None, Vec::new(), None, false, None, 0, Vec::new())
         };
 
-        let message_id = extracted_msg_id.unwrap_or_else(|| {
-            format!("<{}.inbound@{}>", Uuid::new_v4(), app_domain)
-        });
+        let message_id = extracted_msg_id
+            .unwrap_or_else(|| format!("<{}.inbound@{}>", Uuid::new_v4(), app_domain));
 
         let sender = extract_email(&payload.from);
         let recipients_to = parse_email_list(&payload.to);
@@ -97,7 +96,8 @@ impl EmailParser {
         let raw_html = payload.html.clone();
 
         // Check if forwarded email
-        let is_forwarded = Self::is_forwarded_email(&subject, raw_text.as_deref().unwrap_or_default());
+        let is_forwarded =
+            Self::is_forwarded_email(&subject, raw_text.as_deref().unwrap_or_default());
 
         // Convert HTML to Markdown if text is missing or as fallback
         let base_text = if let Some(ref text) = raw_text {
@@ -124,7 +124,8 @@ impl EmailParser {
 
         for att in payload.attachments_data {
             let size = att.content.len();
-            let is_small_image = att.content_type.to_lowercase().starts_with("image/") && size < 10_000;
+            let is_small_image =
+                att.content_type.to_lowercase().starts_with("image/") && size < 10_000;
 
             let mut hasher = Sha256::new();
             hasher.update(&att.content);
@@ -152,11 +153,7 @@ impl EmailParser {
         let prompt_text = if attachment_prompts.is_empty() {
             clean_text_body.clone()
         } else {
-            format!(
-                "{}\n\n{}",
-                clean_text_body,
-                attachment_prompts.join("\n")
-            )
+            format!("{}\n\n{}", clean_text_body, attachment_prompts.join("\n"))
         };
 
         ParsedEmail {
@@ -175,9 +172,9 @@ impl EmailParser {
             prompt_text,
             is_auto_reply,
             is_forwarded,
-            workflow_id_header,
+            channel_id_header,
             hop_count,
-            trace_workflows,
+            trace_channels,
             spf_status: payload.spf,
             dkim_status: payload.dkim,
             dmarc_status: payload.dmarc,
@@ -207,9 +204,9 @@ impl EmailParser {
         let mut references = Vec::new();
         let mut thread_index = None;
         let mut is_auto_reply = false;
-        let mut workflow_id_header = None;
+        let mut channel_id_header = None;
         let mut hop_count = 0u32;
-        let mut trace_workflows = Vec::new();
+        let mut trace_channels = Vec::new();
 
         for line in headers_str.lines() {
             let line = line.trim();
@@ -232,15 +229,15 @@ impl EmailParser {
                     .collect();
             } else if lower.starts_with("thread-index:") {
                 thread_index = Some(line["thread-index:".len()..].trim().to_string());
-            } else if lower.starts_with("x-mailagents-workflow-id:") {
-                let val = line["x-mailagents-workflow-id:".len()..].trim();
-                workflow_id_header = Uuid::from_str(val).ok();
+            } else if lower.starts_with("x-mailagents-channel-id:") {
+                let val = line["x-mailagents-channel-id:".len()..].trim();
+                channel_id_header = Uuid::from_str(val).ok();
             } else if lower.starts_with("x-mailagents-hop-count:") {
                 let val = line["x-mailagents-hop-count:".len()..].trim();
                 hop_count = val.parse().unwrap_or(0);
             } else if lower.starts_with("x-mailagents-trace:") {
                 let val = line["x-mailagents-trace:".len()..].trim();
-                trace_workflows = val
+                trace_channels = val
                     .split(',')
                     .filter_map(|s| Uuid::from_str(s.trim()).ok())
                     .collect();
@@ -249,12 +246,15 @@ impl EmailParser {
                 if val != "no" {
                     is_auto_reply = true;
                 }
-            } else if lower.starts_with("x-autoreply:")
-                || lower.starts_with("x-autorespond:")
-            {
+            } else if lower.starts_with("x-autoreply:") || lower.starts_with("x-autorespond:") {
                 is_auto_reply = true;
             } else if lower.starts_with("precedence:") || lower.starts_with("x-precedence:") {
-                let val = line.split(':').nth(1).unwrap_or_default().trim().to_lowercase();
+                let val = line
+                    .split(':')
+                    .nth(1)
+                    .unwrap_or_default()
+                    .trim()
+                    .to_lowercase();
                 if val == "bulk" || val == "junk" || val == "auto_reply" {
                     is_auto_reply = true;
                 }
@@ -269,9 +269,9 @@ impl EmailParser {
             references,
             thread_index,
             is_auto_reply,
-            workflow_id_header,
+            channel_id_header,
             hop_count,
-            trace_workflows,
+            trace_channels,
         )
     }
 
@@ -287,7 +287,10 @@ impl EmailParser {
 
     pub fn is_forwarded_email(subject: &str, body: &str) -> bool {
         let lower_subj = subject.trim().to_lowercase();
-        if lower_subj.starts_with("fwd:") || lower_subj.starts_with("fw:") || lower_subj.starts_with("forward:") {
+        if lower_subj.starts_with("fwd:")
+            || lower_subj.starts_with("fw:")
+            || lower_subj.starts_with("forward:")
+        {
             return true;
         }
 
@@ -337,7 +340,10 @@ impl EmailParser {
     }
 
     /// Fallback quote stripping by subtracting previous DB thread message lines from new message
-    pub fn strip_historical_quotes_fallback(clean_text: &str, history_clean_bodies: &[String]) -> String {
+    pub fn strip_historical_quotes_fallback(
+        clean_text: &str,
+        history_clean_bodies: &[String],
+    ) -> String {
         if history_clean_bodies.is_empty() {
             return clean_text.to_string();
         }
@@ -354,7 +360,9 @@ impl EmailParser {
 
             // Check if this line exists verbatim in previous messages
             let exists_in_history = history_clean_bodies.iter().any(|prev_body| {
-                prev_body.lines().any(|prev_line| prev_line.trim() == trimmed)
+                prev_body
+                    .lines()
+                    .any(|prev_line| prev_line.trim() == trimmed)
             });
 
             if exists_in_history {
@@ -398,27 +406,40 @@ Message-ID: <CAGX123@mail.gmail.com>
 In-Reply-To: <ORIGINAL456@mailagents.com>
 References: <REF1@mailagents.com> <REF2@mailagents.com>
 Auto-Submitted: auto-replied
-X-MailAgents-Workflow-ID: 00000000-0000-0000-0000-000000000001
+X-MailAgents-Channel-ID: 00000000-0000-0000-0000-000000000001
 X-MailAgents-Hop-Count: 2
 Subject: Test Email
 "#;
 
-        let (msg_id, in_reply, refs, thread_idx, is_auto, wf_id, hop, trace) = EmailParser::parse_headers(headers);
+        let (msg_id, in_reply, refs, thread_idx, is_auto, wf_id, hop, trace) =
+            EmailParser::parse_headers(headers);
         assert_eq!(msg_id.as_deref(), Some("<CAGX123@mail.gmail.com>"));
         assert_eq!(in_reply.as_deref(), Some("<ORIGINAL456@mailagents.com>"));
         assert_eq!(refs, vec!["<REF1@mailagents.com>", "<REF2@mailagents.com>"]);
         assert!(thread_idx.is_none());
         assert!(is_auto);
-        assert_eq!(wf_id, Some(Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()));
+        assert_eq!(
+            wf_id,
+            Some(Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap())
+        );
         assert_eq!(hop, 2);
         assert!(trace.is_empty());
     }
 
     #[test]
     fn test_forwarded_email_detection() {
-        assert!(EmailParser::is_forwarded_email("Fwd: Customer Issue", "Original message text"));
-        assert!(EmailParser::is_forwarded_email("FW: Urgent", "Original text"));
-        assert!(!EmailParser::is_forwarded_email("Normal Subject", "Hello agent"));
+        assert!(EmailParser::is_forwarded_email(
+            "Fwd: Customer Issue",
+            "Original message text"
+        ));
+        assert!(EmailParser::is_forwarded_email(
+            "FW: Urgent",
+            "Original text"
+        ));
+        assert!(!EmailParser::is_forwarded_email(
+            "Normal Subject",
+            "Hello agent"
+        ));
     }
 
     #[test]

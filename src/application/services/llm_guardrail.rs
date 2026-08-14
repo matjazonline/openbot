@@ -105,7 +105,7 @@ Respond strictly with a JSON object in this exact format: {\"is_spam\": true|fal
                 m.increment_counter("llm_guardrail_rejected_total", 1, &[("reason", "llm_classified_spam")]);
                 m.record_ai_execution(&AiExecutionMetrics {
                     company_id: None,
-                    workflow_id: None,
+                    channel_id: None,
                     agent_id: None,
                     provider: provider.to_string(),
                     model: model.to_string(),

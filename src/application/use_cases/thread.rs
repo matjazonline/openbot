@@ -13,27 +13,28 @@ use crate::{
     app_error::AppResult,
     domain::monitoring::MonitoringService,
     entities::{
-        channel::{ChannelType, ParticipantIdentity},
+        channel::{Channel, ChannelType, ParticipantIdentity},
         company::Company,
         message::{Message, MessageDirection, MessageRole},
         message_contract::{NormalizedInboundMessage, NormalizedOutboundMessage},
         task::TokenUsage,
         thread::Thread,
-        workflow::Workflow,
     },
     infra::config::AppConfig,
     services::{
         agent_runner::{
             AgentRunner, ApprovalContext as AgentRunnerApprovalContext, ResolvedAgentParams,
         },
-        email_parser::{EmailParser, MAX_WORKFLOW_HOPS, ParsedEmail, RawInboundPayload},
+        email_parser::{EmailParser, MAX_CHANNEL_HOPS, ParsedEmail, RawInboundPayload},
         outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
     },
     use_cases::{
         agent::AgentPersistence,
         approval::ApprovalUseCases,
+        channel::{
+            ChannelPersistence, find_similar_channel_slugs, parse_recipient_address_pipeline,
+        },
         company::CompanyPersistence,
-        workflow::{WorkflowPersistence, parse_recipient_address_pipeline, find_similar_workflow_slugs},
     },
 };
 
@@ -43,7 +44,7 @@ pub const MAX_THREAD_MESSAGES_PER_HOUR: usize = 20;
 pub trait ThreadPersistence: Send + Sync {
     async fn create_thread(
         &self,
-        workflow_id: Uuid,
+        channel_id: Uuid,
         subject: &str,
         participant_emails: &[String],
     ) -> AppResult<Thread>;
@@ -76,7 +77,7 @@ pub trait ThreadPersistence: Send + Sync {
 #[derive(Clone)]
 pub struct ThreadUseCases {
     thread_persistence: Arc<dyn ThreadPersistence>,
-    workflow_persistence: Arc<dyn WorkflowPersistence>,
+    channel_persistence: Arc<dyn ChannelPersistence>,
     company_persistence: Arc<dyn CompanyPersistence>,
     task_persistence: Arc<dyn TaskPersistence>,
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
@@ -89,7 +90,7 @@ pub struct ThreadUseCases {
 impl ThreadUseCases {
     pub fn new(
         thread_persistence: Arc<dyn ThreadPersistence>,
-        workflow_persistence: Arc<dyn WorkflowPersistence>,
+        channel_persistence: Arc<dyn ChannelPersistence>,
         company_persistence: Arc<dyn CompanyPersistence>,
         task_persistence: Arc<dyn TaskPersistence>,
         config: Arc<AppConfig>,
@@ -100,7 +101,7 @@ impl ThreadUseCases {
 
         Self {
             thread_persistence,
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             agent_persistence: None,
@@ -111,26 +112,17 @@ impl ThreadUseCases {
         }
     }
 
-    pub fn with_egress_registry(
-        mut self,
-        egress_registry: Arc<EgressRegistry>,
-    ) -> Self {
+    pub fn with_egress_registry(mut self, egress_registry: Arc<EgressRegistry>) -> Self {
         self.egress_registry = egress_registry;
         self
     }
 
-    pub fn with_agent_persistence(
-        mut self,
-        agent_persistence: Arc<dyn AgentPersistence>,
-    ) -> Self {
+    pub fn with_agent_persistence(mut self, agent_persistence: Arc<dyn AgentPersistence>) -> Self {
         self.agent_persistence = Some(agent_persistence);
         self
     }
 
-    pub fn with_approval_use_cases(
-        mut self,
-        approval_use_cases: Arc<ApprovalUseCases>,
-    ) -> Self {
+    pub fn with_approval_use_cases(mut self, approval_use_cases: Arc<ApprovalUseCases>) -> Self {
         self.approval_use_cases = Some(approval_use_cases);
         self
     }
@@ -139,16 +131,13 @@ impl ThreadUseCases {
         self.approval_use_cases.clone()
     }
 
-    pub fn with_monitoring(
-        mut self,
-        monitoring: Arc<dyn MonitoringService>,
-    ) -> Self {
+    pub fn with_monitoring(mut self, monitoring: Arc<dyn MonitoringService>) -> Self {
         self.monitoring = Some(monitoring);
         self
     }
 
-    pub fn workflow_persistence(&self) -> &Arc<dyn WorkflowPersistence> {
-        &self.workflow_persistence
+    pub fn channel_persistence(&self) -> &Arc<dyn ChannelPersistence> {
+        &self.channel_persistence
     }
 
     pub fn company_persistence(&self) -> &Arc<dyn CompanyPersistence> {
@@ -179,8 +168,16 @@ impl ThreadUseCases {
             references: norm.references.clone(),
             thread_index: norm.thread_index.clone(),
             sender: norm.sender.identity.clone(),
-            recipients_to: norm.recipients_to.iter().map(|p| p.identity.clone()).collect(),
-            recipients_cc: norm.recipients_cc.iter().map(|p| p.identity.clone()).collect(),
+            recipients_to: norm
+                .recipients_to
+                .iter()
+                .map(|p| p.identity.clone())
+                .collect(),
+            recipients_cc: norm
+                .recipients_cc
+                .iter()
+                .map(|p| p.identity.clone())
+                .collect(),
             subject: norm.subject.clone(),
             clean_text_body: norm.clean_text.clone(),
             raw_text_body: norm.raw_text.clone(),
@@ -189,9 +186,9 @@ impl ThreadUseCases {
             prompt_text: norm.clean_text.clone(),
             is_auto_reply: norm.is_auto_reply,
             is_forwarded: norm.is_forwarded,
-            workflow_id_header: norm.channel_id_header,
+            channel_id_header: norm.channel_id_header,
             hop_count: norm.hop_count,
-            trace_workflows: norm.trace_channels.clone(),
+            trace_channels: norm.trace_channels.clone(),
             spf_status: norm.spf_status.clone(),
             dkim_status: norm.dkim_status.clone(),
             dmarc_status: norm.dmarc_status.clone(),
@@ -218,13 +215,13 @@ impl ThreadUseCases {
             ));
         }
 
-        let is_inter_workflow = parsed.workflow_id_header.is_some()
+        let is_inter_channel = parsed.channel_id_header.is_some()
             || parsed
                 .sender
                 .ends_with(&format!(".{}", self.config.app_domain_name));
 
         // Global SPF / DKIM / DMARC authentication verification check
-        if !is_inter_workflow {
+        if !is_inter_channel {
             if let Some(ref spf) = parsed.spf_status {
                 if spf.eq_ignore_ascii_case("fail") {
                     warn!("SPF authentication failed for sender '{}'", parsed.sender);
@@ -245,18 +242,18 @@ impl ThreadUseCases {
             }
         }
 
-        // Inter-workflow hop limit check
-        if is_inter_workflow && parsed.hop_count >= MAX_WORKFLOW_HOPS {
+        // Inter-channel hop limit check
+        if is_inter_channel && parsed.hop_count >= MAX_CHANNEL_HOPS {
             warn!(
-                "Max inter-workflow hop count ({}) reached for Message-ID: {}",
+                "Max inter-channel hop count ({}) reached for Message-ID: {}",
                 parsed.hop_count, parsed.message_id
             );
             return Ok(InboundIngestResult::rejected(
-                "Max inter-workflow hop count reached",
+                "Max inter-channel hop count reached",
             ));
         }
 
-        if !is_inter_workflow && parsed.is_auto_reply {
+        if !is_inter_channel && parsed.is_auto_reply {
             warn!(
                 "External auto-reply loop detected for Message-ID: {}, dropping message",
                 parsed.message_id
@@ -275,8 +272,9 @@ impl ThreadUseCases {
             candidates.push((cc.clone(), RecipientRole::Cc));
         }
 
-        let mut candidate_matches: Vec<(Company, Workflow, RecipientRole, usize, usize)> = Vec::new();
-        let mut seen_workflows = std::collections::HashSet::new();
+        let mut candidate_matches: Vec<(Company, Channel, RecipientRole, usize, usize)> =
+            Vec::new();
+        let mut seen_channels = std::collections::HashSet::new();
         let mut unauthorized_count = 0;
 
         let mut invalid_slugs = Vec::new();
@@ -284,30 +282,44 @@ impl ThreadUseCases {
         let mut matched_company_slug: Option<String> = None;
 
         for (addr, role) in candidates {
-            if let Some((company_slug, workflow_slugs)) = parse_recipient_address_pipeline(&addr, &self.config.app_domain_name) {
+            if let Some((company_slug, channel_slugs)) =
+                parse_recipient_address_pipeline(&addr, &self.config.app_domain_name)
+            {
                 matched_company_slug = Some(company_slug.clone());
-                let company_opt = self.company_persistence.get_by_slug(&company_slug).await.ok().flatten();
+                let company_opt = self
+                    .company_persistence
+                    .get_by_slug(&company_slug)
+                    .await
+                    .ok()
+                    .flatten();
 
                 if let Some(company) = company_opt {
-                    let available_workflows = self.workflow_persistence.list_by_company_id(company.id).await.unwrap_or_default();
-                    let total_steps = workflow_slugs.len();
+                    let available_channels = self
+                        .channel_persistence
+                        .list_by_company_id(company.id)
+                        .await
+                        .unwrap_or_default();
+                    let total_steps = channel_slugs.len();
 
-                    for (step_idx, workflow_slug) in workflow_slugs.into_iter().enumerate() {
-                        let matched_wf = available_workflows.iter().find(|w| w.slug.eq_ignore_ascii_case(&workflow_slug)).cloned();
+                    for (step_idx, channel_slug) in channel_slugs.into_iter().enumerate() {
+                        let matched_wf = available_channels
+                            .iter()
+                            .find(|w| w.slug.eq_ignore_ascii_case(&channel_slug))
+                            .cloned();
 
-                        if let Some(workflow) = matched_wf {
-                            if seen_workflows.contains(&workflow.id) {
+                        if let Some(channel) = matched_wf {
+                            if seen_channels.contains(&channel.id) {
                                 continue;
                             }
 
-                            // Inter-workflow cycle detection
-                            if is_inter_workflow && parsed.trace_workflows.contains(&workflow.id) {
+                            // Inter-channel cycle detection
+                            if is_inter_channel && parsed.trace_channels.contains(&channel.id) {
                                 warn!(
-                                    "Inter-workflow cycle detected for workflow '{}' in Message-ID: {}",
-                                    workflow.id, parsed.message_id
+                                    "Inter-channel cycle detected for channel '{}' in Message-ID: {}",
+                                    channel.id, parsed.message_id
                                 );
                                 return Ok(InboundIngestResult::rejected(
-                                    "Inter-workflow loop cycle detected",
+                                    "Inter-channel loop cycle detected",
                                 ));
                             }
 
@@ -315,30 +327,74 @@ impl ThreadUseCases {
                             let sender_clean = parsed.sender.trim();
                             let is_team_member = self
                                 .company_persistence
-                                .is_company_team_member(workflow.company_id, sender_clean)
+                                .is_company_team_member(channel.company_id, sender_clean)
                                 .await
                                 .unwrap_or(false);
 
-                            let (is_authorized, is_trusted_participant) = match &workflow.participant_emails {
-                                Some(allowed) if !allowed.is_empty() => {
-                                    let is_public = allowed.iter().any(|e| e.trim().eq_ignore_ascii_case("@public"));
-                                    let explicitly_listed = allowed
-                                        .iter()
-                                        .any(|e| !e.trim().eq_ignore_ascii_case("@public") && e.eq_ignore_ascii_case(sender_clean));
-                                    let authorized = is_public || explicitly_listed;
-                                    let trusted = explicitly_listed || is_team_member;
-                                    (authorized, trusted)
-                                }
-                                _ => {
-                                    // None or empty: default to company team members
-                                    (is_team_member, is_team_member)
-                                }
-                            };
+                            let (is_authorized, is_trusted_participant) =
+                                match &channel.participant_emails {
+                                    Some(allowed) if !allowed.is_empty() => {
+                                        let is_public = allowed
+                                            .iter()
+                                            .any(|e| e.trim().eq_ignore_ascii_case("@public"));
+                                        let explicitly_listed = allowed.iter().any(|e| {
+                                            !e.trim().eq_ignore_ascii_case("@public")
+                                                && e.eq_ignore_ascii_case(sender_clean)
+                                        });
+                                        let authorized = is_public || explicitly_listed;
+                                        let trusted = explicitly_listed || is_team_member;
+                                        (authorized, trusted)
+                                    }
+                                    _ => {
+                                        // None or empty: default to company team members
+                                        (is_team_member, is_team_member)
+                                    }
+                                };
 
-                            if !is_authorized && !is_inter_workflow {
+                            let mut is_thread_authorized = false;
+                            if !is_authorized && !is_inter_channel {
+                                let mut lookup_ids = Vec::new();
+                                if let Some(ref reply_id) = parsed.in_reply_to {
+                                    lookup_ids.push(reply_id.clone());
+                                }
+                                lookup_ids.extend(parsed.references.clone());
+
+                                let mut ext_t = if !lookup_ids.is_empty() {
+                                    self.thread_persistence
+                                        .find_thread_by_message_ids(&lookup_ids)
+                                        .await
+                                        .ok()
+                                        .flatten()
+                                } else {
+                                    None
+                                };
+
+                                if ext_t.is_none() {
+                                    if let Some(ref idx) = parsed.thread_index {
+                                        ext_t = self
+                                            .thread_persistence
+                                            .find_thread_by_thread_index(idx)
+                                            .await
+                                            .ok()
+                                            .flatten();
+                                    }
+                                }
+
+                                if let Some(ref t) = ext_t {
+                                    if t.channel_id == channel.id
+                                        && t.participant_emails
+                                            .iter()
+                                            .any(|p| p.trim().eq_ignore_ascii_case(sender_clean))
+                                    {
+                                        is_thread_authorized = true;
+                                    }
+                                }
+                            }
+
+                            if !is_authorized && !is_thread_authorized && !is_inter_channel {
                                 warn!(
-                                    "Sender '{}' unauthorized for workflow '{}'",
-                                    parsed.sender, workflow.slug
+                                    "Sender '{}' unauthorized for channel '{}'",
+                                    parsed.sender, channel.slug
                                 );
                                 unauthorized_count += 1;
                                 continue;
@@ -360,14 +416,21 @@ impl ThreadUseCases {
                                 }
                             }
 
-                            seen_workflows.insert(workflow.id);
-                            candidate_matches.push((company.clone(), workflow, role, step_idx, total_steps));
+                            seen_channels.insert(channel.id);
+                            candidate_matches.push((
+                                company.clone(),
+                                channel,
+                                role,
+                                step_idx,
+                                total_steps,
+                            ));
                         } else {
-                            // Misspelled / Invalid workflow slug found
-                            let suggestions = find_similar_workflow_slugs(&workflow_slug, &available_workflows);
-                            invalid_slugs.push(workflow_slug.clone());
+                            // Misspelled / Invalid channel slug found
+                            let suggestions =
+                                find_similar_channel_slugs(&channel_slug, &available_channels);
+                            invalid_slugs.push(channel_slug.clone());
                             bounce_suggestions.push(BounceSuggestion {
-                                invalid_slug: workflow_slug,
+                                invalid_slug: channel_slug,
                                 suggestions,
                             });
                         }
@@ -376,7 +439,7 @@ impl ThreadUseCases {
             }
         }
 
-        // Strict pipeline & address validation: If any invalid workflow slug was encountered
+        // Strict pipeline & address validation: If any invalid channel slug was encountered
         if !invalid_slugs.is_empty() {
             let bounce = BounceInfo {
                 recipient_to: parsed.sender.clone(),
@@ -386,22 +449,29 @@ impl ThreadUseCases {
                 original_subject: parsed.subject.clone(),
             };
             return Ok(InboundIngestResult::rejected_with_bounce(
-                "Workflow address not found or misspelled",
+                "Channel address not found or misspelled",
                 bounce,
             ));
         }
 
         if candidate_matches.is_empty() {
             if unauthorized_count > 0 {
-                return Ok(InboundIngestResult::rejected("Sender unauthorized for workflow"));
+                return Ok(InboundIngestResult::rejected(
+                    "Sender unauthorized for channel",
+                ));
             }
-            warn!("No valid company/workflow matched for To: {:?}, CC: {:?}", parsed.recipients_to, parsed.recipients_cc);
-            return Ok(InboundIngestResult::rejected("Company or Workflow not found"));
+            warn!(
+                "No valid company/channel matched for To: {:?}, CC: {:?}",
+                parsed.recipients_to, parsed.recipients_cc
+            );
+            return Ok(InboundIngestResult::rejected(
+                "Company or Channel not found",
+            ));
         }
 
-        let mut workflow_matches = Vec::new();
+        let mut channel_matches = Vec::new();
 
-        for (company, workflow, role, step_idx, total_steps) in candidate_matches {
+        for (company, channel, role, step_idx, total_steps) in candidate_matches {
             // Thread Resolution
             let mut lookup_ids = Vec::new();
             if let Some(ref reply_id) = parsed.in_reply_to {
@@ -427,7 +497,7 @@ impl ThreadUseCases {
             }
 
             if let Some(ref ext_t) = existing_thread {
-                if ext_t.channel_id == workflow.id {
+                if ext_t.channel_id == channel.id {
                     let sender_clean = parsed.sender.trim();
                     let is_thread_participant = ext_t
                         .participant_emails
@@ -441,8 +511,8 @@ impl ThreadUseCases {
                         if let Ok(active_tasks) = self
                             .task_persistence
                             .list_company_tasks(
-                                workflow.company_id,
-                                Some(workflow.id),
+                                channel.company_id,
+                                Some(channel.id),
                                 Some(crate::entities::task::TaskStatus::WaitingForThirdPartyReply),
                                 false,
                             )
@@ -450,12 +520,18 @@ impl ThreadUseCases {
                         {
                             for task in active_tasks {
                                 if task.thread_id == Some(ext_t.id) {
-                                    if let Some(delegations) = task.payload.get("delegations").and_then(|d| d.as_array()) {
+                                    if let Some(delegations) =
+                                        task.payload.get("delegations").and_then(|d| d.as_array())
+                                    {
                                         for item in delegations {
-                                            if let Some(target_emails) = item.get("target_emails").and_then(|e| e.as_array()) {
+                                            if let Some(target_emails) =
+                                                item.get("target_emails").and_then(|e| e.as_array())
+                                            {
                                                 if target_emails.iter().any(|e_val| {
                                                     e_val.as_str().map_or(false, |e_str| {
-                                                        e_str.trim().eq_ignore_ascii_case(sender_clean)
+                                                        e_str
+                                                            .trim()
+                                                            .eq_ignore_ascii_case(sender_clean)
                                                     })
                                                 }) {
                                                     is_delegation_target = true;
@@ -502,15 +578,78 @@ impl ThreadUseCases {
                 }
             }
 
+            // Extract third-party recipients if sender is a workflow participant or team member
+            let sender_clean = parsed.sender.trim();
+            let is_team_member = self
+                .company_persistence
+                .is_company_team_member(channel.company_id, sender_clean)
+                .await
+                .unwrap_or(false);
+
+            let is_trusted_participant = match &channel.participant_emails {
+                Some(allowed) if !allowed.is_empty() => {
+                    let explicitly_listed = allowed.iter().any(|e| {
+                        !e.trim().eq_ignore_ascii_case("@public")
+                            && e.eq_ignore_ascii_case(sender_clean)
+                    });
+                    explicitly_listed || is_team_member
+                }
+                _ => is_team_member,
+            };
+
+            let mut third_party_recipients = Vec::new();
+            if is_trusted_participant {
+                let mut candidate_recipients = Vec::new();
+                candidate_recipients.extend(parsed.recipients_to.clone());
+                candidate_recipients.extend(parsed.recipients_cc.clone());
+
+                for addr in candidate_recipients {
+                    let addr_clean = addr.trim();
+                    if addr_clean.is_empty() {
+                        continue;
+                    }
+                    if addr_clean.eq_ignore_ascii_case(sender_clean) {
+                        continue;
+                    }
+                    // Check if addr is an actual channel email address in our system
+                    let is_channel_address = if let Some((comp_slug, _)) =
+                        parse_recipient_address_pipeline(addr_clean, &self.config.app_domain_name)
+                    {
+                        self.company_persistence
+                            .get_by_slug(&comp_slug)
+                            .await
+                            .ok()
+                            .flatten()
+                            .is_some()
+                    } else {
+                        false
+                    };
+
+                    if is_channel_address {
+                        continue;
+                    }
+
+                    if !third_party_recipients
+                        .iter()
+                        .any(|r: &String| r.eq_ignore_ascii_case(addr_clean))
+                    {
+                        third_party_recipients.push(addr_clean.to_string());
+                    }
+                }
+            }
+
             let thread = match existing_thread {
-                Some(t) if t.channel_id == workflow.id => t,
+                Some(t) if t.channel_id == channel.id => t,
                 _ => {
                     let mut participants = vec![parsed.sender.clone()];
-                    participants.extend(parsed.recipients_cc.clone());
-                    participants.dedup();
+                    for tp in &third_party_recipients {
+                        if !participants.iter().any(|p| p.eq_ignore_ascii_case(tp)) {
+                            participants.push(tp.clone());
+                        }
+                    }
 
                     self.thread_persistence
-                        .create_thread(workflow.id, &parsed.subject, &participants)
+                        .create_thread(channel.id, &parsed.subject, &participants)
                         .await?
                 }
             };
@@ -538,13 +677,15 @@ impl ThreadUseCases {
                 current_participants.push(parsed.sender.clone());
                 participant_added = true;
             }
-            for cc in &parsed.recipients_cc {
-                if !current_participants
-                    .iter()
-                    .any(|p| p.eq_ignore_ascii_case(cc))
-                {
-                    current_participants.push(cc.clone());
-                    participant_added = true;
+            if is_trusted_participant {
+                for tp in &third_party_recipients {
+                    if !current_participants
+                        .iter()
+                        .any(|p| p.eq_ignore_ascii_case(tp))
+                    {
+                        current_participants.push(tp.clone());
+                        participant_added = true;
+                    }
                 }
             }
             let thread = if participant_added {
@@ -580,7 +721,10 @@ impl ThreadUseCases {
                 let attachment_prompts: Vec<String> = parsed
                     .attachments
                     .iter()
-                    .filter(|att| !(att.content_type.to_lowercase().starts_with("image/") && att.size_bytes < 10_000))
+                    .filter(|att| {
+                        !(att.content_type.to_lowercase().starts_with("image/")
+                            && att.size_bytes < 10_000)
+                    })
                     .map(|meta| {
                         format!(
                             "[Attachment: {}, Type: {}, SHA256: {}, Size: {} bytes]",
@@ -592,11 +736,15 @@ impl ThreadUseCases {
                 parsed.prompt_text = if attachment_prompts.is_empty() {
                     parsed.clean_text_body.clone()
                 } else {
-                    format!("{}\n\n{}", parsed.clean_text_body, attachment_prompts.join("\n"))
+                    format!(
+                        "{}\n\n{}",
+                        parsed.clean_text_body,
+                        attachment_prompts.join("\n")
+                    )
                 };
             }
 
-            let inbound_role = if is_inter_workflow {
+            let inbound_role = if is_inter_channel {
                 MessageRole::Agent
             } else {
                 MessageRole::Human
@@ -632,9 +780,9 @@ impl ThreadUseCases {
                 .create_message(&inbound_message)
                 .await?;
 
-            workflow_matches.push(WorkflowMatch {
+            channel_matches.push(ChannelMatch {
                 company,
-                workflow,
+                channel,
                 thread,
                 inbound_message: saved_inbound,
                 recipient_role: role,
@@ -643,7 +791,7 @@ impl ThreadUseCases {
             });
         }
 
-        let first = workflow_matches[0].clone();
+        let first = channel_matches[0].clone();
 
         let mut ingest_result = InboundIngestResult {
             accepted: true,
@@ -651,11 +799,11 @@ impl ThreadUseCases {
             thread: Some(first.thread.clone()),
             inbound_message: Some(first.inbound_message.clone()),
             company: Some(first.company.clone()),
-            workflow: Some(first.workflow.clone()),
+            channel: Some(first.channel.clone()),
             parsed_email: Some(parsed.clone()),
             normalized_message: Some(norm.clone()),
             task_id: None,
-            workflow_matches,
+            channel_matches,
             bounce_info: None,
         };
 
@@ -665,7 +813,7 @@ impl ThreadUseCases {
             .task_persistence
             .enqueue_task(
                 first.company.id,
-                first.workflow.id,
+                first.channel.id,
                 Some(first.thread.id),
                 "email_agent_dispatch",
                 payload_json,
@@ -689,11 +837,17 @@ impl ThreadUseCases {
                     info!("Successfully claimed task {} for execution", task_id);
                 }
                 Ok(false) => {
-                    info!("Task {} already claimed or completed by another worker, skipping duplicate dispatch", task_id);
+                    info!(
+                        "Task {} already claimed or completed by another worker, skipping duplicate dispatch",
+                        task_id
+                    );
                     return Ok(None);
                 }
                 Err(err) => {
-                    warn!("Failed to mark task {} as processing: {}, continuing with execution", task_id, err);
+                    warn!(
+                        "Failed to mark task {} as processing: {}, continuing with execution",
+                        task_id, err
+                    );
                 }
             }
         }
@@ -703,17 +857,17 @@ impl ThreadUseCases {
             None => return Ok(None),
         };
 
-        let matches: Vec<WorkflowMatch> = if !ingest.workflow_matches.is_empty() {
-            ingest.workflow_matches.clone()
+        let matches: Vec<ChannelMatch> = if !ingest.channel_matches.is_empty() {
+            ingest.channel_matches.clone()
         } else if let (Some(c), Some(w), Some(t), Some(m)) = (
             &ingest.company,
-            &ingest.workflow,
+            &ingest.channel,
             &ingest.thread,
             &ingest.inbound_message,
         ) {
-            vec![WorkflowMatch {
+            vec![ChannelMatch {
                 company: c.clone(),
-                workflow: w.clone(),
+                channel: w.clone(),
                 thread: t.clone(),
                 inbound_message: m.clone(),
                 recipient_role: RecipientRole::To,
@@ -724,7 +878,7 @@ impl ThreadUseCases {
             return Ok(None);
         };
 
-        let mut agent_outputs: Vec<(&WorkflowMatch, String, Option<String>)> = Vec::new();
+        let mut agent_outputs: Vec<(&ChannelMatch, String, Option<String>)> = Vec::new();
         let mut total_prompt_tokens = 0usize;
         let mut total_completion_tokens = 0usize;
         let mut primary_execution_error = None;
@@ -738,7 +892,7 @@ impl ThreadUseCases {
                 .await?;
 
             let approver_email = m
-                .workflow
+                .channel
                 .participant_emails
                 .as_ref()
                 .and_then(|p| p.first().cloned())
@@ -746,9 +900,9 @@ impl ThreadUseCases {
 
             let approval_ctx = AgentRunnerApprovalContext {
                 company_id: m.company.id,
-                workflow_id: m.workflow.id,
-                workflow_name: m.workflow.name.clone(),
-                workflow_slug: m.workflow.slug.clone(),
+                channel_id: m.channel.id,
+                channel_name: m.channel.name.clone(),
+                channel_slug: m.channel.slug.clone(),
                 company_slug: m.company.slug.clone(),
                 thread_id: Some(m.thread.id),
                 task_id: None,
@@ -756,7 +910,7 @@ impl ThreadUseCases {
             };
 
             let first_agent = if let Some(ref ap) = self.agent_persistence {
-                if let Some(&agent_id) = m.workflow.agent_ids.as_ref().and_then(|ids| ids.first()) {
+                if let Some(&agent_id) = m.channel.agent_ids.as_ref().and_then(|ids| ids.first()) {
                     ap.get_by_id(agent_id).await.ok().flatten()
                 } else {
                     None
@@ -765,7 +919,8 @@ impl ThreadUseCases {
                 None
             };
 
-            let resolved_params_res = ResolvedAgentParams::new(Some(&m.company), Some(&m.workflow), first_agent.as_ref());
+            let resolved_params_res =
+                ResolvedAgentParams::new(Some(&m.company), Some(&m.channel), first_agent.as_ref());
             if idx == 0 {
                 primary_resolved_params = resolved_params_res.as_ref().ok().cloned();
                 primary_agent = first_agent.clone();
@@ -778,11 +933,12 @@ impl ThreadUseCases {
                 .await
                 .unwrap_or(false);
 
-            let is_participant = match &m.workflow.participant_emails {
+            let is_participant = match &m.channel.participant_emails {
                 Some(allowed) if !allowed.is_empty() => {
-                    let explicitly_listed = allowed
-                        .iter()
-                        .any(|e| !e.trim().eq_ignore_ascii_case("@public") && e.eq_ignore_ascii_case(sender_clean));
+                    let explicitly_listed = allowed.iter().any(|e| {
+                        !e.trim().eq_ignore_ascii_case("@public")
+                            && e.eq_ignore_ascii_case(sender_clean)
+                    });
                     explicitly_listed || is_team_member
                 }
                 _ => is_team_member,
@@ -794,8 +950,8 @@ impl ThreadUseCases {
                     upstream_context.push_str(&format!(
                         "--- Step {step_num}: {name} ({slug}) ---\n{content}\n\n",
                         step_num = prev_m.step_index + 1,
-                        name = prev_m.workflow.name,
-                        slug = prev_m.workflow.slug,
+                        name = prev_m.channel.name,
+                        slug = prev_m.channel.slug,
                         content = prev_content
                     ));
                 }
@@ -821,7 +977,7 @@ impl ThreadUseCases {
                         .upstream_pipeline_context(upstream_ctx_opt)
                         .ids(
                             Some(m.company.id),
-                            Some(m.workflow.id),
+                            Some(m.channel.id),
                             first_agent.as_ref().map(|a| a.id),
                         )
                         .execute()
@@ -858,8 +1014,8 @@ impl ThreadUseCases {
                 };
                 let header = format!(
                     "[{name} ({slug}@{comp}.{domain}) - {role_label}]",
-                    name = m.workflow.name,
-                    slug = m.workflow.slug,
+                    name = m.channel.name,
+                    slug = m.channel.slug,
                     comp = m.company.slug,
                     domain = self.config.app_domain_name,
                     role_label = role_label
@@ -870,7 +1026,7 @@ impl ThreadUseCases {
         };
 
         let primary_match = &matches[0];
-        let primary_workflow = &primary_match.workflow;
+        let primary_channel = &primary_match.channel;
         let primary_company = &primary_match.company;
 
         let (
@@ -892,7 +1048,7 @@ impl ThreadUseCases {
             }
 
             let mut outbound_cc = parsed.recipients_cc.clone();
-            if let Some(ref wf_participants) = primary_workflow.participant_emails {
+            if let Some(ref wf_participants) = primary_channel.participant_emails {
                 for p in wf_participants {
                     if !p.eq_ignore_ascii_case(&parsed.sender) && !outbound_cc.contains(p) {
                         outbound_cc.push(p.clone());
@@ -910,15 +1066,15 @@ impl ThreadUseCases {
                 content: combined_agent_response.clone(),
                 attachments: vec![],
                 protocol: ChannelType::Email,
-                channel_id: primary_workflow.id,
+                channel_id: primary_channel.id,
                 hop_count: parsed.hop_count,
-                trace_channels: parsed.trace_workflows.clone(),
+                trace_channels: parsed.trace_channels.clone(),
             };
 
             let outbound_email = OutboundEmail {
-                workflow_id: primary_workflow.id,
-                workflow_name: primary_workflow.name.clone(),
-                workflow_slug: primary_workflow.slug.clone(),
+                channel_id: primary_channel.id,
+                channel_name: primary_channel.name.clone(),
+                channel_slug: primary_channel.slug.clone(),
                 company_slug: primary_company.slug.clone(),
                 trigger_message_id: parsed.message_id.clone(),
                 thread_references: references_for_outbound,
@@ -927,7 +1083,7 @@ impl ThreadUseCases {
                 subject: parsed.subject.clone(),
                 body_text: combined_agent_response.clone(),
                 hop_count: parsed.hop_count,
-                trace_workflows: parsed.trace_workflows.clone(),
+                trace_channels: parsed.trace_channels.clone(),
             };
 
             let sent_result = OutboundDispatcher::send(&self.config, outbound_email).await?;
@@ -952,7 +1108,7 @@ impl ThreadUseCases {
             );
             let from_email = format!(
                 "{}@{}.{}",
-                primary_workflow.slug, primary_company.slug, self.config.app_domain_name
+                primary_channel.slug, primary_company.slug, self.config.app_domain_name
             );
             info!(
                 "Simulation test mode (Run_Test): Skipped SMTP email dispatch for Message-ID {}",
@@ -1013,7 +1169,10 @@ impl ThreadUseCases {
                         }
                         if let Some(llm) = obj.get_mut("llm").and_then(|v| v.as_object_mut()) {
                             if llm.contains_key("api_key") {
-                                llm.insert("api_key".to_string(), serde_json::json!("***masked***"));
+                                llm.insert(
+                                    "api_key".to_string(),
+                                    serde_json::json!("***masked***"),
+                                );
                             }
                         }
                     }
@@ -1044,7 +1203,10 @@ impl ThreadUseCases {
                     "token_usage": TokenUsage::new(total_prompt_tokens, total_completion_tokens),
                 }));
             }
-            let _ = self.task_persistence.update_task_payload(task_id, updated_payload).await;
+            let _ = self
+                .task_persistence
+                .update_task_payload(task_id, updated_payload)
+                .await;
         }
 
         if let Some(ref err_msg) = primary_execution_error {
@@ -1066,7 +1228,10 @@ impl ThreadUseCases {
             outbound_message_id: Some(sent_message_id),
             agent_response: combined_agent_response,
             email_sent,
-            token_usage: Some(TokenUsage::new(total_prompt_tokens, total_completion_tokens)),
+            token_usage: Some(TokenUsage::new(
+                total_prompt_tokens,
+                total_completion_tokens,
+            )),
         }))
     }
 
@@ -1167,12 +1332,12 @@ impl ThreadUseCases {
     pub async fn list_company_tasks(
         &self,
         company_id: Uuid,
-        workflow_id: Option<Uuid>,
+        channel_id: Option<Uuid>,
         status: Option<crate::entities::task::TaskStatus>,
         sort_asc: bool,
     ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
         self.task_persistence
-            .list_company_tasks(company_id, workflow_id, status, sort_asc)
+            .list_company_tasks(company_id, channel_id, status, sort_asc)
             .await
     }
 
@@ -1200,9 +1365,9 @@ impl RecipientRole {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkflowMatch {
+pub struct ChannelMatch {
     pub company: Company,
-    pub workflow: Workflow,
+    pub channel: Channel,
     pub thread: Thread,
     pub inbound_message: Message,
     pub recipient_role: RecipientRole,
@@ -1230,7 +1395,7 @@ pub struct BounceInfo {
 pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String {
     let mut body = String::new();
     body.push_str("Undeliverable Mail Notification\n\n");
-    body.push_str("Your email could not be delivered because one or more workflow addresses were not found or misspelled.\n\n");
+    body.push_str("Your email could not be delivered because one or more channel addresses were not found or misspelled.\n\n");
 
     if let Some(ref comp) = bounce.company_slug {
         body.push_str(&format!("Company Domain: {comp}.{app_domain}\n\n"));
@@ -1244,19 +1409,22 @@ pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String
             .map(|c| format!("{c}.{app_domain}"))
             .unwrap_or_else(|| app_domain.to_string());
 
-        body.push_str(&format!("  - Invalid Workflow Slug: '{}@{}'\n", s.invalid_slug, domain_part));
+        body.push_str(&format!(
+            "  - Invalid Channel Slug: '{}@{}'\n",
+            s.invalid_slug, domain_part
+        ));
         if !s.suggestions.is_empty() {
             body.push_str("    Did you mean:\n");
             for sug in &s.suggestions {
                 body.push_str(&format!("      * {sug}@{domain_part}\n"));
             }
         } else {
-            body.push_str("    No similar workflow suggestions found.\n");
+            body.push_str("    No similar channel suggestions found.\n");
         }
         body.push('\n');
     }
 
-    body.push_str("Please check the workflow address and try sending your email again.\n");
+    body.push_str("Please check the channel address and try sending your email again.\n");
     body
 }
 
@@ -1267,12 +1435,12 @@ pub struct InboundIngestResult {
     pub thread: Option<Thread>,
     pub inbound_message: Option<Message>,
     pub company: Option<Company>,
-    pub workflow: Option<Workflow>,
+    pub channel: Option<Channel>,
     pub parsed_email: Option<ParsedEmail>,
     pub normalized_message: Option<NormalizedInboundMessage>,
     pub task_id: Option<Uuid>,
     #[serde(default)]
-    pub workflow_matches: Vec<WorkflowMatch>,
+    pub channel_matches: Vec<ChannelMatch>,
     #[serde(default)]
     pub bounce_info: Option<BounceInfo>,
 }
@@ -1285,11 +1453,11 @@ impl InboundIngestResult {
             thread: None,
             inbound_message: None,
             company: None,
-            workflow: None,
+            channel: None,
             parsed_email: None,
             normalized_message: None,
             task_id: None,
-            workflow_matches: Vec::new(),
+            channel_matches: Vec::new(),
             bounce_info: None,
         }
     }
@@ -1301,11 +1469,11 @@ impl InboundIngestResult {
             thread: None,
             inbound_message: None,
             company: None,
-            workflow: None,
+            channel: None,
             parsed_email: None,
             normalized_message: None,
             task_id: None,
-            workflow_matches: Vec::new(),
+            channel_matches: Vec::new(),
             bounce_info: Some(bounce),
         }
     }
@@ -1373,7 +1541,16 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> {
+        async fn create(
+            &self,
+            _user_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
             unimplemented!()
         }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> {
@@ -1391,7 +1568,16 @@ mod tests {
         async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
             unimplemented!()
         }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> {
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
@@ -1401,25 +1587,35 @@ mod tests {
             let members = self.team_members.lock().unwrap();
             let clean = email.trim().to_lowercase();
             if members.is_empty() {
-                if clean.contains("spammer") || clean.contains("unauthorized") || clean.contains("evil") || clean.contains("notallowed") {
+                if clean.contains("spammer")
+                    || clean.contains("unauthorized")
+                    || clean.contains("evil")
+                    || clean.contains("notallowed")
+                {
                     return Ok(false);
                 }
                 return Ok(true);
             }
-            Ok(members.iter().any(|(cid, e)| *cid == company_id && e.eq_ignore_ascii_case(&clean)))
+            Ok(members
+                .iter()
+                .any(|(cid, e)| *cid == company_id && e.eq_ignore_ascii_case(&clean)))
         }
         async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>> {
             let members = self.team_members.lock().unwrap();
-            Ok(members.iter().filter(|(cid, _)| *cid == company_id).map(|(_, e)| e.clone()).collect())
+            Ok(members
+                .iter()
+                .filter(|(cid, _)| *cid == company_id)
+                .map(|(_, e)| e.clone())
+                .collect())
         }
     }
 
-    struct MockWorkflowPersistence {
-        workflows: Mutex<Vec<Channel>>,
+    struct MockChannelPersistence {
+        channels: Mutex<Vec<Channel>>,
     }
 
     #[async_trait]
-    impl ChannelPersistence for MockWorkflowPersistence {
+    impl ChannelPersistence for MockChannelPersistence {
         async fn create(
             &self,
             _company_id: Uuid,
@@ -1440,19 +1636,19 @@ mod tests {
         async fn get_by_company_slug_and_channel_slug(
             &self,
             _company_slug: &str,
-            workflow_slug: &str,
+            channel_slug: &str,
         ) -> AppResult<Option<Channel>> {
             Ok(self
-                .workflows
+                .channels
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|w| w.slug == workflow_slug)
+                .find(|w| w.slug == channel_slug)
                 .cloned())
         }
         async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(self
-                .workflows
+                .channels
                 .lock()
                 .unwrap()
                 .iter()
@@ -1488,13 +1684,13 @@ mod tests {
     impl ThreadPersistence for MockThreadPersistence {
         async fn create_thread(
             &self,
-            workflow_id: Uuid,
+            channel_id: Uuid,
             subject: &str,
             participant_emails: &[String],
         ) -> AppResult<Thread> {
             let thread = Thread {
                 id: Uuid::new_v4(),
-                channel_id: workflow_id,
+                channel_id,
                 subject: subject.to_string(),
                 participant_emails: participant_emails.to_vec(),
                 created_at: Utc::now().naive_utc(),
@@ -1607,7 +1803,7 @@ mod tests {
         async fn enqueue_task(
             &self,
             company_id: Uuid,
-            workflow_id: Uuid,
+            channel_id: Uuid,
             thread_id: Option<Uuid>,
             task_type: &str,
             payload: serde_json::Value,
@@ -1615,7 +1811,7 @@ mod tests {
             let task = crate::entities::task::BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
-                channel_id: workflow_id,
+                channel_id,
                 thread_id,
                 task_type: task_type.to_string(),
                 status: crate::entities::task::TaskStatus::Pending,
@@ -1644,11 +1840,7 @@ mod tests {
                 .cloned())
         }
 
-        async fn update_task_payload(
-            &self,
-            id: Uuid,
-            payload: serde_json::Value,
-        ) -> AppResult<()> {
+        async fn update_task_payload(&self, id: Uuid, payload: serde_json::Value) -> AppResult<()> {
             let mut list = self.tasks.lock().unwrap();
             if let Some(t) = list.iter_mut().find(|t| t.id == id) {
                 t.payload = payload;
@@ -1672,7 +1864,10 @@ mod tests {
 
         async fn mark_task_processing(&self, id: Uuid) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id && t.status == crate::entities::task::TaskStatus::Pending) {
+            if let Some(t) = list
+                .iter_mut()
+                .find(|t| t.id == id && t.status == crate::entities::task::TaskStatus::Pending)
+            {
                 t.status = crate::entities::task::TaskStatus::Processing;
                 Ok(true)
             } else {
@@ -1721,7 +1916,11 @@ mod tests {
             Ok(t.clone())
         }
 
-        async fn update_task_status(&self, id: Uuid, status: crate::entities::task::TaskStatus) -> AppResult<crate::entities::task::BackgroundTask> {
+        async fn update_task_status(
+            &self,
+            id: Uuid,
+            status: crate::entities::task::TaskStatus,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
             let t = list.iter_mut().find(|t| t.id == id).unwrap();
             t.status = status;
@@ -1731,7 +1930,7 @@ mod tests {
         async fn list_company_tasks(
             &self,
             company_id: Uuid,
-            workflow_id: Option<Uuid>,
+            channel_id: Option<Uuid>,
             status: Option<crate::entities::task::TaskStatus>,
             _sort_asc: bool,
         ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
@@ -1741,7 +1940,7 @@ mod tests {
                 .unwrap()
                 .iter()
                 .filter(|t| t.company_id == company_id)
-                .filter(|t| workflow_id.map_or(true, |w_id| t.channel_id == w_id))
+                .filter(|t| channel_id.map_or(true, |w_id| t.channel_id == w_id))
                 .filter(|t| status.as_ref().map_or(true, |s| t.status == *s))
                 .cloned()
                 .collect())
@@ -1749,25 +1948,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_inter_workflow_hop_limit_rejection() {
+    async fn test_inter_channel_hop_limit_rejection() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
-                api_key: None,
-                provider: None,
-                model: None,
-                enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
-            }]));
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![Workflow {
-                id: workflow_id,
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
+                id: channel_id,
                 company_id,
                 name: "Inbound Flow".to_string(),
                 slug: "inbound".to_string(),
@@ -1817,7 +2016,7 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence,
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config,
@@ -1826,10 +2025,10 @@ mod tests {
         let raw_payload = RawInboundPayload {
             to: "inbound@acme.mailagents.com".to_string(),
             from: "other_wf@acme.mailagents.com".to_string(),
-            subject: Some("Test Inter Workflow".to_string()),
+            subject: Some("Test Inter Channel".to_string()),
             text: Some("Hello".to_string()),
             headers: Some(format!(
-                "X-MailAgents-Workflow-ID: {}\nX-MailAgents-Hop-Count: 5\n",
+                "X-MailAgents-Channel-ID: {}\nX-MailAgents-Hop-Count: 5\n",
                 Uuid::new_v4()
             )),
             ..Default::default()
@@ -1842,30 +2041,30 @@ mod tests {
         assert!(!result.accepted);
         assert_eq!(
             result.reason.as_deref(),
-            Some("Max inter-workflow hop count reached")
+            Some("Max inter-channel hop count reached")
         );
     }
 
     #[tokio::test]
     async fn test_spf_authentication_failure_rejection() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
-                api_key: None,
-                provider: None,
-                model: None,
-                enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
-            }]));
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![Workflow {
-                id: workflow_id,
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
+                id: channel_id,
                 company_id,
                 name: "Inbound Flow".to_string(),
                 slug: "inbound".to_string(),
@@ -1915,7 +2114,7 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence,
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config,
@@ -1941,23 +2140,23 @@ mod tests {
     #[tokio::test]
     async fn test_high_spam_score_rejection() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
-                api_key: None,
-                provider: None,
-                model: None,
-                enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
-            }]));
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![Workflow {
-                id: workflow_id,
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
+                id: channel_id,
                 company_id,
                 name: "Inbound Flow".to_string(),
                 slug: "inbound".to_string(),
@@ -2007,7 +2206,7 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence,
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config,
@@ -2027,29 +2226,32 @@ mod tests {
             .await
             .unwrap();
         assert!(!result.accepted);
-        assert_eq!(result.reason.as_deref(), Some("Spam score threshold exceeded"));
+        assert_eq!(
+            result.reason.as_deref(),
+            Some("Spam score threshold exceeded")
+        );
     }
 
     #[tokio::test]
     async fn test_dmarc_authentication_failure_rejection() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
-                api_key: None,
-                provider: None,
-                model: None,
-                enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
-            }]));
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![Workflow {
-                id: workflow_id,
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
+                id: channel_id,
                 company_id,
                 name: "Inbound Flow".to_string(),
                 slug: "inbound".to_string(),
@@ -2099,7 +2301,7 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence,
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config,
@@ -2119,29 +2321,32 @@ mod tests {
             .await
             .unwrap();
         assert!(!result.accepted);
-        assert_eq!(result.reason.as_deref(), Some("DMARC authentication failed"));
+        assert_eq!(
+            result.reason.as_deref(),
+            Some("DMARC authentication failed")
+        );
     }
 
     #[tokio::test]
     async fn test_unauthorized_sender_blocked_before_spam_checks() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
-                api_key: None,
-                provider: None,
-                model: None,
-                enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
-            }]));
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![Workflow {
-                id: workflow_id,
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
+                id: channel_id,
                 company_id,
                 name: "Restricted Flow".to_string(),
                 slug: "restricted".to_string(),
@@ -2191,7 +2396,7 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence,
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config,
@@ -2214,30 +2419,30 @@ mod tests {
         assert!(!result.accepted);
         assert_eq!(
             result.reason.as_deref(),
-            Some("Sender unauthorized for workflow")
+            Some("Sender unauthorized for channel")
         );
     }
 
     #[tokio::test]
     async fn test_participant_sender_bypasses_spam_checks() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
-                api_key: None,
-                provider: None,
-                model: None,
-                enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
-            }]));
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![Workflow {
-                id: workflow_id,
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
+                id: channel_id,
                 company_id,
                 name: "Restricted Flow".to_string(),
                 slug: "restricted".to_string(),
@@ -2287,7 +2492,7 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence,
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config,
@@ -2313,25 +2518,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_workflow_in_cc_resolves_properly() {
+    async fn test_channel_in_cc_resolves_properly() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
-                api_key: None,
-                provider: None,
-                model: None,
-                enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
-            }]));
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![Workflow {
-                id: workflow_id,
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
+                id: channel_id,
                 company_id,
                 name: "Support Flow".to_string(),
                 slug: "support".to_string(),
@@ -2381,7 +2586,7 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence,
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config,
@@ -2402,31 +2607,31 @@ mod tests {
             .unwrap();
 
         assert!(result.accepted);
-        assert_eq!(result.workflow_matches.len(), 1);
-        assert_eq!(result.workflow_matches[0].recipient_role, RecipientRole::Cc);
+        assert_eq!(result.channel_matches.len(), 1);
+        assert_eq!(result.channel_matches[0].recipient_role, RecipientRole::Cc);
     }
 
     #[tokio::test]
-    async fn test_multi_workflow_to_and_cc_execution() {
+    async fn test_multi_channel_to_and_cc_execution() {
         let company_id = Uuid::new_v4();
         let wf1_id = Uuid::new_v4();
         let wf2_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
-                api_key: None,
-                provider: None,
-                model: None,
-                enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
-            }]));
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![
-                Workflow {
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![
+                Channel {
                     id: wf1_id,
                     company_id,
                     name: "Support".to_string(),
@@ -2439,7 +2644,7 @@ mod tests {
                     channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
-                Workflow {
+                Channel {
                     id: wf2_id,
                     company_id,
                     name: "Billing".to_string(),
@@ -2491,7 +2696,7 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence.clone(),
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config,
@@ -2512,13 +2717,13 @@ mod tests {
             .unwrap();
 
         assert!(ingest.accepted);
-        assert_eq!(ingest.workflow_matches.len(), 2);
-        assert_eq!(ingest.workflow_matches[0].workflow.slug, "support");
-        assert_eq!(ingest.workflow_matches[0].recipient_role, RecipientRole::To);
-        assert_eq!(ingest.workflow_matches[1].workflow.slug, "billing");
-        assert_eq!(ingest.workflow_matches[1].recipient_role, RecipientRole::Cc);
+        assert_eq!(ingest.channel_matches.len(), 2);
+        assert_eq!(ingest.channel_matches[0].channel.slug, "support");
+        assert_eq!(ingest.channel_matches[0].recipient_role, RecipientRole::To);
+        assert_eq!(ingest.channel_matches[1].channel.slug, "billing");
+        assert_eq!(ingest.channel_matches[1].recipient_role, RecipientRole::Cc);
 
-        // Verify thread creation for both workflows
+        // Verify thread creation for both channels
         let threads = thread_persistence.threads.lock().unwrap();
         assert_eq!(threads.len(), 2);
     }
@@ -2531,20 +2736,20 @@ mod tests {
         let wf3_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
-                api_key: None,
-                provider: None,
-                model: None,
-                enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
-            }]));
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![
-                Workflow {
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![
+                Channel {
                     id: wf1_id,
                     company_id,
                     name: "Support".to_string(),
@@ -2557,7 +2762,7 @@ mod tests {
                     channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
-                Workflow {
+                Channel {
                     id: wf2_id,
                     company_id,
                     name: "Billing".to_string(),
@@ -2570,7 +2775,7 @@ mod tests {
                     channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
-                Workflow {
+                Channel {
                     id: wf3_id,
                     company_id,
                     name: "Legal".to_string(),
@@ -2622,7 +2827,7 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence.clone(),
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config,
@@ -2642,39 +2847,39 @@ mod tests {
             .unwrap();
 
         assert!(ingest.accepted);
-        assert_eq!(ingest.workflow_matches.len(), 3);
-        assert_eq!(ingest.workflow_matches[0].workflow.slug, "support");
-        assert_eq!(ingest.workflow_matches[0].step_index, 0);
-        assert_eq!(ingest.workflow_matches[0].total_steps, 3);
-        assert_eq!(ingest.workflow_matches[1].workflow.slug, "billing");
-        assert_eq!(ingest.workflow_matches[1].step_index, 1);
-        assert_eq!(ingest.workflow_matches[2].workflow.slug, "legal");
-        assert_eq!(ingest.workflow_matches[2].step_index, 2);
+        assert_eq!(ingest.channel_matches.len(), 3);
+        assert_eq!(ingest.channel_matches[0].channel.slug, "support");
+        assert_eq!(ingest.channel_matches[0].step_index, 0);
+        assert_eq!(ingest.channel_matches[0].total_steps, 3);
+        assert_eq!(ingest.channel_matches[1].channel.slug, "billing");
+        assert_eq!(ingest.channel_matches[1].step_index, 1);
+        assert_eq!(ingest.channel_matches[2].channel.slug, "legal");
+        assert_eq!(ingest.channel_matches[2].step_index, 2);
 
-        // Verify threads were created for all 3 step workflows
+        // Verify threads were created for all 3 step channels
         let threads = thread_persistence.threads.lock().unwrap();
         assert_eq!(threads.len(), 3);
     }
 
     #[tokio::test]
-    async fn test_misspelled_workflow_bounce_and_strict_pipeline_validation() {
+    async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         let company_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
-                api_key: None,
-                provider: None,
-                model: None,
-                enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
-            }]));
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![
-                Workflow {
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![
+                Channel {
                     id: Uuid::new_v4(),
                     company_id,
                     name: "Support".to_string(),
@@ -2687,7 +2892,7 @@ mod tests {
                     channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
-                Workflow {
+                Channel {
                     id: Uuid::new_v4(),
                     company_id,
                     name: "Billing".to_string(),
@@ -2739,7 +2944,7 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence.clone(),
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config,
@@ -2760,7 +2965,10 @@ mod tests {
             .unwrap();
 
         assert!(!ingest_single.accepted);
-        assert_eq!(ingest_single.reason.as_deref(), Some("Workflow address not found or misspelled"));
+        assert_eq!(
+            ingest_single.reason.as_deref(),
+            Some("Channel address not found or misspelled")
+        );
         let bounce_single = ingest_single.bounce_info.unwrap();
         assert_eq!(bounce_single.invalid_slugs, vec!["suppport"]);
         assert_eq!(bounce_single.suggestions[0].suggestions, vec!["support"]);
@@ -2793,23 +3001,23 @@ mod tests {
     #[tokio::test]
     async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
-                api_key: None,
-                provider: None,
-                model: None,
-                enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
-            }]));
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![Workflow {
-                id: workflow_id,
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
+                id: channel_id,
                 company_id,
                 name: "Support".to_string(),
                 slug: "support".to_string(),
@@ -2859,7 +3067,7 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence.clone(),
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config,
@@ -2894,7 +3102,9 @@ mod tests {
             from: "customer@client.com".to_string(),
             subject: Some("Re: New Ticket with Quotes".to_string()),
             text: Some(msg2_text.to_string()),
-            headers: Some("Message-ID: <msg2@client.com>\nIn-Reply-To: <msg1@client.com>\n".to_string()),
+            headers: Some(
+                "Message-ID: <msg2@client.com>\nIn-Reply-To: <msg1@client.com>\n".to_string(),
+            ),
             ..Default::default()
         };
 
@@ -2951,9 +3161,9 @@ mod tests {
         let flow_public = Uuid::new_v4();
         let flow_explicit = Uuid::new_v4();
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![
-                Workflow {
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![
+                Channel {
                     id: flow_team_only,
                     company_id,
                     name: "Team Only".to_string(),
@@ -2966,7 +3176,7 @@ mod tests {
                     channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
-                Workflow {
+                Channel {
                     id: flow_public,
                     company_id,
                     name: "Public Flow".to_string(),
@@ -2979,7 +3189,7 @@ mod tests {
                     channel_config: None,
                     created_at: Utc::now().naive_utc(),
                 },
-                Workflow {
+                Channel {
                     id: flow_explicit,
                     company_id,
                     name: "Explicit Flow".to_string(),
@@ -3031,68 +3241,89 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence,
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence,
             config,
         );
 
         // 1. Team-only flow: Team member accepted
-        let res1 = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
-            to: "team-only@acme.mailagents.com".to_string(),
-            from: "team_member@acme.com".to_string(),
-            subject: Some("Team msg".to_string()),
-            text: Some("Hello team".to_string()),
-            ..Default::default()
-        }).await.unwrap();
+        let res1 = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                to: "team-only@acme.mailagents.com".to_string(),
+                from: "team_member@acme.com".to_string(),
+                subject: Some("Team msg".to_string()),
+                text: Some("Hello team".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
         assert!(res1.accepted);
 
         // 2. Team-only flow: External sender rejected
-        let res2 = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
-            to: "team-only@acme.mailagents.com".to_string(),
-            from: "external@other.com".to_string(),
-            subject: Some("External msg".to_string()),
-            text: Some("Hello team".to_string()),
-            ..Default::default()
-        }).await.unwrap();
+        let res2 = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                to: "team-only@acme.mailagents.com".to_string(),
+                from: "external@other.com".to_string(),
+                subject: Some("External msg".to_string()),
+                text: Some("Hello team".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
         assert!(!res2.accepted);
-        assert_eq!(res2.reason.as_deref(), Some("Sender unauthorized for workflow"));
+        assert_eq!(
+            res2.reason.as_deref(),
+            Some("Sender unauthorized for channel")
+        );
 
         // 3. Public flow: External sender accepted
-        let res3 = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
-            to: "public-flow@acme.mailagents.com".to_string(),
-            from: "external@other.com".to_string(),
-            subject: Some("Public msg".to_string()),
-            text: Some("Hello public".to_string()),
-            ..Default::default()
-        }).await.unwrap();
+        let res3 = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                to: "public-flow@acme.mailagents.com".to_string(),
+                from: "external@other.com".to_string(),
+                subject: Some("Public msg".to_string()),
+                text: Some("Hello public".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
         assert!(res3.accepted);
 
         // 4. Explicit list flow: Allowed sender accepted, non-allowed rejected
-        let res4 = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
-            to: "explicit-flow@acme.mailagents.com".to_string(),
-            from: "allowed@external.com".to_string(),
-            subject: Some("Explicit allowed".to_string()),
-            text: Some("Hello allowed".to_string()),
-            ..Default::default()
-        }).await.unwrap();
+        let res4 = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                to: "explicit-flow@acme.mailagents.com".to_string(),
+                from: "allowed@external.com".to_string(),
+                subject: Some("Explicit allowed".to_string()),
+                text: Some("Hello allowed".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
         assert!(res4.accepted);
 
-        let res5 = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
-            to: "explicit-flow@acme.mailagents.com".to_string(),
-            from: "notallowed@external.com".to_string(),
-            subject: Some("Explicit blocked".to_string()),
-            text: Some("Hello blocked".to_string()),
-            ..Default::default()
-        }).await.unwrap();
+        let res5 = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                to: "explicit-flow@acme.mailagents.com".to_string(),
+                from: "notallowed@external.com".to_string(),
+                subject: Some("Explicit blocked".to_string()),
+                text: Some("Hello blocked".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
         assert!(!res5.accepted);
-        assert_eq!(res5.reason.as_deref(), Some("Sender unauthorized for workflow"));
+        assert_eq!(
+            res5.reason.as_deref(),
+            Some("Sender unauthorized for channel")
+        );
     }
 
     #[tokio::test]
     async fn test_sender_verification_and_delegation_target_check() {
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
             id: company_id,
@@ -3106,9 +3337,9 @@ mod tests {
             created_at: Utc::now().naive_utc(),
         }]));
 
-        let workflow_persistence = Arc::new(MockWorkflowPersistence {
-            workflows: Mutex::new(vec![Workflow {
-                id: workflow_id,
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
+                id: channel_id,
                 company_id,
                 name: "Support".to_string(),
                 slug: "support".to_string(),
@@ -3158,21 +3389,24 @@ mod tests {
 
         let thread_use_cases = ThreadUseCases::new(
             thread_persistence,
-            workflow_persistence,
+            channel_persistence,
             company_persistence,
             task_persistence.clone(),
             config,
         );
 
         // 1. Initial email from client creates thread
-        let res1 = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
-            headers: Some("Message-ID: <msg-client-1@external.com>\n".to_string()),
-            to: "support@acme.mailagents.com".to_string(),
-            from: "client@external.com".to_string(),
-            subject: Some("Need quote".to_string()),
-            text: Some("Can I get a quote?".to_string()),
-            ..Default::default()
-        }).await.unwrap();
+        let res1 = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                headers: Some("Message-ID: <msg-client-1@external.com>\n".to_string()),
+                to: "support@acme.mailagents.com".to_string(),
+                from: "client@external.com".to_string(),
+                subject: Some("Need quote".to_string()),
+                text: Some("Can I get a quote?".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
         assert!(res1.accepted);
         let thread_id = res1.thread.unwrap().id;
 
@@ -3186,13 +3420,16 @@ mod tests {
                 }
             ]
         });
-        let task = task_persistence.enqueue_task(
-            company_id,
-            workflow_id,
-            Some(thread_id),
-            "email_agent_dispatch",
-            delegation_payload,
-        ).await.unwrap();
+        let task = task_persistence
+            .enqueue_task(
+                company_id,
+                channel_id,
+                Some(thread_id),
+                "email_agent_dispatch",
+                delegation_payload,
+            )
+            .await
+            .unwrap();
 
         let mut list = task_persistence.tasks.lock().unwrap();
         if let Some(t) = list.iter_mut().find(|t| t.id == task.id) {
@@ -3228,7 +3465,216 @@ mod tests {
         assert!(res_vendor.accepted);
 
         // Verify task was resumed to Pending
-        let resumed_task = task_persistence.get_task_by_id(task.id).await.unwrap().unwrap();
-        assert_eq!(resumed_task.status, crate::entities::task::TaskStatus::Pending);
+        let resumed_task = task_persistence
+            .get_task_by_id(task.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            resumed_task.status,
+            crate::entities::task::TaskStatus::Pending
+        );
+    }
+
+    #[tokio::test]
+    async fn test_third_party_thread_participants_addition_and_authorization() {
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+
+        let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
+            vec![Company {
+                id: company_id,
+                user_id: Uuid::new_v4(),
+                name: "Acme Corp".to_string(),
+                slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                enable_llm_spam_guardrail: None,
+                created_at: Utc::now().naive_utc(),
+            }],
+            vec![(company_id, "team@acme.com".to_string())],
+        ));
+
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
+                id: channel_id,
+                company_id,
+                name: "Support Channel".to_string(),
+                slug: "support".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                participant_emails: None, // Default = company team members
+                agent_ids: None,
+                channel_config: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        });
+
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+
+        let thread_use_cases = ThreadUseCases::new(
+            thread_persistence.clone(),
+            channel_persistence,
+            company_persistence,
+            task_persistence,
+            config,
+        );
+
+        // 1. Team member (workflow participant) sends email to channel with third-party in CC
+        let res1 = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                headers: Some("Message-ID: <msg-team-1@acme.com>\n".to_string()),
+                to: "support@acme.mailagents.com".to_string(),
+                cc: Some("client@external.com".to_string()),
+                from: "team@acme.com".to_string(),
+                subject: Some("Client Inquiry".to_string()),
+                text: Some("Adding third-party client to thread".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        assert!(res1.accepted);
+        let thread = res1.thread.unwrap();
+        assert!(thread
+            .participant_emails
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case("client@external.com")));
+
+        // 2. Third-party client replies to thread -> ACCEPTED because they were added to thread participants
+        let res_reply = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                headers: Some(
+                    "Message-ID: <msg-client-reply-1@external.com>\nIn-Reply-To: <msg-team-1@acme.com>\n"
+                        .to_string(),
+                ),
+                to: "support@acme.mailagents.com".to_string(),
+                from: "client@external.com".to_string(),
+                subject: Some("Re: Client Inquiry".to_string()),
+                text: Some("Thanks for adding me".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        assert!(res_reply.accepted);
+
+        // 3. Third-party client tries to send a NEW email to channel without thread reference -> REJECTED
+        let res_unauth = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                headers: Some("Message-ID: <msg-client-new-1@external.com>\n".to_string()),
+                to: "support@acme.mailagents.com".to_string(),
+                from: "client@external.com".to_string(),
+                subject: Some("Unrelated Subject".to_string()),
+                text: Some("Starting a new conversation".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        assert!(!res_unauth.accepted);
+        assert_eq!(
+            res_unauth.reason.as_deref(),
+            Some("Sender unauthorized for channel")
+        );
+
+        // 4. Team member replies to existing thread, adding another third party (vendor@supplier.com) in To
+        let res_expand = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                headers: Some(
+                    "Message-ID: <msg-team-2@acme.com>\nIn-Reply-To: <msg-team-1@acme.com>\n"
+                        .to_string(),
+                ),
+                to: "support@acme.mailagents.com, vendor@supplier.com".to_string(),
+                from: "team@acme.com".to_string(),
+                subject: Some("Re: Client Inquiry".to_string()),
+                text: Some("Looping in supplier".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        assert!(res_expand.accepted);
+        let updated_thread = res_expand.thread.unwrap();
+        assert!(updated_thread
+            .participant_emails
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case("vendor@supplier.com")));
+
+        // 5. vendor@supplier.com replies to thread -> ACCEPTED
+        let res_vendor_reply = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                headers: Some(
+                    "Message-ID: <msg-vendor-reply-1@supplier.com>\nIn-Reply-To: <msg-team-2@acme.com>\n"
+                        .to_string(),
+                ),
+                to: "support@acme.mailagents.com".to_string(),
+                from: "vendor@supplier.com".to_string(),
+                subject: Some("Re: Client Inquiry".to_string()),
+                text: Some("Vendor here".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        assert!(res_vendor_reply.accepted);
+
+        // 6. External non-team-member (client@external.com) replies and tries to CC unauthorized@other.com -> unauthorized@other.com is NOT added
+        let res_external_cc = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                headers: Some(
+                    "Message-ID: <msg-client-reply-2@external.com>\nIn-Reply-To: <msg-team-1@acme.com>\n"
+                        .to_string(),
+                ),
+                to: "support@acme.mailagents.com".to_string(),
+                cc: Some("unauthorized@other.com".to_string()),
+                from: "client@external.com".to_string(),
+                subject: Some("Re: Client Inquiry".to_string()),
+                text: Some("Adding random CC".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        assert!(res_external_cc.accepted);
+        let current_thread = res_external_cc.thread.unwrap();
+        assert!(!current_thread
+            .participant_emails
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case("unauthorized@other.com")));
     }
 }

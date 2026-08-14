@@ -8,7 +8,7 @@ use crate::{
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
         company::CompanyUseCases, company_invite::CompanyInviteUseCases, thread::ThreadUseCases,
-        user::UserUseCases, workflow::WorkflowUseCases,
+        user::UserUseCases,
     },
 };
 
@@ -20,7 +20,6 @@ pub struct AppState {
     pub company_use_cases: Arc<CompanyUseCases>,
     pub company_invite_use_cases: Arc<CompanyInviteUseCases>,
     pub channel_use_cases: Arc<ChannelUseCases>,
-    pub workflow_use_cases: Arc<WorkflowUseCases>,
     pub agent_use_cases: Arc<AgentUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
     pub approval_use_cases: Arc<ApprovalUseCases>,

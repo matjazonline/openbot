@@ -1,11 +1,9 @@
-use std::sync::Arc;
 use chrono::Utc;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::{
-        approval::ApprovalPersistence, task::TaskPersistence,
-    },
+    adapters::persistence::{approval::ApprovalPersistence, task::TaskPersistence},
     app_error::{AppError, AppResult},
     entities::{
         approval::{ApprovalStatus, HumanApproval},
@@ -54,9 +52,9 @@ impl ApprovalUseCases {
     pub async fn create_and_send_approval_request(
         &self,
         company_id: Uuid,
-        workflow_id: Uuid,
-        workflow_name: &str,
-        workflow_slug: &str,
+        channel_id: Uuid,
+        channel_name: &str,
+        channel_slug: &str,
         company_slug: &str,
         thread_id: Option<Uuid>,
         task_id: Option<Uuid>,
@@ -74,7 +72,7 @@ impl ApprovalUseCases {
             .approval_persistence
             .create_approval(
                 company_id,
-                workflow_id,
+                channel_id,
                 thread_id,
                 task_id,
                 step_key,
@@ -94,19 +92,19 @@ impl ApprovalUseCases {
         let reject_url = format!("http://{}/approvals/{}?action=reject", domain, token);
 
         let body_text = format!(
-            "Action Approval Requested for Workflow '{}'\n\n\
+            "Action Approval Requested for Channel '{}'\n\n\
              Action: {}\n\
              Summary: {}\n\n\
              Click to CONFIRM:\n{}\n\n\
              Click to REJECT:\n{}\n\n\
              This link is valid for 24 hours.",
-            workflow_name, action_title, action_summary, confirm_url, reject_url
+            channel_name, action_title, action_summary, confirm_url, reject_url
         );
 
         let email = OutboundEmail {
-            workflow_id,
-            workflow_name: workflow_name.to_string(),
-            workflow_slug: workflow_slug.to_string(),
+            channel_id,
+            channel_name: channel_name.to_string(),
+            channel_slug: channel_slug.to_string(),
             company_slug: company_slug.to_string(),
             trigger_message_id: format!("<approval-{}@{}>", approval.id, domain),
             thread_references: vec![],
@@ -115,7 +113,7 @@ impl ApprovalUseCases {
             subject: format!("[APPROVAL REQUIRED] {}", action_title),
             body_text,
             hop_count: 0,
-            trace_workflows: vec![workflow_id],
+            trace_channels: vec![channel_id],
         };
 
         let _ = OutboundDispatcher::send(&self.config, email).await;
@@ -168,14 +166,11 @@ impl ApprovalUseCases {
 
         let normalized_action = action.to_lowercase();
         let new_status = match normalized_action.as_str() {
-            "confirm" | "approved" | "approve" | "proceed_partial" | "extend_24h" | "extend_48h" | "extend" => {
-                ApprovalStatus::Approved
-            }
+            "confirm" | "approved" | "approve" | "proceed_partial" | "extend_24h"
+            | "extend_48h" | "extend" => ApprovalStatus::Approved,
             "reject" | "rejected" => ApprovalStatus::Rejected,
             _ => {
-                return Err(AppError::Internal(
-                    format!("Invalid action '{}'.", action),
-                ));
+                return Err(AppError::Internal(format!("Invalid action '{}'.", action)));
             }
         };
 
@@ -191,10 +186,16 @@ impl ApprovalUseCases {
                         let mut payload = task.payload.clone();
                         if let Some(q) = payload.get_mut("quorum_outreach") {
                             if let Some(obj) = q.as_object_mut() {
-                                obj.insert("status".to_string(), serde_json::json!("proceed_partial"));
+                                obj.insert(
+                                    "status".to_string(),
+                                    serde_json::json!("proceed_partial"),
+                                );
                             }
                         }
-                        let _ = self.task_persistence.update_task_payload(task_id, payload).await;
+                        let _ = self
+                            .task_persistence
+                            .update_task_payload(task_id, payload)
+                            .await;
                     }
                     let _ = self.task_persistence.resume_task(task_id).await;
                 }
@@ -203,7 +204,10 @@ impl ApprovalUseCases {
                     let sys_msg = Message {
                         id: Uuid::new_v4(),
                         thread_id,
-                        message_id: format!("<quorum-partial-{}@{}>", approval.id, self.config.app_domain_name),
+                        message_id: format!(
+                            "<quorum-partial-{}@{}>",
+                            approval.id, self.config.app_domain_name
+                        ),
                         in_reply_to: None,
                         references_list: vec![],
                         sender: approval.approver_email.clone(),
@@ -226,27 +230,44 @@ impl ApprovalUseCases {
                 }
 
                 format!(
-                    "✓ Action '{}' confirmed: Proceeding with partial data. Workflows resumed.",
+                    "✓ Action '{}' confirmed: Proceeding with partial data. Channels resumed.",
                     approval.action_title
                 )
             }
             "extend_24h" | "extend_48h" | "extend" => {
-                let extend_hours = if normalized_action.contains("48") { 48 } else { 24 };
+                let extend_hours = if normalized_action.contains("48") {
+                    48
+                } else {
+                    24
+                };
                 if let Some(task_id) = approval.task_id {
                     if let Ok(Some(task)) = self.task_persistence.get_task_by_id(task_id).await {
                         let mut payload = task.payload.clone();
                         if let Some(q) = payload.get_mut("quorum_outreach") {
                             if let Some(obj) = q.as_object_mut() {
-                                let new_exp = Utc::now().naive_utc() + chrono::Duration::hours(extend_hours);
-                                obj.insert("expires_at".to_string(), serde_json::json!(new_exp.to_string()));
-                                obj.insert("status".to_string(), serde_json::json!("awaiting_quorum"));
+                                let new_exp =
+                                    Utc::now().naive_utc() + chrono::Duration::hours(extend_hours);
+                                obj.insert(
+                                    "expires_at".to_string(),
+                                    serde_json::json!(new_exp.to_string()),
+                                );
+                                obj.insert(
+                                    "status".to_string(),
+                                    serde_json::json!("awaiting_quorum"),
+                                );
                             }
                         }
-                        let _ = self.task_persistence.update_task_payload(task_id, payload).await;
+                        let _ = self
+                            .task_persistence
+                            .update_task_payload(task_id, payload)
+                            .await;
                     }
                     let _ = self
                         .task_persistence
-                        .update_task_status(task_id, crate::entities::task::TaskStatus::WaitingForThirdPartyReply)
+                        .update_task_status(
+                            task_id,
+                            crate::entities::task::TaskStatus::WaitingForThirdPartyReply,
+                        )
                         .await;
                 }
 
@@ -254,7 +275,10 @@ impl ApprovalUseCases {
                     let sys_msg = Message {
                         id: Uuid::new_v4(),
                         thread_id,
-                        message_id: format!("<quorum-extended-{}@{}>", approval.id, self.config.app_domain_name),
+                        message_id: format!(
+                            "<quorum-extended-{}@{}>",
+                            approval.id, self.config.app_domain_name
+                        ),
                         in_reply_to: None,
                         references_list: vec![],
                         sender: approval.approver_email.clone(),
@@ -293,7 +317,10 @@ impl ApprovalUseCases {
                         let sys_msg = Message {
                             id: Uuid::new_v4(),
                             thread_id,
-                            message_id: format!("<approval-granted-{}@{}>", approval.id, self.config.app_domain_name),
+                            message_id: format!(
+                                "<approval-granted-{}@{}>",
+                                approval.id, self.config.app_domain_name
+                            ),
                             in_reply_to: None,
                             references_list: vec![],
                             sender: approval.approver_email.clone(),
@@ -316,7 +343,7 @@ impl ApprovalUseCases {
                     }
 
                     format!(
-                        "✓ Action '{}' has been CONFIRMED successfully. Associated automated workflows have been resumed.",
+                        "✓ Action '{}' has been CONFIRMED successfully. Associated automated channels have been resumed.",
                         approval.action_title
                     )
                 }
@@ -331,7 +358,10 @@ impl ApprovalUseCases {
                         let sys_msg = Message {
                             id: Uuid::new_v4(),
                             thread_id,
-                            message_id: format!("<approval-rejected-{}@{}>", approval.id, self.config.app_domain_name),
+                            message_id: format!(
+                                "<approval-rejected-{}@{}>",
+                                approval.id, self.config.app_domain_name
+                            ),
                             in_reply_to: None,
                             references_list: vec![],
                             sender: approval.approver_email.clone(),
@@ -354,7 +384,7 @@ impl ApprovalUseCases {
                     }
 
                     format!(
-                        "✗ Action '{}' has been REJECTED. The automated workflow task has been cancelled.",
+                        "✗ Action '{}' has been REJECTED. The automated channel task has been cancelled.",
                         approval.action_title
                     )
                 }
@@ -365,13 +395,13 @@ impl ApprovalUseCases {
         Ok((updated, message_text))
     }
 
-    pub async fn list_workflow_approvals(
+    pub async fn list_channel_approvals(
         &self,
         company_id: Uuid,
-        workflow_id: Uuid,
+        channel_id: Uuid,
     ) -> AppResult<Vec<HumanApproval>> {
         self.approval_persistence
-            .list_approvals_by_workflow(company_id, workflow_id)
+            .list_approvals_by_channel(company_id, channel_id)
             .await
     }
 }
@@ -391,7 +421,7 @@ mod tests {
         async fn create_approval(
             &self,
             company_id: Uuid,
-            workflow_id: Uuid,
+            channel_id: Uuid,
             thread_id: Option<Uuid>,
             task_id: Option<Uuid>,
             step_key: &str,
@@ -406,7 +436,7 @@ mod tests {
             let approval = HumanApproval {
                 id: Uuid::new_v4(),
                 company_id,
-                channel_id: workflow_id,
+                channel_id: channel_id,
                 thread_id,
                 task_id,
                 step_key: step_key.to_string(),
@@ -461,17 +491,17 @@ mod tests {
             Ok(approval.clone())
         }
 
-        async fn list_approvals_by_workflow(
+        async fn list_approvals_by_channel(
             &self,
             company_id: Uuid,
-            workflow_id: Uuid,
+            channel_id: Uuid,
         ) -> AppResult<Vec<HumanApproval>> {
             Ok(self
                 .approvals
                 .lock()
                 .unwrap()
                 .iter()
-                .filter(|a| a.company_id == company_id && a.channel_id == workflow_id)
+                .filter(|a| a.company_id == company_id && a.channel_id == channel_id)
                 .cloned()
                 .collect())
         }
@@ -480,31 +510,126 @@ mod tests {
     struct MockTaskPersistence;
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
-        async fn enqueue_task(&self, _company_id: Uuid, _workflow_id: Uuid, _thread_id: Option<Uuid>, _task_type: &str, _payload: serde_json::Value) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
-        async fn get_task_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::task::BackgroundTask>> { unimplemented!() }
-        async fn update_task_payload(&self, _id: Uuid, _payload: serde_json::Value) -> AppResult<()> { Ok(()) }
-        async fn poll_next_pending_tasks(&self, _limit: i64) -> AppResult<Vec<crate::entities::task::BackgroundTask>> { unimplemented!() }
-        async fn mark_task_processing(&self, _id: Uuid) -> AppResult<bool> { Ok(true) }
-        async fn mark_task_completed(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
-        async fn mark_task_failed(&self, _id: Uuid, _error_msg: &str, _next_run_at: chrono::NaiveDateTime, _is_dead_letter: bool) -> AppResult<()> { Ok(()) }
-        async fn stop_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
-        async fn resume_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
-        async fn update_task_status(&self, _id: Uuid, _status: crate::entities::task::TaskStatus) -> AppResult<crate::entities::task::BackgroundTask> { unimplemented!() }
-        async fn list_company_tasks(&self, _company_id: Uuid, _workflow_id: Option<Uuid>, _status: Option<crate::entities::task::TaskStatus>, _sort_asc: bool) -> AppResult<Vec<crate::entities::task::BackgroundTask>> { unimplemented!() }
+        async fn enqueue_task(
+            &self,
+            _company_id: Uuid,
+            _channel_id: Uuid,
+            _thread_id: Option<Uuid>,
+            _task_type: &str,
+            _payload: serde_json::Value,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
+            unimplemented!()
+        }
+        async fn get_task_by_id(
+            &self,
+            _id: Uuid,
+        ) -> AppResult<Option<crate::entities::task::BackgroundTask>> {
+            unimplemented!()
+        }
+        async fn update_task_payload(
+            &self,
+            _id: Uuid,
+            _payload: serde_json::Value,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn poll_next_pending_tasks(
+            &self,
+            _limit: i64,
+        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            unimplemented!()
+        }
+        async fn mark_task_processing(&self, _id: Uuid) -> AppResult<bool> {
+            Ok(true)
+        }
+        async fn mark_task_completed(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
+        async fn mark_task_failed(
+            &self,
+            _id: Uuid,
+            _error_msg: &str,
+            _next_run_at: chrono::NaiveDateTime,
+            _is_dead_letter: bool,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn stop_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
+            unimplemented!()
+        }
+        async fn resume_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
+            unimplemented!()
+        }
+        async fn update_task_status(
+            &self,
+            _id: Uuid,
+            _status: crate::entities::task::TaskStatus,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
+            unimplemented!()
+        }
+        async fn list_company_tasks(
+            &self,
+            _company_id: Uuid,
+            _channel_id: Option<Uuid>,
+            _status: Option<crate::entities::task::TaskStatus>,
+            _sort_asc: bool,
+        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            unimplemented!()
+        }
     }
 
     struct MockThreadPersistence;
     #[async_trait]
     impl ThreadPersistence for MockThreadPersistence {
-        async fn create_thread(&self, _workflow_id: Uuid, _subject: &str, _participant_emails: &[String]) -> AppResult<crate::entities::thread::Thread> { unimplemented!() }
-        async fn get_thread_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::thread::Thread>> { unimplemented!() }
-        async fn update_thread_participants(&self, _id: Uuid, _participant_emails: &[String]) -> AppResult<crate::entities::thread::Thread> { unimplemented!() }
-        async fn find_thread_by_message_ids(&self, _message_ids: &[String]) -> AppResult<Option<crate::entities::thread::Thread>> { unimplemented!() }
-        async fn find_thread_by_thread_index(&self, _thread_index_prefix: &str) -> AppResult<Option<crate::entities::thread::Thread>> { unimplemented!() }
-        async fn count_recent_messages(&self, _thread_id: Uuid, _duration_secs: i64) -> AppResult<usize> { unimplemented!() }
-        async fn create_message(&self, message: &Message) -> AppResult<Message> { Ok(message.clone()) }
-        async fn get_message_by_message_id(&self, _message_id: &str) -> AppResult<Option<Message>> { unimplemented!() }
-        async fn list_messages_by_thread_id(&self, _thread_id: Uuid) -> AppResult<Vec<Message>> { unimplemented!() }
+        async fn create_thread(
+            &self,
+            _channel_id: Uuid,
+            _subject: &str,
+            _participant_emails: &[String],
+        ) -> AppResult<crate::entities::thread::Thread> {
+            unimplemented!()
+        }
+        async fn get_thread_by_id(
+            &self,
+            _id: Uuid,
+        ) -> AppResult<Option<crate::entities::thread::Thread>> {
+            unimplemented!()
+        }
+        async fn update_thread_participants(
+            &self,
+            _id: Uuid,
+            _participant_emails: &[String],
+        ) -> AppResult<crate::entities::thread::Thread> {
+            unimplemented!()
+        }
+        async fn find_thread_by_message_ids(
+            &self,
+            _message_ids: &[String],
+        ) -> AppResult<Option<crate::entities::thread::Thread>> {
+            unimplemented!()
+        }
+        async fn find_thread_by_thread_index(
+            &self,
+            _thread_index_prefix: &str,
+        ) -> AppResult<Option<crate::entities::thread::Thread>> {
+            unimplemented!()
+        }
+        async fn count_recent_messages(
+            &self,
+            _thread_id: Uuid,
+            _duration_secs: i64,
+        ) -> AppResult<usize> {
+            unimplemented!()
+        }
+        async fn create_message(&self, message: &Message) -> AppResult<Message> {
+            Ok(message.clone())
+        }
+        async fn get_message_by_message_id(&self, _message_id: &str) -> AppResult<Option<Message>> {
+            unimplemented!()
+        }
+        async fn list_messages_by_thread_id(&self, _thread_id: Uuid) -> AppResult<Vec<Message>> {
+            unimplemented!()
+        }
     }
 
     #[tokio::test]
@@ -547,15 +672,15 @@ mod tests {
         );
 
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
 
         // 1. Create approval request
         let approval = use_cases
             .create_and_send_approval_request(
                 company_id,
-                workflow_id,
-                "Support Workflow",
+                channel_id,
+                "Support Channel",
                 "support",
                 "acme",
                 Some(thread_id),
@@ -605,7 +730,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_simulated_server_restart_with_agent_approval_handler() {
-        use crate::services::agent_runner::{AgentApprovalHandler, ApprovalContext as AgentApprovalContext};
+        use crate::services::agent_runner::{
+            AgentApprovalHandler, ApprovalContext as AgentApprovalContext,
+        };
         use ai_agents::hitl::{ApprovalHandler, ApprovalRequest, ApprovalTrigger};
 
         // Shared persistent database mock across server instances
@@ -640,7 +767,7 @@ mod tests {
         });
 
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
 
         // --- SERVER INSTANCE 1 ---
@@ -653,9 +780,9 @@ mod tests {
 
         let ctx1 = AgentApprovalContext {
             company_id,
-            workflow_id,
-            workflow_name: "Deploy Agent".into(),
-            workflow_slug: "deploy".into(),
+            channel_id,
+            channel_name: "Deploy Agent".into(),
+            channel_slug: "deploy".into(),
             company_slug: "acme".into(),
             thread_id: Some(thread_id),
             task_id: None,
@@ -709,9 +836,9 @@ mod tests {
         // 2. Server 2 re-runs Agent task after restart
         let ctx2 = AgentApprovalContext {
             company_id,
-            workflow_id,
-            workflow_name: "Deploy Agent".into(),
-            workflow_slug: "deploy".into(),
+            channel_id,
+            channel_name: "Deploy Agent".into(),
+            channel_slug: "deploy".into(),
             company_slug: "acme".into(),
             thread_id: Some(thread_id),
             task_id: None,
@@ -778,49 +905,61 @@ mod tests {
         );
 
         let company_id = Uuid::new_v4();
-        let workflow_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
 
         // Create approval request for partial quorum timeout
-        let approval = use_cases.create_and_send_approval_request(
-            company_id,
-            workflow_id,
-            "Support",
-            "support",
-            "acme",
-            Some(thread_id),
-            None,
-            "step_quorum_timeout_123",
-            "manager@acme.com",
-            "quorum_timeout",
-            "Partial Quorum Timeout: Action Required",
-            "Received 1/4 responses (25.0%). Required: 50.0%.",
-            serde_json::json!({ "threshold_percent": 50.0 }),
-        ).await.unwrap();
+        let approval = use_cases
+            .create_and_send_approval_request(
+                company_id,
+                channel_id,
+                "Support",
+                "support",
+                "acme",
+                Some(thread_id),
+                None,
+                "step_quorum_timeout_123",
+                "manager@acme.com",
+                "quorum_timeout",
+                "Partial Quorum Timeout: Action Required",
+                "Received 1/4 responses (25.0%). Required: 50.0%.",
+                serde_json::json!({ "threshold_percent": 50.0 }),
+            )
+            .await
+            .unwrap();
 
         // 1. Test "proceed_partial" action
-        let (updated, msg) = use_cases.process_link_action(&approval.token, "proceed_partial").await.unwrap();
+        let (updated, msg) = use_cases
+            .process_link_action(&approval.token, "proceed_partial")
+            .await
+            .unwrap();
         assert_eq!(updated.status, ApprovalStatus::Approved);
         assert!(msg.contains("Proceeding with partial data"));
 
         // 2. Create another approval and test "extend_24h" action
-        let approval2 = use_cases.create_and_send_approval_request(
-            company_id,
-            workflow_id,
-            "Support",
-            "support",
-            "acme",
-            Some(thread_id),
-            None,
-            "step_quorum_timeout_456",
-            "manager@acme.com",
-            "quorum_timeout",
-            "Partial Quorum Timeout: Action Required",
-            "Received 1/4 responses (25.0%). Required: 50.0%.",
-            serde_json::json!({ "threshold_percent": 50.0 }),
-        ).await.unwrap();
+        let approval2 = use_cases
+            .create_and_send_approval_request(
+                company_id,
+                channel_id,
+                "Support",
+                "support",
+                "acme",
+                Some(thread_id),
+                None,
+                "step_quorum_timeout_456",
+                "manager@acme.com",
+                "quorum_timeout",
+                "Partial Quorum Timeout: Action Required",
+                "Received 1/4 responses (25.0%). Required: 50.0%.",
+                serde_json::json!({ "threshold_percent": 50.0 }),
+            )
+            .await
+            .unwrap();
 
-        let (updated2, msg2) = use_cases.process_link_action(&approval2.token, "extend_24h").await.unwrap();
+        let (updated2, msg2) = use_cases
+            .process_link_action(&approval2.token, "extend_24h")
+            .await
+            .unwrap();
         assert_eq!(updated2.status, ApprovalStatus::Approved);
         assert!(msg2.contains("extended by 24 hours"));
     }

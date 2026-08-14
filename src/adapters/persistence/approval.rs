@@ -34,8 +34,8 @@ impl TryFrom<HumanApprovalDb> for HumanApproval {
     type Error = AppError;
 
     fn try_from(db: HumanApprovalDb) -> AppResult<Self> {
-        let status = ApprovalStatus::from_str(&db.status)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+        let status =
+            ApprovalStatus::from_str(&db.status).map_err(|e| AppError::Internal(e.to_string()))?;
 
         Ok(HumanApproval {
             id: db.id,
@@ -63,7 +63,7 @@ pub trait ApprovalPersistence: Send + Sync {
     async fn create_approval(
         &self,
         company_id: Uuid,
-        workflow_id: Uuid,
+        channel_id: Uuid,
         thread_id: Option<Uuid>,
         task_id: Option<Uuid>,
         step_key: &str,
@@ -90,10 +90,10 @@ pub trait ApprovalPersistence: Send + Sync {
         status: ApprovalStatus,
     ) -> AppResult<HumanApproval>;
 
-    async fn list_approvals_by_workflow(
+    async fn list_approvals_by_channel(
         &self,
         company_id: Uuid,
-        workflow_id: Uuid,
+        channel_id: Uuid,
     ) -> AppResult<Vec<HumanApproval>>;
 }
 
@@ -102,7 +102,7 @@ impl ApprovalPersistence for PostgresPersistence {
     async fn create_approval(
         &self,
         company_id: Uuid,
-        workflow_id: Uuid,
+        channel_id: Uuid,
         thread_id: Option<Uuid>,
         task_id: Option<Uuid>,
         step_key: &str,
@@ -128,7 +128,7 @@ impl ApprovalPersistence for PostgresPersistence {
         )
         .bind(id)
         .bind(company_id)
-        .bind(workflow_id)
+        .bind(channel_id)
         .bind(thread_id)
         .bind(task_id)
         .bind(step_key)
@@ -206,10 +206,10 @@ impl ApprovalPersistence for PostgresPersistence {
         db.try_into()
     }
 
-    async fn list_approvals_by_workflow(
+    async fn list_approvals_by_channel(
         &self,
         company_id: Uuid,
-        workflow_id: Uuid,
+        channel_id: Uuid,
     ) -> AppResult<Vec<HumanApproval>> {
         let list = sqlx::query_as::<_, HumanApprovalDb>(
             r#"
@@ -219,10 +219,10 @@ impl ApprovalPersistence for PostgresPersistence {
             "#,
         )
         .bind(company_id)
-        .bind(workflow_id)
+        .bind(channel_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| AppError::Internal(format!("Failed to list workflow approvals: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to list channel approvals: {}", e)))?;
 
         list.into_iter().map(|d| d.try_into()).collect()
     }

@@ -36,9 +36,9 @@ impl Header for CustomHeader {
 
 #[derive(Debug, Clone)]
 pub struct OutboundEmail {
-    pub workflow_id: Uuid,
-    pub workflow_name: String,
-    pub workflow_slug: String,
+    pub channel_id: Uuid,
+    pub channel_name: String,
+    pub channel_slug: String,
     pub company_slug: String,
     pub trigger_message_id: String,
     pub thread_references: Vec<String>,
@@ -47,7 +47,7 @@ pub struct OutboundEmail {
     pub subject: String,
     pub body_text: String,
     pub hop_count: u32,
-    pub trace_workflows: Vec<Uuid>,
+    pub trace_channels: Vec<Uuid>,
 }
 
 #[derive(Debug, Clone)]
@@ -71,9 +71,9 @@ impl OutboundDispatcher {
 
         let from_email = format!(
             "{}@{}.{}",
-            email.workflow_slug, email.company_slug, config.app_domain_name
+            email.channel_slug, email.company_slug, config.app_domain_name
         );
-        let from_header_value = format!("\"{}\" <{}>", email.workflow_name, from_email);
+        let from_header_value = format!("\"{}\" <{}>", email.channel_name, from_email);
 
         let in_reply_to = email.trigger_message_id.clone();
 
@@ -140,17 +140,17 @@ impl OutboundDispatcher {
             value: "All".to_string(),
         });
 
-        // Platform Inter-Workflow Tracking Headers
-        let mut trace = email.trace_workflows.clone();
-        if !trace.contains(&email.workflow_id) {
-            trace.push(email.workflow_id);
+        // Platform Inter-Channel Tracking Headers
+        let mut trace = email.trace_channels.clone();
+        if !trace.contains(&email.channel_id) {
+            trace.push(email.channel_id);
         }
         let trace_str = trace.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
         let next_hop = email.hop_count + 1;
 
         builder = builder.header(CustomHeader {
-            name: HeaderName::new_from_ascii_str("X-MailAgents-Workflow-ID"),
-            value: email.workflow_id.to_string(),
+            name: HeaderName::new_from_ascii_str("X-MailAgents-Channel-ID"),
+            value: email.channel_id.to_string(),
         });
         builder = builder.header(CustomHeader {
             name: HeaderName::new_from_ascii_str("X-MailAgents-Hop-Count"),
@@ -310,9 +310,9 @@ mod tests {
         };
 
         let outbound_email = OutboundEmail {
-            workflow_id: Uuid::new_v4(),
-            workflow_name: "Support Bot".into(),
-            workflow_slug: "support".into(),
+            channel_id: Uuid::new_v4(),
+            channel_name: "Support Bot".into(),
+            channel_slug: "support".into(),
             company_slug: "acme".into(),
             trigger_message_id: "<TRIGGER123@mail.com>".into(),
             thread_references: vec!["<REF1@mail.com>".into()],
@@ -321,7 +321,7 @@ mod tests {
             subject: "Help needed".into(),
             body_text: "Hello! I am your AI assistant.".into(),
             hop_count: 0,
-            trace_workflows: Vec::new(),
+            trace_channels: Vec::new(),
         };
 
         let result = OutboundDispatcher::send(&config, outbound_email).await.unwrap();
