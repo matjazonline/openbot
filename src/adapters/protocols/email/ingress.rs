@@ -48,6 +48,7 @@ impl EmailIngressAdapter {
             dkim_status: parsed.dkim_status,
             dmarc_status: parsed.dmarc_status,
             spam_score: parsed.spam_score,
+            is_context_only: parsed.is_context_only,
         }
     }
 }

@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::agent::Agent,
-    use_cases::company::CompanyPersistence,
+    use_cases::{channel::validate_slug, company::CompanyPersistence},
 };
 
 #[async_trait]
@@ -107,6 +107,8 @@ impl AgentUseCases {
             ));
         }
 
+        validate_slug(&slug_clean)?;
+
         let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
         let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
         let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
@@ -194,6 +196,8 @@ impl AgentUseCases {
                 "Agent name and slug cannot be empty.".into(),
             ));
         }
+
+        validate_slug(&slug_clean)?;
 
         let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
         let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
@@ -567,6 +571,22 @@ mod tests {
         });
 
         let use_cases = AgentUseCases::new(company_persistence, agent_persistence);
+
+        // 0. Invalid reserved suffix slug rejection test
+        let invalid_res = use_cases
+            .create_agent(
+                owner_id,
+                company_id,
+                "Quiet Bot",
+                "quiet",
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await;
+        assert!(invalid_res.is_err());
 
         // 1. Owner creates agent with config_json
         let config = json!({ "temperature": 0.7, "system_prompt": "Hello" });

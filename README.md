@@ -156,6 +156,12 @@ Inbound Email (SMTP / Webhook)
 └────────────────────────────────────────────────────────┘
 ```
 
+### 3.8 Context-Only / Quiet Mode Ingestion & Reserved Slug Validation
+- **Context-Only Ingestion:** Ingest emails directly into a channel thread's history without triggering agent execution or automated replies. Allows users and integrations to post background context, transcripts, or notes.
+- **Trigger Suffixes & Body Commands:** Supported via recipient address subaddressing/suffixes (`channel.quiet@...`, `channel.noagent@...`, `channel.message@...`, `channel.msg@...`, `channel.na@...`, `channel+quiet@...`) or email body prefix triggers (`[[quiet]]`, `[quiet]`, `[[noagent]]`, `[noagent]`, `[[message]]`, `[msg]`, `[na]`).
+- **Reserved Slug Validation:** Agent and Channel/Workflow slug creation and updates strictly validate against reserved mode keywords (`quiet`, `noagent`, `message`, `msg`, `na`) to prevent route ambiguity.
+- **Thread History Integration:** Messages ingested in context-only mode are saved to database thread history. Subsequent normal messages sent to the channel trigger the agent, which reads the full thread context including all quiet notes.
+
 ## Development Setup
 
 ### Database Setup

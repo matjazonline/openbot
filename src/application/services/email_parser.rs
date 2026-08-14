@@ -8,6 +8,7 @@ use crate::entities::message::AttachmentMetadata;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_CHANNEL_HOPS: u32 = 5;
+pub const RESERVED_CONTEXT_SUFFIXES: &[&str] = &["noagent", "quiet", "message", "msg", "na"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedEmail {
@@ -33,6 +34,7 @@ pub struct ParsedEmail {
     pub dkim_status: Option<String>,
     pub dmarc_status: Option<String>,
     pub spam_score: Option<f64>,
+    pub is_context_only: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -61,6 +63,26 @@ pub struct RawAttachmentData {
 pub struct EmailParser;
 
 impl EmailParser {
+    pub fn check_body_context_trigger(text: &str) -> (bool, String) {
+        let trimmed = text.trim_start();
+        let lower = trimmed.to_lowercase();
+
+        for suffix in RESERVED_CONTEXT_SUFFIXES {
+            let double_bracket = format!("[[{}]]", suffix);
+            let single_bracket = format!("[{}]", suffix);
+
+            if lower.starts_with(&double_bracket) {
+                let remaining = trimmed[double_bracket.len()..].trim_start();
+                return (true, remaining.to_string());
+            } else if lower.starts_with(&single_bracket) {
+                let remaining = trimmed[single_bracket.len()..].trim_start();
+                return (true, remaining.to_string());
+            }
+        }
+
+        (false, text.to_string())
+    }
+
     pub fn parse(payload: RawInboundPayload, app_domain: &str) -> ParsedEmail {
         let (
             extracted_msg_id,
@@ -71,10 +93,11 @@ impl EmailParser {
             channel_id_header,
             hop_count,
             trace_channels,
+            is_context_from_headers,
         ) = if let Some(ref hdrs) = payload.headers {
             Self::parse_headers(hdrs)
         } else {
-            (None, None, Vec::new(), None, false, None, 0, Vec::new())
+            (None, None, Vec::new(), None, false, None, 0, Vec::new(), false)
         };
 
         let message_id = extracted_msg_id
@@ -116,7 +139,9 @@ impl EmailParser {
 
         // Preserve full text in clean_text_body; quote stripping is applied during thread ingestion
         // if the email is a reply in an existing thread and not forwarded.
-        let clean_text_body = base_text.trim().to_string();
+        let base_clean_text = base_text.trim().to_string();
+        let (is_context_from_body, clean_text_body) = Self::check_body_context_trigger(&base_clean_text);
+        let is_context_only = is_context_from_headers || is_context_from_body;
 
         // Process attachments - Filter small inline signature images (< 10KB images)
         let mut attachments = Vec::new();
@@ -179,6 +204,7 @@ impl EmailParser {
             dkim_status: payload.dkim,
             dmarc_status: payload.dmarc,
             spam_score: payload.spam_score,
+            is_context_only,
         }
     }
 
@@ -198,6 +224,7 @@ impl EmailParser {
         Option<Uuid>,
         u32,
         Vec<Uuid>,
+        bool,
     ) {
         let mut message_id = None;
         let mut in_reply_to = None;
@@ -207,6 +234,7 @@ impl EmailParser {
         let mut channel_id_header = None;
         let mut hop_count = 0u32;
         let mut trace_channels = Vec::new();
+        let mut is_context_only = false;
 
         for line in headers_str.lines() {
             let line = line.trim();
@@ -260,6 +288,15 @@ impl EmailParser {
                 }
             } else if lower.starts_with("x-auto-response-suppress:") {
                 is_auto_reply = true;
+            } else if lower.starts_with("x-mailagents-context-only:")
+                || lower.starts_with("x-no-agent:")
+                || lower.starts_with("x-context-only:")
+                || lower.starts_with("x-quiet:")
+            {
+                let val = line.split(':').nth(1).unwrap_or_default().trim().to_lowercase();
+                if val == "true" || val == "1" || val == "yes" || val.is_empty() {
+                    is_context_only = true;
+                }
             }
         }
 
@@ -272,6 +309,7 @@ impl EmailParser {
             channel_id_header,
             hop_count,
             trace_channels,
+            is_context_only,
         )
     }
 
@@ -411,7 +449,7 @@ X-MailAgents-Hop-Count: 2
 Subject: Test Email
 "#;
 
-        let (msg_id, in_reply, refs, thread_idx, is_auto, wf_id, hop, trace) =
+        let (msg_id, in_reply, refs, thread_idx, is_auto, wf_id, hop, trace, is_context) =
             EmailParser::parse_headers(headers);
         assert_eq!(msg_id.as_deref(), Some("<CAGX123@mail.gmail.com>"));
         assert_eq!(in_reply.as_deref(), Some("<ORIGINAL456@mailagents.com>"));
@@ -424,6 +462,29 @@ Subject: Test Email
         );
         assert_eq!(hop, 2);
         assert!(trace.is_empty());
+        assert!(!is_context);
+    }
+
+    #[test]
+    fn test_body_and_header_context_trigger() {
+        let text1 = "[[quiet]] This is background context for the thread.";
+        let (is_ctx1, clean1) = EmailParser::check_body_context_trigger(text1);
+        assert!(is_ctx1);
+        assert_eq!(clean1, "This is background context for the thread.");
+
+        let text2 = "[noagent] Additional note.";
+        let (is_ctx2, clean2) = EmailParser::check_body_context_trigger(text2);
+        assert!(is_ctx2);
+        assert_eq!(clean2, "Additional note.");
+
+        let text3 = "Normal message to agent.";
+        let (is_ctx3, clean3) = EmailParser::check_body_context_trigger(text3);
+        assert!(!is_ctx3);
+        assert_eq!(clean3, "Normal message to agent.");
+
+        let headers = "X-MailAgents-Context-Only: true\n";
+        let (_, _, _, _, _, _, _, _, is_ctx_hdr) = EmailParser::parse_headers(headers);
+        assert!(is_ctx_hdr);
     }
 
     #[test]

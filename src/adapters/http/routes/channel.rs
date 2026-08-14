@@ -1219,6 +1219,7 @@ mod tests {
                     dkim_status: Some("pass".to_string()),
                     dmarc_status: Some("pass".to_string()),
                     spam_score: None,
+                    is_context_only: false,
                 }),
                 task_id: None,
             },

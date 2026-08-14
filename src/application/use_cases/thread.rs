@@ -193,6 +193,7 @@ impl ThreadUseCases {
             dkim_status: norm.dkim_status.clone(),
             dmarc_status: norm.dmarc_status.clone(),
             spam_score: norm.spam_score,
+            is_context_only: norm.is_context_only,
         };
 
         info!(
@@ -280,11 +281,15 @@ impl ThreadUseCases {
         let mut invalid_slugs = Vec::new();
         let mut bounce_suggestions = Vec::new();
         let mut matched_company_slug: Option<String> = None;
+        let mut is_address_context_only = false;
 
         for (addr, role) in candidates {
-            if let Some((company_slug, channel_slugs)) =
+            if let Some((company_slug, channel_slugs, is_addr_context)) =
                 parse_recipient_address_pipeline(&addr, &self.config.app_domain_name)
             {
+                if is_addr_context {
+                    is_address_context_only = true;
+                }
                 matched_company_slug = Some(company_slug.clone());
                 let company_opt = self
                     .company_persistence
@@ -612,7 +617,7 @@ impl ThreadUseCases {
                         continue;
                     }
                     // Check if addr is an actual channel email address in our system
-                    let is_channel_address = if let Some((comp_slug, _)) =
+                    let is_channel_address = if let Some((comp_slug, _, _)) =
                         parse_recipient_address_pipeline(addr_clean, &self.config.app_domain_name)
                     {
                         self.company_persistence
@@ -793,6 +798,12 @@ impl ThreadUseCases {
 
         let first = channel_matches[0].clone();
 
+        let is_context_only_effective =
+            parsed.is_context_only || norm.is_context_only || is_address_context_only;
+        parsed.is_context_only = is_context_only_effective;
+        let mut norm_updated = norm.clone();
+        norm_updated.is_context_only = is_context_only_effective;
+
         let mut ingest_result = InboundIngestResult {
             accepted: true,
             reason: None,
@@ -801,11 +812,19 @@ impl ThreadUseCases {
             company: Some(first.company.clone()),
             channel: Some(first.channel.clone()),
             parsed_email: Some(parsed.clone()),
-            normalized_message: Some(norm.clone()),
+            normalized_message: Some(norm_updated),
             task_id: None,
             channel_matches,
             bounce_info: None,
         };
+
+        if is_context_only_effective {
+            info!(
+                "Ingested message ID '{}' for thread '{}' in context-only / quiet mode. Skipping background task creation and agent execution.",
+                parsed.message_id, first.thread.id
+            );
+            return Ok(ingest_result);
+        }
 
         // Enqueue background task for durable processing & crash recovery
         let payload_json = serde_json::to_value(&ingest_result).unwrap_or_default();
@@ -831,6 +850,19 @@ impl ThreadUseCases {
         ingest: &InboundIngestResult,
         send_email: bool,
     ) -> AppResult<Option<AgentExecutionResult>> {
+        if let Some(ref p) = ingest.parsed_email {
+            if p.is_context_only {
+                info!("Skipping agent execution for context-only message ID {}", p.message_id);
+                return Ok(None);
+            }
+        }
+        if let Some(ref n) = ingest.normalized_message {
+            if n.is_context_only {
+                info!("Skipping agent execution for context-only message ID {}", n.message_id);
+                return Ok(None);
+            }
+        }
+
         if let Some(task_id) = ingest.task_id {
             match self.task_persistence.mark_task_processing(task_id).await {
                 Ok(true) => {
@@ -3676,5 +3708,120 @@ mod tests {
             .participant_emails
             .iter()
             .any(|p| p.eq_ignore_ascii_case("unauthorized@other.com")));
+    }
+
+    #[tokio::test]
+    async fn test_context_only_quiet_mode_ingestion() {
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+
+        let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
+            vec![Company {
+                id: company_id,
+                user_id: Uuid::new_v4(),
+                name: "Acme Corp".to_string(),
+                slug: "acme".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                enable_llm_spam_guardrail: None,
+                created_at: Utc::now().naive_utc(),
+            }],
+            vec![(company_id, "team@acme.com".to_string())],
+        ));
+
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![Channel {
+                id: channel_id,
+                company_id,
+                name: "Support Channel".to_string(),
+                slug: "support".to_string(),
+                api_key: None,
+                provider: None,
+                model: None,
+                participant_emails: None,
+                agent_ids: None,
+                channel_config: None,
+                created_at: Utc::now().naive_utc(),
+            }]),
+        });
+
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        });
+
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+
+        let thread_use_cases = ThreadUseCases::new(
+            thread_persistence.clone(),
+            channel_persistence,
+            company_persistence,
+            task_persistence,
+            config,
+        );
+
+        // 1. Ingest email with .quiet suffix in address -> accepted, task_id is None (agent execution skipped)
+        let res_quiet_addr = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                headers: Some("Message-ID: <msg-quiet-1@acme.com>\n".to_string()),
+                to: "support.quiet@acme.mailagents.com".to_string(),
+                from: "team@acme.com".to_string(),
+                subject: Some("Quiet Note".to_string()),
+                text: Some("Background context note".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        assert!(res_quiet_addr.accepted);
+        assert!(res_quiet_addr.task_id.is_none());
+        assert!(res_quiet_addr.parsed_email.unwrap().is_context_only);
+
+        // 2. Ingest email with [[quiet]] body tag -> accepted, task_id is None, tag stripped from text
+        let res_quiet_body = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                headers: Some("Message-ID: <msg-quiet-2@acme.com>\nIn-Reply-To: <msg-quiet-1@acme.com>\n".to_string()),
+                to: "support@acme.mailagents.com".to_string(),
+                from: "team@acme.com".to_string(),
+                subject: Some("Re: Quiet Note".to_string()),
+                text: Some("[[quiet]] Additional background note".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        assert!(res_quiet_body.accepted);
+        assert!(res_quiet_body.task_id.is_none());
+        let parsed_body = res_quiet_body.parsed_email.unwrap();
+        assert!(parsed_body.is_context_only);
+        assert_eq!(parsed_body.clean_text_body, "Additional background note");
     }
 }

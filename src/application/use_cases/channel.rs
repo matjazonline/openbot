@@ -115,6 +115,8 @@ impl ChannelUseCases {
             ));
         }
 
+        validate_slug(&slug_clean)?;
+
         let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
         let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
         let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
@@ -229,6 +231,8 @@ impl ChannelUseCases {
                 "Channel name and slug cannot be empty.".into(),
             ));
         }
+
+        validate_slug(&slug_clean)?;
 
         let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
         let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
@@ -428,10 +432,73 @@ pub fn extract_email_address(input: &str) -> String {
     email_addr.trim().to_lowercase()
 }
 
+pub fn validate_slug(slug: &str) -> AppResult<()> {
+    let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
+    if slug_clean.is_empty() {
+        return Err(AppError::Internal("Slug cannot be empty.".into()));
+    }
+
+    for suffix in crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES {
+        let dot_s = format!(".{}", suffix);
+        let plus_s = format!("+{}", suffix);
+        let dash_s = format!("-{}", suffix);
+        let underscore_s = format!("_{}", suffix);
+
+        if slug_clean == *suffix
+            || slug_clean.ends_with(&dot_s)
+            || slug_clean.ends_with(&plus_s)
+            || slug_clean.ends_with(&dash_s)
+            || slug_clean.ends_with(&underscore_s)
+        {
+            return Err(AppError::Internal(format!(
+                "Invalid slug '{}': Slugs cannot equal or end with reserved context-only mode suffixes (noagent, quiet, message, msg, na).",
+                slug_clean
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+pub fn strip_context_suffix_from_slug(raw_slug: &str) -> (String, bool) {
+    let lower = raw_slug.trim().to_lowercase();
+    for suffix in crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES {
+        let dot_s = format!(".{}", suffix);
+        let plus_s = format!("+{}", suffix);
+        let dash_s = format!("-{}", suffix);
+        let underscore_s = format!("_{}", suffix);
+
+        if lower.ends_with(&dot_s) {
+            let base = lower[..lower.len() - dot_s.len()].trim();
+            if !base.is_empty() {
+                return (base.to_string(), true);
+            }
+        } else if lower.ends_with(&plus_s) {
+            let base = lower[..lower.len() - plus_s.len()].trim();
+            if !base.is_empty() {
+                return (base.to_string(), true);
+            }
+        } else if lower.ends_with(&dash_s) {
+            let base = lower[..lower.len() - dash_s.len()].trim();
+            if !base.is_empty() {
+                return (base.to_string(), true);
+            }
+        } else if lower.ends_with(&underscore_s) {
+            let base = lower[..lower.len() - underscore_s.len()].trim();
+            if !base.is_empty() {
+                return (base.to_string(), true);
+            }
+        } else if lower == *suffix {
+            return (String::new(), true);
+        }
+    }
+    (raw_slug.trim().to_lowercase(), false)
+}
+
 pub fn parse_recipient_address_pipeline(
     to_str: &str,
     app_domain_name: &str,
-) -> Option<(String, Vec<String>)> {
+) -> Option<(String, Vec<String>, bool)> {
     let email_addr = if let (Some(start), Some(end)) = (to_str.find('<'), to_str.rfind('>')) {
         if start < end {
             &to_str[start + 1..end]
@@ -472,22 +539,29 @@ pub fn parse_recipient_address_pipeline(
         return None;
     }
 
-    let channel_slugs: Vec<String> = channel_part
-        .split('+')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
+    let mut is_context_only = false;
+    let mut channel_slugs = Vec::new();
+
+    for part in channel_part.split('+') {
+        let (clean_slug, is_context) = strip_context_suffix_from_slug(part);
+        if is_context {
+            is_context_only = true;
+        }
+        if !clean_slug.is_empty() && !channel_slugs.contains(&clean_slug) {
+            channel_slugs.push(clean_slug);
+        }
+    }
 
     if channel_slugs.is_empty() {
         return None;
     }
 
-    Some((company_slug.to_string(), channel_slugs))
+    Some((company_slug.to_string(), channel_slugs, is_context_only))
 }
 
 pub fn parse_recipient_address(to_str: &str, app_domain_name: &str) -> Option<(String, String)> {
     parse_recipient_address_pipeline(to_str, app_domain_name)
-        .map(|(company, channels)| (company, channels[0].clone()))
+        .map(|(company, channels, _)| (company, channels[0].clone()))
 }
 
 pub fn levenshtein_distance(a: &str, b: &str) -> usize {
@@ -893,13 +967,33 @@ mod tests {
         assert_eq!(channel_slug, "inbound-email");
 
         // Chained pipeline email format
-        let (company_slug, channel_slugs) = parse_recipient_address_pipeline(
+        let (company_slug, channel_slugs, is_ctx) = parse_recipient_address_pipeline(
             "support+billing+legal@acme.mailagents.com",
             app_domain,
         )
         .unwrap();
         assert_eq!(company_slug, "acme");
         assert_eq!(channel_slugs, vec!["support", "billing", "legal"]);
+        assert!(!is_ctx);
+
+        // Quiet / Context-only subaddressing formats (.quiet, .noagent, .message, .msg, .na)
+        let (comp1, ch1, is_ctx1) = parse_recipient_address_pipeline(
+            "support.quiet@acme.mailagents.com",
+            app_domain,
+        )
+        .unwrap();
+        assert_eq!(comp1, "acme");
+        assert_eq!(ch1, vec!["support"]);
+        assert!(is_ctx1);
+
+        let (comp2, ch2, is_ctx2) = parse_recipient_address_pipeline(
+            "support+noagent@acme.mailagents.com",
+            app_domain,
+        )
+        .unwrap();
+        assert_eq!(comp2, "acme");
+        assert_eq!(ch2, vec!["support"]);
+        assert!(is_ctx2);
 
         // Localhost app domain
         let (company_slug, channel_slug) =
@@ -910,6 +1004,19 @@ mod tests {
         // Invalid formats
         assert!(parse_recipient_address("invalid-email", app_domain).is_none());
         assert!(parse_recipient_address("support@mailagents.com", app_domain).is_none());
+    }
+
+    #[test]
+    fn test_slug_validation_reserved_suffixes() {
+        assert!(validate_slug("support").is_ok());
+        assert!(validate_slug("tech-help").is_ok());
+
+        assert!(validate_slug("quiet").is_err());
+        assert!(validate_slug("noagent").is_err());
+        assert!(validate_slug("support.quiet").is_err());
+        assert!(validate_slug("support-noagent").is_err());
+        assert!(validate_slug("sales_message").is_err());
+        assert!(validate_slug("bot+na").is_err());
     }
 
     #[test]
