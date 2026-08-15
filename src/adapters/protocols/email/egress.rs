@@ -1,13 +1,10 @@
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 use crate::{
     adapters::protocols::ProtocolEgressAdapter,
     app_error::AppResult,
-    entities::{
-        channel::ChannelType,
-        message_contract::NormalizedOutboundMessage,
-    },
+    entities::{channel::ChannelType, message_contract::NormalizedOutboundMessage},
     infra::config::AppConfig,
     services::outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
     use_cases::thread::BounceInfo,
@@ -42,10 +39,7 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
             .map(|p| p.identity.clone())
             .collect();
 
-        let trigger_message_id = message
-            .in_reply_to_ref
-            .clone()
-            .unwrap_or_default();
+        let trigger_message_id = message.in_reply_to_ref.clone().unwrap_or_default();
 
         let outbound = OutboundEmail {
             channel_id: message.channel_id,

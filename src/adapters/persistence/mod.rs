@@ -11,8 +11,6 @@ pub mod task;
 pub mod thread;
 pub mod user;
 
-
-
 #[derive(Clone)]
 pub struct PostgresPersistence {
     pool: PgPool,

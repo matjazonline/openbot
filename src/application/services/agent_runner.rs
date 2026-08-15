@@ -47,6 +47,48 @@ pub struct AgentExecutionOutput {
     pub metadata: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+struct AgentExecutionDiagnostics {
+    duration_ms: u64,
+    prompt_characters: usize,
+    response_characters: usize,
+    history_message_count: usize,
+    token_usage_source: String,
+    tool_call_count: usize,
+    tool_names: Vec<String>,
+}
+
+fn attach_execution_diagnostics(
+    metadata: Option<serde_json::Value>,
+    diagnostics: &AgentExecutionDiagnostics,
+) -> Option<serde_json::Value> {
+    let mut metadata = match metadata {
+        Some(serde_json::Value::Object(map)) => serde_json::Value::Object(map),
+        Some(value) => serde_json::json!({ "ai_agents_metadata": value }),
+        None => serde_json::json!({}),
+    };
+    metadata.as_object_mut()?.insert(
+        "execution_diagnostics".to_string(),
+        serde_json::to_value(diagnostics).ok()?,
+    );
+    Some(metadata)
+}
+
+fn attach_observability_report(
+    metadata: Option<serde_json::Value>,
+    report: serde_json::Value,
+) -> Option<serde_json::Value> {
+    let mut metadata = match metadata {
+        Some(serde_json::Value::Object(map)) => serde_json::Value::Object(map),
+        Some(value) => serde_json::json!({ "ai_agents_metadata": value }),
+        None => serde_json::json!({}),
+    };
+    metadata
+        .as_object_mut()?
+        .insert("observability".to_string(), report);
+    Some(metadata)
+}
+
 pub fn sanitize_text(input: &str, secret_key: Option<&str>) -> String {
     let mut result = URL_KEY_REGEX
         .replace_all(input, "${1}[REDACTED]")
@@ -71,8 +113,33 @@ pub fn sanitize_text(input: &str, secret_key: Option<&str>) -> String {
     result
 }
 
+fn ai_agents_observability_enabled() -> bool {
+    std::env::var("ENABLE_AI_AGENTS_OBSERVABILITY")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(false)
+}
+
 pub fn base_agent_config() -> serde_json::Value {
+    base_agent_config_with_observability(ai_agents_observability_enabled())
+}
+
+fn base_agent_config_with_observability(observability_enabled: bool) -> serde_json::Value {
     serde_json::json!({
+        "observability": {
+            "enabled": observability_enabled,
+            "privacy": {
+                "include_prompts": false,
+                "include_responses": false,
+                "include_tool_args": false,
+                "include_tool_outputs": false,
+                "hash_inputs": true
+            },
+            "export": {
+                "write_report": false,
+                "write_raw_events": false
+            }
+        },
         "context": {
             "time": {
                 "type": "builtin",
@@ -330,6 +397,12 @@ pub fn ensure_config_fields(
         }
 
         if let serde_json::Value::Object(llm_map) = llm_val {
+            if !llm_map.contains_key("max_tokens") {
+                // Override ai-agents' small implicit 2,048-token limit, which can
+                // otherwise stop long email responses in the middle of a sentence.
+                llm_map.insert("max_tokens".to_string(), serde_json::json!(8192));
+            }
+
             if llm_map
                 .get("provider")
                 .and_then(|v| v.as_str())
@@ -361,6 +434,40 @@ pub fn ensure_config_fields(
             }
         }
     }
+}
+
+fn provider_config_from_agent_config(
+    config: &serde_json::Value,
+) -> anyhow::Result<(
+    ai_agents::llm::LLMConfig,
+    Option<String>,
+    Option<ai_agents::ToolChoice>,
+)> {
+    let llm = config
+        .get("llm")
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("Agent configuration is missing the llm section"))?;
+    let spec: ai_agents::LLMConfig = serde_json::from_value(llm)?;
+    let base_url = spec.base_url.clone();
+    let tool_choice = spec.tool_choice.clone();
+    let mut extra = spec.extra;
+    extra.remove("api_key");
+    let provider_config = ai_agents::llm::LLMConfig {
+        temperature: Some(spec.temperature),
+        max_tokens: Some(spec.max_tokens),
+        top_p: spec.top_p,
+        top_k: None,
+        frequency_penalty: None,
+        presence_penalty: None,
+        stop_sequences: None,
+        timeout_seconds: spec.timeout_seconds,
+        reasoning: spec.reasoning,
+        reasoning_effort: spec.reasoning_effort,
+        reasoning_budget_tokens: spec.reasoning_budget_tokens,
+        extra,
+    };
+
+    Ok((provider_config, base_url, tool_choice))
 }
 
 #[derive(Clone, Debug)]
@@ -584,6 +691,7 @@ impl<'a> AgentRunner<'a> {
 
     pub async fn execute(self) -> anyhow::Result<AgentExecutionOutput> {
         let start_time = std::time::Instant::now();
+        let history_message_count = self.history.len();
         info!(
             "Executing AI Agent with prompt length {} and history count {}",
             self.prompt.len(),
@@ -673,6 +781,7 @@ impl<'a> AgentRunner<'a> {
         }
 
         let config_yaml = serde_yaml::to_string(&config).unwrap_or_default();
+        let (provider_config, base_url, tool_choice) = provider_config_from_agent_config(&config)?;
 
         let full_prompt = sanitize_text(&raw_full_prompt, Some(key));
         info!("Full prompt context length: {}", full_prompt.len());
@@ -704,12 +813,16 @@ impl<'a> AgentRunner<'a> {
             }
 
             if let Ok(provider_type) = std::str::FromStr::from_str(&provider_name) {
-                let provider = ai_agents::UnifiedLLMProvider::new(
+                let mut provider = ai_agents::UnifiedLLMProvider::from_spec_config(
                     provider_type,
-                    model_name.clone(),
+                    &model_name,
                     Some(key_for_task.clone()),
-                    None,
+                    base_url,
+                    provider_config,
                 )?;
+                if let Some(choice) = tool_choice {
+                    provider = provider.with_tool_choice(choice);
+                }
                 builder = builder.llm(std::sync::Arc::new(provider));
             } else {
                 builder = builder.auto_configure_llms()?;
@@ -791,10 +904,12 @@ impl<'a> AgentRunner<'a> {
                 }
             }
 
-            if prompt_tokens == 0 {
+            let prompt_tokens_estimated = prompt_tokens == 0;
+            let completion_tokens_estimated = completion_tokens == 0;
+            if prompt_tokens_estimated {
                 prompt_tokens = estimate_tokens(&full_prompt);
             }
-            if completion_tokens == 0 {
+            if completion_tokens_estimated {
                 completion_tokens = estimate_tokens(&clean_content);
             }
 
@@ -807,10 +922,41 @@ impl<'a> AgentRunner<'a> {
                 serde_json::from_str(&sanitized).ok().or(Some(val))
             });
 
+            let observability_report = agent
+                .observability()
+                .map(|manager| serde_json::to_value(manager.generate_report()))
+                .transpose()?;
+
+            let tool_names = response
+                .tool_calls
+                .as_ref()
+                .map(|calls| calls.iter().map(|call| call.name.clone()).collect())
+                .unwrap_or_else(Vec::new);
+            let token_usage_source = match (prompt_tokens_estimated, completion_tokens_estimated) {
+                (false, false) => "provider",
+                (true, true) => "estimated",
+                _ => "mixed",
+            };
+            let diagnostics = AgentExecutionDiagnostics {
+                duration_ms: 0,
+                prompt_characters: full_prompt.chars().count(),
+                response_characters: clean_content.chars().count(),
+                history_message_count,
+                token_usage_source: token_usage_source.to_string(),
+                tool_call_count: tool_names.len(),
+                tool_names,
+            };
+
+            let metadata = attach_execution_diagnostics(clean_meta, &diagnostics);
+            let metadata = match observability_report {
+                Some(report) => attach_observability_report(metadata, report),
+                None => metadata,
+            };
+
             Ok::<AgentExecutionOutput, anyhow::Error>(AgentExecutionOutput {
                 content: clean_content,
                 token_usage,
-                metadata: clean_meta,
+                metadata,
             })
         })
         .await;
@@ -818,7 +964,15 @@ impl<'a> AgentRunner<'a> {
         let duration_ms = start_time.elapsed().as_millis() as u64;
 
         match task_result {
-            Ok(Ok(output)) => {
+            Ok(Ok(mut output)) => {
+                if let Some(diagnostics) = output
+                    .metadata
+                    .as_mut()
+                    .and_then(|meta| meta.get_mut("execution_diagnostics"))
+                    .and_then(|value| value.as_object_mut())
+                {
+                    diagnostics.insert("duration_ms".to_string(), serde_json::json!(duration_ms));
+                }
                 if let Some(ref m) = self.monitoring {
                     m.record_ai_execution(&AiExecutionMetrics {
                         company_id: self.company_id,
@@ -1067,7 +1221,8 @@ mod tests {
                 "llm": {
                     "provider": "google",
                     "model": "gemini-2.5-flash",
-                    "api_key": "company-api-key"
+                    "api_key": "company-api-key",
+                    "max_tokens": 8192
                 }
             }),
         );
@@ -1119,7 +1274,8 @@ mod tests {
                 "llm": {
                     "provider": "openai",
                     "model": "gemini-2.5-flash",
-                    "api_key": "channel-api-key"
+                    "api_key": "channel-api-key",
+                    "max_tokens": 8192
                 }
             }),
         );
@@ -1190,7 +1346,8 @@ mod tests {
                 "llm": {
                     "provider": "anthropic",
                     "model": "claude-3-5-sonnet",
-                    "api_key": "agent-api-key"
+                    "api_key": "agent-api-key",
+                    "max_tokens": 8192
                 }
             }),
         );
@@ -1393,7 +1550,137 @@ mod tests {
         assert_eq!(llm.get("provider").unwrap().as_str().unwrap(), "openai");
         assert_eq!(llm.get("model").unwrap().as_str().unwrap(), "gpt-4o");
         assert_eq!(llm.get("api_key").unwrap().as_str().unwrap(), "sk-test-123");
+        assert_eq!(llm.get("max_tokens").unwrap().as_u64().unwrap(), 8192);
         assert_eq!(config.get("temperature").unwrap().as_f64().unwrap(), 0.5);
+    }
+
+    #[test]
+    fn test_ensure_config_fields_preserves_max_tokens_override() {
+        let mut config = serde_json::json!({
+            "llm": {
+                "max_tokens": 4096
+            }
+        });
+
+        ensure_config_fields(&mut config, "openai", "gpt-4o", "sk-test-123", None, None);
+
+        assert_eq!(config["llm"]["max_tokens"].as_u64().unwrap(), 4096);
+    }
+
+    #[test]
+    fn test_provider_config_preserves_agent_llm_settings() {
+        let config = serde_json::json!({
+            "llm": {
+                "provider": "google",
+                "model": "gemini-2.5-flash",
+                "api_key": "runtime-key",
+                "temperature": 0.25,
+                "max_tokens": 8192,
+                "top_p": 0.8,
+                "base_url": "https://example.test",
+                "timeout_seconds": 45,
+                "reasoning": true,
+                "reasoning_budget_tokens": 1024
+            }
+        });
+
+        let (provider_config, base_url, tool_choice) =
+            provider_config_from_agent_config(&config).unwrap();
+
+        assert_eq!(provider_config.temperature, Some(0.25));
+        assert_eq!(provider_config.max_tokens, Some(8192));
+        assert_eq!(provider_config.top_p, Some(0.8));
+        assert_eq!(provider_config.timeout_seconds, Some(45));
+        assert_eq!(provider_config.reasoning, Some(true));
+        assert_eq!(provider_config.reasoning_budget_tokens, Some(1024));
+        assert!(!provider_config.extra.contains_key("api_key"));
+        assert_eq!(base_url.as_deref(), Some("https://example.test"));
+        assert!(tool_choice.is_none());
+    }
+
+    #[test]
+    fn test_base_agent_config_enables_private_in_memory_observability() {
+        let config = base_agent_config_with_observability(true);
+
+        assert_eq!(config["observability"]["enabled"], true);
+        assert_eq!(config["observability"]["privacy"]["include_prompts"], false);
+        assert_eq!(
+            config["observability"]["privacy"]["include_responses"],
+            false
+        );
+        assert_eq!(
+            config["observability"]["privacy"]["include_tool_args"],
+            false
+        );
+        assert_eq!(
+            config["observability"]["privacy"]["include_tool_outputs"],
+            false
+        );
+        assert_eq!(config["observability"]["export"]["write_report"], false);
+        assert_eq!(config["observability"]["export"]["write_raw_events"], false);
+    }
+
+    #[test]
+    fn test_agent_config_can_override_base_observability() {
+        let mut config = base_agent_config_with_observability(true);
+        merge_json(
+            &mut config,
+            &serde_json::json!({
+                "observability": {
+                    "enabled": false
+                }
+            }),
+        );
+
+        assert_eq!(config["observability"]["enabled"], false);
+        assert_eq!(config["observability"]["privacy"]["include_prompts"], false);
+    }
+
+    #[test]
+    fn test_attach_execution_diagnostics_preserves_ai_metadata() {
+        let diagnostics = AgentExecutionDiagnostics {
+            duration_ms: 123,
+            prompt_characters: 1000,
+            response_characters: 500,
+            history_message_count: 3,
+            token_usage_source: "estimated".to_string(),
+            tool_call_count: 1,
+            tool_names: vec!["search".to_string()],
+        };
+
+        let metadata = attach_execution_diagnostics(
+            Some(serde_json::json!({ "reasoning": { "iterations": 1 } })),
+            &diagnostics,
+        )
+        .unwrap();
+
+        assert_eq!(metadata["reasoning"]["iterations"], 1);
+        assert_eq!(metadata["execution_diagnostics"]["duration_ms"], 123);
+        assert_eq!(
+            metadata["execution_diagnostics"]["token_usage_source"],
+            "estimated"
+        );
+        assert_eq!(metadata["execution_diagnostics"]["tool_names"][0], "search");
+    }
+
+    #[test]
+    fn test_attach_observability_report_preserves_existing_metadata() {
+        let metadata = attach_observability_report(
+            Some(serde_json::json!({
+                "execution_diagnostics": { "duration_ms": 123 }
+            })),
+            serde_json::json!({
+                "summary": {
+                    "total_events": 2,
+                    "total_llm_calls": 1
+                }
+            }),
+        )
+        .unwrap();
+
+        assert_eq!(metadata["execution_diagnostics"]["duration_ms"], 123);
+        assert_eq!(metadata["observability"]["summary"]["total_events"], 2);
+        assert_eq!(metadata["observability"]["summary"]["total_llm_calls"], 1);
     }
 
     #[test]

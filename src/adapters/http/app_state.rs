@@ -78,4 +78,3 @@ impl FromRef<AppState> for Arc<ApprovalUseCases> {
         app_state.approval_use_cases.clone()
     }
 }
-

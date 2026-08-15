@@ -60,7 +60,11 @@ impl LlmSpamGuardrail {
         if let Some(reason) = Self::static_pattern_check(prompt_text) {
             warn!("Stage 3 LLM Guardrail blocked prompt via pattern match: {reason}");
             if let Some(m) = monitoring {
-                m.increment_counter("llm_guardrail_rejected_total", 1, &[("reason", "pattern_match")]);
+                m.increment_counter(
+                    "llm_guardrail_rejected_total",
+                    1,
+                    &[("reason", "pattern_match")],
+                );
             }
             anyhow::bail!("LLM Guardrail rejected message: {reason}");
         }
@@ -98,11 +102,17 @@ Respond strictly with a JSON object in this exact format: {\"is_spam\": true|fal
         };
 
         if decision.is_spam {
-            let reason_str = decision.reason.unwrap_or_else(|| "Flagged as spam or malicious injection by LLM Guardrail".to_string());
+            let reason_str = decision.reason.unwrap_or_else(|| {
+                "Flagged as spam or malicious injection by LLM Guardrail".to_string()
+            });
             warn!("Stage 3 LLM Guardrail blocked message: {reason_str}");
 
             if let Some(m) = monitoring {
-                m.increment_counter("llm_guardrail_rejected_total", 1, &[("reason", "llm_classified_spam")]);
+                m.increment_counter(
+                    "llm_guardrail_rejected_total",
+                    1,
+                    &[("reason", "llm_classified_spam")],
+                );
                 m.record_ai_execution(&AiExecutionMetrics {
                     company_id: None,
                     channel_id: None,
@@ -196,10 +206,15 @@ mod tests {
             "google",
             "gemini-2.5-flash",
             "fake_key",
-        ).await;
+        )
+        .await;
 
         assert!(res.is_err());
-        assert!(res.unwrap_err().to_string().contains("ignore all previous instructions"));
+        assert!(
+            res.unwrap_err()
+                .to_string()
+                .contains("ignore all previous instructions")
+        );
 
         // Company has explicitly disabled guardrail even when global env is true
         let mut config_env_true = config;
@@ -218,7 +233,8 @@ mod tests {
             "google",
             "gemini-2.5-flash",
             "fake_key",
-        ).await;
+        )
+        .await;
 
         assert!(res_disabled.is_ok());
     }

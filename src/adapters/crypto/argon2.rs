@@ -29,6 +29,9 @@ impl UserCredentialsHasher for ArgonPasswordHasher {
         let parsed_hash = PasswordHash::new(hash)
             .map_err(|_| AppError::Internal("Invalid password hash format.".into()))?;
 
-        Ok(self.hasher.verify_password(password.as_bytes(), &parsed_hash).is_ok())
+        Ok(self
+            .hasher
+            .verify_password(password.as_bytes(), &parsed_hash)
+            .is_ok())
     }
 }

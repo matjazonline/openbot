@@ -21,11 +21,20 @@ use crate::{
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/companies", get(list_companies).post(create_company))
-        .route("/companies/{id}", put(update_company).delete(delete_company))
+        .route(
+            "/companies/{id}",
+            put(update_company).delete(delete_company),
+        )
         .route("/companies/{id}/edit", get(edit_company_form))
         .route("/companies/{id}/cancel", get(cancel_company_edit))
-        .route("/api/companies", get(list_companies_json).post(create_company_json))
-        .route("/api/companies/{id}", put(update_company_json).delete(delete_company_json))
+        .route(
+            "/api/companies",
+            get(list_companies_json).post(create_company_json),
+        )
+        .route(
+            "/api/companies/{id}",
+            put(update_company_json).delete(delete_company_json),
+        )
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -90,7 +99,11 @@ async fn create_company(
                 .list_user_companies(user.id)
                 .await
                 .unwrap_or_default();
-            Html(format!("{}{}", error_html, pages::company_list_fragment(&companies)))
+            Html(format!(
+                "{}{}",
+                error_html,
+                pages::company_list_fragment(&companies)
+            ))
         }
     }
 }
@@ -255,6 +268,9 @@ mod tests {
         assert!(page_html.contains("Test Corp"));
         assert!(page_html.contains("/test-corp"));
         assert!(page_html.contains("hx-post=\"/companies\""));
+        assert!(page_html.contains("id=\"company-form-toggle\""));
+        assert!(page_html.contains("id=\"company-form-card\" class=\"hidden"));
+        assert!(page_html.contains("aria-expanded=\"false\""));
         assert!(page_html.contains("id=\"nav-channels\""));
         assert!(page_html.contains("selectCompany"));
 

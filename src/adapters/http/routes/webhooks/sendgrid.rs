@@ -67,7 +67,8 @@ async fn sendgrid_inbound_webhook(
                     if let Ok(bytes) = field.bytes().await {
                         raw_payload.attachments_data.push(RawAttachmentData {
                             filename,
-                            content_type: field_content_type.unwrap_or_else(|| "application/octet-stream".into()),
+                            content_type: field_content_type
+                                .unwrap_or_else(|| "application/octet-stream".into()),
                             content: bytes.to_vec(),
                         });
                     }
@@ -134,7 +135,10 @@ async fn sendgrid_inbound_webhook(
 
         // Offload Agent Execution and Outbound SMTP Dispatch to background task
         tokio::spawn(async move {
-            if let Err(err) = thread_use_cases_bg.execute_agent_and_dispatch(&ingest_bg, true).await {
+            if let Err(err) = thread_use_cases_bg
+                .execute_agent_and_dispatch(&ingest_bg, true)
+                .await
+            {
                 warn!("Background agent execution failed: {err}");
             }
         });
@@ -206,14 +210,14 @@ mod tests {
 
     use crate::{
         app_error::AppResult,
-        entities::{company::Company, message::Message, thread::Thread, channel::Channel},
+        entities::{channel::Channel, company::Company, message::Message, thread::Thread},
         infra::config::AppConfig,
         use_cases::{
+            channel::{ChannelPersistence, ChannelUseCases},
             company::CompanyPersistence,
+            company_invite::CompanyInvitePersistence,
             thread::ThreadPersistence,
             user::UserPersistence,
-            channel::{ChannelPersistence, ChannelUseCases},
-            company_invite::CompanyInvitePersistence,
         },
     };
 
@@ -223,16 +227,54 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> { unimplemented!() }
-        async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
-            Ok(self.companies.lock().unwrap().iter().find(|c| c.slug == slug).cloned())
+        async fn create(
+            &self,
+            _user_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
+            unimplemented!()
         }
-        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> { unimplemented!() }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> { unimplemented!() }
-        async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> { Ok(true) }
-        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> { Ok(vec![]) }
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> {
+            unimplemented!()
+        }
+        async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
+            Ok(self
+                .companies
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|c| c.slug == slug)
+                .cloned())
+        }
+        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
+            unimplemented!()
+        }
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
+        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
+            Ok(true)
+        }
+        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
+            Ok(vec![])
+        }
     }
 
     struct MockChannelPersistence {
@@ -241,26 +283,107 @@ mod tests {
 
     #[async_trait]
     impl ChannelPersistence for MockChannelPersistence {
-        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Channel> { unimplemented!() }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> { unimplemented!() }
-        async fn get_by_company_slug_and_channel_slug(&self, _company_slug: &str, channel_slug: &str) -> AppResult<Option<Channel>> {
-            Ok(self.channels.lock().unwrap().iter().find(|w| w.slug == channel_slug).cloned())
+        async fn create(
+            &self,
+            _company_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _participant_emails: Option<Vec<String>>,
+            _agent_ids: Option<Vec<Uuid>>,
+            _channel_config: Option<serde_json::Value>,
+        ) -> AppResult<Channel> {
+            unimplemented!()
         }
-        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> { Ok(self.channels.lock().unwrap().clone()) }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _participant_emails: Option<Vec<String>>, _agent_ids: Option<Vec<Uuid>>, _channel_config: Option<serde_json::Value>) -> AppResult<Channel> { unimplemented!() }
-        async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
+            unimplemented!()
+        }
+        async fn get_by_company_slug_and_channel_slug(
+            &self,
+            _company_slug: &str,
+            channel_slug: &str,
+        ) -> AppResult<Option<Channel>> {
+            Ok(self
+                .channels
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|w| w.slug == channel_slug)
+                .cloned())
+        }
+        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
+            Ok(self.channels.lock().unwrap().clone())
+        }
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _participant_emails: Option<Vec<String>>,
+            _agent_ids: Option<Vec<Uuid>>,
+            _channel_config: Option<serde_json::Value>,
+        ) -> AppResult<Channel> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
     }
 
     struct MockAgentPersistence;
 
     #[async_trait]
     impl crate::use_cases::agent::AgentPersistence for MockAgentPersistence {
-        async fn create(&self, _company_id: Uuid, _name: &str, _slug: &str, _provider: Option<&str>, _model: Option<&str>, _api_key: Option<&str>, _system_prompt: Option<&str>, _config_json: Option<serde_json::Value>) -> AppResult<crate::entities::agent::Agent> { unimplemented!() }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::agent::Agent>> { unimplemented!() }
-        async fn get_by_company_slug_and_agent_slug(&self, _company_slug: &str, _agent_slug: &str) -> AppResult<Option<crate::entities::agent::Agent>> { unimplemented!() }
-        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<crate::entities::agent::Agent>> { Ok(vec![]) }
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _provider: Option<&str>, _model: Option<&str>, _api_key: Option<&str>, _system_prompt: Option<&str>, _config_json: Option<serde_json::Value>) -> AppResult<crate::entities::agent::Agent> { unimplemented!() }
-        async fn delete(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
+        async fn create(
+            &self,
+            _company_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _api_key: Option<&str>,
+            _system_prompt: Option<&str>,
+            _config_json: Option<serde_json::Value>,
+        ) -> AppResult<crate::entities::agent::Agent> {
+            unimplemented!()
+        }
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::agent::Agent>> {
+            unimplemented!()
+        }
+        async fn get_by_company_slug_and_agent_slug(
+            &self,
+            _company_slug: &str,
+            _agent_slug: &str,
+        ) -> AppResult<Option<crate::entities::agent::Agent>> {
+            unimplemented!()
+        }
+        async fn list_by_company_id(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::agent::Agent>> {
+            Ok(vec![])
+        }
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _api_key: Option<&str>,
+            _system_prompt: Option<&str>,
+            _config_json: Option<serde_json::Value>,
+        ) -> AppResult<crate::entities::agent::Agent> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
     }
 
     struct MockThreadPersistence {
@@ -270,7 +393,12 @@ mod tests {
 
     #[async_trait]
     impl ThreadPersistence for MockThreadPersistence {
-        async fn create_thread(&self, channel_id: Uuid, subject: &str, participant_emails: &[String]) -> AppResult<Thread> {
+        async fn create_thread(
+            &self,
+            channel_id: Uuid,
+            subject: &str,
+            participant_emails: &[String],
+        ) -> AppResult<Thread> {
             let thread = Thread {
                 id: Uuid::new_v4(),
                 channel_id,
@@ -284,17 +412,30 @@ mod tests {
         }
 
         async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>> {
-            Ok(self.threads.lock().unwrap().iter().find(|t| t.id == id).cloned())
+            Ok(self
+                .threads
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|t| t.id == id)
+                .cloned())
         }
 
-        async fn update_thread_participants(&self, id: Uuid, participant_emails: &[String]) -> AppResult<Thread> {
+        async fn update_thread_participants(
+            &self,
+            id: Uuid,
+            participant_emails: &[String],
+        ) -> AppResult<Thread> {
             let mut list = self.threads.lock().unwrap();
             let thread = list.iter_mut().find(|t| t.id == id).unwrap();
             thread.participant_emails = participant_emails.to_vec();
             Ok(thread.clone())
         }
 
-        async fn find_thread_by_message_ids(&self, message_ids: &[String]) -> AppResult<Option<Thread>> {
+        async fn find_thread_by_message_ids(
+            &self,
+            message_ids: &[String],
+        ) -> AppResult<Option<Thread>> {
             let thread_id = {
                 let msgs = self.messages.lock().unwrap();
                 msgs.iter()
@@ -307,11 +448,19 @@ mod tests {
             Ok(None)
         }
 
-        async fn find_thread_by_thread_index(&self, thread_index_prefix: &str) -> AppResult<Option<Thread>> {
+        async fn find_thread_by_thread_index(
+            &self,
+            thread_index_prefix: &str,
+        ) -> AppResult<Option<Thread>> {
             let thread_id = {
                 let msgs = self.messages.lock().unwrap();
                 msgs.iter()
-                    .find(|m| m.thread_index.as_deref().unwrap_or_default().starts_with(thread_index_prefix))
+                    .find(|m| {
+                        m.thread_index
+                            .as_deref()
+                            .unwrap_or_default()
+                            .starts_with(thread_index_prefix)
+                    })
                     .map(|m| m.thread_id)
             };
             if let Some(tid) = thread_id {
@@ -320,7 +469,11 @@ mod tests {
             Ok(None)
         }
 
-        async fn count_recent_messages(&self, thread_id: Uuid, _duration_secs: i64) -> AppResult<usize> {
+        async fn count_recent_messages(
+            &self,
+            thread_id: Uuid,
+            _duration_secs: i64,
+        ) -> AppResult<usize> {
             let msgs = self.messages.lock().unwrap();
             Ok(msgs.iter().filter(|m| m.thread_id == thread_id).count())
         }
@@ -331,11 +484,24 @@ mod tests {
         }
 
         async fn get_message_by_message_id(&self, message_id: &str) -> AppResult<Option<Message>> {
-            Ok(self.messages.lock().unwrap().iter().find(|m| m.message_id == message_id).cloned())
+            Ok(self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|m| m.message_id == message_id)
+                .cloned())
         }
 
         async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-            Ok(self.messages.lock().unwrap().iter().filter(|m| m.thread_id == thread_id).cloned().collect())
+            Ok(self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m| m.thread_id == thread_id)
+                .cloned()
+                .collect())
         }
     }
 
@@ -345,7 +511,14 @@ mod tests {
 
     #[async_trait]
     impl crate::adapters::persistence::task::TaskPersistence for MockTaskPersistence {
-        async fn enqueue_task(&self, company_id: Uuid, channel_id: Uuid, thread_id: Option<Uuid>, task_type: &str, payload: serde_json::Value) -> AppResult<crate::entities::task::BackgroundTask> {
+        async fn enqueue_task(
+            &self,
+            company_id: Uuid,
+            channel_id: Uuid,
+            thread_id: Option<Uuid>,
+            task_type: &str,
+            payload: serde_json::Value,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
             let task = crate::entities::task::BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
@@ -365,8 +538,17 @@ mod tests {
             Ok(task)
         }
 
-        async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<crate::entities::task::BackgroundTask>> {
-            Ok(self.tasks.lock().unwrap().iter().find(|t| t.id == id).cloned())
+        async fn get_task_by_id(
+            &self,
+            id: Uuid,
+        ) -> AppResult<Option<crate::entities::task::BackgroundTask>> {
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|t| t.id == id)
+                .cloned())
         }
 
         async fn update_task_payload(&self, id: Uuid, payload: serde_json::Value) -> AppResult<()> {
@@ -377,13 +559,26 @@ mod tests {
             Ok(())
         }
 
-        async fn poll_next_pending_tasks(&self, _limit: i64) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            Ok(self.tasks.lock().unwrap().iter().filter(|t| t.status == crate::entities::task::TaskStatus::Pending).cloned().collect())
+        async fn poll_next_pending_tasks(
+            &self,
+            _limit: i64,
+        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|t| t.status == crate::entities::task::TaskStatus::Pending)
+                .cloned()
+                .collect())
         }
 
         async fn mark_task_processing(&self, id: Uuid) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id && t.status == crate::entities::task::TaskStatus::Pending) {
+            if let Some(t) = list
+                .iter_mut()
+                .find(|t| t.id == id && t.status == crate::entities::task::TaskStatus::Pending)
+            {
                 t.status = crate::entities::task::TaskStatus::Processing;
                 Ok(true)
             } else {
@@ -399,11 +594,21 @@ mod tests {
             Ok(())
         }
 
-        async fn mark_task_failed(&self, id: Uuid, error_msg: &str, _next_run_at: chrono::NaiveDateTime, is_dead_letter: bool) -> AppResult<()> {
+        async fn mark_task_failed(
+            &self,
+            id: Uuid,
+            error_msg: &str,
+            _next_run_at: chrono::NaiveDateTime,
+            is_dead_letter: bool,
+        ) -> AppResult<()> {
             let mut list = self.tasks.lock().unwrap();
             if let Some(t) = list.iter_mut().find(|t| t.id == id) {
                 t.last_error = Some(error_msg.to_string());
-                t.status = if is_dead_letter { crate::entities::task::TaskStatus::DeadLetter } else { crate::entities::task::TaskStatus::Failed };
+                t.status = if is_dead_letter {
+                    crate::entities::task::TaskStatus::DeadLetter
+                } else {
+                    crate::entities::task::TaskStatus::Failed
+                };
             }
             Ok(())
         }
@@ -422,50 +627,174 @@ mod tests {
             Ok(t.clone())
         }
 
-        async fn update_task_status(&self, id: Uuid, status: crate::entities::task::TaskStatus) -> AppResult<crate::entities::task::BackgroundTask> {
+        async fn update_task_status(
+            &self,
+            id: Uuid,
+            status: crate::entities::task::TaskStatus,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
             let t = list.iter_mut().find(|t| t.id == id).unwrap();
             t.status = status;
             Ok(t.clone())
         }
 
-        async fn list_company_tasks(&self, company_id: Uuid, _channel_id: Option<Uuid>, _status: Option<crate::entities::task::TaskStatus>, _sort_asc: bool) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            Ok(self.tasks.lock().unwrap().iter().filter(|t| t.company_id == company_id).cloned().collect())
+        async fn list_company_tasks(
+            &self,
+            company_id: Uuid,
+            _channel_id: Option<Uuid>,
+            _status: Option<crate::entities::task::TaskStatus>,
+            _sort_asc: bool,
+        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|t| t.company_id == company_id)
+                .cloned()
+                .collect())
         }
     }
 
     struct MockUserPersistence;
     #[async_trait]
     impl UserPersistence for MockUserPersistence {
-        async fn create_user(&self, _username: &str, _email: &str, _password_hash: &str) -> AppResult<()> { unimplemented!() }
-        async fn get_by_email(&self, _email: &str) -> AppResult<Option<crate::entities::user::User>> { unimplemented!() }
-        async fn get_by_username(&self, _username: &str) -> AppResult<Option<crate::entities::user::User>> { unimplemented!() }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::user::User>> { unimplemented!() }
+        async fn create_user(
+            &self,
+            _username: &str,
+            _email: &str,
+            _password_hash: &str,
+        ) -> AppResult<()> {
+            unimplemented!()
+        }
+        async fn get_by_email(
+            &self,
+            _email: &str,
+        ) -> AppResult<Option<crate::entities::user::User>> {
+            unimplemented!()
+        }
+        async fn get_by_username(
+            &self,
+            _username: &str,
+        ) -> AppResult<Option<crate::entities::user::User>> {
+            unimplemented!()
+        }
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::user::User>> {
+            unimplemented!()
+        }
     }
 
     struct MockCompanyInvitePersistence;
     #[async_trait]
     impl CompanyInvitePersistence for MockCompanyInvitePersistence {
-        async fn create_invite(&self, _company_id: Uuid, _email: &str) -> AppResult<crate::entities::company_invite::CompanyInvite> { unimplemented!() }
-        async fn get_invite_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::company_invite::CompanyInvite>> { unimplemented!() }
-        async fn list_invites_by_company(&self, _company_id: Uuid) -> AppResult<Vec<crate::entities::company_invite::CompanyInvite>> { unimplemented!() }
-        async fn update_invite_email(&self, _id: Uuid, _new_email: &str) -> AppResult<crate::entities::company_invite::CompanyInvite> { unimplemented!() }
-        async fn update_invite_status(&self, _id: Uuid, _status: &str) -> AppResult<crate::entities::company_invite::CompanyInvite> { unimplemented!() }
-        async fn delete_invite(&self, _id: Uuid) -> AppResult<()> { unimplemented!() }
-        async fn list_invites_by_email(&self, _email: &str) -> AppResult<Vec<crate::entities::company_invite::CompanyInvite>> { unimplemented!() }
-        async fn add_member(&self, _company_id: Uuid, _user_id: Uuid, _role: &str) -> AppResult<crate::entities::company_member::CompanyMember> { unimplemented!() }
-        async fn list_members_by_company(&self, _company_id: Uuid) -> AppResult<Vec<crate::entities::company_member::CompanyMember>> { unimplemented!() }
-        async fn remove_member(&self, _company_id: Uuid, _user_id: Uuid) -> AppResult<()> { unimplemented!() }
+        async fn create_invite(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<crate::entities::company_invite::CompanyInvite> {
+            unimplemented!()
+        }
+        async fn get_invite_by_id(
+            &self,
+            _id: Uuid,
+        ) -> AppResult<Option<crate::entities::company_invite::CompanyInvite>> {
+            unimplemented!()
+        }
+        async fn list_invites_by_company(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::company_invite::CompanyInvite>> {
+            unimplemented!()
+        }
+        async fn update_invite_email(
+            &self,
+            _id: Uuid,
+            _new_email: &str,
+        ) -> AppResult<crate::entities::company_invite::CompanyInvite> {
+            unimplemented!()
+        }
+        async fn update_invite_status(
+            &self,
+            _id: Uuid,
+            _status: &str,
+        ) -> AppResult<crate::entities::company_invite::CompanyInvite> {
+            unimplemented!()
+        }
+        async fn delete_invite(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
+        async fn list_invites_by_email(
+            &self,
+            _email: &str,
+        ) -> AppResult<Vec<crate::entities::company_invite::CompanyInvite>> {
+            unimplemented!()
+        }
+        async fn add_member(
+            &self,
+            _company_id: Uuid,
+            _user_id: Uuid,
+            _role: &str,
+        ) -> AppResult<crate::entities::company_member::CompanyMember> {
+            unimplemented!()
+        }
+        async fn list_members_by_company(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::company_member::CompanyMember>> {
+            unimplemented!()
+        }
+        async fn remove_member(&self, _company_id: Uuid, _user_id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
     }
 
     struct MockApprovalPersistence;
     #[async_trait]
     impl crate::adapters::persistence::approval::ApprovalPersistence for MockApprovalPersistence {
-        async fn create_approval(&self, _company_id: Uuid, _channel_id: Uuid, _thread_id: Option<Uuid>, _task_id: Option<Uuid>, _step_key: &str, _approver_email: &str, _action_type: &str, _action_title: &str, _action_summary: &str, _payload: serde_json::Value, _token: &str, _expires_at: chrono::NaiveDateTime) -> AppResult<crate::entities::approval::HumanApproval> { unimplemented!() }
-        async fn find_approval_by_step_key(&self, _thread_id: Option<Uuid>, _step_key: &str) -> AppResult<Option<crate::entities::approval::HumanApproval>> { Ok(None) }
-        async fn get_approval_by_token(&self, _token: &str) -> AppResult<Option<crate::entities::approval::HumanApproval>> { Ok(None) }
-        async fn update_approval_status(&self, _id: Uuid, _status: crate::entities::approval::ApprovalStatus) -> AppResult<crate::entities::approval::HumanApproval> { unimplemented!() }
-        async fn list_approvals_by_channel(&self, _company_id: Uuid, _channel_id: Uuid) -> AppResult<Vec<crate::entities::approval::HumanApproval>> { Ok(vec![]) }
+        async fn create_approval(
+            &self,
+            _company_id: Uuid,
+            _channel_id: Uuid,
+            _thread_id: Option<Uuid>,
+            _task_id: Option<Uuid>,
+            _step_key: &str,
+            _approver_email: &str,
+            _action_type: &str,
+            _action_title: &str,
+            _action_summary: &str,
+            _payload: serde_json::Value,
+            _token: &str,
+            _expires_at: chrono::NaiveDateTime,
+        ) -> AppResult<crate::entities::approval::HumanApproval> {
+            unimplemented!()
+        }
+        async fn find_approval_by_step_key(
+            &self,
+            _thread_id: Option<Uuid>,
+            _step_key: &str,
+        ) -> AppResult<Option<crate::entities::approval::HumanApproval>> {
+            Ok(None)
+        }
+        async fn get_approval_by_token(
+            &self,
+            _token: &str,
+        ) -> AppResult<Option<crate::entities::approval::HumanApproval>> {
+            Ok(None)
+        }
+        async fn update_approval_status(
+            &self,
+            _id: Uuid,
+            _status: crate::entities::approval::ApprovalStatus,
+        ) -> AppResult<crate::entities::approval::HumanApproval> {
+            unimplemented!()
+        }
+        async fn list_approvals_by_channel(
+            &self,
+            _company_id: Uuid,
+            _channel_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::approval::HumanApproval>> {
+            Ok(vec![])
+        }
     }
 
     #[tokio::test]
@@ -550,7 +879,11 @@ mod tests {
             config.clone(),
         ));
 
-        let channel_use_cases = Arc::new(ChannelUseCases::new(company_persistence.clone(), channel_persistence, config.clone()));
+        let channel_use_cases = Arc::new(ChannelUseCases::new(
+            company_persistence.clone(),
+            channel_persistence,
+            config.clone(),
+        ));
         let app_state = AppState {
             config: config.clone(),
             monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
@@ -558,13 +891,19 @@ mod tests {
                 Arc::new(crate::infra::argon2_password_hasher()),
                 Arc::new(MockUserPersistence {}),
             )),
-            company_use_cases: Arc::new(crate::use_cases::company::CompanyUseCases::new(
-                Arc::new(MockCompanyPersistence { companies: Mutex::new(vec![]) }),
-            )),
-            company_invite_use_cases: Arc::new(crate::use_cases::company_invite::CompanyInviteUseCases::new(
-                Arc::new(MockCompanyPersistence { companies: Mutex::new(vec![]) }),
-                Arc::new(MockCompanyInvitePersistence {}),
-            )),
+            company_use_cases: Arc::new(crate::use_cases::company::CompanyUseCases::new(Arc::new(
+                MockCompanyPersistence {
+                    companies: Mutex::new(vec![]),
+                },
+            ))),
+            company_invite_use_cases: Arc::new(
+                crate::use_cases::company_invite::CompanyInviteUseCases::new(
+                    Arc::new(MockCompanyPersistence {
+                        companies: Mutex::new(vec![]),
+                    }),
+                    Arc::new(MockCompanyInvitePersistence {}),
+                ),
+            ),
             channel_use_cases,
             agent_use_cases: Arc::new(crate::use_cases::agent::AgentUseCases::new(
                 company_persistence,
@@ -598,7 +937,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
         assert!(body_str.contains("\"processed\":true"));
         assert!(body_str.contains("\"inbound_message_id\":\"<MSG123@external.com>\""));
@@ -614,10 +955,22 @@ mod tests {
         let messages = thread_persistence.messages.lock().unwrap();
         assert_eq!(messages.len(), 2); // 1 Inbound Human + 1 Outbound Agent
 
-        assert_eq!(messages[0].role, crate::entities::message::MessageRole::Human);
-        assert_eq!(messages[0].direction, crate::entities::message::MessageDirection::Inbound);
+        assert_eq!(
+            messages[0].role,
+            crate::entities::message::MessageRole::Human
+        );
+        assert_eq!(
+            messages[0].direction,
+            crate::entities::message::MessageDirection::Inbound
+        );
 
-        assert_eq!(messages[1].role, crate::entities::message::MessageRole::Agent);
-        assert_eq!(messages[1].direction, crate::entities::message::MessageDirection::Outbound);
+        assert_eq!(
+            messages[1].role,
+            crate::entities::message::MessageRole::Agent
+        );
+        assert_eq!(
+            messages[1].direction,
+            crate::entities::message::MessageDirection::Outbound
+        );
     }
 }

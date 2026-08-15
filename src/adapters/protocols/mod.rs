@@ -1,13 +1,10 @@
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
-use async_trait::async_trait;
 
 use crate::{
     app_error::AppResult,
-    entities::{
-        channel::ChannelType,
-        message_contract::NormalizedOutboundMessage,
-    },
+    entities::{channel::ChannelType, message_contract::NormalizedOutboundMessage},
     use_cases::thread::BounceInfo,
 };
 

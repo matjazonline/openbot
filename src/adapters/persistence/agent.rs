@@ -168,9 +168,9 @@ impl AgentPersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
     use crate::use_cases::company::CompanyPersistence;
     use crate::use_cases::user::UserPersistence;
+    use serde_json::json;
 
     #[tokio::test]
     async fn postgres_agent_persistence_works() {
@@ -188,12 +188,27 @@ mod tests {
 
         let owner_username = format!("owner_{}", Uuid::new_v4().simple());
         let owner_email = format!("{}@example.com", owner_username);
-        let _ = persistence.create_user(&owner_username, &owner_email, "hash").await;
-        let owner = persistence.get_by_email(&owner_email).await.unwrap().unwrap();
-
-        let company = CompanyPersistence::create(&persistence, owner.id, "Agent Corp", "agent-corp", None, None, None, None)
+        let _ = persistence
+            .create_user(&owner_username, &owner_email, "hash")
+            .await;
+        let owner = persistence
+            .get_by_email(&owner_email)
             .await
+            .unwrap()
             .unwrap();
+
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            "Agent Corp",
+            "agent-corp",
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         let config = json!({ "prompt": "System prompt" });
 
@@ -216,13 +231,21 @@ mod tests {
         assert_eq!(agent.provider.as_deref(), Some("openai"));
         assert_eq!(agent.model.as_deref(), Some("gpt-4o"));
         assert_eq!(agent.api_key.as_deref(), Some("key_123"));
-        assert_eq!(agent.system_prompt.as_deref(), Some("You are a helpful support agent."));
+        assert_eq!(
+            agent.system_prompt.as_deref(),
+            Some("You are a helpful support agent.")
+        );
         assert_eq!(agent.config_json, Some(config));
 
-        let fetched = AgentPersistence::get_by_id(&persistence, agent.id).await.unwrap().unwrap();
+        let fetched = AgentPersistence::get_by_id(&persistence, agent.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(fetched.id, agent.id);
 
-        let list = AgentPersistence::list_by_company_id(&persistence, company.id).await.unwrap();
+        let list = AgentPersistence::list_by_company_id(&persistence, company.id)
+            .await
+            .unwrap();
         assert_eq!(list.len(), 1);
 
         let updated = AgentPersistence::update(
@@ -241,8 +264,12 @@ mod tests {
         assert_eq!(updated.name, "Support Agent V2");
         assert_eq!(updated.api_key, None);
 
-        AgentPersistence::delete(&persistence, agent.id).await.unwrap();
-        let list_after = AgentPersistence::list_by_company_id(&persistence, company.id).await.unwrap();
+        AgentPersistence::delete(&persistence, agent.id)
+            .await
+            .unwrap();
+        let list_after = AgentPersistence::list_by_company_id(&persistence, company.id)
+            .await
+            .unwrap();
         assert_eq!(list_after.len(), 0);
 
         let _ = CompanyPersistence::delete(&persistence, company.id).await;

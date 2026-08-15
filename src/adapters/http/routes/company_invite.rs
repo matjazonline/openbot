@@ -23,24 +23,57 @@ use crate::{
 pub fn router() -> Router<AppState> {
     Router::new()
         // Web / HTMX Company Invites & Team
-        .route("/companies/{company_id}/invites", get(company_invites_page).post(create_company_invite))
-        .route("/companies/{company_id}/invites/{invite_id}/edit", get(edit_invite_form))
-        .route("/companies/{company_id}/invites/{invite_id}/cancel", get(cancel_invite_edit))
-        .route("/companies/{company_id}/invites/{invite_id}", put(update_company_invite).delete(delete_company_invite))
-        .route("/companies/{company_id}/team/{user_id}", delete(remove_team_member))
+        .route(
+            "/companies/{company_id}/invites",
+            get(company_invites_page).post(create_company_invite),
+        )
+        .route(
+            "/companies/{company_id}/invites/{invite_id}/edit",
+            get(edit_invite_form),
+        )
+        .route(
+            "/companies/{company_id}/invites/{invite_id}/cancel",
+            get(cancel_invite_edit),
+        )
+        .route(
+            "/companies/{company_id}/invites/{invite_id}",
+            put(update_company_invite).delete(delete_company_invite),
+        )
+        .route(
+            "/companies/{company_id}/team/{user_id}",
+            delete(remove_team_member),
+        )
         // Web / HTMX User Invites
         .route("/invites", get(user_invites_page))
         .route("/invites/{invite_id}/accept", post(accept_user_invite))
         .route("/invites/{invite_id}/decline", post(decline_user_invite))
         // JSON API Company Invites & Team
-        .route("/api/companies/{company_id}/invites", get(list_company_invites_json).post(create_company_invite_json))
-        .route("/api/companies/{company_id}/invites/{invite_id}", put(update_company_invite_json).delete(delete_company_invite_json))
-        .route("/api/companies/{company_id}/team", get(list_team_members_json))
-        .route("/api/companies/{company_id}/team/{user_id}", delete(remove_team_member_json))
+        .route(
+            "/api/companies/{company_id}/invites",
+            get(list_company_invites_json).post(create_company_invite_json),
+        )
+        .route(
+            "/api/companies/{company_id}/invites/{invite_id}",
+            put(update_company_invite_json).delete(delete_company_invite_json),
+        )
+        .route(
+            "/api/companies/{company_id}/team",
+            get(list_team_members_json),
+        )
+        .route(
+            "/api/companies/{company_id}/team/{user_id}",
+            delete(remove_team_member_json),
+        )
         // JSON API User Invites
         .route("/api/invites", get(list_user_invites_json))
-        .route("/api/invites/{invite_id}/accept", post(accept_user_invite_json))
-        .route("/api/invites/{invite_id}/decline", post(decline_user_invite_json))
+        .route(
+            "/api/invites/{invite_id}/accept",
+            post(accept_user_invite_json),
+        )
+        .route(
+            "/api/invites/{invite_id}/decline",
+            post(decline_user_invite_json),
+        )
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -74,7 +107,10 @@ async fn company_invites_page(
     };
 
     if company.user_id != user.id {
-        return Html(pages::error_alert("Unauthorized: Only company owner can manage invites.")).into_response();
+        return Html(pages::error_alert(
+            "Unauthorized: Only company owner can manage invites.",
+        ))
+        .into_response();
     }
 
     let invites = invite_use_cases
@@ -115,7 +151,11 @@ async fn create_company_invite(
                 .list_company_invites(user.id, company_id)
                 .await
                 .unwrap_or_default();
-            Html(format!("{}{}", error_html, pages::company_invite_list_fragment(company_id, &invites)))
+            Html(format!(
+                "{}{}",
+                error_html,
+                pages::company_invite_list_fragment(company_id, &invites)
+            ))
         }
     }
 }
@@ -196,7 +236,9 @@ async fn remove_team_member(
         .await
     {
         Ok(_) => Html(String::new()),
-        Err(err) => Html(pages::error_alert(&format!("Failed to remove member: {err}"))),
+        Err(err) => Html(pages::error_alert(&format!(
+            "Failed to remove member: {err}"
+        ))),
     }
 }
 
@@ -233,7 +275,10 @@ async fn accept_user_invite(
         _ => return Html(pages::error_alert("User not found.")).into_response(),
     };
 
-    match invite_use_cases.accept_invite(&active_user, invite_id).await {
+    match invite_use_cases
+        .accept_invite(&active_user, invite_id)
+        .await
+    {
         Ok(invite) => Html(pages::user_invite_row_fragment(&invite)).into_response(),
         Err(err) => Html(pages::error_alert(&format!("Failed to accept: {err}"))).into_response(),
     }
@@ -252,7 +297,10 @@ async fn decline_user_invite(
         _ => return Html(pages::error_alert("User not found.")).into_response(),
     };
 
-    match invite_use_cases.decline_invite(&active_user, invite_id).await {
+    match invite_use_cases
+        .decline_invite(&active_user, invite_id)
+        .await
+    {
         Ok(invite) => Html(pages::user_invite_row_fragment(&invite)).into_response(),
         Err(err) => Html(pages::error_alert(&format!("Failed to decline: {err}"))).into_response(),
     }
@@ -381,7 +429,9 @@ async fn accept_user_invite_json(
         .await?
         .ok_or_else(|| crate::app_error::AppError::Internal("User not found.".into()))?;
 
-    let invite = invite_use_cases.accept_invite(&active_user, invite_id).await?;
+    let invite = invite_use_cases
+        .accept_invite(&active_user, invite_id)
+        .await?;
     Ok((
         StatusCode::OK,
         Json(InviteResponse {
@@ -403,7 +453,9 @@ async fn decline_user_invite_json(
         .await?
         .ok_or_else(|| crate::app_error::AppError::Internal("User not found.".into()))?;
 
-    let invite = invite_use_cases.decline_invite(&active_user, invite_id).await?;
+    let invite = invite_use_cases
+        .decline_invite(&active_user, invite_id)
+        .await?;
     Ok((
         StatusCode::OK,
         Json(InviteResponse {
@@ -415,8 +467,8 @@ async fn decline_user_invite_json(
 
 #[cfg(test)]
 mod tests {
-    use chrono::Utc;
     use super::*;
+    use chrono::Utc;
 
     #[test]
     fn company_invites_page_renders_html_components() {

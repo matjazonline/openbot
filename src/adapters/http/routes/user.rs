@@ -112,7 +112,11 @@ async fn login_form(
     Form(form): Form<LoginForm>,
 ) -> impl IntoResponse {
     if form.email_or_username.trim().is_empty() {
-        return (jar, Html(pages::error_alert("Email or username is required."))).into_response();
+        return (
+            jar,
+            Html(pages::error_alert("Email or username is required.")),
+        )
+            .into_response();
     }
 
     match user_use_cases
@@ -120,20 +124,28 @@ async fn login_form(
         .await
     {
         Ok(user) => {
-            let cookie = axum_extra::extract::cookie::Cookie::build(("user_id", user.id.to_string()))
-                .path("/")
-                .http_only(true)
-                .build();
+            let cookie =
+                axum_extra::extract::cookie::Cookie::build(("user_id", user.id.to_string()))
+                    .path("/")
+                    .http_only(true)
+                    .build();
             let updated_jar = jar.add(cookie);
 
             let alert = pages::success_alert(
-                &format!("Welcome back, {}! Authentication successful.", user.username),
+                &format!(
+                    "Welcome back, {}! Authentication successful.",
+                    user.username
+                ),
                 Some(("/companies", "Go to Companies")),
             );
 
             (updated_jar, Html(alert)).into_response()
         }
-        Err(_) => (jar, Html(pages::error_alert("Invalid username/email or password."))).into_response(),
+        Err(_) => (
+            jar,
+            Html(pages::error_alert("Invalid username/email or password.")),
+        )
+            .into_response(),
     }
 }
 

@@ -97,7 +97,17 @@ impl EmailParser {
         ) = if let Some(ref hdrs) = payload.headers {
             Self::parse_headers(hdrs)
         } else {
-            (None, None, Vec::new(), None, false, None, 0, Vec::new(), false)
+            (
+                None,
+                None,
+                Vec::new(),
+                None,
+                false,
+                None,
+                0,
+                Vec::new(),
+                false,
+            )
         };
 
         let message_id = extracted_msg_id
@@ -140,7 +150,8 @@ impl EmailParser {
         // Preserve full text in clean_text_body; quote stripping is applied during thread ingestion
         // if the email is a reply in an existing thread and not forwarded.
         let base_clean_text = base_text.trim().to_string();
-        let (is_context_from_body, clean_text_body) = Self::check_body_context_trigger(&base_clean_text);
+        let (is_context_from_body, clean_text_body) =
+            Self::check_body_context_trigger(&base_clean_text);
         let is_context_only = is_context_from_headers || is_context_from_body;
 
         // Process attachments - Filter small inline signature images (< 10KB images)
@@ -293,7 +304,12 @@ impl EmailParser {
                 || lower.starts_with("x-context-only:")
                 || lower.starts_with("x-quiet:")
             {
-                let val = line.split(':').nth(1).unwrap_or_default().trim().to_lowercase();
+                let val = line
+                    .split(':')
+                    .nth(1)
+                    .unwrap_or_default()
+                    .trim()
+                    .to_lowercase();
                 if val == "true" || val == "1" || val == "yes" || val.is_empty() {
                     is_context_only = true;
                 }

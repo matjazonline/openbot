@@ -153,7 +153,8 @@ mod test {
         }
 
         fn verify_password(&self, password: &str, hash: &str) -> AppResult<bool> {
-            Ok(hash == &format!("{}_hash", password) || hash == "secret_hash" && password == "secret")
+            Ok(hash == &format!("{}_hash", password)
+                || hash == "secret_hash" && password == "secret")
         }
     }
 

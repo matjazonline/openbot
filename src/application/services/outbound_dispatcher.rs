@@ -145,7 +145,11 @@ impl OutboundDispatcher {
         if !trace.contains(&email.channel_id) {
             trace.push(email.channel_id);
         }
-        let trace_str = trace.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
+        let trace_str = trace
+            .iter()
+            .map(|u| u.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
         let next_hop = email.hop_count + 1;
 
         builder = builder.header(CustomHeader {
@@ -244,13 +248,14 @@ impl OutboundDispatcher {
                 value: "auto-replied".to_string(),
             });
 
-        let email_msg = builder
-            .body(bounce_body.to_string())
-            .map_err(|e| AppError::Internal(format!("Failed to build bounce email message: {}", e)))?;
+        let email_msg = builder.body(bounce_body.to_string()).map_err(|e| {
+            AppError::Internal(format!("Failed to build bounce email message: {}", e))
+        })?;
 
         if !config.smtp_host.is_empty() {
-            let mut mailer_builder = AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&config.smtp_host)
-                .port(config.smtp_port);
+            let mut mailer_builder =
+                AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&config.smtp_host)
+                    .port(config.smtp_port);
 
             if !config.smtp_username.is_empty() {
                 mailer_builder = mailer_builder.credentials(Credentials::new(
@@ -324,11 +329,16 @@ mod tests {
             trace_channels: Vec::new(),
         };
 
-        let result = OutboundDispatcher::send(&config, outbound_email).await.unwrap();
+        let result = OutboundDispatcher::send(&config, outbound_email)
+            .await
+            .unwrap();
 
         assert!(result.outbound_message_id.contains("@mailagents.com"));
         assert_eq!(result.in_reply_to, "<TRIGGER123@mail.com>");
-        assert_eq!(result.references, vec!["<REF1@mail.com>", "<TRIGGER123@mail.com>"]);
+        assert_eq!(
+            result.references,
+            vec!["<REF1@mail.com>", "<TRIGGER123@mail.com>"]
+        );
         assert_eq!(result.subject, "Re: Help needed");
         assert_eq!(result.from_address, "support@acme.mailagents.com");
         assert_eq!(result.recipients_to, vec!["user@example.com"]);

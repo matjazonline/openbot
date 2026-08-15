@@ -7,8 +7,9 @@ use crate::{
     domain::monitoring::MonitoringService,
     infra::{argon2_password_hasher, config::AppConfig, postgres_persistence},
     use_cases::{
-        agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases, company::CompanyUseCases,
-        company_invite::CompanyInviteUseCases, thread::ThreadUseCases, user::UserUseCases,
+        agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
+        company::CompanyUseCases, company_invite::CompanyInviteUseCases, thread::ThreadUseCases,
+        user::UserUseCases,
     },
 };
 use std::fs::File;
@@ -28,8 +29,13 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
 
     let user_use_cases = UserUseCases::new(Arc::new(argon_hasher), postgres_arc.clone());
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
-    let company_invite_use_cases = CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());
-    let channel_use_cases = Arc::new(ChannelUseCases::new(postgres_arc.clone(), postgres_arc.clone(), config.clone()));
+    let company_invite_use_cases =
+        CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());
+    let channel_use_cases = Arc::new(ChannelUseCases::new(
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        config.clone(),
+    ));
     let agent_use_cases = AgentUseCases::new(postgres_arc.clone(), postgres_arc.clone());
 
     let approval_use_cases = Arc::new(ApprovalUseCases::new(
@@ -39,9 +45,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         config.clone(),
     ));
 
-    let egress_registry = Arc::new(
-        EgressRegistry::new().register(Arc::new(EmailEgressAdapter::new(config.clone()))),
-    );
+    let egress_registry =
+        Arc::new(EgressRegistry::new().register(Arc::new(EmailEgressAdapter::new(config.clone()))));
 
     let thread_use_cases = Arc::new(
         ThreadUseCases::new(

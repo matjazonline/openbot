@@ -22,6 +22,7 @@ use crate::{
         channel::ChannelUseCases,
         company::CompanyUseCases,
         thread::{SimulationMode, ThreadUseCases},
+        user::UserUseCases,
     },
 };
 
@@ -229,6 +230,44 @@ async fn create_channel_handler(
         .as_deref()
         .map(|s| s.trim())
         .filter(|s| !s.is_empty());
+
+    let generated_system_prompt = if form.form_mode.as_deref() == Some("simple") {
+        match system_prompt_clean {
+            Some(instructions) => match agent_use_cases
+                .generate_system_prompt(user.id, company_id, instructions, None, None, None)
+                .await
+            {
+                Ok(prompt) => Some(prompt),
+                Err(err) => {
+                    let agents = agent_use_cases
+                        .list_company_agents(user.id, company_id)
+                        .await
+                        .unwrap_or_default();
+                    let channels = channel_use_cases
+                        .list_company_channels(user.id, company_id)
+                        .await
+                        .unwrap_or_default();
+                    let error_html =
+                        pages::error_alert(&format!("Failed to generate agent prompt: {err}"));
+                    return Html(format!(
+                        "{}{}",
+                        error_html,
+                        pages::channel_list_fragment(
+                            &company,
+                            &config.app_domain_name,
+                            &channels,
+                            &agents
+                        )
+                    ));
+                }
+            },
+            None => None,
+        }
+    } else {
+        None
+    };
+
+    let system_prompt_clean = generated_system_prompt.as_deref().or(system_prompt_clean);
 
     if let Some(prompt) = system_prompt_clean {
         match agent_use_cases
@@ -506,7 +545,7 @@ async fn delete_channel_handler(
 #[derive(Debug, Clone, Deserialize)]
 pub struct SimulationForm {
     pub to: String,
-    pub from: String,
+    pub from: Option<String>,
     pub subject: Option<String>,
     pub text_body: Option<String>,
     pub html_body: Option<String>,
@@ -525,8 +564,16 @@ pub struct OpenThreadParams {
 }
 
 /// GET /companies/{company_id}/channels/{id}/simulate - Simulation page (Protected).
-#[instrument(skip(company_use_cases, channel_use_cases, thread_use_cases, config, user))]
+#[instrument(skip(
+    user_use_cases,
+    company_use_cases,
+    channel_use_cases,
+    thread_use_cases,
+    config,
+    user
+))]
 async fn simulate_channel_page(
+    State(user_use_cases): State<Arc<UserUseCases>>,
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
@@ -546,6 +593,11 @@ async fn simulate_channel_page(
     {
         Ok(Some(wf)) => wf,
         _ => return Html(pages::error_alert("Channel not found.")).into_response(),
+    };
+
+    let active_user = match user_use_cases.get_user_by_id(user.id).await {
+        Ok(Some(active_user)) => active_user,
+        _ => return Html(pages::error_alert("User not found.")).into_response(),
     };
 
     let mut initial_thread_id: Option<String> = None;
@@ -625,6 +677,7 @@ async fn simulate_channel_page(
         &company,
         &config.app_domain_name,
         &channel,
+        &active_user.email,
         initial_thread_id.as_deref(),
         initial_result_html.as_deref(),
     ))
@@ -636,11 +689,13 @@ async fn simulate_channel_page(
     company_use_cases,
     channel_use_cases,
     thread_use_cases,
+    user_use_cases,
     config,
     user,
     form
 ))]
 async fn simulate_channel_handler(
+    State(user_use_cases): State<Arc<UserUseCases>>,
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
@@ -658,9 +713,10 @@ async fn simulate_channel_handler(
 
     match mode {
         SimulationMode::Verify => {
+            let sender = form.from.clone().unwrap_or_default();
             let inbound_email = crate::use_cases::channel::InboundEmail {
                 to: form.to.clone(),
-                from: form.from.clone(),
+                from: sender.clone(),
                 subject: form.subject.clone(),
                 text_body: form.text_body.clone(),
                 html_body: form.html_body.clone(),
@@ -693,7 +749,7 @@ async fn simulate_channel_handler(
                         company.as_ref(),
                         channel.as_ref(),
                         &form.to,
-                        &form.from,
+                        &sender,
                         form.subject.as_deref().unwrap_or("(No subject)"),
                         &format!("Simulation failed: {err}"),
                     ))
@@ -702,6 +758,11 @@ async fn simulate_channel_handler(
             }
         }
         SimulationMode::RunTest | SimulationMode::Run => {
+            let sender = match user_use_cases.get_user_by_id(user.id).await {
+                Ok(Some(active_user)) => active_user.email,
+                _ => return Html(pages::error_alert("User not found.")).into_response(),
+            };
+
             let mut headers = String::new();
             if let Some(ref reply_to) = form.in_reply_to {
                 let trimmed = reply_to.trim();
@@ -715,7 +776,7 @@ async fn simulate_channel_handler(
 
             let raw_payload = RawInboundPayload {
                 to: form.to.clone(),
-                from: form.from.clone(),
+                from: sender.clone(),
                 subject: form.subject.clone(),
                 text: form.text_body.clone(),
                 html: form.html_body.clone(),
@@ -775,7 +836,7 @@ async fn simulate_channel_handler(
                         company.as_ref(),
                         channel.as_ref(),
                         &form.to,
-                        &form.from,
+                        &sender,
                         form.subject.as_deref().unwrap_or("(No subject)"),
                         &format!("Simulation execution failed: {err}"),
                     ))
@@ -1132,6 +1193,15 @@ mod tests {
         assert!(page_html.contains("LLM Model (Optional Override)"));
         assert!(page_html.contains("LLM API Key (Optional Override)"));
         assert!(page_html.contains("Channel Config (JSON, Optional)"));
+        assert!(page_html.contains("id=\"channel-form-toggle\""));
+        assert!(page_html.contains("id=\"channel-form-card\" class=\"hidden"));
+        assert!(page_html.contains("aria-controls=\"channel-form-card\""));
+        assert!(page_html.contains("Agent Instructions"));
+        assert!(!page_html.contains("target_id\": \"simple_system_prompt\""));
+        assert!(!page_html.contains("id=\"simple_prompt_gen_box\""));
+        assert!(page_html.contains("Creating..."));
+        assert!(page_html.contains("animate-spin h-4 w-4"));
+        assert!(page_html.contains("hx-disabled-elt=\"find button[type='submit']\""));
 
         let row_html = pages::channel_row_fragment(&company, "example.com", &channel, &[]);
         assert!(row_html.contains("Auto Dispatcher"));
@@ -1144,20 +1214,30 @@ mod tests {
         assert!(edit_html.contains("value=\"Auto Dispatcher\""));
         assert!(edit_html.contains("Custom Channel Agent"));
 
-        let sim_html =
-            pages::channel_simulation_page(&company, "example.com", &channel, None, None);
+        let sim_html = pages::channel_simulation_page(
+            &company,
+            "example.com",
+            &channel,
+            "logged-in@test.com",
+            None,
+            None,
+        );
         assert!(sim_html.contains("Simulate Webhook: Auto Dispatcher"));
         assert!(sim_html.contains("auto-dispatcher@acme.example.com"));
         assert!(sim_html.contains("value=\"verify\""));
         assert!(sim_html.contains("value=\"run_test\""));
         assert!(sim_html.contains("value=\"run\""));
+        assert!(sim_html.contains("Trigger Webhook Simulation"));
+        assert!(sim_html.contains("Simulating..."));
         assert!(sim_html.contains("Open Existing Thread by ID"));
         assert!(sim_html.contains("Simulated Webhook Payload"));
+        assert!(sim_html.contains("value=\"logged-in@test.com\""));
 
         let sim_html_with_thread = pages::channel_simulation_page(
             &company,
             "example.com",
             &channel,
+            "logged-in@test.com",
             Some("0f5421b8-9e78-4f21-ac52-3af494c3f344"),
             None,
         );
@@ -1225,7 +1305,7 @@ mod tests {
             },
             agent_execution: Some(crate::use_cases::thread::AgentExecutionResult {
                 outbound_message_id: Some("<out1@test>".to_string()),
-                agent_response: "Hello from Agent".to_string(),
+                agent_response: "## Agent Result\n\n**Hello** from Agent".to_string(),
                 email_sent: false,
                 token_usage: Some(crate::entities::task::TokenUsage::new(10, 5)),
                 metadata: None,
@@ -1251,17 +1331,39 @@ mod tests {
             thread_index: None,
             created_at: Utc::now().naive_utc(),
         };
+        let test_agent_message = crate::entities::message::Message {
+            id: Uuid::new_v4(),
+            thread_id: test_message.thread_id,
+            message_id: "<out1@test>".to_string(),
+            in_reply_to: Some(test_message.message_id.clone()),
+            references_list: vec![],
+            sender: "auto-dispatcher@acme.example.com".to_string(),
+            recipients_to: vec!["agent@test.com".to_string()],
+            recipients_cc: vec![],
+            subject: "Re: Test".to_string(),
+            clean_text_body: "### Thread Result\n\n- **First** item\n- Second item".to_string(),
+            raw_text_body: None,
+            raw_html_body: None,
+            attachments: None,
+            direction: crate::entities::message::MessageDirection::Outbound,
+            role: crate::entities::message::MessageRole::Agent,
+            thread_index: None,
+            created_at: Utc::now().naive_utc(),
+        };
 
         let run_test_html = pages::channel_simulation_execution_result_fragment(
             company.id,
             channel.id,
             &full_sim_res,
-            &[test_message.clone()],
+            &[test_message.clone(), test_agent_message.clone()],
             &[],
         );
         assert!(run_test_html.contains("Run_Test"));
         assert!(run_test_html.contains("Skipped (Run_Test Dry-Run)"));
-        assert!(run_test_html.contains("Hello from Agent"));
+        assert!(run_test_html.contains("<h2>Agent Result</h2>"));
+        assert!(run_test_html.contains("<strong>Hello</strong> from Agent"));
+        assert!(run_test_html.contains("<h3>Thread Result</h3>"));
+        assert!(run_test_html.contains("<li><strong>First</strong> item</li>"));
         assert!(run_test_html.contains("Task Execution Parameters"));
         assert!(run_test_html.contains("LLM Provider:"));
         assert!(run_test_html.contains("LLM Model:"));
@@ -1269,7 +1371,9 @@ mod tests {
         assert!(run_test_html.contains("hx-swap-oob=\"outerHTML\""));
         assert!(run_test_html.contains("Simulate New Thread"));
         assert!(run_test_html.contains("Simulate Reply Webhook Call"));
-        assert!(run_test_html.contains("value=\"<msg1@test>\""));
+        assert!(run_test_html.contains("Trigger Reply Webhook Simulation"));
+        assert!(run_test_html.contains("Simulating..."));
+        assert!(run_test_html.contains("value=\"<out1@test>\""));
         assert!(run_test_html.contains("Thread History"));
 
         let fail_html = pages::channel_simulation_failure_fragment(
@@ -1303,7 +1407,7 @@ mod tests {
             &channel,
             "example.com",
             &sample_thread,
-            &[test_message],
+            &[test_message, test_agent_message],
             &[],
             true,
         );
@@ -1311,6 +1415,10 @@ mod tests {
         assert!(loaded_thread_html.contains("Existing Thread Subject"));
         assert!(loaded_thread_html.contains("Task Execution Parameters"));
         assert!(loaded_thread_html.contains("Simulate Reply Webhook Call"));
+        assert!(loaded_thread_html.contains("Trigger Reply Webhook Simulation"));
+        assert!(loaded_thread_html.contains("Simulating..."));
+        assert!(loaded_thread_html.contains("hx-disabled-elt=\"find button[type='submit']\""));
+        assert!(loaded_thread_html.contains("<h3>Thread Result</h3>"));
 
         let error_thread_html = pages::channel_simulation_thread_error_fragment(
             company.id,
@@ -1357,6 +1465,7 @@ mod tests {
             form_simple.system_prompt,
             Some("You are a support agent.".to_string())
         );
+        assert_eq!(form_simple.form_mode.as_deref(), Some("simple"));
         assert_eq!(slugify(&form_simple.name), "inbound-support");
 
         let req_omitted = Request::builder()

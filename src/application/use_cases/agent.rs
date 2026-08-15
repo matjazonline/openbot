@@ -244,10 +244,7 @@ impl AgentUseCases {
             ));
         }
 
-        info!(
-            "Deleting agent {} for company {}",
-            agent_id, company_id
-        );
+        info!("Deleting agent {} for company {}", agent_id, company_id);
         self.agent_persistence.delete(agent_id).await
     }
 
@@ -272,21 +269,37 @@ impl AgentUseCases {
         let provider_opt = provider_override
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
-            .or_else(|| company.provider.as_deref().map(|s| s.trim()).filter(|s| !s.is_empty()));
-
-        let provider = provider_opt
-            .map(|s| s.to_lowercase())
-            .unwrap_or_else(|| {
-                if std::env::var("OPENAI_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some() {
-                    "openai".to_string()
-                } else if std::env::var("ANTHROPIC_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some() {
-                    "anthropic".to_string()
-                } else if std::env::var("GROQ_API_KEY").ok().filter(|s| !s.trim().is_empty()).is_some() {
-                    "groq".to_string()
-                } else {
-                    "google".to_string()
-                }
+            .or_else(|| {
+                company
+                    .provider
+                    .as_deref()
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
             });
+
+        let provider = provider_opt.map(|s| s.to_lowercase()).unwrap_or_else(|| {
+            if std::env::var("OPENAI_API_KEY")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+                .is_some()
+            {
+                "openai".to_string()
+            } else if std::env::var("ANTHROPIC_API_KEY")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+                .is_some()
+            {
+                "anthropic".to_string()
+            } else if std::env::var("GROQ_API_KEY")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+                .is_some()
+            {
+                "groq".to_string()
+            } else {
+                "google".to_string()
+            }
+        });
 
         let default_model = match provider.as_str() {
             "google" | "gemini" => "gemini-2.5-flash",
@@ -299,16 +312,26 @@ impl AgentUseCases {
         let model = model_override
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
-            .or_else(|| company.model.as_deref().map(|s| s.trim()).filter(|s| !s.is_empty()))
+            .or_else(|| {
+                company
+                    .model
+                    .as_deref()
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })
             .unwrap_or(default_model)
             .to_string();
 
         let env_key = match provider.as_str() {
-            "google" | "gemini" => std::env::var("GEMINI_API_KEY").ok().or_else(|| std::env::var("GOOGLE_API_KEY").ok()),
+            "google" | "gemini" => std::env::var("GEMINI_API_KEY")
+                .ok()
+                .or_else(|| std::env::var("GOOGLE_API_KEY").ok()),
             "openai" => std::env::var("OPENAI_API_KEY").ok(),
             "anthropic" => std::env::var("ANTHROPIC_API_KEY").ok(),
             "groq" => std::env::var("GROQ_API_KEY").ok(),
-            _ => std::env::var("LLM_API_KEY").ok().or_else(|| std::env::var("API_KEY").ok()),
+            _ => std::env::var("LLM_API_KEY")
+                .ok()
+                .or_else(|| std::env::var("API_KEY").ok()),
         };
 
         let api_key = api_key_override
@@ -334,7 +357,13 @@ Guidelines:
 
         let indented_system_prompt = prepared_system_prompt
             .lines()
-            .map(|line| if line.is_empty() { String::new() } else { format!("  {}", line) })
+            .map(|line| {
+                if line.is_empty() {
+                    String::new()
+                } else {
+                    format!("  {}", line)
+                }
+            })
             .collect::<Vec<_>>()
             .join("\n");
 
@@ -343,8 +372,9 @@ Guidelines:
             indented_system_prompt, provider, model, api_key
         );
 
-        let mut builder = ai_agents::AgentBuilder::from_yaml(&config_yaml)
-            .map_err(|e| AppError::Internal(format!("Failed to parse agent builder config: {e}")))?;
+        let mut builder = ai_agents::AgentBuilder::from_yaml(&config_yaml).map_err(|e| {
+            AppError::Internal(format!("Failed to parse agent builder config: {e}"))
+        })?;
 
         if let Ok(provider_type) = std::str::FromStr::from_str(&provider) {
             let unified_provider = ai_agents::UnifiedLLMProvider::new(
@@ -389,11 +419,11 @@ Guidelines:
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
+    use super::*;
+    use crate::entities::company::Company;
     use chrono::Utc;
     use serde_json::json;
-    use crate::entities::company::Company;
-    use super::*;
+    use std::sync::Mutex;
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
@@ -401,7 +431,16 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> {
+        async fn create(
+            &self,
+            _user_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -429,7 +468,16 @@ mod tests {
             unimplemented!()
         }
 
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> {
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -688,7 +736,13 @@ Guidelines:
 
         let indented_system_prompt = prepared_system_prompt
             .lines()
-            .map(|line| if line.is_empty() { String::new() } else { format!("  {}", line) })
+            .map(|line| {
+                if line.is_empty() {
+                    String::new()
+                } else {
+                    format!("  {}", line)
+                }
+            })
             .collect::<Vec<_>>()
             .join("\n");
 

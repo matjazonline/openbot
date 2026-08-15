@@ -175,9 +175,9 @@ impl ChannelPersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
     use crate::use_cases::company::CompanyPersistence;
     use crate::use_cases::user::UserPersistence;
+    use serde_json::json;
 
     #[tokio::test]
     async fn postgres_channel_persistence_works() {
@@ -196,12 +196,27 @@ mod tests {
         // Create owner & company
         let owner_username = format!("owner_{}", Uuid::new_v4().simple());
         let owner_email = format!("{}@example.com", owner_username);
-        let _ = persistence.create_user(&owner_username, &owner_email, "hash").await;
-        let owner = persistence.get_by_email(&owner_email).await.unwrap().unwrap();
-
-        let company = CompanyPersistence::create(&persistence, owner.id, "Channel Corp", "ch-corp", None, None, None, None)
+        let _ = persistence
+            .create_user(&owner_username, &owner_email, "hash")
+            .await;
+        let owner = persistence
+            .get_by_email(&owner_email)
             .await
+            .unwrap()
             .unwrap();
+
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            "Channel Corp",
+            "ch-corp",
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         // 1. Create Channel
         let emails = vec!["a@example.com".to_string(), "b@example.com".to_string()];
@@ -236,11 +251,16 @@ mod tests {
         assert_eq!(channel.channel_config, Some(config));
 
         // 2. Get by ID
-        let fetched = ChannelPersistence::get_by_id(&persistence, channel.id).await.unwrap().unwrap();
+        let fetched = ChannelPersistence::get_by_id(&persistence, channel.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(fetched.id, channel.id);
 
         // 3. List by company ID
-        let list = ChannelPersistence::list_by_company_id(&persistence, company.id).await.unwrap();
+        let list = ChannelPersistence::list_by_company_id(&persistence, company.id)
+            .await
+            .unwrap();
         assert_eq!(list.len(), 1);
 
         // 4. Update
@@ -263,8 +283,12 @@ mod tests {
         assert_eq!(updated.participant_emails, None);
 
         // 5. Delete
-        ChannelPersistence::delete(&persistence, channel.id).await.unwrap();
-        let list_after = ChannelPersistence::list_by_company_id(&persistence, company.id).await.unwrap();
+        ChannelPersistence::delete(&persistence, channel.id)
+            .await
+            .unwrap();
+        let list_after = ChannelPersistence::list_by_company_id(&persistence, company.id)
+            .await
+            .unwrap();
         assert_eq!(list_after.len(), 0);
 
         // Cleanup

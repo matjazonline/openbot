@@ -41,8 +41,8 @@ impl AppConfig {
             .parse()
             .expect("ACCESS_TOKEN_TTL_SECS must be a valid number");
 
-        let app_domain_name = env::var("APP_DOMAIN_NAME")
-            .unwrap_or_else(|_| "localhost".to_string());
+        let app_domain_name =
+            env::var("APP_DOMAIN_NAME").unwrap_or_else(|_| "localhost".to_string());
 
         let smtp_host = env::var("SMTP_HOST").unwrap_or_else(|_| "localhost".to_string());
         let smtp_port: u16 = env::var("SMTP_PORT")
@@ -51,13 +51,15 @@ impl AppConfig {
             .unwrap_or(1025);
         let smtp_username = env::var("SMTP_USERNAME").unwrap_or_default();
         let smtp_password = env::var("SMTP_PASSWORD").unwrap_or_default();
-        let smtp_from_address = env::var("SMTP_FROM_ADDRESS").unwrap_or_else(|_| "noreply@localhost".to_string());
+        let smtp_from_address =
+            env::var("SMTP_FROM_ADDRESS").unwrap_or_else(|_| "noreply@localhost".to_string());
 
         let incoming_smtp_enabled: bool = env::var("INCOMING_SMTP_ENABLED")
             .unwrap_or_else(|_| "true".to_string())
             .parse()
             .unwrap_or(true);
-        let incoming_smtp_host = env::var("INCOMING_SMTP_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+        let incoming_smtp_host =
+            env::var("INCOMING_SMTP_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
         let incoming_smtp_port: u16 = env::var("INCOMING_SMTP_PORT")
             .unwrap_or_else(|_| "2525".to_string())
             .parse()
@@ -100,8 +102,8 @@ impl AppConfig {
             .parse()
             .unwrap_or(false);
 
-        let spam_scanner_type = env::var("SPAM_SCANNER_TYPE")
-            .unwrap_or_else(|_| "rspamd".to_string());
+        let spam_scanner_type =
+            env::var("SPAM_SCANNER_TYPE").unwrap_or_else(|_| "rspamd".to_string());
 
         let spam_scanner_url = env::var("SPAM_SCANNER_URL")
             .unwrap_or_else(|_| "http://localhost:11333/checkv2".to_string());

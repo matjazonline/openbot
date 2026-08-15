@@ -3,8 +3,8 @@ use crate::domain::monitoring::{
     TaskStatusMetric,
 };
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub struct InMemoryMonitor {
     // AI Metrics
@@ -85,14 +85,19 @@ impl MonitoringService for InMemoryMonitor {
     fn record_ai_execution(&self, metrics: &AiExecutionMetrics) {
         self.ai_total_executions.fetch_add(1, Ordering::Relaxed);
         if metrics.success {
-            self.ai_successful_executions.fetch_add(1, Ordering::Relaxed);
+            self.ai_successful_executions
+                .fetch_add(1, Ordering::Relaxed);
         } else {
             self.ai_failed_executions.fetch_add(1, Ordering::Relaxed);
         }
-        self.ai_total_prompt_tokens.fetch_add(metrics.prompt_tokens as u64, Ordering::Relaxed);
-        self.ai_total_completion_tokens.fetch_add(metrics.completion_tokens as u64, Ordering::Relaxed);
-        self.ai_total_tokens.fetch_add(metrics.total_tokens as u64, Ordering::Relaxed);
-        self.ai_total_duration_ms.fetch_add(metrics.duration_ms, Ordering::Relaxed);
+        self.ai_total_prompt_tokens
+            .fetch_add(metrics.prompt_tokens as u64, Ordering::Relaxed);
+        self.ai_total_completion_tokens
+            .fetch_add(metrics.completion_tokens as u64, Ordering::Relaxed);
+        self.ai_total_tokens
+            .fetch_add(metrics.total_tokens as u64, Ordering::Relaxed);
+        self.ai_total_duration_ms
+            .fetch_add(metrics.duration_ms, Ordering::Relaxed);
     }
 
     fn record_smtp_connection(&self, metrics: &SmtpConnectionMetrics) {
@@ -100,11 +105,15 @@ impl MonitoringService for InMemoryMonitor {
         match metrics.status {
             SmtpStatus::Accepted => self.smtp_accepted.fetch_add(1, Ordering::Relaxed),
             SmtpStatus::BlockedDnsbl => self.smtp_blocked_dnsbl.fetch_add(1, Ordering::Relaxed),
-            SmtpStatus::BlockedRateLimit => self.smtp_blocked_rate_limit.fetch_add(1, Ordering::Relaxed),
+            SmtpStatus::BlockedRateLimit => {
+                self.smtp_blocked_rate_limit.fetch_add(1, Ordering::Relaxed)
+            }
             SmtpStatus::RejectedSpf => self.smtp_rejected_spf.fetch_add(1, Ordering::Relaxed),
             SmtpStatus::RejectedDkim => self.smtp_rejected_dkim.fetch_add(1, Ordering::Relaxed),
             SmtpStatus::RejectedDmarc => self.smtp_rejected_dmarc.fetch_add(1, Ordering::Relaxed),
-            SmtpStatus::RejectedSpamScore => self.smtp_rejected_spam_score.fetch_add(1, Ordering::Relaxed),
+            SmtpStatus::RejectedSpamScore => self
+                .smtp_rejected_spam_score
+                .fetch_add(1, Ordering::Relaxed),
             SmtpStatus::RejectedHelo => self.smtp_rejected_helo.fetch_add(1, Ordering::Relaxed),
             SmtpStatus::RejectedPtr => self.smtp_rejected_ptr.fetch_add(1, Ordering::Relaxed),
             SmtpStatus::Error => self.smtp_errors.fetch_add(1, Ordering::Relaxed),
@@ -118,7 +127,8 @@ impl MonitoringService for InMemoryMonitor {
             TaskStatusMetric::Failed => self.task_failed.fetch_add(1, Ordering::Relaxed),
             TaskStatusMetric::Retried => self.task_retried.fetch_add(1, Ordering::Relaxed),
         };
-        self.task_total_duration_ms.fetch_add(metrics.duration_ms, Ordering::Relaxed);
+        self.task_total_duration_ms
+            .fetch_add(metrics.duration_ms, Ordering::Relaxed);
     }
 
     fn increment_counter(&self, name: &str, value: u64, _labels: &[(&str, &str)]) {
@@ -134,13 +144,26 @@ impl MonitoringService for InMemoryMonitor {
     fn get_stats_json(&self) -> serde_json::Value {
         let ai_total = self.ai_total_executions.load(Ordering::Relaxed);
         let ai_duration = self.ai_total_duration_ms.load(Ordering::Relaxed);
-        let ai_avg_latency_ms = if ai_total > 0 { ai_duration as f64 / ai_total as f64 } else { 0.0 };
+        let ai_avg_latency_ms = if ai_total > 0 {
+            ai_duration as f64 / ai_total as f64
+        } else {
+            0.0
+        };
 
         let task_total = self.task_total_executions.load(Ordering::Relaxed);
         let task_duration = self.task_total_duration_ms.load(Ordering::Relaxed);
-        let task_avg_latency_ms = if task_total > 0 { task_duration as f64 / task_total as f64 } else { 0.0 };
+        let task_avg_latency_ms = if task_total > 0 {
+            task_duration as f64 / task_total as f64
+        } else {
+            0.0
+        };
 
-        let custom = self.custom_counters.read().ok().map(|c| c.clone()).unwrap_or_default();
+        let custom = self
+            .custom_counters
+            .read()
+            .ok()
+            .map(|c| c.clone())
+            .unwrap_or_default();
 
         serde_json::json!({
             "ai_executions": {

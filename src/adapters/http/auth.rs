@@ -71,7 +71,12 @@ mod tests {
         let response = AuthError::RedirectToLogin.into_response();
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
         assert_eq!(
-            response.headers().get("location").unwrap().to_str().unwrap(),
+            response
+                .headers()
+                .get("location")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "/login"
         );
     }

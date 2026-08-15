@@ -31,11 +31,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Initialize Incoming SMTP Server loop
     let smtp_server = Arc::new(
-        SmtpServer::new(
-            app_state.thread_use_cases.clone(),
-            app_state.config.clone(),
-        )
-        .with_monitoring(app_state.monitoring.clone()),
+        SmtpServer::new(app_state.thread_use_cases.clone(), app_state.config.clone())
+            .with_monitoring(app_state.monitoring.clone()),
     );
 
     tokio::spawn(smtp_server.start_server_loop(shutdown_rx.resubscribe()));

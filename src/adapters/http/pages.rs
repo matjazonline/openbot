@@ -1,3 +1,4 @@
+use pulldown_cmark::{Options, Parser, html};
 use uuid::Uuid;
 
 use crate::entities::{
@@ -13,6 +14,21 @@ use crate::entities::{
 };
 use crate::use_cases::channel::InboundEmailResult;
 use crate::use_cases::thread::{SimulationExecutionResult, SimulationMode};
+
+const MARKDOWN_CONTENT_STYLES: &str = "[&_p]:mb-2 [&_p:last-child]:mb-0 [&_h1]:mb-2 [&_h1]:text-base [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:text-sm [&_h2]:font-bold [&_h3]:mb-2 [&_h3]:font-bold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-600 [&_blockquote]:pl-3 [&_blockquote]:text-slate-300 [&_a]:underline [&_a]:text-indigo-300 [&_strong]:font-bold [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-slate-900 [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_table]:my-2 [&_table]:w-full [&_th]:border [&_th]:border-slate-700 [&_th]:p-2 [&_th]:text-left [&_td]:border [&_td]:border-slate-800 [&_td]:p-2";
+
+fn render_markdown(markdown: &str) -> String {
+    let options =
+        Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES | Options::ENABLE_TASKLISTS;
+    let parser = Parser::new_ext(markdown, options);
+    let mut rendered = String::new();
+    html::push_html(&mut rendered, parser);
+
+    ammonia::Builder::default()
+        .link_rel(Some("noopener noreferrer"))
+        .clean(&rendered)
+        .to_string()
+}
 
 pub fn base_layout(title: &str, content: &str) -> String {
     format!(
@@ -410,17 +426,22 @@ pub fn companies_page(companies: &[Company]) -> String {
                 <h2 class="text-2xl font-bold text-white">Company Accounts</h2>
                 <p class="text-slate-400 text-sm mt-1">Manage your organization profiles and indexed slugs</p>
             </div>
+            <button id="company-form-toggle" type="button" aria-controls="company-form-card" aria-expanded="false"
+                onclick="const card = document.getElementById('company-form-card'); const opening = card.classList.contains('hidden'); card.classList.toggle('hidden'); this.setAttribute('aria-expanded', opening);"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer">
+                Add Company
+            </button>
         </div>
 
         <div id="response-message" class="mb-6"></div>
 
         <!-- Create Company Card -->
-        <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-8">
+        <div id="company-form-card" class="hidden bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-8">
             <h3 class="text-md font-semibold text-white mb-3 flex items-center gap-2">
                 <span class="text-indigo-400">+</span> Add New Company
             </h3>
             <form hx-post="/companies" hx-target="#company-list" hx-swap="innerHTML" class="space-y-4"
-                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) this.reset();">
+                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('company-form-card').classList.add('hidden'); document.getElementById('company-form-toggle').setAttribute('aria-expanded', 'false'); }}">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label for="company_name" class="block text-xs font-medium text-slate-300 mb-1">Company Name</label>
@@ -482,7 +503,7 @@ pub fn company_list_fragment(companies: &[Company]) -> String {
     if companies.is_empty() {
         return r##"
             <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-8 text-center">
-                <p class="text-slate-400 text-sm">No companies registered yet. Create your first company above!</p>
+                <p class="text-slate-400 text-sm">No companies registered yet. Use Add Company to create your first one.</p>
             </div>
         "##
         .to_string();
@@ -1138,7 +1159,6 @@ pub fn channels_page(
     let list_html = channel_list_fragment(company, app_domain_name, channels, agents);
     let agents_selection_html = render_agents_selection(company.id, agents, None, "new");
     let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, true);
-
     let content = format!(
         r##"
         <div class="flex items-center justify-between mb-6">
@@ -1147,12 +1167,17 @@ pub fn channels_page(
                 <h2 class="text-2xl font-bold text-white">{company_name} Channels</h2>
                 <p class="text-slate-400 text-sm mt-0.5">Manage channels for <span class="font-mono text-indigo-300">@{slug}.{app_domain_name}</span></p>
             </div>
+            <button id="channel-form-toggle" type="button" aria-controls="channel-form-card" aria-expanded="false"
+                onclick="const card = document.getElementById('channel-form-card'); const opening = card.classList.contains('hidden'); card.classList.toggle('hidden'); this.setAttribute('aria-expanded', opening);"
+                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/30 transition cursor-pointer">
+                Add Channel
+            </button>
         </div>
 
         <div id="response-message" class="mb-6"></div>
 
         <!-- Create Channel Card -->
-        <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-8">
+        <div id="channel-form-card" class="hidden bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-8">
             <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
                 <h3 class="text-md font-semibold text-white flex items-center gap-2">
                     <span class="text-emerald-400">+</span> Add New Channel
@@ -1170,8 +1195,8 @@ pub fn channels_page(
             </div>
 
             <!-- Simple Create Channel Form (Default) -->
-            <form id="simple-channel-form" hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" class="space-y-4" data-company-id="{company_id}"
-                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) this.reset();">
+            <form id="simple-channel-form" hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']" class="space-y-4" data-company-id="{company_id}"
+                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('channel-form-card').classList.add('hidden'); document.getElementById('channel-form-toggle').setAttribute('aria-expanded', 'false'); }}">
                 <input type="hidden" name="form_mode" value="simple">
                 <div>
                     <label for="simple_channel_name" class="block text-xs font-medium text-slate-300 mb-1">Channel Name</label>
@@ -1180,22 +1205,27 @@ pub fn channels_page(
                         placeholder="Inbound Email Handler">
                 </div>
                 <div>
-                    <label for="simple_system_prompt" class="block text-xs font-medium text-slate-300 mb-1">System Prompt</label>
+                    <label for="simple_system_prompt" class="block text-xs font-medium text-slate-300 mb-1">Agent Instructions</label>
                     <textarea id="simple_system_prompt" name="system_prompt" rows="4" required
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs"
-                        placeholder="You are a helpful support agent for this channel. Answer questions accurately and concisely."></textarea>
+                        placeholder="Describe the agent's role, responsibilities, rules, and tone. A complete system prompt will be generated when you create the channel."></textarea>
                 </div>
                 <div class="flex justify-end">
                     <button type="submit"
-                        class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/30 transition cursor-pointer">
-                        Create Channel
+                        class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/30 transition cursor-pointer flex items-center gap-2 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
+                        <svg class="animate-spin h-4 w-4 text-white hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="[.htmx-request_&]:hidden">Create Channel</span>
+                        <span class="hidden [.htmx-request_&]:inline">Creating...</span>
                     </button>
                 </div>
             </form>
 
             <!-- Advanced Create Channel Form (Hidden by default) -->
             <form id="advanced-channel-form" hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" class="hidden space-y-4" data-company-id="{company_id}"
-                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) this.reset();">
+                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('channel-form-card').classList.add('hidden'); document.getElementById('channel-form-toggle').setAttribute('aria-expanded', 'false'); }}">
                 <input type="hidden" name="form_mode" value="advanced">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -1318,7 +1348,7 @@ pub fn channel_list_fragment(
     if channels.is_empty() {
         return r##"
             <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-8 text-center">
-                <p class="text-slate-400 text-sm">No channels configured yet. Create your first channel above!</p>
+                <p class="text-slate-400 text-sm">No channels configured yet. Use Add Channel to create your first one.</p>
             </div>
         "##
         .to_string();
@@ -1584,15 +1614,11 @@ pub fn channel_simulation_page(
     company: &Company,
     app_domain_name: &str,
     channel: &Channel,
+    sender_email: &str,
     initial_thread_id: Option<&str>,
     initial_result_html: Option<&str>,
 ) -> String {
     let target_recipient = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
-
-    let default_sender = match &channel.participant_emails {
-        Some(emails) if !emails.is_empty() => emails[0].clone(),
-        _ => "sender@example.com".to_string(),
-    };
 
     let initial_result_val = initial_result_html.unwrap_or("");
 
@@ -1628,7 +1654,7 @@ pub fn channel_simulation_page(
                         <h3 class="text-md font-semibold text-white mb-4 flex items-center gap-2">
                             <span class="text-indigo-400">⚡</span> Simulated Webhook Payload
                         </h3>
-                        <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate" hx-target="#simulation-result" hx-swap="innerHTML" class="space-y-4">
+                        <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate" hx-target="#simulation-result" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']" class="space-y-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label for="to" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
@@ -1637,8 +1663,8 @@ pub fn channel_simulation_page(
                                 </div>
                                 <div>
                                     <label for="from" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
-                                    <input type="text" id="from" name="from" value="{default_sender}" required
-                                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <input type="text" id="from" name="from" value="{sender_email}" data-server-sender="{sender_email}" required
+                                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed">
                                 </div>
                             </div>
                             <div>
@@ -1655,21 +1681,21 @@ pub fn channel_simulation_page(
                                 <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-indigo-500 transition">
-                                        <input type="radio" name="simulation_mode" value="verify" checked class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                                        <input type="radio" name="simulation_mode" value="verify" checked onchange="this.form.elements.namedItem('from').disabled = false" class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
                                         <div class="ml-2.5">
                                             <span class="block text-xs font-bold text-white">Verify</span>
                                             <span class="block text-[11px] text-slate-400 mt-0.5">Verification only (Recipient & Sender ACL check)</span>
                                         </div>
                                     </label>
                                     <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
-                                        <input type="radio" name="simulation_mode" value="run_test" class="mt-0.5 text-amber-500 focus:ring-amber-500">
+                                        <input type="radio" name="simulation_mode" value="run_test" onchange="const sender = this.form.elements.namedItem('from'); sender.value = sender.dataset.serverSender; sender.disabled = true" class="mt-0.5 text-amber-500 focus:ring-amber-500">
                                         <div class="ml-2.5">
                                             <span class="block text-xs font-bold text-amber-300">Run_Test</span>
                                             <span class="block text-[11px] text-slate-400 mt-0.5">Execute full channel & agent, skip email dispatch</span>
                                         </div>
                                     </label>
                                     <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
-                                        <input type="radio" name="simulation_mode" value="run" class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
+                                        <input type="radio" name="simulation_mode" value="run" onchange="const sender = this.form.elements.namedItem('from'); sender.value = sender.dataset.serverSender; sender.disabled = true" class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
                                         <div class="ml-2.5">
                                             <span class="block text-xs font-bold text-emerald-400">Run</span>
                                             <span class="block text-[11px] text-slate-400 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
@@ -1679,9 +1705,14 @@ pub fn channel_simulation_page(
                             </div>
                             <div class="flex justify-end">
                                 <button type="submit"
-                                    class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2">
-                                    <span>Trigger Webhook Simulation</span>
-                                    <span>&rarr;</span>
+                                    class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
+                                    <svg class="animate-spin h-4 w-4 text-white hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span class="[.htmx-request_&]:hidden">Trigger Webhook Simulation</span>
+                                    <span class="hidden [.htmx-request_&]:inline">Simulating...</span>
+                                    <span class="[.htmx-request_&]:hidden">&rarr;</span>
                                 </button>
                             </div>
                         </form>
@@ -1714,7 +1745,7 @@ pub fn channel_simulation_page(
             company_id = company.id,
             channel_id = channel.id,
             target_recipient = target_recipient,
-            default_sender = default_sender,
+            sender_email = sender_email,
         )
     };
 
@@ -2337,10 +2368,15 @@ pub fn channel_simulation_execution_result_fragment(
     };
 
     let response_style = if is_agent_error {
-        "bg-slate-950 p-3 rounded-lg text-rose-300 whitespace-pre-wrap border border-rose-800/80 font-mono text-xs max-h-60 overflow-y-auto"
+        format!(
+            "bg-slate-950 p-3 rounded-lg text-rose-300 border border-rose-800/80 font-mono text-xs max-h-60 overflow-y-auto {MARKDOWN_CONTENT_STYLES}"
+        )
     } else {
-        "bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 font-sans text-xs max-h-60 overflow-y-auto"
+        format!(
+            "bg-slate-950 p-3 rounded-lg text-emerald-300 border border-slate-800 font-sans text-xs max-h-60 overflow-y-auto {MARKDOWN_CONTENT_STYLES}"
+        )
     };
+    let agent_response_html = render_markdown(agent_response_text);
 
     let simulation_token_meter_html = if let Some(ref tu) =
         agent_exec.and_then(|a| a.token_usage.as_ref())
@@ -2361,7 +2397,8 @@ pub fn channel_simulation_execution_result_fragment(
         String::new()
     };
 
-    let simulation_metadata_html = if let Some(meta) = agent_exec.and_then(|a| a.metadata.as_ref()) {
+    let simulation_metadata_html = if let Some(meta) = agent_exec.and_then(|a| a.metadata.as_ref())
+    {
         let meta_pretty = serde_json::to_string_pretty(meta).unwrap_or_else(|_| meta.to_string());
         let finish_reason = meta
             .get("finish_reason")
@@ -2371,10 +2408,15 @@ pub fn channel_simulation_execution_result_fragment(
         let finish_badge = if let Some(reason) = finish_reason {
             let style = match reason {
                 "length" | "max_tokens" => "bg-amber-950 text-amber-300 border-amber-700 font-bold",
-                "stop" | "end_turn" => "bg-emerald-950 text-emerald-300 border-emerald-700 font-semibold",
+                "stop" | "end_turn" => {
+                    "bg-emerald-950 text-emerald-300 border-emerald-700 font-semibold"
+                }
                 _ => "bg-slate-800 text-slate-300 border-slate-700 font-semibold",
             };
-            format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono border {}">Finish Reason: {}</span>"#, style, reason)
+            format!(
+                r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono border {}">Finish Reason: {}</span>"#,
+                style, reason
+            )
         } else {
             String::new()
         };
@@ -2464,7 +2506,7 @@ pub fn channel_simulation_execution_result_fragment(
 
             <div class="pt-2 border-t border-slate-800">
                 {response_label}
-                <div class="{response_style}">{agent_response_text}</div>
+                <div class="{response_style}">{agent_response_html}</div>
             </div>
         </div>
         "##,
@@ -2485,7 +2527,7 @@ pub fn channel_simulation_execution_result_fragment(
         text_body_str = text_body_str,
         response_label = response_label,
         response_style = response_style,
-        agent_response_text = agent_response_text,
+        agent_response_html = agent_response_html,
     );
 
     let resolved_config = crate::services::agent_runner::ResolvedAgentParams::new(
@@ -2561,6 +2603,7 @@ pub fn channel_simulation_execution_result_fragment(
             let params_html = render_message_task_parameters_html(&msg_task_payload);
 
             if is_agent {
+                let body_html = render_markdown(&msg.clean_text_body);
                 msgs_html.push_str(&format!(
                     r##"
                     <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 space-y-2 shadow-sm">
@@ -2575,7 +2618,7 @@ pub fn channel_simulation_execution_result_fragment(
                         <div class="text-xs font-mono text-slate-400">
                             <span>Message ID: </span><span class="text-indigo-200">{msg_id}</span>
                         </div>
-                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-xs font-sans max-h-60 overflow-y-auto">
+                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 border border-slate-800 text-xs font-sans max-h-60 overflow-y-auto {markdown_styles}">
                             {body}
                         </div>
                         {params_html}
@@ -2583,7 +2626,8 @@ pub fn channel_simulation_execution_result_fragment(
                     "##,
                     created_at = created_at_fmt,
                     msg_id = msg.message_id,
-                    body = msg.clean_text_body,
+                    body = body_html,
+                    markdown_styles = MARKDOWN_CONTENT_STYLES,
                     params_html = params_html,
                 ));
             } else {
@@ -2695,6 +2739,7 @@ pub fn channel_simulation_execution_result_fragment(
             <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate"
                   hx-target="#simulation-result"
                   hx-swap="innerHTML"
+                  hx-disabled-elt="find button[type='submit']"
                   class="space-y-4">
                 <input type="hidden" name="in_reply_to" value="{last_msg_id}">
 
@@ -2706,8 +2751,8 @@ pub fn channel_simulation_execution_result_fragment(
                     </div>
                     <div>
                         <label for="from_reply" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
-                        <input type="text" id="from_reply" name="from" value="{from_str}" required
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input type="text" id="from_reply" name="from" value="{from_str}" disabled
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono opacity-60 cursor-not-allowed">
                     </div>
                 </div>
 
@@ -2745,9 +2790,14 @@ pub fn channel_simulation_execution_result_fragment(
 
                 <div class="flex justify-end pt-1">
                     <button type="submit"
-                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2">
-                        <span>Trigger Reply Webhook Simulation</span>
-                        <span>&rarr;</span>
+                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
+                        <svg class="animate-spin h-4 w-4 text-white hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="[.htmx-request_&]:hidden">Trigger Reply Webhook Simulation</span>
+                        <span class="hidden [.htmx-request_&]:inline">Simulating...</span>
+                        <span class="[.htmx-request_&]:hidden">&rarr;</span>
                     </button>
                 </div>
             </form>
@@ -2939,6 +2989,7 @@ pub fn channel_simulation_loaded_thread_fragment(
             let params_html = render_message_task_parameters_html(&msg_task_payload);
 
             if is_agent {
+                let body_html = render_markdown(&msg.clean_text_body);
                 msgs_html.push_str(&format!(
                     r##"
                     <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 space-y-2 shadow-sm">
@@ -2953,7 +3004,7 @@ pub fn channel_simulation_loaded_thread_fragment(
                         <div class="text-xs font-mono text-slate-400">
                             <span>Message ID: </span><span class="text-indigo-200">{msg_id}</span>
                         </div>
-                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-xs font-sans max-h-60 overflow-y-auto">
+                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 border border-slate-800 text-xs font-sans max-h-60 overflow-y-auto {markdown_styles}">
                             {body}
                         </div>
                         {params_html}
@@ -2961,7 +3012,8 @@ pub fn channel_simulation_loaded_thread_fragment(
                     "##,
                     created_at = msg_created_at,
                     msg_id = msg.message_id,
-                    body = msg.clean_text_body,
+                    body = body_html,
+                    markdown_styles = MARKDOWN_CONTENT_STYLES,
                     params_html = params_html,
                 ));
             } else {
@@ -3050,6 +3102,7 @@ pub fn channel_simulation_loaded_thread_fragment(
             <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate"
                   hx-target="#simulation-result"
                   hx-swap="innerHTML"
+                  hx-disabled-elt="find button[type='submit']"
                   class="space-y-4">
                 <input type="hidden" name="in_reply_to" value="{last_msg_id}">
 
@@ -3061,8 +3114,8 @@ pub fn channel_simulation_loaded_thread_fragment(
                     </div>
                     <div>
                         <label for="from_reply" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
-                        <input type="text" id="from_reply" name="from" value="{default_sender}" required
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input type="text" id="from_reply" name="from" value="{default_sender}" disabled
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono opacity-60 cursor-not-allowed">
                     </div>
                 </div>
 
@@ -3100,9 +3153,14 @@ pub fn channel_simulation_loaded_thread_fragment(
 
                 <div class="flex justify-end">
                     <button type="submit"
-                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2">
-                        <span>Simulate Reply Webhook Call</span>
-                        <span>&rarr;</span>
+                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
+                        <svg class="animate-spin h-4 w-4 text-white hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="[.htmx-request_&]:hidden">Trigger Reply Webhook Simulation</span>
+                        <span class="hidden [.htmx-request_&]:inline">Simulating...</span>
+                        <span class="[.htmx-request_&]:hidden">&rarr;</span>
                     </button>
                 </div>
             </form>
@@ -3444,10 +3502,8 @@ pub fn find_task_for_message<'a>(
     }
 
     if let Some(tid) = thread_id {
-        let thread_tasks: Vec<&BackgroundTask> = tasks
-            .iter()
-            .filter(|t| t.thread_id == Some(tid))
-            .collect();
+        let thread_tasks: Vec<&BackgroundTask> =
+            tasks.iter().filter(|t| t.thread_id == Some(tid)).collect();
 
         if thread_tasks.len() == 1 {
             return Some(thread_tasks[0]);
@@ -3553,6 +3609,40 @@ pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> Strin
         .or_else(|| sanitized_payload.get("metadata"));
 
     if let Some(m) = meta_val {
+        if let Some(diagnostics) = m.get("execution_diagnostics") {
+            if let Some(duration_ms) = diagnostics.get("duration_ms").and_then(|v| v.as_u64()) {
+                badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">Duration: {} ms</span>"#, duration_ms));
+            }
+            if let Some(source) = diagnostics
+                .get("token_usage_source")
+                .and_then(|v| v.as_str())
+            {
+                badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700">Token Usage: {}</span>"#, source));
+            }
+            if let Some(response_chars) = diagnostics
+                .get("response_characters")
+                .and_then(|v| v.as_u64())
+            {
+                badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700">Response: {} chars</span>"#, response_chars));
+            }
+            if let Some(tool_calls) = diagnostics
+                .get("tool_call_count")
+                .and_then(|v| v.as_u64())
+                .filter(|count| *count > 0)
+            {
+                badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-950/80 text-purple-300 border border-purple-800/60">Tool Calls: {}</span>"#, tool_calls));
+            }
+        }
+
+        if let Some(summary) = m.get("observability").and_then(|v| v.get("summary")) {
+            if let (Some(events), Some(llm_calls)) = (
+                summary.get("total_events").and_then(|v| v.as_u64()),
+                summary.get("total_llm_calls").and_then(|v| v.as_u64()),
+            ) {
+                badges.push(format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-teal-950/80 text-teal-300 border border-teal-800/60">Observed: {} events / {} LLM calls</span>"#, events, llm_calls));
+            }
+        }
+
         let finish_reason = m
             .get("finish_reason")
             .or_else(|| m.get("stop_reason"))
@@ -3962,18 +4052,25 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                     <h2 class="text-2xl font-bold text-white">{company_name} Agents</h2>
                     <p class="text-slate-400 text-sm mt-0.5">Manage AI Agents, model providers, and configurations</p>
                 </div>
-                <a href="/companies" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition">
-                    &larr; Back to Companies
-                </a>
+                <div class="flex items-center gap-3">
+                    <a href="/companies" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition">
+                        &larr; Back to Companies
+                    </a>
+                    <button id="agent-form-toggle" type="button" aria-controls="agent-form-card" aria-expanded="false"
+                        onclick="const card = document.getElementById('agent-form-card'); const opening = card.classList.contains('hidden'); card.classList.toggle('hidden'); this.setAttribute('aria-expanded', opening);"
+                        class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/30 transition cursor-pointer">
+                        Add Agent
+                    </button>
+                </div>
             </div>
 
             <!-- Create Agent Card -->
-            <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl p-5 mb-8 shadow-lg">
+            <div id="agent-form-card" class="hidden bg-slate-800/40 border border-slate-700/60 rounded-xl p-5 mb-8 shadow-lg">
                 <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
                     <span class="text-emerald-400">+</span> Add New Agent
                 </h3>
                 <form hx-post="/companies/{company_id}/agents" hx-target="#agent-list" hx-swap="innerHTML" class="space-y-4"
-                      hx-on::after-request="if(event.detail.successful && event.detail.elt === this) this.reset();"
+                      hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('agent-form-card').classList.add('hidden'); document.getElementById('agent-form-toggle').setAttribute('aria-expanded', 'false'); }}"
                       onkeydown="if(event.key==='Enter' && event.target.tagName!=='TEXTAREA') event.preventDefault()">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -4048,7 +4145,7 @@ pub fn agent_list_fragment(company: &Company, agents: &[Agent]) -> String {
         return format!(
             r#"<div class="bg-slate-800/20 border border-slate-800 rounded-xl p-8 text-center text-slate-400">
                 <p class="text-sm">No agents configured for <span class="font-semibold text-white">{}</span> yet.</p>
-                <p class="text-xs text-slate-500 mt-1">Create your first agent using the form above.</p>
+                <p class="text-xs text-slate-500 mt-1">Use Add Agent to create your first one.</p>
             </div>"#,
             company.name
         );
@@ -4221,6 +4318,18 @@ mod tests {
     use uuid::Uuid;
 
     #[test]
+    fn test_render_markdown_formats_content_and_removes_unsafe_html() {
+        let html =
+            render_markdown("## Result\n\n**Ready** with `code`.\n\n<script>alert('xss')</script>");
+
+        assert!(html.contains("<h2>Result</h2>"));
+        assert!(html.contains("<strong>Ready</strong>"));
+        assert!(html.contains("<code>code</code>"));
+        assert!(!html.contains("<script"));
+        assert!(!html.contains("alert('xss')"));
+    }
+
+    #[test]
     fn test_find_task_for_message_multi_task_matching() {
         let thread_id = Uuid::new_v4();
         let company_id = Uuid::new_v4();
@@ -4370,5 +4479,34 @@ mod tests {
 
         let matched_out2 = find_task_for_message(&msg_out2, &tasks, None, Some(thread_id)).unwrap();
         assert_eq!(matched_out2.id, task2_id);
+    }
+
+    #[test]
+    fn test_task_parameters_render_execution_diagnostics() {
+        let html = render_message_task_parameters_html(&json!({
+            "execution_result": {
+                "metadata": {
+                    "execution_diagnostics": {
+                        "duration_ms": 1250,
+                        "response_characters": 4096,
+                        "token_usage_source": "estimated",
+                        "tool_call_count": 2,
+                        "tool_names": ["search", "send_email"]
+                    },
+                    "observability": {
+                        "summary": {
+                            "total_events": 3,
+                            "total_llm_calls": 1
+                        }
+                    }
+                }
+            }
+        }));
+
+        assert!(html.contains("Duration: 1250 ms"));
+        assert!(html.contains("Token Usage: estimated"));
+        assert!(html.contains("Response: 4096 chars"));
+        assert!(html.contains("Tool Calls: 2"));
+        assert!(html.contains("Observed: 3 events / 1 LLM calls"));
     }
 }

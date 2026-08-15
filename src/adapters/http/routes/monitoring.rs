@@ -1,10 +1,7 @@
-use axum::{extract::State, response::Json, routing::get, Router};
+use axum::{Router, extract::State, response::Json, routing::get};
 use std::sync::Arc;
 
-use crate::{
-    adapters::http::app_state::AppState,
-    domain::monitoring::MonitoringService,
-};
+use crate::{adapters::http::app_state::AppState, domain::monitoring::MonitoringService};
 
 pub fn router() -> Router<AppState> {
     Router::new()

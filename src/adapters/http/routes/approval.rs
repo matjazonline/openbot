@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use axum::{
+    Router,
     extract::{Path, Query, State},
     response::{Html, IntoResponse},
     routing::get,
-    Router,
 };
 use serde::Deserialize;
 use uuid::Uuid;
@@ -44,7 +44,9 @@ async fn approval_link_handler(
                 };
                 Html(pages::approval_result_page(page_title, &approval, &msg))
             }
-            Err(err) => Html(pages::error_alert(&format!("Approval processing error: {err}"))),
+            Err(err) => Html(pages::error_alert(&format!(
+                "Approval processing error: {err}"
+            ))),
         }
     } else {
         match approval_use_cases
@@ -66,6 +68,8 @@ async fn list_channel_approvals_handler(
         .await
     {
         Ok(list) => Html(pages::channel_approvals_fragment(&list)),
-        Err(err) => Html(pages::error_alert(&format!("Failed to list approvals: {err}"))),
+        Err(err) => Html(pages::error_alert(&format!(
+            "Failed to list approvals: {err}"
+        ))),
     }
 }

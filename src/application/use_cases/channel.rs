@@ -977,20 +977,16 @@ mod tests {
         assert!(!is_ctx);
 
         // Quiet / Context-only subaddressing formats (.quiet, .noagent, .message, .msg, .na)
-        let (comp1, ch1, is_ctx1) = parse_recipient_address_pipeline(
-            "support.quiet@acme.mailagents.com",
-            app_domain,
-        )
-        .unwrap();
+        let (comp1, ch1, is_ctx1) =
+            parse_recipient_address_pipeline("support.quiet@acme.mailagents.com", app_domain)
+                .unwrap();
         assert_eq!(comp1, "acme");
         assert_eq!(ch1, vec!["support"]);
         assert!(is_ctx1);
 
-        let (comp2, ch2, is_ctx2) = parse_recipient_address_pipeline(
-            "support+noagent@acme.mailagents.com",
-            app_domain,
-        )
-        .unwrap();
+        let (comp2, ch2, is_ctx2) =
+            parse_recipient_address_pipeline("support+noagent@acme.mailagents.com", app_domain)
+                .unwrap();
         assert_eq!(comp2, "acme");
         assert_eq!(ch2, vec!["support"]);
         assert!(is_ctx2);

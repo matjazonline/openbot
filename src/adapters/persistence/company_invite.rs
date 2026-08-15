@@ -186,7 +186,12 @@ impl CompanyInvitePersistence for PostgresPersistence {
         Ok(db_list.into_iter().map(Into::into).collect())
     }
 
-    async fn add_member(&self, company_id: Uuid, user_id: Uuid, role: &str) -> AppResult<CompanyMember> {
+    async fn add_member(
+        &self,
+        company_id: Uuid,
+        user_id: Uuid,
+        role: &str,
+    ) -> AppResult<CompanyMember> {
         let uuid = Uuid::new_v4();
 
         sqlx::query!(
@@ -272,13 +277,25 @@ mod tests {
         // Create test owner and user
         let owner_username = format!("owner_{}", Uuid::new_v4().simple());
         let owner_email = format!("{}@example.com", owner_username);
-        let _ = persistence.create_user(&owner_username, &owner_email, "hash").await;
-        let owner = persistence.get_by_email(&owner_email).await.unwrap().unwrap();
+        let _ = persistence
+            .create_user(&owner_username, &owner_email, "hash")
+            .await;
+        let owner = persistence
+            .get_by_email(&owner_email)
+            .await
+            .unwrap()
+            .unwrap();
 
         let member_username = format!("member_{}", Uuid::new_v4().simple());
         let member_email = format!("{}@example.com", member_username);
-        let _ = persistence.create_user(&member_username, &member_email, "hash").await;
-        let member = persistence.get_by_email(&member_email).await.unwrap().unwrap();
+        let _ = persistence
+            .create_user(&member_username, &member_email, "hash")
+            .await;
+        let member = persistence
+            .get_by_email(&member_email)
+            .await
+            .unwrap()
+            .unwrap();
 
         // Create company
         let company = persistence
@@ -310,10 +327,16 @@ mod tests {
         assert_eq!(updated.email, updated_email);
 
         // Update back
-        let _ = persistence.update_invite_email(invite.id, &member_email).await.unwrap();
+        let _ = persistence
+            .update_invite_email(invite.id, &member_email)
+            .await
+            .unwrap();
 
         // 4. Update Status to accepted
-        let _ = persistence.update_invite_status(invite.id, "accepted").await.unwrap();
+        let _ = persistence
+            .update_invite_status(invite.id, "accepted")
+            .await
+            .unwrap();
 
         // 5. Add member to team
         let team_member = persistence
@@ -331,7 +354,10 @@ mod tests {
         assert_eq!(members[0].username, Some(member_username));
 
         // 7. Remove team member
-        persistence.remove_member(company.id, member.id).await.unwrap();
+        persistence
+            .remove_member(company.id, member.id)
+            .await
+            .unwrap();
         let members_after = persistence
             .list_members_by_company(company.id)
             .await

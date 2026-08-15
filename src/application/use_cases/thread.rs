@@ -850,20 +850,45 @@ impl ThreadUseCases {
         ingest: &InboundIngestResult,
         send_email: bool,
     ) -> AppResult<Option<AgentExecutionResult>> {
+        self.execute_agent_and_dispatch_inner(ingest, send_email, false)
+            .await
+    }
+
+    pub async fn execute_claimed_agent_task_and_dispatch(
+        &self,
+        ingest: &InboundIngestResult,
+        send_email: bool,
+    ) -> AppResult<Option<AgentExecutionResult>> {
+        self.execute_agent_and_dispatch_inner(ingest, send_email, true)
+            .await
+    }
+
+    async fn execute_agent_and_dispatch_inner(
+        &self,
+        ingest: &InboundIngestResult,
+        send_email: bool,
+        task_already_claimed: bool,
+    ) -> AppResult<Option<AgentExecutionResult>> {
         if let Some(ref p) = ingest.parsed_email {
             if p.is_context_only {
-                info!("Skipping agent execution for context-only message ID {}", p.message_id);
+                info!(
+                    "Skipping agent execution for context-only message ID {}",
+                    p.message_id
+                );
                 return Ok(None);
             }
         }
         if let Some(ref n) = ingest.normalized_message {
             if n.is_context_only {
-                info!("Skipping agent execution for context-only message ID {}", n.message_id);
+                info!(
+                    "Skipping agent execution for context-only message ID {}",
+                    n.message_id
+                );
                 return Ok(None);
             }
         }
 
-        if let Some(task_id) = ingest.task_id {
+        if !task_already_claimed && let Some(task_id) = ingest.task_id {
             match self.task_persistence.mark_task_processing(task_id).await {
                 Ok(true) => {
                     info!("Successfully claimed task {} for execution", task_id);
@@ -910,7 +935,12 @@ impl ThreadUseCases {
             return Ok(None);
         };
 
-        let mut agent_outputs: Vec<(&ChannelMatch, String, Option<String>, Option<serde_json::Value>)> = Vec::new();
+        let mut agent_outputs: Vec<(
+            &ChannelMatch,
+            String,
+            Option<String>,
+            Option<serde_json::Value>,
+        )> = Vec::new();
         let mut total_prompt_tokens = 0usize;
         let mut total_completion_tokens = 0usize;
         let mut primary_execution_error = None;
@@ -1063,7 +1093,10 @@ impl ThreadUseCases {
             let mut map = serde_json::Map::new();
             for (i, (m, _, _, meta)) in agent_outputs.iter().enumerate() {
                 if let Some(meta_val) = meta {
-                    map.insert(format!("step_{}_{}", i + 1, m.channel.slug), meta_val.clone());
+                    map.insert(
+                        format!("step_{}_{}", i + 1, m.channel.slug),
+                        meta_val.clone(),
+                    );
                 }
             }
             if map.is_empty() {
@@ -1251,7 +1284,10 @@ impl ThreadUseCases {
                     "token_usage": TokenUsage::new(total_prompt_tokens, total_completion_tokens),
                 });
                 if let Some(ref meta) = combined_metadata {
-                    exec_res.as_object_mut().unwrap().insert("metadata".to_string(), meta.clone());
+                    exec_res
+                        .as_object_mut()
+                        .unwrap()
+                        .insert("metadata".to_string(), meta.clone());
                 }
                 obj.insert("execution_result".to_string(), exec_res);
             }
@@ -3626,10 +3662,12 @@ mod tests {
 
         assert!(res1.accepted);
         let thread = res1.thread.unwrap();
-        assert!(thread
-            .participant_emails
-            .iter()
-            .any(|p| p.eq_ignore_ascii_case("client@external.com")));
+        assert!(
+            thread
+                .participant_emails
+                .iter()
+                .any(|p| p.eq_ignore_ascii_case("client@external.com"))
+        );
 
         // 2. Third-party client replies to thread -> ACCEPTED because they were added to thread participants
         let res_reply = thread_use_cases
@@ -3686,10 +3724,12 @@ mod tests {
 
         assert!(res_expand.accepted);
         let updated_thread = res_expand.thread.unwrap();
-        assert!(updated_thread
-            .participant_emails
-            .iter()
-            .any(|p| p.eq_ignore_ascii_case("vendor@supplier.com")));
+        assert!(
+            updated_thread
+                .participant_emails
+                .iter()
+                .any(|p| p.eq_ignore_ascii_case("vendor@supplier.com"))
+        );
 
         // 5. vendor@supplier.com replies to thread -> ACCEPTED
         let res_vendor_reply = thread_use_cases
@@ -3728,10 +3768,12 @@ mod tests {
 
         assert!(res_external_cc.accepted);
         let current_thread = res_external_cc.thread.unwrap();
-        assert!(!current_thread
-            .participant_emails
-            .iter()
-            .any(|p| p.eq_ignore_ascii_case("unauthorized@other.com")));
+        assert!(
+            !current_thread
+                .participant_emails
+                .iter()
+                .any(|p| p.eq_ignore_ascii_case("unauthorized@other.com"))
+        );
     }
 
     #[tokio::test]
@@ -3832,7 +3874,10 @@ mod tests {
         // 2. Ingest email with [[quiet]] body tag -> accepted, task_id is None, tag stripped from text
         let res_quiet_body = thread_use_cases
             .ingest_and_save_inbound_message(RawInboundPayload {
-                headers: Some("Message-ID: <msg-quiet-2@acme.com>\nIn-Reply-To: <msg-quiet-1@acme.com>\n".to_string()),
+                headers: Some(
+                    "Message-ID: <msg-quiet-2@acme.com>\nIn-Reply-To: <msg-quiet-1@acme.com>\n"
+                        .to_string(),
+                ),
                 to: "support@acme.mailagents.com".to_string(),
                 from: "team@acme.com".to_string(),
                 subject: Some("Re: Quiet Note".to_string()),

@@ -6,9 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::{
-        company_invite::CompanyInvite, company_member::CompanyMember, user::User,
-    },
+    entities::{company_invite::CompanyInvite, company_member::CompanyMember, user::User},
     use_cases::company::CompanyPersistence,
 };
 
@@ -21,7 +19,12 @@ pub trait CompanyInvitePersistence: Send + Sync {
     async fn update_invite_status(&self, id: Uuid, status: &str) -> AppResult<CompanyInvite>;
     async fn delete_invite(&self, id: Uuid) -> AppResult<()>;
     async fn list_invites_by_email(&self, email: &str) -> AppResult<Vec<CompanyInvite>>;
-    async fn add_member(&self, company_id: Uuid, user_id: Uuid, role: &str) -> AppResult<CompanyMember>;
+    async fn add_member(
+        &self,
+        company_id: Uuid,
+        user_id: Uuid,
+        role: &str,
+    ) -> AppResult<CompanyMember>;
     async fn list_members_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyMember>>;
     async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()>;
 }
@@ -75,7 +78,10 @@ impl CompanyInviteUseCases {
             ));
         }
 
-        info!("Creating invite for email {} to company {}", email_trimmed, company_id);
+        info!(
+            "Creating invite for email {} to company {}",
+            email_trimmed, company_id
+        );
         self.invite_persistence
             .create_invite(company_id, &email_trimmed)
             .await
@@ -88,7 +94,9 @@ impl CompanyInviteUseCases {
         company_id: Uuid,
     ) -> AppResult<Vec<CompanyInvite>> {
         self.verify_company_owner(user_id, company_id).await?;
-        self.invite_persistence.list_invites_by_company(company_id).await
+        self.invite_persistence
+            .list_invites_by_company(company_id)
+            .await
     }
 
     #[instrument(skip(self))]
@@ -125,7 +133,9 @@ impl CompanyInviteUseCases {
             .ok_or_else(|| AppError::Internal("Invite not found.".into()))?;
 
         if invite.company_id != company_id {
-            return Err(AppError::Internal("Invite does not belong to this company.".into()));
+            return Err(AppError::Internal(
+                "Invite does not belong to this company.".into(),
+            ));
         }
 
         let email_trimmed = new_email.trim().to_lowercase();
@@ -157,7 +167,9 @@ impl CompanyInviteUseCases {
             .ok_or_else(|| AppError::Internal("Invite not found.".into()))?;
 
         if invite.company_id != company_id {
-            return Err(AppError::Internal("Invite does not belong to this company.".into()));
+            return Err(AppError::Internal(
+                "Invite does not belong to this company.".into(),
+            ));
         }
 
         info!("Deleting invite {} for company {}", invite_id, company_id);
@@ -166,7 +178,9 @@ impl CompanyInviteUseCases {
 
     #[instrument(skip(self))]
     pub async fn list_user_invites(&self, user_email: &str) -> AppResult<Vec<CompanyInvite>> {
-        self.invite_persistence.list_invites_by_email(user_email.trim()).await
+        self.invite_persistence
+            .list_invites_by_email(user_email.trim())
+            .await
     }
 
     #[instrument(skip(self, user))]
@@ -243,7 +257,9 @@ impl CompanyInviteUseCases {
             return Ok(members);
         }
 
-        self.invite_persistence.list_members_by_company(company_id).await
+        self.invite_persistence
+            .list_members_by_company(company_id)
+            .await
     }
 
     #[instrument(skip(self))]
@@ -265,16 +281,18 @@ impl CompanyInviteUseCases {
             "Removing user {} from company {} team",
             member_user_id, company_id
         );
-        self.invite_persistence.remove_member(company_id, member_user_id).await
+        self.invite_persistence
+            .remove_member(company_id, member_user_id)
+            .await
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-    use chrono::Utc;
-    use crate::entities::company::Company;
     use super::*;
+    use crate::entities::company::Company;
+    use chrono::Utc;
+    use std::sync::Mutex;
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
@@ -282,7 +300,16 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> {
+        async fn create(
+            &self,
+            _user_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -310,7 +337,16 @@ mod tests {
             unimplemented!()
         }
 
-        async fn update(&self, _id: Uuid, _name: &str, _slug: &str, _api_key: Option<&str>, _provider: Option<&str>, _model: Option<&str>, _enable_llm_spam_guardrail: Option<bool>) -> AppResult<Company> {
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _enable_llm_spam_guardrail: Option<bool>,
+        ) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -404,7 +440,12 @@ mod tests {
                 .collect())
         }
 
-        async fn add_member(&self, company_id: Uuid, user_id: Uuid, role: &str) -> AppResult<CompanyMember> {
+        async fn add_member(
+            &self,
+            company_id: Uuid,
+            user_id: Uuid,
+            role: &str,
+        ) -> AppResult<CompanyMember> {
             let member = CompanyMember {
                 id: Uuid::new_v4(),
                 company_id,
@@ -485,7 +526,10 @@ mod tests {
         assert_eq!(updated.email, "newuser@example.com");
 
         // List invites for user
-        let user_invites = use_cases.list_user_invites("newuser@example.com").await.unwrap();
+        let user_invites = use_cases
+            .list_user_invites("newuser@example.com")
+            .await
+            .unwrap();
         assert_eq!(user_invites.len(), 1);
 
         // User accepts invite
@@ -501,17 +545,25 @@ mod tests {
         assert_eq!(accepted.status, "accepted");
 
         // Verify member was added to team
-        let members = use_cases.list_company_team_members(owner_id, company_id).await.unwrap();
+        let members = use_cases
+            .list_company_team_members(owner_id, company_id)
+            .await
+            .unwrap();
         assert_eq!(members.len(), 1);
         assert_eq!(members[0].user_id, user.id);
 
         // Verify member (non-owner) can also list company team members
-        let member_list = use_cases.list_company_team_members(user.id, company_id).await.unwrap();
+        let member_list = use_cases
+            .list_company_team_members(user.id, company_id)
+            .await
+            .unwrap();
         assert_eq!(member_list.len(), 1);
         assert_eq!(member_list[0].user_id, user.id);
 
         // Verify random user cannot list company team members
-        let random_user_err = use_cases.list_company_team_members(Uuid::new_v4(), company_id).await;
+        let random_user_err = use_cases
+            .list_company_team_members(Uuid::new_v4(), company_id)
+            .await;
         assert!(random_user_err.is_err());
 
         // Owner removes member from team
@@ -519,7 +571,10 @@ mod tests {
             .remove_company_team_member(owner_id, company_id, user.id)
             .await
             .unwrap();
-        let members_after = use_cases.list_company_team_members(owner_id, company_id).await.unwrap();
+        let members_after = use_cases
+            .list_company_team_members(owner_id, company_id)
+            .await
+            .unwrap();
         assert_eq!(members_after.len(), 0);
     }
 }

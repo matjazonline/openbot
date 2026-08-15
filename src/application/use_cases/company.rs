@@ -72,9 +72,20 @@ impl CompanyUseCases {
             ));
         }
 
-        info!("Creating company: {} ({}) for user {}", name_trimmed, slug_clean, user_id);
+        info!(
+            "Creating company: {} ({}) for user {}",
+            name_trimmed, slug_clean, user_id
+        );
         self.persistence
-            .create(user_id, name_trimmed, &slug_clean, api_key_clean, provider_clean, model_clean, enable_llm_spam_guardrail)
+            .create(
+                user_id,
+                name_trimmed,
+                &slug_clean,
+                api_key_clean,
+                provider_clean,
+                model_clean,
+                enable_llm_spam_guardrail,
+            )
             .await
     }
 
@@ -118,7 +129,15 @@ impl CompanyUseCases {
 
         info!("Updating company {}: {} ({})", id, name_trimmed, slug_clean);
         self.persistence
-            .update(id, name_trimmed, &slug_clean, api_key_clean, provider_clean, model_clean, enable_llm_spam_guardrail)
+            .update(
+                id,
+                name_trimmed,
+                &slug_clean,
+                api_key_clean,
+                provider_clean,
+                model_clean,
+                enable_llm_spam_guardrail,
+            )
             .await
     }
 
@@ -248,7 +267,15 @@ mod tests {
 
         // Create
         let company = use_cases
-            .create_company(user_id, "Acme Corp", "acme-corp", Some("key123"), Some("google"), Some("gemini-2.5-flash"), Some(true))
+            .create_company(
+                user_id,
+                "Acme Corp",
+                "acme-corp",
+                Some("key123"),
+                Some("google"),
+                Some("gemini-2.5-flash"),
+                Some(true),
+            )
             .await
             .unwrap();
         assert_eq!(company.name, "Acme Corp");
@@ -264,7 +291,15 @@ mod tests {
 
         // Update
         let updated = use_cases
-            .update_company(company.id, "Acme Inc", "acme-inc", None, None, None, Some(false))
+            .update_company(
+                company.id,
+                "Acme Inc",
+                "acme-inc",
+                None,
+                None,
+                None,
+                Some(false),
+            )
             .await
             .unwrap();
         assert_eq!(updated.name, "Acme Inc");

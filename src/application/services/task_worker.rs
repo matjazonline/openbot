@@ -298,10 +298,10 @@ impl TaskWorker {
 
         // Execute Agent and Dispatch Outbound Email
         let mut ingest_exec = ingest.clone();
-        ingest_exec.task_id = None;
+        ingest_exec.task_id = Some(task.id);
 
         self.thread_use_cases
-            .execute_agent_and_dispatch(&ingest_exec, true)
+            .execute_claimed_agent_task_and_dispatch(&ingest_exec, true)
             .await
             .map_err(|e| e.to_string())?;
 

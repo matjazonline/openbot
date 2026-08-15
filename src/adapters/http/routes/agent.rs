@@ -15,10 +15,7 @@ use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::AppResult,
     entities::agent::Agent,
-    use_cases::{
-        agent::AgentUseCases,
-        company::CompanyUseCases,
-    },
+    use_cases::{agent::AgentUseCases, company::CompanyUseCases},
 };
 
 pub fn router() -> Router<AppState> {
@@ -582,7 +579,9 @@ pub async fn generate_agent_prompt_handler(
     if instructions.trim().is_empty() {
         return Ok((
             StatusCode::BAD_REQUEST,
-            Html(pages::error_alert("Please enter instructions for prompt generation.")),
+            Html(pages::error_alert(
+                "Please enter instructions for prompt generation.",
+            )),
         )
             .into_response());
     }
@@ -600,7 +599,9 @@ pub async fn generate_agent_prompt_handler(
         .filter(|s| !s.trim().is_empty())
         .or_else(|| form.inline_agent_api_key.filter(|s| !s.trim().is_empty()));
 
-    let target_id = form.target_id.unwrap_or_else(|| "agent_system_prompt".to_string());
+    let target_id = form
+        .target_id
+        .unwrap_or_else(|| "agent_system_prompt".to_string());
     let gen_box_id = form.gen_box_id.unwrap_or_default();
 
     match agent_use_cases
@@ -644,7 +645,9 @@ pub async fn generate_agent_prompt_handler(
         }
         Err(err) => Ok((
             StatusCode::OK,
-            Html(pages::error_alert(&format!("Prompt generation failed: {err}"))),
+            Html(pages::error_alert(&format!(
+                "Prompt generation failed: {err}"
+            ))),
         )
             .into_response()),
     }
@@ -676,9 +679,9 @@ pub async fn generate_agent_prompt_json(
 
 #[cfg(test)]
 mod tests {
+    use crate::entities::company::Company;
     use chrono::Utc;
     use serde_json::json;
-    use crate::entities::company::Company;
 
     use super::*;
 
@@ -723,8 +726,12 @@ mod tests {
         let page_html = pages::agents_page(&company, &[agent.clone()]);
         assert!(page_html.contains("Acme Corp Agents"));
         assert!(page_html.contains("Add New Agent"));
+        assert!(page_html.contains("id=\"agent-form-toggle\""));
+        assert!(page_html.contains("id=\"agent-form-card\" class=\"hidden"));
+        assert!(page_html.contains("aria-controls=\"agent-form-card\""));
 
-        let selection_html = pages::render_agents_selection(company.id, &[agent.clone()], Some(&[agent.id]), "new");
+        let selection_html =
+            pages::render_agents_selection(company.id, &[agent.clone()], Some(&[agent.id]), "new");
         assert!(selection_html.contains("agents-selection-new"));
         assert!(selection_html.contains("inline-agent-form-new"));
         assert!(selection_html.contains("/companies/"));
@@ -732,23 +739,32 @@ mod tests {
         assert!(selection_html.contains("Create & Select Agent"));
         assert!(selection_html.contains("checked"));
 
-        let selection_error_html = pages::render_agents_selection_full(company.id, &[agent], None, "wf-1", Some("Slug is already taken"));
+        let selection_error_html = pages::render_agents_selection_full(
+            company.id,
+            &[agent],
+            None,
+            "wf-1",
+            Some("Slug is already taken"),
+        );
         assert!(selection_error_html.contains("Slug is already taken"));
         assert!(selection_error_html.contains("agents-selection-wf-1"));
     }
 
     #[tokio::test]
     async fn test_inline_agent_form_deserialization_with_parent_channel_fields() {
-        use axum::extract::FromRequest;
-        use axum::http::{header, Request};
         use axum::body::Body;
+        use axum::extract::FromRequest;
+        use axum::http::{Request, header};
 
         let req = Request::builder()
             .method("POST")
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
             .body(Body::from("name=&slug=&inline_agent_name=Billing+Bot&inline_agent_slug=billing-bot&inline_agent_provider=openai"))
             .unwrap();
-        let form = Form::<InlineAgentForm>::from_request(req, &()).await.unwrap().0;
+        let form = Form::<InlineAgentForm>::from_request(req, &())
+            .await
+            .unwrap()
+            .0;
 
         let name = form
             .inline_agent_name

@@ -148,7 +148,10 @@ impl ExternalSpamScanner {
             .build()
             .unwrap_or_default();
 
-        Self { config, http_client }
+        Self {
+            config,
+            http_client,
+        }
     }
 
     pub async fn scan_mime(&self, raw_mime: &[u8]) -> SpamScanResult {
@@ -159,14 +162,12 @@ impl ExternalSpamScanner {
         }
 
         match self.config.spam_scanner_type.to_lowercase().as_str() {
-            "spamassassin" | "spamd" => {
-                match self.scan_spamassassin(raw_mime).await {
-                    Ok(res) => return res,
-                    Err(err) => {
-                        warn!("SpamAssassin scan failed: {err}");
-                    }
+            "spamassassin" | "spamd" => match self.scan_spamassassin(raw_mime).await {
+                Ok(res) => return res,
+                Err(err) => {
+                    warn!("SpamAssassin scan failed: {err}");
                 }
-            }
+            },
             _ => {
                 // Default to Rspamd HTTP
                 match self.scan_rspamd(raw_mime).await {
@@ -198,7 +199,9 @@ impl ExternalSpamScanner {
 
         if let Some(score) = json.get("score").and_then(|v| v.as_f64()) {
             result.score = score;
-            result.reasons.push(format!("Rspamd evaluation score: {:.2}", score));
+            result
+                .reasons
+                .push(format!("Rspamd evaluation score: {:.2}", score));
         }
 
         if let Some(action) = json.get("action").and_then(|v| v.as_str()) {
@@ -255,7 +258,9 @@ impl ExternalSpamScanner {
                     let score_part = parts[1].split('/').next().unwrap_or("0").trim();
                     if let Ok(score) = score_part.parse::<f64>() {
                         result.score = score;
-                        result.reasons.push(format!("SpamAssassin score: {:.2}", score));
+                        result
+                            .reasons
+                            .push(format!("SpamAssassin score: {:.2}", score));
                     }
                 }
             }
@@ -318,13 +323,20 @@ mod tests {
         let result = HeuristicScanner::scan(
             Some("URGENT: CLAIM YOUR REWARD NOW!!!"),
             Some("spammer@evil.com"),
-            Some("Send bitcoin to wallet address: 1ABC123 and get 100% free cash! Check bit.ly/123"),
+            Some(
+                "Send bitcoin to wallet address: 1ABC123 and get 100% free cash! Check bit.ly/123",
+            ),
             None,
         );
 
         assert!(result.score >= 5.0);
         assert!(result.reasons.iter().any(|r| r.contains("URGENT")));
-        assert!(result.reasons.iter().any(|r| r.contains("CLAIM YOUR REWARD")));
+        assert!(
+            result
+                .reasons
+                .iter()
+                .any(|r| r.contains("CLAIM YOUR REWARD"))
+        );
         assert!(result.reasons.iter().any(|r| r.contains("bit.ly")));
     }
 
@@ -358,13 +370,15 @@ mod tests {
         let service = SpamScannerService::new(config);
         let raw_mime = b"From: spammer@evil.com\r\nTo: user@target.com\r\nSubject: URGENT: WINNER LOTTERY!!!\r\n\r\nCheck bit.ly/free-cash to claim $1000000";
 
-        let result = service.scan(
-            raw_mime,
-            Some("URGENT: WINNER LOTTERY!!!"),
-            Some("spammer@evil.com"),
-            Some("Check bit.ly/free-cash to claim $1000000"),
-            None,
-        ).await;
+        let result = service
+            .scan(
+                raw_mime,
+                Some("URGENT: WINNER LOTTERY!!!"),
+                Some("spammer@evil.com"),
+                Some("Check bit.ly/free-cash to claim $1000000"),
+                None,
+            )
+            .await;
 
         assert!(result.score >= 5.0);
         assert!(result.is_spam);
