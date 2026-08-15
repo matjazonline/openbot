@@ -181,6 +181,25 @@ pub trait TaskPersistence: Send + Sync {
         status: Option<TaskStatus>,
         sort_asc: bool,
     ) -> AppResult<Vec<BackgroundTask>>;
+
+    async fn list_company_tasks_page(
+        &self,
+        company_id: Uuid,
+        channel_id: Option<Uuid>,
+        status: Option<TaskStatus>,
+        sort_asc: bool,
+        offset: i64,
+        limit: i64,
+    ) -> AppResult<Vec<BackgroundTask>> {
+        let tasks = self
+            .list_company_tasks(company_id, channel_id, status, sort_asc)
+            .await?;
+        Ok(tasks
+            .into_iter()
+            .skip(offset.max(0) as usize)
+            .take(limit.max(0) as usize)
+            .collect())
+    }
 }
 
 #[async_trait]
@@ -657,6 +676,19 @@ impl TaskPersistence for PostgresPersistence {
         status: Option<TaskStatus>,
         sort_asc: bool,
     ) -> AppResult<Vec<BackgroundTask>> {
+        self.list_company_tasks_page(company_id, channel_id, status, sort_asc, 0, 200)
+            .await
+    }
+
+    async fn list_company_tasks_page(
+        &self,
+        company_id: Uuid,
+        channel_id: Option<Uuid>,
+        status: Option<TaskStatus>,
+        sort_asc: bool,
+        offset: i64,
+        limit: i64,
+    ) -> AppResult<Vec<BackgroundTask>> {
         let mut query = QueryBuilder::<Postgres>::new(
             r#"SELECT id, company_id, channel_id, thread_id, task_type, status, payload,
                       retry_count, max_retries, last_error, worker_id, locked_at, lock_expires_at,
@@ -675,7 +707,11 @@ impl TaskPersistence for PostgresPersistence {
         } else {
             query.push(" ORDER BY created_at DESC, id DESC");
         }
-        query.push(" LIMIT 200");
+        query
+            .push(" LIMIT ")
+            .push_bind(limit)
+            .push(" OFFSET ")
+            .push_bind(offset);
 
         let db_list = query
             .build_query_as::<BackgroundTaskDb>()

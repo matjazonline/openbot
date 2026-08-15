@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
+use chrono::NaiveDateTime;
 use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
@@ -50,6 +51,13 @@ pub trait ThreadPersistence: Send + Sync {
     ) -> AppResult<Thread>;
 
     async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>>;
+
+    async fn list_threads_by_channel_id(
+        &self,
+        channel_id: Uuid,
+        before: Option<(NaiveDateTime, Uuid)>,
+        limit: usize,
+    ) -> AppResult<Vec<Thread>>;
 
     async fn update_thread_participants(
         &self,
@@ -1522,6 +1530,17 @@ impl ThreadUseCases {
         self.thread_persistence.get_thread_by_id(thread_id).await
     }
 
+    pub async fn list_channel_threads(
+        &self,
+        channel_id: Uuid,
+        before: Option<(NaiveDateTime, Uuid)>,
+        limit: usize,
+    ) -> AppResult<Vec<Thread>> {
+        self.thread_persistence
+            .list_threads_by_channel_id(channel_id, before, limit)
+            .await
+    }
+
     pub async fn get_thread_history(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
         self.thread_persistence
             .list_messages_by_thread_id(thread_id)
@@ -1628,6 +1647,20 @@ impl ThreadUseCases {
     ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
         self.task_persistence
             .list_company_tasks(company_id, channel_id, status, sort_asc)
+            .await
+    }
+
+    pub async fn list_company_tasks_page(
+        &self,
+        company_id: Uuid,
+        channel_id: Option<Uuid>,
+        status: Option<crate::entities::task::TaskStatus>,
+        sort_asc: bool,
+        offset: i64,
+        limit: i64,
+    ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+        self.task_persistence
+            .list_company_tasks_page(company_id, channel_id, status, sort_asc, offset, limit)
             .await
     }
 
@@ -2056,6 +2089,28 @@ mod tests {
                 .iter()
                 .find(|t| t.id == id)
                 .cloned())
+        }
+
+        async fn list_threads_by_channel_id(
+            &self,
+            channel_id: Uuid,
+            before: Option<(chrono::NaiveDateTime, Uuid)>,
+            limit: usize,
+        ) -> AppResult<Vec<Thread>> {
+            let mut threads: Vec<_> = self
+                .threads
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|thread| thread.channel_id == channel_id)
+                .filter(|thread| {
+                    before.is_none_or(|cursor| (thread.updated_at, thread.id) < cursor)
+                })
+                .cloned()
+                .collect();
+            threads.sort_by_key(|thread| std::cmp::Reverse((thread.updated_at, thread.id)));
+            threads.truncate(limit);
+            Ok(threads)
         }
 
         async fn update_thread_participants(

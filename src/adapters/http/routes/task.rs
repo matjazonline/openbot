@@ -17,6 +17,9 @@ use crate::{
     use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
 };
 
+const DEFAULT_TASK_PAGE_SIZE: usize = 50;
+const MAX_TASK_PAGE_SIZE: usize = 100;
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/companies/{id}/tasks", get(list_company_tasks_page))
@@ -53,6 +56,20 @@ pub struct TaskFilterQuery {
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub status: Option<String>,
     pub sort: Option<String>,
+    pub page: Option<usize>,
+    pub limit: Option<usize>,
+}
+
+impl TaskFilterQuery {
+    fn page(&self) -> usize {
+        self.page.unwrap_or(1).max(1)
+    }
+
+    fn limit(&self) -> usize {
+        self.limit
+            .unwrap_or(DEFAULT_TASK_PAGE_SIZE)
+            .clamp(1, MAX_TASK_PAGE_SIZE)
+    }
 }
 
 #[instrument(skip(company_use_cases, channel_use_cases, thread_use_cases, _user))]
@@ -80,10 +97,30 @@ async fn list_company_tasks_page(
         .and_then(|s| s.parse::<TaskStatus>().ok());
     let sort_asc = query.sort.as_deref() == Some("asc");
 
-    let tasks = thread_use_cases
-        .list_company_tasks(company_id, query.channel_id, status_enum.clone(), sort_asc)
+    let page = query.page();
+    let limit = query.limit();
+    let mut tasks = thread_use_cases
+        .list_company_tasks_page(
+            company_id,
+            query.channel_id,
+            status_enum,
+            sort_asc,
+            task_page_offset(page, limit),
+            (limit + 1) as i64,
+        )
         .await
         .unwrap_or_default();
+    let has_next = tasks.len() > limit;
+    tasks.truncate(limit);
+    let pagination = build_task_pagination(
+        company_id,
+        query.channel_id,
+        status_enum.as_ref(),
+        sort_asc,
+        page,
+        limit,
+        has_next,
+    );
 
     Html(pages::company_tasks_page(
         &company,
@@ -92,29 +129,86 @@ async fn list_company_tasks_page(
         query.channel_id,
         status_enum,
         sort_asc,
+        &pagination,
     ))
 }
 
-fn build_tasks_push_url(company_id: Uuid, query: &TaskFilterQuery) -> String {
+fn task_page_offset(page: usize, limit: usize) -> i64 {
+    page.saturating_sub(1)
+        .saturating_mul(limit)
+        .min(i64::MAX as usize) as i64
+}
+
+fn build_tasks_url(
+    company_id: Uuid,
+    channel_id: Option<Uuid>,
+    status: Option<&TaskStatus>,
+    sort_asc: bool,
+    page: usize,
+    limit: usize,
+    filter_endpoint: bool,
+) -> String {
     let mut params = Vec::new();
-    if let Some(ch_id) = query.channel_id {
-        params.push(format!("channel_id={}", ch_id));
+    if let Some(channel_id) = channel_id {
+        params.push(format!("channel_id={channel_id}"));
     }
-    if let Some(ref st) = query.status {
-        if !st.trim().is_empty() {
-            params.push(format!("status={}", st));
-        }
+    if let Some(status) = status {
+        params.push(format!("status={}", status.as_str()));
     }
-    if let Some(ref s) = query.sort {
-        if !s.trim().is_empty() {
-            params.push(format!("sort={}", s));
-        }
+    if sort_asc {
+        params.push("sort=asc".to_string());
+    }
+    if limit != DEFAULT_TASK_PAGE_SIZE {
+        params.push(format!("limit={limit}"));
+    }
+    if page > 1 {
+        params.push(format!("page={page}"));
     }
 
+    let suffix = if filter_endpoint { "/filter" } else { "" };
+    let base = format!("/companies/{company_id}/tasks{suffix}");
     if params.is_empty() {
-        format!("/companies/{company_id}/tasks")
+        base
     } else {
-        format!("/companies/{company_id}/tasks?{}", params.join("&"))
+        format!("{base}?{}", params.join("&"))
+    }
+}
+
+fn build_task_pagination(
+    company_id: Uuid,
+    channel_id: Option<Uuid>,
+    status: Option<&TaskStatus>,
+    sort_asc: bool,
+    page: usize,
+    limit: usize,
+    has_next: bool,
+) -> pages::TaskPagination {
+    let build_link = |target_page| pages::TaskPageLink {
+        href: build_tasks_url(
+            company_id,
+            channel_id,
+            status,
+            sort_asc,
+            target_page,
+            limit,
+            false,
+        ),
+        hx_get: build_tasks_url(
+            company_id,
+            channel_id,
+            status,
+            sort_asc,
+            target_page,
+            limit,
+            true,
+        ),
+    };
+
+    pages::TaskPagination {
+        current_page: page,
+        limit,
+        previous: (page > 1).then(|| build_link(page - 1)),
+        next: has_next.then(|| build_link(page.saturating_add(1))),
     }
 }
 
@@ -145,16 +239,44 @@ async fn filter_company_tasks(
         .and_then(|s| s.parse::<TaskStatus>().ok());
     let sort_asc = query.sort.as_deref() == Some("asc");
 
-    let tasks = thread_use_cases
-        .list_company_tasks(company_id, query.channel_id, status_enum, sort_asc)
+    let page = query.page();
+    let limit = query.limit();
+    let mut tasks = thread_use_cases
+        .list_company_tasks_page(
+            company_id,
+            query.channel_id,
+            status_enum,
+            sort_asc,
+            task_page_offset(page, limit),
+            (limit + 1) as i64,
+        )
         .await
         .unwrap_or_default();
+    let has_next = tasks.len() > limit;
+    tasks.truncate(limit);
+    let pagination = build_task_pagination(
+        company_id,
+        query.channel_id,
+        status_enum.as_ref(),
+        sort_asc,
+        page,
+        limit,
+        has_next,
+    );
 
-    let push_url = build_tasks_push_url(company_id, &query);
+    let push_url = build_tasks_url(
+        company_id,
+        query.channel_id,
+        status_enum.as_ref(),
+        sort_asc,
+        page,
+        limit,
+        false,
+    );
 
     (
         [("HX-Push-Url", push_url)],
-        Html(pages::task_list_fragment(company_id, &tasks)),
+        Html(pages::task_list_fragment(company_id, &tasks, &pagination)),
     )
 }
 
@@ -246,13 +368,15 @@ mod tests {
         assert_eq!(query.channel_id, None);
         assert_eq!(query.status, Some("completed".to_string()));
         assert_eq!(query.sort, Some("desc".to_string()));
+        assert_eq!(query.page(), 1);
+        assert_eq!(query.limit(), DEFAULT_TASK_PAGE_SIZE);
     }
 
     #[test]
     fn test_task_filter_query_deserialization_with_channel() {
         let ch_id = Uuid::new_v4();
         let uri_str = format!(
-            "/companies/123/tasks/filter?channel_id={}&status=pending&sort=asc",
+            "/companies/123/tasks/filter?channel_id={}&status=pending&sort=asc&page=2&limit=25",
             ch_id
         );
         let uri: axum::http::Uri = uri_str.parse().unwrap();
@@ -261,6 +385,8 @@ mod tests {
         assert_eq!(query.channel_id, Some(ch_id));
         assert_eq!(query.status, Some("pending".to_string()));
         assert_eq!(query.sort, Some("asc".to_string()));
+        assert_eq!(query.page(), 2);
+        assert_eq!(query.limit(), 25);
     }
 
     #[test]
@@ -273,10 +399,12 @@ mod tests {
         assert_eq!(query.channel_id, None);
         assert_eq!(query.status, None);
         assert_eq!(query.sort, Some("".to_string()));
+        assert_eq!(query.page(), 1);
+        assert_eq!(query.limit(), DEFAULT_TASK_PAGE_SIZE);
     }
 
     #[test]
-    fn test_task_row_fragment_renders_simulation_link() {
+    fn test_task_row_fragment_renders_thread_link() {
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
@@ -301,7 +429,7 @@ mod tests {
         };
 
         let html = pages::task_row_fragment(company_id, &task);
-        assert!(html.contains("Open Simulation"));
+        assert!(html.contains("Open Thread"));
         assert!(html.contains(&format!(
             "/companies/{company_id}/channels/{channel_id}/simulate?thread_id={thread_id}"
         )));
@@ -353,29 +481,62 @@ mod tests {
     }
 
     #[test]
-    fn test_build_tasks_push_url() {
+    fn test_build_tasks_url() {
         let company_id = Uuid::new_v4();
         let ch_id = Uuid::new_v4();
 
-        let query_empty = TaskFilterQuery {
-            channel_id: None,
-            status: None,
-            sort: None,
-        };
         assert_eq!(
-            build_tasks_push_url(company_id, &query_empty),
+            build_tasks_url(company_id, None, None, false, 1, 50, false),
             format!("/companies/{company_id}/tasks")
         );
 
-        let query_wf = TaskFilterQuery {
-            channel_id: Some(ch_id),
-            status: Some("pending".to_string()),
-            sort: Some("desc".to_string()),
-        };
+        let status = TaskStatus::Pending;
         assert_eq!(
-            build_tasks_push_url(company_id, &query_wf),
-            format!("/companies/{company_id}/tasks?channel_id={ch_id}&status=pending&sort=desc")
+            build_tasks_url(company_id, Some(ch_id), Some(&status), true, 2, 25, false),
+            format!(
+                "/companies/{company_id}/tasks?channel_id={ch_id}&status=pending&sort=asc&limit=25&page=2"
+            )
         );
+        assert_eq!(
+            build_tasks_url(company_id, Some(ch_id), None, false, 1, 50, true),
+            format!("/companies/{company_id}/tasks/filter?channel_id={ch_id}")
+        );
+        assert!(!build_tasks_url(company_id, None, None, false, 1, 50, false).ends_with('?'));
+    }
+
+    #[test]
+    fn test_task_filter_query_bounds_pagination() {
+        let uri: axum::http::Uri = "/companies/123/tasks?limit=1000&page=0".parse().unwrap();
+        let Query(query) =
+            Query::<TaskFilterQuery>::try_from_uri(&uri).expect("Should deserialize");
+        assert_eq!(query.page(), 1);
+        assert_eq!(query.limit(), MAX_TASK_PAGE_SIZE);
+        assert_eq!(task_page_offset(3, 25), 50);
+    }
+
+    #[test]
+    fn test_task_pagination_preserves_filters_in_both_links() {
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+        let status = TaskStatus::Completed;
+        let pagination = build_task_pagination(
+            company_id,
+            Some(channel_id),
+            Some(&status),
+            true,
+            2,
+            25,
+            true,
+        );
+
+        let html = pages::task_list_fragment(company_id, &[], &pagination);
+        assert!(html.contains("Page 2"));
+        assert!(html.contains("&larr; Previous"));
+        assert!(html.contains("Next &rarr;"));
+        assert!(html.contains(&format!("channel_id={channel_id}")));
+        assert!(html.contains("status=completed&amp;") || html.contains("status=completed&"));
+        assert!(html.contains("/tasks/filter?"));
+        assert!(!html.contains(&format!("channel_id={channel_id}?")));
     }
 
     #[test]
@@ -476,7 +637,14 @@ mod tests {
         assert!(row_html.contains("165 total"));
         assert!(row_html.contains("Prompt: 120 • Completion: 45"));
 
-        let page_html = pages::company_tasks_page(&company, &[], &[task], None, None, false);
+        let pagination = pages::TaskPagination {
+            current_page: 1,
+            limit: DEFAULT_TASK_PAGE_SIZE,
+            previous: None,
+            next: None,
+        };
+        let page_html =
+            pages::company_tasks_page(&company, &[], &[task], None, None, false, &pagination);
         assert!(page_html.contains("Token Meter Summary"));
         assert!(page_html.contains("120"));
         assert!(page_html.contains("45"));

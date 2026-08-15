@@ -7,14 +7,15 @@ use axum::{
     response::{Html, IntoResponse},
     routing::{get, put},
 };
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
-    app_error::AppResult,
-    entities::channel::Channel,
+    app_error::{AppError, AppResult},
+    entities::{channel::Channel, thread::Thread},
     infra::config::AppConfig,
     services::email_parser::RawInboundPayload,
     use_cases::{
@@ -53,6 +54,14 @@ pub fn router() -> Router<AppState> {
             get(open_simulated_thread_get).post(open_simulated_thread_post),
         )
         .route(
+            "/companies/{company_id}/channels/{id}/threads",
+            get(list_channel_threads_page),
+        )
+        .route(
+            "/companies/{company_id}/channels/{id}/threads/list",
+            get(list_channel_threads_fragment),
+        )
+        .route(
             "/api/companies/{company_id}/channels",
             get(list_channels_json).post(create_channel_json),
         )
@@ -61,6 +70,10 @@ pub fn router() -> Router<AppState> {
             get(get_channel_json)
                 .put(update_channel_json)
                 .delete(delete_channel_json),
+        )
+        .route(
+            "/api/companies/{company_id}/channels/{id}/threads",
+            get(list_channel_threads_json),
         )
 }
 
@@ -133,6 +146,73 @@ pub struct ChannelJsonPayload {
 pub struct ChannelResponse {
     pub success: bool,
     pub channel: Channel,
+}
+
+const DEFAULT_THREAD_PAGE_SIZE: usize = 50;
+const MAX_THREAD_PAGE_SIZE: usize = 100;
+const THREAD_CURSOR_TIMESTAMP_FORMAT: &str = "%Y%m%dT%H%M%S%.f";
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ThreadListQuery {
+    pub limit: Option<usize>,
+    pub cursor: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ThreadListResponse {
+    pub threads: Vec<Thread>,
+    pub next_cursor: Option<String>,
+    pub has_more: bool,
+}
+
+fn parse_thread_cursor(cursor: &str) -> AppResult<(NaiveDateTime, Uuid)> {
+    let (updated_at, id) = cursor
+        .rsplit_once('_')
+        .ok_or_else(|| AppError::BadRequest("Invalid thread cursor".into()))?;
+    let updated_at = NaiveDateTime::parse_from_str(updated_at, THREAD_CURSOR_TIMESTAMP_FORMAT)
+        .map_err(|_| AppError::BadRequest("Invalid thread cursor".into()))?;
+    let id =
+        Uuid::parse_str(id).map_err(|_| AppError::BadRequest("Invalid thread cursor".into()))?;
+    Ok((updated_at, id))
+}
+
+fn format_thread_cursor(thread: &Thread) -> String {
+    format!(
+        "{}_{}",
+        thread.updated_at.format(THREAD_CURSOR_TIMESTAMP_FORMAT),
+        thread.id
+    )
+}
+
+async fn load_thread_page(
+    thread_use_cases: &ThreadUseCases,
+    channel_id: Uuid,
+    query: &ThreadListQuery,
+) -> AppResult<ThreadListResponse> {
+    let limit = query.limit.unwrap_or(DEFAULT_THREAD_PAGE_SIZE);
+    if !(1..=MAX_THREAD_PAGE_SIZE).contains(&limit) {
+        return Err(AppError::BadRequest(format!(
+            "limit must be between 1 and {MAX_THREAD_PAGE_SIZE}"
+        )));
+    }
+    let before = query
+        .cursor
+        .as_deref()
+        .map(parse_thread_cursor)
+        .transpose()?;
+
+    let mut threads = thread_use_cases
+        .list_channel_threads(channel_id, before, limit + 1)
+        .await?;
+    let has_more = threads.len() > limit;
+    threads.truncate(limit);
+    let next_cursor = has_more.then(|| format_thread_cursor(&threads[threads.len() - 1]));
+
+    Ok(ThreadListResponse {
+        threads,
+        next_cursor,
+        has_more,
+    })
 }
 
 fn parse_emails_form(input: Option<String>) -> Option<Vec<String>> {
@@ -1029,6 +1109,63 @@ async fn open_simulated_thread_post(
     .await
 }
 
+/// GET /companies/{company_id}/channels/{id}/threads - Paginated thread list page (Protected).
+async fn list_channel_threads_page(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
+) -> AppResult<Html<String>> {
+    let company = company_use_cases
+        .get_company(company_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Company not found".into()))?;
+    let channel = channel_use_cases
+        .get_company_channel(user.id, company_id, channel_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+    let page = load_thread_page(
+        &thread_use_cases,
+        channel_id,
+        &ThreadListQuery {
+            limit: None,
+            cursor: None,
+        },
+    )
+    .await?;
+
+    Ok(Html(pages::channel_threads_page(
+        &company,
+        &channel,
+        &page.threads,
+        page.next_cursor.as_deref(),
+    )))
+}
+
+/// GET /companies/{company_id}/channels/{id}/threads/list - Next HTMX page (Protected).
+async fn list_channel_threads_fragment(
+    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
+    Query(query): Query<ThreadListQuery>,
+) -> AppResult<Html<String>> {
+    channel_use_cases
+        .get_company_channel(user.id, company_id, channel_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+    let page = load_thread_page(&thread_use_cases, channel_id, &query).await?;
+
+    Ok(Html(pages::channel_thread_list_fragment(
+        company_id,
+        channel_id,
+        &page.threads,
+        page.next_cursor.as_deref(),
+        true,
+    )))
+}
+
 /// JSON API: List company channels (Protected).
 async fn list_channels_json(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
@@ -1039,6 +1176,24 @@ async fn list_channels_json(
         .list_company_channels(user.id, company_id)
         .await?;
     Ok((StatusCode::OK, Json(channels)))
+}
+
+/// JSON API: List channel threads newest-first with keyset pagination (Protected).
+async fn list_channel_threads_json(
+    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
+    Query(query): Query<ThreadListQuery>,
+) -> AppResult<impl IntoResponse> {
+    channel_use_cases
+        .get_company_channel(user.id, company_id, channel_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+
+    let page = load_thread_page(&thread_use_cases, channel_id, &query).await?;
+
+    Ok((StatusCode::OK, Json(page)))
 }
 
 /// JSON API: Create company channel (Protected).
@@ -1178,11 +1333,33 @@ async fn delete_channel_json(
 
 #[cfg(test)]
 mod tests {
-    use crate::entities::company::Company;
+    use crate::entities::{company::Company, thread::Thread};
     use chrono::Utc;
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn thread_cursor_round_trips() {
+        let thread = Thread {
+            id: Uuid::new_v4(),
+            channel_id: Uuid::new_v4(),
+            subject: "Subject".into(),
+            participant_emails: vec![],
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+        };
+
+        let cursor = format_thread_cursor(&thread);
+        assert_eq!(
+            parse_thread_cursor(&cursor).unwrap(),
+            (thread.updated_at, thread.id)
+        );
+        assert!(matches!(
+            parse_thread_cursor("invalid"),
+            Err(AppError::BadRequest(_))
+        ));
+    }
 
     #[test]
     fn channel_pages_and_fragments_render_correctly() {
@@ -1234,6 +1411,34 @@ mod tests {
         assert!(row_html.contains("auto-dispatcher@acme.example.com"));
         assert!(row_html.contains("agent@test.com"));
         assert!(row_html.contains("async"));
+        assert!(row_html.contains(&format!(
+            "/companies/{}/channels/{}/threads",
+            company.id, channel.id
+        )));
+
+        let thread = Thread {
+            id: Uuid::new_v4(),
+            channel_id: channel.id,
+            subject: "Question <script>".into(),
+            participant_emails: vec!["person@example.com".into()],
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+        };
+        let threads_page = pages::channel_threads_page(
+            &company,
+            &channel,
+            std::slice::from_ref(&thread),
+            Some("next_cursor"),
+        );
+        assert!(threads_page.contains("Auto Dispatcher Threads"));
+        assert!(threads_page.contains("Question &lt;script&gt;"));
+        assert!(threads_page.contains(&format!("thread_id={}", thread.id)));
+        assert!(threads_page.contains("hx-swap=\"beforeend\""));
+        assert!(threads_page.contains("threads/list?cursor=next_cursor"));
+
+        let next_threads =
+            pages::channel_thread_list_fragment(company.id, channel.id, &[thread], None, true);
+        assert!(next_threads.contains("hx-swap-oob=\"outerHTML\""));
 
         let edit_html = pages::channel_edit_fragment(&company, "example.com", &channel, &[], true);
         assert!(edit_html.contains("hx-put="));

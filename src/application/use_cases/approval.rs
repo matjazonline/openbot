@@ -674,6 +674,14 @@ mod tests {
         ) -> AppResult<Option<crate::entities::thread::Thread>> {
             unimplemented!()
         }
+        async fn list_threads_by_channel_id(
+            &self,
+            _channel_id: Uuid,
+            _before: Option<(chrono::NaiveDateTime, Uuid)>,
+            _limit: usize,
+        ) -> AppResult<Vec<crate::entities::thread::Thread>> {
+            unimplemented!()
+        }
         async fn update_thread_participants(
             &self,
             _id: Uuid,

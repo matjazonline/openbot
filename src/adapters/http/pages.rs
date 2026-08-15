@@ -1558,6 +1558,123 @@ pub fn channel_list_fragment(
         .collect()
 }
 
+fn escape_html_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+pub fn channel_threads_page(
+    company: &Company,
+    channel: &Channel,
+    threads: &[Thread],
+    next_cursor: Option<&str>,
+) -> String {
+    let list_html =
+        channel_thread_list_fragment(company.id, channel.id, threads, next_cursor, false);
+    let content = format!(
+        r##"
+        <div class="mb-6">
+            <a href="/companies/{company_id}/channels" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Channels</a>
+            <h2 class="text-2xl font-bold text-white">{channel_name} Threads</h2>
+            <p class="text-slate-400 text-sm mt-0.5">Newest conversations for <span class="font-mono text-emerald-300">/{channel_slug}</span></p>
+        </div>
+        <div id="thread-list" class="space-y-3">
+            {list_html}
+        </div>
+        "##,
+        company_id = company.id,
+        channel_name = escape_html_text(&channel.name),
+        channel_slug = escape_html_text(&channel.slug),
+        list_html = list_html,
+    );
+
+    base_layout(&format!("{} Threads", channel.name), &content)
+}
+
+pub fn channel_thread_list_fragment(
+    company_id: Uuid,
+    channel_id: Uuid,
+    threads: &[Thread],
+    next_cursor: Option<&str>,
+    out_of_band_pagination: bool,
+) -> String {
+    let cards = if threads.is_empty() && !out_of_band_pagination {
+        r##"
+        <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-8 text-center">
+            <p class="text-slate-400 text-sm">No threads have been created for this channel yet.</p>
+        </div>
+        "##
+        .to_string()
+    } else {
+        threads
+            .iter()
+            .map(|thread| {
+                let participants = if thread.participant_emails.is_empty() {
+                    "No participants".to_string()
+                } else {
+                    escape_html_text(&thread.participant_emails.join(", "))
+                };
+                format!(
+                    r##"
+                    <article class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 hover:border-indigo-700/70 transition shadow-sm">
+                        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                            <div class="min-w-0">
+                                <h3 class="font-semibold text-white break-words">{subject}</h3>
+                                <p class="text-xs text-slate-400 mt-1 break-words">{participants}</p>
+                                <p class="text-[11px] font-mono text-slate-500 mt-2">{thread_id}</p>
+                            </div>
+                            <div class="sm:text-right shrink-0">
+                                <p class="text-xs text-slate-400">Updated {updated_at}</p>
+                                <a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={thread_id}"
+                                    class="inline-block mt-2 px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
+                                    Open Thread
+                                </a>
+                            </div>
+                        </div>
+                    </article>
+                    "##,
+                    subject = escape_html_text(&thread.subject),
+                    participants = participants,
+                    thread_id = thread.id,
+                    updated_at = thread.updated_at.format("%b %d, %Y %H:%M"),
+                    company_id = company_id,
+                    channel_id = channel_id,
+                )
+            })
+            .collect()
+    };
+
+    let oob = if out_of_band_pagination {
+        " hx-swap-oob=\"outerHTML\""
+    } else {
+        ""
+    };
+    let pagination = match next_cursor {
+        Some(cursor) => format!(
+            r##"
+            <div id="thread-pagination" class="pt-3 text-center"{oob}>
+                <button hx-get="/companies/{company_id}/channels/{channel_id}/threads/list?cursor={cursor}"
+                    hx-target="#thread-list" hx-swap="beforeend" hx-disabled-elt="this"
+                    class="px-4 py-2 text-sm font-medium bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-200 border border-slate-700 rounded-lg transition cursor-pointer">
+                    Load older threads
+                </button>
+            </div>
+            "##,
+            company_id = company_id,
+            channel_id = channel_id,
+            cursor = cursor,
+            oob = oob,
+        ),
+        None => format!(r##"<div id="thread-pagination"{oob}></div>"##),
+    };
+
+    format!("{cards}{pagination}")
+}
+
 pub fn channel_row_fragment(
     company: &Company,
     app_domain_name: &str,
@@ -1608,7 +1725,11 @@ pub fn channel_row_fragment(
                     </div>
                     <p class="text-xs text-slate-400 mt-1">Created on {created_at_str}</p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                    <a href="/companies/{company_id}/channels/{channel_id}/threads"
+                        class="px-3 py-1.5 text-xs font-medium bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/50 rounded-lg transition">
+                        Threads
+                    </a>
                     <a href="/companies/{company_id}/tasks?channel_id={channel_id}"
                         class="px-3 py-1.5 text-xs font-medium bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/50 rounded-lg transition">
                         Tasks
@@ -3426,6 +3547,18 @@ pub fn channel_simulation_thread_error_fragment(
     }
 }
 
+pub struct TaskPageLink {
+    pub href: String,
+    pub hx_get: String,
+}
+
+pub struct TaskPagination {
+    pub current_page: usize,
+    pub limit: usize,
+    pub previous: Option<TaskPageLink>,
+    pub next: Option<TaskPageLink>,
+}
+
 pub fn company_tasks_page(
     company: &Company,
     channels: &[Channel],
@@ -3433,8 +3566,9 @@ pub fn company_tasks_page(
     current_wf: Option<Uuid>,
     current_status: Option<TaskStatus>,
     sort_asc: bool,
+    pagination: &TaskPagination,
 ) -> String {
-    let task_list_html = task_list_fragment(company.id, tasks);
+    let task_list_html = task_list_fragment(company.id, tasks, pagination);
 
     let (total_prompt_tokens, total_completion_tokens, total_tokens_meter) = tasks
         .iter()
@@ -3507,7 +3641,7 @@ pub fn company_tasks_page(
                 </div>
                 <div>
                     <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-300">Token Meter Summary</h4>
-                    <p class="text-xs text-slate-400">Total tokens consumed across filtered task executions</p>
+                    <p class="text-xs text-slate-400">Total tokens consumed by tasks on this page</p>
                 </div>
             </div>
             <div class="flex items-center gap-3 text-xs font-mono">
@@ -3529,6 +3663,7 @@ pub fn company_tasks_page(
         <!-- Filter & Sort Bar -->
         <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6">
             <form hx-get="/companies/{company_id}/tasks/filter" hx-target="#task-list" hx-swap="innerHTML" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input type="hidden" name="limit" value="{limit}">
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Filter by Channel</label>
                     <select name="channel_id" onchange="this.form.requestSubmit()"
@@ -3569,26 +3704,65 @@ pub fn company_tasks_page(
         status_options = status_options,
         sort_desc_selected = sort_desc_selected,
         sort_asc_selected = sort_asc_selected,
+        limit = pagination.limit,
         task_list_html = task_list_html,
     );
 
     base_layout(&format!("{} Tasks", company.name), &content)
 }
 
-pub fn task_list_fragment(company_id: Uuid, tasks: &[BackgroundTask]) -> String {
-    if tasks.is_empty() {
-        return r##"
+pub fn task_list_fragment(
+    company_id: Uuid,
+    tasks: &[BackgroundTask],
+    pagination: &TaskPagination,
+) -> String {
+    let tasks_html = if tasks.is_empty() {
+        r##"
             <div class="bg-slate-900/40 border border-dashed border-slate-700/80 rounded-xl p-8 text-center">
                 <p class="text-slate-400 text-sm">No tasks matching the selected filters.</p>
             </div>
         "##
-        .to_string();
-    }
+        .to_string()
+    } else {
+        tasks
+            .iter()
+            .map(|t| task_row_fragment(company_id, t))
+            .collect()
+    };
 
-    tasks
-        .iter()
-        .map(|t| task_row_fragment(company_id, t))
-        .collect()
+    let link = |link: &TaskPageLink, label: &str| {
+        format!(
+            r##"<a href="{href}" hx-get="{hx_get}" hx-target="#task-list" hx-swap="innerHTML"
+                class="px-3 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition">{label}</a>"##,
+            href = link.href,
+            hx_get = link.hx_get,
+            label = label,
+        )
+    };
+    let previous = pagination
+        .previous
+        .as_ref()
+        .map(|value| link(value, "&larr; Previous"))
+        .unwrap_or_default();
+    let next = pagination
+        .next
+        .as_ref()
+        .map(|value| link(value, "Next &rarr;"))
+        .unwrap_or_default();
+    let pagination_html = if pagination.previous.is_some() || pagination.next.is_some() {
+        format!(
+            r##"<nav aria-label="Task pagination" class="flex items-center justify-between pt-3">
+                <div>{previous}</div>
+                <span class="text-xs font-mono text-slate-400">Page {page}</span>
+                <div>{next}</div>
+            </nav>"##,
+            page = pagination.current_page,
+        )
+    } else {
+        String::new()
+    };
+
+    format!("{tasks_html}{pagination_html}")
 }
 
 fn sanitize_json_payload(value: &serde_json::Value) -> serde_json::Value {
@@ -3946,11 +4120,11 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
         _ => String::new(),
     };
 
-    let simulation_link = match task.thread_id {
+    let thread_link = match task.thread_id {
         Some(tid) => format!(
             r##"<a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={tid}"
                 class="px-3 py-1.5 text-xs font-semibold bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-lg transition flex items-center gap-1 shadow-sm whitespace-nowrap">
-                <span>⚡ Open Simulation</span>
+                <span>Open Thread</span>
             </a>"##,
             company_id = company_id,
             channel_id = task.channel_id,
@@ -4005,7 +4179,7 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
                     {token_meter_badge}
                 </div>
                 <div class="flex items-center gap-2">
-                    {simulation_link}
+                    {thread_link}
                     {action_button}
                 </div>
             </div>
@@ -4021,7 +4195,7 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
         created_at_str = created_at_str,
         thread_info = thread_info,
         token_meter_badge = token_meter_badge,
-        simulation_link = simulation_link,
+        thread_link = thread_link,
         action_button = action_button,
         error_html = error_html,
         parameters_html = parameters_html,

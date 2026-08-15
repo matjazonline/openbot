@@ -16,6 +16,8 @@ impl IntoResponse for AppError {
             AppError::InvalidCredentials => {
                 (StatusCode::UNAUTHORIZED, "Invalid credentials").into_response()
             }
+            AppError::BadRequest(message) => (StatusCode::BAD_REQUEST, message).into_response(),
+            AppError::NotFound(message) => (StatusCode::NOT_FOUND, message).into_response(),
             AppError::Internal(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal error").into_response()
             }

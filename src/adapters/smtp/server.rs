@@ -919,6 +919,15 @@ mod tests {
                 .cloned())
         }
 
+        async fn list_threads_by_channel_id(
+            &self,
+            _channel_id: Uuid,
+            _before: Option<(chrono::NaiveDateTime, Uuid)>,
+            _limit: usize,
+        ) -> AppResult<Vec<Thread>> {
+            unimplemented!()
+        }
+
         async fn update_thread_participants(
             &self,
             id: Uuid,

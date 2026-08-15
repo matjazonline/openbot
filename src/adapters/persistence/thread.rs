@@ -187,6 +187,44 @@ impl ThreadPersistence for PostgresPersistence {
         load_thread(&self.pool, id).await
     }
 
+    async fn list_threads_by_channel_id(
+        &self,
+        channel_id: Uuid,
+        before: Option<(NaiveDateTime, Uuid)>,
+        limit: usize,
+    ) -> AppResult<Vec<Thread>> {
+        let db = if let Some((updated_at, id)) = before {
+            let query = format!(
+                r#"{THREAD_SELECT}
+                   WHERE t.channel_id = $1 AND (t.updated_at, t.id) < ($2, $3)
+                   ORDER BY t.updated_at DESC, t.id DESC
+                   LIMIT $4"#
+            );
+            sqlx::query_as::<_, ThreadDb>(&query)
+                .bind(channel_id)
+                .bind(updated_at)
+                .bind(id)
+                .bind(limit as i64)
+                .fetch_all(&self.pool)
+                .await
+        } else {
+            let query = format!(
+                r#"{THREAD_SELECT}
+                   WHERE t.channel_id = $1
+                   ORDER BY t.updated_at DESC, t.id DESC
+                   LIMIT $2"#
+            );
+            sqlx::query_as::<_, ThreadDb>(&query)
+                .bind(channel_id)
+                .bind(limit as i64)
+                .fetch_all(&self.pool)
+                .await
+        }
+        .map_err(AppError::from)?;
+
+        Ok(db.into_iter().map(Into::into).collect())
+    }
+
     async fn update_thread_participants(
         &self,
         id: Uuid,
@@ -524,6 +562,32 @@ mod tests {
             .create_thread(second_channel.id, "Subject", std::slice::from_ref(&email))
             .await
             .unwrap();
+        let another_first_thread = persistence
+            .create_thread(
+                first_channel.id,
+                "Another subject",
+                std::slice::from_ref(&email),
+            )
+            .await
+            .unwrap();
+
+        let first_page = persistence
+            .list_threads_by_channel_id(first_channel.id, None, 1)
+            .await
+            .unwrap();
+        assert_eq!(first_page.len(), 1);
+        let cursor = (first_page[0].updated_at, first_page[0].id);
+        let second_page = persistence
+            .list_threads_by_channel_id(first_channel.id, Some(cursor), 1)
+            .await
+            .unwrap();
+        assert_eq!(second_page.len(), 1);
+        assert_ne!(first_page[0].id, second_page[0].id);
+        assert!(
+            [first_thread.id, another_first_thread.id]
+                .into_iter()
+                .all(|id| id == first_page[0].id || id == second_page[0].id)
+        );
 
         let internet_message_id = format!("<{suffix}@example.com>");
         let message = Message {

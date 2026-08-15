@@ -126,8 +126,7 @@ const BASE_CONTEXT_SYSTEM_PROMPT: &str = "Runtime context:\n\
 - Agent name: {{ context.agent_info.name }}\n\
 - Recipient role: {{ context.recipient_role }}\n\
 - Primary recipient: {{ context.is_to }}\n\
-- CC recipient: {{ context.is_cc }}\n\n\
-Agent instructions:";
+- CC recipient: {{ context.is_cc }}";
 
 pub fn base_agent_config() -> serde_json::Value {
     base_agent_config_with_observability(ai_agents_observability_enabled())
@@ -322,7 +321,7 @@ impl ResolvedAgentParams {
             fallback_sys_prompt,
             fallback_name,
         );
-        prepend_base_context_prompt(&mut config);
+        append_base_context_prompt(&mut config);
 
         Ok(Self {
             provider,
@@ -353,7 +352,7 @@ impl ResolvedAgentParams {
     }
 }
 
-fn prepend_base_context_prompt(config: &mut serde_json::Value) {
+fn append_base_context_prompt(config: &mut serde_json::Value) {
     let Some(system_prompt) = config
         .get("system_prompt")
         .and_then(serde_json::Value::as_str)
@@ -362,7 +361,7 @@ fn prepend_base_context_prompt(config: &mut serde_json::Value) {
     };
 
     config["system_prompt"] =
-        serde_json::json!(format!("{BASE_CONTEXT_SYSTEM_PROMPT}\n{system_prompt}"));
+        serde_json::json!(format!("{system_prompt}\n\n{BASE_CONTEXT_SYSTEM_PROMPT}"));
 }
 
 pub fn merge_json(base: &mut serde_json::Value, override_val: &serde_json::Value) {
@@ -1243,7 +1242,7 @@ mod tests {
             &serde_json::json!({
                 "name": "Acme Corp",
                 "system_prompt": format!(
-                    "{BASE_CONTEXT_SYSTEM_PROMPT}\nYou are a helpful assistant."
+                    "You are a helpful assistant.\n\n{BASE_CONTEXT_SYSTEM_PROMPT}"
                 ),
                 "llm": {
                     "provider": "google",
@@ -1296,7 +1295,7 @@ mod tests {
             &mut expected,
             &serde_json::json!({
                 "name": "Support Channel",
-                "system_prompt": format!("{BASE_CONTEXT_SYSTEM_PROMPT}\nChannel prompt"),
+                "system_prompt": format!("Channel prompt\n\n{BASE_CONTEXT_SYSTEM_PROMPT}"),
                 "temperature": 0.2,
                 "llm": {
                     "provider": "openai",
@@ -1367,7 +1366,7 @@ mod tests {
             &mut expected,
             &serde_json::json!({
                 "name": "Tech Agent",
-                "system_prompt": format!("{BASE_CONTEXT_SYSTEM_PROMPT}\nAgent prompt"),
+                "system_prompt": format!("Agent prompt\n\n{BASE_CONTEXT_SYSTEM_PROMPT}"),
                 "temperature": 0.7,
                 "channel_only_field": true,
                 "llm": {
@@ -1524,7 +1523,7 @@ mod tests {
         let cfg = resolved.config();
         assert_eq!(
             cfg.get("system_prompt").unwrap().as_str().unwrap(),
-            format!("{BASE_CONTEXT_SYSTEM_PROMPT}\nYou are a helpful triage assistant.")
+            format!("You are a helpful triage assistant.\n\n{BASE_CONTEXT_SYSTEM_PROMPT}")
         );
     }
 
@@ -1546,7 +1545,7 @@ mod tests {
         let cfg = resolved.config();
         assert_eq!(
             cfg.get("system_prompt").unwrap().as_str().unwrap(),
-            format!("{BASE_CONTEXT_SYSTEM_PROMPT}\nYou are a helpful assistant.")
+            format!("You are a helpful assistant.\n\n{BASE_CONTEXT_SYSTEM_PROMPT}")
         );
     }
 
