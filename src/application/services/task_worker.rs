@@ -84,6 +84,20 @@ impl TaskWorker {
 
             match result {
                 Ok(_) => {
+                    if let Ok(Some(current)) = self.task_persistence.get_task_by_id(task_id).await
+                        && matches!(
+                            current.status,
+                            crate::entities::task::TaskStatus::PendingApproval
+                                | crate::entities::task::TaskStatus::WaitingForThirdPartyReply
+                        )
+                    {
+                        info!(
+                            "Background task {} suspended with status {}",
+                            task_id,
+                            current.status.as_str()
+                        );
+                        continue;
+                    }
                     info!("Successfully completed background task {}", task_id);
                     match self
                         .task_persistence
@@ -166,6 +180,18 @@ impl TaskWorker {
             .map_err(|error| error.to_string())?;
 
         for queued in emails {
+            if !self
+                .task_persistence
+                .is_outbox_delivery_active(queued.id)
+                .await
+                .unwrap_or(false)
+            {
+                let _ = self
+                    .task_persistence
+                    .cancel_claimed_outbox(queued.id, self.worker_id)
+                    .await;
+                continue;
+            }
             let email: OutboundEmail = match serde_json::from_value(queued.payload) {
                 Ok(email) => email,
                 Err(error) => {
@@ -192,6 +218,16 @@ impl TaskWorker {
                             &sent.outbound_message_id,
                         )
                         .await;
+                    if let Err(error) = self
+                        .thread_use_cases
+                        .record_outreach_outbound_message(queued.id, &sent)
+                        .await
+                    {
+                        warn!(
+                            "Failed to record sent outreach outbox {} in thread history: {}",
+                            queued.id, error
+                        );
+                    }
                 }
                 Err(error) => {
                     let _ = self
@@ -206,96 +242,123 @@ impl TaskWorker {
 
     pub async fn check_quorum_timeouts(&self) -> Result<(), String> {
         let now = chrono::Utc::now().naive_utc();
-        let tasks = self
+        let outreaches = self
             .task_persistence
-            .list_due_waiting_tasks(now, 100)
+            .list_due_outreaches(now, 100)
             .await
             .unwrap_or_default();
 
-        for task in tasks {
-            if let Some(quorum) = task.payload.get("quorum_outreach") {
-                let status = quorum
-                    .get("status")
-                    .and_then(|s| s.as_str())
-                    .unwrap_or_default();
-                if status == "awaiting_quorum" {
-                    let curr_pct = quorum
-                        .get("current_percent")
-                        .and_then(|v| v.as_f64())
-                        .unwrap_or(0.0);
-                    let req_pct = quorum
-                        .get("required_threshold_percent")
-                        .and_then(|v| v.as_f64())
-                        .unwrap_or(50.0);
-
-                    if curr_pct < req_pct {
-                        info!(
-                            "Task {} reached quorum timeout with {:.1}% responses (< {:.1}% required). Triggering HITL timeout approval.",
-                            task.id, curr_pct, req_pct
-                        );
-
-                        if self
-                            .task_persistence
-                            .update_task_status(
-                                task.id,
-                                crate::entities::task::TaskStatus::PendingApproval,
-                            )
-                            .await
-                            .is_err()
-                        {
-                            continue;
-                        }
-
-                        let mut payload = task.payload.clone();
-                        if let Some(q) = payload
-                            .get_mut("quorum_outreach")
-                            .and_then(|q| q.as_object_mut())
-                        {
-                            q.insert(
-                                "status".to_string(),
-                                serde_json::json!("timeout_pending_approval"),
-                            );
-                        }
-                        let _ = self
-                            .task_persistence
-                            .update_task_payload(task.id, payload)
-                            .await;
-                        if let Some(approval_use_cases) =
-                            self.thread_use_cases.get_approval_use_cases()
-                        {
-                            let curr_cnt = quorum
-                                .get("current_count")
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(0);
-                            let tot_cnt = quorum
-                                .get("total_targets")
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(0);
-                            let step_key = format!("quorum_timeout_{}", task.id);
-
-                            let _ = approval_use_cases.create_and_send_approval_request(
-                                task.company_id,
-                                task.channel_id,
-                                "Channel",
-                                "channel",
-                                "company",
-                                task.thread_id,
-                                Some(task.id),
-                                &step_key,
-                                "admin@company.com",
-                                "quorum_timeout",
-                                "Partial Quorum Timeout: Action Required",
-                                &format!("Outreach reached timeout with {}/{} responses ({:.1}%). Required: {:.1}%.", curr_cnt, tot_cnt, curr_pct, req_pct),
-                                serde_json::json!({
-                                    "current_percent": curr_pct,
-                                    "required_percent": req_pct,
-                                    "current_count": curr_cnt,
-                                    "total_targets": tot_cnt,
-                                }),
-                            ).await;
-                        }
-                    }
-                }
+        for outreach in outreaches {
+            let current_percent = if outreach.target_count == 0 {
+                0.0
+            } else {
+                outreach.response_count as f64 * 100.0 / outreach.target_count as f64
+            };
+            if current_percent >= outreach.required_threshold_percent {
+                continue;
+            }
+            let Some(approval_use_cases) = self.thread_use_cases.get_approval_use_cases() else {
+                continue;
+            };
+            let Some(task) = self
+                .task_persistence
+                .get_task_by_id(outreach.task_id)
+                .await
+                .map_err(|error| error.to_string())?
+            else {
+                continue;
+            };
+            let ingest: InboundIngestResult =
+                serde_json::from_value(task.payload.clone()).map_err(|error| error.to_string())?;
+            let channel = ingest.channel.or_else(|| {
+                ingest
+                    .channel_matches
+                    .first()
+                    .map(|matched| matched.channel.clone())
+            });
+            let company = ingest.company.or_else(|| {
+                ingest
+                    .channel_matches
+                    .first()
+                    .map(|matched| matched.company.clone())
+            });
+            let (Some(channel), Some(company)) = (channel, company) else {
+                continue;
+            };
+            let team_approver = self
+                .thread_use_cases
+                .company_persistence()
+                .list_company_team_emails(task.company_id)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .next();
+            let approver_email = channel
+                .participant_emails
+                .as_ref()
+                .and_then(|participants| {
+                    participants
+                        .iter()
+                        .find(|email| !email.eq_ignore_ascii_case("@public"))
+                })
+                .cloned()
+                .or(team_approver)
+                .unwrap_or_default();
+            if approver_email.is_empty() {
+                warn!("No approver configured for outreach task {}", task.id);
+                continue;
+            }
+            if !self
+                .task_persistence
+                .mark_outreach_timeout_pending(outreach.outreach_id)
+                .await
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            info!(
+                "Task {} reached quorum timeout with {:.1}% responses (< {:.1}% required)",
+                outreach.task_id, current_percent, outreach.required_threshold_percent
+            );
+            if let Err(error) = approval_use_cases
+                .create_and_send_approval_request(
+                    task.company_id,
+                    task.channel_id,
+                    &channel.name,
+                    &channel.slug,
+                    &company.slug,
+                    task.thread_id,
+                    Some(task.id),
+                    &format!(
+                        "quorum_timeout_{}_{}",
+                        outreach.outreach_id,
+                        outreach.expires_at.and_utc().timestamp()
+                    ),
+                    &approver_email,
+                    "quorum_timeout",
+                    "Partial Quorum Timeout: Action Required",
+                    &format!(
+                        "Outreach timed out with {}/{} responses ({:.1}%). Required: {:.1}%.",
+                        outreach.response_count,
+                        outreach.target_count,
+                        current_percent,
+                        outreach.required_threshold_percent
+                    ),
+                    serde_json::json!({
+                        "outreach_id": outreach.outreach_id,
+                        "current_percent": current_percent,
+                        "required_percent": outreach.required_threshold_percent,
+                        "current_count": outreach.response_count,
+                        "total_targets": outreach.target_count,
+                    }),
+                )
+                .await
+            {
+                let _ = self
+                    .task_persistence
+                    .restore_outreach_waiting(outreach.outreach_id)
+                    .await;
+                return Err(error.to_string());
             }
         }
 
@@ -911,35 +974,6 @@ mod tests {
             t.locked_at = None;
             t.lock_expires_at = None;
             Ok(t.clone())
-        }
-
-        async fn list_due_waiting_tasks(
-            &self,
-            due_at: chrono::NaiveDateTime,
-            limit: i64,
-        ) -> AppResult<Vec<BackgroundTask>> {
-            Ok(self
-                .tasks
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|task| {
-                    task.status == TaskStatus::WaitingForThirdPartyReply
-                        && task
-                            .payload
-                            .pointer("/quorum_outreach/status")
-                            .and_then(|value| value.as_str())
-                            == Some("awaiting_quorum")
-                        && task
-                            .payload
-                            .pointer("/quorum_outreach/expires_at")
-                            .and_then(|value| value.as_str())
-                            .and_then(|value| value.parse::<chrono::NaiveDateTime>().ok())
-                            .is_some_and(|expires| expires <= due_at)
-                })
-                .take(limit as usize)
-                .cloned()
-                .collect())
         }
 
         async fn list_company_tasks(

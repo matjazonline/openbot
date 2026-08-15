@@ -94,6 +94,17 @@ pub trait ApprovalPersistence: Send + Sync {
         now: NaiveDateTime,
     ) -> AppResult<Option<HumanApproval>>;
 
+    async fn consume_quorum_timeout_action(
+        &self,
+        _token: &str,
+        _action: &str,
+        _now: NaiveDateTime,
+    ) -> AppResult<Option<HumanApproval>> {
+        Err(AppError::Internal(
+            "Atomic quorum approval persistence is not configured".into(),
+        ))
+    }
+
     async fn expire_pending_approval(
         &self,
         token: &str,
@@ -293,6 +304,139 @@ impl ApprovalPersistence for PostgresPersistence {
         .map_err(|e| AppError::Internal(format!("Failed to consume approval token: {}", e)))?;
 
         db.map(TryInto::try_into).transpose()
+    }
+
+    async fn consume_quorum_timeout_action(
+        &self,
+        token: &str,
+        action: &str,
+        now: NaiveDateTime,
+    ) -> AppResult<Option<HumanApproval>> {
+        let Ok(token) = Uuid::parse_str(token) else {
+            return Ok(None);
+        };
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let approval = sqlx::query_as::<_, HumanApprovalDb>(
+            r#"SELECT * FROM human_approvals
+               WHERE token = $1 AND status = 'pending' AND expires_at >= $2
+                 AND action_type = 'quorum_timeout'
+               FOR UPDATE"#,
+        )
+        .bind(token)
+        .bind(now)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        let Some(approval) = approval else {
+            tx.rollback().await.map_err(AppError::from)?;
+            return Ok(None);
+        };
+        let task_id = approval.task_id.ok_or_else(|| {
+            AppError::Internal("Quorum timeout approval is missing its task".into())
+        })?;
+
+        let task_updated = match action {
+            "proceed_partial" => {
+                let outreach = sqlx::query(
+                    r#"UPDATE task_outreaches SET status = 'proceed_partial',
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE task_id = $1 AND status = 'timeout_pending_approval'"#,
+                )
+                .bind(task_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+                let task = sqlx::query(
+                    r#"UPDATE background_tasks SET status = 'pending', run_at = CURRENT_TIMESTAMP,
+                           wait_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+                       WHERE id = $1 AND status = 'pending_approval'"#,
+                )
+                .bind(task_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+                outreach.rows_affected() == 1 && task.rows_affected() == 1
+            }
+            "extend_24h" | "extend_48h" | "extend" => {
+                let hours = if action == "extend_48h" { 48 } else { 24 };
+                let expires_at = now + chrono::Duration::hours(hours);
+                let outreach = sqlx::query(
+                    r#"UPDATE task_outreaches SET status = 'waiting', expires_at = $2,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE task_id = $1 AND status = 'timeout_pending_approval'"#,
+                )
+                .bind(task_id)
+                .bind(expires_at)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+                let task = sqlx::query(
+                    r#"UPDATE background_tasks SET status = 'waiting_for_third_party_reply',
+                           wait_expires_at = $2, updated_at = CURRENT_TIMESTAMP
+                       WHERE id = $1 AND status = 'pending_approval'"#,
+                )
+                .bind(task_id)
+                .bind(expires_at)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+                outreach.rows_affected() == 1 && task.rows_affected() == 1
+            }
+            "reject" => {
+                let outreach = sqlx::query(
+                    r#"UPDATE task_outreaches SET status = 'cancelled',
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE task_id = $1 AND status = 'timeout_pending_approval'"#,
+                )
+                .bind(task_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+                sqlx::query(
+                    r#"UPDATE email_outbox SET status = 'failed', last_error = 'Outreach rejected',
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE task_id = $1 AND status = 'pending'"#,
+                )
+                .bind(task_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+                let task = sqlx::query(
+                    r#"UPDATE background_tasks SET status = 'stopped', wait_expires_at = NULL,
+                           worker_id = NULL, locked_at = NULL, lock_expires_at = NULL,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE id = $1 AND status = 'pending_approval'"#,
+                )
+                .bind(task_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+                outreach.rows_affected() == 1 && task.rows_affected() == 1
+            }
+            _ => false,
+        };
+        if !task_updated {
+            tx.rollback().await.map_err(AppError::from)?;
+            return Err(AppError::Internal(
+                "Outreach is no longer awaiting this timeout decision".into(),
+            ));
+        }
+        let status = if action == "reject" {
+            ApprovalStatus::Rejected
+        } else {
+            ApprovalStatus::Approved
+        };
+        let updated = sqlx::query_as::<_, HumanApprovalDb>(
+            r#"UPDATE human_approvals SET status = $2, updated_at = CURRENT_TIMESTAMP
+               WHERE id = $1 AND status = 'pending' RETURNING *"#,
+        )
+        .bind(approval.id)
+        .bind(status.as_str())
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        tx.commit().await.map_err(AppError::from)?;
+        Ok(Some(updated.try_into()?))
     }
 
     async fn expire_pending_approval(

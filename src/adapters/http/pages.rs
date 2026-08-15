@@ -46,13 +46,18 @@ fn layout(title: &str, content: &str, authenticated: bool) -> String {
     };
     let navigation = if authenticated {
         r##"
-                <a href="/companies" class="text-slate-300 hover:text-white transition">Companies</a>
-                <a id="nav-agents" href="#" class="hidden text-slate-300 hover:text-white transition">Agents</a>
                 <a id="nav-channels" href="#" class="hidden text-slate-300 hover:text-white transition">Channels</a>
-                <a href="/invites" class="text-slate-300 hover:text-white transition">My Invites</a>
-                <form method="post" action="/logout">
-                    <button type="submit" class="text-slate-300 hover:text-white transition cursor-pointer">Log Out</button>
-                </form>
+                <a id="nav-agents" href="#" class="hidden text-slate-300 hover:text-white transition">Agents</a>
+                <details class="relative">
+                    <summary class="list-none text-slate-300 hover:text-white transition cursor-pointer [&::-webkit-details-marker]:hidden">Account</summary>
+                    <div class="absolute right-0 z-50 mt-2 w-36 overflow-hidden rounded-lg border border-slate-700 bg-slate-800 shadow-xl">
+                        <a href="/companies" class="block px-4 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white transition">Companies</a>
+                        <a href="/invites" class="block px-4 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white transition">My Invites</a>
+                        <form method="post" action="/logout" class="border-t border-slate-700">
+                            <button type="submit" class="w-full px-4 py-2.5 text-left text-slate-300 hover:bg-slate-700 hover:text-white transition cursor-pointer">Log Out</button>
+                        </form>
+                    </div>
+                </details>
         "##
     } else {
         r##"
@@ -1732,11 +1737,11 @@ pub fn channel_row_fragment(
                     </a>
                     <a href="/companies/{company_id}/tasks?channel_id={channel_id}"
                         class="px-3 py-1.5 text-xs font-medium bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/50 rounded-lg transition">
-                        Tasks
+                        Task Executions
                     </a>
                     <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                         class="px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
-                        Simulate
+                        New Thread
                     </a>
                     <button hx-get="/companies/{company_id}/channels/{channel_id}/edit" hx-target="#channel-{channel_id}" hx-swap="outerHTML"
                         class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
@@ -1982,7 +1987,7 @@ pub fn channel_simulation_page(
                                 </div>
                                 <div>
                                     <label for="from" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
-                                    <input type="text" id="from" name="from" value="{sender_email}" data-server-sender="{sender_email}" required
+                                    <input type="text" id="from" name="from" value="{sender_email}" data-server-sender="{sender_email}" required disabled
                                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed">
                                 </div>
                             </div>
@@ -2000,14 +2005,14 @@ pub fn channel_simulation_page(
                                 <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-indigo-500 transition">
-                                        <input type="radio" name="simulation_mode" value="verify" checked onchange="this.form.elements.namedItem('from').disabled = false" class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                                        <input type="radio" name="simulation_mode" value="verify" onchange="this.form.elements.namedItem('from').disabled = false" class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
                                         <div class="ml-2.5">
                                             <span class="block text-xs font-bold text-white">Verify</span>
                                             <span class="block text-[11px] text-slate-400 mt-0.5">Verification only (Recipient & Sender ACL check)</span>
                                         </div>
                                     </label>
                                     <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
-                                        <input type="radio" name="simulation_mode" value="run_test" onchange="const sender = this.form.elements.namedItem('from'); sender.value = sender.dataset.serverSender; sender.disabled = true" class="mt-0.5 text-amber-500 focus:ring-amber-500">
+                                        <input type="radio" name="simulation_mode" value="run_test" checked onchange="const sender = this.form.elements.namedItem('from'); sender.value = sender.dataset.serverSender; sender.disabled = true" class="mt-0.5 text-amber-500 focus:ring-amber-500">
                                         <div class="ml-2.5">
                                             <span class="block text-xs font-bold text-amber-300">Run_Test</span>
                                             <span class="block text-[11px] text-slate-400 mt-0.5">Execute full channel & agent, skip email dispatch</span>

@@ -810,7 +810,7 @@ async fn simulate_channel_handler(
         .into_response();
     }
 
-    let mode_str = form.simulation_mode.as_deref().unwrap_or("verify");
+    let mode_str = form.simulation_mode.as_deref().unwrap_or("run_test");
     let mode = match mode_str.to_lowercase().as_str() {
         "run_test" => SimulationMode::RunTest,
         "run" => SimulationMode::Run,
@@ -1411,6 +1411,8 @@ mod tests {
         assert!(row_html.contains("auto-dispatcher@acme.example.com"));
         assert!(row_html.contains("agent@test.com"));
         assert!(row_html.contains("async"));
+        assert!(row_html.contains("Task Executions"));
+        assert!(row_html.contains("New Thread"));
         assert!(row_html.contains(&format!(
             "/companies/{}/channels/{}/threads",
             company.id, channel.id
@@ -1456,8 +1458,9 @@ mod tests {
         assert!(sim_html.contains("Simulate Webhook: Auto Dispatcher"));
         assert!(sim_html.contains("auto-dispatcher@acme.example.com"));
         assert!(sim_html.contains("value=\"verify\""));
-        assert!(sim_html.contains("value=\"run_test\""));
+        assert!(sim_html.contains("value=\"run_test\" checked"));
         assert!(sim_html.contains("value=\"run\""));
+        assert!(sim_html.contains("data-server-sender=\"logged-in@test.com\" required disabled"));
         assert!(sim_html.contains("Trigger Webhook Simulation"));
         assert!(sim_html.contains("Simulating..."));
         assert!(sim_html.contains("Open Existing Thread by ID"));

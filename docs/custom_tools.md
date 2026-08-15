@@ -1,136 +1,166 @@
-# Custom Agent Tools & HITL Workflows in `mail-agents-server`
+# Custom Agent Tools
 
-This document outlines the architecture, schemas, and workflows for custom agent tools in `mail-agents-server`, specifically focusing on **Third-Party Delegation**, **Sender Verification**, and **Multi-Party Outreach with Quorum Thresholds & HITL Timeout Handling**.
+`mail-agents-server` provides one application-owned custom tool:
 
----
+```text
+outreach_and_await_quorum
+```
 
-## 1. Single-Target Delegation (`delegate_to_third_party`)
+The tool sends an individual email to each external recipient, pauses the current background task, and resumes it after the configured percentage of distinct recipients replies. If the deadline expires first, the configured approver can proceed with available responses, extend the deadline, or stop the task.
 
-### Overview
-Allows an LLM agent to send an email query to an external third-party (e.g. vendor, partner, or auditor), pause the background task, and resume when a valid reply is received.
+## Agent YAML
 
-### Tool Definition
+Custom tools are implemented and registered by the Rust server, but an agent must explicitly grant them in its YAML configuration. Registration alone does not expose a tool to the model.
+
+```yaml
+name: VendorResearchAgent
+system_prompt: |
+  You coordinate requests for information from external contacts.
+  Use outreach_and_await_quorum when the task requires replies from third parties.
+  Use one recipient and a 100 percent threshold for single-party delegation.
+  After the outreach resumes, synthesize the received replies for the original requester.
+
+llm:
+  provider: openai
+  model: gpt-5.4-mini
+
+tools:
+  - name: outreach_and_await_quorum
+
+hitl:
+  default_timeout_seconds: 86400
+  on_timeout: reject
+  tools:
+    outreach_and_await_quorum:
+      require_approval: true
+      approval_context:
+        - target_emails
+        - completion_threshold_percent
+        - timeout_hours
+        - subject
+
+tool_security:
+  tools:
+    outreach_and_await_quorum:
+      timeout_ms: 10000
+      max_output_chars: 4000
+      config:
+        max_targets: 50
+        max_timeout_hours: 720
+```
+
+The server supplies the shown HITL and security settings as defaults. Channel and agent configuration is merged over those defaults. Keep approval enabled unless the channel is explicitly trusted to send external mail autonomously.
+
+Do not add task, company, channel, thread, or worker identifiers to the YAML or tool arguments. The server injects those values from the trusted task execution context.
+
+## Tool Arguments
+
+The model calls the tool with:
+
 ```json
 {
-  "name": "delegate_to_third_party",
-  "description": "Delegates an inquiry to an external third party via email and sets task to waiting.",
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "target_emails": {
-        "type": "array",
-        "items": { "type": "string" },
-        "description": "List of external email addresses to delegate to."
-      },
-      "subject": { "type": "string", "description": "Email subject" },
-      "body": { "type": "string", "description": "Email body content" }
-    },
-    "required": ["target_emails", "subject", "body"]
-  }
+  "target_emails": [
+    "alice@supplier.example",
+    "bob@supplier.example",
+    "carol@supplier.example"
+  ],
+  "completion_threshold_percent": 67,
+  "timeout_hours": 48,
+  "subject": "Availability confirmation",
+  "body": "Please confirm available capacity for the requested delivery window."
 }
 ```
 
-### Workflow
-1. **Agent Call:** The agent invokes `delegate_to_third_party(target_emails=["vendor@supplier.com"], ...)`.
-2. **HITL Gate (Optional):** If human approval is required, an email is sent to the administrator with `[Approve]` / `[Reject]` links.
-3. **Dispatch & Task Pause:** The email is dispatched via `OutboundDispatcher::send()`. The task payload is updated with the delegation state, and task status transitions to `TaskStatus::WaitingForThirdPartyReply`.
-4. **Sender Verification Check:**
-   When an inbound reply arrives matching the thread via `In-Reply-To` / `References`:
-   - The system checks if `sender` is in `thread.participant_emails` OR in `target_emails` of a `WaitingForThirdPartyReply` task.
-   - **Authorized:** Resumes task (`TaskStatus::Pending`) and appends reply to thread history.
-   - **Unauthorized (Option A):** Generates `BounceInfo` and sends an automated `[Undeliverable]` bounce email to the unauthorized address without appending to thread history.
+| Field | Type | Requirements |
+|---|---|---|
+| `target_emails` | string array | 1 to `max_targets` valid external addresses; duplicates are normalized and removed |
+| `completion_threshold_percent` | number | Greater than 0 and at most 100 |
+| `timeout_hours` | integer | 1 to `max_timeout_hours` |
+| `subject` | string | 1 to 300 characters after trimming |
+| `body` | string | 1 to 20,000 characters after trimming |
 
----
+Platform addresses under the configured application domain cannot be outreach targets. Each target receives a separate email and is never exposed to the other targets through `To` or `CC`.
 
-## 2. Multi-Party Outreach & Quorum Thresholds (`outreach_and_await_quorum`)
+The required response count is:
 
-### Overview
-Enables an agent to send queries to a group of external contacts and wait until a specified percentage (quorum) of responses is received before resuming agent execution.
+```text
+ceil(number_of_targets * completion_threshold_percent / 100)
+```
 
-### Tool Definition
+Examples:
+
+| Targets | Threshold | Required replies |
+|---:|---:|---:|
+| 1 | 100% | 1 |
+| 3 | 50% | 2 |
+| 4 | 50% | 2 |
+| 10 | 20% | 2 |
+
+## Single-Party Delegation
+
+The quorum tool also covers single-recipient delegation. Use one target and a 100 percent threshold:
+
 ```json
 {
-  "name": "outreach_and_await_quorum",
-  "description": "Sends an email query to a list of recipients and waits until a quorum percentage of responses is reached.",
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "target_emails": {
-        "type": "array",
-        "items": { "type": "string" },
-        "description": "List of recipient email addresses."
-      },
-      "completion_threshold_percent": {
-        "type": "number",
-        "description": "Percentage threshold of responses needed (e.g., 50.0 for 50%)."
-      },
-      "timeout_hours": {
-        "type": "integer",
-        "description": "Maximum hours to wait for responses."
-      },
-      "subject": { "type": "string" },
-      "body": { "type": "string" }
-    },
-    "required": ["target_emails", "completion_threshold_percent", "timeout_hours", "subject", "body"]
-  }
+  "target_emails": ["vendor@supplier.example"],
+  "completion_threshold_percent": 100,
+  "timeout_hours": 24,
+  "subject": "Invoice clarification",
+  "body": "Please confirm the tax amount on invoice INV-1042."
 }
 ```
 
-### Task Payload Schema (`quorum_outreach`)
-```json
-{
-  "quorum_outreach": {
-    "outreach_id": "outreach-9876",
-    "target_emails": [
-      "alice@supplier.com",
-      "bob@supplier.com",
-      "carol@supplier.com",
-      "dave@supplier.com"
-    ],
-    "total_targets": 4,
-    "required_threshold_percent": 50.0,
-    "received_responses": ["alice@supplier.com"],
-    "current_count": 1,
-    "current_percent": 25.0,
-    "status": "awaiting_quorum",
-    "expires_at": "2026-08-14T10:00:00"
-  }
-}
+There is no separate `delegate_to_third_party` tool.
+
+## Execution Lifecycle
+
+1. The model requests `outreach_and_await_quorum`.
+2. The configured HITL policy sends an approval request and pauses the task.
+3. Approval resumes the original task, and the model repeats the approved tool call.
+4. The tool validates and normalizes its arguments.
+5. One database transaction creates the outreach, target records, and outbox emails and changes the task to `waiting_for_third_party_reply`.
+6. The tool returns immediately. It does not hold an invocation open while waiting for people.
+7. The outbox worker sends one message per target and records each outbound `Message-ID`.
+8. Correlated replies are added to the thread as context without creating separate agent tasks.
+9. Reaching quorum changes the parent task to `pending` exactly once.
+10. The resumed agent receives the original request, collected replies, and an outreach progress summary.
+11. The final response is sent to the original requester, and the outreach is marked completed.
+
+Outreach creation is idempotent for the same task and normalized arguments. A resumed agent repeating the same tool call receives the existing outreach state instead of sending duplicate emails.
+
+## Reply Verification
+
+A reply is accepted as an outreach response only when all of these values match:
+
+```text
+company + channel + thread
+sender email == outreach target
+In-Reply-To or References contains that target's outbound Message-ID
 ```
 
----
+Only the first response from each target counts toward quorum. Additional correlated replies can remain in thread history but do not increment the response count. Concurrent replies are serialized through database row locking so only one request can cross the threshold and resume the task.
 
-## 3. Partial Quorum Timeout & HITL Intervention
+Messages that do not satisfy the sender and outbound-reference checks are rejected as unauthorized thread injection and are not added to the thread.
 
-### Overview
-If the task timeout (`expires_at`) occurs before reaching the required response percentage, the system does NOT fail or hang indefinitely. Instead, it triggers a **Human-In-The-Loop (HITL)** decision request.
+## Timeout Decisions
 
-### Timeout HITL Actions & Links
+When the outreach expires below quorum, the task changes to `pending_approval`. The timeout approval email provides these actions:
 
-1. **`proceed_partial` (`/approvals/{token}?action=proceed_partial`):**
-   - **Action:** Approves proceeding with available partial responses.
-   - **Task State:** Resumes task (`TaskStatus::Pending`) with `quorum_outreach.status = "proceed_partial"`.
-   - **Thread Message:** Injects system notice into thread history.
-   - **Agent Context:** `AgentRunner` receives all collected vendor replies and a context notice:
-     `"[Partial Quorum Proceed Notice: Manager approved proceeding with partial data (Received 1/4 responses, 25.0%).]"`
+| Action | Result |
+|---|---|
+| `proceed_partial` | Resume with all responses currently available, including none |
+| `extend_24h` | Return to waiting with a deadline 24 hours from the decision |
+| `extend_48h` | Return to waiting with a deadline 48 hours from the decision |
+| `reject` | Cancel the outreach and stop the parent task |
 
-2. **`extend_24h` / `extend_48h` (`/approvals/{token}?action=extend_24h`):**
-   - **Action:** Extends the outreach response deadline by 24 or 48 hours.
-   - **Task State:** Updates `expires_at = Utc::now() + Duration::hours(X)` and maintains `TaskStatus::WaitingForThirdPartyReply`.
-   - **Thread Message:** Injects `"[HITL Timeout Extended]: Manager extended outreach timeout by X hours."`
+A valid reply arriving while timeout approval is pending still counts. If it reaches quorum, the pending timeout approval expires and the parent task resumes automatically.
 
-3. **`reject` (`/approvals/{token}?action=reject`):**
-   - **Action:** Cancels the outreach task.
-   - **Task State:** Sets task status to `TaskStatus::Stopped`.
-   - **Thread Message:** Injects `"[HITL Rejected]: Manager cancelled outreach task after partial timeout."`
+## Configuration Notes
 
----
-
-## 4. Verification & Security Matrix
-
-| Scenario | Sender In `participant_emails` / `target_emails` | Quorum Reached | Task Status Action | Result |
-| :--- | :---: | :---: | :---: | :--- |
-| **Valid Reply (Awaiting Quorum)** | Yes | No (< 50%) | Retain `WaitingForThirdPartyReply` | Recalculate percent; wait for more replies |
-| **Valid Reply (Quorum Met)** | Yes | Yes (>= 50%) | Resume to `Pending` | Agent executes with all replies in context |
-| **Unauthorized Sender** | No | N/A | Rejected | Option A Bounce Email dispatched; thread untouched |
-| **Timeout (Partial Responses)** | Yes | No (< 50%) | Transition to `PendingApproval` | Email sent to manager with `proceed_partial` / `extend_24h` / `reject` links |
+- The canonical tool ID must be exactly `outreach_and_await_quorum` everywhere.
+- A YAML `tools:` grant without the Rust implementation causes agent build validation to fail.
+- Omitting the tool from `tools:` means the model has no access to it.
+- Tool-specific values under `tool_security.tools.outreach_and_await_quorum.config` are available to the Rust tool through `ToolExecutionContext.custom_config`.
+- `timeout_ms` limits creation of the durable outreach, not the human response window. `timeout_hours` controls the response deadline.
+- At least one channel participant or company team member must be available as the approver when HITL is enabled.
+- Do not place secrets in tool arguments, YAML custom configuration, or tool output.

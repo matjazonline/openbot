@@ -8,7 +8,13 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::task::{BackgroundTask, TaskStatus},
+    entities::{
+        outreach::{
+            CreateOutreachRequest, DueOutreach, OutreachProgress, OutreachReplyMatch,
+            OutreachStatus,
+        },
+        task::{BackgroundTask, TaskStatus},
+    },
 };
 
 pub const TASK_LEASE_SECONDS: i64 = 15 * 60;
@@ -37,6 +43,15 @@ pub struct BackgroundTaskDb {
 pub struct OutboxEmail {
     pub id: Uuid,
     pub payload: Value,
+}
+
+#[derive(sqlx::FromRow, Debug)]
+struct OutreachDb {
+    id: Uuid,
+    task_id: Uuid,
+    status: String,
+    required_threshold_percent: f64,
+    expires_at: NaiveDateTime,
 }
 
 impl TryFrom<BackgroundTaskDb> for BackgroundTask {
@@ -69,6 +84,60 @@ impl TryFrom<BackgroundTaskDb> for BackgroundTask {
 
 #[async_trait]
 pub trait TaskPersistence: Send + Sync {
+    async fn create_outreach_and_pause(
+        &self,
+        _request: CreateOutreachRequest,
+    ) -> AppResult<OutreachProgress> {
+        Err(AppError::Internal(
+            "Outreach persistence is not configured".into(),
+        ))
+    }
+
+    async fn find_correlated_outreach_reply(
+        &self,
+        _company_id: Uuid,
+        _channel_id: Uuid,
+        _thread_id: Uuid,
+        _sender: &str,
+        _references: &[String],
+    ) -> AppResult<Option<OutreachReplyMatch>> {
+        Ok(None)
+    }
+
+    async fn record_outreach_reply(
+        &self,
+        _matched: &OutreachReplyMatch,
+        _response_message_id: Uuid,
+    ) -> AppResult<OutreachProgress> {
+        Err(AppError::Internal(
+            "Outreach persistence is not configured".into(),
+        ))
+    }
+
+    async fn list_due_outreaches(
+        &self,
+        _due_at: NaiveDateTime,
+        _limit: i64,
+    ) -> AppResult<Vec<DueOutreach>> {
+        Ok(Vec::new())
+    }
+
+    async fn mark_outreach_timeout_pending(&self, _outreach_id: Uuid) -> AppResult<bool> {
+        Ok(false)
+    }
+
+    async fn restore_outreach_waiting(&self, _outreach_id: Uuid) -> AppResult<()> {
+        Ok(())
+    }
+
+    async fn get_outreach_context(&self, _task_id: Uuid) -> AppResult<Option<String>> {
+        Ok(None)
+    }
+
+    async fn complete_outreach(&self, _task_id: Uuid) -> AppResult<()> {
+        Ok(())
+    }
+
     async fn claim_outbox_emails(
         &self,
         _worker_id: Uuid,
@@ -94,6 +163,18 @@ pub trait TaskPersistence: Send + Sync {
         _error: &str,
     ) -> AppResult<bool> {
         Ok(true)
+    }
+
+    async fn get_outreach_thread_for_outbox(&self, _outbox_id: Uuid) -> AppResult<Option<Uuid>> {
+        Ok(None)
+    }
+
+    async fn is_outbox_delivery_active(&self, _outbox_id: Uuid) -> AppResult<bool> {
+        Ok(true)
+    }
+
+    async fn cancel_claimed_outbox(&self, _outbox_id: Uuid, _worker_id: Uuid) -> AppResult<bool> {
+        Ok(false)
     }
 
     async fn enqueue_task(
@@ -168,12 +249,6 @@ pub trait TaskPersistence: Send + Sync {
 
     async fn update_task_status(&self, id: Uuid, status: TaskStatus) -> AppResult<BackgroundTask>;
 
-    async fn list_due_waiting_tasks(
-        &self,
-        due_at: NaiveDateTime,
-        limit: i64,
-    ) -> AppResult<Vec<BackgroundTask>>;
-
     async fn list_company_tasks(
         &self,
         company_id: Uuid,
@@ -204,6 +279,439 @@ pub trait TaskPersistence: Send + Sync {
 
 #[async_trait]
 impl TaskPersistence for PostgresPersistence {
+    async fn create_outreach_and_pause(
+        &self,
+        request: CreateOutreachRequest,
+    ) -> AppResult<OutreachProgress> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let outreach = sqlx::query_as::<_, OutreachDb>(
+            r#"INSERT INTO task_outreaches (
+                    id, task_id, outreach_key, status, required_threshold_percent,
+                    expires_at, subject, body
+               )
+               SELECT $1, id, $2, 'waiting', $3, $4, $5, $6
+               FROM background_tasks
+               WHERE id = $7 AND company_id = $8
+                 AND status = 'processing' AND worker_id = $9
+                 AND lock_expires_at > CURRENT_TIMESTAMP
+               ON CONFLICT (task_id, outreach_key) DO UPDATE
+                   SET outreach_key = EXCLUDED.outreach_key
+               RETURNING id, task_id, status,
+                         required_threshold_percent::double precision AS required_threshold_percent,
+                         expires_at"#,
+        )
+        .bind(request.id)
+        .bind(&request.outreach_key)
+        .bind(request.required_threshold_percent)
+        .bind(request.expires_at)
+        .bind(&request.subject)
+        .bind(&request.body)
+        .bind(request.task_id)
+        .bind(request.company_id)
+        .bind(request.worker_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?
+        .ok_or_else(|| AppError::Internal("Outreach task lease was lost before creation".into()))?;
+
+        let created = outreach.id == request.id;
+        if created {
+            for (position, target) in request.targets.iter().enumerate() {
+                sqlx::query(
+                    r#"INSERT INTO email_outbox (
+                            id, company_id, task_id, idempotency_key, payload
+                       ) VALUES ($1, $2, $3, $4, $5)"#,
+                )
+                .bind(target.outbox_id)
+                .bind(request.company_id)
+                .bind(request.task_id)
+                .bind(format!("outreach:{}:target:{}", outreach.id, position))
+                .bind(&target.outbox_payload)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+
+                sqlx::query(
+                    r#"INSERT INTO task_outreach_targets (outreach_id, email, outbox_id)
+                       VALUES ($1, $2, $3)"#,
+                )
+                .bind(outreach.id)
+                .bind(&target.email)
+                .bind(target.outbox_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+            }
+        }
+
+        let status = OutreachStatus::from_str(&outreach.status)
+            .map_err(|error| AppError::Internal(error.to_string()))?;
+        let suspended = status == OutreachStatus::Waiting;
+        if suspended {
+            let paused = sqlx::query(
+                r#"UPDATE background_tasks
+                   SET status = 'waiting_for_third_party_reply', wait_expires_at = $1,
+                       worker_id = NULL, locked_at = NULL, lock_expires_at = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $2 AND company_id = $3
+                     AND status = 'processing' AND worker_id = $4
+                     AND lock_expires_at > CURRENT_TIMESTAMP"#,
+            )
+            .bind(outreach.expires_at)
+            .bind(request.task_id)
+            .bind(request.company_id)
+            .bind(request.worker_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+            if paused.rows_affected() != 1 {
+                return Err(AppError::Internal(
+                    "Outreach task could not be paused".into(),
+                ));
+            }
+        }
+
+        let (target_count, response_count): (i64, i64) = sqlx::query_as(
+            r#"SELECT COUNT(*)::bigint,
+                      COUNT(*) FILTER (WHERE responded_at IS NOT NULL)::bigint
+               FROM task_outreach_targets WHERE outreach_id = $1"#,
+        )
+        .bind(outreach.id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        tx.commit().await.map_err(AppError::from)?;
+
+        Ok(outreach_progress(
+            &outreach,
+            status,
+            target_count,
+            response_count,
+            suspended,
+        ))
+    }
+
+    async fn find_correlated_outreach_reply(
+        &self,
+        company_id: Uuid,
+        channel_id: Uuid,
+        thread_id: Uuid,
+        sender: &str,
+        references: &[String],
+    ) -> AppResult<Option<OutreachReplyMatch>> {
+        if references.is_empty() {
+            return Ok(None);
+        }
+        let row = sqlx::query_as::<_, (Uuid, Uuid, String)>(
+            r#"SELECT outreach.id, task.id, target.email::text
+               FROM task_outreaches outreach
+               JOIN background_tasks task ON task.id = outreach.task_id
+               JOIN task_outreach_targets target ON target.outreach_id = outreach.id
+               JOIN email_outbox outbox ON outbox.id = target.outbox_id
+               WHERE task.company_id = $1 AND task.channel_id = $2 AND task.thread_id = $3
+                 AND target.email = $4
+                 AND outreach.status IN ('waiting', 'timeout_pending_approval', 'threshold_met')
+                 AND outbox.status = 'sent'
+                 AND outbox.provider_message_id = ANY($5)
+               ORDER BY outreach.created_at DESC
+               LIMIT 1"#,
+        )
+        .bind(company_id)
+        .bind(channel_id)
+        .bind(thread_id)
+        .bind(sender.trim())
+        .bind(references)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(
+            row.map(|(outreach_id, task_id, target_email)| OutreachReplyMatch {
+                outreach_id,
+                task_id,
+                target_email,
+            }),
+        )
+    }
+
+    async fn record_outreach_reply(
+        &self,
+        matched: &OutreachReplyMatch,
+        response_message_id: Uuid,
+    ) -> AppResult<OutreachProgress> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let mut outreach = sqlx::query_as::<_, OutreachDb>(
+            r#"SELECT id, task_id, status,
+                      required_threshold_percent::double precision AS required_threshold_percent,
+                      expires_at
+               FROM task_outreaches WHERE id = $1 FOR UPDATE"#,
+        )
+        .bind(matched.outreach_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+
+        sqlx::query(
+            r#"UPDATE task_outreach_targets
+               SET responded_at = CURRENT_TIMESTAMP, response_message_id = $3
+               WHERE outreach_id = $1 AND email = $2 AND responded_at IS NULL"#,
+        )
+        .bind(matched.outreach_id)
+        .bind(&matched.target_email)
+        .bind(response_message_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+
+        let (target_count, response_count): (i64, i64) = sqlx::query_as(
+            r#"SELECT COUNT(*)::bigint,
+                      COUNT(*) FILTER (WHERE responded_at IS NOT NULL)::bigint
+               FROM task_outreach_targets WHERE outreach_id = $1"#,
+        )
+        .bind(matched.outreach_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        let required = required_response_count(target_count, outreach.required_threshold_percent);
+        let current_status = OutreachStatus::from_str(&outreach.status)
+            .map_err(|error| AppError::Internal(error.to_string()))?;
+        let reached = response_count >= required as i64;
+
+        if reached
+            && matches!(
+                current_status,
+                OutreachStatus::Waiting | OutreachStatus::TimeoutPendingApproval
+            )
+        {
+            sqlx::query(
+                r#"UPDATE task_outreaches SET status = 'threshold_met',
+                       updated_at = CURRENT_TIMESTAMP WHERE id = $1"#,
+            )
+            .bind(matched.outreach_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+            sqlx::query(
+                r#"UPDATE background_tasks SET status = 'pending', run_at = CURRENT_TIMESTAMP,
+                       wait_expires_at = NULL, worker_id = NULL, locked_at = NULL,
+                       lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $1 AND status IN (
+                       'waiting_for_third_party_reply', 'pending_approval'
+                   )"#,
+            )
+            .bind(outreach.task_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+            sqlx::query(
+                r#"UPDATE human_approvals SET status = 'expired', updated_at = CURRENT_TIMESTAMP
+                   WHERE task_id = $1 AND action_type = 'quorum_timeout'
+                     AND status = 'pending'"#,
+            )
+            .bind(outreach.task_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+            outreach.status = OutreachStatus::ThresholdMet.as_str().to_string();
+        }
+        tx.commit().await.map_err(AppError::from)?;
+
+        let status = OutreachStatus::from_str(&outreach.status)
+            .map_err(|error| AppError::Internal(error.to_string()))?;
+        Ok(outreach_progress(
+            &outreach,
+            status,
+            target_count,
+            response_count,
+            false,
+        ))
+    }
+
+    async fn list_due_outreaches(
+        &self,
+        due_at: NaiveDateTime,
+        limit: i64,
+    ) -> AppResult<Vec<DueOutreach>> {
+        let rows = sqlx::query_as::<
+            _,
+            (
+                Uuid,
+                Uuid,
+                Uuid,
+                Uuid,
+                Option<Uuid>,
+                f64,
+                i64,
+                i64,
+                NaiveDateTime,
+            ),
+        >(
+            r#"SELECT outreach.id, task.id, task.company_id, task.channel_id, task.thread_id,
+                      outreach.required_threshold_percent::double precision,
+                      COUNT(target.*)::bigint,
+                      COUNT(target.*) FILTER (WHERE target.responded_at IS NOT NULL)::bigint,
+                      outreach.expires_at
+               FROM task_outreaches outreach
+               JOIN background_tasks task ON task.id = outreach.task_id
+               JOIN task_outreach_targets target ON target.outreach_id = outreach.id
+               WHERE outreach.status = 'waiting' AND outreach.expires_at <= $1
+                 AND task.status = 'waiting_for_third_party_reply'
+               GROUP BY outreach.id, task.id
+               ORDER BY outreach.expires_at, outreach.id
+               LIMIT $2"#,
+        )
+        .bind(due_at)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(rows
+            .into_iter()
+            .map(
+                |(
+                    outreach_id,
+                    task_id,
+                    company_id,
+                    channel_id,
+                    thread_id,
+                    required_threshold_percent,
+                    target_count,
+                    response_count,
+                    expires_at,
+                )| DueOutreach {
+                    outreach_id,
+                    task_id,
+                    company_id,
+                    channel_id,
+                    thread_id,
+                    required_threshold_percent,
+                    target_count: target_count as usize,
+                    response_count: response_count as usize,
+                    expires_at,
+                },
+            )
+            .collect())
+    }
+
+    async fn mark_outreach_timeout_pending(&self, outreach_id: Uuid) -> AppResult<bool> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let task_id = sqlx::query_scalar::<_, Uuid>(
+            r#"UPDATE task_outreaches
+               SET status = 'timeout_pending_approval', updated_at = CURRENT_TIMESTAMP
+               WHERE id = $1 AND status = 'waiting' AND expires_at <= CURRENT_TIMESTAMP
+               RETURNING task_id"#,
+        )
+        .bind(outreach_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        let Some(task_id) = task_id else {
+            tx.rollback().await.map_err(AppError::from)?;
+            return Ok(false);
+        };
+        let updated = sqlx::query(
+            r#"UPDATE background_tasks
+               SET status = 'pending_approval', wait_expires_at = NULL,
+                   worker_id = NULL, locked_at = NULL, lock_expires_at = NULL,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = $1 AND status = 'waiting_for_third_party_reply'"#,
+        )
+        .bind(task_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        tx.commit().await.map_err(AppError::from)?;
+        Ok(updated.rows_affected() == 1)
+    }
+
+    async fn restore_outreach_waiting(&self, outreach_id: Uuid) -> AppResult<()> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let row = sqlx::query_as::<_, (Uuid, NaiveDateTime)>(
+            r#"UPDATE task_outreaches SET status = 'waiting', updated_at = CURRENT_TIMESTAMP
+               WHERE id = $1 AND status = 'timeout_pending_approval'
+               RETURNING task_id, expires_at"#,
+        )
+        .bind(outreach_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        if let Some((task_id, expires_at)) = row {
+            sqlx::query(
+                r#"UPDATE background_tasks
+                   SET status = 'waiting_for_third_party_reply', wait_expires_at = $2,
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $1 AND status = 'pending_approval'"#,
+            )
+            .bind(task_id)
+            .bind(expires_at)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+        }
+        tx.commit().await.map_err(AppError::from)?;
+        Ok(())
+    }
+
+    async fn get_outreach_context(&self, task_id: Uuid) -> AppResult<Option<String>> {
+        let rows = sqlx::query_as::<_, (String, String, String, f64, String, bool)>(
+            r#"SELECT outreach.subject, outreach.body, outreach.status,
+                      outreach.required_threshold_percent::double precision,
+                      target.email::text, target.responded_at IS NOT NULL
+               FROM task_outreaches outreach
+               JOIN task_outreach_targets target ON target.outreach_id = outreach.id
+               WHERE outreach.id = (
+                   SELECT id FROM task_outreaches
+                   WHERE task_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1
+               )
+               ORDER BY outreach.created_at DESC, target.email"#,
+        )
+        .bind(task_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        let Some((subject, body, status, threshold, _, _)) = rows.first() else {
+            return Ok(None);
+        };
+        let responded = rows
+            .iter()
+            .filter(|row| row.5)
+            .map(|row| row.4.clone())
+            .collect::<Vec<_>>();
+        let outstanding = rows
+            .iter()
+            .filter(|row| !row.5)
+            .map(|row| row.4.clone())
+            .collect::<Vec<_>>();
+        Ok(Some(format!(
+            "Outreach status: {status}\nSubject: {subject}\nRequest: {body}\nRequired threshold: {threshold:.1}%\nResponses: {}/{}\nRespondents: {}\nOutstanding: {}",
+            responded.len(),
+            rows.len(),
+            if responded.is_empty() {
+                "none".to_string()
+            } else {
+                responded.join(", ")
+            },
+            if outstanding.is_empty() {
+                "none".to_string()
+            } else {
+                outstanding.join(", ")
+            },
+        )))
+    }
+
+    async fn complete_outreach(&self, task_id: Uuid) -> AppResult<()> {
+        sqlx::query(
+            r#"UPDATE task_outreaches SET status = 'completed', updated_at = CURRENT_TIMESTAMP
+               WHERE task_id = $1 AND status IN ('threshold_met', 'proceed_partial')"#,
+        )
+        .bind(task_id)
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(())
+    }
+
     async fn claim_outbox_emails(
         &self,
         worker_id: Uuid,
@@ -281,6 +789,54 @@ impl TaskPersistence for PostgresPersistence {
         Ok(result.rows_affected() == 1)
     }
 
+    async fn get_outreach_thread_for_outbox(&self, outbox_id: Uuid) -> AppResult<Option<Uuid>> {
+        sqlx::query_scalar(
+            r#"SELECT task.thread_id
+               FROM task_outreach_targets target
+               JOIN task_outreaches outreach ON outreach.id = target.outreach_id
+               JOIN background_tasks task ON task.id = outreach.task_id
+               WHERE target.outbox_id = $1"#,
+        )
+        .bind(outbox_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)
+        .map(Option::flatten)
+    }
+
+    async fn is_outbox_delivery_active(&self, outbox_id: Uuid) -> AppResult<bool> {
+        sqlx::query_scalar::<_, bool>(
+            r#"SELECT CASE
+                   WHEN target.outbox_id IS NULL THEN true
+                   ELSE outreach.status = 'waiting'
+               END
+               FROM email_outbox outbox
+               LEFT JOIN task_outreach_targets target ON target.outbox_id = outbox.id
+               LEFT JOIN task_outreaches outreach ON outreach.id = target.outreach_id
+               WHERE outbox.id = $1"#,
+        )
+        .bind(outbox_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)
+        .map(|active| active.unwrap_or(false))
+    }
+
+    async fn cancel_claimed_outbox(&self, outbox_id: Uuid, worker_id: Uuid) -> AppResult<bool> {
+        let result = sqlx::query(
+            r#"UPDATE email_outbox SET status = 'failed', last_error = 'Outreach closed',
+                   worker_id = NULL, locked_at = NULL, lock_expires_at = NULL,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = $1 AND status = 'sending' AND worker_id = $2"#,
+        )
+        .bind(outbox_id)
+        .bind(worker_id)
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(result.rows_affected() == 1)
+    }
+
     async fn enqueue_task(
         &self,
         company_id: Uuid,
@@ -290,7 +846,6 @@ impl TaskPersistence for PostgresPersistence {
         payload: Value,
     ) -> AppResult<BackgroundTask> {
         let id = Uuid::new_v4();
-        let wait_expires_at = quorum_expiry(&payload);
         let source_message_id = payload
             .pointer("/inbound_message/message_id")
             .and_then(Value::as_str)
@@ -300,9 +855,9 @@ impl TaskPersistence for PostgresPersistence {
         let db = sqlx::query_as::<_, BackgroundTaskDb>(
             r#"INSERT INTO background_tasks (
                     id, company_id, channel_id, thread_id, source_message_id,
-                    task_type, status, payload, wait_expires_at
+                    task_type, status, payload
                )
-               VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8)
+               VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
                ON CONFLICT (company_id, source_message_id)
                DO UPDATE SET source_message_id = EXCLUDED.source_message_id
                RETURNING id, company_id, channel_id, thread_id, task_type, status, payload,
@@ -316,7 +871,6 @@ impl TaskPersistence for PostgresPersistence {
         .bind(source_message_id)
         .bind(task_type)
         .bind(payload)
-        .bind(wait_expires_at)
         .fetch_one(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -382,14 +936,12 @@ impl TaskPersistence for PostgresPersistence {
     }
 
     async fn update_task_payload(&self, id: Uuid, payload: Value) -> AppResult<()> {
-        let wait_expires_at = quorum_expiry(&payload);
         sqlx::query(
             r#"UPDATE background_tasks
-               SET payload = $1, wait_expires_at = $2, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $3"#,
+               SET payload = $1, updated_at = CURRENT_TIMESTAMP
+               WHERE id = $2"#,
         )
         .bind(payload)
-        .bind(wait_expires_at)
         .bind(id)
         .execute(&self.pool)
         .await
@@ -404,15 +956,13 @@ impl TaskPersistence for PostgresPersistence {
         worker_id: Uuid,
         payload: Value,
     ) -> AppResult<bool> {
-        let wait_expires_at = quorum_expiry(&payload);
         let result = sqlx::query(
             r#"UPDATE background_tasks
-               SET payload = $1, wait_expires_at = $2, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $3 AND status = 'processing' AND worker_id = $4
-                 AND lock_expires_at > CURRENT_TIMESTAMP"#,
+               SET payload = $1, updated_at = CURRENT_TIMESTAMP
+               WHERE id = $2 AND status = 'processing' AND worker_id = $3
+                  AND lock_expires_at > CURRENT_TIMESTAMP"#,
         )
         .bind(payload)
-        .bind(wait_expires_at)
         .bind(id)
         .bind(worker_id)
         .execute(&self.pool)
@@ -559,6 +1109,7 @@ impl TaskPersistence for PostgresPersistence {
     }
 
     async fn stop_task(&self, id: Uuid) -> AppResult<BackgroundTask> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let db = sqlx::query_as::<_, BackgroundTaskDb>(
             r#"UPDATE background_tasks
                SET status = 'stopped', worker_id = NULL, locked_at = NULL,
@@ -571,10 +1122,27 @@ impl TaskPersistence for PostgresPersistence {
                           run_at, created_at, updated_at"#,
         )
         .bind(id)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await
         .map_err(AppError::from)?;
-
+        sqlx::query(
+            r#"UPDATE task_outreaches SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+               WHERE task_id = $1 AND status IN ('waiting', 'timeout_pending_approval')"#,
+        )
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        sqlx::query(
+            r#"UPDATE email_outbox SET status = 'failed', last_error = 'Task stopped',
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE task_id = $1 AND status = 'pending'"#,
+        )
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        tx.commit().await.map_err(AppError::from)?;
         db.try_into()
     }
 
@@ -641,34 +1209,6 @@ impl TaskPersistence for PostgresPersistence {
         db.try_into()
     }
 
-    async fn list_due_waiting_tasks(
-        &self,
-        due_at: NaiveDateTime,
-        limit: i64,
-    ) -> AppResult<Vec<BackgroundTask>> {
-        let db_list = sqlx::query_as::<_, BackgroundTaskDb>(
-            r#"SELECT id, company_id, channel_id, thread_id, task_type, status, payload,
-                      retry_count, max_retries, last_error, worker_id, locked_at, lock_expires_at,
-                      run_at, created_at, updated_at
-                FROM background_tasks
-                WHERE status = 'waiting_for_third_party_reply'
-                  AND payload #>> '{quorum_outreach,status}' = 'awaiting_quorum'
-                  AND wait_expires_at <= $1
-               ORDER BY wait_expires_at ASC, id ASC
-               LIMIT $2"#,
-        )
-        .bind(due_at)
-        .bind(limit)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
-        db_list
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<AppResult<Vec<_>>>()
-    }
-
     async fn list_company_tasks(
         &self,
         company_id: Uuid,
@@ -727,14 +1267,31 @@ impl TaskPersistence for PostgresPersistence {
     }
 }
 
-fn quorum_expiry(payload: &Value) -> Option<NaiveDateTime> {
-    let value = payload.pointer("/quorum_outreach/expires_at")?.as_str()?;
+fn required_response_count(target_count: i64, threshold_percent: f64) -> usize {
+    ((target_count as f64 * threshold_percent / 100.0).ceil() as usize).max(1)
+}
 
-    chrono::DateTime::parse_from_rfc3339(value)
-        .map(|value| value.naive_utc())
-        .or_else(|_| NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f"))
-        .or_else(|_| NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S%.f"))
-        .ok()
+fn outreach_progress(
+    outreach: &OutreachDb,
+    status: OutreachStatus,
+    target_count: i64,
+    response_count: i64,
+    suspended: bool,
+) -> OutreachProgress {
+    OutreachProgress {
+        id: outreach.id,
+        task_id: outreach.task_id,
+        status,
+        required_threshold_percent: outreach.required_threshold_percent,
+        target_count: target_count as usize,
+        response_count: response_count as usize,
+        required_response_count: required_response_count(
+            target_count,
+            outreach.required_threshold_percent,
+        ),
+        expires_at: outreach.expires_at,
+        suspended,
+    }
 }
 
 struct TaskTarget {
@@ -808,10 +1365,20 @@ fn json_uuid(value: &Value, pointer: &str) -> AppResult<Uuid> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::message::{Message, MessageDirection, MessageRole};
+    use crate::services::outbound_dispatcher::OutboundEmail;
     use crate::use_cases::{
         channel::ChannelPersistence, company::CompanyPersistence, thread::ThreadPersistence,
         user::UserPersistence,
     };
+
+    #[test]
+    fn quorum_threshold_rounds_up() {
+        assert_eq!(required_response_count(1, 100.0), 1);
+        assert_eq!(required_response_count(3, 50.0), 2);
+        assert_eq!(required_response_count(4, 50.0), 2);
+        assert_eq!(required_response_count(10, 20.0), 2);
+    }
 
     #[tokio::test]
     async fn concurrent_workers_claim_a_task_once() {
@@ -884,6 +1451,192 @@ mod tests {
         let claimed: Vec<_> = first.unwrap().into_iter().chain(second.unwrap()).collect();
         assert_eq!(claimed.len(), 1);
         assert_eq!(claimed[0].id, task.id);
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn outreach_reply_reaches_quorum_and_resumes_task() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            return;
+        };
+        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+            return;
+        };
+        sqlx::migrate!().run(&pool).await.unwrap();
+        let persistence = PostgresPersistence::new(pool);
+        let suffix = Uuid::new_v4().simple().to_string();
+        let owner_email = format!("outreach_owner_{suffix}@example.com");
+        persistence
+            .create_user(&format!("outreach_owner_{suffix}"), &owner_email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &owner_email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            "Outreach Test",
+            &format!("outreach-test-{suffix}"),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            "Outreach",
+            "outreach",
+            None,
+            None,
+            None,
+            Some(vec![owner_email.clone()]),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let thread = persistence
+            .create_thread(
+                channel.id,
+                "Need response",
+                std::slice::from_ref(&owner_email),
+            )
+            .await
+            .unwrap();
+        let task = persistence
+            .enqueue_task(
+                company.id,
+                channel.id,
+                Some(thread.id),
+                "email_agent_dispatch",
+                serde_json::json!({}),
+            )
+            .await
+            .unwrap();
+        let worker_id = Uuid::new_v4();
+        assert!(
+            persistence
+                .claim_task(
+                    task.id,
+                    worker_id,
+                    chrono::Utc::now().naive_utc() + chrono::Duration::minutes(5),
+                )
+                .await
+                .unwrap()
+        );
+        let outreach_id = Uuid::new_v4();
+        let outbox_id = Uuid::new_v4();
+        let target_email = "vendor@supplier.example";
+        let outbox_payload = serde_json::to_value(OutboundEmail {
+            channel_id: channel.id,
+            channel_name: channel.name.clone(),
+            channel_slug: channel.slug.clone(),
+            company_slug: company.slug.clone(),
+            trigger_message_id: "<request@example.com>".into(),
+            thread_references: Vec::new(),
+            recipient_to: target_email.into(),
+            recipients_cc: Vec::new(),
+            subject: "Question".into(),
+            body_text: "Please respond".into(),
+            hop_count: 0,
+            trace_channels: Vec::new(),
+        })
+        .unwrap();
+        let progress = persistence
+            .create_outreach_and_pause(CreateOutreachRequest {
+                id: outreach_id,
+                task_id: task.id,
+                company_id: company.id,
+                worker_id,
+                outreach_key: "integration-outreach".into(),
+                required_threshold_percent: 100.0,
+                expires_at: chrono::Utc::now().naive_utc() + chrono::Duration::hours(24),
+                subject: "Question".into(),
+                body: "Please respond".into(),
+                targets: vec![crate::entities::outreach::OutreachTargetRequest {
+                    email: target_email.into(),
+                    outbox_id,
+                    outbox_payload,
+                }],
+            })
+            .await
+            .unwrap();
+        assert!(progress.suspended);
+        assert_eq!(
+            persistence
+                .get_task_by_id(task.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            TaskStatus::WaitingForThirdPartyReply
+        );
+
+        let outbound_message_id = "<outreach-vendor@mailagents.test>";
+        sqlx::query(
+            "UPDATE email_outbox SET status = 'sent', provider_message_id = $2 WHERE id = $1",
+        )
+        .bind(outbox_id)
+        .bind(outbound_message_id)
+        .execute(&persistence.pool)
+        .await
+        .unwrap();
+        let matched = persistence
+            .find_correlated_outreach_reply(
+                company.id,
+                channel.id,
+                thread.id,
+                target_email,
+                &[outbound_message_id.into()],
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        let response = persistence
+            .create_message(&Message {
+                id: Uuid::new_v4(),
+                thread_id: thread.id,
+                message_id: "<vendor-response@supplier.example>".into(),
+                in_reply_to: Some(outbound_message_id.into()),
+                references_list: vec![outbound_message_id.into()],
+                sender: target_email.into(),
+                recipients_to: vec![owner_email.clone()],
+                recipients_cc: Vec::new(),
+                subject: "Re: Question".into(),
+                clean_text_body: "Confirmed".into(),
+                raw_text_body: None,
+                raw_html_body: None,
+                attachments: None,
+                direction: MessageDirection::Inbound,
+                role: MessageRole::Human,
+                thread_index: None,
+                created_at: chrono::Utc::now().naive_utc(),
+            })
+            .await
+            .unwrap();
+        let progress = persistence
+            .record_outreach_reply(&matched, response.id)
+            .await
+            .unwrap();
+        assert_eq!(progress.status, OutreachStatus::ThresholdMet);
+        assert_eq!(progress.response_count, 1);
+        assert_eq!(
+            persistence
+                .get_task_by_id(task.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            TaskStatus::Pending
+        );
 
         CompanyPersistence::delete(&persistence, company.id)
             .await

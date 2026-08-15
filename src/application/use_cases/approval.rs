@@ -72,6 +72,29 @@ impl ApprovalUseCases {
         let domain = &self.config.app_domain_name;
         let confirm_url = format!("http://{}/approvals/{}?action=confirm", domain, token);
         let reject_url = format!("http://{}/approvals/{}?action=reject", domain, token);
+        let body_text = if action_type == "quorum_timeout" {
+            let proceed_url = format!(
+                "http://{}/approvals/{}?action=proceed_partial",
+                domain, token
+            );
+            let extend_24_url = format!("http://{}/approvals/{}?action=extend_24h", domain, token);
+            let extend_48_url = format!("http://{}/approvals/{}?action=extend_48h", domain, token);
+            format!(
+                "Outreach Timeout Decision for Channel '{}'\n\nAction: {}\nSummary: {}\n\nProceed with available responses:\n{}\n\nExtend 24 hours:\n{}\n\nExtend 48 hours:\n{}\n\nReject and stop the task:\n{}\n\nThis link is valid for 24 hours.",
+                channel_name,
+                action_title,
+                action_summary,
+                proceed_url,
+                extend_24_url,
+                extend_48_url,
+                reject_url
+            )
+        } else {
+            format!(
+                "Action Approval Requested for Channel '{}'\n\nAction: {}\nSummary: {}\n\nClick to CONFIRM:\n{}\n\nClick to REJECT:\n{}\n\nThis link is valid for 24 hours.",
+                channel_name, action_title, action_summary, confirm_url, reject_url
+            )
+        };
         let notification = serde_json::to_value(OutboundEmail {
             channel_id,
             channel_name: channel_name.to_string(),
@@ -82,15 +105,14 @@ impl ApprovalUseCases {
             recipient_to: approver_email.to_string(),
             recipients_cc: vec![],
             subject: format!("[APPROVAL REQUIRED] {}", action_title),
-            body_text: format!(
-                "Action Approval Requested for Channel '{}'\n\nAction: {}\nSummary: {}\n\nClick to CONFIRM:\n{}\n\nClick to REJECT:\n{}\n\nThis link is valid for 24 hours.",
-                channel_name, action_title, action_summary, confirm_url, reject_url
-            ),
+            body_text,
             hop_count: 0,
             trace_channels: vec![channel_id],
         })
         .map_err(|error| {
-            AppError::Internal(format!("Failed to serialize approval notification: {error}"))
+            AppError::Internal(format!(
+                "Failed to serialize approval notification: {error}"
+            ))
         })?;
 
         let (approval, created) = self
@@ -164,6 +186,23 @@ impl ApprovalUseCases {
         }
 
         let normalized_action = action.to_lowercase();
+        let action_allowed = if approval.action_type == "quorum_timeout" {
+            matches!(
+                normalized_action.as_str(),
+                "proceed_partial" | "extend_24h" | "extend_48h" | "extend" | "reject"
+            )
+        } else {
+            matches!(
+                normalized_action.as_str(),
+                "confirm" | "approved" | "approve" | "reject" | "rejected"
+            )
+        };
+        if !action_allowed {
+            return Err(AppError::Internal(format!(
+                "Action '{}' is not valid for approval type '{}'.",
+                action, approval.action_type
+            )));
+        }
         let new_status = match normalized_action.as_str() {
             "confirm" | "approved" | "approve" | "proceed_partial" | "extend_24h"
             | "extend_48h" | "extend" => ApprovalStatus::Approved,
@@ -174,11 +213,16 @@ impl ApprovalUseCases {
         };
 
         let now = Utc::now().naive_utc();
-        let Some(updated) = self
-            .approval_persistence
-            .consume_pending_approval(token, new_status.clone(), now)
-            .await?
-        else {
+        let consumed = if approval.action_type == "quorum_timeout" && approval.task_id.is_some() {
+            self.approval_persistence
+                .consume_quorum_timeout_action(token, &normalized_action, now)
+                .await?
+        } else {
+            self.approval_persistence
+                .consume_pending_approval(token, new_status.clone(), now)
+                .await?
+        };
+        let Some(updated) = consumed else {
             if let Some(expired) = self
                 .approval_persistence
                 .expire_pending_approval(token, now)
@@ -204,25 +248,6 @@ impl ApprovalUseCases {
 
         let message_text = match normalized_action.as_str() {
             "proceed_partial" => {
-                if let Some(task_id) = approval.task_id {
-                    if let Ok(Some(task)) = self.task_persistence.get_task_by_id(task_id).await {
-                        let mut payload = task.payload.clone();
-                        if let Some(q) = payload.get_mut("quorum_outreach") {
-                            if let Some(obj) = q.as_object_mut() {
-                                obj.insert(
-                                    "status".to_string(),
-                                    serde_json::json!("proceed_partial"),
-                                );
-                            }
-                        }
-                        let _ = self
-                            .task_persistence
-                            .update_task_payload(task_id, payload)
-                            .await;
-                    }
-                    let _ = self.task_persistence.resume_task(task_id).await;
-                }
-
                 if let Some(thread_id) = approval.thread_id {
                     let sys_msg = Message {
                         id: Uuid::new_v4(),
@@ -263,37 +288,6 @@ impl ApprovalUseCases {
                 } else {
                     24
                 };
-                if let Some(task_id) = approval.task_id {
-                    if let Ok(Some(task)) = self.task_persistence.get_task_by_id(task_id).await {
-                        let mut payload = task.payload.clone();
-                        if let Some(q) = payload.get_mut("quorum_outreach") {
-                            if let Some(obj) = q.as_object_mut() {
-                                let new_exp =
-                                    Utc::now().naive_utc() + chrono::Duration::hours(extend_hours);
-                                obj.insert(
-                                    "expires_at".to_string(),
-                                    serde_json::json!(new_exp.to_string()),
-                                );
-                                obj.insert(
-                                    "status".to_string(),
-                                    serde_json::json!("awaiting_quorum"),
-                                );
-                            }
-                        }
-                        let _ = self
-                            .task_persistence
-                            .update_task_payload(task_id, payload)
-                            .await;
-                    }
-                    let _ = self
-                        .task_persistence
-                        .update_task_status(
-                            task_id,
-                            crate::entities::task::TaskStatus::WaitingForThirdPartyReply,
-                        )
-                        .await;
-                }
-
                 if let Some(thread_id) = approval.thread_id {
                     let sys_msg = Message {
                         id: Uuid::new_v4(),
@@ -373,7 +367,9 @@ impl ApprovalUseCases {
                 ApprovalStatus::Rejected => {
                     // Stop task if associated
                     if let Some(task_id) = approval.task_id {
-                        let _ = self.task_persistence.stop_task(task_id).await;
+                        if approval.action_type != "quorum_timeout" {
+                            let _ = self.task_persistence.stop_task(task_id).await;
+                        }
                     }
 
                     // Add system message to thread if associated
@@ -638,13 +634,6 @@ mod tests {
             _status: crate::entities::task::TaskStatus,
         ) -> AppResult<crate::entities::task::BackgroundTask> {
             unimplemented!()
-        }
-        async fn list_due_waiting_tasks(
-            &self,
-            _due_at: chrono::NaiveDateTime,
-            _limit: i64,
-        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            Ok(vec![])
         }
         async fn list_company_tasks(
             &self,
@@ -931,6 +920,7 @@ mod tests {
         let handler1 = AgentApprovalHandler {
             approval_use_cases: server1_approval_use_cases,
             context: ctx1,
+            suspended: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         // Tool trigger attempt on Server 1
@@ -987,6 +977,7 @@ mod tests {
         let handler2 = AgentApprovalHandler {
             approval_use_cases: server2_approval_use_cases,
             context: ctx2,
+            suspended: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         let req2 = ApprovalRequest::new(

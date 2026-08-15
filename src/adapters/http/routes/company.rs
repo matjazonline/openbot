@@ -282,6 +282,13 @@ mod tests {
         assert!(page_html.contains("id=\"company-form-card\" class=\"hidden"));
         assert!(page_html.contains("aria-expanded=\"false\""));
         assert!(page_html.contains("id=\"nav-channels\""));
+        assert!(page_html.find(">Channels</a>") < page_html.find(">Agents</a>"));
+        assert!(page_html.find(">Agents</a>") < page_html.find(">Account</summary>"));
+        assert!(page_html.contains(">Account</summary>"));
+        assert!(page_html.find(">Account</summary>") < page_html.find(">Companies</a>"));
+        assert!(page_html.find(">Companies</a>") < page_html.find(">My Invites</a>"));
+        assert!(page_html.contains("href=\"/invites\""));
+        assert!(page_html.contains("action=\"/logout\""));
         assert!(page_html.contains("selectCompany"));
 
         let edit_fragment = pages::company_edit_fragment(&company);

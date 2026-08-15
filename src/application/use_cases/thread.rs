@@ -18,16 +18,19 @@ use crate::{
         company::Company,
         message::{Message, MessageDirection, MessageRole},
         message_contract::{NormalizedInboundMessage, NormalizedOutboundMessage},
+        outreach::OutreachReplyMatch,
         task::TokenUsage,
         thread::Thread,
     },
     infra::config::AppConfig,
     services::{
         agent_runner::{
-            AgentRunner, ApprovalContext as AgentRunnerApprovalContext, ResolvedAgentParams,
+            AgentExecutionDisposition, AgentRunner, ApprovalContext as AgentRunnerApprovalContext,
+            ResolvedAgentParams,
         },
         email_parser::{EmailParser, MAX_CHANNEL_HOPS, ParsedEmail, RawInboundPayload},
         outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
+        outreach_tool::OutreachToolContext,
     },
     use_cases::{
         agent::AgentPersistence,
@@ -170,6 +173,42 @@ impl ThreadUseCases {
         &self.config
     }
 
+    pub async fn record_outreach_outbound_message(
+        &self,
+        outbox_id: Uuid,
+        sent: &crate::services::outbound_dispatcher::SentEmailResult,
+    ) -> AppResult<()> {
+        let Some(thread_id) = self
+            .task_persistence
+            .get_outreach_thread_for_outbox(outbox_id)
+            .await?
+        else {
+            return Ok(());
+        };
+        self.thread_persistence
+            .create_message(&Message {
+                id: Uuid::new_v4(),
+                thread_id,
+                message_id: sent.outbound_message_id.clone(),
+                in_reply_to: Some(sent.in_reply_to.clone()),
+                references_list: sent.references.clone(),
+                sender: sent.from_address.clone(),
+                recipients_to: sent.recipients_to.clone(),
+                recipients_cc: sent.recipients_cc.clone(),
+                subject: sent.subject.clone(),
+                clean_text_body: sent.body_text.clone(),
+                raw_text_body: None,
+                raw_html_body: None,
+                attachments: None,
+                direction: MessageDirection::Outbound,
+                role: MessageRole::Agent,
+                thread_index: None,
+                created_at: chrono::Utc::now().naive_utc(),
+            })
+            .await?;
+        Ok(())
+    }
+
     #[instrument(skip(self, raw_payload))]
     pub async fn ingest_and_save_inbound_message(
         &self,
@@ -292,6 +331,7 @@ impl ThreadUseCases {
         let mut bounce_suggestions = Vec::new();
         let mut matched_company_slug: Option<String> = None;
         let mut is_address_context_only = false;
+        let mut matched_outreach_by_channel: HashMap<Uuid, OutreachReplyMatch> = HashMap::new();
 
         for (addr, role) in candidates {
             if let Some((company_slug, channel_slugs, is_addr_context)) =
@@ -417,12 +457,26 @@ impl ThreadUseCases {
                                 }
 
                                 if let Some(ref t) = ext_t {
-                                    if t.channel_id == channel.id
-                                        && t.participant_emails
+                                    if t.channel_id == channel.id {
+                                        if t.participant_emails
                                             .iter()
                                             .any(|p| p.trim().eq_ignore_ascii_case(sender_clean))
-                                    {
-                                        is_thread_authorized = true;
+                                        {
+                                            is_thread_authorized = true;
+                                        } else if let Ok(Some(matched)) = self
+                                            .task_persistence
+                                            .find_correlated_outreach_reply(
+                                                channel.company_id,
+                                                channel.id,
+                                                t.id,
+                                                sender_clean,
+                                                &lookup_ids,
+                                            )
+                                            .await
+                                        {
+                                            is_thread_authorized = true;
+                                            matched_outreach_by_channel.insert(channel.id, matched);
+                                        }
                                     }
                                 }
                             }
@@ -561,52 +615,31 @@ impl ThreadUseCases {
                         .iter()
                         .any(|p| p.trim().eq_ignore_ascii_case(sender_clean));
 
-                    let mut is_delegation_target = false;
-                    let mut matched_waiting_task_id = None;
-
-                    if !is_thread_participant {
-                        if let Ok(active_tasks) = self
+                    if !is_thread_participant
+                        && !matched_outreach_by_channel.contains_key(&channel.id)
+                    {
+                        let mut reply_references = Vec::new();
+                        if let Some(ref reply_id) = parsed.in_reply_to {
+                            reply_references.push(reply_id.clone());
+                        }
+                        reply_references.extend(parsed.references.clone());
+                        if let Some(matched) = self
                             .task_persistence
-                            .list_company_tasks(
+                            .find_correlated_outreach_reply(
                                 channel.company_id,
-                                Some(channel.id),
-                                Some(crate::entities::task::TaskStatus::WaitingForThirdPartyReply),
-                                false,
+                                channel.id,
+                                ext_t.id,
+                                sender_clean,
+                                &reply_references,
                             )
-                            .await
+                            .await?
                         {
-                            for task in active_tasks {
-                                if task.thread_id == Some(ext_t.id) {
-                                    if let Some(delegations) =
-                                        task.payload.get("delegations").and_then(|d| d.as_array())
-                                    {
-                                        for item in delegations {
-                                            if let Some(target_emails) =
-                                                item.get("target_emails").and_then(|e| e.as_array())
-                                            {
-                                                if target_emails.iter().any(|e_val| {
-                                                    e_val.as_str().map_or(false, |e_str| {
-                                                        e_str
-                                                            .trim()
-                                                            .eq_ignore_ascii_case(sender_clean)
-                                                    })
-                                                }) {
-                                                    is_delegation_target = true;
-                                                    matched_waiting_task_id = Some(task.id);
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                if is_delegation_target {
-                                    break;
-                                }
-                            }
+                            matched_outreach_by_channel.insert(channel.id, matched);
                         }
                     }
+                    let is_outreach_target = matched_outreach_by_channel.contains_key(&channel.id);
 
-                    if !is_thread_participant && !is_delegation_target {
+                    if !is_thread_participant && !is_outreach_target {
                         warn!(
                             "Unauthorized thread injection attempt by '{}' for thread '{}'. Triggering bounce notification.",
                             sender_clean, ext_t.id
@@ -627,10 +660,6 @@ impl ThreadUseCases {
                             "Sender is not an authorized participant or delegation target for this thread",
                             bounce,
                         ));
-                    }
-
-                    if let Some(task_id) = matched_waiting_task_id {
-                        let _ = self.task_persistence.resume_task(task_id).await;
                     }
                 }
             }
@@ -742,9 +771,10 @@ impl ThreadUseCases {
             // Update thread participants
             let mut current_participants = thread.participant_emails.clone();
             let mut participant_added = false;
-            if !current_participants
-                .iter()
-                .any(|p| p.eq_ignore_ascii_case(&parsed.sender))
+            if !matched_outreach_by_channel.contains_key(&channel.id)
+                && !current_participants
+                    .iter()
+                    .any(|p| p.eq_ignore_ascii_case(&parsed.sender))
             {
                 current_participants.push(parsed.sender.clone());
                 participant_added = true;
@@ -851,6 +881,13 @@ impl ThreadUseCases {
                 .thread_persistence
                 .create_message(&inbound_message)
                 .await?;
+
+            if let Some(matched) = matched_outreach_by_channel.get(&channel.id) {
+                self.task_persistence
+                    .record_outreach_reply(matched, saved_inbound.id)
+                    .await?;
+                is_address_context_only = true;
+            }
 
             channel_matches.push(ChannelMatch {
                 company,
@@ -1029,12 +1066,25 @@ impl ThreadUseCases {
                 .list_messages_by_thread_id(m.thread.id)
                 .await?;
 
+            let team_approver = self
+                .company_persistence
+                .list_company_team_emails(m.company.id)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .next();
             let approver_email = m
                 .channel
                 .participant_emails
                 .as_ref()
-                .and_then(|p| p.first().cloned())
-                .unwrap_or_else(|| parsed.sender.clone());
+                .and_then(|participants| {
+                    participants
+                        .iter()
+                        .find(|email| !email.eq_ignore_ascii_case("@public"))
+                        .cloned()
+                })
+                .or(team_approver)
+                .unwrap_or_default();
 
             let approval_ctx = AgentRunnerApprovalContext {
                 company_id: m.company.id,
@@ -1108,6 +1158,14 @@ impl ThreadUseCases {
                 }
             }
 
+            if let Some(task_id) = ingest.task_id
+                && let Some(outreach_context) =
+                    self.task_persistence.get_outreach_context(task_id).await?
+            {
+                upstream_context.push_str("--- Outreach Progress ---\n");
+                upstream_context.push_str(&outreach_context);
+                upstream_context.push_str("\n\n");
+            }
             let upstream_ctx_opt = if !upstream_context.is_empty() {
                 Some(upstream_context)
             } else {
@@ -1116,7 +1174,7 @@ impl ThreadUseCases {
 
             let runner_res = match &resolved_params_res {
                 Ok(resolved_params) => {
-                    AgentRunner::new(&parsed.prompt_text, resolved_params)
+                    let mut runner = AgentRunner::new(&parsed.prompt_text, resolved_params)
                         .history(&history_messages)
                         .approval_use_cases(self.approval_use_cases.clone())
                         .approval_context(Some(approval_ctx))
@@ -1130,15 +1188,44 @@ impl ThreadUseCases {
                             Some(m.company.id),
                             Some(m.channel.id),
                             first_agent.as_ref().map(|a| a.id),
-                        )
-                        .execute()
-                        .await
+                        );
+                    if let (Some(task_id), Some(worker_id)) = (ingest.task_id, effective_worker_id)
+                    {
+                        let mut thread_references = parsed.references.clone();
+                        if let Some(ref in_reply_to) = parsed.in_reply_to
+                            && !thread_references.contains(in_reply_to)
+                        {
+                            thread_references.push(in_reply_to.clone());
+                        }
+                        runner = runner.outreach_tool(
+                            self.task_persistence.clone(),
+                            OutreachToolContext {
+                                task_id,
+                                worker_id,
+                                company_id: m.company.id,
+                                channel_id: m.channel.id,
+                                channel_name: m.channel.name.clone(),
+                                channel_slug: m.channel.slug.clone(),
+                                company_slug: m.company.slug.clone(),
+                                trigger_message_id: parsed.message_id.clone(),
+                                thread_references,
+                                hop_count: parsed.hop_count,
+                                trace_channels: parsed.trace_channels.clone(),
+                                app_domain_name: self.config.app_domain_name.clone(),
+                            },
+                        );
+                    }
+                    runner.execute().await
                 }
                 Err(err) => Err(anyhow::anyhow!("{err}")),
             };
 
             match runner_res {
                 Ok(output) => {
+                    if output.disposition == AgentExecutionDisposition::Suspended {
+                        info!("Agent execution suspended for task approval or outreach");
+                        return Ok(None);
+                    }
                     total_prompt_tokens += output.token_usage.prompt_tokens;
                     total_completion_tokens += output.token_usage.completion_tokens;
                     agent_outputs.push((m, output.content, None::<String>, output.metadata));
@@ -1422,6 +1509,9 @@ impl ThreadUseCases {
             return Err(crate::app_error::AppError::Internal(err_msg.clone()));
         }
 
+        if let Some(task_id) = ingest.task_id {
+            self.task_persistence.complete_outreach(task_id).await?;
+        }
         if let (Some(task_id), Some(worker_id)) = (ingest.task_id, direct_worker_id) {
             let _ = self
                 .task_persistence
@@ -2233,6 +2323,60 @@ mod tests {
 
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        async fn find_correlated_outreach_reply(
+            &self,
+            company_id: Uuid,
+            channel_id: Uuid,
+            thread_id: Uuid,
+            sender: &str,
+            references: &[String],
+        ) -> AppResult<Option<crate::entities::outreach::OutreachReplyMatch>> {
+            let tasks = self.tasks.lock().unwrap();
+            Ok(tasks.iter().find_map(|task| {
+                let outreach = task.payload.get("test_outreach")?;
+                let target = outreach.get("target_email")?.as_str()?;
+                let outbound_message_id = outreach.get("outbound_message_id")?.as_str()?;
+                (task.company_id == company_id
+                    && task.channel_id == channel_id
+                    && task.thread_id == Some(thread_id)
+                    && target.eq_ignore_ascii_case(sender)
+                    && references.iter().any(|value| value == outbound_message_id))
+                .then(|| crate::entities::outreach::OutreachReplyMatch {
+                    outreach_id: outreach
+                        .get("outreach_id")
+                        .and_then(serde_json::Value::as_str)
+                        .and_then(|value| Uuid::parse_str(value).ok())
+                        .unwrap(),
+                    task_id: task.id,
+                    target_email: target.to_string(),
+                })
+            }))
+        }
+
+        async fn record_outreach_reply(
+            &self,
+            matched: &crate::entities::outreach::OutreachReplyMatch,
+            _response_message_id: Uuid,
+        ) -> AppResult<crate::entities::outreach::OutreachProgress> {
+            let mut tasks = self.tasks.lock().unwrap();
+            let task = tasks
+                .iter_mut()
+                .find(|task| task.id == matched.task_id)
+                .unwrap();
+            task.status = crate::entities::task::TaskStatus::Pending;
+            Ok(crate::entities::outreach::OutreachProgress {
+                id: matched.outreach_id,
+                task_id: matched.task_id,
+                status: crate::entities::outreach::OutreachStatus::ThresholdMet,
+                required_threshold_percent: 100.0,
+                target_count: 1,
+                response_count: 1,
+                required_response_count: 1,
+                expires_at: Utc::now().naive_utc() + chrono::Duration::hours(1),
+                suspended: false,
+            })
+        }
+
         async fn enqueue_task(
             &self,
             company_id: Uuid,
@@ -2465,35 +2609,6 @@ mod tests {
             t.locked_at = None;
             t.lock_expires_at = None;
             Ok(t.clone())
-        }
-
-        async fn list_due_waiting_tasks(
-            &self,
-            due_at: chrono::NaiveDateTime,
-            limit: i64,
-        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            Ok(self
-                .tasks
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|task| {
-                    task.status == crate::entities::task::TaskStatus::WaitingForThirdPartyReply
-                        && task
-                            .payload
-                            .pointer("/quorum_outreach/status")
-                            .and_then(|value| value.as_str())
-                            == Some("awaiting_quorum")
-                        && task
-                            .payload
-                            .pointer("/quorum_outreach/expires_at")
-                            .and_then(|value| value.as_str())
-                            .and_then(|value| value.parse::<chrono::NaiveDateTime>().ok())
-                            .is_some_and(|expires| expires <= due_at)
-                })
-                .take(limit as usize)
-                .cloned()
-                .collect())
         }
 
         async fn list_company_tasks(
@@ -3979,15 +4094,14 @@ mod tests {
         assert!(res1.accepted);
         let thread_id = res1.thread.unwrap().id;
 
-        // 2. Enqueue task in WaitingForThirdPartyReply state with target_emails: ["vendor@supplier.com"]
+        // 2. Enqueue a waiting outreach with one target and a sent outbound Message-ID.
+        let outreach_id = Uuid::new_v4();
         let delegation_payload = serde_json::json!({
-            "delegations": [
-                {
-                    "delegation_id": "d1",
-                    "target_emails": ["vendor@supplier.com"],
-                    "status": "awaiting_reply"
-                }
-            ]
+            "test_outreach": {
+                "outreach_id": outreach_id,
+                "target_email": "vendor@supplier.com",
+                "outbound_message_id": "<outreach-vendor@mailagents.com>"
+            }
         });
         let task = task_persistence
             .enqueue_task(
@@ -4022,9 +4136,9 @@ mod tests {
             Some("Sender is not an authorized participant or delegation target for this thread")
         );
 
-        // 4. Authorized vendor replies using In-Reply-To
+        // 4. Authorized vendor replies to their exact outreach Message-ID.
         let res_vendor = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
-            headers: Some("Message-ID: <msg-vendor-1@supplier.com>\nIn-Reply-To: <msg-client-1@external.com>\n".to_string()),
+            headers: Some("Message-ID: <msg-vendor-1@supplier.com>\nIn-Reply-To: <outreach-vendor@mailagents.com>\nReferences: <msg-client-1@external.com>\n".to_string()),
             to: "support@acme.mailagents.com".to_string(),
             from: "vendor@supplier.com".to_string(),
             subject: Some("Re: Need quote".to_string()),
@@ -4043,6 +4157,24 @@ mod tests {
             resumed_task.status,
             crate::entities::task::TaskStatus::Pending
         );
+
+        // Outreach authorization is scoped to the correlated outbound message and does not
+        // permanently promote the target to a thread participant.
+        let res_uncorrelated = thread_use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                headers: Some(
+                    "Message-ID: <msg-vendor-2@supplier.com>\nIn-Reply-To: <msg-client-1@external.com>\n"
+                        .to_string(),
+                ),
+                to: "support@acme.mailagents.com".to_string(),
+                from: "vendor@supplier.com".to_string(),
+                subject: Some("Re: Need quote".to_string()),
+                text: Some("Uncorrelated follow-up".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert!(!res_uncorrelated.accepted);
     }
 
     #[tokio::test]

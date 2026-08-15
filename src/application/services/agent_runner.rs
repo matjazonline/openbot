@@ -1,3 +1,4 @@
+use crate::adapters::persistence::task::TaskPersistence;
 use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService};
 use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::approval::ApprovalStatus;
@@ -5,12 +6,16 @@ use crate::entities::channel::Channel;
 use crate::entities::company::Company;
 use crate::entities::message::{Message, MessageRole};
 use crate::entities::task::TokenUsage;
+use crate::services::outreach_tool::{OutreachAndAwaitQuorumTool, OutreachToolContext};
 use crate::use_cases::approval::ApprovalUseCases;
 use crate::use_cases::thread::RecipientRole;
 use ai_agents::{Agent, AgentBuilder};
 use regex::Regex;
 use sha2::{Digest, Sha256};
-use std::sync::{Arc, LazyLock};
+use std::sync::{
+    Arc, LazyLock,
+    atomic::{AtomicBool, Ordering},
+};
 use tracing::info;
 use uuid::Uuid;
 
@@ -43,8 +48,16 @@ pub fn estimate_tokens(text: &str) -> usize {
 pub struct AgentExecutionOutput {
     pub content: String,
     pub token_usage: TokenUsage,
+    pub disposition: AgentExecutionDisposition,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentExecutionDisposition {
+    Completed,
+    Suspended,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -146,6 +159,33 @@ fn base_agent_config_with_observability(observability_enabled: bool) -> serde_js
             "export": {
                 "write_report": false,
                 "write_raw_events": false
+            }
+        },
+        "hitl": {
+            "default_timeout_seconds": 86400,
+            "on_timeout": "reject",
+            "tools": {
+                "outreach_and_await_quorum": {
+                    "require_approval": true,
+                    "approval_context": [
+                        "target_emails",
+                        "completion_threshold_percent",
+                        "timeout_hours",
+                        "subject"
+                    ]
+                }
+            }
+        },
+        "tool_security": {
+            "tools": {
+                "outreach_and_await_quorum": {
+                    "timeout_ms": 10000,
+                    "max_output_chars": 4000,
+                    "config": {
+                        "max_targets": 50,
+                        "max_timeout_hours": 720
+                    }
+                }
             }
         },
         "context": {
@@ -518,6 +558,7 @@ pub struct ApprovalContext {
 pub struct AgentApprovalHandler {
     pub approval_use_cases: Arc<ApprovalUseCases>,
     pub context: ApprovalContext,
+    pub suspended: Arc<AtomicBool>,
 }
 
 #[async_trait::async_trait]
@@ -526,6 +567,11 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
         &self,
         req: ai_agents::hitl::ApprovalRequest,
     ) -> ai_agents::hitl::ApprovalResult {
+        if self.context.approver_email.trim().is_empty() {
+            return ai_agents::hitl::ApprovalResult::rejected_with_reason(
+                "No channel participant or company team member is configured to approve this action.",
+            );
+        }
         let step_raw = match &req.trigger {
             ai_agents::hitl::ApprovalTrigger::Tool { name, args } => {
                 format!(
@@ -547,9 +593,14 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
             .thread_id
             .map(|t| t.to_string())
             .unwrap_or_default();
+        let task_str = self
+            .context
+            .task_id
+            .map(|task| task.to_string())
+            .unwrap_or_default();
         let step_key = format!(
             "{:x}",
-            Sha256::digest(format!("{}:{}", thread_str, step_raw).as_bytes())
+            Sha256::digest(format!("{}:{}:{}", task_str, thread_str, step_raw).as_bytes())
         );
 
         // Check if DB already has approval or rejection
@@ -618,9 +669,12 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
             .await;
 
         match res {
-            Ok(_) => ai_agents::hitl::ApprovalResult::rejected_with_reason(
-                "Approval requested via email link; task paused waiting for human decision.",
-            ),
+            Ok(_) => {
+                self.suspended.store(true, Ordering::SeqCst);
+                ai_agents::hitl::ApprovalResult::rejected_with_reason(
+                    "Approval requested via email link; task paused waiting for human decision.",
+                )
+            }
             Err(e) => ai_agents::hitl::ApprovalResult::rejected_with_reason(e.to_string()),
         }
     }
@@ -643,6 +697,8 @@ pub struct AgentRunner<'a> {
     skip_spam_guardrail: bool,
     recipient_role: Option<RecipientRole>,
     upstream_pipeline_context: Option<String>,
+    task_persistence: Option<Arc<dyn TaskPersistence>>,
+    outreach_context: Option<OutreachToolContext>,
 }
 
 impl<'a> AgentRunner<'a> {
@@ -662,6 +718,8 @@ impl<'a> AgentRunner<'a> {
             skip_spam_guardrail: false,
             recipient_role: None,
             upstream_pipeline_context: None,
+            task_persistence: None,
+            outreach_context: None,
         }
     }
 
@@ -724,6 +782,16 @@ impl<'a> AgentRunner<'a> {
 
     pub fn upstream_pipeline_context(mut self, ctx: Option<String>) -> Self {
         self.upstream_pipeline_context = ctx;
+        self
+    }
+
+    pub fn outreach_tool(
+        mut self,
+        persistence: Arc<dyn TaskPersistence>,
+        context: OutreachToolContext,
+    ) -> Self {
+        self.task_persistence = Some(persistence);
+        self.outreach_context = Some(context);
         self
     }
 
@@ -824,6 +892,10 @@ impl<'a> AgentRunner<'a> {
         let approval_use_cases = self.approval_use_cases.clone();
         let approval_context = self.approval_context.clone();
         let recipient_role = self.recipient_role;
+        let task_persistence = self.task_persistence.clone();
+        let outreach_context = self.outreach_context.clone();
+        let suspended = Arc::new(AtomicBool::new(false));
+        let suspended_for_task = suspended.clone();
 
         let task_result = tokio::spawn(async move {
             let mut builder = AgentBuilder::from_yaml(&config_yaml)?;
@@ -832,6 +904,7 @@ impl<'a> AgentRunner<'a> {
                 let handler = Arc::new(AgentApprovalHandler {
                     approval_use_cases: use_cases,
                     context: ctx,
+                    suspended: suspended_for_task.clone(),
                 });
                 builder = builder.approval_handler(handler);
             }
@@ -852,13 +925,20 @@ impl<'a> AgentRunner<'a> {
                 builder = builder.auto_configure_llms()?;
             }
 
-            let agent = builder
+            let mut builder = builder
                 .auto_configure_features()?
                 .auto_configure_mcp()
                 .await?
                 .auto_configure_spawner()
-                .await?
-                .build()?;
+                .await?;
+            if let (Some(persistence), Some(context)) = (task_persistence, outreach_context) {
+                builder = builder.tool(Arc::new(OutreachAndAwaitQuorumTool::new(
+                    persistence,
+                    context,
+                    suspended_for_task.clone(),
+                )));
+            }
+            let agent = builder.build()?;
 
             let role_str = recipient_role.map(|r| r.as_str()).unwrap_or("to");
             let is_to = role_str == "to";
@@ -980,6 +1060,11 @@ impl<'a> AgentRunner<'a> {
             Ok::<AgentExecutionOutput, anyhow::Error>(AgentExecutionOutput {
                 content: clean_content,
                 token_usage,
+                disposition: if suspended_for_task.load(Ordering::SeqCst) {
+                    AgentExecutionDisposition::Suspended
+                } else {
+                    AgentExecutionDisposition::Completed
+                },
                 metadata,
             })
         })

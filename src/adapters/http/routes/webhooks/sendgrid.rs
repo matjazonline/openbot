@@ -710,14 +710,6 @@ mod tests {
             Ok(t.clone())
         }
 
-        async fn list_due_waiting_tasks(
-            &self,
-            _due_at: chrono::NaiveDateTime,
-            _limit: i64,
-        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            Ok(vec![])
-        }
-
         async fn list_company_tasks(
             &self,
             company_id: Uuid,
