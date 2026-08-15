@@ -88,8 +88,8 @@ impl CompanyPersistence for PostgresPersistence {
 
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, created_at 
-               FROM companies WHERE LOWER(slug) = LOWER($1)"#,
+            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, created_at
+               FROM companies WHERE slug = $1"#,
         )
         .bind(slug)
         .fetch_optional(&self.pool)
@@ -102,7 +102,8 @@ impl CompanyPersistence for PostgresPersistence {
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         let db_list = sqlx::query_as::<_, CompanyDb>(
             r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, created_at 
-               FROM companies WHERE user_id = $1 ORDER BY created_at DESC"#,
+               FROM companies WHERE user_id = $1
+               ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -150,13 +151,60 @@ impl CompanyPersistence for PostgresPersistence {
         Ok(())
     }
 
+    async fn update_for_user(
+        &self,
+        user_id: Uuid,
+        id: Uuid,
+        name: &str,
+        slug: &str,
+        api_key: Option<&str>,
+        provider: Option<&str>,
+        model: Option<&str>,
+        enable_llm_spam_guardrail: Option<bool>,
+    ) -> AppResult<Company> {
+        let db = sqlx::query_as::<_, CompanyDb>(
+            r#"UPDATE companies
+               SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5,
+                   enable_llm_spam_guardrail = $6
+               WHERE id = $7 AND user_id = $8
+               RETURNING id, user_id, name, slug, api_key, provider, model,
+                         enable_llm_spam_guardrail, created_at"#,
+        )
+        .bind(name)
+        .bind(slug)
+        .bind(api_key)
+        .bind(provider)
+        .bind(model)
+        .bind(enable_llm_spam_guardrail)
+        .bind(id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?
+        .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
+        Ok(db.into())
+    }
+
+    async fn delete_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
+        let result = sqlx::query("DELETE FROM companies WHERE id = $1 AND user_id = $2")
+            .bind(id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        if result.rows_affected() != 1 {
+            return Err(AppError::Internal("Company not found.".into()));
+        }
+        Ok(())
+    }
+
     async fn is_company_team_member(&self, company_id: Uuid, email: &str) -> AppResult<bool> {
         let clean_email = email.trim().to_lowercase();
         let res = sqlx::query_scalar!(
             r#"SELECT EXISTS (
-                SELECT 1 FROM companies c JOIN users u ON c.user_id = u.id WHERE c.id = $1 AND LOWER(u.email) = LOWER($2)
+                SELECT 1 FROM companies c JOIN users u ON c.user_id = u.id WHERE c.id = $1 AND u.email = $2
                 UNION ALL
-                SELECT 1 FROM company_members m JOIN users u ON m.user_id = u.id WHERE m.company_id = $1 AND LOWER(u.email) = LOWER($2)
+                SELECT 1 FROM company_members m JOIN users u ON m.user_id = u.id WHERE m.company_id = $1 AND u.email = $2
             ) as "exists!""#,
             company_id,
             clean_email

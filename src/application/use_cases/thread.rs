@@ -1,11 +1,11 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::task::TaskPersistence,
+    adapters::persistence::task::{TASK_LEASE_SECONDS, TaskPersistence},
     adapters::protocols::{
         EgressRegistry,
         email::{EmailEgressAdapter, EmailIngressAdapter},
@@ -57,11 +57,15 @@ pub trait ThreadPersistence: Send + Sync {
         participant_emails: &[String],
     ) -> AppResult<Thread>;
 
-    async fn find_thread_by_message_ids(&self, message_ids: &[String])
-    -> AppResult<Option<Thread>>;
+    async fn find_thread_by_message_ids(
+        &self,
+        channel_id: Uuid,
+        message_ids: &[String],
+    ) -> AppResult<Option<Thread>>;
 
     async fn find_thread_by_thread_index(
         &self,
+        channel_id: Uuid,
         thread_index_prefix: &str,
     ) -> AppResult<Option<Thread>>;
 
@@ -69,7 +73,17 @@ pub trait ThreadPersistence: Send + Sync {
 
     async fn create_message(&self, message: &Message) -> AppResult<Message>;
 
-    async fn get_message_by_message_id(&self, message_id: &str) -> AppResult<Option<Message>>;
+    async fn get_message_by_message_id(
+        &self,
+        company_id: Uuid,
+        message_id: &str,
+    ) -> AppResult<Option<Message>>;
+
+    async fn find_outbound_reply(
+        &self,
+        thread_id: Uuid,
+        in_reply_to: &str,
+    ) -> AppResult<Option<Message>>;
 
     async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>>;
 }
@@ -201,21 +215,6 @@ impl ThreadUseCases {
             parsed.message_id, parsed.sender, parsed.recipients_to
         );
 
-        // SendGrid Webhook Redelivery Idempotency Check
-        if let Ok(Some(_)) = self
-            .thread_persistence
-            .get_message_by_message_id(&parsed.message_id)
-            .await
-        {
-            warn!(
-                "SendGrid Webhook Redelivery: Duplicate Message-ID '{}' already processed",
-                parsed.message_id
-            );
-            return Ok(InboundIngestResult::rejected(
-                "Duplicate Message-ID already processed",
-            ));
-        }
-
         let is_inter_channel = parsed.channel_id_header.is_some()
             || parsed
                 .sender
@@ -276,6 +275,9 @@ impl ThreadUseCases {
         let mut candidate_matches: Vec<(Company, Channel, RecipientRole, usize, usize)> =
             Vec::new();
         let mut seen_channels = std::collections::HashSet::new();
+        let mut company_cache: HashMap<String, Option<Company>> = HashMap::new();
+        let mut channel_cache: HashMap<Uuid, Vec<Channel>> = HashMap::new();
+        let mut membership_cache: HashMap<(Uuid, String), bool> = HashMap::new();
         let mut unauthorized_count = 0;
 
         let mut invalid_slugs = Vec::new();
@@ -291,19 +293,32 @@ impl ThreadUseCases {
                     is_address_context_only = true;
                 }
                 matched_company_slug = Some(company_slug.clone());
-                let company_opt = self
-                    .company_persistence
-                    .get_by_slug(&company_slug)
-                    .await
-                    .ok()
-                    .flatten();
+                let company_key = company_slug.to_lowercase();
+                let company_opt = if let Some(cached) = company_cache.get(&company_key) {
+                    cached.clone()
+                } else {
+                    let loaded = self
+                        .company_persistence
+                        .get_by_slug(&company_slug)
+                        .await
+                        .ok()
+                        .flatten();
+                    company_cache.insert(company_key, loaded.clone());
+                    loaded
+                };
 
                 if let Some(company) = company_opt {
-                    let available_channels = self
-                        .channel_persistence
-                        .list_by_company_id(company.id)
-                        .await
-                        .unwrap_or_default();
+                    let available_channels = if let Some(cached) = channel_cache.get(&company.id) {
+                        cached.clone()
+                    } else {
+                        let loaded = self
+                            .channel_persistence
+                            .list_by_company_id(company.id)
+                            .await
+                            .unwrap_or_default();
+                        channel_cache.insert(company.id, loaded.clone());
+                        loaded
+                    };
                     let total_steps = channel_slugs.len();
 
                     for (step_idx, channel_slug) in channel_slugs.into_iter().enumerate() {
@@ -330,11 +345,19 @@ impl ThreadUseCases {
 
                             // ACL & Participant Restriction Check
                             let sender_clean = parsed.sender.trim();
-                            let is_team_member = self
-                                .company_persistence
-                                .is_company_team_member(channel.company_id, sender_clean)
-                                .await
-                                .unwrap_or(false);
+                            let member_key = (channel.company_id, sender_clean.to_lowercase());
+                            let is_team_member =
+                                if let Some(cached) = membership_cache.get(&member_key) {
+                                    *cached
+                                } else {
+                                    let loaded = self
+                                        .company_persistence
+                                        .is_company_team_member(channel.company_id, sender_clean)
+                                        .await
+                                        .unwrap_or(false);
+                                    membership_cache.insert(member_key, loaded);
+                                    loaded
+                                };
 
                             let (is_authorized, is_trusted_participant) =
                                 match &channel.participant_emails {
@@ -366,7 +389,7 @@ impl ThreadUseCases {
 
                                 let mut ext_t = if !lookup_ids.is_empty() {
                                     self.thread_persistence
-                                        .find_thread_by_message_ids(&lookup_ids)
+                                        .find_thread_by_message_ids(channel.id, &lookup_ids)
                                         .await
                                         .ok()
                                         .flatten()
@@ -378,7 +401,7 @@ impl ThreadUseCases {
                                     if let Some(ref idx) = parsed.thread_index {
                                         ext_t = self
                                             .thread_persistence
-                                            .find_thread_by_thread_index(idx)
+                                            .find_thread_by_thread_index(channel.id, idx)
                                             .await
                                             .ok()
                                             .flatten();
@@ -474,29 +497,50 @@ impl ThreadUseCases {
             ));
         }
 
+        let task_company_id = candidate_matches[0].0.id;
+        if candidate_matches
+            .iter()
+            .any(|(company, _, _, _, _)| company.id != task_company_id)
+        {
+            return Ok(InboundIngestResult::rejected(
+                "A channel pipeline cannot span multiple companies",
+            ));
+        }
+
+        if let Ok(Some(_)) = self
+            .task_persistence
+            .get_task_by_source_message_id(task_company_id, &parsed.message_id)
+            .await
+        {
+            warn!(
+                "Duplicate Message-ID '{}' already processed for company {}",
+                parsed.message_id, task_company_id
+            );
+            return Ok(InboundIngestResult::rejected(
+                "Duplicate Message-ID already processed",
+            ));
+        }
+
         let mut channel_matches = Vec::new();
 
         for (company, channel, role, step_idx, total_steps) in candidate_matches {
             // Thread Resolution
-            let mut lookup_ids = Vec::new();
+            let mut lookup_ids = vec![parsed.message_id.clone()];
             if let Some(ref reply_id) = parsed.in_reply_to {
                 lookup_ids.push(reply_id.clone());
             }
             lookup_ids.extend(parsed.references.clone());
 
-            let mut existing_thread = if !lookup_ids.is_empty() {
-                self.thread_persistence
-                    .find_thread_by_message_ids(&lookup_ids)
-                    .await?
-            } else {
-                None
-            };
+            let mut existing_thread = self
+                .thread_persistence
+                .find_thread_by_message_ids(channel.id, &lookup_ids)
+                .await?;
 
             if existing_thread.is_none() {
                 if let Some(ref idx) = parsed.thread_index {
                     existing_thread = self
                         .thread_persistence
-                        .find_thread_by_thread_index(idx)
+                        .find_thread_by_thread_index(channel.id, idx)
                         .await?;
                 }
             }
@@ -585,11 +629,18 @@ impl ThreadUseCases {
 
             // Extract third-party recipients if sender is a workflow participant or team member
             let sender_clean = parsed.sender.trim();
-            let is_team_member = self
-                .company_persistence
-                .is_company_team_member(channel.company_id, sender_clean)
-                .await
-                .unwrap_or(false);
+            let member_key = (channel.company_id, sender_clean.to_lowercase());
+            let is_team_member = if let Some(cached) = membership_cache.get(&member_key) {
+                *cached
+            } else {
+                let loaded = self
+                    .company_persistence
+                    .is_company_team_member(channel.company_id, sender_clean)
+                    .await
+                    .unwrap_or(false);
+                membership_cache.insert(member_key, loaded);
+                loaded
+            };
 
             let is_trusted_participant = match &channel.participant_emails {
                 Some(allowed) if !allowed.is_empty() => {
@@ -620,12 +671,20 @@ impl ThreadUseCases {
                     let is_channel_address = if let Some((comp_slug, _, _)) =
                         parse_recipient_address_pipeline(addr_clean, &self.config.app_domain_name)
                     {
-                        self.company_persistence
-                            .get_by_slug(&comp_slug)
-                            .await
-                            .ok()
-                            .flatten()
-                            .is_some()
+                        let key = comp_slug.to_lowercase();
+                        let company = if let Some(cached) = company_cache.get(&key) {
+                            cached.clone()
+                        } else {
+                            let loaded = self
+                                .company_persistence
+                                .get_by_slug(&comp_slug)
+                                .await
+                                .ok()
+                                .flatten();
+                            company_cache.insert(key, loaded.clone());
+                            loaded
+                        };
+                        company.is_some()
                     } else {
                         false
                     };
@@ -827,8 +886,8 @@ impl ThreadUseCases {
         }
 
         // Enqueue background task for durable processing & crash recovery
-        let payload_json = serde_json::to_value(&ingest_result).unwrap_or_default();
-        if let Ok(task) = self
+        let payload_json = durable_ingest_payload(&ingest_result);
+        let task = self
             .task_persistence
             .enqueue_task(
                 first.company.id,
@@ -837,10 +896,8 @@ impl ThreadUseCases {
                 "email_agent_dispatch",
                 payload_json,
             )
-            .await
-        {
-            ingest_result.task_id = Some(task.id);
-        }
+            .await?;
+        ingest_result.task_id = Some(task.id);
 
         Ok(ingest_result)
     }
@@ -850,7 +907,7 @@ impl ThreadUseCases {
         ingest: &InboundIngestResult,
         send_email: bool,
     ) -> AppResult<Option<AgentExecutionResult>> {
-        self.execute_agent_and_dispatch_inner(ingest, send_email, false)
+        self.execute_agent_and_dispatch_inner(ingest, send_email, false, None)
             .await
     }
 
@@ -858,8 +915,9 @@ impl ThreadUseCases {
         &self,
         ingest: &InboundIngestResult,
         send_email: bool,
+        worker_id: Uuid,
     ) -> AppResult<Option<AgentExecutionResult>> {
-        self.execute_agent_and_dispatch_inner(ingest, send_email, true)
+        self.execute_agent_and_dispatch_inner(ingest, send_email, true, Some(worker_id))
             .await
     }
 
@@ -868,6 +926,7 @@ impl ThreadUseCases {
         ingest: &InboundIngestResult,
         send_email: bool,
         task_already_claimed: bool,
+        claimed_worker_id: Option<Uuid>,
     ) -> AppResult<Option<AgentExecutionResult>> {
         if let Some(ref p) = ingest.parsed_email {
             if p.is_context_only {
@@ -888,10 +947,19 @@ impl ThreadUseCases {
             }
         }
 
+        let mut direct_worker_id = None;
         if !task_already_claimed && let Some(task_id) = ingest.task_id {
-            match self.task_persistence.mark_task_processing(task_id).await {
+            let worker_id = Uuid::new_v4();
+            let lock_expires_at =
+                chrono::Utc::now().naive_utc() + chrono::Duration::seconds(TASK_LEASE_SECONDS);
+            match self
+                .task_persistence
+                .claim_task(task_id, worker_id, lock_expires_at)
+                .await
+            {
                 Ok(true) => {
                     info!("Successfully claimed task {} for execution", task_id);
+                    direct_worker_id = Some(worker_id);
                 }
                 Ok(false) => {
                     info!(
@@ -901,13 +969,11 @@ impl ThreadUseCases {
                     return Ok(None);
                 }
                 Err(err) => {
-                    warn!(
-                        "Failed to mark task {} as processing: {}, continuing with execution",
-                        task_id, err
-                    );
+                    return Err(err);
                 }
             }
         }
+        let effective_worker_id = claimed_worker_id.or(direct_worker_id);
 
         let parsed = match &ingest.parsed_email {
             Some(p) => p,
@@ -946,6 +1012,8 @@ impl ThreadUseCases {
         let mut primary_execution_error = None;
         let mut primary_resolved_params = None;
         let mut primary_agent = None;
+        let mut membership_cache: HashMap<(Uuid, String), bool> = HashMap::new();
+        let mut agent_cache: HashMap<Uuid, Option<crate::entities::agent::Agent>> = HashMap::new();
 
         for (idx, m) in matches.iter().enumerate() {
             let history_messages = self
@@ -967,13 +1035,19 @@ impl ThreadUseCases {
                 channel_slug: m.channel.slug.clone(),
                 company_slug: m.company.slug.clone(),
                 thread_id: Some(m.thread.id),
-                task_id: None,
+                task_id: ingest.task_id,
                 approver_email,
             };
 
             let first_agent = if let Some(ref ap) = self.agent_persistence {
                 if let Some(&agent_id) = m.channel.agent_ids.as_ref().and_then(|ids| ids.first()) {
-                    ap.get_by_id(agent_id).await.ok().flatten()
+                    if let Some(cached) = agent_cache.get(&agent_id) {
+                        cached.clone()
+                    } else {
+                        let loaded = ap.get_by_id(agent_id).await.ok().flatten();
+                        agent_cache.insert(agent_id, loaded.clone());
+                        loaded
+                    }
                 } else {
                     None
                 }
@@ -989,11 +1063,18 @@ impl ThreadUseCases {
             }
 
             let sender_clean = parsed.sender.trim();
-            let is_team_member = self
-                .company_persistence
-                .is_company_team_member(m.company.id, sender_clean)
-                .await
-                .unwrap_or(false);
+            let member_key = (m.company.id, sender_clean.to_lowercase());
+            let is_team_member = if let Some(cached) = membership_cache.get(&member_key) {
+                *cached
+            } else {
+                let loaded = self
+                    .company_persistence
+                    .is_company_team_member(m.company.id, sender_clean)
+                    .await
+                    .unwrap_or(false);
+                membership_cache.insert(member_key, loaded);
+                loaded
+            };
 
             let is_participant = match &m.channel.participant_emails {
                 Some(allowed) if !allowed.is_empty() => {
@@ -1131,7 +1212,12 @@ impl ThreadUseCases {
             let mut outbound_cc = parsed.recipients_cc.clone();
             if let Some(ref wf_participants) = primary_channel.participant_emails {
                 for p in wf_participants {
-                    if !p.eq_ignore_ascii_case(&parsed.sender) && !outbound_cc.contains(p) {
+                    if !p.eq_ignore_ascii_case("@public")
+                        && !p.eq_ignore_ascii_case(&parsed.sender)
+                        && !outbound_cc
+                            .iter()
+                            .any(|recipient| recipient.eq_ignore_ascii_case(p))
+                    {
                         outbound_cc.push(p.clone());
                     }
                 }
@@ -1167,7 +1253,32 @@ impl ThreadUseCases {
                 trace_channels: parsed.trace_channels.clone(),
             };
 
-            let sent_result = OutboundDispatcher::send(&self.config, outbound_email).await?;
+            if let (Some(task_id), Some(worker_id)) = (ingest.task_id, effective_worker_id) {
+                let renewed = self
+                    .task_persistence
+                    .renew_task_lease(
+                        task_id,
+                        worker_id,
+                        chrono::Utc::now().naive_utc()
+                            + chrono::Duration::seconds(TASK_LEASE_SECONDS),
+                    )
+                    .await?;
+                if !renewed {
+                    return Err(crate::app_error::AppError::Internal(
+                        "Task lease was lost before outbound dispatch".into(),
+                    ));
+                }
+            }
+            let sent_result = if let Some(task_id) = ingest.task_id {
+                OutboundDispatcher::send_idempotent(
+                    &self.config,
+                    outbound_email,
+                    &format!("task:{task_id}:agent-reply"),
+                )
+                .await?
+            } else {
+                OutboundDispatcher::send(&self.config, outbound_email).await?
+            };
             if let Some(adapter) = self.egress_registry.get(&norm_outbound.protocol) {
                 let _ = adapter; // Registered egress adapter present
             }
@@ -1244,19 +1355,7 @@ impl ThreadUseCases {
             let exec_params = match &primary_resolved_params {
                 Some(p) => {
                     let mut cfg = p.config().clone();
-                    if let Some(obj) = cfg.as_object_mut() {
-                        if obj.contains_key("api_key") {
-                            obj.insert("api_key".to_string(), serde_json::json!("***masked***"));
-                        }
-                        if let Some(llm) = obj.get_mut("llm").and_then(|v| v.as_object_mut()) {
-                            if llm.contains_key("api_key") {
-                                llm.insert(
-                                    "api_key".to_string(),
-                                    serde_json::json!("***masked***"),
-                                );
-                            }
-                        }
-                    }
+                    scrub_json_secrets(Some(&mut cfg));
                     serde_json::json!({
                         "provider": p.provider(),
                         "model": p.model(),
@@ -1273,7 +1372,7 @@ impl ThreadUseCases {
                 }),
             };
 
-            let mut updated_payload = serde_json::to_value(ingest).unwrap_or_default();
+            let mut updated_payload = durable_ingest_payload(ingest);
             if let Some(obj) = updated_payload.as_object_mut() {
                 obj.insert("execution_parameters".to_string(), exec_params);
                 let mut exec_res = serde_json::json!({
@@ -1291,25 +1390,35 @@ impl ThreadUseCases {
                 }
                 obj.insert("execution_result".to_string(), exec_res);
             }
-            let _ = self
-                .task_persistence
-                .update_task_payload(task_id, updated_payload)
-                .await;
+            if let Some(worker_id) = effective_worker_id {
+                let _ = self
+                    .task_persistence
+                    .update_claimed_task_payload(task_id, worker_id, updated_payload)
+                    .await;
+            } else {
+                let _ = self
+                    .task_persistence
+                    .update_task_payload(task_id, updated_payload)
+                    .await;
+            }
         }
 
         if let Some(ref err_msg) = primary_execution_error {
-            if let Some(task_id) = ingest.task_id {
+            if let (Some(task_id), Some(worker_id)) = (ingest.task_id, direct_worker_id) {
                 let next_run = chrono::Utc::now().naive_utc();
                 let _ = self
                     .task_persistence
-                    .mark_task_failed(task_id, err_msg, next_run, true)
+                    .mark_task_failed(task_id, worker_id, err_msg, next_run, true)
                     .await;
             }
             return Err(crate::app_error::AppError::Internal(err_msg.clone()));
         }
 
-        if let Some(task_id) = ingest.task_id {
-            let _ = self.task_persistence.mark_task_completed(task_id).await;
+        if let (Some(task_id), Some(worker_id)) = (ingest.task_id, direct_worker_id) {
+            let _ = self
+                .task_persistence
+                .mark_task_completed(task_id, worker_id)
+                .await;
         }
 
         Ok(Some(AgentExecutionResult {
@@ -1419,6 +1528,97 @@ impl ThreadUseCases {
             .await
     }
 
+    pub async fn find_outbound_reply(
+        &self,
+        thread_id: Uuid,
+        in_reply_to: &str,
+    ) -> AppResult<Option<Message>> {
+        self.thread_persistence
+            .find_outbound_reply(thread_id, in_reply_to)
+            .await
+    }
+
+    pub async fn save_message(&self, message: &Message) -> AppResult<Message> {
+        self.thread_persistence.create_message(message).await
+    }
+
+    pub async fn hydrate_ingest_configuration(
+        &self,
+        ingest: &mut InboundIngestResult,
+    ) -> AppResult<()> {
+        if let Some(company) = ingest.company.as_mut() {
+            *company = self
+                .company_persistence
+                .get_by_id(company.id)
+                .await?
+                .ok_or_else(|| {
+                    crate::app_error::AppError::Internal("Task company no longer exists".into())
+                })?;
+        }
+        if let Some(channel) = ingest.channel.as_mut() {
+            let current = self
+                .channel_persistence
+                .get_by_id(channel.id)
+                .await?
+                .ok_or_else(|| {
+                    crate::app_error::AppError::Internal("Task channel no longer exists".into())
+                })?;
+            if ingest
+                .company
+                .as_ref()
+                .is_some_and(|company| company.id != current.company_id)
+            {
+                return Err(crate::app_error::AppError::Internal(
+                    "Task channel does not belong to its company".into(),
+                ));
+            }
+            *channel = current;
+        }
+        for channel_match in &mut ingest.channel_matches {
+            let company = self
+                .company_persistence
+                .get_by_id(channel_match.company.id)
+                .await?
+                .ok_or_else(|| {
+                    crate::app_error::AppError::Internal(
+                        "Task target company no longer exists".into(),
+                    )
+                })?;
+            let channel = self
+                .channel_persistence
+                .get_by_id(channel_match.channel.id)
+                .await?
+                .ok_or_else(|| {
+                    crate::app_error::AppError::Internal(
+                        "Task target channel no longer exists".into(),
+                    )
+                })?;
+            if channel.company_id != company.id {
+                return Err(crate::app_error::AppError::Internal(
+                    "Task target channel does not belong to its company".into(),
+                ));
+            }
+            let thread = self
+                .thread_persistence
+                .get_thread_by_id(channel_match.thread.id)
+                .await?
+                .ok_or_else(|| {
+                    crate::app_error::AppError::Internal(
+                        "Task target thread no longer exists".into(),
+                    )
+                })?;
+            if thread.channel_id != channel.id {
+                return Err(crate::app_error::AppError::Internal(
+                    "Task target thread does not belong to its channel".into(),
+                ));
+            }
+            channel_match.company = company;
+            channel_match.channel = channel;
+            channel_match.thread = thread;
+        }
+        Ok(())
+    }
+
     pub async fn list_company_tasks(
         &self,
         company_id: Uuid,
@@ -1465,6 +1665,62 @@ pub struct ChannelMatch {
     pub step_index: usize,
     #[serde(default)]
     pub total_steps: usize,
+}
+
+fn durable_ingest_payload(ingest: &InboundIngestResult) -> serde_json::Value {
+    let mut durable = ingest.clone();
+    if let Some(company) = durable.company.as_mut() {
+        company.api_key = None;
+    }
+    if let Some(channel) = durable.channel.as_mut() {
+        channel.api_key = None;
+        scrub_json_secrets(channel.channel_config.as_mut());
+    }
+    for channel_match in &mut durable.channel_matches {
+        channel_match.company.api_key = None;
+        channel_match.channel.api_key = None;
+        scrub_json_secrets(channel_match.channel.channel_config.as_mut());
+    }
+    serde_json::to_value(durable).unwrap_or_default()
+}
+
+fn scrub_json_secrets(value: Option<&mut serde_json::Value>) {
+    let Some(value) = value else {
+        return;
+    };
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                let normalized = key.to_ascii_lowercase();
+                if matches!(
+                    normalized.as_str(),
+                    "api_key"
+                        | "apikey"
+                        | "access_token"
+                        | "token"
+                        | "secret"
+                        | "secret_key"
+                        | "private_key"
+                        | "app_key"
+                        | "app_secret"
+                        | "auth"
+                        | "authorization"
+                        | "password"
+                        | "bearer"
+                ) {
+                    *value = serde_json::Value::Null;
+                } else {
+                    scrub_json_secrets(Some(value));
+                }
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for value in values {
+                scrub_json_secrets(Some(value));
+            }
+        }
+        _ => {}
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1815,6 +2071,7 @@ mod tests {
 
         async fn find_thread_by_message_ids(
             &self,
+            channel_id: Uuid,
             message_ids: &[String],
         ) -> AppResult<Option<Thread>> {
             let thread_id = {
@@ -1824,13 +2081,17 @@ mod tests {
                     .map(|m| m.thread_id)
             };
             if let Some(tid) = thread_id {
-                return self.get_thread_by_id(tid).await;
+                return Ok(self
+                    .get_thread_by_id(tid)
+                    .await?
+                    .filter(|thread| thread.channel_id == channel_id));
             }
             Ok(None)
         }
 
         async fn find_thread_by_thread_index(
             &self,
+            channel_id: Uuid,
             thread_index_prefix: &str,
         ) -> AppResult<Option<Thread>> {
             let thread_id = {
@@ -1845,7 +2106,10 @@ mod tests {
                     .map(|m| m.thread_id)
             };
             if let Some(tid) = thread_id {
-                return self.get_thread_by_id(tid).await;
+                return Ok(self
+                    .get_thread_by_id(tid)
+                    .await?
+                    .filter(|thread| thread.channel_id == channel_id));
             }
             Ok(None)
         }
@@ -1864,13 +2128,35 @@ mod tests {
             Ok(message.clone())
         }
 
-        async fn get_message_by_message_id(&self, message_id: &str) -> AppResult<Option<Message>> {
+        async fn get_message_by_message_id(
+            &self,
+            _company_id: Uuid,
+            message_id: &str,
+        ) -> AppResult<Option<Message>> {
             Ok(self
                 .messages
                 .lock()
                 .unwrap()
                 .iter()
                 .find(|m| m.message_id == message_id)
+                .cloned())
+        }
+
+        async fn find_outbound_reply(
+            &self,
+            thread_id: Uuid,
+            in_reply_to: &str,
+        ) -> AppResult<Option<Message>> {
+            Ok(self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|message| {
+                    message.thread_id == thread_id
+                        && message.direction == MessageDirection::Outbound
+                        && message.in_reply_to.as_deref() == Some(in_reply_to)
+                })
                 .cloned())
         }
 
@@ -1911,6 +2197,9 @@ mod tests {
                 retry_count: 0,
                 max_retries: 3,
                 last_error: None,
+                worker_id: None,
+                locked_at: None,
+                lock_expires_at: None,
                 run_at: Utc::now().naive_utc(),
                 created_at: Utc::now().naive_utc(),
                 updated_at: Utc::now().naive_utc(),
@@ -1940,71 +2229,152 @@ mod tests {
             Ok(())
         }
 
-        async fn poll_next_pending_tasks(
+        async fn claim_pending_tasks(
             &self,
-            _limit: i64,
+            worker_id: Uuid,
+            lock_expires_at: chrono::NaiveDateTime,
+            limit: i64,
         ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            Ok(self
-                .tasks
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|t| t.status == crate::entities::task::TaskStatus::Pending)
-                .cloned()
-                .collect())
+            let now = Utc::now().naive_utc();
+            let mut tasks = self.tasks.lock().unwrap();
+            let mut claimed = Vec::new();
+            for task in tasks
+                .iter_mut()
+                .filter(|task| {
+                    (task.status == crate::entities::task::TaskStatus::Pending
+                        && task.run_at <= now)
+                        || (task.status == crate::entities::task::TaskStatus::Processing
+                            && task.lock_expires_at.is_none_or(|expires| expires <= now))
+                })
+                .take(limit as usize)
+            {
+                task.status = crate::entities::task::TaskStatus::Processing;
+                task.worker_id = Some(worker_id);
+                task.locked_at = Some(now);
+                task.lock_expires_at = Some(lock_expires_at);
+                claimed.push(task.clone());
+            }
+            Ok(claimed)
         }
 
-        async fn mark_task_processing(&self, id: Uuid) -> AppResult<bool> {
+        async fn claim_task(
+            &self,
+            id: Uuid,
+            worker_id: Uuid,
+            lock_expires_at: chrono::NaiveDateTime,
+        ) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list
-                .iter_mut()
-                .find(|t| t.id == id && t.status == crate::entities::task::TaskStatus::Pending)
-            {
+            let now = Utc::now().naive_utc();
+            if let Some(t) = list.iter_mut().find(|t| {
+                t.id == id
+                    && t.status == crate::entities::task::TaskStatus::Pending
+                    && t.run_at <= now
+            }) {
                 t.status = crate::entities::task::TaskStatus::Processing;
+                t.worker_id = Some(worker_id);
+                t.locked_at = Some(now);
+                t.lock_expires_at = Some(lock_expires_at);
                 Ok(true)
             } else {
                 Ok(false)
             }
         }
 
-        async fn mark_task_completed(&self, id: Uuid) -> AppResult<()> {
+        async fn mark_task_completed(&self, id: Uuid, worker_id: Uuid) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+            let now = Utc::now().naive_utc();
+            if let Some(t) = list.iter_mut().find(|t| {
+                t.id == id
+                    && t.status == crate::entities::task::TaskStatus::Processing
+                    && t.worker_id == Some(worker_id)
+                    && t.lock_expires_at.is_some_and(|expires| expires > now)
+            }) {
                 t.status = crate::entities::task::TaskStatus::Completed;
+                t.worker_id = None;
+                t.locked_at = None;
+                t.lock_expires_at = None;
+                Ok(true)
+            } else {
+                Ok(false)
             }
-            Ok(())
         }
 
         async fn mark_task_failed(
             &self,
             id: Uuid,
+            worker_id: Uuid,
             error_msg: &str,
-            _next_run_at: chrono::NaiveDateTime,
+            next_run_at: chrono::NaiveDateTime,
             is_dead_letter: bool,
-        ) -> AppResult<()> {
+        ) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+            let now = Utc::now().naive_utc();
+            if let Some(t) = list.iter_mut().find(|t| {
+                t.id == id
+                    && t.status == crate::entities::task::TaskStatus::Processing
+                    && t.worker_id == Some(worker_id)
+                    && t.lock_expires_at.is_some_and(|expires| expires > now)
+            }) {
                 t.last_error = Some(error_msg.to_string());
+                t.retry_count += 1;
+                t.run_at = next_run_at;
                 t.status = if is_dead_letter {
                     crate::entities::task::TaskStatus::DeadLetter
                 } else {
-                    crate::entities::task::TaskStatus::Failed
+                    crate::entities::task::TaskStatus::Pending
                 };
+                t.worker_id = None;
+                t.locked_at = None;
+                t.lock_expires_at = None;
+                Ok(true)
+            } else {
+                Ok(false)
             }
-            Ok(())
         }
 
         async fn stop_task(&self, id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
-            let t = list.iter_mut().find(|t| t.id == id).unwrap();
+            let t = list
+                .iter_mut()
+                .find(|t| {
+                    t.id == id
+                        && matches!(
+                            t.status,
+                            crate::entities::task::TaskStatus::Pending
+                                | crate::entities::task::TaskStatus::Processing
+                                | crate::entities::task::TaskStatus::PendingApproval
+                                | crate::entities::task::TaskStatus::WaitingForThirdPartyReply
+                                | crate::entities::task::TaskStatus::Failed
+                        )
+                })
+                .unwrap();
             t.status = crate::entities::task::TaskStatus::Stopped;
+            t.worker_id = None;
+            t.locked_at = None;
+            t.lock_expires_at = None;
             Ok(t.clone())
         }
 
         async fn resume_task(&self, id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
-            let t = list.iter_mut().find(|t| t.id == id).unwrap();
+            let t = list
+                .iter_mut()
+                .find(|t| {
+                    t.id == id
+                        && matches!(
+                            t.status,
+                            crate::entities::task::TaskStatus::Stopped
+                                | crate::entities::task::TaskStatus::PendingApproval
+                                | crate::entities::task::TaskStatus::WaitingForThirdPartyReply
+                                | crate::entities::task::TaskStatus::Failed
+                        )
+                })
+                .unwrap();
             t.status = crate::entities::task::TaskStatus::Pending;
+            t.run_at = Utc::now().naive_utc();
+            t.worker_id = None;
+            t.locked_at = None;
+            t.lock_expires_at = None;
             Ok(t.clone())
         }
 
@@ -2014,9 +2384,61 @@ mod tests {
             status: crate::entities::task::TaskStatus,
         ) -> AppResult<crate::entities::task::BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
-            let t = list.iter_mut().find(|t| t.id == id).unwrap();
+            let t = list
+                .iter_mut()
+                .find(|t| {
+                    t.id == id
+                        && match status {
+                            crate::entities::task::TaskStatus::PendingApproval => matches!(
+                                t.status,
+                                crate::entities::task::TaskStatus::Processing
+                                    | crate::entities::task::TaskStatus::WaitingForThirdPartyReply
+                            ),
+                            crate::entities::task::TaskStatus::WaitingForThirdPartyReply => {
+                                matches!(
+                                    t.status,
+                                    crate::entities::task::TaskStatus::Processing
+                                        | crate::entities::task::TaskStatus::PendingApproval
+                                )
+                            }
+                            _ => false,
+                        }
+                })
+                .unwrap();
             t.status = status;
+            t.worker_id = None;
+            t.locked_at = None;
+            t.lock_expires_at = None;
             Ok(t.clone())
+        }
+
+        async fn list_due_waiting_tasks(
+            &self,
+            due_at: chrono::NaiveDateTime,
+            limit: i64,
+        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|task| {
+                    task.status == crate::entities::task::TaskStatus::WaitingForThirdPartyReply
+                        && task
+                            .payload
+                            .pointer("/quorum_outreach/status")
+                            .and_then(|value| value.as_str())
+                            == Some("awaiting_quorum")
+                        && task
+                            .payload
+                            .pointer("/quorum_outreach/expires_at")
+                            .and_then(|value| value.as_str())
+                            .and_then(|value| value.parse::<chrono::NaiveDateTime>().ok())
+                            .is_some_and(|expires| expires <= due_at)
+                })
+                .take(limit as usize)
+                .cloned()
+                .collect())
         }
 
         async fn list_company_tasks(

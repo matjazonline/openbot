@@ -129,20 +129,7 @@ async fn sendgrid_inbound_webhook(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    if ingest.accepted {
-        let thread_use_cases_bg = thread_use_cases.clone();
-        let ingest_bg = ingest.clone();
-
-        // Offload Agent Execution and Outbound SMTP Dispatch to background task
-        tokio::spawn(async move {
-            if let Err(err) = thread_use_cases_bg
-                .execute_agent_and_dispatch(&ingest_bg, true)
-                .await
-            {
-                warn!("Background agent execution failed: {err}");
-            }
-        });
-    } else {
+    if !ingest.accepted {
         let thread_use_cases_bg = thread_use_cases.clone();
         let ingest_bg = ingest.clone();
         tokio::spawn(async move {
@@ -434,6 +421,7 @@ mod tests {
 
         async fn find_thread_by_message_ids(
             &self,
+            _channel_id: Uuid,
             message_ids: &[String],
         ) -> AppResult<Option<Thread>> {
             let thread_id = {
@@ -450,6 +438,7 @@ mod tests {
 
         async fn find_thread_by_thread_index(
             &self,
+            _channel_id: Uuid,
             thread_index_prefix: &str,
         ) -> AppResult<Option<Thread>> {
             let thread_id = {
@@ -483,13 +472,35 @@ mod tests {
             Ok(message.clone())
         }
 
-        async fn get_message_by_message_id(&self, message_id: &str) -> AppResult<Option<Message>> {
+        async fn get_message_by_message_id(
+            &self,
+            _company_id: Uuid,
+            message_id: &str,
+        ) -> AppResult<Option<Message>> {
             Ok(self
                 .messages
                 .lock()
                 .unwrap()
                 .iter()
                 .find(|m| m.message_id == message_id)
+                .cloned())
+        }
+
+        async fn find_outbound_reply(
+            &self,
+            thread_id: Uuid,
+            in_reply_to: &str,
+        ) -> AppResult<Option<Message>> {
+            Ok(self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|message| {
+                    message.thread_id == thread_id
+                        && message.direction == crate::entities::message::MessageDirection::Outbound
+                        && message.in_reply_to.as_deref() == Some(in_reply_to)
+                })
                 .cloned())
         }
 
@@ -530,6 +541,9 @@ mod tests {
                 retry_count: 0,
                 max_retries: 3,
                 last_error: None,
+                worker_id: None,
+                locked_at: None,
+                lock_expires_at: None,
                 run_at: Utc::now().naive_utc(),
                 created_at: Utc::now().naive_utc(),
                 updated_at: Utc::now().naive_utc(),
@@ -559,58 +573,107 @@ mod tests {
             Ok(())
         }
 
-        async fn poll_next_pending_tasks(
+        async fn claim_pending_tasks(
             &self,
-            _limit: i64,
+            worker_id: Uuid,
+            lock_expires_at: chrono::NaiveDateTime,
+            limit: i64,
         ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            Ok(self
-                .tasks
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|t| t.status == crate::entities::task::TaskStatus::Pending)
-                .cloned()
-                .collect())
+            let now = Utc::now().naive_utc();
+            let mut tasks = self.tasks.lock().unwrap();
+            let mut claimed = Vec::new();
+            for task in tasks
+                .iter_mut()
+                .filter(|task| {
+                    (task.status == crate::entities::task::TaskStatus::Pending
+                        && task.run_at <= now)
+                        || (task.status == crate::entities::task::TaskStatus::Processing
+                            && task.lock_expires_at.is_none_or(|expires| expires <= now))
+                })
+                .take(limit as usize)
+            {
+                task.status = crate::entities::task::TaskStatus::Processing;
+                task.worker_id = Some(worker_id);
+                task.locked_at = Some(now);
+                task.lock_expires_at = Some(lock_expires_at);
+                claimed.push(task.clone());
+            }
+            Ok(claimed)
         }
 
-        async fn mark_task_processing(&self, id: Uuid) -> AppResult<bool> {
+        async fn claim_task(
+            &self,
+            id: Uuid,
+            worker_id: Uuid,
+            lock_expires_at: chrono::NaiveDateTime,
+        ) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list
-                .iter_mut()
-                .find(|t| t.id == id && t.status == crate::entities::task::TaskStatus::Pending)
-            {
+            let now = Utc::now().naive_utc();
+            if let Some(t) = list.iter_mut().find(|t| {
+                t.id == id
+                    && t.status == crate::entities::task::TaskStatus::Pending
+                    && t.run_at <= now
+            }) {
                 t.status = crate::entities::task::TaskStatus::Processing;
+                t.worker_id = Some(worker_id);
+                t.locked_at = Some(now);
+                t.lock_expires_at = Some(lock_expires_at);
                 Ok(true)
             } else {
                 Ok(false)
             }
         }
 
-        async fn mark_task_completed(&self, id: Uuid) -> AppResult<()> {
+        async fn mark_task_completed(&self, id: Uuid, worker_id: Uuid) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+            let now = Utc::now().naive_utc();
+            if let Some(t) = list.iter_mut().find(|t| {
+                t.id == id
+                    && t.status == crate::entities::task::TaskStatus::Processing
+                    && t.worker_id == Some(worker_id)
+                    && t.lock_expires_at.is_some_and(|expires| expires > now)
+            }) {
                 t.status = crate::entities::task::TaskStatus::Completed;
+                t.worker_id = None;
+                t.locked_at = None;
+                t.lock_expires_at = None;
+                Ok(true)
+            } else {
+                Ok(false)
             }
-            Ok(())
         }
 
         async fn mark_task_failed(
             &self,
             id: Uuid,
+            worker_id: Uuid,
             error_msg: &str,
-            _next_run_at: chrono::NaiveDateTime,
+            next_run_at: chrono::NaiveDateTime,
             is_dead_letter: bool,
-        ) -> AppResult<()> {
+        ) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+            let now = Utc::now().naive_utc();
+            if let Some(t) = list.iter_mut().find(|t| {
+                t.id == id
+                    && t.status == crate::entities::task::TaskStatus::Processing
+                    && t.worker_id == Some(worker_id)
+                    && t.lock_expires_at.is_some_and(|expires| expires > now)
+            }) {
                 t.last_error = Some(error_msg.to_string());
+                t.retry_count += 1;
+                t.run_at = next_run_at;
                 t.status = if is_dead_letter {
                     crate::entities::task::TaskStatus::DeadLetter
                 } else {
-                    crate::entities::task::TaskStatus::Failed
+                    crate::entities::task::TaskStatus::Pending
                 };
+                t.worker_id = None;
+                t.locked_at = None;
+                t.lock_expires_at = None;
+                Ok(true)
+            } else {
+                Ok(false)
             }
-            Ok(())
         }
 
         async fn stop_task(&self, id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
@@ -636,6 +699,14 @@ mod tests {
             let t = list.iter_mut().find(|t| t.id == id).unwrap();
             t.status = status;
             Ok(t.clone())
+        }
+
+        async fn list_due_waiting_tasks(
+            &self,
+            _due_at: chrono::NaiveDateTime,
+            _limit: i64,
+        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            Ok(vec![])
         }
 
         async fn list_company_tasks(
@@ -713,11 +784,12 @@ mod tests {
         ) -> AppResult<crate::entities::company_invite::CompanyInvite> {
             unimplemented!()
         }
-        async fn update_invite_status(
+        async fn accept_pending_invite(
             &self,
-            _id: Uuid,
-            _status: &str,
-        ) -> AppResult<crate::entities::company_invite::CompanyInvite> {
+            _invite_id: Uuid,
+            _user_id: Uuid,
+            _user_email: &str,
+        ) -> AppResult<Option<crate::entities::company_invite::CompanyInvite>> {
             unimplemented!()
         }
         async fn delete_invite(&self, _id: Uuid) -> AppResult<()> {
@@ -729,12 +801,11 @@ mod tests {
         ) -> AppResult<Vec<crate::entities::company_invite::CompanyInvite>> {
             unimplemented!()
         }
-        async fn add_member(
+        async fn decline_pending_invite(
             &self,
-            _company_id: Uuid,
-            _user_id: Uuid,
-            _role: &str,
-        ) -> AppResult<crate::entities::company_member::CompanyMember> {
+            _invite_id: Uuid,
+            _user_email: &str,
+        ) -> AppResult<Option<crate::entities::company_invite::CompanyInvite>> {
             unimplemented!()
         }
         async fn list_members_by_company(
@@ -763,13 +834,16 @@ mod tests {
             _action_title: &str,
             _action_summary: &str,
             _payload: serde_json::Value,
+            _notification: serde_json::Value,
             _token: &str,
             _expires_at: chrono::NaiveDateTime,
-        ) -> AppResult<crate::entities::approval::HumanApproval> {
+        ) -> AppResult<(crate::entities::approval::HumanApproval, bool)> {
             unimplemented!()
         }
         async fn find_approval_by_step_key(
             &self,
+            _company_id: Uuid,
+            _channel_id: Uuid,
             _thread_id: Option<Uuid>,
             _step_key: &str,
         ) -> AppResult<Option<crate::entities::approval::HumanApproval>> {
@@ -781,11 +855,19 @@ mod tests {
         ) -> AppResult<Option<crate::entities::approval::HumanApproval>> {
             Ok(None)
         }
-        async fn update_approval_status(
+        async fn consume_pending_approval(
             &self,
-            _id: Uuid,
+            _token: &str,
             _status: crate::entities::approval::ApprovalStatus,
-        ) -> AppResult<crate::entities::approval::HumanApproval> {
+            _now: chrono::NaiveDateTime,
+        ) -> AppResult<Option<crate::entities::approval::HumanApproval>> {
+            unimplemented!()
+        }
+        async fn expire_pending_approval(
+            &self,
+            _token: &str,
+            _now: chrono::NaiveDateTime,
+        ) -> AppResult<Option<crate::entities::approval::HumanApproval>> {
             unimplemented!()
         }
         async fn list_approvals_by_channel(
@@ -944,16 +1026,13 @@ mod tests {
         assert!(body_str.contains("\"processed\":true"));
         assert!(body_str.contains("\"inbound_message_id\":\"<MSG123@external.com>\""));
 
-        // Allow async background task to run
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-        // Verify message and thread persistence
+        // Ingestion persists the inbound message; the durable worker sends the reply.
         let threads = thread_persistence.threads.lock().unwrap();
         assert_eq!(threads.len(), 1);
         assert_eq!(threads[0].subject, "Help Needed");
 
         let messages = thread_persistence.messages.lock().unwrap();
-        assert_eq!(messages.len(), 2); // 1 Inbound Human + 1 Outbound Agent
+        assert_eq!(messages.len(), 1);
 
         assert_eq!(
             messages[0].role,
@@ -962,15 +1041,6 @@ mod tests {
         assert_eq!(
             messages[0].direction,
             crate::entities::message::MessageDirection::Inbound
-        );
-
-        assert_eq!(
-            messages[1].role,
-            crate::entities::message::MessageRole::Agent
-        );
-        assert_eq!(
-            messages[1].direction,
-            crate::entities::message::MessageDirection::Outbound
         );
     }
 }

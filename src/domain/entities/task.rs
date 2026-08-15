@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
     Pending,
@@ -79,6 +79,9 @@ pub struct BackgroundTask {
     pub retry_count: i32,
     pub max_retries: i32,
     pub last_error: Option<String>,
+    pub worker_id: Option<Uuid>,
+    pub locked_at: Option<chrono::NaiveDateTime>,
+    pub lock_expires_at: Option<chrono::NaiveDateTime>,
     pub run_at: chrono::NaiveDateTime,
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,

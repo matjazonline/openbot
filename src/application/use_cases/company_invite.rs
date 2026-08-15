@@ -16,15 +16,19 @@ pub trait CompanyInvitePersistence: Send + Sync {
     async fn get_invite_by_id(&self, id: Uuid) -> AppResult<Option<CompanyInvite>>;
     async fn list_invites_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyInvite>>;
     async fn update_invite_email(&self, id: Uuid, new_email: &str) -> AppResult<CompanyInvite>;
-    async fn update_invite_status(&self, id: Uuid, status: &str) -> AppResult<CompanyInvite>;
     async fn delete_invite(&self, id: Uuid) -> AppResult<()>;
     async fn list_invites_by_email(&self, email: &str) -> AppResult<Vec<CompanyInvite>>;
-    async fn add_member(
+    async fn accept_pending_invite(
         &self,
-        company_id: Uuid,
+        invite_id: Uuid,
         user_id: Uuid,
-        role: &str,
-    ) -> AppResult<CompanyMember>;
+        user_email: &str,
+    ) -> AppResult<Option<CompanyInvite>>;
+    async fn decline_pending_invite(
+        &self,
+        invite_id: Uuid,
+        user_email: &str,
+    ) -> AppResult<Option<CompanyInvite>>;
     async fn list_members_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyMember>>;
     async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()>;
 }
@@ -185,51 +189,62 @@ impl CompanyInviteUseCases {
 
     #[instrument(skip(self, user))]
     pub async fn accept_invite(&self, user: &User, invite_id: Uuid) -> AppResult<CompanyInvite> {
+        info!("User {} accepting invite {}", user.id, invite_id);
+        if let Some(invite) = self
+            .invite_persistence
+            .accept_pending_invite(invite_id, user.id, &user.email)
+            .await?
+        {
+            return Ok(invite);
+        }
+
         let invite = self
             .invite_persistence
             .get_invite_by_id(invite_id)
             .await?
             .ok_or_else(|| AppError::Internal("Invite not found.".into()))?;
-
         if !invite.email.eq_ignore_ascii_case(&user.email) {
             return Err(AppError::Internal(
                 "Invite email does not match active user email.".into(),
             ));
         }
-
-        info!("User {} accepting invite {}", user.id, invite_id);
-        let updated_invite = self
-            .invite_persistence
-            .update_invite_status(invite_id, "accepted")
-            .await?;
-
-        // Add user to company team
-        let _ = self
-            .invite_persistence
-            .add_member(invite.company_id, user.id, "member")
-            .await?;
-
-        Ok(updated_invite)
+        if invite.status == "accepted" {
+            return Ok(invite);
+        }
+        Err(AppError::Internal(format!(
+            "Invite was already processed as '{}'.",
+            invite.status
+        )))
     }
 
     #[instrument(skip(self, user))]
     pub async fn decline_invite(&self, user: &User, invite_id: Uuid) -> AppResult<CompanyInvite> {
+        info!("User {} declining invite {}", user.id, invite_id);
+        if let Some(invite) = self
+            .invite_persistence
+            .decline_pending_invite(invite_id, &user.email)
+            .await?
+        {
+            return Ok(invite);
+        }
+
         let invite = self
             .invite_persistence
             .get_invite_by_id(invite_id)
             .await?
             .ok_or_else(|| AppError::Internal("Invite not found.".into()))?;
-
         if !invite.email.eq_ignore_ascii_case(&user.email) {
             return Err(AppError::Internal(
                 "Invite email does not match active user email.".into(),
             ));
         }
-
-        info!("User {} declining invite {}", user.id, invite_id);
-        self.invite_persistence
-            .update_invite_status(invite_id, "declined")
-            .await
+        if invite.status == "declined" {
+            return Ok(invite);
+        }
+        Err(AppError::Internal(format!(
+            "Invite was already processed as '{}'.",
+            invite.status
+        )))
     }
 
     #[instrument(skip(self))]
@@ -414,16 +429,6 @@ mod tests {
             Ok(invite.clone())
         }
 
-        async fn update_invite_status(&self, id: Uuid, status: &str) -> AppResult<CompanyInvite> {
-            let mut list = self.invites.lock().unwrap();
-            let invite = list
-                .iter_mut()
-                .find(|i| i.id == id)
-                .ok_or_else(|| AppError::Internal("Not found".into()))?;
-            invite.status = status.to_string();
-            Ok(invite.clone())
-        }
-
         async fn delete_invite(&self, id: Uuid) -> AppResult<()> {
             self.invites.lock().unwrap().retain(|i| i.id != id);
             Ok(())
@@ -440,23 +445,57 @@ mod tests {
                 .collect())
         }
 
-        async fn add_member(
+        async fn accept_pending_invite(
             &self,
-            company_id: Uuid,
+            invite_id: Uuid,
             user_id: Uuid,
-            role: &str,
-        ) -> AppResult<CompanyMember> {
-            let member = CompanyMember {
-                id: Uuid::new_v4(),
-                company_id,
-                user_id,
-                username: Some("inviteduser".to_string()),
-                email: Some("invited@example.com".to_string()),
-                role: role.to_string(),
-                created_at: Utc::now().naive_utc(),
+            user_email: &str,
+        ) -> AppResult<Option<CompanyInvite>> {
+            let mut invites = self.invites.lock().unwrap();
+            let Some(invite) = invites.iter_mut().find(|i| {
+                i.id == invite_id
+                    && i.status == "pending"
+                    && i.email.eq_ignore_ascii_case(user_email)
+            }) else {
+                return Ok(None);
             };
-            self.members.lock().unwrap().push(member.clone());
-            Ok(member)
+
+            let mut members = self.members.lock().unwrap();
+            if let Some(member) = members
+                .iter_mut()
+                .find(|m| m.company_id == invite.company_id && m.user_id == user_id)
+            {
+                member.role = "member".to_string();
+            } else {
+                members.push(CompanyMember {
+                    id: Uuid::new_v4(),
+                    company_id: invite.company_id,
+                    user_id,
+                    username: Some("inviteduser".to_string()),
+                    email: Some(user_email.to_string()),
+                    role: "member".to_string(),
+                    created_at: Utc::now().naive_utc(),
+                });
+            }
+            invite.status = "accepted".to_string();
+            Ok(Some(invite.clone()))
+        }
+
+        async fn decline_pending_invite(
+            &self,
+            invite_id: Uuid,
+            user_email: &str,
+        ) -> AppResult<Option<CompanyInvite>> {
+            let mut invites = self.invites.lock().unwrap();
+            let Some(invite) = invites.iter_mut().find(|i| {
+                i.id == invite_id
+                    && i.status == "pending"
+                    && i.email.eq_ignore_ascii_case(user_email)
+            }) else {
+                return Ok(None);
+            };
+            invite.status = "declined".to_string();
+            Ok(Some(invite.clone()))
         }
 
         async fn list_members_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyMember>> {
@@ -543,6 +582,15 @@ mod tests {
 
         let accepted = use_cases.accept_invite(&user, invite.id).await.unwrap();
         assert_eq!(accepted.status, "accepted");
+        assert_eq!(
+            use_cases
+                .accept_invite(&user, invite.id)
+                .await
+                .unwrap()
+                .status,
+            "accepted"
+        );
+        assert!(use_cases.decline_invite(&user, invite.id).await.is_err());
 
         // Verify member was added to team
         let members = use_cases

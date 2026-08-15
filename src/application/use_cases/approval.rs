@@ -10,7 +10,7 @@ use crate::{
         message::{Message, MessageDirection, MessageRole},
     },
     infra::config::AppConfig,
-    services::outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
+    services::outbound_dispatcher::OutboundEmail,
     use_cases::thread::ThreadPersistence,
 };
 
@@ -38,12 +38,14 @@ impl ApprovalUseCases {
 
     pub async fn check_step_approval(
         &self,
+        company_id: Uuid,
+        channel_id: Uuid,
         thread_id: Option<Uuid>,
         step_key: &str,
     ) -> AppResult<Option<ApprovalStatus>> {
         let approval = self
             .approval_persistence
-            .find_approval_by_step_key(thread_id, step_key)
+            .find_approval_by_step_key(company_id, channel_id, thread_id, step_key)
             .await?;
 
         Ok(approval.map(|a| a.status))
@@ -67,8 +69,31 @@ impl ApprovalUseCases {
     ) -> AppResult<HumanApproval> {
         let token = Uuid::new_v4().to_string();
         let expires_at = Utc::now().naive_utc() + chrono::Duration::hours(24);
+        let domain = &self.config.app_domain_name;
+        let confirm_url = format!("http://{}/approvals/{}?action=confirm", domain, token);
+        let reject_url = format!("http://{}/approvals/{}?action=reject", domain, token);
+        let notification = serde_json::to_value(OutboundEmail {
+            channel_id,
+            channel_name: channel_name.to_string(),
+            channel_slug: channel_slug.to_string(),
+            company_slug: company_slug.to_string(),
+            trigger_message_id: format!("<approval-{}@{}>", token, domain),
+            thread_references: vec![],
+            recipient_to: approver_email.to_string(),
+            recipients_cc: vec![],
+            subject: format!("[APPROVAL REQUIRED] {}", action_title),
+            body_text: format!(
+                "Action Approval Requested for Channel '{}'\n\nAction: {}\nSummary: {}\n\nClick to CONFIRM:\n{}\n\nClick to REJECT:\n{}\n\nThis link is valid for 24 hours.",
+                channel_name, action_title, action_summary, confirm_url, reject_url
+            ),
+            hop_count: 0,
+            trace_channels: vec![channel_id],
+        })
+        .map_err(|error| {
+            AppError::Internal(format!("Failed to serialize approval notification: {error}"))
+        })?;
 
-        let approval = self
+        let (approval, created) = self
             .approval_persistence
             .create_approval(
                 company_id,
@@ -81,54 +106,14 @@ impl ApprovalUseCases {
                 action_title,
                 action_summary,
                 payload,
+                notification,
                 &token,
                 expires_at,
             )
             .await?;
 
-        // Construct links
-        let domain = &self.config.app_domain_name;
-        let confirm_url = format!("http://{}/approvals/{}?action=confirm", domain, token);
-        let reject_url = format!("http://{}/approvals/{}?action=reject", domain, token);
-
-        let body_text = format!(
-            "Action Approval Requested for Channel '{}'\n\n\
-             Action: {}\n\
-             Summary: {}\n\n\
-             Click to CONFIRM:\n{}\n\n\
-             Click to REJECT:\n{}\n\n\
-             This link is valid for 24 hours.",
-            channel_name, action_title, action_summary, confirm_url, reject_url
-        );
-
-        let email = OutboundEmail {
-            channel_id,
-            channel_name: channel_name.to_string(),
-            channel_slug: channel_slug.to_string(),
-            company_slug: company_slug.to_string(),
-            trigger_message_id: format!("<approval-{}@{}>", approval.id, domain),
-            thread_references: vec![],
-            recipient_to: approver_email.to_string(),
-            recipients_cc: vec![],
-            subject: format!("[APPROVAL REQUIRED] {}", action_title),
-            body_text,
-            hop_count: 0,
-            trace_channels: vec![channel_id],
-        };
-
-        let _ = OutboundDispatcher::send(&self.config, email).await;
-
-        // If task_id is present, mark task status as PendingApproval so poller ignores it until link click
-        if let Some(tid) = task_id {
-            let _ = self
-                .task_persistence
-                .mark_task_failed(
-                    tid,
-                    "Task paused waiting for HumanInTheMiddle approval",
-                    Utc::now().naive_utc(),
-                    false,
-                )
-                .await;
+        if !created {
+            return Ok(approval);
         }
 
         Ok(approval)
@@ -153,15 +138,29 @@ impl ApprovalUseCases {
             return Ok((approval, msg));
         }
 
-        if approval.expires_at < Utc::now().naive_utc() {
-            let expired = self
+        let now = Utc::now().naive_utc();
+        if approval.expires_at < now {
+            if let Some(expired) = self
                 .approval_persistence
-                .update_approval_status(approval.id, ApprovalStatus::Expired)
-                .await?;
-            return Ok((
-                expired,
-                "This confirmation link has expired (24-hour TTL).".into(),
-            ));
+                .expire_pending_approval(token, now)
+                .await?
+            {
+                return Ok((
+                    expired,
+                    "This confirmation link has expired (24-hour TTL).".into(),
+                ));
+            }
+
+            let current = self
+                .approval_persistence
+                .get_approval_by_token(token)
+                .await?
+                .ok_or_else(|| AppError::Internal("Approval request token not found.".into()))?;
+            let msg = format!(
+                "This request was already processed as '{}'.",
+                current.status.as_str()
+            );
+            return Ok((current, msg));
         }
 
         let normalized_action = action.to_lowercase();
@@ -174,10 +173,34 @@ impl ApprovalUseCases {
             }
         };
 
-        let updated = self
+        let now = Utc::now().naive_utc();
+        let Some(updated) = self
             .approval_persistence
-            .update_approval_status(approval.id, new_status.clone())
-            .await?;
+            .consume_pending_approval(token, new_status.clone(), now)
+            .await?
+        else {
+            if let Some(expired) = self
+                .approval_persistence
+                .expire_pending_approval(token, now)
+                .await?
+            {
+                return Ok((
+                    expired,
+                    "This confirmation link has expired (24-hour TTL).".into(),
+                ));
+            }
+
+            let current = self
+                .approval_persistence
+                .get_approval_by_token(token)
+                .await?
+                .ok_or_else(|| AppError::Internal("Approval request token not found.".into()))?;
+            let msg = format!(
+                "This request was already processed as '{}'.",
+                current.status.as_str()
+            );
+            return Ok((current, msg));
+        };
 
         let message_text = match normalized_action.as_str() {
             "proceed_partial" => {
@@ -395,6 +418,10 @@ impl ApprovalUseCases {
         Ok((updated, message_text))
     }
 
+    pub async fn get_approval_by_token(&self, token: &str) -> AppResult<Option<HumanApproval>> {
+        self.approval_persistence.get_approval_by_token(token).await
+    }
+
     pub async fn list_channel_approvals(
         &self,
         company_id: Uuid,
@@ -430,9 +457,18 @@ mod tests {
             action_title: &str,
             action_summary: &str,
             payload: serde_json::Value,
+            _notification: serde_json::Value,
             token: &str,
             expires_at: chrono::NaiveDateTime,
-        ) -> AppResult<HumanApproval> {
+        ) -> AppResult<(HumanApproval, bool)> {
+            let mut approvals = self.approvals.lock().unwrap();
+            if let Some(existing) = approvals
+                .iter()
+                .find(|a| a.thread_id == thread_id && a.step_key == step_key)
+            {
+                return Ok((existing.clone(), false));
+            }
+
             let approval = HumanApproval {
                 id: Uuid::new_v4(),
                 company_id,
@@ -451,12 +487,14 @@ mod tests {
                 created_at: Utc::now().naive_utc(),
                 updated_at: Utc::now().naive_utc(),
             };
-            self.approvals.lock().unwrap().push(approval.clone());
-            Ok(approval)
+            approvals.push(approval.clone());
+            Ok((approval, true))
         }
 
         async fn find_approval_by_step_key(
             &self,
+            company_id: Uuid,
+            channel_id: Uuid,
             thread_id: Option<Uuid>,
             step_key: &str,
         ) -> AppResult<Option<HumanApproval>> {
@@ -465,7 +503,12 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|a| a.thread_id == thread_id && a.step_key == step_key)
+                .find(|a| {
+                    a.company_id == company_id
+                        && a.channel_id == channel_id
+                        && a.thread_id == thread_id
+                        && a.step_key == step_key
+                })
                 .cloned())
         }
 
@@ -479,16 +522,37 @@ mod tests {
                 .cloned())
         }
 
-        async fn update_approval_status(
+        async fn consume_pending_approval(
             &self,
-            id: Uuid,
+            token: &str,
             status: ApprovalStatus,
-        ) -> AppResult<HumanApproval> {
+            now: chrono::NaiveDateTime,
+        ) -> AppResult<Option<HumanApproval>> {
             let mut list = self.approvals.lock().unwrap();
-            let approval = list.iter_mut().find(|a| a.id == id).unwrap();
+            let Some(approval) = list.iter_mut().find(|a| {
+                a.token == token && a.status == ApprovalStatus::Pending && a.expires_at >= now
+            }) else {
+                return Ok(None);
+            };
             approval.status = status;
             approval.updated_at = Utc::now().naive_utc();
-            Ok(approval.clone())
+            Ok(Some(approval.clone()))
+        }
+
+        async fn expire_pending_approval(
+            &self,
+            token: &str,
+            now: chrono::NaiveDateTime,
+        ) -> AppResult<Option<HumanApproval>> {
+            let mut list = self.approvals.lock().unwrap();
+            let Some(approval) = list.iter_mut().find(|a| {
+                a.token == token && a.status == ApprovalStatus::Pending && a.expires_at < now
+            }) else {
+                return Ok(None);
+            };
+            approval.status = ApprovalStatus::Expired;
+            approval.updated_at = Utc::now().naive_utc();
+            Ok(Some(approval.clone()))
         }
 
         async fn list_approvals_by_channel(
@@ -533,26 +597,34 @@ mod tests {
         ) -> AppResult<()> {
             Ok(())
         }
-        async fn poll_next_pending_tasks(
+        async fn claim_pending_tasks(
             &self,
+            _worker_id: Uuid,
+            _lock_expires_at: chrono::NaiveDateTime,
             _limit: i64,
         ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
             unimplemented!()
         }
-        async fn mark_task_processing(&self, _id: Uuid) -> AppResult<bool> {
+        async fn claim_task(
+            &self,
+            _id: Uuid,
+            _worker_id: Uuid,
+            _lock_expires_at: chrono::NaiveDateTime,
+        ) -> AppResult<bool> {
             Ok(true)
         }
-        async fn mark_task_completed(&self, _id: Uuid) -> AppResult<()> {
+        async fn mark_task_completed(&self, _id: Uuid, _worker_id: Uuid) -> AppResult<bool> {
             unimplemented!()
         }
         async fn mark_task_failed(
             &self,
             _id: Uuid,
+            _worker_id: Uuid,
             _error_msg: &str,
             _next_run_at: chrono::NaiveDateTime,
             _is_dead_letter: bool,
-        ) -> AppResult<()> {
-            Ok(())
+        ) -> AppResult<bool> {
+            Ok(true)
         }
         async fn stop_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
             unimplemented!()
@@ -566,6 +638,13 @@ mod tests {
             _status: crate::entities::task::TaskStatus,
         ) -> AppResult<crate::entities::task::BackgroundTask> {
             unimplemented!()
+        }
+        async fn list_due_waiting_tasks(
+            &self,
+            _due_at: chrono::NaiveDateTime,
+            _limit: i64,
+        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            Ok(vec![])
         }
         async fn list_company_tasks(
             &self,
@@ -604,12 +683,14 @@ mod tests {
         }
         async fn find_thread_by_message_ids(
             &self,
+            _channel_id: Uuid,
             _message_ids: &[String],
         ) -> AppResult<Option<crate::entities::thread::Thread>> {
             unimplemented!()
         }
         async fn find_thread_by_thread_index(
             &self,
+            _channel_id: Uuid,
             _thread_index_prefix: &str,
         ) -> AppResult<Option<crate::entities::thread::Thread>> {
             unimplemented!()
@@ -624,8 +705,19 @@ mod tests {
         async fn create_message(&self, message: &Message) -> AppResult<Message> {
             Ok(message.clone())
         }
-        async fn get_message_by_message_id(&self, _message_id: &str) -> AppResult<Option<Message>> {
+        async fn get_message_by_message_id(
+            &self,
+            _company_id: Uuid,
+            _message_id: &str,
+        ) -> AppResult<Option<Message>> {
             unimplemented!()
+        }
+        async fn find_outbound_reply(
+            &self,
+            _thread_id: Uuid,
+            _in_reply_to: &str,
+        ) -> AppResult<Option<Message>> {
+            Ok(None)
         }
         async fn list_messages_by_thread_id(&self, _thread_id: Uuid) -> AppResult<Vec<Message>> {
             unimplemented!()
@@ -697,29 +789,68 @@ mod tests {
 
         assert_eq!(approval.status, ApprovalStatus::Pending);
 
+        let duplicate = use_cases
+            .create_and_send_approval_request(
+                company_id,
+                channel_id,
+                "Support Channel",
+                "support",
+                "acme",
+                Some(thread_id),
+                None,
+                "step_key_hash_123",
+                "manager@acme.com",
+                "tool",
+                "Tool Execution: command",
+                "Execute deploy command",
+                serde_json::json!({}),
+            )
+            .await
+            .unwrap();
+        assert_eq!(duplicate.id, approval.id);
+        assert_eq!(approval_persistence.approvals.lock().unwrap().len(), 1);
+
         // Check step approval before link click -> Pending
         let check_res = use_cases
-            .check_step_approval(Some(thread_id), "step_key_hash_123")
+            .check_step_approval(company_id, channel_id, Some(thread_id), "step_key_hash_123")
             .await
             .unwrap();
         assert_eq!(check_res, Some(ApprovalStatus::Pending));
 
-        // 2. Process link confirmation
-        let (updated, msg) = use_cases
-            .process_link_action(&approval.token, "confirm")
-            .await
-            .unwrap();
-        assert_eq!(updated.status, ApprovalStatus::Approved);
-        assert!(msg.contains("CONFIRMED successfully"));
+        // 2. Concurrent clicks consume the token once.
+        let (first, second) = tokio::join!(
+            use_cases.process_link_action(&approval.token, "confirm"),
+            use_cases.process_link_action(&approval.token, "confirm")
+        );
+        let results = [first.unwrap(), second.unwrap()];
+        assert_eq!(
+            results
+                .iter()
+                .filter(|(_, msg)| msg.contains("CONFIRMED successfully"))
+                .count(),
+            1
+        );
+        assert_eq!(
+            results
+                .iter()
+                .filter(|(_, msg)| msg.contains("already processed as 'approved'"))
+                .count(),
+            1
+        );
+        assert!(
+            results
+                .iter()
+                .all(|(approval, _)| approval.status == ApprovalStatus::Approved)
+        );
 
         // Check step approval after link click -> Approved
         let check_res2 = use_cases
-            .check_step_approval(Some(thread_id), "step_key_hash_123")
+            .check_step_approval(company_id, channel_id, Some(thread_id), "step_key_hash_123")
             .await
             .unwrap();
         assert_eq!(check_res2, Some(ApprovalStatus::Approved));
 
-        // 3. Second click (Idempotency) -> Returns already processed message
+        // 3. Later clicks remain idempotent.
         let (updated_again, msg_again) = use_cases
             .process_link_action(&approval.token, "confirm")
             .await

@@ -4,23 +4,30 @@ pub mod channel;
 pub mod company;
 pub mod company_invite;
 pub mod monitoring;
+pub mod onboarding;
 pub mod task;
 pub mod user;
 pub mod webhooks;
 
-use axum::Router;
+use axum::{Router, middleware};
 
-use crate::adapters::http::app_state::AppState;
+use crate::adapters::http::{app_state::AppState, auth};
 
 pub fn router() -> Router<AppState> {
-    Router::new()
-        .merge(user::router())
+    let protected = Router::new()
+        .merge(user::protected_router())
         .merge(company::router())
         .merge(company_invite::router())
         .merge(task::router())
         .merge(channel::router())
         .merge(agent::router())
-        .merge(webhooks::router())
         .merge(approval::router())
         .merge(monitoring::router())
+        .merge(onboarding::router())
+        .route_layer(middleware::from_fn(auth::require_auth));
+
+    Router::new()
+        .merge(user::public_router())
+        .merge(webhooks::router())
+        .merge(protected)
 }

@@ -35,6 +35,39 @@ pub trait CompanyPersistence: Send + Sync {
         enable_llm_spam_guardrail: Option<bool>,
     ) -> AppResult<Company>;
     async fn delete(&self, id: Uuid) -> AppResult<()>;
+    async fn update_for_user(
+        &self,
+        user_id: Uuid,
+        id: Uuid,
+        name: &str,
+        slug: &str,
+        api_key: Option<&str>,
+        provider: Option<&str>,
+        model: Option<&str>,
+        enable_llm_spam_guardrail: Option<bool>,
+    ) -> AppResult<Company> {
+        match self.get_by_id(id).await? {
+            Some(company) if company.user_id == user_id => {
+                self.update(
+                    id,
+                    name,
+                    slug,
+                    api_key,
+                    provider,
+                    model,
+                    enable_llm_spam_guardrail,
+                )
+                .await
+            }
+            _ => Err(AppError::Internal("Company not found.".into())),
+        }
+    }
+    async fn delete_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
+        match self.get_by_id(id).await? {
+            Some(company) if company.user_id == user_id => self.delete(id).await,
+            _ => Err(AppError::Internal("Company not found.".into())),
+        }
+    }
     async fn is_company_team_member(&self, company_id: Uuid, email: &str) -> AppResult<bool>;
     async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>>;
 }
@@ -145,6 +178,42 @@ impl CompanyUseCases {
     pub async fn delete_company(&self, id: Uuid) -> AppResult<()> {
         info!("Deleting company {}", id);
         self.persistence.delete(id).await
+    }
+
+    pub async fn update_company_for_user(
+        &self,
+        user_id: Uuid,
+        id: Uuid,
+        name: &str,
+        slug: &str,
+        api_key: Option<&str>,
+        provider: Option<&str>,
+        model: Option<&str>,
+        enable_llm_spam_guardrail: Option<bool>,
+    ) -> AppResult<Company> {
+        let name = name.trim();
+        let slug = slug.trim().to_lowercase().replace(' ', "-");
+        if name.is_empty() || slug.is_empty() {
+            return Err(AppError::Internal(
+                "Company name and slug cannot be empty.".into(),
+            ));
+        }
+        self.persistence
+            .update_for_user(
+                user_id,
+                id,
+                name,
+                &slug,
+                api_key.map(str::trim).filter(|value| !value.is_empty()),
+                provider.map(str::trim).filter(|value| !value.is_empty()),
+                model.map(str::trim).filter(|value| !value.is_empty()),
+                enable_llm_spam_guardrail,
+            )
+            .await
+    }
+
+    pub async fn delete_company_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
+        self.persistence.delete_for_user(user_id, id).await
     }
 }
 

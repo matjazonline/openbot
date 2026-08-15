@@ -12,14 +12,13 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
 
 use crate::{
-    adapters::http::{app_state::AppState, pages},
+    adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::AppResult,
-    use_cases::user::UserUseCases,
+    use_cases::{company::CompanyUseCases, user::UserUseCases},
 };
 
-pub fn router() -> Router<AppState> {
+pub fn public_router() -> Router<AppState> {
     Router::new()
-        .route("/", get(index))
         .route("/login", get(login_page).post(login_form))
         .route("/register", get(register_page).post(register_form))
         .route("/api/user/register", post(register_form))
@@ -28,8 +27,29 @@ pub fn router() -> Router<AppState> {
         .route("/api/json/user/login", post(login_json))
 }
 
-async fn index() -> impl IntoResponse {
-    Redirect::temporary("/login")
+pub fn protected_router() -> Router<AppState> {
+    Router::new()
+        .route("/", get(index))
+        .route("/logout", post(logout))
+}
+
+async fn index(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+) -> impl IntoResponse {
+    let destination = match company_use_cases.list_user_companies(user.id).await {
+        Ok(companies) if companies.is_empty() => "/onboarding",
+        _ => "/companies",
+    };
+    Redirect::temporary(destination)
+}
+
+async fn logout(_user: AuthenticatedUser, jar: CookieJar) -> impl IntoResponse {
+    let cookie = axum_extra::extract::cookie::Cookie::build(("user_id", ""))
+        .path("/")
+        .build();
+
+    (jar.remove(cookie), Redirect::to("/login"))
 }
 
 async fn login_page() -> impl IntoResponse {
@@ -136,10 +156,10 @@ async fn login_form(
                     "Welcome back, {}! Authentication successful.",
                     user.username
                 ),
-                Some(("/companies", "Go to Companies")),
+                Some(("/", "Continue")),
             );
 
-            (updated_jar, Html(alert)).into_response()
+            (updated_jar, [("HX-Redirect", "/")], Html(alert)).into_response()
         }
         Err(_) => (
             jar,
@@ -210,6 +230,8 @@ mod tests {
         assert!(html.contains("htmx.org"));
         assert!(html.contains("hx-post=\"/api/user/login\""));
         assert!(html.contains("hx-target=\"#response-message\""));
+        assert!(!html.contains(">Companies</a>"));
+        assert!(!html.contains(">My Invites</a>"));
     }
 
     #[tokio::test]
@@ -218,6 +240,8 @@ mod tests {
         assert!(html.contains("htmx.org"));
         assert!(html.contains("hx-post=\"/api/user/register\""));
         assert!(html.contains("hx-target=\"#response-message\""));
+        assert!(!html.contains(">Companies</a>"));
+        assert!(!html.contains(">My Invites</a>"));
     }
 
     #[test]
@@ -228,5 +252,36 @@ mod tests {
 
         let error = pages::error_alert("Something went wrong");
         assert!(error.contains("Something went wrong"));
+    }
+
+    #[tokio::test]
+    async fn logout_clears_cookie_and_redirects_to_login() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(
+            axum::http::header::COOKIE,
+            format!("user_id={}", uuid::Uuid::nil()).parse().unwrap(),
+        );
+        let jar = CookieJar::from_headers(&headers);
+
+        let response = logout(
+            AuthenticatedUser {
+                id: uuid::Uuid::nil(),
+            },
+            jar,
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get("location").unwrap(), "/login");
+        let set_cookie = response
+            .headers()
+            .get("set-cookie")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(set_cookie.starts_with("user_id="));
+        assert!(set_cookie.contains("Max-Age=0"));
+        assert!(set_cookie.contains("Path=/"));
     }
 }

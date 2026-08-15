@@ -3,7 +3,7 @@ use tokio::time::{Duration, sleep};
 use tracing::{error, info, warn};
 
 use crate::{
-    adapters::persistence::task::TaskPersistence,
+    adapters::persistence::task::{TASK_LEASE_SECONDS, TaskPersistence},
     domain::monitoring::{MonitoringService, TaskExecutionMetrics, TaskStatusMetric},
     infra::config::AppConfig,
     services::outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
@@ -15,6 +15,7 @@ pub struct TaskWorker {
     thread_use_cases: Arc<ThreadUseCases>,
     config: Arc<AppConfig>,
     monitoring: Option<Arc<dyn MonitoringService>>,
+    worker_id: uuid::Uuid,
 }
 
 impl TaskWorker {
@@ -28,6 +29,7 @@ impl TaskWorker {
             thread_use_cases,
             config,
             monitoring: None,
+            worker_id: uuid::Uuid::new_v4(),
         }
     }
 
@@ -59,11 +61,16 @@ impl TaskWorker {
     }
 
     pub async fn process_next_batch(&self) -> Result<(), String> {
+        self.process_outbox_emails().await?;
         let _ = self.check_quorum_timeouts().await;
 
         let tasks = self
             .task_persistence
-            .poll_next_pending_tasks(10)
+            .claim_pending_tasks(
+                self.worker_id,
+                chrono::Utc::now().naive_utc() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
+                1,
+            )
             .await
             .map_err(|e| e.to_string())?;
 
@@ -71,29 +78,25 @@ impl TaskWorker {
             let task_id = task.id;
             info!("Processing task {} (type = '{}')", task_id, task.task_type);
 
-            match self.task_persistence.mark_task_processing(task_id).await {
-                Ok(true) => {}
-                Ok(false) => {
-                    info!(
-                        "Task {} already claimed by another worker, skipping",
-                        task_id
-                    );
-                    continue;
-                }
-                Err(err) => {
-                    error!("Failed to mark task {} as processing: {}", task_id, err);
-                    continue;
-                }
-            }
-
             let start_time = std::time::Instant::now();
-            let result = self.execute_single_task(&task).await;
+            let result = self.execute_single_task_with_lease(&task).await;
             let duration_ms = start_time.elapsed().as_millis() as u64;
 
             match result {
                 Ok(_) => {
                     info!("Successfully completed background task {}", task_id);
-                    let _ = self.task_persistence.mark_task_completed(task_id).await;
+                    match self
+                        .task_persistence
+                        .mark_task_completed(task_id, self.worker_id)
+                        .await
+                    {
+                        Ok(true) => {}
+                        Ok(false) => warn!(
+                            "Task {} completion ignored because its lease or status changed",
+                            task_id
+                        ),
+                        Err(err) => error!("Failed to complete task {}: {}", task_id, err),
+                    }
                     if let Some(ref m) = self.monitoring {
                         m.record_task_execution(&TaskExecutionMetrics {
                             company_id: Some(task.company_id),
@@ -115,10 +118,24 @@ impl TaskWorker {
                     let next_run =
                         chrono::Utc::now().naive_utc() + chrono::Duration::seconds(backoff_secs);
 
-                    let _ = self
+                    match self
                         .task_persistence
-                        .mark_task_failed(task_id, &err_msg, next_run, is_dead_letter)
-                        .await;
+                        .mark_task_failed(
+                            task_id,
+                            self.worker_id,
+                            &err_msg,
+                            next_run,
+                            is_dead_letter,
+                        )
+                        .await
+                    {
+                        Ok(true) => {}
+                        Ok(false) => warn!(
+                            "Task {} failure ignored because its lease or status changed",
+                            task_id
+                        ),
+                        Err(err) => error!("Failed to fail task {}: {}", task_id, err),
+                    }
 
                     if let Some(ref m) = self.monitoring {
                         m.record_task_execution(&TaskExecutionMetrics {
@@ -137,19 +154,63 @@ impl TaskWorker {
         Ok(())
     }
 
-    pub async fn check_quorum_timeouts(&self) -> Result<(), String> {
-        let tasks = self
+    async fn process_outbox_emails(&self) -> Result<(), String> {
+        let emails = self
             .task_persistence
-            .list_company_tasks(
-                uuid::Uuid::nil(),
-                None,
-                Some(crate::entities::task::TaskStatus::WaitingForThirdPartyReply),
-                true,
+            .claim_outbox_emails(
+                self.worker_id,
+                chrono::Utc::now().naive_utc() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
+                10,
             )
             .await
-            .unwrap_or_default();
+            .map_err(|error| error.to_string())?;
 
+        for queued in emails {
+            let email: OutboundEmail = match serde_json::from_value(queued.payload) {
+                Ok(email) => email,
+                Err(error) => {
+                    let _ = self
+                        .task_persistence
+                        .mark_outbox_email_failed(queued.id, self.worker_id, &error.to_string())
+                        .await;
+                    continue;
+                }
+            };
+            match OutboundDispatcher::send_idempotent(
+                &self.config,
+                email,
+                &format!("outbox:{}", queued.id),
+            )
+            .await
+            {
+                Ok(sent) => {
+                    let _ = self
+                        .task_persistence
+                        .mark_outbox_email_sent(
+                            queued.id,
+                            self.worker_id,
+                            &sent.outbound_message_id,
+                        )
+                        .await;
+                }
+                Err(error) => {
+                    let _ = self
+                        .task_persistence
+                        .mark_outbox_email_failed(queued.id, self.worker_id, &error.to_string())
+                        .await;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn check_quorum_timeouts(&self) -> Result<(), String> {
         let now = chrono::Utc::now().naive_utc();
+        let tasks = self
+            .task_persistence
+            .list_due_waiting_tasks(now, 100)
+            .await
+            .unwrap_or_default();
 
         for task in tasks {
             if let Some(quorum) = task.payload.get("quorum_outreach") {
@@ -158,17 +219,6 @@ impl TaskWorker {
                     .and_then(|s| s.as_str())
                     .unwrap_or_default();
                 if status == "awaiting_quorum" {
-                    let expires_str = quorum.get("expires_at").and_then(|s| s.as_str());
-                    let is_expired = if let Some(exp_s) = expires_str {
-                        chrono::NaiveDateTime::parse_from_str(exp_s, "%Y-%m-%dT%H:%M:%S")
-                            .or_else(|_| {
-                                chrono::NaiveDateTime::parse_from_str(exp_s, "%Y-%m-%d %H:%M:%S")
-                            })
-                            .map_or(false, |exp_dt| now > exp_dt)
-                    } else {
-                        false
-                    };
-
                     let curr_pct = quorum
                         .get("current_percent")
                         .and_then(|v| v.as_f64())
@@ -178,11 +228,23 @@ impl TaskWorker {
                         .and_then(|v| v.as_f64())
                         .unwrap_or(50.0);
 
-                    if is_expired && curr_pct < req_pct {
+                    if curr_pct < req_pct {
                         info!(
                             "Task {} reached quorum timeout with {:.1}% responses (< {:.1}% required). Triggering HITL timeout approval.",
                             task.id, curr_pct, req_pct
                         );
+
+                        if self
+                            .task_persistence
+                            .update_task_status(
+                                task.id,
+                                crate::entities::task::TaskStatus::PendingApproval,
+                            )
+                            .await
+                            .is_err()
+                        {
+                            continue;
+                        }
 
                         let mut payload = task.payload.clone();
                         if let Some(q) = payload
@@ -198,14 +260,6 @@ impl TaskWorker {
                             .task_persistence
                             .update_task_payload(task.id, payload)
                             .await;
-                        let _ = self
-                            .task_persistence
-                            .update_task_status(
-                                task.id,
-                                crate::entities::task::TaskStatus::PendingApproval,
-                            )
-                            .await;
-
                         if let Some(approval_use_cases) =
                             self.thread_use_cases.get_approval_use_cases()
                         {
@@ -253,8 +307,13 @@ impl TaskWorker {
         task: &crate::entities::task::BackgroundTask,
     ) -> Result<(), String> {
         // Parse payload
-        let ingest: InboundIngestResult = serde_json::from_value(task.payload.clone())
+        let mut ingest: InboundIngestResult = serde_json::from_value(task.payload.clone())
             .map_err(|e| format!("Invalid task payload JSON: {}", e))?;
+
+        self.thread_use_cases
+            .hydrate_ingest_configuration(&mut ingest)
+            .await
+            .map_err(|e| e.to_string())?;
 
         if !ingest.accepted {
             return Ok(());
@@ -266,18 +325,40 @@ impl TaskWorker {
             .ok_or_else(|| "Missing inbound message in task payload".to_string())?;
 
         // Idempotency Guard: Check if an outbound email for this triggering message was already sent
-        let thread_messages = self
-            .thread_use_cases
-            .get_thread_history(inbound_msg.thread_id)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        let outbound_reply = thread_messages.iter().find(|m| {
-            m.direction == crate::entities::message::MessageDirection::Outbound
-                && m.in_reply_to.as_deref() == Some(&inbound_msg.message_id)
-        });
+        let target_thread_ids: Vec<_> = if ingest.channel_matches.is_empty() {
+            vec![inbound_msg.thread_id]
+        } else {
+            ingest
+                .channel_matches
+                .iter()
+                .map(|channel_match| channel_match.thread.id)
+                .collect()
+        };
+        let mut outbound_reply = None;
+        let mut missing_threads = Vec::new();
+        for thread_id in target_thread_ids {
+            match self
+                .thread_use_cases
+                .find_outbound_reply(thread_id, &inbound_msg.message_id)
+                .await
+                .map_err(|e| e.to_string())?
+            {
+                Some(message) => outbound_reply = Some(message),
+                None => missing_threads.push(thread_id),
+            }
+        }
 
         if let Some(outbound) = outbound_reply {
+            for thread_id in missing_threads {
+                self.thread_use_cases
+                    .save_message(&crate::entities::message::Message {
+                        id: uuid::Uuid::new_v4(),
+                        thread_id,
+                        ..outbound.clone()
+                    })
+                    .await
+                    .map_err(|error| error.to_string())?;
+            }
             if outbound
                 .clean_text_body
                 .starts_with("Agent execution failed:")
@@ -301,11 +382,43 @@ impl TaskWorker {
         ingest_exec.task_id = Some(task.id);
 
         self.thread_use_cases
-            .execute_claimed_agent_task_and_dispatch(&ingest_exec, true)
+            .execute_claimed_agent_task_and_dispatch(&ingest_exec, true, self.worker_id)
             .await
             .map_err(|e| e.to_string())?;
 
         Ok(())
+    }
+
+    async fn execute_single_task_with_lease(
+        &self,
+        task: &crate::entities::task::BackgroundTask,
+    ) -> Result<(), String> {
+        let execution = self.execute_single_task(task);
+        tokio::pin!(execution);
+        let mut heartbeat =
+            tokio::time::interval(Duration::from_secs((TASK_LEASE_SECONDS / 3).max(1) as u64));
+        heartbeat.tick().await;
+
+        loop {
+            tokio::select! {
+                result = &mut execution => return result,
+                _ = heartbeat.tick() => {
+                    let renewed = self
+                        .task_persistence
+                        .renew_task_lease(
+                            task.id,
+                            self.worker_id,
+                            chrono::Utc::now().naive_utc()
+                                + chrono::Duration::seconds(TASK_LEASE_SECONDS),
+                        )
+                        .await
+                        .map_err(|error| error.to_string())?;
+                    if !renewed {
+                        return Err("Task lease was lost during execution".to_string());
+                    }
+                }
+            }
+        }
     }
 
     pub async fn stop_task_and_notify(&self, task_id: uuid::Uuid) -> Result<(), String> {
@@ -374,7 +487,9 @@ mod tests {
         use_cases::{company::CompanyPersistence, thread::ThreadPersistence},
     };
 
-    struct MockCompanyPersistence;
+    struct MockCompanyPersistence {
+        company: Option<Company>,
+    }
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
         async fn create(
@@ -389,8 +504,8 @@ mod tests {
         ) -> AppResult<Company> {
             unimplemented!()
         }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> {
-            unimplemented!()
+        async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
+            Ok(self.company.clone().filter(|company| company.id == id))
         }
         async fn get_by_slug(&self, _slug: &str) -> AppResult<Option<Company>> {
             unimplemented!()
@@ -423,7 +538,9 @@ mod tests {
 
     use crate::use_cases::channel::ChannelPersistence;
 
-    struct MockChannelPersistence;
+    struct MockChannelPersistence {
+        channel: Option<Channel>,
+    }
     #[async_trait]
     impl ChannelPersistence for MockChannelPersistence {
         async fn create(
@@ -440,8 +557,8 @@ mod tests {
         ) -> AppResult<Channel> {
             unimplemented!()
         }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
-            unimplemented!()
+        async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>> {
+            Ok(self.channel.clone().filter(|channel| channel.id == id))
         }
         async fn get_by_company_slug_and_channel_slug(
             &self,
@@ -498,12 +615,14 @@ mod tests {
         }
         async fn find_thread_by_message_ids(
             &self,
+            _channel_id: Uuid,
             _message_ids: &[String],
         ) -> AppResult<Option<Thread>> {
             unimplemented!()
         }
         async fn find_thread_by_thread_index(
             &self,
+            _channel_id: Uuid,
             _thread_index_prefix: &str,
         ) -> AppResult<Option<Thread>> {
             unimplemented!()
@@ -519,8 +638,29 @@ mod tests {
             self.messages.lock().unwrap().push(message.clone());
             Ok(message.clone())
         }
-        async fn get_message_by_message_id(&self, _message_id: &str) -> AppResult<Option<Message>> {
+        async fn get_message_by_message_id(
+            &self,
+            _company_id: Uuid,
+            _message_id: &str,
+        ) -> AppResult<Option<Message>> {
             unimplemented!()
+        }
+        async fn find_outbound_reply(
+            &self,
+            thread_id: Uuid,
+            in_reply_to: &str,
+        ) -> AppResult<Option<Message>> {
+            Ok(self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|message| {
+                    message.thread_id == thread_id
+                        && message.direction == crate::entities::message::MessageDirection::Outbound
+                        && message.in_reply_to.as_deref() == Some(in_reply_to)
+                })
+                .cloned())
         }
         async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
             Ok(self
@@ -559,6 +699,9 @@ mod tests {
                 retry_count: 0,
                 max_retries: 3,
                 last_error: None,
+                worker_id: None,
+                locked_at: None,
+                lock_expires_at: None,
                 run_at: Utc::now().naive_utc(),
                 created_at: Utc::now().naive_utc(),
                 updated_at: Utc::now().naive_utc(),
@@ -585,68 +728,150 @@ mod tests {
             Ok(())
         }
 
-        async fn poll_next_pending_tasks(&self, _limit: i64) -> AppResult<Vec<BackgroundTask>> {
-            Ok(self
-                .tasks
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|t| t.status == TaskStatus::Pending)
-                .cloned()
-                .collect())
+        async fn claim_pending_tasks(
+            &self,
+            worker_id: Uuid,
+            lock_expires_at: chrono::NaiveDateTime,
+            limit: i64,
+        ) -> AppResult<Vec<BackgroundTask>> {
+            let mut list = self.tasks.lock().unwrap();
+            let now = Utc::now().naive_utc();
+            let mut claimed = Vec::new();
+            for task in list
+                .iter_mut()
+                .filter(|task| {
+                    (task.status == TaskStatus::Pending && task.run_at <= now)
+                        || (task.status == TaskStatus::Processing
+                            && task.lock_expires_at.is_none_or(|expires| expires <= now))
+                })
+                .take(limit as usize)
+            {
+                task.status = TaskStatus::Processing;
+                task.worker_id = Some(worker_id);
+                task.locked_at = Some(now);
+                task.lock_expires_at = Some(lock_expires_at);
+                claimed.push(task.clone());
+            }
+            Ok(claimed)
         }
 
-        async fn mark_task_processing(&self, id: Uuid) -> AppResult<bool> {
+        async fn claim_task(
+            &self,
+            id: Uuid,
+            worker_id: Uuid,
+            lock_expires_at: chrono::NaiveDateTime,
+        ) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
+            let now = Utc::now().naive_utc();
             if let Some(t) = list
                 .iter_mut()
-                .find(|t| t.id == id && t.status == TaskStatus::Pending)
+                .find(|t| t.id == id && t.status == TaskStatus::Pending && t.run_at <= now)
             {
                 t.status = TaskStatus::Processing;
+                t.worker_id = Some(worker_id);
+                t.locked_at = Some(now);
+                t.lock_expires_at = Some(lock_expires_at);
                 Ok(true)
             } else {
                 Ok(false)
             }
         }
 
-        async fn mark_task_completed(&self, id: Uuid) -> AppResult<()> {
+        async fn mark_task_completed(&self, id: Uuid, worker_id: Uuid) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+            let now = Utc::now().naive_utc();
+            if let Some(t) = list.iter_mut().find(|t| {
+                t.id == id
+                    && t.status == TaskStatus::Processing
+                    && t.worker_id == Some(worker_id)
+                    && t.lock_expires_at.is_some_and(|expires| expires > now)
+            }) {
                 t.status = TaskStatus::Completed;
+                t.worker_id = None;
+                t.locked_at = None;
+                t.lock_expires_at = None;
+                Ok(true)
+            } else {
+                Ok(false)
             }
-            Ok(())
         }
 
         async fn mark_task_failed(
             &self,
             id: Uuid,
+            worker_id: Uuid,
             error_msg: &str,
-            _next_run_at: chrono::NaiveDateTime,
+            next_run_at: chrono::NaiveDateTime,
             is_dead_letter: bool,
-        ) -> AppResult<()> {
+        ) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+            let now = Utc::now().naive_utc();
+            if let Some(t) = list.iter_mut().find(|t| {
+                t.id == id
+                    && t.status == TaskStatus::Processing
+                    && t.worker_id == Some(worker_id)
+                    && t.lock_expires_at.is_some_and(|expires| expires > now)
+            }) {
                 t.last_error = Some(error_msg.to_string());
+                t.retry_count += 1;
+                t.run_at = next_run_at;
                 t.status = if is_dead_letter {
                     TaskStatus::DeadLetter
                 } else {
-                    TaskStatus::Failed
+                    TaskStatus::Pending
                 };
+                t.worker_id = None;
+                t.locked_at = None;
+                t.lock_expires_at = None;
+                Ok(true)
+            } else {
+                Ok(false)
             }
-            Ok(())
         }
 
         async fn stop_task(&self, id: Uuid) -> AppResult<BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
-            let t = list.iter_mut().find(|t| t.id == id).unwrap();
+            let t = list
+                .iter_mut()
+                .find(|t| {
+                    t.id == id
+                        && matches!(
+                            t.status,
+                            TaskStatus::Pending
+                                | TaskStatus::Processing
+                                | TaskStatus::PendingApproval
+                                | TaskStatus::WaitingForThirdPartyReply
+                                | TaskStatus::Failed
+                        )
+                })
+                .unwrap();
             t.status = TaskStatus::Stopped;
+            t.worker_id = None;
+            t.locked_at = None;
+            t.lock_expires_at = None;
             Ok(t.clone())
         }
 
         async fn resume_task(&self, id: Uuid) -> AppResult<BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
-            let t = list.iter_mut().find(|t| t.id == id).unwrap();
+            let t = list
+                .iter_mut()
+                .find(|t| {
+                    t.id == id
+                        && matches!(
+                            t.status,
+                            TaskStatus::Stopped
+                                | TaskStatus::PendingApproval
+                                | TaskStatus::WaitingForThirdPartyReply
+                                | TaskStatus::Failed
+                        )
+                })
+                .unwrap();
             t.status = TaskStatus::Pending;
+            t.run_at = Utc::now().naive_utc();
+            t.worker_id = None;
+            t.locked_at = None;
+            t.lock_expires_at = None;
             Ok(t.clone())
         }
 
@@ -656,9 +881,57 @@ mod tests {
             status: TaskStatus,
         ) -> AppResult<BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
-            let t = list.iter_mut().find(|t| t.id == id).unwrap();
+            let t = list
+                .iter_mut()
+                .find(|t| {
+                    t.id == id
+                        && match status {
+                            TaskStatus::PendingApproval => matches!(
+                                t.status,
+                                TaskStatus::Processing | TaskStatus::WaitingForThirdPartyReply
+                            ),
+                            TaskStatus::WaitingForThirdPartyReply => matches!(
+                                t.status,
+                                TaskStatus::Processing | TaskStatus::PendingApproval
+                            ),
+                            _ => false,
+                        }
+                })
+                .unwrap();
             t.status = status;
+            t.worker_id = None;
+            t.locked_at = None;
+            t.lock_expires_at = None;
             Ok(t.clone())
+        }
+
+        async fn list_due_waiting_tasks(
+            &self,
+            due_at: chrono::NaiveDateTime,
+            limit: i64,
+        ) -> AppResult<Vec<BackgroundTask>> {
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|task| {
+                    task.status == TaskStatus::WaitingForThirdPartyReply
+                        && task
+                            .payload
+                            .pointer("/quorum_outreach/status")
+                            .and_then(|value| value.as_str())
+                            == Some("awaiting_quorum")
+                        && task
+                            .payload
+                            .pointer("/quorum_outreach/expires_at")
+                            .and_then(|value| value.as_str())
+                            .and_then(|value| value.parse::<chrono::NaiveDateTime>().ok())
+                            .is_some_and(|expires| expires <= due_at)
+                })
+                .take(limit as usize)
+                .cloned()
+                .collect())
         }
 
         async fn list_company_tasks(
@@ -680,6 +953,61 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn expired_lease_is_reclaimed_and_stale_worker_cannot_complete() {
+        let persistence = MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        };
+        let task = persistence
+            .enqueue_task(
+                Uuid::new_v4(),
+                Uuid::new_v4(),
+                None,
+                "email_agent_dispatch",
+                serde_json::json!({}),
+            )
+            .await
+            .unwrap();
+        let first_worker = Uuid::new_v4();
+        let second_worker = Uuid::new_v4();
+
+        let first_claim = persistence
+            .claim_pending_tasks(
+                first_worker,
+                Utc::now().naive_utc() + chrono::Duration::minutes(1),
+                1,
+            )
+            .await
+            .unwrap();
+        assert_eq!(first_claim.len(), 1);
+
+        persistence.tasks.lock().unwrap()[0].lock_expires_at =
+            Some(Utc::now().naive_utc() - chrono::Duration::seconds(1));
+
+        let second_claim = persistence
+            .claim_pending_tasks(
+                second_worker,
+                Utc::now().naive_utc() + chrono::Duration::minutes(1),
+                1,
+            )
+            .await
+            .unwrap();
+        assert_eq!(second_claim.len(), 1);
+        assert_eq!(second_claim[0].worker_id, Some(second_worker));
+        assert!(
+            !persistence
+                .mark_task_completed(task.id, first_worker)
+                .await
+                .unwrap()
+        );
+        assert!(
+            persistence
+                .mark_task_completed(task.id, second_worker)
+                .await
+                .unwrap()
+        );
+    }
+
+    #[tokio::test]
     async fn test_task_worker_stop_and_resume_flow() {
         let task_persistence = Arc::new(MockTaskPersistence {
             tasks: Mutex::new(Vec::new()),
@@ -687,8 +1015,8 @@ mod tests {
         let thread_persistence = Arc::new(MockThreadPersistence {
             messages: Mutex::new(Vec::new()),
         });
-        let company_persistence = Arc::new(MockCompanyPersistence);
-        let channel_persistence = Arc::new(MockChannelPersistence);
+        let company_persistence = Arc::new(MockCompanyPersistence { company: None });
+        let channel_persistence = Arc::new(MockChannelPersistence { channel: None });
 
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
@@ -798,8 +1126,12 @@ mod tests {
             created_at: chrono::Utc::now().naive_utc(),
         };
 
-        let company_persistence = Arc::new(MockCompanyPersistence);
-        let channel_persistence = Arc::new(MockChannelPersistence);
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            company: Some(company.clone()),
+        });
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channel: Some(channel.clone()),
+        });
 
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
@@ -910,7 +1242,8 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(failed_task.status, TaskStatus::Failed);
+        assert_eq!(failed_task.status, TaskStatus::Pending);
+        assert_eq!(failed_task.retry_count, 1);
         assert!(
             failed_task
                 .last_error

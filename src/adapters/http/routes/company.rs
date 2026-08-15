@@ -115,7 +115,9 @@ async fn edit_company_form(
     _user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    if let Ok(Some(company)) = company_use_cases.get_company(id).await {
+    if let Ok(Some(company)) = company_use_cases.get_company(id).await
+        && company.user_id == _user.id
+    {
         Html(pages::company_edit_fragment(&company))
     } else {
         Html(pages::error_alert("Company not found."))
@@ -129,7 +131,9 @@ async fn cancel_company_edit(
     _user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    if let Ok(Some(company)) = company_use_cases.get_company(id).await {
+    if let Ok(Some(company)) = company_use_cases.get_company(id).await
+        && company.user_id == _user.id
+    {
         Html(pages::company_row_fragment(&company))
     } else {
         Html(String::new())
@@ -145,7 +149,8 @@ async fn update_company(
     Form(form): Form<CompanyForm>,
 ) -> impl IntoResponse {
     match company_use_cases
-        .update_company(
+        .update_company_for_user(
+            _user.id,
             id,
             &form.name,
             &form.slug,
@@ -168,7 +173,9 @@ async fn delete_company(
     _user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let _ = company_use_cases.delete_company(id).await;
+    let _ = company_use_cases
+        .delete_company_for_user(_user.id, id)
+        .await;
     Html(String::new())
 }
 
@@ -215,7 +222,8 @@ async fn update_company_json(
     Json(payload): Json<CompanyForm>,
 ) -> AppResult<impl IntoResponse> {
     let company = company_use_cases
-        .update_company(
+        .update_company_for_user(
+            _user.id,
             id,
             &payload.name,
             &payload.slug,
@@ -240,7 +248,9 @@ async fn delete_company_json(
     _user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
-    company_use_cases.delete_company(id).await?;
+    company_use_cases
+        .delete_company_for_user(_user.id, id)
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -300,6 +310,9 @@ mod tests {
 
         let base_html = pages::base_layout("Test Title", "<p>Test Content</p>");
         assert!(base_html.contains("id=\"nav-channels\""));
+        assert!(base_html.contains("action=\"/logout\""));
+        assert!(!base_html.contains(">Sign In</a>"));
+        assert!(!base_html.contains(">Sign Up</a>"));
         assert!(base_html.contains("localStorage.getItem('cached_company_id')"));
         assert!(base_html.contains("autoDetectAndSyncCompany"));
     }

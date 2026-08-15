@@ -99,7 +99,7 @@ impl AgentPersistence for PostgresPersistence {
             r#"SELECT a.id, a.company_id, a.name, a.slug, a.provider, a.model, a.api_key, a.system_prompt, a.config_json, a.created_at
                FROM agents a
                JOIN companies c ON c.id = a.company_id
-               WHERE LOWER(c.slug) = LOWER($1) AND LOWER(a.slug) = LOWER($2)"#,
+               WHERE c.slug = $1 AND a.slug = $2"#,
         )
         .bind(company_slug)
         .bind(agent_slug)
@@ -113,7 +113,8 @@ impl AgentPersistence for PostgresPersistence {
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>> {
         let db_list = sqlx::query_as::<_, AgentDb>(
             r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, config_json, created_at
-               FROM agents WHERE company_id = $1 ORDER BY created_at DESC"#,
+               FROM agents WHERE company_id = $1
+               ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
         .bind(company_id)
         .fetch_all(&self.pool)

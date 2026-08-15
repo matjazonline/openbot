@@ -65,7 +65,7 @@ async fn list_company_tasks_page(
     Query(query): Query<TaskFilterQuery>,
 ) -> impl IntoResponse {
     let company = match company_use_cases.get_company(company_id).await {
-        Ok(Some(c)) => c,
+        Ok(Some(c)) if c.user_id == _user.id => c,
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
@@ -118,13 +118,27 @@ fn build_tasks_push_url(company_id: Uuid, query: &TaskFilterQuery) -> String {
     }
 }
 
-#[instrument(skip(thread_use_cases, _user))]
+#[instrument(skip(thread_use_cases, company_use_cases, _user))]
 async fn filter_company_tasks(
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
     _user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
     Query(query): Query<TaskFilterQuery>,
 ) -> impl IntoResponse {
+    let is_owner = company_use_cases
+        .get_company(company_id)
+        .await
+        .ok()
+        .flatten()
+        .is_some_and(|company| company.user_id == _user.id);
+    if !is_owner {
+        return (
+            [("HX-Push-Url", format!("/companies/{company_id}/tasks"))],
+            Html(pages::error_alert("Company not found.")),
+        );
+    }
+
     let status_enum = query
         .status
         .as_deref()
@@ -144,17 +158,33 @@ async fn filter_company_tasks(
     )
 }
 
-#[instrument(skip(thread_use_cases, config, _user))]
+#[instrument(skip(thread_use_cases, company_use_cases, config, _user))]
 async fn stop_company_task(
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(config): State<Arc<crate::infra::config::AppConfig>>,
     _user: AuthenticatedUser,
     Path((company_id, task_id)): Path<(Uuid, Uuid)>,
 ) -> impl IntoResponse {
+    let is_owner = company_use_cases
+        .get_company(company_id)
+        .await
+        .ok()
+        .flatten()
+        .is_some_and(|company| company.user_id == _user.id);
+    if !is_owner {
+        return Html(pages::error_alert("Company not found."));
+    }
     let task_persistence = thread_use_cases.get_task_persistence().await;
+    if !matches!(task_persistence.get_task_by_id(task_id).await, Ok(Some(task)) if task.company_id == company_id)
+    {
+        return Html(pages::error_alert("Task not found."));
+    }
     let worker = TaskWorker::new(task_persistence.clone(), thread_use_cases.clone(), config);
 
-    let _ = worker.stop_task_and_notify(task_id).await;
+    if let Err(error) = worker.stop_task_and_notify(task_id).await {
+        return Html(pages::error_alert(&format!("Failed to stop task: {error}")));
+    }
 
     if let Ok(Some(updated_task)) = task_persistence.get_task_by_id(task_id).await {
         Html(pages::task_row_fragment(company_id, &updated_task))
@@ -163,17 +193,35 @@ async fn stop_company_task(
     }
 }
 
-#[instrument(skip(thread_use_cases, config, _user))]
+#[instrument(skip(thread_use_cases, company_use_cases, config, _user))]
 async fn resume_company_task(
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(config): State<Arc<crate::infra::config::AppConfig>>,
     _user: AuthenticatedUser,
     Path((company_id, task_id)): Path<(Uuid, Uuid)>,
 ) -> impl IntoResponse {
+    let is_owner = company_use_cases
+        .get_company(company_id)
+        .await
+        .ok()
+        .flatten()
+        .is_some_and(|company| company.user_id == _user.id);
+    if !is_owner {
+        return Html(pages::error_alert("Company not found."));
+    }
     let task_persistence = thread_use_cases.get_task_persistence().await;
+    if !matches!(task_persistence.get_task_by_id(task_id).await, Ok(Some(task)) if task.company_id == company_id)
+    {
+        return Html(pages::error_alert("Task not found."));
+    }
     let worker = TaskWorker::new(task_persistence.clone(), thread_use_cases.clone(), config);
 
-    let _ = worker.resume_task(task_id).await;
+    if let Err(error) = worker.resume_task(task_id).await {
+        return Html(pages::error_alert(&format!(
+            "Failed to resume task: {error}"
+        )));
+    }
 
     if let Ok(Some(updated_task)) = task_persistence.get_task_by_id(task_id).await {
         Html(pages::task_row_fragment(company_id, &updated_task))
@@ -244,6 +292,9 @@ mod tests {
             retry_count: 0,
             max_retries: 3,
             last_error: None,
+            worker_id: None,
+            locked_at: None,
+            lock_expires_at: None,
             run_at: chrono::Utc::now().naive_utc(),
             created_at: chrono::Utc::now().naive_utc(),
             updated_at: chrono::Utc::now().naive_utc(),
@@ -283,6 +334,9 @@ mod tests {
             retry_count: 0,
             max_retries: 3,
             last_error: None,
+            worker_id: None,
+            locked_at: None,
+            lock_expires_at: None,
             run_at: chrono::Utc::now().naive_utc(),
             created_at: chrono::Utc::now().naive_utc(),
             updated_at: chrono::Utc::now().naive_utc(),
@@ -400,6 +454,9 @@ mod tests {
             retry_count: 0,
             max_retries: 3,
             last_error: None,
+            worker_id: None,
+            locked_at: None,
+            lock_expires_at: None,
             run_at: chrono::Utc::now().naive_utc(),
             created_at: chrono::Utc::now().naive_utc(),
             updated_at: chrono::Utc::now().naive_utc(),

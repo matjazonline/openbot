@@ -120,6 +120,15 @@ fn ai_agents_observability_enabled() -> bool {
         .unwrap_or(false)
 }
 
+const BASE_CONTEXT_SYSTEM_PROMPT: &str = "Runtime context:\n\
+- Current local date: {{ context.time.date }}\n\
+- Current local time: {{ context.time.time }}\n\
+- Agent name: {{ context.agent_info.name }}\n\
+- Recipient role: {{ context.recipient_role }}\n\
+- Primary recipient: {{ context.is_to }}\n\
+- CC recipient: {{ context.is_cc }}\n\n\
+Agent instructions:";
+
 pub fn base_agent_config() -> serde_json::Value {
     base_agent_config_with_observability(ai_agents_observability_enabled())
 }
@@ -153,6 +162,18 @@ fn base_agent_config_with_observability(observability_enabled: bool) -> serde_js
             "agent_info": {
                 "type": "builtin",
                 "source": "agent"
+            },
+            "recipient_role": {
+                "type": "runtime",
+                "required": true
+            },
+            "is_to": {
+                "type": "runtime",
+                "required": true
+            },
+            "is_cc": {
+                "type": "runtime",
+                "required": true
             }
         }
     })
@@ -301,6 +322,7 @@ impl ResolvedAgentParams {
             fallback_sys_prompt,
             fallback_name,
         );
+        prepend_base_context_prompt(&mut config);
 
         Ok(Self {
             provider,
@@ -329,6 +351,18 @@ impl ResolvedAgentParams {
     pub fn into_tuple(self) -> (String, String, String, serde_json::Value) {
         (self.provider, self.model, self.api_key, self.config)
     }
+}
+
+fn prepend_base_context_prompt(config: &mut serde_json::Value) {
+    let Some(system_prompt) = config
+        .get("system_prompt")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return;
+    };
+
+    config["system_prompt"] =
+        serde_json::json!(format!("{BASE_CONTEXT_SYSTEM_PROMPT}\n{system_prompt}"));
 }
 
 pub fn merge_json(base: &mut serde_json::Value, override_val: &serde_json::Value) {
@@ -522,7 +556,12 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
         // Check if DB already has approval or rejection
         if let Ok(Some(status)) = self
             .approval_use_cases
-            .check_step_approval(self.context.thread_id, &step_key)
+            .check_step_approval(
+                self.context.company_id,
+                self.context.channel_id,
+                self.context.thread_id,
+                &step_key,
+            )
             .await
         {
             match status {
@@ -765,20 +804,6 @@ impl<'a> AgentRunner<'a> {
 
         let mut config = self.params.config.clone();
         ensure_config_fields(&mut config, provider_name, model_name, key, None, None);
-
-        let role_str = self.recipient_role.map(|r| r.as_str()).unwrap_or("to");
-        let is_to_str = if role_str == "to" { "true" } else { "false" };
-        let is_cc_str = if role_str == "cc" { "true" } else { "false" };
-
-        if let Some(sp) = config.get_mut("system_prompt") {
-            if let Some(s) = sp.as_str() {
-                let replaced = s
-                    .replace("{{recipient_role}}", role_str)
-                    .replace("{{is_to}}", is_to_str)
-                    .replace("{{is_cc}}", is_cc_str);
-                *sp = serde_json::json!(replaced);
-            }
-        }
 
         let config_yaml = serde_yaml::to_string(&config).unwrap_or_default();
         let (provider_config, base_url, tool_choice) = provider_config_from_agent_config(&config)?;
@@ -1217,7 +1242,9 @@ mod tests {
             &mut expected,
             &serde_json::json!({
                 "name": "Acme Corp",
-                "system_prompt": "You are a helpful assistant.",
+                "system_prompt": format!(
+                    "{BASE_CONTEXT_SYSTEM_PROMPT}\nYou are a helpful assistant."
+                ),
                 "llm": {
                     "provider": "google",
                     "model": "gemini-2.5-flash",
@@ -1269,7 +1296,7 @@ mod tests {
             &mut expected,
             &serde_json::json!({
                 "name": "Support Channel",
-                "system_prompt": "Channel prompt",
+                "system_prompt": format!("{BASE_CONTEXT_SYSTEM_PROMPT}\nChannel prompt"),
                 "temperature": 0.2,
                 "llm": {
                     "provider": "openai",
@@ -1340,7 +1367,7 @@ mod tests {
             &mut expected,
             &serde_json::json!({
                 "name": "Tech Agent",
-                "system_prompt": "Agent prompt",
+                "system_prompt": format!("{BASE_CONTEXT_SYSTEM_PROMPT}\nAgent prompt"),
                 "temperature": 0.7,
                 "channel_only_field": true,
                 "llm": {
@@ -1497,7 +1524,7 @@ mod tests {
         let cfg = resolved.config();
         assert_eq!(
             cfg.get("system_prompt").unwrap().as_str().unwrap(),
-            "You are a helpful triage assistant."
+            format!("{BASE_CONTEXT_SYSTEM_PROMPT}\nYou are a helpful triage assistant.")
         );
     }
 
@@ -1519,7 +1546,7 @@ mod tests {
         let cfg = resolved.config();
         assert_eq!(
             cfg.get("system_prompt").unwrap().as_str().unwrap(),
-            "You are a helpful assistant."
+            format!("{BASE_CONTEXT_SYSTEM_PROMPT}\nYou are a helpful assistant.")
         );
     }
 
@@ -1618,6 +1645,31 @@ mod tests {
         );
         assert_eq!(config["observability"]["export"]["write_report"], false);
         assert_eq!(config["observability"]["export"]["write_raw_events"], false);
+    }
+
+    #[test]
+    fn test_base_agent_config_declares_delivery_context() {
+        let config = base_agent_config_with_observability(false);
+
+        for key in ["recipient_role", "is_to", "is_cc"] {
+            assert_eq!(config["context"][key]["type"], "runtime");
+            assert_eq!(config["context"][key]["required"], true);
+        }
+    }
+
+    #[test]
+    fn test_base_context_prompt_exposes_basic_runtime_information() {
+        for variable in [
+            "{{ context.time.date }}",
+            "{{ context.time.time }}",
+            "{{ context.agent_info.name }}",
+            "{{ context.recipient_role }}",
+            "{{ context.is_to }}",
+            "{{ context.is_cc }}",
+        ] {
+            assert!(BASE_CONTEXT_SYSTEM_PROMPT.contains(variable));
+        }
+        assert!(!BASE_CONTEXT_SYSTEM_PROMPT.contains("context.session"));
     }
 
     #[test]
@@ -1731,6 +1783,10 @@ system_prompt: Hello
                 .set_context("is_cc", serde_json::json!(is_cc))
                 .unwrap();
 
+            let context = agent.get_context();
+            assert_eq!(context["recipient_role"], serde_json::json!(expected_role));
+            assert_eq!(context["is_to"], serde_json::json!(expected_to));
+            assert_eq!(context["is_cc"], serde_json::json!(expected_cc));
             assert_eq!(role_str, expected_role);
             assert_eq!(is_to, expected_to);
             assert_eq!(is_cc, expected_cc);

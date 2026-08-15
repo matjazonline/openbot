@@ -6,6 +6,7 @@ use lettre::{
     },
     transport::smtp::authentication::Credentials,
 };
+use sha2::{Digest, Sha256};
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -34,7 +35,7 @@ impl Header for CustomHeader {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OutboundEmail {
     pub channel_id: Uuid,
     pub channel_name: String,
@@ -66,8 +67,31 @@ pub struct OutboundDispatcher;
 
 impl OutboundDispatcher {
     pub async fn send(config: &AppConfig, email: OutboundEmail) -> AppResult<SentEmailResult> {
-        let outbound_uuid = Uuid::new_v4();
-        let outbound_message_id = format!("<{}@{}>", outbound_uuid, config.app_domain_name);
+        Self::send_with_message_id(config, email, None).await
+    }
+
+    pub async fn send_idempotent(
+        config: &AppConfig,
+        email: OutboundEmail,
+        idempotency_key: &str,
+    ) -> AppResult<SentEmailResult> {
+        let digest = Sha256::digest(idempotency_key.as_bytes());
+        let local_part = digest
+            .iter()
+            .take(16)
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        let message_id = format!("<task-{local_part}@{}>", config.app_domain_name);
+        Self::send_with_message_id(config, email, Some(message_id)).await
+    }
+
+    async fn send_with_message_id(
+        config: &AppConfig,
+        email: OutboundEmail,
+        outbound_message_id: Option<String>,
+    ) -> AppResult<SentEmailResult> {
+        let outbound_message_id = outbound_message_id
+            .unwrap_or_else(|| format!("<{}@{}>", Uuid::new_v4(), config.app_domain_name));
 
         let from_email = format!(
             "{}@{}.{}",

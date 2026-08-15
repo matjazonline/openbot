@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use serde_json::Value;
-use std::str::FromStr;
+use sha2::{Digest, Sha256};
+use sqlx::PgPool;
+use std::{collections::HashSet, str::FromStr};
 use uuid::Uuid;
 
 use crate::{
@@ -70,7 +72,7 @@ impl TryFrom<MessageDb> for Message {
         let attachments = match db.attachments {
             Some(v) if !v.is_null() => {
                 let parsed: Vec<AttachmentMetadata> = serde_json::from_value(v).map_err(|e| {
-                    AppError::Internal(format!("Failed to parse attachments JSON: {}", e))
+                    AppError::Internal(format!("Failed to parse attachments JSON: {e}"))
                 })?;
                 Some(parsed)
             }
@@ -99,6 +101,48 @@ impl TryFrom<MessageDb> for Message {
     }
 }
 
+const THREAD_SELECT: &str = r#"
+    SELECT t.id, t.channel_id, t.subject,
+           COALESCE(
+               (SELECT array_agg(tp.email::text ORDER BY tp.email::text)
+                FROM thread_participants tp WHERE tp.thread_id = t.id),
+               ARRAY[]::text[]
+           ) AS participant_emails,
+           t.created_at, t.updated_at
+    FROM threads t
+"#;
+
+const MESSAGE_SELECT: &str = r#"
+    SELECT tm.id, tm.thread_id, em.message_id, em.in_reply_to,
+           em.references_list, em.sender::text AS sender, em.recipients_to,
+           em.recipients_cc, em.subject, tm.clean_text_body, em.raw_text_body,
+           em.raw_html_body, em.attachments, tm.direction, tm.role,
+           em.thread_index, tm.created_at
+    FROM thread_messages tm
+    JOIN email_messages em ON em.id = tm.email_message_id
+"#;
+
+async fn load_thread(pool: &PgPool, id: Uuid) -> AppResult<Option<Thread>> {
+    let query = format!("{THREAD_SELECT} WHERE t.id = $1");
+    let db = sqlx::query_as::<_, ThreadDb>(&query)
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .map_err(AppError::from)?;
+    Ok(db.map(Into::into))
+}
+
+fn normalized_participants(participants: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    participants
+        .iter()
+        .filter_map(|email| {
+            let normalized = email.trim().to_lowercase();
+            (!normalized.is_empty() && seen.insert(normalized.clone())).then_some(normalized)
+        })
+        .collect()
+}
+
 #[async_trait]
 impl ThreadPersistence for PostgresPersistence {
     async fn create_thread(
@@ -108,33 +152,39 @@ impl ThreadPersistence for PostgresPersistence {
         participant_emails: &[String],
     ) -> AppResult<Thread> {
         let id = Uuid::new_v4();
-        let db = sqlx::query_as::<_, ThreadDb>(
-            r#"INSERT INTO threads (id, channel_id, subject, participant_emails)
-               VALUES ($1, $2, $3, $4)
-               RETURNING id, channel_id, subject, participant_emails, created_at, updated_at"#,
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let inserted = sqlx::query(
+            r#"INSERT INTO threads (id, company_id, channel_id, subject)
+               SELECT $1, company_id, id, $3 FROM channels WHERE id = $2"#,
         )
         .bind(id)
         .bind(channel_id)
         .bind(subject)
-        .bind(participant_emails)
-        .fetch_one(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.into())
+        if inserted.rows_affected() == 0 {
+            return Err(AppError::Internal("Channel not found".into()));
+        }
+
+        for email in normalized_participants(participant_emails) {
+            sqlx::query("INSERT INTO thread_participants (thread_id, email) VALUES ($1, $2)")
+                .bind(id)
+                .bind(email)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+        }
+
+        tx.commit().await.map_err(AppError::from)?;
+        load_thread(&self.pool, id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Created thread was not found".into()))
     }
 
     async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>> {
-        let db = sqlx::query_as::<_, ThreadDb>(
-            r#"SELECT id, channel_id, subject, participant_emails, created_at, updated_at
-               FROM threads WHERE id = $1"#,
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
-        Ok(db.map(Into::into))
+        load_thread(&self.pool, id).await
     }
 
     async fn update_thread_participants(
@@ -142,165 +192,398 @@ impl ThreadPersistence for PostgresPersistence {
         id: Uuid,
         participant_emails: &[String],
     ) -> AppResult<Thread> {
-        let db = sqlx::query_as::<_, ThreadDb>(
-            r#"UPDATE threads
-               SET participant_emails = $1, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $2
-               RETURNING id, channel_id, subject, participant_emails, created_at, updated_at"#,
-        )
-        .bind(participant_emails)
-        .bind(id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(AppError::from)?;
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        for email in normalized_participants(participant_emails) {
+            sqlx::query(
+                r#"INSERT INTO thread_participants (thread_id, email)
+                   VALUES ($1, $2) ON CONFLICT (thread_id, email) DO NOTHING"#,
+            )
+            .bind(id)
+            .bind(email)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+        }
 
-        Ok(db.into())
+        let updated =
+            sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
+                .bind(id)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+        if updated.rows_affected() == 0 {
+            return Err(AppError::Internal("Thread not found".into()));
+        }
+
+        tx.commit().await.map_err(AppError::from)?;
+        load_thread(&self.pool, id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Updated thread was not found".into()))
     }
 
     async fn find_thread_by_message_ids(
         &self,
+        channel_id: Uuid,
         message_ids: &[String],
     ) -> AppResult<Option<Thread>> {
         if message_ids.is_empty() {
             return Ok(None);
         }
 
-        let db = sqlx::query_as::<_, ThreadDb>(
-            r#"SELECT t.id, t.channel_id, t.subject, t.participant_emails, t.created_at, t.updated_at
-               FROM threads t
-               JOIN messages m ON m.thread_id = t.id
-               WHERE m.message_id = ANY($1)
-               LIMIT 1"#,
-        )
-        .bind(message_ids)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
+        let query = format!(
+            r#"{THREAD_SELECT}
+               JOIN thread_messages tm ON tm.thread_id = t.id
+               JOIN email_messages em ON em.id = tm.email_message_id
+               WHERE t.channel_id = $1 AND em.message_id = ANY($2)
+               ORDER BY array_position($2, em.message_id), tm.created_at DESC
+               LIMIT 1"#
+        );
+        let db = sqlx::query_as::<_, ThreadDb>(&query)
+            .bind(channel_id)
+            .bind(message_ids)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(AppError::from)?;
         Ok(db.map(Into::into))
     }
 
     async fn find_thread_by_thread_index(
         &self,
-        thread_index_prefix: &str,
+        channel_id: Uuid,
+        thread_index: &str,
     ) -> AppResult<Option<Thread>> {
-        if thread_index_prefix.trim().is_empty() {
+        let thread_index = thread_index.trim();
+        if thread_index.is_empty() {
             return Ok(None);
         }
 
-        let prefix_match = format!("{}%", thread_index_prefix.trim());
-        let db = sqlx::query_as::<_, ThreadDb>(
-            r#"SELECT t.id, t.channel_id, t.subject, t.participant_emails, t.created_at, t.updated_at
-               FROM threads t
-               JOIN messages m ON m.thread_id = t.id
-               WHERE m.thread_index LIKE $1
-               LIMIT 1"#,
-        )
-        .bind(prefix_match)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
+        let query = format!(
+            r#"{THREAD_SELECT}
+               JOIN thread_messages tm ON tm.thread_id = t.id
+               JOIN email_messages em ON em.id = tm.email_message_id
+               WHERE t.channel_id = $1
+                 AND em.thread_index IS NOT NULL
+                 AND $2 LIKE em.thread_index || '%'
+               ORDER BY length(em.thread_index) DESC, tm.created_at DESC
+               LIMIT 1"#
+        );
+        let db = sqlx::query_as::<_, ThreadDb>(&query)
+            .bind(channel_id)
+            .bind(thread_index)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(AppError::from)?;
         Ok(db.map(Into::into))
     }
 
     async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize> {
-        let count: Option<i64> = sqlx::query_scalar(
-            r#"SELECT COUNT(*) FROM messages
-               WHERE thread_id = $1 AND created_at >= NOW() - ($2 || ' seconds')::INTERVAL"#,
+        let count: i64 = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM thread_messages
+               WHERE thread_id = $1
+                 AND created_at >= CURRENT_TIMESTAMP - make_interval(secs => $2)"#,
         )
         .bind(thread_id)
-        .bind(duration_secs.to_string())
+        .bind(duration_secs as f64)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
-
-        Ok(count.unwrap_or(0) as usize)
+        Ok(count as usize)
     }
 
     async fn create_message(&self, message: &Message) -> AppResult<Message> {
-        let attachments_json = message
+        let attachments = message
             .attachments
             .as_ref()
-            .map(|a| serde_json::to_value(a).unwrap_or(Value::Null));
+            .map(serde_json::to_value)
+            .transpose()
+            .map_err(|e| AppError::Internal(format!("Failed to serialize attachments: {e}")))?;
+        let email_message_id = Uuid::new_v4();
+        let content_hash = canonical_message_hash(message, attachments.as_ref());
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
 
-        let db = sqlx::query_as::<_, MessageDb>(
-            r#"INSERT INTO messages (
-                    id, thread_id, message_id, in_reply_to, references_list,
-                    sender, recipients_to, recipients_cc, subject, clean_text_body,
-                    raw_text_body, raw_html_body, attachments, direction, role, thread_index
+        let canonical_id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO email_messages (
+                    id, company_id, message_id, content_hash, in_reply_to, references_list, sender,
+                    recipients_to, recipients_cc, subject, raw_text_body,
+                    raw_html_body, attachments, thread_index
                )
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-               RETURNING id, thread_id, message_id, in_reply_to, references_list,
-                         sender, recipients_to, recipients_cc, subject, clean_text_body,
-                         raw_text_body, raw_html_body, attachments, direction, role, thread_index,
-                         created_at"#,
+               SELECT $1, company_id, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+               FROM threads WHERE id = $2
+               ON CONFLICT (company_id, message_id)
+               DO UPDATE SET message_id = EXCLUDED.message_id
+               WHERE email_messages.content_hash = EXCLUDED.content_hash
+               RETURNING id"#,
         )
-        .bind(message.id)
+        .bind(email_message_id)
         .bind(message.thread_id)
         .bind(&message.message_id)
+        .bind(content_hash)
         .bind(message.in_reply_to.as_deref())
         .bind(&message.references_list)
         .bind(&message.sender)
         .bind(&message.recipients_to)
         .bind(&message.recipients_cc)
         .bind(&message.subject)
-        .bind(&message.clean_text_body)
         .bind(message.raw_text_body.as_deref())
         .bind(message.raw_html_body.as_deref())
-        .bind(attachments_json)
-        .bind(message.direction.as_str())
-        .bind(message.role.as_str())
+        .bind(attachments)
         .bind(message.thread_index.as_deref())
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await
         .map_err(AppError::from)?;
 
-        // Update thread's updated_at timestamp
-        let _ = sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
-            .bind(message.thread_id)
-            .execute(&self.pool)
-            .await;
+        let association_id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO thread_messages (
+                    id, company_id, channel_id, thread_id, email_message_id,
+                    clean_text_body, direction, role
+               )
+               SELECT $1, company_id, channel_id, id, $3, $4, $5, $6
+               FROM threads WHERE id = $2
+               ON CONFLICT (channel_id, email_message_id) DO UPDATE SET
+                   clean_text_body = EXCLUDED.clean_text_body,
+                   direction = EXCLUDED.direction,
+                   role = EXCLUDED.role
+               WHERE thread_messages.thread_id = EXCLUDED.thread_id
+               RETURNING id"#,
+        )
+        .bind(message.id)
+        .bind(message.thread_id)
+        .bind(canonical_id)
+        .bind(&message.clean_text_body)
+        .bind(message.direction.as_str())
+        .bind(message.role.as_str())
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
 
+        sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
+            .bind(message.thread_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+        tx.commit().await.map_err(AppError::from)?;
+
+        let query = format!("{MESSAGE_SELECT} WHERE tm.id = $1");
+        let db = sqlx::query_as::<_, MessageDb>(&query)
+            .bind(association_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(AppError::from)?;
         db.try_into()
     }
 
-    async fn get_message_by_message_id(&self, message_id: &str) -> AppResult<Option<Message>> {
-        let db = sqlx::query_as::<_, MessageDb>(
-            r#"SELECT id, thread_id, message_id, in_reply_to, references_list,
-                      sender, recipients_to, recipients_cc, subject, clean_text_body,
-                      raw_text_body, raw_html_body, attachments, direction, role, thread_index,
-                      created_at
-               FROM messages WHERE message_id = $1"#,
-        )
-        .bind(message_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
+    async fn get_message_by_message_id(
+        &self,
+        company_id: Uuid,
+        message_id: &str,
+    ) -> AppResult<Option<Message>> {
+        let query = format!(
+            "{MESSAGE_SELECT} WHERE em.company_id = $1 AND em.message_id = $2 \
+             ORDER BY tm.created_at, tm.id LIMIT 1"
+        );
+        let db = sqlx::query_as::<_, MessageDb>(&query)
+            .bind(company_id)
+            .bind(message_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        db.map(TryInto::try_into).transpose()
+    }
 
-        match db {
-            Some(d) => Ok(Some(d.try_into()?)),
-            None => Ok(None),
-        }
+    async fn find_outbound_reply(
+        &self,
+        thread_id: Uuid,
+        in_reply_to: &str,
+    ) -> AppResult<Option<Message>> {
+        let query = format!(
+            r#"{MESSAGE_SELECT}
+               WHERE tm.thread_id = $1 AND tm.direction = 'outbound'
+                 AND em.in_reply_to = $2
+               ORDER BY tm.created_at DESC, tm.id DESC
+               LIMIT 1"#
+        );
+        let db = sqlx::query_as::<_, MessageDb>(&query)
+            .bind(thread_id)
+            .bind(in_reply_to)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        db.map(TryInto::try_into).transpose()
     }
 
     async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-        let db_list = sqlx::query_as::<_, MessageDb>(
-            r#"SELECT id, thread_id, message_id, in_reply_to, references_list,
-                      sender, recipients_to, recipients_cc, subject, clean_text_body,
-                      raw_text_body, raw_html_body, attachments, direction, role, thread_index,
-                      created_at
-               FROM messages WHERE thread_id = $1 ORDER BY created_at ASC"#,
-        )
-        .bind(thread_id)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(AppError::from)?;
+        let query = format!(
+            r#"SELECT * FROM (
+                   {MESSAGE_SELECT}
+                   WHERE tm.thread_id = $1
+                   ORDER BY tm.created_at DESC, tm.id DESC
+                   LIMIT 200
+               ) recent
+               ORDER BY recent.created_at ASC, recent.id ASC"#
+        );
+        let db = sqlx::query_as::<_, MessageDb>(&query)
+            .bind(thread_id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        db.into_iter().map(TryInto::try_into).collect()
+    }
+}
 
-        let mut messages = Vec::new();
-        for db in db_list {
-            messages.push(db.try_into()?);
-        }
-        Ok(messages)
+fn canonical_message_hash(message: &Message, attachments: Option<&Value>) -> Vec<u8> {
+    let canonical = serde_json::json!({
+        "message_id": message.message_id,
+        "in_reply_to": message.in_reply_to,
+        "references": message.references_list,
+        "sender": message.sender.to_lowercase(),
+        "to": message.recipients_to,
+        "cc": message.recipients_cc,
+        "subject": message.subject,
+        "raw_text": message.raw_text_body,
+        "raw_html": message.raw_html_body,
+        "attachments": attachments,
+        "thread_index": message.thread_index,
+    });
+    Sha256::digest(canonical.to_string().as_bytes()).to_vec()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entities::message::{MessageDirection, MessageRole};
+    use crate::use_cases::{
+        channel::ChannelPersistence, company::CompanyPersistence, user::UserPersistence,
+    };
+
+    #[tokio::test]
+    async fn one_email_can_be_associated_with_isolated_channel_threads() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            return;
+        };
+        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("thread_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            "Thread Test",
+            &format!("thread-test-{suffix}"),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let first_channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            "First",
+            "first",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let second_channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            "Second",
+            "second",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let first_thread = persistence
+            .create_thread(first_channel.id, "Subject", std::slice::from_ref(&email))
+            .await
+            .unwrap();
+        let second_thread = persistence
+            .create_thread(second_channel.id, "Subject", std::slice::from_ref(&email))
+            .await
+            .unwrap();
+
+        let internet_message_id = format!("<{suffix}@example.com>");
+        let message = Message {
+            id: Uuid::new_v4(),
+            thread_id: first_thread.id,
+            message_id: internet_message_id.clone(),
+            in_reply_to: None,
+            references_list: vec![],
+            sender: email.clone(),
+            recipients_to: vec!["first@example.com".into()],
+            recipients_cc: vec![],
+            subject: "Subject".into(),
+            clean_text_body: "First context".into(),
+            raw_text_body: Some("Body".into()),
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            thread_index: Some("root-index".into()),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+        persistence.create_message(&message).await.unwrap();
+        persistence
+            .create_message(&Message {
+                id: Uuid::new_v4(),
+                thread_id: second_thread.id,
+                clean_text_body: "Second context".into(),
+                ..message.clone()
+            })
+            .await
+            .unwrap();
+
+        let canonical_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM email_messages WHERE message_id = $1")
+                .bind(&internet_message_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(canonical_count, 1);
+        assert_eq!(
+            persistence
+                .find_thread_by_message_ids(first_channel.id, &[internet_message_id.clone()])
+                .await
+                .unwrap()
+                .unwrap()
+                .id,
+            first_thread.id
+        );
+        assert_eq!(
+            persistence
+                .find_thread_by_message_ids(second_channel.id, &[internet_message_id])
+                .await
+                .unwrap()
+                .unwrap()
+                .id,
+            second_thread.id
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
     }
 }

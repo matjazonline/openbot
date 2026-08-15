@@ -19,7 +19,7 @@ use crate::{
     services::email_parser::RawInboundPayload,
     use_cases::{
         agent::AgentUseCases,
-        channel::ChannelUseCases,
+        channel::{ChannelUseCases, parse_recipient_address_pipeline},
         company::CompanyUseCases,
         thread::{SimulationMode, ThreadUseCases},
         user::UserUseCases,
@@ -704,6 +704,32 @@ async fn simulate_channel_handler(
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
     Form(form): Form<SimulationForm>,
 ) -> impl IntoResponse {
+    let company = match company_use_cases.get_company(company_id).await {
+        Ok(Some(company)) if company.user_id == user.id => company,
+        _ => return Html(pages::error_alert("Company not found.")).into_response(),
+    };
+    let channel = match channel_use_cases
+        .get_company_channel(user.id, company_id, channel_id)
+        .await
+    {
+        Ok(Some(channel)) => channel,
+        _ => return Html(pages::error_alert("Channel not found.")).into_response(),
+    };
+    let authorized_recipient = parse_recipient_address_pipeline(&form.to, &config.app_domain_name)
+        .is_some_and(|(company_slug, channel_slugs, _)| {
+            company_slug.eq_ignore_ascii_case(&company.slug)
+                && !channel_slugs.is_empty()
+                && channel_slugs
+                    .iter()
+                    .all(|slug| slug.eq_ignore_ascii_case(&channel.slug))
+        });
+    if !authorized_recipient {
+        return Html(pages::error_alert(
+            "Simulation recipient must match the selected company and channel.",
+        ))
+        .into_response();
+    }
+
     let mode_str = form.simulation_mode.as_deref().unwrap_or("verify");
     let mode = match mode_str.to_lowercase().as_str() {
         "run_test" => SimulationMode::RunTest,

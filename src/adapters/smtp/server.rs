@@ -550,15 +550,6 @@ impl SmtpServer {
                                 }
 
                                 if ingest.accepted {
-                                    let thread_use_cases_bg = self.thread_use_cases.clone();
-                                    tokio::spawn(async move {
-                                        if let Err(err) = thread_use_cases_bg
-                                            .execute_agent_and_dispatch(&ingest, true)
-                                            .await
-                                        {
-                                            warn!("SMTP background agent execution failed: {err}");
-                                        }
-                                    });
                                     writer
                                         .write_all(b"250 2.0.0 Message queued for delivery\r\n")
                                         .await?;
@@ -941,6 +932,7 @@ mod tests {
 
         async fn find_thread_by_message_ids(
             &self,
+            _channel_id: Uuid,
             message_ids: &[String],
         ) -> AppResult<Option<Thread>> {
             let thread_id = {
@@ -957,6 +949,7 @@ mod tests {
 
         async fn find_thread_by_thread_index(
             &self,
+            _channel_id: Uuid,
             thread_index_prefix: &str,
         ) -> AppResult<Option<Thread>> {
             let thread_id = {
@@ -990,13 +983,35 @@ mod tests {
             Ok(message.clone())
         }
 
-        async fn get_message_by_message_id(&self, message_id: &str) -> AppResult<Option<Message>> {
+        async fn get_message_by_message_id(
+            &self,
+            _company_id: Uuid,
+            message_id: &str,
+        ) -> AppResult<Option<Message>> {
             Ok(self
                 .messages
                 .lock()
                 .unwrap()
                 .iter()
                 .find(|m| m.message_id == message_id)
+                .cloned())
+        }
+
+        async fn find_outbound_reply(
+            &self,
+            thread_id: Uuid,
+            in_reply_to: &str,
+        ) -> AppResult<Option<Message>> {
+            Ok(self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|message| {
+                    message.thread_id == thread_id
+                        && message.direction == crate::entities::message::MessageDirection::Outbound
+                        && message.in_reply_to.as_deref() == Some(in_reply_to)
+                })
                 .cloned())
         }
 
@@ -1035,6 +1050,9 @@ mod tests {
                 retry_count: 0,
                 max_retries: 3,
                 last_error: None,
+                worker_id: None,
+                locked_at: None,
+                lock_expires_at: None,
                 run_at: Utc::now().naive_utc(),
                 created_at: Utc::now().naive_utc(),
                 updated_at: Utc::now().naive_utc(),
@@ -1053,26 +1071,34 @@ mod tests {
         ) -> AppResult<()> {
             Ok(())
         }
-        async fn poll_next_pending_tasks(
+        async fn claim_pending_tasks(
             &self,
+            _worker_id: Uuid,
+            _lock_expires_at: chrono::NaiveDateTime,
             _limit: i64,
         ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
             Ok(vec![])
         }
-        async fn mark_task_processing(&self, _id: Uuid) -> AppResult<bool> {
+        async fn claim_task(
+            &self,
+            _id: Uuid,
+            _worker_id: Uuid,
+            _lock_expires_at: chrono::NaiveDateTime,
+        ) -> AppResult<bool> {
             Ok(true)
         }
-        async fn mark_task_completed(&self, _id: Uuid) -> AppResult<()> {
-            Ok(())
+        async fn mark_task_completed(&self, _id: Uuid, _worker_id: Uuid) -> AppResult<bool> {
+            Ok(true)
         }
         async fn mark_task_failed(
             &self,
             _id: Uuid,
+            _worker_id: Uuid,
             _error_msg: &str,
             _next_run_at: chrono::NaiveDateTime,
             _is_dead_letter: bool,
-        ) -> AppResult<()> {
-            Ok(())
+        ) -> AppResult<bool> {
+            Ok(true)
         }
         async fn stop_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
             unimplemented!()
@@ -1086,6 +1112,13 @@ mod tests {
             _status: crate::entities::task::TaskStatus,
         ) -> AppResult<crate::entities::task::BackgroundTask> {
             unimplemented!()
+        }
+        async fn list_due_waiting_tasks(
+            &self,
+            _due_at: chrono::NaiveDateTime,
+            _limit: i64,
+        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+            Ok(vec![])
         }
         async fn list_company_tasks(
             &self,
@@ -1290,16 +1323,13 @@ mod tests {
         buf_reader.read_line(&mut response).await.unwrap();
         assert!(response.contains("221"));
 
-        // Allow async background agent task to run
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-        // Verify Message in DB
+        // SMTP acceptance persists inbound state; the durable worker sends the reply.
         let threads = thread_persistence.threads.lock().unwrap();
         assert_eq!(threads.len(), 1);
         assert_eq!(threads[0].subject, "SMTP Test Order");
 
         let messages = thread_persistence.messages.lock().unwrap();
-        assert_eq!(messages.len(), 2); // 1 Inbound Human + 1 Outbound Agent
+        assert_eq!(messages.len(), 1);
         assert_eq!(
             messages[0].clean_text_body,
             "Hello agent, please process this order via SMTP."
@@ -1503,10 +1533,8 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         writer.write_all(b"QUIT\r\n").await.unwrap();
         writer.flush().await.unwrap();
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
         let messages = thread_persistence.messages.lock().unwrap();
-        assert_eq!(messages.len(), 2);
+        assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].clean_text_body, "Please register my account.");
     }
 

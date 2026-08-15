@@ -9,6 +9,7 @@ pub struct Agent {
     pub slug: String,
     pub provider: Option<String>,
     pub model: Option<String>,
+    #[serde(skip_serializing)]
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     pub config_json: Option<serde_json::Value>,

@@ -59,8 +59,148 @@ Email clients append the entire historical thread below newly typed text. Feedin
 
 ### 3.4 Background Task Queue & Worker
 - **Durable Task Store (`background_tasks`):** Ingests inbound emails synchronously and enqueues background processing tasks, allowing the webhook to return `HTTP 200 OK` in < 100ms.
-- **Task Worker Poller (`TaskWorker`):** Runs a 3-second polling loop executing tasks, featuring exponential backoff retries (30s, 60s, 120s) and transitioning to `dead_letter` on max retries.
-- **Graceful Shutdown:** Listens for termination signals (`Ctrl+C` / `SIGTERM`) to cleanly finish active tasks before exiting.
+- **Task Worker Poller (`TaskWorker`):** Every 3 seconds, processes up to 10 outbox emails, checks quorum timeouts, and claims at most one task. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
+- **Leased Execution:** Claims use `FOR UPDATE SKIP LOCKED` and a 15-minute lease. Background executions renew the lease every 5 minutes, and an expired lease can be reclaimed by another worker.
+- **Shutdown:** `Ctrl+C` broadcasts a shutdown signal to the worker and SMTP listener. The loops exit when control returns to their outer `select`; spawned worker and SMTP tasks are not explicitly awaited before runtime shutdown.
+
+#### Task Execution Flow
+
+```mermaid
+flowchart TD
+    subgraph Ingress[Inbound ingestion]
+        SG[SendGrid webhook]
+        SMTP[SMTP server]
+        RUN[Protected Run or RunTest simulation]
+        NORMALIZE[Parse and normalize email<br/>authenticate, authorize, scan, resolve channels]
+        ACCEPT{Ingestion result}
+        REJECT[Reject or bounce<br/>no background task]
+        QUIET[Persist context-only message<br/>no background task]
+        SAVE[Persist thread and inbound message]
+        ENQUEUE[Enqueue email_agent_dispatch<br/>duplicate-safe by source Message-ID]
+
+        SG --> NORMALIZE
+        SMTP --> NORMALIZE
+        RUN --> NORMALIZE
+        NORMALIZE --> ACCEPT
+        ACCEPT -->|rejected| REJECT
+        ACCEPT -->|context-only| QUIET
+        ACCEPT -->|accepted| SAVE --> ENQUEUE
+    end
+
+    subgraph TaskQueue[Durable task queue]
+        PENDING[(pending<br/>run_at controls availability)]
+        PROCESSING[(processing<br/>worker ID and 15-minute lease)]
+        COMPLETED[(completed)]
+        DEAD[(dead_letter)]
+        APPROVAL[(pending_approval)]
+        WAITING[(waiting_for_third_party_reply)]
+        STOPPED[(stopped)]
+    end
+
+    ENQUEUE --> PENDING
+
+    subgraph Worker[TaskWorker iteration every 3 seconds]
+        TICK[Poll iteration]
+        OUTBOX_STEP[Claim and send up to 10 outbox emails]
+        QUORUM[Check up to 100 due quorum waits]
+        CLAIM[Atomically claim one due task<br/>FOR UPDATE SKIP LOCKED]
+
+        TICK --> OUTBOX_STEP --> QUORUM --> CLAIM
+    end
+
+    PENDING -->|due| CLAIM
+    PROCESSING -->|lease expired| CLAIM
+    CLAIM --> PROCESSING
+
+    subgraph Execute[Claimed task execution]
+        LOAD[Deserialize payload as InboundIngestResult<br/>and hydrate current configuration]
+        IDEMPOTENT{Saved outbound reply<br/>already exists?}
+        PRIOR_OK[Reuse saved reply across target threads]
+        PRIOR_ERROR[Return the saved agent failure]
+        AGENTS[Execute matched channel agents<br/>including sequential pipelines]
+        HITL{Approval or third-party<br/>pause requested?}
+        RENEW[Renew lease immediately before dispatch]
+        DISPATCH[Send deterministic task reply<br/>task:task_id:agent-reply]
+        PERSIST[Save outbound messages<br/>and execution result in task payload]
+        RESULT{Execution result}
+
+        LOAD --> IDEMPOTENT
+        IDEMPOTENT -->|successful reply| PRIOR_OK
+        IDEMPOTENT -->|saved failure reply| PRIOR_ERROR
+        IDEMPOTENT -->|no| AGENTS --> HITL
+        HITL -->|no| RENEW --> DISPATCH --> PERSIST --> RESULT
+        PRIOR_OK --> RESULT
+        PRIOR_ERROR --> RESULT
+    end
+
+    PROCESSING --> LOAD
+    PROCESSING -. background heartbeat every 5 minutes .-> PROCESSING
+    RESULT -->|success and lease still owned| COMPLETED
+    RESULT -->|error| RETRY{Next retry reaches max?}
+    RETRY -->|no: delay 60s, then 120s| PENDING
+    RETRY -->|yes: third failed attempt| DEAD
+    RENEW -->|lease lost| RETRY
+
+    subgraph Pauses[Approval, waiting, and manual control]
+        APPROVAL_ACTION{Approval action}
+        STOP[Manual stop]
+        RESUME[Manual resume]
+        REPLY[Authorized third-party reply]
+        TIMEOUT[Quorum timeout below threshold]
+
+        APPROVAL --> APPROVAL_ACTION
+        APPROVAL_ACTION -->|approve, default, or proceed partial| PENDING
+        APPROVAL_ACTION -->|extend| WAITING
+        APPROVAL_ACTION -->|reject| STOPPED
+        WAITING --> REPLY --> PENDING
+        WAITING --> TIMEOUT --> APPROVAL
+        STOP --> STOPPED
+        STOPPED --> RESUME --> PENDING
+    end
+
+    HITL -->|approval required| APPROVAL
+    HITL -->|wait for replies| WAITING
+    QUORUM -. finds due waits .-> TIMEOUT
+    PROCESSING -. stop clears lease; in-flight call is fenced later .-> STOP
+    PENDING -.-> STOP
+    APPROVAL -.-> STOP
+    WAITING -.-> STOP
+
+    subgraph Outbox[Approval email outbox]
+        OUT_PENDING[(pending or expired sending)]
+        OUT_SENDING[(sending<br/>15-minute lease)]
+        OUT_SENT[(sent)]
+        OUT_FAILED[(failed after 5 attempts)]
+        OUT_RETRY{Send result}
+
+        OUT_PENDING -->|worker claim| OUT_SENDING --> OUT_RETRY
+        OUT_RETRY -->|success| OUT_SENT
+        OUT_RETRY -->|failure before attempt 5<br/>delayed retry| OUT_PENDING
+        OUT_RETRY -->|fifth failure| OUT_FAILED
+    end
+
+    APPROVAL -->|queue approval notification| OUT_PENDING
+    OUTBOX_STEP -. drives .-> OUT_PENDING
+
+    subgraph Direct[Direct simulation path]
+        DIRECT_CLAIM[Claim the newly enqueued task directly<br/>with a separate 15-minute lease]
+        DIRECT_EXEC[Execute immediately<br/>no periodic lease heartbeat]
+    end
+
+    RUN -. after enqueue .-> DIRECT_CLAIM
+    PENDING --> DIRECT_CLAIM --> DIRECT_EXEC --> LOAD
+
+    subgraph Shutdown[Shutdown]
+        CTRL[Ctrl+C]
+        SIGNAL[Broadcast shutdown]
+        WORKER_EXIT[Worker exits at outer loop boundary]
+        SMTP_EXIT[SMTP listener stops accepting]
+
+        CTRL --> SIGNAL
+        SIGNAL --> WORKER_EXIT
+        SIGNAL --> SMTP_EXIT
+    end
+```
 
 ### 3.5 Company Tasks HTMX Dashboard
 - **Web Dashboard (`/companies/{id}/tasks`):** Interactive HTMX interface allowing company owners to monitor tasks, filter by workflow or status (`pending`, `processing`, `completed`, `failed`, `dead_letter`, `stopped`), and sort by time.
@@ -79,7 +219,7 @@ Email clients append the entire historical thread below newly typed text. Feedin
 - **Cumulative Upstream Context Sharing:** In a `+` pipeline, each subsequent step agent receives the user's prompt **plus** the accumulated outputs of all prior step agents (`[Upstream Pipeline Context from Prior Step Agents]`). For example, Step 3 (`legal`) receives the outputs from both Step 1 (`support`) and Step 2 (`billing`).
 - **Strict Validation, Bounce Notifications & Fuzzy Suggestions:** If an address or pipeline step is misspelled (e.g., `suppport@...` or `support+biling@...`), strict validation halts execution and the server dispatches an automated bounce reply email (`[Undeliverable] Re: ...`) to the sender containing fuzzy suggestions calculated via Levenshtein distance matching (e.g., *"Did you mean: `support@acme.mailagents.com`?"*).
 - **Isolated Thread Contexts:** An independent thread is resolved or created for each matched workflow, maintaining clean, isolated conversation history per agent.
-- **Delivery Role Context (`RecipientRole`):** Each agent execution receives its recipient delivery context (`To` vs. `Cc`), injecting `[Delivery Context: Email received via TO/CC field]` into the prompt context and supporting template variables (`{{recipient_role}}`, `{{is_to}}`, `{{is_cc}}`) in system prompts.
+- **Delivery Role Context (`RecipientRole`):** Each agent execution receives its recipient delivery context (`To` vs. `Cc`), injecting `[Delivery Context: Email received via TO/CC field]` into the prompt and exposing `{{ context.recipient_role }}`, `{{ context.is_to }}`, and `{{ context.is_cc }}` in system prompts.
 - **Response Concatenation & Outbound Filtering:** Agent outputs from all triggered workflows are concatenated into a single consolidated email response dispatched to the human sender. Outbound replies automatically strip all agent email addresses (`*@*.<domain>`) from recipient headers (`To`/`Cc`) to prevent inter-agent reply loops while preserving human CC participants.
 
 #### Inbound Processing & Spam Check Decision Matrix
