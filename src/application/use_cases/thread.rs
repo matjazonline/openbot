@@ -11,7 +11,7 @@ use crate::{
         EgressRegistry,
         email::{EmailEgressAdapter, EmailIngressAdapter},
     },
-    app_error::AppResult,
+    app_error::{AppError, AppResult},
     domain::monitoring::MonitoringService,
     entities::{
         channel::{Channel, ChannelType, ParticipantIdentity},
@@ -29,7 +29,7 @@ use crate::{
             ResolvedAgentParams,
         },
         email_parser::{EmailParser, MAX_CHANNEL_HOPS, ParsedEmail, RawInboundPayload},
-        outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
+        outbound_dispatcher::{OutboundDispatcher, OutboundEmail, SentEmailResult},
         outreach_tool::OutreachToolContext,
     },
     use_cases::{
@@ -43,6 +43,12 @@ use crate::{
 };
 
 pub const MAX_THREAD_MESSAGES_PER_HOUR: usize = 20;
+
+#[derive(Clone, Copy)]
+struct InternalChannelSource {
+    company_id: Uuid,
+    channel_id: Uuid,
+}
 
 #[async_trait]
 pub trait ThreadPersistence: Send + Sync {
@@ -173,6 +179,160 @@ impl ThreadUseCases {
         &self.config
     }
 
+    async fn resolve_internal_destination(
+        &self,
+        source_channel_id: Uuid,
+        recipient: &str,
+    ) -> AppResult<Option<(Channel, Channel, Company)>> {
+        let recipient_domain = recipient
+            .trim()
+            .rsplit_once('@')
+            .map(|(_, domain)| domain.trim().to_lowercase())
+            .unwrap_or_default();
+        let app_domain = self.config.app_domain_name.trim().to_lowercase();
+        if recipient_domain != app_domain && !recipient_domain.ends_with(&format!(".{app_domain}"))
+        {
+            return Ok(None);
+        }
+
+        let (company_slug, channel_slugs, is_context_only) =
+            parse_recipient_address_pipeline(recipient, &self.config.app_domain_name).ok_or_else(
+                || AppError::Internal(format!("Invalid platform channel address: {recipient}")),
+            )?;
+        if is_context_only || channel_slugs.len() != 1 {
+            return Err(AppError::Internal(
+                "Internal channel delivery requires one direct channel address".into(),
+            ));
+        }
+
+        let source = self
+            .channel_persistence
+            .get_by_id(source_channel_id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Internal source channel was not found".into()))?;
+        let target = self
+            .channel_persistence
+            .get_by_company_slug_and_channel_slug(&company_slug, &channel_slugs[0])
+            .await?
+            .ok_or_else(|| {
+                AppError::Internal(format!("Platform channel does not exist: {recipient}"))
+            })?;
+        if source.company_id != target.company_id {
+            return Err(AppError::Internal(
+                "Cross-company internal channel delivery is not allowed".into(),
+            ));
+        }
+        if source.id == target.id {
+            return Err(AppError::Internal(
+                "A channel cannot deliver an internal message to itself".into(),
+            ));
+        }
+        if target.agent_ids.as_ref().is_none_or(Vec::is_empty) {
+            return Err(AppError::Internal(format!(
+                "Target channel '{}' has no configured agent",
+                target.slug
+            )));
+        }
+        let company = self
+            .company_persistence
+            .get_by_id(source.company_id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Internal source company was not found".into()))?;
+        if !company.slug.eq_ignore_ascii_case(&company_slug) {
+            return Err(AppError::Internal(
+                "Internal recipient company does not match the source company".into(),
+            ));
+        }
+        Ok(Some((source, target, company)))
+    }
+
+    pub async fn prepare_internal_channel_delivery(
+        &self,
+        email: OutboundEmail,
+        idempotency_key: Option<&str>,
+    ) -> AppResult<Option<SentEmailResult>> {
+        if self
+            .resolve_internal_destination(email.channel_id, &email.recipient_to)
+            .await?
+            .is_none()
+        {
+            return Ok(None);
+        }
+        let prepared = match idempotency_key {
+            Some(key) => OutboundDispatcher::prepare_idempotent(&self.config, email, key)?,
+            None => OutboundDispatcher::prepare(&self.config, email)?,
+        };
+        Ok(Some(prepared))
+    }
+
+    pub async fn ingest_prepared_internal_message(
+        &self,
+        sent: &SentEmailResult,
+    ) -> AppResult<InboundIngestResult> {
+        let source_channel_id = sent.source_channel_id.ok_or_else(|| {
+            AppError::Internal("Internal delivery has no source channel identity".into())
+        })?;
+        let recipient = sent
+            .recipients_to
+            .first()
+            .ok_or_else(|| AppError::Internal("Internal delivery has no recipient".into()))?;
+        let (source, _, company) = self
+            .resolve_internal_destination(source_channel_id, recipient)
+            .await?
+            .ok_or_else(|| AppError::Internal("Recipient is not an internal channel".into()))?;
+        let expected_sender = format!(
+            "{}@{}.{}",
+            source.slug, company.slug, self.config.app_domain_name
+        );
+        if !sent.from_address.eq_ignore_ascii_case(&expected_sender) {
+            return Err(AppError::Internal(
+                "Internal sender address does not match its source channel".into(),
+            ));
+        }
+
+        let norm = NormalizedInboundMessage {
+            message_id: sent.outbound_message_id.clone(),
+            thread_ref: Some(sent.in_reply_to.clone()),
+            references: sent.references.clone(),
+            thread_index: None,
+            sender: ParticipantIdentity::email(&sent.from_address),
+            recipients_to: sent
+                .recipients_to
+                .iter()
+                .map(ParticipantIdentity::email)
+                .collect(),
+            recipients_cc: sent
+                .recipients_cc
+                .iter()
+                .map(ParticipantIdentity::email)
+                .collect(),
+            subject: sent.subject.clone(),
+            clean_text: sent.body_text.clone(),
+            raw_text: Some(sent.body_text.clone()),
+            raw_html: None,
+            attachments: Vec::new(),
+            is_auto_reply: true,
+            is_forwarded: false,
+            channel_id_header: Some(source_channel_id),
+            hop_count: sent.hop_count,
+            trace_channels: sent.trace_channels.clone(),
+            protocol: ChannelType::Email,
+            spf_status: None,
+            dkim_status: None,
+            dmarc_status: None,
+            spam_score: None,
+            is_context_only: false,
+        };
+        self.ingest_normalized_message_with_source(
+            norm,
+            Some(InternalChannelSource {
+                company_id: company.id,
+                channel_id: source_channel_id,
+            }),
+        )
+        .await
+    }
+
     pub async fn record_outreach_outbound_message(
         &self,
         outbox_id: Uuid,
@@ -223,6 +383,14 @@ impl ThreadUseCases {
         &self,
         norm: NormalizedInboundMessage,
     ) -> AppResult<InboundIngestResult> {
+        self.ingest_normalized_message_with_source(norm, None).await
+    }
+
+    async fn ingest_normalized_message_with_source(
+        &self,
+        norm: NormalizedInboundMessage,
+        internal_source: Option<InternalChannelSource>,
+    ) -> AppResult<InboundIngestResult> {
         let mut parsed = ParsedEmail {
             message_id: norm.message_id.clone(),
             in_reply_to: norm.thread_ref.clone(),
@@ -262,10 +430,14 @@ impl ThreadUseCases {
             parsed.message_id, parsed.sender, parsed.recipients_to
         );
 
-        let is_inter_channel = parsed.channel_id_header.is_some()
-            || parsed
-                .sender
-                .ends_with(&format!(".{}", self.config.app_domain_name));
+        let is_inter_channel = internal_source.is_some();
+        if let Some(source) = internal_source
+            && parsed.channel_id_header != Some(source.channel_id)
+        {
+            return Ok(InboundIngestResult::rejected(
+                "Internal source channel identity mismatch",
+            ));
+        }
 
         // Global SPF / DKIM / DMARC authentication verification check
         if !is_inter_channel {
@@ -356,6 +528,13 @@ impl ThreadUseCases {
                 };
 
                 if let Some(company) = company_opt {
+                    if let Some(source) = internal_source
+                        && company.id != source.company_id
+                    {
+                        return Ok(InboundIngestResult::rejected(
+                            "Cross-company internal channel delivery is not allowed",
+                        ));
+                    }
                     let available_channels = if let Some(cached) = channel_cache.get(&company.id) {
                         cached.clone()
                     } else {
@@ -380,15 +559,45 @@ impl ThreadUseCases {
                                 continue;
                             }
 
-                            // Inter-channel cycle detection
+                            // A channel may appear again only when this is the correlated
+                            // response to an outreach that is already waiting in that thread.
                             if is_inter_channel && parsed.trace_channels.contains(&channel.id) {
-                                warn!(
-                                    "Inter-channel cycle detected for channel '{}' in Message-ID: {}",
-                                    channel.id, parsed.message_id
-                                );
-                                return Ok(InboundIngestResult::rejected(
-                                    "Inter-channel loop cycle detected",
-                                ));
+                                let mut reply_references = Vec::new();
+                                if let Some(ref reply_id) = parsed.in_reply_to {
+                                    reply_references.push(reply_id.clone());
+                                }
+                                reply_references.extend(parsed.references.clone());
+                                let existing_thread = if reply_references.is_empty() {
+                                    None
+                                } else {
+                                    self.thread_persistence
+                                        .find_thread_by_message_ids(channel.id, &reply_references)
+                                        .await?
+                                };
+                                let correlated = if let Some(thread) = existing_thread {
+                                    self.task_persistence
+                                        .find_correlated_outreach_reply(
+                                            channel.company_id,
+                                            channel.id,
+                                            thread.id,
+                                            parsed.sender.trim(),
+                                            &reply_references,
+                                        )
+                                        .await?
+                                } else {
+                                    None
+                                };
+                                if let Some(matched) = correlated {
+                                    matched_outreach_by_channel.insert(channel.id, matched);
+                                } else {
+                                    warn!(
+                                        "Inter-channel cycle detected for channel '{}' in Message-ID: {}",
+                                        channel.id, parsed.message_id
+                                    );
+                                    return Ok(InboundIngestResult::rejected(
+                                        "Inter-channel loop cycle detected",
+                                    ));
+                                }
                             }
 
                             // ACL & Participant Restriction Check
@@ -1199,6 +1408,7 @@ impl ThreadUseCases {
                         }
                         runner = runner.outreach_tool(
                             self.task_persistence.clone(),
+                            self.channel_persistence.clone(),
                             OutreachToolContext {
                                 task_id,
                                 worker_id,
@@ -1364,13 +1574,32 @@ impl ThreadUseCases {
                     ));
                 }
             }
-            let sent_result = if let Some(task_id) = ingest.task_id {
-                OutboundDispatcher::send_idempotent(
-                    &self.config,
-                    outbound_email,
-                    &format!("task:{task_id}:agent-reply"),
+            let idempotency_key = ingest
+                .task_id
+                .map(|task_id| format!("task:{task_id}:agent-reply"));
+            let sent_result = if let Some(prepared) = self
+                .prepare_internal_channel_delivery(
+                    outbound_email.clone(),
+                    idempotency_key.as_deref(),
                 )
                 .await?
+            {
+                let internal_ingest = self.ingest_prepared_internal_message(&prepared).await?;
+                if !internal_ingest.accepted
+                    && internal_ingest.reason.as_deref()
+                        != Some("Duplicate Message-ID already processed")
+                {
+                    return Err(AppError::Internal(internal_ingest.reason.unwrap_or_else(
+                        || "Internal channel delivery was rejected".into(),
+                    )));
+                }
+                info!(
+                    "Delivered agent response {} through trusted internal channel transport",
+                    prepared.outbound_message_id
+                );
+                prepared
+            } else if let Some(ref key) = idempotency_key {
+                OutboundDispatcher::send_idempotent(&self.config, outbound_email, key).await?
             } else {
                 OutboundDispatcher::send(&self.config, outbound_email).await?
             };
@@ -1989,6 +2218,33 @@ mod tests {
     use chrono::Utc;
     use std::sync::Mutex;
 
+    fn internal_test_config() -> Arc<AppConfig> {
+        Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            smtp_host: "smtp.invalid".to_string(),
+            smtp_port: 2525,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        })
+    }
+
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
         team_members: Mutex<Vec<(Uuid, String)>>,
@@ -2024,8 +2280,14 @@ mod tests {
         ) -> AppResult<Company> {
             unimplemented!()
         }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> {
-            unimplemented!()
+        async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
+            Ok(self
+                .companies
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|company| company.id == id)
+                .cloned())
         }
         async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
             Ok(self
@@ -2101,8 +2363,14 @@ mod tests {
         ) -> AppResult<Channel> {
             unimplemented!()
         }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
-            unimplemented!()
+        async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>> {
+            Ok(self
+                .channels
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|channel| channel.id == id)
+                .cloned())
         }
         async fn get_by_company_slug_and_channel_slug(
             &self,
@@ -2635,6 +2903,7 @@ mod tests {
     async fn test_inter_channel_hop_limit_rejection() {
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
+        let source_channel_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
             id: company_id,
@@ -2649,19 +2918,34 @@ mod tests {
         }]));
 
         let channel_persistence = Arc::new(MockChannelPersistence {
-            channels: Mutex::new(vec![Channel {
-                id: channel_id,
-                company_id,
-                name: "Inbound Flow".to_string(),
-                slug: "inbound".to_string(),
-                api_key: None,
-                provider: None,
-                model: None,
-                participant_emails: None,
-                agent_ids: None,
-                channel_config: None,
-                created_at: Utc::now().naive_utc(),
-            }]),
+            channels: Mutex::new(vec![
+                Channel {
+                    id: channel_id,
+                    company_id,
+                    name: "Inbound Flow".to_string(),
+                    slug: "inbound".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: Some(vec![Uuid::new_v4()]),
+                    channel_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+                Channel {
+                    id: source_channel_id,
+                    company_id,
+                    name: "Source Flow".to_string(),
+                    slug: "source".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: Some(vec![Uuid::new_v4()]),
+                    channel_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+            ]),
         });
 
         let thread_persistence = Arc::new(MockThreadPersistence {
@@ -2706,20 +2990,29 @@ mod tests {
             config,
         );
 
-        let raw_payload = RawInboundPayload {
-            to: "inbound@acme.mailagents.com".to_string(),
-            from: "other_wf@acme.mailagents.com".to_string(),
-            subject: Some("Test Inter Channel".to_string()),
-            text: Some("Hello".to_string()),
-            headers: Some(format!(
-                "X-MailAgents-Channel-ID: {}\nX-MailAgents-Hop-Count: 5\n",
-                Uuid::new_v4()
-            )),
-            ..Default::default()
-        };
-
+        let prepared = thread_use_cases
+            .prepare_internal_channel_delivery(
+                OutboundEmail {
+                    channel_id: source_channel_id,
+                    channel_name: "Source Flow".to_string(),
+                    channel_slug: "source".to_string(),
+                    company_slug: "acme".to_string(),
+                    trigger_message_id: "<source@example.com>".to_string(),
+                    thread_references: Vec::new(),
+                    recipient_to: "inbound@acme.mailagents.com".to_string(),
+                    recipients_cc: Vec::new(),
+                    subject: "Test Inter Channel".to_string(),
+                    body_text: "Hello".to_string(),
+                    hop_count: MAX_CHANNEL_HOPS - 1,
+                    trace_channels: Vec::new(),
+                },
+                Some("hop-limit-test"),
+            )
+            .await
+            .unwrap()
+            .unwrap();
         let result = thread_use_cases
-            .ingest_and_save_inbound_message(raw_payload)
+            .ingest_prepared_internal_message(&prepared)
             .await
             .unwrap();
         assert!(!result.accepted);
@@ -2806,9 +3099,10 @@ mod tests {
 
         let raw_payload = RawInboundPayload {
             to: "restricted@acme.mailagents.com".to_string(),
-            from: "agent@example.com".to_string(),
+            from: "forged@acme.mailagents.com".to_string(),
             subject: Some("Spoofed email".to_string()),
             text: Some("Hello".to_string()),
+            headers: Some(format!("X-MailAgents-Channel-ID: {channel_id}\n")),
             spf: Some("fail".to_string()),
             ..Default::default()
         };
@@ -4175,6 +4469,384 @@ mod tests {
             .await
             .unwrap();
         assert!(!res_uncorrelated.accepted);
+    }
+
+    #[tokio::test]
+    async fn internal_channel_callback_resumes_original_task_without_new_task() {
+        let company_id = Uuid::new_v4();
+        let channel_a_id = Uuid::new_v4();
+        let channel_b_id = Uuid::new_v4();
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![
+                Channel {
+                    id: channel_a_id,
+                    company_id,
+                    name: "Agent A".to_string(),
+                    slug: "agent-a".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: Some(vec!["@public".to_string()]),
+                    agent_ids: Some(vec![Uuid::new_v4()]),
+                    channel_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+                Channel {
+                    id: channel_b_id,
+                    company_id,
+                    name: "Agent B".to_string(),
+                    slug: "agent-b".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: Some(vec![Uuid::new_v4()]),
+                    channel_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+            ]),
+        });
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+        let use_cases = ThreadUseCases::new(
+            thread_persistence.clone(),
+            channel_persistence,
+            company_persistence,
+            task_persistence.clone(),
+            internal_test_config(),
+        );
+
+        let initial = use_cases
+            .ingest_and_save_inbound_message(RawInboundPayload {
+                headers: Some("Message-ID: <human-request@example.com>\n".to_string()),
+                to: "agent-a@acme.mailagents.com".to_string(),
+                from: "human@example.com".to_string(),
+                subject: Some("Acquire data".to_string()),
+                text: Some("Please obtain supplier data".to_string()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let parent_task_id = initial.task_id.unwrap();
+        let thread_a = initial.thread.unwrap();
+        let call = use_cases
+            .prepare_internal_channel_delivery(
+                OutboundEmail {
+                    channel_id: channel_a_id,
+                    channel_name: "Agent A".to_string(),
+                    channel_slug: "agent-a".to_string(),
+                    company_slug: "acme".to_string(),
+                    trigger_message_id: "<human-request@example.com>".to_string(),
+                    thread_references: Vec::new(),
+                    recipient_to: "agent-b@acme.mailagents.com".to_string(),
+                    recipients_cc: Vec::new(),
+                    subject: "Acquire data".to_string(),
+                    body_text: "Obtain supplier data".to_string(),
+                    hop_count: 0,
+                    trace_channels: Vec::new(),
+                },
+                Some("agent-a-call"),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        let call_message_id = call.outbound_message_id.clone();
+        thread_persistence
+            .create_message(&Message {
+                id: Uuid::new_v4(),
+                thread_id: thread_a.id,
+                message_id: call_message_id.clone(),
+                in_reply_to: Some(call.in_reply_to.clone()),
+                references_list: call.references.clone(),
+                sender: call.from_address.clone(),
+                recipients_to: call.recipients_to.clone(),
+                recipients_cc: call.recipients_cc.clone(),
+                subject: call.subject.clone(),
+                clean_text_body: call.body_text.clone(),
+                raw_text_body: None,
+                raw_html_body: None,
+                attachments: None,
+                direction: MessageDirection::Outbound,
+                role: MessageRole::Agent,
+                thread_index: None,
+                created_at: Utc::now().naive_utc(),
+            })
+            .await
+            .unwrap();
+        let outreach_id = Uuid::new_v4();
+        {
+            let mut tasks = task_persistence.tasks.lock().unwrap();
+            let parent_task = tasks
+                .iter_mut()
+                .find(|task| task.id == parent_task_id)
+                .unwrap();
+            parent_task.payload = serde_json::json!({
+                "test_outreach": {
+                    "outreach_id": outreach_id,
+                    "target_email": "agent-b@acme.mailagents.com",
+                    "outbound_message_id": call_message_id.clone()
+                }
+            });
+            parent_task.status = crate::entities::task::TaskStatus::WaitingForThirdPartyReply;
+        }
+        let delegated = use_cases
+            .ingest_prepared_internal_message(&call)
+            .await
+            .unwrap();
+        assert!(delegated.accepted);
+        assert!(delegated.task_id.is_some());
+        assert_ne!(delegated.thread.as_ref().unwrap().id, thread_a.id);
+        assert_eq!(delegated.thread.as_ref().unwrap().channel_id, channel_b_id);
+
+        let prepared = use_cases
+            .prepare_internal_channel_delivery(
+                OutboundEmail {
+                    channel_id: channel_b_id,
+                    channel_name: "Agent B".to_string(),
+                    channel_slug: "agent-b".to_string(),
+                    company_slug: "acme".to_string(),
+                    trigger_message_id: call_message_id.clone(),
+                    thread_references: vec![
+                        "<human-request@example.com>".to_string(),
+                        call_message_id.clone(),
+                    ],
+                    recipient_to: "agent-a@acme.mailagents.com".to_string(),
+                    recipients_cc: Vec::new(),
+                    subject: "Acquire data".to_string(),
+                    body_text: "Supplier confirmed 2,000 units".to_string(),
+                    hop_count: 1,
+                    trace_channels: vec![channel_a_id],
+                },
+                Some("agent-b-result"),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        let callback = use_cases
+            .ingest_prepared_internal_message(&prepared)
+            .await
+            .unwrap();
+
+        assert!(callback.accepted);
+        assert!(callback.task_id.is_none());
+        assert_eq!(callback.thread.unwrap().id, thread_a.id);
+        assert_eq!(callback.inbound_message.unwrap().role, MessageRole::Agent);
+        assert_eq!(
+            task_persistence
+                .get_task_by_id(parent_task_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            crate::entities::task::TaskStatus::Pending
+        );
+        assert_eq!(task_persistence.tasks.lock().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn uncorrelated_inter_channel_cycle_is_rejected() {
+        let company_id = Uuid::new_v4();
+        let channel_a_id = Uuid::new_v4();
+        let channel_b_id = Uuid::new_v4();
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![
+                Channel {
+                    id: channel_a_id,
+                    company_id,
+                    name: "Agent A".to_string(),
+                    slug: "agent-a".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: Some(vec![Uuid::new_v4()]),
+                    channel_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+                Channel {
+                    id: channel_b_id,
+                    company_id,
+                    name: "Agent B".to_string(),
+                    slug: "agent-b".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: Some(vec![Uuid::new_v4()]),
+                    channel_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+            ]),
+        });
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+        let use_cases = ThreadUseCases::new(
+            thread_persistence,
+            channel_persistence,
+            company_persistence,
+            task_persistence,
+            internal_test_config(),
+        );
+
+        let unsolicited_prepared = use_cases
+            .prepare_internal_channel_delivery(
+                OutboundEmail {
+                    channel_id: channel_b_id,
+                    channel_name: "Agent B".to_string(),
+                    channel_slug: "agent-b".to_string(),
+                    company_slug: "acme".to_string(),
+                    trigger_message_id: "<unsolicited@example.com>".to_string(),
+                    thread_references: vec!["<unsolicited@example.com>".to_string()],
+                    recipient_to: "agent-a@acme.mailagents.com".to_string(),
+                    recipients_cc: Vec::new(),
+                    subject: "Unsolicited message".to_string(),
+                    body_text: "Spontaneous message".to_string(),
+                    hop_count: 1,
+                    trace_channels: vec![channel_a_id],
+                },
+                None,
+            )
+            .await
+            .unwrap()
+            .unwrap();
+
+        let result = use_cases
+            .ingest_prepared_internal_message(&unsolicited_prepared)
+            .await
+            .unwrap();
+
+        assert!(!result.accepted);
+        assert_eq!(
+            result.reason.as_deref(),
+            Some("Inter-channel loop cycle detected")
+        );
+    }
+
+    #[tokio::test]
+    async fn inter_channel_max_hops_exceeded_is_rejected() {
+        let company_id = Uuid::new_v4();
+        let channel_a_id = Uuid::new_v4();
+        let channel_b_id = Uuid::new_v4();
+        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }]));
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(vec![
+                Channel {
+                    id: channel_a_id,
+                    company_id,
+                    name: "Agent A".to_string(),
+                    slug: "agent-a".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: Some(vec![Uuid::new_v4()]),
+                    channel_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+                Channel {
+                    id: channel_b_id,
+                    company_id,
+                    name: "Agent B".to_string(),
+                    slug: "agent-b".to_string(),
+                    api_key: None,
+                    provider: None,
+                    model: None,
+                    participant_emails: None,
+                    agent_ids: Some(vec![Uuid::new_v4()]),
+                    channel_config: None,
+                    created_at: Utc::now().naive_utc(),
+                },
+            ]),
+        });
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        });
+        let task_persistence = Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        });
+        let use_cases = ThreadUseCases::new(
+            thread_persistence,
+            channel_persistence,
+            company_persistence,
+            task_persistence,
+            internal_test_config(),
+        );
+
+        let max_hop_prepared = use_cases
+            .prepare_internal_channel_delivery(
+                OutboundEmail {
+                    channel_id: channel_a_id,
+                    channel_name: "Agent A".to_string(),
+                    channel_slug: "agent-a".to_string(),
+                    company_slug: "acme".to_string(),
+                    trigger_message_id: "<msg@example.com>".to_string(),
+                    thread_references: Vec::new(),
+                    recipient_to: "agent-b@acme.mailagents.com".to_string(),
+                    recipients_cc: Vec::new(),
+                    subject: "Deep loop".to_string(),
+                    body_text: "Exceeding max hops".to_string(),
+                    hop_count: crate::use_cases::thread::MAX_CHANNEL_HOPS,
+                    trace_channels: Vec::new(),
+                },
+                None,
+            )
+            .await
+            .unwrap()
+            .unwrap();
+
+        let result = use_cases
+            .ingest_prepared_internal_message(&max_hop_prepared)
+            .await
+            .unwrap();
+
+        assert!(!result.accepted);
+        assert_eq!(
+            result.reason.as_deref(),
+            Some("Max inter-channel hop count reached")
+        );
     }
 
     #[tokio::test]

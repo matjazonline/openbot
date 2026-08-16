@@ -410,7 +410,9 @@ impl TaskPersistence for PostgresPersistence {
                JOIN email_outbox outbox ON outbox.id = target.outbox_id
                WHERE task.company_id = $1 AND task.channel_id = $2 AND task.thread_id = $3
                  AND target.email = $4
-                 AND outreach.status IN ('waiting', 'timeout_pending_approval', 'threshold_met')
+                  AND outreach.status IN (
+                      'waiting', 'timeout_pending_approval', 'threshold_met', 'completed'
+                  )
                  AND outbox.status = 'sent'
                  AND outbox.provider_message_id = ANY($5)
                ORDER BY outreach.created_at DESC

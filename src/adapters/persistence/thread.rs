@@ -436,7 +436,12 @@ impl ThreadPersistence for PostgresPersistence {
         let query = format!(
             r#"{MESSAGE_SELECT}
                WHERE tm.thread_id = $1 AND tm.direction = 'outbound'
-                 AND em.in_reply_to = $2
+                  AND em.in_reply_to = $2
+                  AND NOT EXISTS (
+                      SELECT 1 FROM email_outbox outbox
+                      JOIN task_outreach_targets target ON target.outbox_id = outbox.id
+                      WHERE outbox.provider_message_id = em.message_id
+                  )
                ORDER BY tm.created_at DESC, tm.id DESC
                LIMIT 1"#
         );
@@ -645,6 +650,140 @@ mod tests {
                 .id,
             second_thread.id
         );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn find_outbound_reply_excludes_outreach_outbox_messages() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            return;
+        };
+        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("outbox_reply_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            "Outbox Reply Test",
+            &format!("outbox-reply-{suffix}"),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            "Outbox Channel",
+            &format!("outbox-channel-{suffix}"),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let thread = persistence
+            .create_thread(channel.id, "Outbox Subject", std::slice::from_ref(&email))
+            .await
+            .unwrap();
+
+        let trigger_msg_id = format!("<trigger-{suffix}@example.com>");
+        let outreach_msg_id = format!("<outreach-{suffix}@example.com>");
+
+        let outreach_outbound = Message {
+            id: Uuid::new_v4(),
+            thread_id: thread.id,
+            message_id: outreach_msg_id.clone(),
+            in_reply_to: Some(trigger_msg_id.clone()),
+            references_list: vec![],
+            sender: format!("outbox-channel-{suffix}@example.com"),
+            recipients_to: vec!["target@example.com".into()],
+            recipients_cc: vec![],
+            subject: "Outreach".into(),
+            clean_text_body: "Outreach body".into(),
+            raw_text_body: None,
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Outbound,
+            role: MessageRole::Agent,
+            thread_index: None,
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+        persistence.create_message(&outreach_outbound).await.unwrap();
+
+        // Task & outreach setup in DB
+        let task_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, task_type, status, payload) VALUES ($1, $2, $3, $4, 'email_agent_dispatch', 'waiting_for_third_party_reply', '{}')",
+        )
+        .bind(task_id)
+        .bind(company.id)
+        .bind(channel.id)
+        .bind(thread.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let outreach_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO task_outreaches (id, task_id, status, required_threshold_percent, target_count, response_count) VALUES ($1, $2, 'waiting', 100.0, 1, 0)",
+        )
+        .bind(outreach_id)
+        .bind(task_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let outbox_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO email_outbox (id, company_id, channel_id, thread_id, status, payload, provider_message_id) VALUES ($1, $2, $3, $4, 'sent', '{}', $5)",
+        )
+        .bind(outbox_id)
+        .bind(company.id)
+        .bind(channel.id)
+        .bind(thread.id)
+        .bind(&outreach_msg_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO task_outreach_targets (id, outreach_id, email, outbox_id) VALUES ($1, $2, 'target@example.com', $3)",
+        )
+        .bind(Uuid::new_v4())
+        .bind(outreach_id)
+        .bind(outbox_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Verify that find_outbound_reply ignores the outreach outbound message
+        let found = persistence
+            .find_outbound_reply(thread.id, &trigger_msg_id)
+            .await
+            .unwrap();
+        assert!(found.is_none());
 
         CompanyPersistence::delete(&persistence, company.id)
             .await

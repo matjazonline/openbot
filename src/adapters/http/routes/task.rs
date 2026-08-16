@@ -571,7 +571,7 @@ mod tests {
         };
 
         let html = pages::channel_row_fragment(&company, "example.com", &channel, &[]);
-        assert!(html.contains("Tasks"));
+        assert!(html.contains("Task Executions"));
         assert!(html.contains(&format!(
             "/companies/{company_id}/tasks?channel_id={channel_id}"
         )));

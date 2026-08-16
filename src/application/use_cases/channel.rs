@@ -527,10 +527,6 @@ pub fn parse_recipient_address_pipeline(
 
     let company_slug = if domain_part.ends_with(&expected_suffix) {
         &domain_part[..domain_part.len() - expected_suffix.len()]
-    } else if domain_part == domain_lower {
-        return None;
-    } else if let Some(idx) = domain_part.find('.') {
-        &domain_part[..idx]
     } else {
         return None;
     };
@@ -1000,6 +996,7 @@ mod tests {
         // Invalid formats
         assert!(parse_recipient_address("invalid-email", app_domain).is_none());
         assert!(parse_recipient_address("support@mailagents.com", app_domain).is_none());
+        assert!(parse_recipient_address("support@acme.example.com", app_domain).is_none());
     }
 
     #[test]

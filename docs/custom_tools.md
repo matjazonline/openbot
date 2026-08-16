@@ -6,7 +6,7 @@
 outreach_and_await_quorum
 ```
 
-The tool sends an individual email to each external recipient, pauses the current background task, and resumes it after the configured percentage of distinct recipients replies. If the deadline expires first, the configured approver can proceed with available responses, extend the deadline, or stop the task.
+The tool sends an individual message to each permitted recipient, pauses the current background task, and resumes it after the configured percentage of distinct recipients replies. Targets are external by default. A same-company channel policy enables durable inter-channel agent calls; see [Inter-Channel Agent Communication](inter_channel_agent_communication.md).
 
 ## Agent YAML
 
@@ -47,6 +47,7 @@ tool_security:
       config:
         max_targets: 50
         max_timeout_hours: 720
+        allowed_target_scope: external_only
 ```
 
 The server supplies the shown HITL and security settings as defaults. Channel and agent configuration is merged over those defaults. Keep approval enabled unless the channel is explicitly trusted to send external mail autonomously.
@@ -73,13 +74,13 @@ The model calls the tool with:
 
 | Field | Type | Requirements |
 |---|---|---|
-| `target_emails` | string array | 1 to `max_targets` valid external addresses; duplicates are normalized and removed |
+| `target_emails` | string array | 1 to `max_targets` addresses permitted by `allowed_target_scope`; duplicates are normalized and removed |
 | `completion_threshold_percent` | number | Greater than 0 and at most 100 |
 | `timeout_hours` | integer | 1 to `max_timeout_hours` |
 | `subject` | string | 1 to 300 characters after trimming |
 | `body` | string | 1 to 20,000 characters after trimming |
 
-Platform addresses under the configured application domain cannot be outreach targets. Each target receives a separate email and is never exposed to the other targets through `To` or `CC`.
+Platform addresses under the configured application domain cannot be outreach targets under the default `external_only` policy. `same_company_channels` permits direct agent-channel addresses in the current company and delivers them through trusted internal transport instead of SMTP. Each target receives a separate message and is never exposed to the other targets through `To` or `CC`.
 
 The required response count is:
 
@@ -161,6 +162,7 @@ A valid reply arriving while timeout approval is pending still counts. If it rea
 - A YAML `tools:` grant without the Rust implementation causes agent build validation to fail.
 - Omitting the tool from `tools:` means the model has no access to it.
 - Tool-specific values under `tool_security.tools.outreach_and_await_quorum.config` are available to the Rust tool through `ToolExecutionContext.custom_config`.
+- `allowed_target_scope` accepts `external_only` (default), `same_company_channels`, or `any`.
 - `timeout_ms` limits creation of the durable outreach, not the human response window. `timeout_hours` controls the response deadline.
 - At least one channel participant or company team member must be available as the approver when HITL is enabled.
 - Do not place secrets in tool arguments, YAML custom configuration, or tool output.

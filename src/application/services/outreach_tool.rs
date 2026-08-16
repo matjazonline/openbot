@@ -2,6 +2,7 @@ use crate::{
     adapters::persistence::task::TaskPersistence,
     entities::outreach::{CreateOutreachRequest, OutreachTargetRequest},
     services::outbound_dispatcher::OutboundEmail,
+    use_cases::channel::{ChannelPersistence, parse_recipient_address_pipeline},
 };
 use ai_agents::{
     Tool, ToolResult,
@@ -70,6 +71,7 @@ struct OutreachOutput {
 
 pub struct OutreachAndAwaitQuorumTool {
     persistence: Arc<dyn TaskPersistence>,
+    channel_persistence: Arc<dyn ChannelPersistence>,
     context: OutreachToolContext,
     suspended: Arc<AtomicBool>,
 }
@@ -77,11 +79,13 @@ pub struct OutreachAndAwaitQuorumTool {
 impl OutreachAndAwaitQuorumTool {
     pub fn new(
         persistence: Arc<dyn TaskPersistence>,
+        channel_persistence: Arc<dyn ChannelPersistence>,
         context: OutreachToolContext,
         suspended: Arc<AtomicBool>,
     ) -> Self {
         Self {
             persistence,
+            channel_persistence,
             context,
             suspended,
         }
@@ -99,7 +103,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
     }
 
     fn description(&self) -> &str {
-        "Send an email to each external recipient and pause this task until the configured percentage of distinct recipients replies or the timeout requires a human decision. Use one recipient with a 100% threshold for single-party delegation."
+        "Send a message to each permitted recipient and pause this task until the configured percentage of distinct recipients replies or the timeout requires a human decision. Same-company agent channels can be permitted by tool policy. Use one recipient with a 100% threshold for single-party delegation."
     }
 
     fn input_schema(&self) -> Value {
@@ -136,7 +140,13 @@ impl Tool for OutreachAndAwaitQuorumTool {
             input.target_emails,
             max_targets,
             &self.context.app_domain_name,
-        ) {
+            self.context.company_id,
+            self.context.channel_id,
+            &ctx.custom_config,
+            self.channel_persistence.as_ref(),
+        )
+        .await
+        {
             Ok(targets) => targets,
             Err(error) => return ToolResult::error(error),
         };
@@ -248,16 +258,44 @@ impl Tool for OutreachAndAwaitQuorumTool {
     }
 }
 
-fn normalize_targets(
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AllowedTargetScope {
+    ExternalOnly,
+    SameCompanyChannels,
+    Any,
+}
+
+fn configured_target_scope(config: &Value) -> Result<AllowedTargetScope, String> {
+    match config
+        .get("allowed_target_scope")
+        .and_then(Value::as_str)
+        .unwrap_or("external_only")
+    {
+        "external_only" => Ok(AllowedTargetScope::ExternalOnly),
+        "same_company_channels" => Ok(AllowedTargetScope::SameCompanyChannels),
+        "any" => Ok(AllowedTargetScope::Any),
+        value => Err(format!(
+            "Unsupported allowed_target_scope '{value}'; expected external_only, same_company_channels, or any"
+        )),
+    }
+}
+
+async fn normalize_targets(
     values: Vec<String>,
     max_targets: usize,
     app_domain_name: &str,
+    company_id: Uuid,
+    source_channel_id: Uuid,
+    config: &Value,
+    channel_persistence: &dyn ChannelPersistence,
 ) -> Result<Vec<String>, String> {
     if values.is_empty() || values.len() > max_targets {
         return Err(format!(
             "target_emails must contain between 1 and {max_targets} addresses"
         ));
     }
+    let scope = configured_target_scope(config)?;
+    let app_domain_lower = app_domain_name.trim().to_lowercase();
     let mut targets = Vec::with_capacity(values.len());
     for value in values {
         let mailbox: Mailbox = value
@@ -269,11 +307,42 @@ fn normalize_targets(
             .rsplit_once('@')
             .map(|(_, domain)| domain)
             .unwrap_or("");
-        if domain.eq_ignore_ascii_case(app_domain_name)
-            || domain.ends_with(&format!(".{app_domain_name}"))
-        {
+        let is_platform_address = domain.eq_ignore_ascii_case(&app_domain_lower)
+            || domain.ends_with(&format!(".{app_domain_lower}"));
+
+        if is_platform_address {
+            if scope == AllowedTargetScope::ExternalOnly {
+                return Err(format!(
+                    "Platform address cannot be an external outreach target: {email}"
+                ));
+            }
+            let (company_slug, channel_slugs, is_context_only) =
+                parse_recipient_address_pipeline(&email, app_domain_name)
+                    .ok_or_else(|| format!("Invalid platform channel address: {email}"))?;
+            if is_context_only || channel_slugs.len() != 1 {
+                return Err(format!(
+                    "Internal outreach requires one direct channel address without pipeline or context-only suffix: {email}"
+                ));
+            }
+            let channel = channel_persistence
+                .get_by_company_slug_and_channel_slug(&company_slug, &channel_slugs[0])
+                .await
+                .map_err(|error| format!("Failed to resolve platform channel {email}: {error}"))?
+                .ok_or_else(|| format!("Platform channel does not exist: {email}"))?;
+            if channel.company_id != company_id {
+                return Err(format!(
+                    "Cross-company channel calls are not allowed: {email}"
+                ));
+            }
+            if channel.id == source_channel_id {
+                return Err(format!("A channel cannot call itself: {email}"));
+            }
+            if channel.agent_ids.as_ref().is_none_or(Vec::is_empty) {
+                return Err(format!("Target channel has no configured agent: {email}"));
+            }
+        } else if scope == AllowedTargetScope::SameCompanyChannels {
             return Err(format!(
-                "Platform address cannot be an outreach target: {email}"
+                "Only same-company platform channels are permitted by this tool policy: {email}"
             ));
         }
         if !targets.contains(&email) {
@@ -303,42 +372,250 @@ fn config_u32(config: &Value, key: &str, default: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        app_error::AppResult, entities::channel::Channel, use_cases::channel::ChannelPersistence,
+    };
 
-    #[test]
-    fn normalizes_and_deduplicates_targets() {
+    struct MockChannelPersistence {
+        channel: Option<Channel>,
+    }
+
+    #[async_trait]
+    impl ChannelPersistence for MockChannelPersistence {
+        async fn create(
+            &self,
+            _company_id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _participant_emails: Option<Vec<String>>,
+            _agent_ids: Option<Vec<Uuid>>,
+            _channel_config: Option<Value>,
+        ) -> AppResult<Channel> {
+            unimplemented!()
+        }
+
+        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
+            Ok(self.channel.clone())
+        }
+
+        async fn get_by_company_slug_and_channel_slug(
+            &self,
+            _company_slug: &str,
+            channel_slug: &str,
+        ) -> AppResult<Option<Channel>> {
+            Ok(self
+                .channel
+                .clone()
+                .filter(|channel| channel.slug == channel_slug))
+        }
+
+        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
+            Ok(self.channel.clone().into_iter().collect())
+        }
+
+        async fn update(
+            &self,
+            _id: Uuid,
+            _name: &str,
+            _slug: &str,
+            _api_key: Option<&str>,
+            _provider: Option<&str>,
+            _model: Option<&str>,
+            _participant_emails: Option<Vec<String>>,
+            _agent_ids: Option<Vec<Uuid>>,
+            _channel_config: Option<Value>,
+        ) -> AppResult<Channel> {
+            unimplemented!()
+        }
+
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
+    }
+
+    fn channel(id: Uuid, company_id: Uuid, slug: &str) -> Channel {
+        Channel {
+            id,
+            company_id,
+            name: slug.to_string(),
+            slug: slug.to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: Some(vec![Uuid::new_v4()]),
+            channel_config: None,
+            created_at: Utc::now().naive_utc(),
+        }
+    }
+
+    #[tokio::test]
+    async fn normalizes_and_deduplicates_targets() {
+        let company_id = Uuid::new_v4();
         let targets = normalize_targets(
             vec!["User@Example.com".into(), "user@example.com".into()],
             10,
             "mailagents.test",
+            company_id,
+            Uuid::new_v4(),
+            &serde_json::json!({}),
+            &MockChannelPersistence { channel: None },
         )
+        .await
         .unwrap();
         assert_eq!(targets, vec!["user@example.com"]);
     }
 
-    #[test]
-    fn rejects_platform_targets() {
+    #[tokio::test]
+    async fn rejects_platform_targets_for_external_scope() {
+        let company_id = Uuid::new_v4();
         let result = normalize_targets(
             vec!["support@acme.mailagents.test".into()],
             10,
             "mailagents.test",
-        );
+            company_id,
+            Uuid::new_v4(),
+            &serde_json::json!({}),
+            &MockChannelPersistence {
+                channel: Some(channel(Uuid::new_v4(), company_id, "support")),
+            },
+        )
+        .await;
         assert!(result.is_err());
     }
 
-    #[test]
-    fn canonical_target_order_is_stable() {
+    #[tokio::test]
+    async fn accepts_same_company_agent_channel_for_internal_scope() {
+        let company_id = Uuid::new_v4();
+        let target = channel(Uuid::new_v4(), company_id, "support");
+        let result = normalize_targets(
+            vec!["support@acme.mailagents.test".into()],
+            10,
+            "mailagents.test",
+            company_id,
+            Uuid::new_v4(),
+            &serde_json::json!({"allowed_target_scope": "same_company_channels"}),
+            &MockChannelPersistence {
+                channel: Some(target),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(result, vec!["support@acme.mailagents.test"]);
+    }
+
+    #[tokio::test]
+    async fn canonical_target_order_is_stable() {
+        let company_id = Uuid::new_v4();
+        let persistence = MockChannelPersistence { channel: None };
         let first = normalize_targets(
             vec!["b@example.com".into(), "a@example.com".into()],
             10,
             "mailagents.test",
+            company_id,
+            Uuid::new_v4(),
+            &serde_json::json!({}),
+            &persistence,
         )
+        .await
         .unwrap();
         let second = normalize_targets(
             vec!["a@example.com".into(), "b@example.com".into()],
             10,
             "mailagents.test",
+            company_id,
+            Uuid::new_v4(),
+            &serde_json::json!({}),
+            &persistence,
         )
+        .await
         .unwrap();
         assert_eq!(first, second);
+    }
+
+    #[tokio::test]
+    async fn rejects_self_calling_channel() {
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+        let self_target = channel(channel_id, company_id, "support");
+        let result = normalize_targets(
+            vec!["support@acme.mailagents.test".into()],
+            10,
+            "mailagents.test",
+            company_id,
+            channel_id,
+            &serde_json::json!({"allowed_target_scope": "same_company_channels"}),
+            &MockChannelPersistence {
+                channel: Some(self_target),
+            },
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("cannot call itself"));
+    }
+
+    #[tokio::test]
+    async fn rejects_cross_company_channel_call() {
+        let source_company_id = Uuid::new_v4();
+        let other_company_id = Uuid::new_v4();
+        let cross_target = channel(Uuid::new_v4(), other_company_id, "support");
+        let result = normalize_targets(
+            vec!["support@acme.mailagents.test".into()],
+            10,
+            "mailagents.test",
+            source_company_id,
+            Uuid::new_v4(),
+            &serde_json::json!({"allowed_target_scope": "same_company_channels"}),
+            &MockChannelPersistence {
+                channel: Some(cross_target),
+            },
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Cross-company channel calls are not allowed"));
+    }
+
+    #[tokio::test]
+    async fn rejects_channel_without_configured_agent() {
+        let company_id = Uuid::new_v4();
+        let mut target = channel(Uuid::new_v4(), company_id, "support");
+        target.agent_ids = None;
+        let result = normalize_targets(
+            vec!["support@acme.mailagents.test".into()],
+            10,
+            "mailagents.test",
+            company_id,
+            Uuid::new_v4(),
+            &serde_json::json!({"allowed_target_scope": "same_company_channels"}),
+            &MockChannelPersistence {
+                channel: Some(target),
+            },
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("has no configured agent"));
+    }
+
+    #[tokio::test]
+    async fn rejects_pipeline_or_context_only_suffix_for_internal_outreach() {
+        let company_id = Uuid::new_v4();
+        let target = channel(Uuid::new_v4(), company_id, "support");
+        let result = normalize_targets(
+            vec!["support+context@acme.mailagents.test".into()],
+            10,
+            "mailagents.test",
+            company_id,
+            Uuid::new_v4(),
+            &serde_json::json!({"allowed_target_scope": "same_company_channels"}),
+            &MockChannelPersistence {
+                channel: Some(target),
+            },
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("one direct channel address"));
     }
 }

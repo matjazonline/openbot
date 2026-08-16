@@ -202,6 +202,69 @@ impl TaskWorker {
                     continue;
                 }
             };
+            let internal_delivery = self
+                .thread_use_cases
+                .prepare_internal_channel_delivery(
+                    email.clone(),
+                    Some(&format!("outbox:{}", queued.id)),
+                )
+                .await;
+            match internal_delivery {
+                Ok(Some(sent)) => {
+                    let delivery_result = async {
+                        self.thread_use_cases
+                            .record_outreach_outbound_message(queued.id, &sent)
+                            .await
+                            .map_err(|error| error.to_string())?;
+                        let ingest = self
+                            .thread_use_cases
+                            .ingest_prepared_internal_message(&sent)
+                            .await
+                            .map_err(|error| error.to_string())?;
+                        if !ingest.accepted
+                            && ingest.reason.as_deref()
+                                != Some("Duplicate Message-ID already processed")
+                        {
+                            return Err(ingest.reason.unwrap_or_else(|| {
+                                "Internal channel delivery was rejected".into()
+                            }));
+                        }
+                        Ok::<(), String>(())
+                    }
+                    .await;
+                    match delivery_result {
+                        Ok(()) => {
+                            let _ = self
+                                .task_persistence
+                                .mark_outbox_email_sent(
+                                    queued.id,
+                                    self.worker_id,
+                                    &sent.outbound_message_id,
+                                )
+                                .await;
+                            info!(
+                                "Delivered outreach outbox {} through trusted internal channel transport",
+                                queued.id
+                            );
+                        }
+                        Err(error) => {
+                            let _ = self
+                                .task_persistence
+                                .mark_outbox_email_failed(queued.id, self.worker_id, &error)
+                                .await;
+                        }
+                    }
+                    continue;
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    let _ = self
+                        .task_persistence
+                        .mark_outbox_email_failed(queued.id, self.worker_id, &error.to_string())
+                        .await;
+                    continue;
+                }
+            }
             match OutboundDispatcher::send_idempotent(
                 &self.config,
                 email,
@@ -514,7 +577,22 @@ impl TaskWorker {
                     trace_channels: parsed.trace_channels,
                 };
 
-                let _ = OutboundDispatcher::send(&self.config, stop_email).await;
+                match self
+                    .thread_use_cases
+                    .prepare_internal_channel_delivery(stop_email.clone(), None)
+                    .await
+                {
+                    Ok(Some(prepared)) => {
+                        let _ = self
+                            .thread_use_cases
+                            .ingest_prepared_internal_message(&prepared)
+                            .await;
+                    }
+                    Ok(None) => {
+                        let _ = OutboundDispatcher::send(&self.config, stop_email).await;
+                    }
+                    Err(error) => warn!("Failed to prepare stop notification: {error}"),
+                }
             }
         }
 

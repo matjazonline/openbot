@@ -57,20 +57,24 @@ pub struct SentEmailResult {
     pub in_reply_to: String,
     pub references: Vec<String>,
     pub from_address: String,
+    pub from_name: Option<String>,
     pub recipients_to: Vec<String>,
     pub recipients_cc: Vec<String>,
     pub subject: String,
     pub body_text: String,
+    pub source_channel_id: Option<Uuid>,
+    pub hop_count: u32,
+    pub trace_channels: Vec<Uuid>,
 }
 
 pub struct OutboundDispatcher;
 
 impl OutboundDispatcher {
-    pub async fn send(config: &AppConfig, email: OutboundEmail) -> AppResult<SentEmailResult> {
-        Self::send_with_message_id(config, email, None).await
+    pub fn prepare(config: &AppConfig, email: OutboundEmail) -> AppResult<SentEmailResult> {
+        Self::prepare_with_message_id(config, email, None)
     }
 
-    pub async fn send_idempotent(
+    pub fn prepare_idempotent(
         config: &AppConfig,
         email: OutboundEmail,
         idempotency_key: &str,
@@ -82,10 +86,24 @@ impl OutboundDispatcher {
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>();
         let message_id = format!("<task-{local_part}@{}>", config.app_domain_name);
-        Self::send_with_message_id(config, email, Some(message_id)).await
+        Self::prepare_with_message_id(config, email, Some(message_id))
     }
 
-    async fn send_with_message_id(
+    pub async fn send(config: &AppConfig, email: OutboundEmail) -> AppResult<SentEmailResult> {
+        let prepared = Self::prepare(config, email)?;
+        Self::send_prepared(config, prepared).await
+    }
+
+    pub async fn send_idempotent(
+        config: &AppConfig,
+        email: OutboundEmail,
+        idempotency_key: &str,
+    ) -> AppResult<SentEmailResult> {
+        let prepared = Self::prepare_idempotent(config, email, idempotency_key)?;
+        Self::send_prepared(config, prepared).await
+    }
+
+    fn prepare_with_message_id(
         config: &AppConfig,
         email: OutboundEmail,
         outbound_message_id: Option<String>,
@@ -97,8 +115,6 @@ impl OutboundDispatcher {
             "{}@{}.{}",
             email.channel_slug, email.company_slug, config.app_domain_name
         );
-        let from_header_value = format!("\"{}\" <{}>", email.channel_name, from_email);
-
         let in_reply_to = email.trigger_message_id.clone();
 
         let mut references = email.thread_references.clone();
@@ -123,38 +139,71 @@ impl OutboundDispatcher {
         });
         cc_list.dedup();
 
+        let mut trace = email.trace_channels.clone();
+        if !trace.contains(&email.channel_id) {
+            trace.push(email.channel_id);
+        }
+        let next_hop = email.hop_count + 1;
+
+        Ok(SentEmailResult {
+            outbound_message_id,
+            in_reply_to,
+            references,
+            from_address: from_email,
+            from_name: Some(email.channel_name),
+            recipients_to: vec![email.recipient_to],
+            recipients_cc: cc_list,
+            subject,
+            body_text: email.body_text,
+            source_channel_id: Some(email.channel_id),
+            hop_count: next_hop,
+            trace_channels: trace,
+        })
+    }
+
+    async fn send_prepared(
+        config: &AppConfig,
+        prepared: SentEmailResult,
+    ) -> AppResult<SentEmailResult> {
         info!(
             "Constructing outbound RFC 5322 email Message-ID: {}, In-Reply-To: {}, To: {}",
-            outbound_message_id, in_reply_to, email.recipient_to
+            prepared.outbound_message_id,
+            prepared.in_reply_to,
+            prepared
+                .recipients_to
+                .first()
+                .map(String::as_str)
+                .unwrap_or_default()
         );
 
-        let from_mailbox = from_header_value
+        let from_header = prepared
+            .from_name
+            .as_ref()
+            .map(|name| format!("\"{name}\" <{}>", prepared.from_address))
+            .unwrap_or_else(|| prepared.from_address.clone());
+        let from_mailbox = from_header
             .parse::<Mailbox>()
             .map_err(|e| AppError::Internal(format!("Invalid From address mailbox: {}", e)))?;
-
-        let to_mailbox = email
-            .recipient_to
+        let to_mailbox = prepared
+            .recipients_to
+            .first()
+            .ok_or_else(|| AppError::Internal("Outbound message has no primary recipient".into()))?
             .parse::<Mailbox>()
             .map_err(|e| AppError::Internal(format!("Invalid To address mailbox: {}", e)))?;
 
         let mut builder = LettreMessage::builder()
             .from(from_mailbox)
             .to(to_mailbox)
-            .subject(&subject)
+            .subject(&prepared.subject)
             .header(ContentType::TEXT_PLAIN);
-
-        for cc in &cc_list {
+        for cc in &prepared.recipients_cc {
             if let Ok(cc_mb) = cc.parse::<Mailbox>() {
                 builder = builder.cc(cc_mb);
             }
         }
-
-        // Standard RFC 5322 headers
-        builder = builder.header(MessageId::from(outbound_message_id.clone()));
-        builder = builder.header(InReplyTo::from(in_reply_to.clone()));
-        builder = builder.header(References::from(references.join(" ")));
-
-        // RFC 3834 Auto-Reply and Exchange Loop Prevention headers
+        builder = builder.header(MessageId::from(prepared.outbound_message_id.clone()));
+        builder = builder.header(InReplyTo::from(prepared.in_reply_to.clone()));
+        builder = builder.header(References::from(prepared.references.join(" ")));
         builder = builder.header(CustomHeader {
             name: HeaderName::new_from_ascii_str("Auto-Submitted"),
             value: "auto-replied".to_string(),
@@ -163,34 +212,28 @@ impl OutboundDispatcher {
             name: HeaderName::new_from_ascii_str("X-Auto-Response-Suppress"),
             value: "All".to_string(),
         });
-
-        // Platform Inter-Channel Tracking Headers
-        let mut trace = email.trace_channels.clone();
-        if !trace.contains(&email.channel_id) {
-            trace.push(email.channel_id);
+        if let Some(channel_id) = prepared.source_channel_id {
+            builder = builder.header(CustomHeader {
+                name: HeaderName::new_from_ascii_str("X-MailAgents-Channel-ID"),
+                value: channel_id.to_string(),
+            });
+            builder = builder.header(CustomHeader {
+                name: HeaderName::new_from_ascii_str("X-MailAgents-Hop-Count"),
+                value: prepared.hop_count.to_string(),
+            });
+            builder = builder.header(CustomHeader {
+                name: HeaderName::new_from_ascii_str("X-MailAgents-Trace"),
+                value: prepared
+                    .trace_channels
+                    .iter()
+                    .map(Uuid::to_string)
+                    .collect::<Vec<_>>()
+                    .join(","),
+            });
         }
-        let trace_str = trace
-            .iter()
-            .map(|u| u.to_string())
-            .collect::<Vec<_>>()
-            .join(",");
-        let next_hop = email.hop_count + 1;
-
-        builder = builder.header(CustomHeader {
-            name: HeaderName::new_from_ascii_str("X-MailAgents-Channel-ID"),
-            value: email.channel_id.to_string(),
-        });
-        builder = builder.header(CustomHeader {
-            name: HeaderName::new_from_ascii_str("X-MailAgents-Hop-Count"),
-            value: next_hop.to_string(),
-        });
-        builder = builder.header(CustomHeader {
-            name: HeaderName::new_from_ascii_str("X-MailAgents-Trace"),
-            value: trace_str,
-        });
 
         let lettre_msg = builder
-            .body(email.body_text.clone())
+            .body(prepared.body_text.clone())
             .map_err(|e| AppError::Internal(format!("Failed to build MIME message: {}", e)))?;
 
         // If SMTP credentials/host configured, dispatch via SMTP; otherwise log
@@ -220,20 +263,11 @@ impl OutboundDispatcher {
         } else {
             info!(
                 "SMTP host set to localhost/empty. Simulating SMTP dispatch for Message-ID: {}",
-                outbound_message_id
+                prepared.outbound_message_id
             );
         }
 
-        Ok(SentEmailResult {
-            outbound_message_id,
-            in_reply_to,
-            references,
-            from_address: from_email,
-            recipients_to: vec![email.recipient_to],
-            recipients_cc: cc_list,
-            subject,
-            body_text: email.body_text,
-        })
+        Ok(prepared)
     }
 
     pub async fn send_bounce(
@@ -299,10 +333,14 @@ impl OutboundDispatcher {
             in_reply_to: String::new(),
             references: vec![],
             from_address: from_email,
+            from_name: Some("Mail Agents Server".to_string()),
             recipients_to: vec![recipient_to.to_string()],
             recipients_cc: vec![],
             subject: formatted_subject,
             body_text: bounce_body.to_string(),
+            source_channel_id: None,
+            hop_count: 0,
+            trace_channels: Vec::new(),
         })
     }
 }

@@ -8,7 +8,7 @@ use crate::entities::message::{Message, MessageRole};
 use crate::entities::task::TokenUsage;
 use crate::services::outreach_tool::{OutreachAndAwaitQuorumTool, OutreachToolContext};
 use crate::use_cases::approval::ApprovalUseCases;
-use crate::use_cases::thread::RecipientRole;
+use crate::use_cases::{channel::ChannelPersistence, thread::RecipientRole};
 use ai_agents::{Agent, AgentBuilder};
 use regex::Regex;
 use sha2::{Digest, Sha256};
@@ -183,7 +183,8 @@ fn base_agent_config_with_observability(observability_enabled: bool) -> serde_js
                     "max_output_chars": 4000,
                     "config": {
                         "max_targets": 50,
-                        "max_timeout_hours": 720
+                        "max_timeout_hours": 720,
+                        "allowed_target_scope": "external_only"
                     }
                 }
             }
@@ -698,6 +699,7 @@ pub struct AgentRunner<'a> {
     recipient_role: Option<RecipientRole>,
     upstream_pipeline_context: Option<String>,
     task_persistence: Option<Arc<dyn TaskPersistence>>,
+    channel_persistence: Option<Arc<dyn ChannelPersistence>>,
     outreach_context: Option<OutreachToolContext>,
 }
 
@@ -719,6 +721,7 @@ impl<'a> AgentRunner<'a> {
             recipient_role: None,
             upstream_pipeline_context: None,
             task_persistence: None,
+            channel_persistence: None,
             outreach_context: None,
         }
     }
@@ -788,9 +791,11 @@ impl<'a> AgentRunner<'a> {
     pub fn outreach_tool(
         mut self,
         persistence: Arc<dyn TaskPersistence>,
+        channel_persistence: Arc<dyn ChannelPersistence>,
         context: OutreachToolContext,
     ) -> Self {
         self.task_persistence = Some(persistence);
+        self.channel_persistence = Some(channel_persistence);
         self.outreach_context = Some(context);
         self
     }
@@ -893,6 +898,7 @@ impl<'a> AgentRunner<'a> {
         let approval_context = self.approval_context.clone();
         let recipient_role = self.recipient_role;
         let task_persistence = self.task_persistence.clone();
+        let channel_persistence = self.channel_persistence.clone();
         let outreach_context = self.outreach_context.clone();
         let suspended = Arc::new(AtomicBool::new(false));
         let suspended_for_task = suspended.clone();
@@ -931,9 +937,12 @@ impl<'a> AgentRunner<'a> {
                 .await?
                 .auto_configure_spawner()
                 .await?;
-            if let (Some(persistence), Some(context)) = (task_persistence, outreach_context) {
+            if let (Some(persistence), Some(channel_persistence), Some(context)) =
+                (task_persistence, channel_persistence, outreach_context)
+            {
                 builder = builder.tool(Arc::new(OutreachAndAwaitQuorumTool::new(
                     persistence,
+                    channel_persistence,
                     context,
                     suspended_for_task.clone(),
                 )));
