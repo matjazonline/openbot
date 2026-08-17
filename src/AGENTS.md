@@ -132,3 +132,18 @@ tests;`), and hoist hand-written mocks (`MockCompanyPersistence`, `MockThreadPer
 one shared `test_support` module instead of re-declaring them per file. The 700 lines of mocks in
 `thread.rs` exist because the decision logic isn't pure — following the extraction rule above
 deletes most of the need for them.
+
+# Regenerate sqlx query metadata after touching SQL
+
+**Whenever you add or change a SQL query, regenerate it and commit the result:**
+
+```sh
+DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" \
+  cargo sqlx prepare -- --all-targets
+```
+
+This refreshes the `.sqlx/` offline query cache that `cargo build` relies on in environments
+without a live `DATABASE_URL` (Fly.io deploy included — see `docs/deploy.md`). A stale `.sqlx/`
+cache after a query edit either fails the build there or, worse, silently keeps building against
+the old query shape. Requires `sqlx-cli` (`cargo install sqlx-cli --no-default-features --features
+postgres,rustls`) and a local Postgres reachable at that URL.
