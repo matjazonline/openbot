@@ -43,3 +43,31 @@ async fn health(State(db): State<PgPool>) -> Json<Value> {
 async fn probe_db(db: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query("SELECT 1").execute(db).await.map(|_| ())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Instant;
+
+    /// A closed local port stands in for a stopped/unreachable database
+    /// machine: the probe must report failure quickly rather than hanging
+    /// out to the pool's 10s+ connect/acquire timeouts.
+    #[tokio::test]
+    async fn probe_reports_down_promptly_when_database_is_unreachable() {
+        let pool = PgPool::connect_lazy("postgres://user:pass@127.0.0.1:1/mail_agents_test")
+            .expect("lazy pool construction never touches the network");
+
+        let start = Instant::now();
+        let result = tokio::time::timeout(DB_PROBE_TIMEOUT, probe_db(&pool)).await;
+        let elapsed = start.elapsed();
+
+        assert!(
+            matches!(result, Ok(Err(_)) | Err(_)),
+            "expected the probe to fail against an unreachable database"
+        );
+        assert!(
+            elapsed < DB_PROBE_TIMEOUT + Duration::from_millis(500),
+            "probe took {elapsed:?}, expected it bounded near {DB_PROBE_TIMEOUT:?}"
+        );
+    }
+}
