@@ -20,6 +20,10 @@ impl PostgresPersistence {
     pub fn new(pool: PgPool) -> Self {
         PostgresPersistence { pool }
     }
+
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
 }
 
 impl From<sqlx::Error> for AppError {

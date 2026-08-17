@@ -63,6 +63,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     );
 
     Ok(AppState {
+        db: postgres_arc.pool().clone(),
         config,
         monitoring,
         user_use_cases: Arc::new(user_use_cases),

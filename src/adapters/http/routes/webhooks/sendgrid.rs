@@ -969,6 +969,9 @@ mod tests {
             config.clone(),
         ));
         let app_state = AppState {
+            // Lazy: this test drives mocked persistence and never opens a connection.
+            db: sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                .expect("valid lazy pool url"),
             config: config.clone(),
             monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
             user_use_cases: Arc::new(crate::use_cases::user::UserUseCases::new(

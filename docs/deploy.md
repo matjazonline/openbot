@@ -156,12 +156,19 @@ two different behaviours, worth keeping straight:
   this by deploying both apps at once, or if the app machine happens to restart
   during database downtime.
 
-Because `/health` is dependency-free, Fly will not recycle a running machine
-during a database outage — which is the intent.
+`/health` always returns HTTP 200 while the process is up, so Fly will not
+recycle a running machine during a database outage — which is the intent.
 
-**`/health` is a liveness probe only.** It intentionally touches no
-dependencies, so a database blip does not cause Fly to recycle a process that is
-otherwise serving traffic.
+**`/health` reports database status but never fails on it.** The HTTP status
+code is unconditionally 200 as long as the process is serving; the response
+body separately reports `"database": "up"` or `"down"` from a `SELECT 1`
+probe bounded to 1 second, well under the platform check's own timeout. A
+database blip shows up in the body for observability without causing Fly to
+recycle a process that is otherwise serving traffic.
+
+```json
+{"status":"ok","version":"0.1.0","database":"up"}
+```
 
 ## Routine tasks
 

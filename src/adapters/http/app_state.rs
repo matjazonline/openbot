@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::extract::FromRef;
+use sqlx::PgPool;
 
 use crate::{
     domain::monitoring::MonitoringService,
@@ -14,6 +15,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct AppState {
+    pub db: PgPool,
     pub config: Arc<AppConfig>,
     pub monitoring: Arc<dyn MonitoringService>,
     pub user_use_cases: Arc<UserUseCases>,
@@ -23,6 +25,12 @@ pub struct AppState {
     pub agent_use_cases: Arc<AgentUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
     pub approval_use_cases: Arc<ApprovalUseCases>,
+}
+
+impl FromRef<AppState> for PgPool {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.db.clone()
+    }
 }
 
 impl FromRef<AppState> for Arc<AppConfig> {
