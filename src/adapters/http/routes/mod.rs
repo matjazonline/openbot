@@ -3,6 +3,7 @@ pub mod approval;
 pub mod channel;
 pub mod company;
 pub mod company_invite;
+pub mod health;
 pub mod monitoring;
 pub mod onboarding;
 pub mod task;
@@ -27,6 +28,7 @@ pub fn router() -> Router<AppState> {
         .route_layer(middleware::from_fn(auth::require_auth));
 
     Router::new()
+        .merge(health::router())
         .merge(user::public_router())
         .merge(webhooks::router())
         .merge(protected)

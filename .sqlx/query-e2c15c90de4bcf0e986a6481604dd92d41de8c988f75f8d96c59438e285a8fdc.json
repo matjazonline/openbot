@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n                SELECT 1 FROM companies c JOIN users u ON c.user_id = u.id WHERE c.id = $1 AND u.email = $2\n                UNION ALL\n                SELECT 1 FROM company_members m JOIN users u ON m.user_id = u.id WHERE m.company_id = $1 AND u.email = $2\n            ) as \"exists!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "citext",
+            "kind": "Simple"
+          }
+        }
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e2c15c90de4bcf0e986a6481604dd92d41de8c988f75f8d96c59438e285a8fdc"
+}

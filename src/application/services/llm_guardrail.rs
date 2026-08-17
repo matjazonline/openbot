@@ -164,6 +164,7 @@ mod tests {
             access_token_ttl: time::Duration::days(1),
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
+            cors_allowed_origins: vec![],
             smtp_host: "localhost".to_string(),
             smtp_port: 1025,
             smtp_username: "".to_string(),

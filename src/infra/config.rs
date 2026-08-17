@@ -7,6 +7,7 @@ pub struct AppConfig {
     pub access_token_ttl: Duration,
     pub refresh_token_ttl: Duration,
     pub app_domain_name: String,
+    pub cors_allowed_origins: Vec<String>,
     pub smtp_host: String,
     pub smtp_port: u16,
     pub smtp_username: String,
@@ -43,6 +44,13 @@ impl AppConfig {
 
         let app_domain_name =
             env::var("APP_DOMAIN_NAME").unwrap_or_else(|_| "localhost".to_string());
+
+        let cors_allowed_origins = env::var("CORS_ALLOWED_ORIGINS")
+            .unwrap_or_else(|_| "http://localhost:5173".to_string())
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
 
         let smtp_host = env::var("SMTP_HOST").unwrap_or_else(|_| "localhost".to_string());
         let smtp_port: u16 = env::var("SMTP_PORT")
@@ -118,6 +126,7 @@ impl AppConfig {
             access_token_ttl: Duration::seconds(access_token_ttl_secs),
             refresh_token_ttl: Duration::days(refresh_token_ttl_days),
             app_domain_name,
+            cors_allowed_origins,
             smtp_host,
             smtp_port,
             smtp_username,

@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT m.id, m.company_id, m.user_id, u.username as \"username?\", u.email as \"email?\", m.role, m.created_at as \"created_at!\"\n               FROM company_members m\n               JOIN users u ON u.id = m.user_id\n               WHERE m.company_id = $1\n               ORDER BY m.created_at ASC, m.id ASC LIMIT 200",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "company_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "username?",
+        "type_info": {
+          "Custom": {
+            "name": "citext",
+            "kind": "Simple"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "email?",
+        "type_info": {
+          "Custom": {
+            "name": "citext",
+            "kind": "Simple"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "role",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at!",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a38bfcf082666e08d3625c61e43f4d13100cf18deeb13dcb9159408ce0dc16db"
+}
