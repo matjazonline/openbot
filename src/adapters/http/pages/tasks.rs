@@ -14,42 +14,50 @@ pub struct TaskPagination {
     pub next: Option<TaskPageLink>,
 }
 
-pub fn company_tasks_page(
-    company: &Company,
-    channels: &[Channel],
-    tasks: &[BackgroundTask],
-    current_wf: Option<Uuid>,
-    current_status: Option<TaskStatus>,
-    sort_asc: bool,
-    pagination: &TaskPagination,
-) -> String {
-    let task_list_html = task_list_fragment(company.id, tasks, pagination);
+/// Totals across the tasks on this page.
+struct TaskTokenTotals {
+    prompt: usize,
+    completion: usize,
+    total: usize,
+}
 
-    let (total_prompt_tokens, total_completion_tokens, total_tokens_meter) = tasks
+fn total_token_usage(tasks: &[BackgroundTask]) -> TaskTokenTotals {
+    tasks
         .iter()
-        .filter_map(|t| t.token_usage())
-        .fold((0, 0, 0), |(p_acc, c_acc, t_acc), tu| {
-            (
-                p_acc + tu.prompt_tokens,
-                c_acc + tu.completion_tokens,
-                t_acc + tu.total_tokens,
-            )
-        });
+        .filter_map(|task| task.token_usage())
+        .fold(
+            TaskTokenTotals {
+                prompt: 0,
+                completion: 0,
+                total: 0,
+            },
+            |acc, usage| TaskTokenTotals {
+                prompt: acc.prompt + usage.prompt_tokens,
+                completion: acc.completion + usage.completion_tokens,
+                total: acc.total + usage.total_tokens,
+            },
+        )
+}
 
-    let mut wf_options = String::from("<option value=\"\">All Channels</option>");
-    for wf in channels {
-        let selected = if current_wf == Some(wf.id) {
+fn channel_filter_options(channels: &[Channel], current: Option<Uuid>) -> String {
+    let mut options = String::from("<option value=\"\">All Channels</option>");
+    for channel in channels {
+        let selected = if current == Some(channel.id) {
             "selected"
         } else {
             ""
         };
-        wf_options.push_str(&format!(
+        options.push_str(&format!(
             "<option value=\"{}\" {}>{} (/{})</option>",
-            wf.id, selected, wf.name, wf.slug
+            channel.id, selected, channel.name, channel.slug
         ));
     }
+    options
+}
 
-    let status_options_vec = vec![
+fn status_filter_options(current: Option<TaskStatus>) -> String {
+    let current = current.as_ref().map(|s| s.as_str()).unwrap_or("");
+    [
         ("", "All Statuses"),
         ("pending", "Pending"),
         ("processing", "Processing"),
@@ -57,37 +65,21 @@ pub fn company_tasks_page(
         ("failed", "Failed"),
         ("dead_letter", "Dead Letter"),
         ("stopped", "Stopped"),
-    ];
+    ]
+    .iter()
+    .map(|(value, label)| {
+        let selected = if current == *value { "selected" } else { "" };
+        format!("<option value=\"{}\" {}>{}</option>", value, selected, label)
+    })
+    .collect()
+}
 
-    let mut status_options = String::new();
-    let current_status_str = current_status.as_ref().map(|s| s.as_str()).unwrap_or("");
-    for (val, label) in status_options_vec {
-        let selected = if current_status_str == val {
-            "selected"
-        } else {
-            ""
-        };
-        status_options.push_str(&format!(
-            "<option value=\"{}\" {}>{}</option>",
-            val, selected, label
-        ));
-    }
-
-    let sort_desc_selected = if !sort_asc { "selected" } else { "" };
-    let sort_asc_selected = if sort_asc { "selected" } else { "" };
-
-    let content = format!(
+/// Running total of tokens consumed by the tasks currently listed.
+fn task_token_meter_card(totals: &TaskTokenTotals) -> String {
+    let (total_prompt_tokens, total_completion_tokens, total_tokens_meter) =
+        (totals.prompt, totals.completion, totals.total);
+    format!(
         r##"
-        <div class="flex items-center justify-between mb-6">
-            <div>
-                <a href="/companies" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Companies</a>
-                <h2 class="text-2xl font-bold text-white">{company_name} Background Tasks</h2>
-                <p class="text-slate-400 text-sm mt-0.5">Monitor, stop, or resume background processing tasks for <span class="font-mono text-indigo-300">/{slug}</span></p>
-            </div>
-        </div>
-
-        <div id="response-message" class="mb-6"></div>
-
         <!-- Token Meter Summary Card -->
         <div class="bg-slate-900/80 border border-indigo-900/60 rounded-xl p-4 mb-6 flex flex-wrap items-center justify-between gap-4 shadow-sm">
             <div class="flex items-center gap-3">
@@ -114,7 +106,22 @@ pub fn company_tasks_page(
                 </div>
             </div>
         </div>
+"##
+    )
+}
 
+/// Channel / status / sort controls; each one re-submits the form and swaps the task list.
+fn task_filter_bar(
+    company_id: Uuid,
+    limit: usize,
+    wf_options: &str,
+    status_options: &str,
+    sort_asc: bool,
+) -> String {
+    let sort_desc_selected = if !sort_asc { "selected" } else { "" };
+    let sort_asc_selected = if sort_asc { "selected" } else { "" };
+    format!(
+        r##"
         <!-- Filter & Sort Bar -->
         <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6">
             <form hx-get="/companies/{company_id}/tasks/filter" hx-target="#task-list" hx-swap="innerHTML" class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -143,7 +150,44 @@ pub fn company_tasks_page(
                 </div>
             </form>
         </div>
+"##
+    )
+}
 
+pub fn company_tasks_page(
+    company: &Company,
+    channels: &[Channel],
+    tasks: &[BackgroundTask],
+    current_wf: Option<Uuid>,
+    current_status: Option<TaskStatus>,
+    sort_asc: bool,
+    pagination: &TaskPagination,
+) -> String {
+    let task_list_html = task_list_fragment(company.id, tasks, pagination);
+    let totals = total_token_usage(tasks);
+    let token_meter_card = task_token_meter_card(&totals);
+    let filter_bar = task_filter_bar(
+        company.id,
+        pagination.limit,
+        &channel_filter_options(channels, current_wf),
+        &status_filter_options(current_status),
+        sort_asc,
+    );
+
+    let content = format!(
+        r##"
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <a href="/companies" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Companies</a>
+                <h2 class="text-2xl font-bold text-white">{company_name} Background Tasks</h2>
+                <p class="text-slate-400 text-sm mt-0.5">Monitor, stop, or resume background processing tasks for <span class="font-mono text-indigo-300">/{slug}</span></p>
+            </div>
+        </div>
+
+        <div id="response-message" class="mb-6"></div>
+
+{token_meter_card}
+{filter_bar}
         <!-- Task List Section -->
         <div>
             <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Tasks</h3>
@@ -154,12 +198,6 @@ pub fn company_tasks_page(
         "##,
         company_name = company.name,
         slug = company.slug,
-        company_id = company.id,
-        wf_options = wf_options,
-        status_options = status_options,
-        sort_desc_selected = sort_desc_selected,
-        sort_asc_selected = sort_asc_selected,
-        limit = pagination.limit,
         task_list_html = task_list_html,
     );
 

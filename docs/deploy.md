@@ -45,6 +45,23 @@ If this fails, `fly deploy` will fail the same way.
 
 ## First deploy
 
+`scripts/deploy.sh --bootstrap` automates both apps' first-time setup (app
+creation, volume, dedicated IPv4, and prompting for secrets), then deploys:
+
+```sh
+scripts/deploy.sh --bootstrap        # db, then app
+scripts/deploy.sh --bootstrap db     # db only
+scripts/deploy.sh --bootstrap app    # app only
+```
+
+It's a no-op (skipped with a message) for any app that already exists, so
+it's safe to leave `--bootstrap` on for routine deploys. Edit the non-secret
+values in `fly.toml` (`APP_DOMAIN_NAME`, `CORS_ALLOWED_ORIGINS`,
+`primary_region`) before the app's first deploy — the script prints a
+reminder but doesn't edit it for you.
+
+The equivalent manual steps, if you'd rather run them by hand:
+
 ### 1. Database
 
 ```sh
@@ -74,9 +91,6 @@ fly secrets set \
 
 fly deploy
 ```
-
-Edit the non-secret values in `fly.toml` (`APP_DOMAIN_NAME`,
-`CORS_ALLOWED_ORIGINS`, `primary_region`) before deploying.
 
 Schema migrations run automatically at startup from `src/infra/db.rs`, under a
 Postgres advisory lock, so they are safe even with several machines booting at

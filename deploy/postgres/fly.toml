@@ -9,7 +9,7 @@ app = "mail-agents-db"
 primary_region = "fra"
 
 [build]
-  image = "postgres:17-bookworm"
+  image = "postgres:18.6-bookworm"
 
 [env]
   # The volume is mounted at /var/lib/postgresql/data, and initdb refuses to
@@ -25,10 +25,10 @@ primary_region = "fra"
   destination = "/var/lib/postgresql/data"
 
 # Listen on :: as well as 0.0.0.0 so the 6PN address is bound; tune memory for
-# the 1gb VM below (roughly 25% shared_buffers, 75% effective_cache_size).
+# the 512mb VM below (roughly 25% shared_buffers, 75% effective_cache_size).
 [processes]
-  app = "postgres -c listen_addresses=* -c max_connections=100 -c shared_buffers=256MB -c effective_cache_size=768MB"
+  app = "postgres -c listen_addresses=* -c max_connections=100 -c shared_buffers=128MB -c effective_cache_size=384MB"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "1gb"
+  memory = "512mb"

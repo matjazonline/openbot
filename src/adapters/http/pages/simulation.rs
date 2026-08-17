@@ -2,22 +2,10 @@
 
 use super::*;
 
-pub fn channel_simulation_page(
-    company: &Company,
-    app_domain_name: &str,
-    channel: &Channel,
-    sender_email: &str,
-    initial_thread_id: Option<&str>,
-    initial_result_html: Option<&str>,
-) -> String {
-    let target_recipient = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
-
-    let initial_result_val = initial_result_html.unwrap_or("");
-
-    let form_container_content = if let Some(tid) =
-        initial_thread_id.filter(|s| !s.trim().is_empty())
-    {
-        format!(
+/// Header shown instead of the compose form once a thread is loaded: the simulator is now
+/// replying within that thread, so the only action offered is starting a fresh one.
+fn simulation_loaded_thread_header(company_id: Uuid, channel_id: Uuid, tid: &str) -> String {
+    format!(
             r##"
             <div id="simulation-form-container">
                 <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
@@ -33,12 +21,21 @@ pub fn channel_simulation_page(
                 </div>
             </div>
             "##,
-            company_id = company.id,
-            channel_id = channel.id,
+            company_id = company_id,
+            channel_id = channel_id,
             tid = tid,
-        )
-    } else {
-        format!(
+    )
+}
+
+/// The compose form: a synthetic inbound webhook payload plus the controls for loading an
+/// existing thread by id.
+fn simulation_compose_form(
+    company_id: Uuid,
+    channel_id: Uuid,
+    target_recipient: &str,
+    sender_email: &str,
+) -> String {
+    format!(
             r##"
             <div id="simulation-form-container">
                 <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-6 shadow-md space-y-6">
@@ -134,11 +131,33 @@ pub fn channel_simulation_page(
                 </div>
             </div>
             "##,
-            company_id = company.id,
-            channel_id = channel.id,
+            company_id = company_id,
+            channel_id = channel_id,
             target_recipient = target_recipient,
             sender_email = sender_email,
-        )
+    )
+}
+
+pub fn channel_simulation_page(
+    company: &Company,
+    app_domain_name: &str,
+    channel: &Channel,
+    sender_email: &str,
+    initial_thread_id: Option<&str>,
+    initial_result_html: Option<&str>,
+) -> String {
+    let target_recipient = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
+
+    let initial_result_val = initial_result_html.unwrap_or("");
+
+    let form_container_content = match initial_thread_id.filter(|s| !s.trim().is_empty()) {
+        Some(tid) => simulation_loaded_thread_header(company.id, channel.id, tid),
+        None => simulation_compose_form(
+            company.id,
+            channel.id,
+            &target_recipient,
+            sender_email,
+        ),
     };
 
     let content = format!(
@@ -422,12 +441,9 @@ pub fn channel_simulation_failure_fragment(
     )
 }
 
-pub fn channel_simulation_result_fragment(
-    company_id: Uuid,
-    channel_id: Uuid,
-    result: &InboundEmailResult,
-) -> String {
-    let oob_form_swap = format!(
+/// Banner that replaces the compose form once a verify-only simulation has run.
+fn simulation_completed_banner(company_id: Uuid, channel_id: Uuid) -> String {
+    format!(
         r##"
         <div id="simulation-form-container" hx-swap-oob="outerHTML">
             <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
@@ -444,7 +460,99 @@ pub fn channel_simulation_result_fragment(
         "##,
         company_id = company_id,
         channel_id = channel_id,
-    );
+    )
+}
+
+/// Routing report for a verify run: which company/channel the address resolved to, the model that
+/// would have answered, and the payload as received.
+fn simulation_routing_report(
+    status_banner: &str,
+    provider_str: &str,
+    model_str: &str,
+    api_key_status: &str,
+    company_name: &str,
+    channel_name: &str,
+    to: &str,
+    from: &str,
+    subject_str: &str,
+    body_str: &str,
+    channel_config_str: &str,
+) -> String {
+    format!(
+        r##"
+        <div class="space-y-4">
+            {status_banner}
+
+            <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
+                <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2">Simulation Execution Details</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Provider:</span>
+                        <span class="text-indigo-300 font-bold">{provider_str}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Model:</span>
+                        <span class="text-indigo-300 font-bold">{model_str}</span>
+                    </div>
+                    <div class="md:col-span-2">
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">API Key Status:</span>
+                        <span>{api_key_status}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
+                        <span class="text-indigo-300">{to}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Sender ('from'):</span>
+                        <span class="text-indigo-300">{from}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Company:</span>
+                        <span class="text-slate-200">{company_name}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Channel:</span>
+                        <span class="text-slate-200">{channel_name}</span>
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-800">
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Email Subject:</span>
+                    <span class="text-slate-200 font-sans font-medium text-sm">{subject_str}</span>
+                </div>
+
+                <div>
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Email Text Body:</span>
+                    <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800">{body_str}</div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-800">
+                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Channel Config:</span>
+                    <pre class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-[11px]">{channel_config_str}</pre>
+                </div>
+            </div>
+        </div>
+        "##,
+        status_banner = status_banner,
+        provider_str = provider_str,
+        model_str = model_str,
+        api_key_status = api_key_status,
+        to = to,
+        from = from,
+        company_name = company_name,
+        channel_name = channel_name,
+        subject_str = subject_str,
+        body_str = body_str,
+        channel_config_str = channel_config_str,
+    )
+}
+
+pub fn channel_simulation_result_fragment(
+    company_id: Uuid,
+    channel_id: Uuid,
+    result: &InboundEmailResult,
+) -> String {
+    let oob_form_swap = simulation_completed_banner(company_id, channel_id);
 
     let llm = resolve_llm_info(result.channel.as_ref(), result.company.as_ref());
     let (provider_str, model_str, api_key_status) = (&llm.provider, &llm.model, &llm.api_key_status);
@@ -505,72 +613,18 @@ pub fn channel_simulation_result_fragment(
         None => "None".to_string(),
     };
 
-    let body_fragment = format!(
-        r##"
-        <div class="space-y-4">
-            {status_banner}
-
-            <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
-                <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2">Simulation Execution Details</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Provider:</span>
-                        <span class="text-indigo-300 font-bold">{provider_str}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">LLM Model:</span>
-                        <span class="text-indigo-300 font-bold">{model_str}</span>
-                    </div>
-                    <div class="md:col-span-2">
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">API Key Status:</span>
-                        <span>{api_key_status}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
-                        <span class="text-indigo-300">{to}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Sender ('from'):</span>
-                        <span class="text-indigo-300">{from}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Company:</span>
-                        <span class="text-slate-200">{company_name}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Target Channel:</span>
-                        <span class="text-slate-200">{channel_name}</span>
-                    </div>
-                </div>
-
-                <div class="pt-2 border-t border-slate-800">
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Email Subject:</span>
-                    <span class="text-slate-200 font-sans font-medium text-sm">{subject_str}</span>
-                </div>
-
-                <div>
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Email Text Body:</span>
-                    <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800">{body_str}</div>
-                </div>
-
-                <div class="pt-2 border-t border-slate-800">
-                    <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">Channel Config:</span>
-                    <pre class="bg-slate-950 p-3 rounded-lg text-emerald-300 whitespace-pre-wrap border border-slate-800 text-[11px]">{channel_config_str}</pre>
-                </div>
-            </div>
-        </div>
-        "##,
-        status_banner = status_banner,
-        provider_str = provider_str,
-        model_str = model_str,
-        api_key_status = api_key_status,
-        to = result.email.to,
-        from = result.email.from,
-        company_name = company_name,
-        channel_name = channel_name,
-        subject_str = subject_str,
-        body_str = body_str,
-        channel_config_str = channel_config_str,
+    let body_fragment = simulation_routing_report(
+        status_banner,
+        provider_str,
+        model_str,
+        api_key_status,
+        &company_name,
+        &channel_name,
+        &result.email.to,
+        &result.email.from,
+        subject_str,
+        &body_str,
+        &channel_config_str,
     );
 
     format!("{oob_form_swap}\n{body_fragment}")
@@ -1154,6 +1208,143 @@ pub(crate) fn resolved_agent_config(
         .unwrap_or_else(|| serde_json::json!({}))
 }
 
+/// The execution-details card for a simulated run: mode, dispatch status, model, the addresses
+/// involved and the agent's own answer.
+fn simulation_execution_details(
+    sim_res: &SimulationExecutionResult,
+    provider_str: &str,
+    model_str: &str,
+    api_key_status: &str,
+    thread_id_str: &str,
+    is_agent_error: bool,
+    agent_response_text: &str,
+    to_str: &str,
+    from_str: &str,
+    subject_str: &str,
+    text_body_str: &str,
+    email_status: &str,
+) -> String {
+    let ingest = &sim_res.ingest_result;
+    let agent_exec = sim_res.agent_execution.as_ref();
+    execution_details_card(&ExecutionDetails {
+        mode_label: match sim_res.simulation_mode {
+            SimulationMode::Verify => "Verify",
+            SimulationMode::RunTest => "Run_Test (Dry-Run)",
+            SimulationMode::Run => "Run (Live)",
+        },
+        email_status,
+        provider_str: &provider_str,
+        model_str: &model_str,
+        api_key_status: &api_key_status,
+        token_meter_html: &token_meter_html(agent_exec.and_then(|a| a.token_usage.as_ref())),
+        metadata_html: &execution_metadata_html(agent_exec.and_then(|a| a.metadata.as_ref())),
+        to_str,
+        from_str,
+        company_name: &ingest
+            .company
+            .as_ref()
+            .map(|c| format!("{} (/{})", c.name, c.slug))
+            .unwrap_or_else(|| "N/A".to_string()),
+        channel_name: &ingest
+            .channel
+            .as_ref()
+            .map(|w| format!("{} (/{})", w.name, w.slug))
+            .unwrap_or_else(|| "N/A".to_string()),
+        thread_id_str: &thread_id_str,
+        inbound_msg_id: &ingest
+            .inbound_message
+            .as_ref()
+            .map(|m| m.message_id.to_string())
+            .unwrap_or_else(|| "N/A".to_string()),
+        outbound_msg_id: &agent_exec
+            .and_then(|a| a.outbound_message_id.clone())
+            .unwrap_or_else(|| "N/A".to_string()),
+        subject_str,
+        text_body_str,
+        is_agent_error,
+        agent_response_html: &render_markdown(agent_response_text),
+    })
+}
+
+/// Thread history for a simulated run, attributing agent messages to the resolved channel config.
+fn simulation_thread_history(
+    ingest: &crate::use_cases::thread::InboundIngestResult,
+    messages: &[Message],
+    tasks: &[BackgroundTask],
+    thread_id_str: &str,
+    provider_str: &str,
+    model_str: &str,
+) -> String {
+    let parsed = ingest.parsed_email.as_ref();
+    thread_history_section(
+        messages,
+        &thread_id_str,
+        "",
+        "",
+        &MessageTaskContext {
+            tasks,
+            task_id: ingest.task_id,
+            thread_id: ingest.thread.as_ref().map(|t| t.id),
+            company: ingest.company.as_ref(),
+            channel: ingest.channel.as_ref(),
+            provider: &provider_str,
+            model: &model_str,
+            resolved_config: resolved_agent_config(
+                ingest.company.as_ref(),
+                ingest.channel.as_ref(),
+            ),
+            agent_prompt: Some(parsed.map(|p| p.prompt_text.as_str()).unwrap_or("")),
+        },
+    )
+}
+
+/// Reply form for a simulated run, pre-addressed to continue the same thread.
+fn simulation_reply_form(
+    sim_res: &SimulationExecutionResult,
+    company_id: Uuid,
+    channel_id: Uuid,
+    messages: &[Message],
+    thread_id_str: &str,
+    to_str: &str,
+    from_str: &str,
+    subject_str: &str,
+) -> String {
+    let ingest = &sim_res.ingest_result;
+    let last_msg_id = messages
+        .last()
+        .map(|m| m.message_id.to_string())
+        .or_else(|| {
+            sim_res
+                .agent_execution
+                .as_ref()
+                .and_then(|a| a.outbound_message_id.clone())
+        })
+        .or_else(|| {
+            ingest
+                .inbound_message
+                .as_ref()
+                .map(|m| m.message_id.to_string())
+        })
+        .unwrap_or_default();
+
+    simulate_reply_form(&ReplyFormFields {
+        company_id,
+        channel_id,
+        thread_id_str: &thread_id_str,
+        last_msg_id: &last_msg_id,
+        to_value: to_str,
+        from_value: from_str,
+        subject: &if subject_str.to_lowercase().starts_with("re:") {
+            subject_str.to_string()
+        } else {
+            format!("Re: {}", subject_str)
+        },
+        run_test_checked: sim_res.simulation_mode == SimulationMode::RunTest,
+        run_checked: sim_res.simulation_mode == SimulationMode::Run,
+        submit_row_class: " pt-1",
+    })
+}
+
 pub fn channel_simulation_execution_result_fragment(
     company_id: Uuid,
     channel_id: Uuid,
@@ -1223,99 +1414,38 @@ pub fn channel_simulation_execution_result_fragment(
         "<span class=\"text-slate-400 font-bold\">None (Verify Only)</span>"
     };
 
-    let exec_details = execution_details_card(&ExecutionDetails {
-        mode_label: match sim_res.simulation_mode {
-            SimulationMode::Verify => "Verify",
-            SimulationMode::RunTest => "Run_Test (Dry-Run)",
-            SimulationMode::Run => "Run (Live)",
-        },
-        email_status,
-        provider_str: &provider_str,
-        model_str: &model_str,
-        api_key_status: &api_key_status,
-        token_meter_html: &token_meter_html(agent_exec.and_then(|a| a.token_usage.as_ref())),
-        metadata_html: &execution_metadata_html(agent_exec.and_then(|a| a.metadata.as_ref())),
+    let exec_details = simulation_execution_details(
+        sim_res,
+        provider_str,
+        model_str,
+        api_key_status,
+        &thread_id_str,
+        is_agent_error,
+        agent_response_text,
         to_str,
         from_str,
-        company_name: &ingest
-            .company
-            .as_ref()
-            .map(|c| format!("{} (/{})", c.name, c.slug))
-            .unwrap_or_else(|| "N/A".to_string()),
-        channel_name: &ingest
-            .channel
-            .as_ref()
-            .map(|w| format!("{} (/{})", w.name, w.slug))
-            .unwrap_or_else(|| "N/A".to_string()),
-        thread_id_str: &thread_id_str,
-        inbound_msg_id: &ingest
-            .inbound_message
-            .as_ref()
-            .map(|m| m.message_id.to_string())
-            .unwrap_or_else(|| "N/A".to_string()),
-        outbound_msg_id: &agent_exec
-            .and_then(|a| a.outbound_message_id.clone())
-            .unwrap_or_else(|| "N/A".to_string()),
         subject_str,
         text_body_str,
-        is_agent_error,
-        agent_response_html: &render_markdown(agent_response_text),
-    });
-
-    let messages_section = thread_history_section(
-        messages,
-        &thread_id_str,
-        "",
-        "",
-        &MessageTaskContext {
-            tasks,
-            task_id: ingest.task_id,
-            thread_id: ingest.thread.as_ref().map(|t| t.id),
-            company: ingest.company.as_ref(),
-            channel: ingest.channel.as_ref(),
-            provider: &provider_str,
-            model: &model_str,
-            resolved_config: resolved_agent_config(
-                ingest.company.as_ref(),
-                ingest.channel.as_ref(),
-            ),
-            agent_prompt: Some(parsed.map(|p| p.prompt_text.as_str()).unwrap_or("")),
-        },
+        email_status,
     );
-
-    let last_msg_id = messages
-        .last()
-        .map(|m| m.message_id.to_string())
-        .or_else(|| {
-            sim_res
-                .agent_execution
-                .as_ref()
-                .and_then(|a| a.outbound_message_id.clone())
-        })
-        .or_else(|| {
-            ingest
-                .inbound_message
-                .as_ref()
-                .map(|m| m.message_id.to_string())
-        })
-        .unwrap_or_default();
-
-    let reply_form = simulate_reply_form(&ReplyFormFields {
+    let messages_section = simulation_thread_history(
+        ingest,
+        messages,
+        tasks,
+        &thread_id_str,
+        provider_str,
+        model_str,
+    );
+    let reply_form = simulation_reply_form(
+        sim_res,
         company_id,
         channel_id,
-        thread_id_str: &thread_id_str,
-        last_msg_id: &last_msg_id,
-        to_value: to_str,
-        from_value: from_str,
-        subject: &if subject_str.to_lowercase().starts_with("re:") {
-            subject_str.to_string()
-        } else {
-            format!("Re: {}", subject_str)
-        },
-        run_test_checked: sim_res.simulation_mode == SimulationMode::RunTest,
-        run_checked: sim_res.simulation_mode == SimulationMode::Run,
-        submit_row_class: " pt-1",
-    });
+        messages,
+        &thread_id_str,
+        to_str,
+        from_str,
+        subject_str,
+    );
 
     let status_banner = simulation_status_banner(sim_res.simulation_mode, is_agent_error);
     format!(
