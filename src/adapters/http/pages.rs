@@ -2522,30 +2522,20 @@ pub fn channel_simulation_result_fragment(
     format!("{oob_form_swap}\n{body_fragment}")
 }
 
-pub fn channel_simulation_execution_result_fragment(
+/// Sticky header that replaces the "new simulation" form once a thread is live.
+fn simulation_active_banner(
     company_id: Uuid,
     channel_id: Uuid,
-    sim_res: &SimulationExecutionResult,
-    messages: &[Message],
-    tasks: &[BackgroundTask],
+    thread_id_str: &str,
+    status_label: &str,
 ) -> String {
-    let ingest = &sim_res.ingest_result;
-    let (provider_str, model_str, api_key_status) =
-        resolve_llm_info(ingest.channel.as_ref(), ingest.company.as_ref());
-
-    let thread_id_str = ingest
-        .thread
-        .as_ref()
-        .map(|t| t.id.to_string())
-        .unwrap_or_else(|| "N/A".to_string());
-
-    let oob_form_swap = format!(
+    format!(
         r##"
         <div id="simulation-form-container" hx-swap-oob="outerHTML">
             <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
                 <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
                     <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>Simulation Thread Active</span>
+                    <span>{status_label}</span>
                     <span class="text-xs text-slate-400 font-mono">({thread_id_str})</span>
                 </div>
                 <a href="/companies/{company_id}/channels/{channel_id}/simulate"
@@ -2554,20 +2544,302 @@ pub fn channel_simulation_execution_result_fragment(
                 </a>
             </div>
         </div>
-        "##,
-        company_id = company_id,
-        channel_id = channel_id,
-        thread_id_str = thread_id_str,
-    );
+        "##
+    )
+}
 
-    if !ingest.accepted {
-        let reason = ingest
-            .reason
-            .as_deref()
-            .unwrap_or("Ingestion failed / unauthorized");
-        return format!(
+/// What the thread history needs in order to describe a message that has no recorded task: the
+/// task list to search, and the channel configuration to attribute an agent reply to.
+struct MessageTaskContext<'a> {
+    tasks: &'a [BackgroundTask],
+    task_id: Option<Uuid>,
+    thread_id: Option<Uuid>,
+    company: Option<&'a Company>,
+    channel: Option<&'a Channel>,
+    provider: &'a str,
+    model: &'a str,
+    resolved_config: serde_json::Value,
+    /// Prompt to report for agent messages with no task; `None` reuses the message body.
+    agent_prompt: Option<&'a str>,
+}
+
+/// The real task payload when one matches, otherwise a synthesized stand-in so the message still
+/// renders its execution parameters.
+fn message_task_payload(
+    msg: &Message,
+    is_agent: bool,
+    created_at_fmt: &str,
+    ctx: &MessageTaskContext<'_>,
+) -> serde_json::Value {
+    if let Some(task) = find_task_for_message(msg, ctx.tasks, ctx.task_id, ctx.thread_id) {
+        return task.payload.clone();
+    }
+    if is_agent {
+        serde_json::json!({
+            "task_type": "email_agent_dispatch",
+            "execution_parameters": {
+                "provider": ctx.provider,
+                "model": ctx.model,
+                "prompt": ctx.agent_prompt.unwrap_or(msg.clean_text_body.as_str()),
+                "config": ctx.resolved_config.clone(),
+                "executed_at": created_at_fmt
+            },
+            "execution_result": {
+                "response": msg.clean_text_body,
+                "outbound_message_id": msg.message_id
+            },
+            "channel": ctx.channel,
+            "company": ctx.company
+        })
+    } else {
+        serde_json::json!({
+            "task_type": "email_agent_dispatch",
+            "parsed_email": {
+                "sender": msg.sender,
+                "subject": msg.subject,
+                "prompt_text": msg.clean_text_body,
+                "message_id": msg.message_id
+            },
+            "inbound_message": {
+                "id": msg.id,
+                "message_id": msg.message_id,
+                "direction": "inbound",
+                "role": "human",
+                "clean_text_body": msg.clean_text_body
+            },
+            "channel": ctx.channel,
+            "company": ctx.company
+        })
+    }
+}
+
+/// One message in the thread history: an indigo agent card or a slate inbound card.
+fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> String {
+    let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
+    let created_at = msg.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+    let params_html =
+        render_message_task_parameters_html(&message_task_payload(msg, is_agent, &created_at, ctx));
+
+    if is_agent {
+        let body = render_markdown(&msg.clean_text_body);
+        format!(
             r##"
-            {oob_form_swap}
+                    <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 space-y-2 shadow-sm">
+                        <div class="flex items-center justify-between border-b border-indigo-500/20 pb-2 text-xs">
+                            <div class="flex items-center gap-2 font-semibold text-indigo-300">
+                                <span>🤖</span>
+                                <span>AI Agent Response</span>
+                                <span class="px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-200 text-[10px] uppercase font-mono">Outbound</span>
+                            </div>
+                            <span class="text-slate-400 font-mono text-[11px]">{created_at}</span>
+                        </div>
+                        <div class="text-xs font-mono text-slate-400">
+                            <span>Message ID: </span><span class="text-indigo-200">{msg_id}</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 border border-slate-800 text-xs font-sans max-h-60 overflow-y-auto {markdown_styles}">
+                            {body}
+                        </div>
+                        {params_html}
+                    </div>
+                    "##,
+            created_at = created_at,
+            msg_id = msg.message_id,
+            body = body,
+            markdown_styles = MARKDOWN_CONTENT_STYLES,
+            params_html = params_html,
+        )
+    } else {
+        format!(
+            r##"
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow-sm">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2 text-xs">
+                            <div class="flex items-center gap-2 font-semibold text-slate-200">
+                                <span>👤</span>
+                                <span>Inbound Email</span>
+                                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] uppercase font-mono">Inbound</span>
+                            </div>
+                            <span class="text-slate-400 font-mono text-[11px]">{created_at}</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono text-slate-400">
+                            <div>From: <span class="text-indigo-300">{sender}</span></div>
+                            <div>Message ID: <span class="text-slate-300">{msg_id}</span></div>
+                        </div>
+                        <div class="text-xs font-medium text-slate-200 pt-1">
+                            Subject: <span class="font-normal text-slate-300">{subject}</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800 text-xs">
+                            {body}
+                        </div>
+                        {params_html}
+                    </div>
+                    "##,
+            created_at = created_at,
+            sender = msg.sender,
+            msg_id = msg.message_id,
+            subject = msg.subject,
+            body = msg.clean_text_body,
+            params_html = params_html,
+        )
+    }
+}
+
+/// The full "Thread History" card, or `empty_state` when the thread has no messages yet.
+fn thread_history_section(
+    messages: &[Message],
+    thread_id_str: &str,
+    wrapper_extra_class: &str,
+    empty_state: &str,
+    ctx: &MessageTaskContext<'_>,
+) -> String {
+    if messages.is_empty() {
+        return empty_state.to_string();
+    }
+    let msgs_html: String = messages
+        .iter()
+        .map(|msg| message_bubble(msg, ctx))
+        .collect();
+    let msg_count = messages.len();
+    let label = if msg_count == 1 { "message" } else { "messages" };
+
+    format!(
+        r##"
+            <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 space-y-4 shadow-lg{wrapper_extra_class}">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h4 class="text-sm font-sans font-bold text-white flex items-center gap-2">
+                        <span>💬</span> Thread History ({msg_count} {label})
+                    </h4>
+                    <span class="text-xs font-mono text-emerald-400">Thread ID: {thread_id_str}</span>
+                </div>
+                <div class="space-y-3">
+                    {msgs_html}
+                </div>
+            </div>
+            "##
+    )
+}
+
+/// Everything that varies between the two "simulate a reply" forms.
+struct ReplyFormFields<'a> {
+    company_id: Uuid,
+    channel_id: Uuid,
+    thread_id_str: &'a str,
+    last_msg_id: &'a str,
+    to_value: &'a str,
+    from_value: &'a str,
+    subject: &'a str,
+    run_test_checked: bool,
+    run_checked: bool,
+    /// The execution-result form pads its submit row; the loaded-thread form doesn't.
+    submit_row_class: &'a str,
+}
+
+fn simulate_reply_form(fields: &ReplyFormFields<'_>) -> String {
+    let ReplyFormFields {
+        company_id,
+        channel_id,
+        thread_id_str,
+        last_msg_id,
+        to_value,
+        from_value,
+        subject,
+        run_test_checked,
+        run_checked,
+        submit_row_class,
+    } = *fields;
+    let run_test_checked = if run_test_checked { " checked" } else { "" };
+    let run_checked = if run_checked { " checked" } else { "" };
+
+    format!(
+        r##"
+        <div class="bg-slate-900/90 border border-indigo-500/40 rounded-xl p-5 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span class="text-indigo-400 text-base">↩️</span> Simulate Reply Webhook Call
+                </h3>
+                <span class="text-xs text-slate-400">Simulate next message in Thread <span class="font-mono text-indigo-300">{thread_id_str}</span></span>
+            </div>
+
+            <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate"
+                  hx-target="#simulation-result"
+                  hx-swap="innerHTML"
+                  hx-disabled-elt="find button[type='submit']"
+                  class="space-y-4">
+                <input type="hidden" name="in_reply_to" value="{last_msg_id}">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="to_reply" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
+                        <input type="text" id="to_reply" name="to" value="{to_value}" required
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label for="from_reply" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
+                        <input type="text" id="from_reply" name="from" value="{from_value}" disabled
+                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono opacity-60 cursor-not-allowed">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="subject_reply" class="block text-xs font-medium text-slate-300 mb-1">Subject</label>
+                    <input type="text" id="subject_reply" name="subject" value="{subject}" required
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div>
+                    <label for="text_body_reply" class="block text-xs font-medium text-slate-300 mb-1">Reply Text Body</label>
+                    <textarea id="text_body_reply" name="text_body" rows="3" required placeholder="Type your reply message here..."
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
+                            <input type="radio" name="simulation_mode" value="run_test"{run_test_checked} class="mt-0.5 text-amber-500 focus:ring-amber-500">
+                            <div class="ml-2.5">
+                                <span class="block text-xs font-bold text-amber-300">Run_Test</span>
+                                <span class="block text-[11px] text-slate-400 mt-0.5">Execute full channel & agent, skip email dispatch</span>
+                            </div>
+                        </label>
+                        <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
+                            <input type="radio" name="simulation_mode" value="run"{run_checked} class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
+                            <div class="ml-2.5">
+                                <span class="block text-xs font-bold text-emerald-400">Run</span>
+                                <span class="block text-[11px] text-slate-400 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end{submit_row_class}">
+                    <button type="submit"
+                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
+                        <svg class="animate-spin h-4 w-4 text-white hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="[.htmx-request_&]:hidden">Trigger Reply Webhook Simulation</span>
+                        <span class="hidden [.htmx-request_&]:inline">Simulating...</span>
+                        <span class="[.htmx-request_&]:hidden">&rarr;</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+        "##
+    )
+}
+
+/// The rejection view: no agent ran, so only the routing/LLM context is worth showing.
+fn simulation_rejection_view(
+    banner: &str,
+    reason: &str,
+    provider_str: &str,
+    model_str: &str,
+    api_key_status: &str,
+) -> String {
+    format!(
+        r##"
+            {banner}
             <div class="space-y-4">
                 <div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
                     <span class="text-rose-400 text-lg">✕</span>
@@ -2592,123 +2864,45 @@ pub fn channel_simulation_execution_result_fragment(
                     </div>
                 </div>
             </div>
-            "##,
-            oob_form_swap = oob_form_swap,
-            reason = reason,
-            provider_str = provider_str,
-            model_str = model_str,
-            api_key_status = api_key_status,
-        );
-    }
+            "##
+    )
+}
 
-    let agent_exec = sim_res.agent_execution.as_ref();
-    let agent_response_text = agent_exec
-        .map(|a| a.agent_response.as_str())
-        .unwrap_or("(No response generated)");
-
-    let agent_lower = agent_response_text.to_lowercase();
-    let is_agent_error = agent_lower.contains("failed")
-        || agent_lower.contains("error")
-        || agent_lower.contains("missing");
-
-    let mode_label = match sim_res.simulation_mode {
-        SimulationMode::Verify => "Verify",
-        SimulationMode::RunTest => "Run_Test (Dry-Run)",
-        SimulationMode::Run => "Run (Live)",
-    };
-
-    let status_banner = if is_agent_error {
-        r#"<div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
+fn simulation_status_banner(mode: SimulationMode, is_agent_error: bool) -> &'static str {
+    if is_agent_error {
+        return r#"<div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
             <span class="text-rose-400 text-lg">✕</span>
             <span>Channel Simulation Execution Failed! (Agent Error)</span>
-        </div>"#
-    } else {
-        match sim_res.simulation_mode {
-            SimulationMode::RunTest => {
-                r#"<div class="p-4 rounded-xl bg-amber-950/80 border border-amber-600/60 text-amber-200 text-sm font-semibold flex items-center gap-2">
+        </div>"#;
+    }
+    match mode {
+        SimulationMode::RunTest => {
+            r#"<div class="p-4 rounded-xl bg-amber-950/80 border border-amber-600/60 text-amber-200 text-sm font-semibold flex items-center gap-2">
                     <span class="text-amber-400 text-lg">⚡</span>
                     <span>Channel Executed Successfully in Run_Test Mode! (Outbound email send was skipped / dry-run)</span>
                 </div>"#
-            }
-            SimulationMode::Run => {
-                r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-600/60 text-emerald-200 text-sm font-semibold flex items-center gap-2">
+        }
+        SimulationMode::Run => {
+            r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-600/60 text-emerald-200 text-sm font-semibold flex items-center gap-2">
                     <span class="text-emerald-400 text-lg">✓</span>
                     <span>Channel Executed & Outbound Email Dispatched Successfully!</span>
                 </div>"#
-            }
-            SimulationMode::Verify => {
-                r#"<div class="p-4 rounded-xl bg-indigo-950/80 border border-indigo-600/60 text-indigo-200 text-sm font-semibold flex items-center gap-2">
+        }
+        SimulationMode::Verify => {
+            r#"<div class="p-4 rounded-xl bg-indigo-950/80 border border-indigo-600/60 text-indigo-200 text-sm font-semibold flex items-center gap-2">
                     <span class="text-indigo-400 text-lg">✓</span>
                     <span>Verification Check Passed!</span>
                 </div>"#
-            }
         }
+    }
+}
+
+fn token_meter_html(token_usage: Option<&crate::entities::task::TokenUsage>) -> String {
+    let Some(tu) = token_usage else {
+        return String::new();
     };
-
-    let inbound_msg_id = ingest
-        .inbound_message
-        .as_ref()
-        .map(|m| m.message_id.to_string())
-        .unwrap_or_else(|| "N/A".to_string());
-
-    let company_name = ingest
-        .company
-        .as_ref()
-        .map(|c| format!("{} (/{})", c.name, c.slug))
-        .unwrap_or_else(|| "N/A".to_string());
-
-    let channel_name = ingest
-        .channel
-        .as_ref()
-        .map(|w| format!("{} (/{})", w.name, w.slug))
-        .unwrap_or_else(|| "N/A".to_string());
-
-    let parsed = ingest.parsed_email.as_ref();
-    let to_str = parsed
-        .and_then(|p| p.recipients_to.first().map(|s| s.as_str()))
-        .unwrap_or("N/A");
-    let from_str = parsed.map(|p| p.sender.as_str()).unwrap_or("N/A");
-    let subject_str = parsed.map(|p| p.subject.as_str()).unwrap_or("(No subject)");
-    let text_body_str = parsed
-        .map(|p| p.clean_text_body.as_str())
-        .unwrap_or("(No text body)");
-
-    let outbound_msg_id = agent_exec
-        .and_then(|a| a.outbound_message_id.clone())
-        .unwrap_or_else(|| "N/A".to_string());
-
-    let email_status = if is_agent_error {
-        "<span class=\"text-rose-400 font-bold\">Failed (Execution Error)</span>"
-    } else if sim_res.simulation_mode == SimulationMode::RunTest {
-        "<span class=\"text-amber-400 font-bold\">Skipped (Run_Test Dry-Run)</span>"
-    } else if sim_res.simulation_mode == SimulationMode::Run {
-        "<span class=\"text-emerald-400 font-bold\">Dispatched via SMTP</span>"
-    } else {
-        "<span class=\"text-slate-400 font-bold\">None (Verify Only)</span>"
-    };
-
-    let response_label = if is_agent_error {
-        "<span class=\"text-rose-400 font-sans block text-[11px] uppercase font-semibold mb-1\">Execution Error Details:</span>"
-    } else {
-        "<span class=\"text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1\">Generated AI Agent Response:</span>"
-    };
-
-    let response_style = if is_agent_error {
-        format!(
-            "bg-slate-950 p-3 rounded-lg text-rose-300 border border-rose-800/80 font-mono text-xs max-h-60 overflow-y-auto {MARKDOWN_CONTENT_STYLES}"
-        )
-    } else {
-        format!(
-            "bg-slate-950 p-3 rounded-lg text-emerald-300 border border-slate-800 font-sans text-xs max-h-60 overflow-y-auto {MARKDOWN_CONTENT_STYLES}"
-        )
-    };
-    let agent_response_html = render_markdown(agent_response_text);
-
-    let simulation_token_meter_html = if let Some(ref tu) =
-        agent_exec.and_then(|a| a.token_usage.as_ref())
-    {
-        format!(
-            r#"
+    format!(
+        r#"
             <div class="md:col-span-2 pt-2 border-t border-slate-800">
                 <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1">📊 Token Meter:</span>
                 <div class="flex items-center gap-2 text-xs font-mono">
@@ -2717,21 +2911,20 @@ pub fn channel_simulation_execution_result_fragment(
                 </div>
             </div>
             "#,
-            tu.total_tokens, tu.prompt_tokens, tu.completion_tokens
-        )
-    } else {
-        String::new()
+        tu.total_tokens, tu.prompt_tokens, tu.completion_tokens
+    )
+}
+
+fn execution_metadata_html(metadata: Option<&serde_json::Value>) -> String {
+    let Some(meta) = metadata else {
+        return String::new();
     };
-
-    let simulation_metadata_html = if let Some(meta) = agent_exec.and_then(|a| a.metadata.as_ref())
-    {
-        let meta_pretty = serde_json::to_string_pretty(meta).unwrap_or_else(|_| meta.to_string());
-        let finish_reason = meta
-            .get("finish_reason")
-            .or_else(|| meta.get("stop_reason"))
-            .and_then(|v| v.as_str());
-
-        let finish_badge = if let Some(reason) = finish_reason {
+    let meta_pretty = serde_json::to_string_pretty(meta).unwrap_or_else(|_| meta.to_string());
+    let finish_badge = meta
+        .get("finish_reason")
+        .or_else(|| meta.get("stop_reason"))
+        .and_then(|v| v.as_str())
+        .map(|reason| {
             let style = match reason {
                 "length" | "max_tokens" => "bg-amber-950 text-amber-300 border-amber-700 font-bold",
                 "stop" | "end_turn" => {
@@ -2743,12 +2936,11 @@ pub fn channel_simulation_execution_result_fragment(
                 r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono border {}">Finish Reason: {}</span>"#,
                 style, reason
             )
-        } else {
-            String::new()
-        };
+        })
+        .unwrap_or_default();
 
-        format!(
-            r#"
+    format!(
+        r#"
             <div class="md:col-span-2 pt-2 border-t border-slate-800">
                 <div class="flex items-center justify-between mb-1">
                     <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">🔍 Execution Metadata:</span>
@@ -2757,13 +2949,70 @@ pub fn channel_simulation_execution_result_fragment(
                 <pre class="bg-slate-950 p-2.5 rounded-lg text-indigo-300 font-mono text-[11px] border border-slate-800/80 overflow-x-auto whitespace-pre-wrap max-h-48">{}</pre>
             </div>
             "#,
-            finish_badge, meta_pretty
+        finish_badge, meta_pretty
+    )
+}
+
+/// Field-by-field account of what the simulated run did.
+struct ExecutionDetails<'a> {
+    mode_label: &'a str,
+    email_status: &'a str,
+    provider_str: &'a str,
+    model_str: &'a str,
+    api_key_status: &'a str,
+    token_meter_html: &'a str,
+    metadata_html: &'a str,
+    to_str: &'a str,
+    from_str: &'a str,
+    company_name: &'a str,
+    channel_name: &'a str,
+    thread_id_str: &'a str,
+    inbound_msg_id: &'a str,
+    outbound_msg_id: &'a str,
+    subject_str: &'a str,
+    text_body_str: &'a str,
+    is_agent_error: bool,
+    agent_response_html: &'a str,
+}
+
+fn execution_details_card(details: &ExecutionDetails<'_>) -> String {
+    let ExecutionDetails {
+        mode_label,
+        email_status,
+        provider_str,
+        model_str,
+        api_key_status,
+        token_meter_html,
+        metadata_html,
+        to_str,
+        from_str,
+        company_name,
+        channel_name,
+        thread_id_str,
+        inbound_msg_id,
+        outbound_msg_id,
+        subject_str,
+        text_body_str,
+        is_agent_error,
+        agent_response_html,
+    } = *details;
+
+    let response_label = if is_agent_error {
+        "<span class=\"text-rose-400 font-sans block text-[11px] uppercase font-semibold mb-1\">Execution Error Details:</span>"
+    } else {
+        "<span class=\"text-slate-500 font-sans block text-[11px] uppercase font-semibold mb-1\">Generated AI Agent Response:</span>"
+    };
+    let response_style = if is_agent_error {
+        format!(
+            "bg-slate-950 p-3 rounded-lg text-rose-300 border border-rose-800/80 font-mono text-xs max-h-60 overflow-y-auto {MARKDOWN_CONTENT_STYLES}"
         )
     } else {
-        String::new()
+        format!(
+            "bg-slate-950 p-3 rounded-lg text-emerald-300 border border-slate-800 font-sans text-xs max-h-60 overflow-y-auto {MARKDOWN_CONTENT_STYLES}"
+        )
     };
 
-    let exec_details = format!(
+    format!(
         r##"
         <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg">
             <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2">Full Execution Details</h4>
@@ -2788,8 +3037,8 @@ pub fn channel_simulation_execution_result_fragment(
                     <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">API Key Status:</span>
                     <span>{api_key_status}</span>
                 </div>
-                {simulation_token_meter_html}
-                {simulation_metadata_html}
+                {token_meter_html}
+                {metadata_html}
                 <div>
                     <span class="text-slate-500 font-sans block text-[11px] uppercase font-semibold">Recipient ('to'):</span>
                     <span class="text-indigo-300">{to_str}</span>
@@ -2835,188 +3084,150 @@ pub fn channel_simulation_execution_result_fragment(
                 <div class="{response_style}">{agent_response_html}</div>
             </div>
         </div>
-        "##,
-        mode_label = mode_label,
-        email_status = email_status,
-        provider_str = provider_str,
-        model_str = model_str,
-        api_key_status = api_key_status,
-        simulation_token_meter_html = simulation_token_meter_html,
-        to_str = to_str,
-        from_str = from_str,
-        company_name = company_name,
-        channel_name = channel_name,
-        thread_id_str = thread_id_str,
-        inbound_msg_id = inbound_msg_id,
-        outbound_msg_id = outbound_msg_id,
-        subject_str = subject_str,
-        text_body_str = text_body_str,
-        response_label = response_label,
-        response_style = response_style,
-        agent_response_html = agent_response_html,
+        "##
+    )
+}
+
+/// The channel configuration an agent reply would have used, for messages with no recorded task.
+fn resolved_agent_config(
+    company: Option<&Company>,
+    channel: Option<&Channel>,
+) -> serde_json::Value {
+    crate::services::agent_runner::ResolvedAgentParams::new(company, channel, None)
+        .map(|p| p.config().clone())
+        .ok()
+        .or_else(|| channel.and_then(|c| c.channel_config.clone()))
+        .unwrap_or_else(|| serde_json::json!({}))
+}
+
+pub fn channel_simulation_execution_result_fragment(
+    company_id: Uuid,
+    channel_id: Uuid,
+    sim_res: &SimulationExecutionResult,
+    messages: &[Message],
+    tasks: &[BackgroundTask],
+) -> String {
+    let ingest = &sim_res.ingest_result;
+    let (provider_str, model_str, api_key_status) =
+        resolve_llm_info(ingest.channel.as_ref(), ingest.company.as_ref());
+
+    let thread_id_str = ingest
+        .thread
+        .as_ref()
+        .map(|t| t.id.to_string())
+        .unwrap_or_else(|| "N/A".to_string());
+
+    let banner = simulation_active_banner(
+        company_id,
+        channel_id,
+        &thread_id_str,
+        "Simulation Thread Active",
     );
 
-    let resolved_config = crate::services::agent_runner::ResolvedAgentParams::new(
-        ingest.company.as_ref(),
-        ingest.channel.as_ref(),
-        None,
-    )
-    .map(|p| p.config().clone())
-    .ok()
-    .or_else(|| {
-        ingest
+    if !ingest.accepted {
+        let reason = ingest
+            .reason
+            .as_deref()
+            .unwrap_or("Ingestion failed / unauthorized");
+        return simulation_rejection_view(
+            &banner,
+            reason,
+            &provider_str,
+            &model_str,
+            &api_key_status,
+        );
+    }
+
+    let agent_exec = sim_res.agent_execution.as_ref();
+    let agent_response_text = agent_exec
+        .map(|a| a.agent_response.as_str())
+        .unwrap_or("(No response generated)");
+
+    // The runner reports failures in-band as response text, so the wording is all we have to go on.
+    let agent_lower = agent_response_text.to_lowercase();
+    let is_agent_error = agent_lower.contains("failed")
+        || agent_lower.contains("error")
+        || agent_lower.contains("missing");
+
+    let parsed = ingest.parsed_email.as_ref();
+    let to_str = parsed
+        .and_then(|p| p.recipients_to.first().map(|s| s.as_str()))
+        .unwrap_or("N/A");
+    let from_str = parsed.map(|p| p.sender.as_str()).unwrap_or("N/A");
+    let subject_str = parsed.map(|p| p.subject.as_str()).unwrap_or("(No subject)");
+    let text_body_str = parsed
+        .map(|p| p.clean_text_body.as_str())
+        .unwrap_or("(No text body)");
+
+    let email_status = if is_agent_error {
+        "<span class=\"text-rose-400 font-bold\">Failed (Execution Error)</span>"
+    } else if sim_res.simulation_mode == SimulationMode::RunTest {
+        "<span class=\"text-amber-400 font-bold\">Skipped (Run_Test Dry-Run)</span>"
+    } else if sim_res.simulation_mode == SimulationMode::Run {
+        "<span class=\"text-emerald-400 font-bold\">Dispatched via SMTP</span>"
+    } else {
+        "<span class=\"text-slate-400 font-bold\">None (Verify Only)</span>"
+    };
+
+    let exec_details = execution_details_card(&ExecutionDetails {
+        mode_label: match sim_res.simulation_mode {
+            SimulationMode::Verify => "Verify",
+            SimulationMode::RunTest => "Run_Test (Dry-Run)",
+            SimulationMode::Run => "Run (Live)",
+        },
+        email_status,
+        provider_str: &provider_str,
+        model_str: &model_str,
+        api_key_status: &api_key_status,
+        token_meter_html: &token_meter_html(agent_exec.and_then(|a| a.token_usage.as_ref())),
+        metadata_html: &execution_metadata_html(agent_exec.and_then(|a| a.metadata.as_ref())),
+        to_str,
+        from_str,
+        company_name: &ingest
+            .company
+            .as_ref()
+            .map(|c| format!("{} (/{})", c.name, c.slug))
+            .unwrap_or_else(|| "N/A".to_string()),
+        channel_name: &ingest
             .channel
             .as_ref()
-            .and_then(|w| w.channel_config.clone())
-    })
-    .unwrap_or_else(|| serde_json::json!({}));
+            .map(|w| format!("{} (/{})", w.name, w.slug))
+            .unwrap_or_else(|| "N/A".to_string()),
+        thread_id_str: &thread_id_str,
+        inbound_msg_id: &ingest
+            .inbound_message
+            .as_ref()
+            .map(|m| m.message_id.to_string())
+            .unwrap_or_else(|| "N/A".to_string()),
+        outbound_msg_id: &agent_exec
+            .and_then(|a| a.outbound_message_id.clone())
+            .unwrap_or_else(|| "N/A".to_string()),
+        subject_str,
+        text_body_str,
+        is_agent_error,
+        agent_response_html: &render_markdown(agent_response_text),
+    });
 
-    let thread_id_opt = ingest.thread.as_ref().map(|t| t.id);
-
-    let messages_section = if messages.is_empty() {
-        String::new()
-    } else {
-        let mut msgs_html = String::new();
-        for msg in messages {
-            let is_agent =
-                msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
-            let created_at_fmt = msg.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
-
-            let matched_task = find_task_for_message(msg, tasks, ingest.task_id, thread_id_opt);
-
-            let msg_task_payload = match matched_task {
-                Some(t) => t.payload.clone(),
-                None => {
-                    if is_agent {
-                        serde_json::json!({
-                            "task_type": "email_agent_dispatch",
-                            "execution_parameters": {
-                                "provider": provider_str,
-                                "model": model_str,
-                                "prompt": parsed.map(|p| p.prompt_text.as_str()).unwrap_or(""),
-                                "config": resolved_config.clone(),
-                                "executed_at": created_at_fmt
-                            },
-                            "execution_result": {
-                                "response": msg.clean_text_body,
-                                "outbound_message_id": msg.message_id
-                            },
-                            "channel": ingest.channel,
-                            "company": ingest.company
-                        })
-                    } else {
-                        serde_json::json!({
-                            "task_type": "email_agent_dispatch",
-                            "parsed_email": {
-                                "sender": msg.sender,
-                                "subject": msg.subject,
-                                "prompt_text": msg.clean_text_body,
-                                "message_id": msg.message_id
-                            },
-                            "inbound_message": {
-                                "id": msg.id,
-                                "message_id": msg.message_id,
-                                "direction": "inbound",
-                                "role": "human",
-                                "clean_text_body": msg.clean_text_body
-                            },
-                            "channel": ingest.channel,
-                            "company": ingest.company
-                        })
-                    }
-                }
-            };
-            let params_html = render_message_task_parameters_html(&msg_task_payload);
-
-            if is_agent {
-                let body_html = render_markdown(&msg.clean_text_body);
-                msgs_html.push_str(&format!(
-                    r##"
-                    <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 space-y-2 shadow-sm">
-                        <div class="flex items-center justify-between border-b border-indigo-500/20 pb-2 text-xs">
-                            <div class="flex items-center gap-2 font-semibold text-indigo-300">
-                                <span>🤖</span>
-                                <span>AI Agent Response</span>
-                                <span class="px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-200 text-[10px] uppercase font-mono">Outbound</span>
-                            </div>
-                            <span class="text-slate-400 font-mono text-[11px]">{created_at}</span>
-                        </div>
-                        <div class="text-xs font-mono text-slate-400">
-                            <span>Message ID: </span><span class="text-indigo-200">{msg_id}</span>
-                        </div>
-                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 border border-slate-800 text-xs font-sans max-h-60 overflow-y-auto {markdown_styles}">
-                            {body}
-                        </div>
-                        {params_html}
-                    </div>
-                    "##,
-                    created_at = created_at_fmt,
-                    msg_id = msg.message_id,
-                    body = body_html,
-                    markdown_styles = MARKDOWN_CONTENT_STYLES,
-                    params_html = params_html,
-                ));
-            } else {
-                msgs_html.push_str(&format!(
-                    r##"
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow-sm">
-                        <div class="flex items-center justify-between border-b border-slate-800 pb-2 text-xs">
-                            <div class="flex items-center gap-2 font-semibold text-slate-200">
-                                <span>👤</span>
-                                <span>Inbound Email</span>
-                                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] uppercase font-mono">Inbound</span>
-                            </div>
-                            <span class="text-slate-400 font-mono text-[11px]">{created_at}</span>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono text-slate-400">
-                            <div>From: <span class="text-indigo-300">{sender}</span></div>
-                            <div>Message ID: <span class="text-slate-300">{msg_id}</span></div>
-                        </div>
-                        <div class="text-xs font-medium text-slate-200 pt-1">
-                            Subject: <span class="font-normal text-slate-300">{subject}</span>
-                        </div>
-                        <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800 text-xs">
-                            {body}
-                        </div>
-                        {params_html}
-                    </div>
-                    "##,
-                    created_at = created_at_fmt,
-                    sender = msg.sender,
-                    msg_id = msg.message_id,
-                    subject = msg.subject,
-                    body = msg.clean_text_body,
-                    params_html = params_html,
-                ));
-            }
-        }
-
-        let msg_count = messages.len();
-        let label = if msg_count == 1 {
-            "message"
-        } else {
-            "messages"
-        };
-        format!(
-            r##"
-            <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 space-y-4 shadow-lg">
-                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <h4 class="text-sm font-sans font-bold text-white flex items-center gap-2">
-                        <span>💬</span> Thread History ({msg_count} {label})
-                    </h4>
-                    <span class="text-xs font-mono text-emerald-400">Thread ID: {thread_id_str}</span>
-                </div>
-                <div class="space-y-3">
-                    {msgs_html}
-                </div>
-            </div>
-            "##,
-            msg_count = msg_count,
-            label = label,
-            thread_id_str = thread_id_str,
-            msgs_html = msgs_html,
-        )
-    };
+    let messages_section = thread_history_section(
+        messages,
+        &thread_id_str,
+        "",
+        "",
+        &MessageTaskContext {
+            tasks,
+            task_id: ingest.task_id,
+            thread_id: ingest.thread.as_ref().map(|t| t.id),
+            company: ingest.company.as_ref(),
+            channel: ingest.channel.as_ref(),
+            provider: &provider_str,
+            model: &model_str,
+            resolved_config: resolved_agent_config(
+                ingest.company.as_ref(),
+                ingest.channel.as_ref(),
+            ),
+            agent_prompt: Some(parsed.map(|p| p.prompt_text.as_str()).unwrap_or("")),
+        },
+    );
 
     let last_msg_id = messages
         .last()
@@ -3035,113 +3246,26 @@ pub fn channel_simulation_execution_result_fragment(
         })
         .unwrap_or_default();
 
-    let reply_subject = if subject_str.to_lowercase().starts_with("re:") {
-        subject_str.to_string()
-    } else {
-        format!("Re: {}", subject_str)
-    };
+    let reply_form = simulate_reply_form(&ReplyFormFields {
+        company_id,
+        channel_id,
+        thread_id_str: &thread_id_str,
+        last_msg_id: &last_msg_id,
+        to_value: to_str,
+        from_value: from_str,
+        subject: &if subject_str.to_lowercase().starts_with("re:") {
+            subject_str.to_string()
+        } else {
+            format!("Re: {}", subject_str)
+        },
+        run_test_checked: sim_res.simulation_mode == SimulationMode::RunTest,
+        run_checked: sim_res.simulation_mode == SimulationMode::Run,
+        submit_row_class: " pt-1",
+    });
 
-    let run_test_checked = if sim_res.simulation_mode == SimulationMode::RunTest {
-        "checked"
-    } else {
-        ""
-    };
-    let run_checked = if sim_res.simulation_mode == SimulationMode::Run {
-        "checked"
-    } else {
-        ""
-    };
-
-    let reply_form = format!(
-        r##"
-        <div class="bg-slate-900/90 border border-indigo-500/40 rounded-xl p-5 shadow-xl space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                    <span class="text-indigo-400 text-base">↩️</span> Simulate Reply Webhook Call
-                </h3>
-                <span class="text-xs text-slate-400">Simulate next message in Thread <span class="font-mono text-indigo-300">{thread_id_str}</span></span>
-            </div>
-
-            <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate"
-                  hx-target="#simulation-result"
-                  hx-swap="innerHTML"
-                  hx-disabled-elt="find button[type='submit']"
-                  class="space-y-4">
-                <input type="hidden" name="in_reply_to" value="{last_msg_id}">
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="to_reply" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
-                        <input type="text" id="to_reply" name="to" value="{to_str}" required
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                    <div>
-                        <label for="from_reply" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
-                        <input type="text" id="from_reply" name="from" value="{from_str}" disabled
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono opacity-60 cursor-not-allowed">
-                    </div>
-                </div>
-
-                <div>
-                    <label for="subject_reply" class="block text-xs font-medium text-slate-300 mb-1">Subject</label>
-                    <input type="text" id="subject_reply" name="subject" value="{reply_subject}" required
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-
-                <div>
-                    <label for="text_body_reply" class="block text-xs font-medium text-slate-300 mb-1">Reply Text Body</label>
-                    <textarea id="text_body_reply" name="text_body" rows="3" required placeholder="Type your reply message here..."
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
-                            <input type="radio" name="simulation_mode" value="run_test" {run_test_checked} class="mt-0.5 text-amber-500 focus:ring-amber-500">
-                            <div class="ml-2.5">
-                                <span class="block text-xs font-bold text-amber-300">Run_Test</span>
-                                <span class="block text-[11px] text-slate-400 mt-0.5">Execute full channel & agent, skip email dispatch</span>
-                            </div>
-                        </label>
-                        <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
-                            <input type="radio" name="simulation_mode" value="run" {run_checked} class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
-                            <div class="ml-2.5">
-                                <span class="block text-xs font-bold text-emerald-400">Run</span>
-                                <span class="block text-[11px] text-slate-400 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="flex justify-end pt-1">
-                    <button type="submit"
-                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
-                        <svg class="animate-spin h-4 w-4 text-white hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span class="[.htmx-request_&]:hidden">Trigger Reply Webhook Simulation</span>
-                        <span class="hidden [.htmx-request_&]:inline">Simulating...</span>
-                        <span class="[.htmx-request_&]:hidden">&rarr;</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-        "##,
-        company_id = company_id,
-        channel_id = channel_id,
-        thread_id_str = thread_id_str,
-        last_msg_id = last_msg_id,
-        to_str = to_str,
-        from_str = from_str,
-        reply_subject = reply_subject,
-        run_test_checked = run_test_checked,
-        run_checked = run_checked,
-    );
-
+    let status_banner = simulation_status_banner(sim_res.simulation_mode, is_agent_error);
     format!(
-        "{oob_form_swap}\n<div class=\"space-y-6\">\n{status_banner}\n{exec_details}\n{messages_section}\n{reply_form}\n</div>"
+        "{banner}\n<div class=\"space-y-6\">\n{status_banner}\n{exec_details}\n{messages_section}\n{reply_form}\n</div>"
     )
 }
 
@@ -3154,8 +3278,6 @@ pub fn channel_simulation_loaded_thread_fragment(
     tasks: &[BackgroundTask],
     include_oob: bool,
 ) -> String {
-    let company_id = company.id;
-    let channel_id = channel.id;
     let thread_id_str = thread.id.to_string();
     let target_recipient = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
 
@@ -3171,42 +3293,78 @@ pub fn channel_simulation_loaded_thread_fragment(
         })
         .unwrap_or_else(|| crate::entities::value_objects::EmailAddress::from("sender@example.com"));
 
-    let oob_form_swap = format!(
-        r##"
-        <div id="simulation-form-container" hx-swap-oob="outerHTML">
-            <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
-                <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
-                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>Thread Loaded & Active</span>
-                    <span class="text-xs text-slate-400 font-mono">({thread_id_str})</span>
-                </div>
-                <a href="/companies/{company_id}/channels/{channel_id}/simulate"
-                   class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
-                    <span>🔄 Simulate New Thread</span>
-                </a>
-            </div>
-        </div>
-        "##,
-        company_id = company_id,
-        channel_id = channel_id,
-        thread_id_str = thread_id_str,
+    let overview_card = loaded_thread_overview_card(
+        thread,
+        &thread_id_str,
+        &target_recipient,
+        messages.len(),
     );
 
-    let created_at_fmt = thread
-        .created_at
-        .format("%Y-%m-%d %H:%M:%S UTC")
-        .to_string();
-    let updated_at_fmt = thread
-        .updated_at
-        .format("%Y-%m-%d %H:%M:%S UTC")
-        .to_string();
+    let (provider_str, model_str, _api_key_status) = resolve_llm_info(Some(channel), Some(company));
+    let messages_section = thread_history_section(
+        messages,
+        &thread_id_str,
+        " mb-6",
+        r#"<div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 shadow-lg text-slate-400 text-xs text-center mb-6">No messages recorded in this thread yet.</div>"#,
+        &MessageTaskContext {
+            tasks,
+            task_id: None,
+            thread_id: Some(thread.id),
+            company: Some(company),
+            channel: Some(channel),
+            provider: &provider_str,
+            model: &model_str,
+            resolved_config: resolved_agent_config(Some(company), Some(channel)),
+            agent_prompt: None,
+        },
+    );
+
+    let reply_form = simulate_reply_form(&ReplyFormFields {
+        company_id: company.id,
+        channel_id: channel.id,
+        thread_id_str: &thread_id_str,
+        last_msg_id: &messages
+            .last()
+            .map(|m| m.message_id.to_string())
+            .unwrap_or_default(),
+        to_value: &target_recipient,
+        from_value: &default_sender,
+        subject: &if thread.subject.to_lowercase().starts_with("re:") {
+            thread.subject.clone()
+        } else {
+            format!("Re: {}", thread.subject)
+        },
+        run_test_checked: true,
+        run_checked: false,
+        submit_row_class: "",
+    });
+
+    if include_oob {
+        let banner = simulation_active_banner(
+            company.id,
+            channel.id,
+            &thread_id_str,
+            "Thread Loaded & Active",
+        );
+        format!("{banner}\n{overview_card}\n{messages_section}\n{reply_form}")
+    } else {
+        format!("{overview_card}\n{messages_section}\n{reply_form}")
+    }
+}
+
+fn loaded_thread_overview_card(
+    thread: &Thread,
+    thread_id_str: &str,
+    target_recipient: &str,
+    msg_count: usize,
+) -> String {
     let participants_str = if thread.participant_emails.is_empty() {
         "None recorded".to_string()
     } else {
         thread.participant_emails.join(", ")
     };
 
-    let overview_card = format!(
+    format!(
         r##"
         <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 space-y-3 text-xs font-mono shadow-lg mb-6">
             <h4 class="text-sm font-sans font-bold text-white border-b border-slate-800 pb-2 flex items-center justify-between">
@@ -3241,271 +3399,10 @@ pub fn channel_simulation_loaded_thread_fragment(
             </div>
         </div>
         "##,
-        thread_id_str = thread_id_str,
         subject = thread.subject,
-        target_recipient = target_recipient,
-        participants_str = participants_str,
-        msg_count = messages.len(),
-        created_at_fmt = created_at_fmt,
-        updated_at_fmt = updated_at_fmt,
-    );
-
-    let (provider_str, model_str, _api_key_status) = resolve_llm_info(Some(channel), Some(company));
-
-    let resolved_config =
-        crate::services::agent_runner::ResolvedAgentParams::new(Some(company), Some(channel), None)
-            .map(|p| p.config().clone())
-            .ok()
-            .or_else(|| channel.channel_config.clone())
-            .unwrap_or_else(|| serde_json::json!({}));
-
-    let messages_section = if messages.is_empty() {
-        r#"<div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 shadow-lg text-slate-400 text-xs text-center mb-6">No messages recorded in this thread yet.</div>"#.to_string()
-    } else {
-        let mut msgs_html = String::new();
-        for msg in messages {
-            let is_agent =
-                msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
-            let msg_created_at = msg.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
-
-            let matched_task = find_task_for_message(msg, tasks, None, Some(thread.id));
-
-            let msg_task_payload = match matched_task {
-                Some(t) => t.payload.clone(),
-                None => {
-                    if is_agent {
-                        serde_json::json!({
-                            "task_type": "email_agent_dispatch",
-                            "execution_parameters": {
-                                "provider": provider_str,
-                                "model": model_str,
-                                "prompt": msg.clean_text_body,
-                                "config": resolved_config.clone(),
-                                "executed_at": msg_created_at
-                            },
-                            "execution_result": {
-                                "response": msg.clean_text_body,
-                                "outbound_message_id": msg.message_id
-                            },
-                            "channel": channel,
-                            "company": company
-                        })
-                    } else {
-                        serde_json::json!({
-                            "task_type": "email_agent_dispatch",
-                            "parsed_email": {
-                                "sender": msg.sender,
-                                "subject": msg.subject,
-                                "prompt_text": msg.clean_text_body,
-                                "message_id": msg.message_id
-                            },
-                            "inbound_message": {
-                                "id": msg.id,
-                                "message_id": msg.message_id,
-                                "direction": "inbound",
-                                "role": "human",
-                                "clean_text_body": msg.clean_text_body
-                            },
-                            "channel": channel,
-                            "company": company
-                        })
-                    }
-                }
-            };
-            let params_html = render_message_task_parameters_html(&msg_task_payload);
-
-            if is_agent {
-                let body_html = render_markdown(&msg.clean_text_body);
-                msgs_html.push_str(&format!(
-                    r##"
-                    <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 space-y-2 shadow-sm">
-                        <div class="flex items-center justify-between border-b border-indigo-500/20 pb-2 text-xs">
-                            <div class="flex items-center gap-2 font-semibold text-indigo-300">
-                                <span>🤖</span>
-                                <span>AI Agent Response</span>
-                                <span class="px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-200 text-[10px] uppercase font-mono">Outbound</span>
-                            </div>
-                            <span class="text-slate-400 font-mono text-[11px]">{created_at}</span>
-                        </div>
-                        <div class="text-xs font-mono text-slate-400">
-                            <span>Message ID: </span><span class="text-indigo-200">{msg_id}</span>
-                        </div>
-                        <div class="bg-slate-950 p-3 rounded-lg text-emerald-300 border border-slate-800 text-xs font-sans max-h-60 overflow-y-auto {markdown_styles}">
-                            {body}
-                        </div>
-                        {params_html}
-                    </div>
-                    "##,
-                    created_at = msg_created_at,
-                    msg_id = msg.message_id,
-                    body = body_html,
-                    markdown_styles = MARKDOWN_CONTENT_STYLES,
-                    params_html = params_html,
-                ));
-            } else {
-                msgs_html.push_str(&format!(
-                    r##"
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow-sm">
-                        <div class="flex items-center justify-between border-b border-slate-800 pb-2 text-xs">
-                            <div class="flex items-center gap-2 font-semibold text-slate-200">
-                                <span>👤</span>
-                                <span>Inbound Email</span>
-                                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] uppercase font-mono">Inbound</span>
-                            </div>
-                            <span class="text-slate-400 font-mono text-[11px]">{created_at}</span>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono text-slate-400">
-                            <div>From: <span class="text-indigo-300">{sender}</span></div>
-                            <div>Message ID: <span class="text-slate-300">{msg_id}</span></div>
-                        </div>
-                        <div class="text-xs font-medium text-slate-200 pt-1">
-                            Subject: <span class="font-normal text-slate-300">{subject}</span>
-                        </div>
-                        <div class="bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800 text-xs">
-                            {body}
-                        </div>
-                        {params_html}
-                    </div>
-                    "##,
-                    created_at = msg_created_at,
-                    sender = msg.sender,
-                    msg_id = msg.message_id,
-                    subject = msg.subject,
-                    body = msg.clean_text_body,
-                    params_html = params_html,
-                ));
-            }
-        }
-
-        let msg_count = messages.len();
-        let label = if msg_count == 1 {
-            "message"
-        } else {
-            "messages"
-        };
-        format!(
-            r##"
-            <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 space-y-4 shadow-lg mb-6">
-                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <h4 class="text-sm font-sans font-bold text-white flex items-center gap-2">
-                        <span>💬</span> Thread History ({msg_count} {label})
-                    </h4>
-                    <span class="text-xs font-mono text-emerald-400">Thread ID: {thread_id_str}</span>
-                </div>
-                <div class="space-y-3">
-                    {msgs_html}
-                </div>
-            </div>
-            "##,
-            msg_count = msg_count,
-            label = label,
-            thread_id_str = thread_id_str,
-            msgs_html = msgs_html,
-        )
-    };
-
-    let last_msg_id = messages
-        .last()
-        .map(|m| m.message_id.clone())
-        .unwrap_or_default();
-
-    let reply_subject = if thread.subject.to_lowercase().starts_with("re:") {
-        thread.subject.clone()
-    } else {
-        format!("Re: {}", thread.subject)
-    };
-
-    let reply_form = format!(
-        r##"
-        <div class="bg-slate-900/90 border border-indigo-500/40 rounded-xl p-5 shadow-xl space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                    <span class="text-indigo-400 text-base">↩️</span> Simulate Reply Webhook Call
-                </h3>
-                <span class="text-xs text-slate-400">Simulate next message in Thread <span class="font-mono text-indigo-300">{thread_id_str}</span></span>
-            </div>
-
-            <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate"
-                  hx-target="#simulation-result"
-                  hx-swap="innerHTML"
-                  hx-disabled-elt="find button[type='submit']"
-                  class="space-y-4">
-                <input type="hidden" name="in_reply_to" value="{last_msg_id}">
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="to_reply" class="block text-xs font-medium text-slate-300 mb-1">To (Recipient Address)</label>
-                        <input type="text" id="to_reply" name="to" value="{target_recipient}" required
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                    <div>
-                        <label for="from_reply" class="block text-xs font-medium text-slate-300 mb-1">From (Sender Address)</label>
-                        <input type="text" id="from_reply" name="from" value="{default_sender}" disabled
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono opacity-60 cursor-not-allowed">
-                    </div>
-                </div>
-
-                <div>
-                    <label for="subject_reply" class="block text-xs font-medium text-slate-300 mb-1">Subject</label>
-                    <input type="text" id="subject_reply" name="subject" value="{reply_subject}" required
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-
-                <div>
-                    <label for="text_body_reply" class="block text-xs font-medium text-slate-300 mb-1">Reply Text Body</label>
-                    <textarea id="text_body_reply" name="text_body" rows="3" required placeholder="Type your reply message here..."
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
-                            <input type="radio" name="simulation_mode" value="run_test" checked class="mt-0.5 text-amber-500 focus:ring-amber-500">
-                            <div class="ml-2.5">
-                                <span class="block text-xs font-bold text-amber-300">Run_Test</span>
-                                <span class="block text-[11px] text-slate-400 mt-0.5">Execute full channel & agent, skip email dispatch</span>
-                            </div>
-                        </label>
-                        <label class="flex items-start p-2.5 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
-                            <input type="radio" name="simulation_mode" value="run" class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
-                            <div class="ml-2.5">
-                                <span class="block text-xs font-bold text-emerald-400">Run</span>
-                                <span class="block text-[11px] text-slate-400 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="flex justify-end">
-                    <button type="submit"
-                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-2 [.htmx-request_&]:pointer-events-none [.htmx-request_&]:opacity-80">
-                        <svg class="animate-spin h-4 w-4 text-white hidden [.htmx-request_&]:inline-block shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span class="[.htmx-request_&]:hidden">Trigger Reply Webhook Simulation</span>
-                        <span class="hidden [.htmx-request_&]:inline">Simulating...</span>
-                        <span class="[.htmx-request_&]:hidden">&rarr;</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-        "##,
-        company_id = company_id,
-        channel_id = channel_id,
-        thread_id_str = thread_id_str,
-        last_msg_id = last_msg_id,
-        target_recipient = target_recipient,
-        default_sender = default_sender,
-        reply_subject = reply_subject,
-    );
-
-    if include_oob {
-        format!("{oob_form_swap}\n{overview_card}\n{messages_section}\n{reply_form}")
-    } else {
-        format!("{overview_card}\n{messages_section}\n{reply_form}")
-    }
+        created_at_fmt = thread.created_at.format("%Y-%m-%d %H:%M:%S UTC"),
+        updated_at_fmt = thread.updated_at.format("%Y-%m-%d %H:%M:%S UTC"),
+    )
 }
 
 pub fn channel_simulation_thread_error_fragment(

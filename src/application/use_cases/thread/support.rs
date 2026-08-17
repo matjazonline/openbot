@@ -1,0 +1,259 @@
+//! Shared, mostly-pure helpers for the inbound ingest and agent dispatch pipelines.
+//!
+//! Everything here is either a pure decision (no `self`, no I/O) or a memoizing wrapper around
+//! persistence lookups. Keeping them out of the pipeline bodies is what lets those bodies read as
+//! a sequence of named phases.
+
+use std::collections::HashMap;
+
+use uuid::Uuid;
+
+use crate::{
+    app_error::AppResult,
+    entities::{
+        channel::Channel,
+        company::Company,
+        message::{AttachmentMetadata, Message},
+        message_contract::NormalizedInboundMessage,
+        value_objects::{CompanySlug, MessageId, ThreadIndex},
+    },
+    services::email_parser::{
+        EmailParser, MAX_CHANNEL_HOPS, ParsedEmail, SMALL_INLINE_IMAGE_BYTES,
+    },
+};
+
+use super::{InboundIngestResult, InternalChannelSource, ThreadUseCases};
+
+/// Memoized directory lookups for a single ingest run.
+///
+/// The ingest pipeline resolves the same company, channel list and team membership repeatedly
+/// while walking `To`/`Cc` pipelines. This owns those caches so the pipeline body never
+/// hand-rolls a `get`/`insert` dance, and so every cache key is built in exactly one place.
+pub(super) struct DirectoryCache<'a> {
+    use_cases: &'a ThreadUseCases,
+    companies: HashMap<String, Option<Company>>,
+    channels: HashMap<Uuid, Vec<Channel>>,
+    memberships: HashMap<(Uuid, String), bool>,
+}
+
+impl<'a> DirectoryCache<'a> {
+    pub(super) fn new(use_cases: &'a ThreadUseCases) -> Self {
+        Self {
+            use_cases,
+            companies: HashMap::new(),
+            channels: HashMap::new(),
+            memberships: HashMap::new(),
+        }
+    }
+
+    pub(super) async fn company(&mut self, slug: &CompanySlug) -> AppResult<Option<Company>> {
+        let key = slug.to_lowercase();
+        if let Some(cached) = self.companies.get(&key) {
+            return Ok(cached.clone());
+        }
+        let loaded = self.use_cases.company_persistence.get_by_slug(slug).await?;
+        self.companies.insert(key, loaded.clone());
+        Ok(loaded)
+    }
+
+    pub(super) async fn channels(&mut self, company_id: Uuid) -> AppResult<Vec<Channel>> {
+        if let Some(cached) = self.channels.get(&company_id) {
+            return Ok(cached.clone());
+        }
+        let loaded = self
+            .use_cases
+            .channel_persistence
+            .list_by_company_id(company_id)
+            .await?;
+        self.channels.insert(company_id, loaded.clone());
+        Ok(loaded)
+    }
+
+    /// Team membership feeds authorization decisions, so a persistence failure propagates rather
+    /// than silently degrading the sender to "not a member".
+    pub(super) async fn is_team_member(&mut self, company_id: Uuid, sender: &str) -> AppResult<bool> {
+        let key = (company_id, sender.trim().to_lowercase());
+        if let Some(cached) = self.memberships.get(&key) {
+            return Ok(*cached);
+        }
+        let loaded = self
+            .use_cases
+            .company_persistence
+            .is_company_team_member(company_id, sender.trim())
+            .await?;
+        self.memberships.insert(key, loaded);
+        Ok(loaded)
+    }
+}
+
+/// Message-IDs that point at *other* messages in the conversation (`In-Reply-To` + `References`).
+pub(super) fn reference_ids(parsed: &ParsedEmail) -> Vec<MessageId> {
+    let mut ids = Vec::with_capacity(parsed.references.len() + 1);
+    if let Some(ref reply_id) = parsed.in_reply_to {
+        ids.push(MessageId::from(reply_id.clone()));
+    }
+    ids.extend(parsed.references.iter().cloned().map(MessageId::from));
+    ids
+}
+
+/// The `References` chain to put on a reply: the inbound chain, extended with the message it
+/// answers. Ordering differs from [`reference_ids`] because this one goes out on the wire.
+pub(super) fn outbound_reference_ids(parsed: &ParsedEmail) -> Vec<String> {
+    let mut references = parsed.references.clone();
+    if let Some(ref reply_to) = parsed.in_reply_to
+        && !references.contains(reply_to)
+    {
+        references.push(reply_to.clone());
+    }
+    references
+}
+
+/// Reference IDs plus this message's own ID, for locating the thread it belongs to.
+pub(super) fn thread_lookup_ids(parsed: &ParsedEmail) -> Vec<MessageId> {
+    let mut ids = vec![MessageId::from(parsed.message_id.clone())];
+    ids.extend(reference_ids(parsed));
+    ids
+}
+
+pub(super) fn thread_index_of(parsed: &ParsedEmail) -> Option<ThreadIndex> {
+    parsed.thread_index.clone().map(ThreadIndex::from)
+}
+
+/// Cheap rejections that need no I/O: identity, authentication, and loop protection.
+///
+/// Runs before any persistence work so a forged or looping message costs a single parse.
+pub(super) fn check_inbound_guards(
+    parsed: &ParsedEmail,
+    internal_source: Option<InternalChannelSource>,
+) -> Option<InboundIngestResult> {
+    let is_inter_channel = internal_source.is_some();
+
+    if let Some(source) = internal_source
+        && parsed.channel_id_header != Some(source.channel_id)
+    {
+        return Some(InboundIngestResult::rejected(
+            "Internal source channel identity mismatch",
+        ));
+    }
+
+    // Trusted internal transport is authenticated by channel identity, not by SPF/DKIM/DMARC.
+    if !is_inter_channel {
+        let checks = [
+            ("SPF", parsed.spf_status.as_deref()),
+            ("DKIM", parsed.dkim_status.as_deref()),
+            ("DMARC", parsed.dmarc_status.as_deref()),
+        ];
+        for (mechanism, status) in checks {
+            if status.is_some_and(|s| s.eq_ignore_ascii_case("fail")) {
+                tracing::warn!(
+                    "{mechanism} authentication failed for sender '{}'",
+                    parsed.sender
+                );
+                return Some(InboundIngestResult::rejected(&format!(
+                    "{mechanism} authentication failed"
+                )));
+            }
+        }
+    }
+
+    if is_inter_channel && parsed.hop_count >= MAX_CHANNEL_HOPS {
+        tracing::warn!(
+            "Max inter-channel hop count ({}) reached for Message-ID: {}",
+            parsed.hop_count,
+            parsed.message_id
+        );
+        return Some(InboundIngestResult::rejected(
+            "Max inter-channel hop count reached",
+        ));
+    }
+
+    if !is_inter_channel && parsed.is_auto_reply {
+        tracing::warn!(
+            "External auto-reply loop detected for Message-ID: {}, dropping message",
+            parsed.message_id
+        );
+        return Some(InboundIngestResult::rejected(
+            "External auto-reply loop detected",
+        ));
+    }
+
+    None
+}
+
+/// Projection of the protocol-neutral inbound message onto the email-shaped view the rest of the
+/// ingest pipeline works with.
+pub(super) fn parsed_email_from_normalized(norm: &NormalizedInboundMessage) -> ParsedEmail {
+    ParsedEmail {
+        message_id: norm.message_id.clone().into_string(),
+        in_reply_to: norm.thread_ref.clone().map(MessageId::into_string),
+        references: norm
+            .references
+            .iter()
+            .cloned()
+            .map(MessageId::into_string)
+            .collect(),
+        thread_index: norm.thread_index.clone().map(ThreadIndex::into_string),
+        sender: norm.sender.identity.clone(),
+        recipients_to: norm
+            .recipients_to
+            .iter()
+            .map(|p| p.identity.clone())
+            .collect(),
+        recipients_cc: norm
+            .recipients_cc
+            .iter()
+            .map(|p| p.identity.clone())
+            .collect(),
+        subject: norm.subject.clone(),
+        clean_text_body: norm.clean_text.clone(),
+        raw_text_body: norm.raw_text.clone(),
+        raw_html_body: norm.raw_html.clone(),
+        attachments: norm.attachments.clone(),
+        prompt_text: norm.clean_text.clone(),
+        is_auto_reply: norm.is_auto_reply,
+        is_forwarded: norm.is_forwarded,
+        channel_id_header: norm.channel_id_header,
+        hop_count: norm.hop_count,
+        trace_channels: norm.trace_channels.clone(),
+        spf_status: norm.spf_status.clone(),
+        dkim_status: norm.dkim_status.clone(),
+        dmarc_status: norm.dmarc_status.clone(),
+        spam_score: norm.spam_score,
+        is_context_only: norm.is_context_only,
+    }
+}
+
+/// Strip quoted history from a reply, falling back to matching against the thread's own stored
+/// bodies when the heuristic can't find a quote marker.
+pub(super) fn strip_quoted_history(parsed: &ParsedEmail, history: &[Message]) -> String {
+    if parsed.is_forwarded || history.is_empty() {
+        return parsed.clean_text_body.clone();
+    }
+    let history_bodies: Vec<String> = history.iter().map(|m| m.clean_text_body.clone()).collect();
+    let heuristic_clean = EmailParser::strip_quotes_heuristic(&parsed.clean_text_body);
+    EmailParser::strip_historical_quotes_fallback(&heuristic_clean, &history_bodies)
+}
+
+/// The prompt handed to the agent: the cleaned body plus a description of every attachment worth
+/// mentioning (tiny inline images are signature decorations, not content).
+pub(super) fn build_prompt_text(clean_body: &str, attachments: &[AttachmentMetadata]) -> String {
+    let attachment_prompts: Vec<String> = attachments
+        .iter()
+        .filter(|att| {
+            !(att.content_type.to_lowercase().starts_with("image/")
+                && att.size_bytes < SMALL_INLINE_IMAGE_BYTES)
+        })
+        .map(|meta| {
+            format!(
+                "[Attachment: {}, Type: {}, SHA256: {}, Size: {} bytes]",
+                meta.filename, meta.content_type, meta.sha256_hash, meta.size_bytes
+            )
+        })
+        .collect();
+
+    if attachment_prompts.is_empty() {
+        clean_body.to_string()
+    } else {
+        format!("{}\n\n{}", clean_body, attachment_prompts.join("\n"))
+    }
+}

@@ -278,6 +278,10 @@ async fn list_channels_page(
     user,
     form
 ))]
+/// Everything needed to re-render the channel list after any outcome.
+///
+/// Every exit from the create/update handlers ends in the same fragment, optionally headed by an
+/// error alert, so the reload lives here instead of at each `return`.
 async fn create_channel_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
@@ -291,129 +295,38 @@ async fn create_channel_handler(
         Ok(Some(c)) => c,
         _ => return Html(pages::error_alert("Company not found.")),
     };
+    let view = ChannelListView {
+        channel_use_cases: &channel_use_cases,
+        agent_use_cases: &agent_use_cases,
+        app_domain_name: &config.app_domain_name,
+        user_id: user.id,
+        company: &company,
+    };
 
     let slug = form
         .slug
         .as_deref()
-        .map(|s| s.trim())
+        .map(str::trim)
         .filter(|s| !s.is_empty())
         .map(String::from)
         .unwrap_or_else(|| slugify(&form.name));
 
-    let emails = parse_emails_form(form.participant_emails);
-    let mut agent_ids = parse_agent_ids_form(form.agent_ids);
-    let confirm_spam_disabled = form.confirm_spam_disabled.as_deref() == Some("true")
-        || form.confirm_spam_disabled.as_deref() == Some("on");
-
-    let system_prompt_clean = form
-        .system_prompt
-        .as_deref()
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty());
-
-    let generated_system_prompt = if form.form_mode.as_deref() == Some("simple") {
-        match system_prompt_clean {
-            Some(instructions) => match agent_use_cases
-                .generate_system_prompt(user.id, company_id, instructions, None, None, None)
-                .await
-            {
-                Ok(prompt) => Some(prompt),
-                Err(err) => {
-                    let agents = agent_use_cases
-                        .list_company_agents(user.id, company_id)
-                        .await
-                        .unwrap_or_default();
-                    let channels = channel_use_cases
-                        .list_company_channels(user.id, company_id)
-                        .await
-                        .unwrap_or_default();
-                    let error_html =
-                        pages::error_alert(&format!("Failed to generate agent prompt: {err}"));
-                    return Html(format!(
-                        "{}{}",
-                        error_html,
-                        pages::channel_list_fragment(
-                            &company,
-                            &config.app_domain_name,
-                            &channels,
-                            &agents
-                        )
-                    ));
-                }
-            },
-            None => None,
-        }
-    } else {
-        None
+    let agent_ids = match resolve_channel_agents(&agent_use_cases, &form, &slug, user.id, company_id)
+        .await
+    {
+        Ok(agent_ids) => agent_ids,
+        Err(message) => return view.render(Some(message)).await,
     };
-
-    let system_prompt_clean = generated_system_prompt.as_deref().or(system_prompt_clean);
-
-    if let Some(prompt) = system_prompt_clean {
-        match agent_use_cases
-            .create_agent(
-                user.id,
-                company_id,
-                &form.name,
-                &slug,
-                form.provider.as_deref(),
-                form.model.as_deref(),
-                form.api_key.as_deref(),
-                Some(prompt),
-                None,
-            )
-            .await
-        {
-            Ok(agent) => {
-                let mut ids = agent_ids.unwrap_or_default();
-                ids.push(agent.id);
-                agent_ids = Some(ids);
-            }
-            Err(err) => {
-                let agents = agent_use_cases
-                    .list_company_agents(user.id, company_id)
-                    .await
-                    .unwrap_or_default();
-                let channels = channel_use_cases
-                    .list_company_channels(user.id, company_id)
-                    .await
-                    .unwrap_or_default();
-                let error_html =
-                    pages::error_alert(&format!("Failed to create agent for channel: {err}"));
-                return Html(format!(
-                    "{}{}",
-                    error_html,
-                    pages::channel_list_fragment(
-                        &company,
-                        &config.app_domain_name,
-                        &channels,
-                        &agents
-                    )
-                ));
-            }
-        }
-    }
 
     let channel_config = match parse_config_form(form.channel_config) {
         Ok(c) => c,
-        Err(err) => {
-            let agents = agent_use_cases
-                .list_company_agents(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            let error_html = pages::error_alert(&err);
-            let channels = channel_use_cases
-                .list_company_channels(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            return Html(format!(
-                "{}{}",
-                error_html,
-                pages::channel_list_fragment(&company, &config.app_domain_name, &channels, &agents)
-            ));
-        }
+        Err(err) => return view.render(Some(err)).await,
     };
 
+    let confirm_spam_disabled = matches!(
+        form.confirm_spam_disabled.as_deref(),
+        Some("true") | Some("on")
+    );
     match channel_use_cases
         .create_channel(
             user.id,
@@ -423,46 +336,109 @@ async fn create_channel_handler(
             form.api_key.as_deref(),
             form.provider.as_deref(),
             form.model.as_deref(),
-            emails,
+            parse_emails_form(form.participant_emails),
             agent_ids,
             channel_config,
             confirm_spam_disabled,
         )
         .await
     {
-        Ok(_) => {
-            let agents = agent_use_cases
-                .list_company_agents(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            let channels = channel_use_cases
-                .list_company_channels(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            Html(pages::channel_list_fragment(
-                &company,
-                &config.app_domain_name,
-                &channels,
-                &agents,
-            ))
-        }
+        Ok(_) => view.render(None).await,
         Err(err) => {
-            let agents = agent_use_cases
-                .list_company_agents(user.id, company_id)
+            view.render(Some(format!("Failed to create channel: {err}")))
                 .await
-                .unwrap_or_default();
-            let error_html = pages::error_alert(&format!("Failed to create channel: {err}"));
-            let channels = channel_use_cases
-                .list_company_channels(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            Html(format!(
-                "{}{}",
-                error_html,
-                pages::channel_list_fragment(&company, &config.app_domain_name, &channels, &agents)
-            ))
         }
     }
+}
+
+/// Everything needed to re-render the channel list after any outcome.
+///
+/// Every exit from the create/update handlers ends in the same fragment, optionally headed by an
+/// error alert, so the reload lives here instead of at each `return`.
+struct ChannelListView<'a> {
+    channel_use_cases: &'a ChannelUseCases,
+    agent_use_cases: &'a AgentUseCases,
+    app_domain_name: &'a str,
+    user_id: Uuid,
+    company: &'a crate::entities::company::Company,
+}
+
+impl ChannelListView<'_> {
+    async fn render(&self, error: Option<String>) -> Html<String> {
+        let company_id = self.company.id;
+        let agents = self
+            .agent_use_cases
+            .list_company_agents(self.user_id, company_id)
+            .await
+            .unwrap_or_default();
+        let channels = self
+            .channel_use_cases
+            .list_company_channels(self.user_id, company_id)
+            .await
+            .unwrap_or_default();
+        let list =
+            pages::channel_list_fragment(self.company, self.app_domain_name, &channels, &agents);
+        Html(match error {
+            Some(message) => format!("{}{}", pages::error_alert(&message), list),
+            None => list,
+        })
+    }
+}
+
+/// The agents this channel should run.
+///
+/// In "simple" mode the submitted instructions are expanded into a system prompt and saved as a
+/// brand new agent, which is then appended to any explicitly selected ones.
+async fn resolve_channel_agents(
+    agent_use_cases: &AgentUseCases,
+    form: &ChannelForm,
+    slug: &str,
+    user_id: Uuid,
+    company_id: Uuid,
+) -> Result<Option<Vec<Uuid>>, String> {
+    let agent_ids = parse_agent_ids_form(form.agent_ids.clone());
+    let instructions = form
+        .system_prompt
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+
+    let generated = if form.form_mode.as_deref() == Some("simple") {
+        match instructions {
+            Some(instructions) => Some(
+                agent_use_cases
+                    .generate_system_prompt(user_id, company_id, instructions, None, None, None)
+                    .await
+                    .map_err(|err| format!("Failed to generate agent prompt: {err}"))?,
+            ),
+            None => None,
+        }
+    } else {
+        None
+    };
+
+    let Some(system_prompt) = generated.as_deref().or(instructions) else {
+        return Ok(agent_ids);
+    };
+
+    let agent = agent_use_cases
+        .create_agent(
+            user_id,
+            company_id,
+            &form.name,
+            slug,
+            form.provider.as_deref(),
+            form.model.as_deref(),
+            form.api_key.as_deref(),
+            Some(system_prompt),
+            None,
+        )
+        .await
+        .map_err(|err| format!("Failed to create agent for channel: {err}"))?;
+
+    let mut ids = agent_ids.unwrap_or_default();
+    ids.push(agent.id);
+    Ok(Some(ids))
 }
 
 /// GET /companies/{company_id}/channels/{id}/edit - HTMX edit channel form fragment (Protected).
@@ -666,7 +642,6 @@ async fn simulate_channel_page(
         Ok(Some(c)) => c,
         _ => return Html(pages::error_alert("Company not found.")).into_response(),
     };
-
     let channel = match channel_use_cases
         .get_company_channel(user.id, company_id, channel_id)
         .await
@@ -674,94 +649,112 @@ async fn simulate_channel_page(
         Ok(Some(wf)) => wf,
         _ => return Html(pages::error_alert("Channel not found.")).into_response(),
     };
-
     let active_user = match user_use_cases.get_user_by_id(user.id).await {
         Ok(Some(active_user)) => active_user,
         _ => return Html(pages::error_alert("User not found.")).into_response(),
     };
 
-    let mut initial_thread_id: Option<String> = None;
-    let mut initial_result_html: Option<String> = None;
-
-    if let Some(ref tid_str) = query.thread_id {
-        let trimmed = tid_str.trim();
-        if !trimmed.is_empty() {
-            initial_thread_id = Some(trimmed.to_string());
-            match Uuid::parse_str(trimmed) {
-                Ok(tid) => match thread_use_cases.get_thread(tid).await {
-                    Ok(Some(thread)) if thread.channel_id == channel_id => {
-                        let messages = thread_use_cases
-                            .get_thread_history(thread.id)
-                            .await
-                            .unwrap_or_default();
-                        let tasks = thread_use_cases
-                            .list_company_tasks(company_id, Some(channel_id), None, true)
-                            .await
-                            .unwrap_or_default();
-                        initial_result_html =
-                            Some(pages::channel_simulation_loaded_thread_fragment(
-                                &company,
-                                &channel,
-                                &config.app_domain_name,
-                                &thread,
-                                &messages,
-                                &tasks,
-                                false,
-                            ));
-                    }
-                    Ok(Some(_)) => {
-                        initial_result_html =
-                            Some(pages::channel_simulation_thread_error_fragment(
-                                company_id,
-                                channel_id,
-                                trimmed,
-                                "Thread does not belong to this channel",
-                                false,
-                            ));
-                    }
-                    Ok(None) => {
-                        initial_result_html =
-                            Some(pages::channel_simulation_thread_error_fragment(
-                                company_id,
-                                channel_id,
-                                trimmed,
-                                "Thread not found",
-                                false,
-                            ));
-                    }
-                    Err(err) => {
-                        initial_result_html =
-                            Some(pages::channel_simulation_thread_error_fragment(
-                                company_id,
-                                channel_id,
-                                trimmed,
-                                &format!("Failed to retrieve thread: {err}"),
-                                false,
-                            ));
-                    }
-                },
-                Err(_) => {
-                    initial_result_html = Some(pages::channel_simulation_thread_error_fragment(
-                        company_id,
-                        channel_id,
-                        trimmed,
-                        "Invalid Thread ID format (must be a valid UUID)",
-                        false,
-                    ));
-                }
-            }
-        }
-    }
+    // A `?thread_id=` on the page URL pre-loads that conversation into the result pane.
+    let requested_thread = query
+        .thread_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty());
+    let initial_result_html = match requested_thread {
+        Some(thread_id) => Some(
+            load_simulation_thread_fragment(
+                &thread_use_cases,
+                &company,
+                &channel,
+                &config.app_domain_name,
+                thread_id,
+                false,
+            )
+            .await
+            .map(|(_, fragment)| fragment)
+            .unwrap_or_else(|error_fragment| error_fragment),
+        ),
+        None => None,
+    };
 
     Html(pages::channel_simulation_page(
         &company,
         &config.app_domain_name,
         &channel,
         &active_user.email,
-        initial_thread_id.as_deref(),
+        requested_thread,
         initial_result_html.as_deref(),
     ))
     .into_response()
+}
+
+/// Render the thread a simulation page was asked to open.
+///
+/// `Ok` carries the loaded thread and its fragment; `Err` carries the fragment explaining why the
+/// id could not be opened, so both paths still have something to show the user.
+async fn load_simulation_thread_fragment(
+    thread_use_cases: &ThreadUseCases,
+    company: &crate::entities::company::Company,
+    channel: &Channel,
+    app_domain_name: &str,
+    thread_id_input: &str,
+    include_oob: bool,
+) -> Result<(Thread, String), String> {
+    let company_id = company.id;
+    let channel_id = channel.id;
+    let trimmed = thread_id_input.trim();
+    let error_fragment = |reason: &str| {
+        pages::channel_simulation_thread_error_fragment(
+            company_id,
+            channel_id,
+            trimmed,
+            reason,
+            include_oob,
+        )
+    };
+
+    if trimmed.is_empty() {
+        return Err(error_fragment("Thread ID cannot be empty"));
+    }
+    let Ok(thread_id) = Uuid::parse_str(trimmed) else {
+        return Err(error_fragment(
+            "Invalid Thread ID format (must be a valid UUID)",
+        ));
+    };
+
+    let thread = match thread_use_cases.get_thread(thread_id).await {
+        Ok(Some(thread)) => thread,
+        Ok(None) => return Err(error_fragment("Thread not found")),
+        Err(err) => return Err(error_fragment(&format!("Failed to retrieve thread: {err}"))),
+    };
+    if thread.channel_id != channel_id {
+        return Err(error_fragment("Thread does not belong to this channel"));
+    }
+
+    let messages = thread_use_cases
+        .get_thread_history(thread.id)
+        .await
+        .unwrap_or_default();
+    let tasks = thread_use_cases
+        .list_company_tasks(company_id, Some(channel_id), None, true)
+        .await
+        .unwrap_or_default();
+
+    let fragment = pages::channel_simulation_loaded_thread_fragment(
+        company,
+        channel,
+        app_domain_name,
+        &thread,
+        &messages,
+        &tasks,
+        include_oob,
+    );
+    Ok((thread, fragment))
+}
+
+/// URL the simulation page should show once a thread is open, so a refresh reloads the same thread.
+fn simulation_thread_url(company_id: Uuid, channel_id: Uuid, thread_id: Uuid) -> String {
+    format!("/companies/{company_id}/channels/{channel_id}/simulate?thread_id={thread_id}")
 }
 
 /// POST /companies/{company_id}/channels/{id}/simulate - Submit simulation form (Protected).
@@ -795,29 +788,44 @@ async fn simulate_channel_handler(
         Ok(Some(channel)) => channel,
         _ => return Html(pages::error_alert("Channel not found.")).into_response(),
     };
-    let authorized_recipient = parse_recipient_address_pipeline(&form.to, &config.app_domain_name)
-        .is_some_and(|(company_slug, channel_slugs, _)| {
-            company_slug.eq_ignore_ascii_case(&company.slug)
-                && !channel_slugs.is_empty()
-                && channel_slugs
-                    .iter()
-                    .all(|slug| slug.eq_ignore_ascii_case(&channel.slug))
-        });
-    if !authorized_recipient {
+
+    // The simulated envelope must address the very channel being simulated — otherwise the run
+    // would exercise a different channel's agent from inside this one's page.
+    if !simulation_recipient_matches(&form.to, &company, &channel, &config.app_domain_name) {
         return Html(pages::error_alert(
             "Simulation recipient must match the selected company and channel.",
         ))
         .into_response();
     }
 
-    let mode_str = form.simulation_mode.as_deref().unwrap_or("run_test");
-    let mode = match mode_str.to_lowercase().as_str() {
+    let mode = match form
+        .simulation_mode
+        .as_deref()
+        .unwrap_or("run_test")
+        .to_lowercase()
+        .as_str()
+    {
         "run_test" => SimulationMode::RunTest,
         "run" => SimulationMode::Run,
         _ => SimulationMode::Verify,
     };
 
+    let failure_fragment = |sender: &str, message: String| {
+        Html(pages::channel_simulation_failure_fragment(
+            company_id,
+            channel_id,
+            Some(&company),
+            Some(&channel),
+            &form.to,
+            sender,
+            form.subject.as_deref().unwrap_or("(No subject)"),
+            &message,
+        ))
+        .into_response()
+    };
+
     match mode {
+        // Verify stops at routing: it resolves the address without running an agent.
         SimulationMode::Verify => {
             let sender = form.from.clone().unwrap_or_default();
             let inbound_email = crate::use_cases::channel::InboundEmail {
@@ -837,30 +845,7 @@ async fn simulate_channel_handler(
                     company_id, channel_id, &result,
                 ))
                 .into_response(),
-                Err(err) => {
-                    let company = company_use_cases
-                        .get_company(company_id)
-                        .await
-                        .ok()
-                        .flatten();
-                    let channel = channel_use_cases
-                        .get_company_channel(user.id, company_id, channel_id)
-                        .await
-                        .ok()
-                        .flatten();
-
-                    Html(pages::channel_simulation_failure_fragment(
-                        company_id,
-                        channel_id,
-                        company.as_ref(),
-                        channel.as_ref(),
-                        &form.to,
-                        &sender,
-                        form.subject.as_deref().unwrap_or("(No subject)"),
-                        &format!("Simulation failed: {err}"),
-                    ))
-                    .into_response()
-                }
+                Err(err) => failure_fragment(&sender, format!("Simulation failed: {err}")),
             }
         }
         SimulationMode::RunTest | SimulationMode::Run => {
@@ -869,42 +854,25 @@ async fn simulate_channel_handler(
                 _ => return Html(pages::error_alert("User not found.")).into_response(),
             };
 
-            let mut headers = String::new();
-            if let Some(ref reply_to) = form.in_reply_to {
-                let trimmed = reply_to.trim();
-                if !trimmed.is_empty() {
-                    headers.push_str(&format!(
-                        "In-Reply-To: {}\nReferences: {}\n",
-                        trimmed, trimmed
-                    ));
-                }
-            }
-
             let raw_payload = RawInboundPayload {
                 to: form.to.clone(),
                 from: sender.clone(),
                 subject: form.subject.clone(),
                 text: form.text_body.clone(),
                 html: form.html_body.clone(),
-                headers: if headers.is_empty() {
-                    None
-                } else {
-                    Some(headers)
-                },
+                headers: reply_headers(form.in_reply_to.as_deref()),
                 ..Default::default()
             };
 
             match thread_use_cases.execute_simulation(raw_payload, mode).await {
                 Ok(sim_res) => {
-                    let messages = if let Some(ref thread) = sim_res.ingest_result.thread {
-                        thread_use_cases
+                    let messages = match sim_res.ingest_result.thread {
+                        Some(ref thread) => thread_use_cases
                             .get_thread_history(thread.id)
                             .await
-                            .unwrap_or_default()
-                    } else {
-                        Vec::new()
+                            .unwrap_or_default(),
+                        None => Vec::new(),
                     };
-
                     let tasks = thread_use_cases
                         .list_company_tasks(company_id, Some(channel_id), None, true)
                         .await
@@ -914,43 +882,51 @@ async fn simulate_channel_handler(
                         company_id, channel_id, &sim_res, &messages, &tasks,
                     );
 
-                    if let Some(ref thread) = sim_res.ingest_result.thread {
-                        let push_url = format!(
-                            "/companies/{company_id}/channels/{channel_id}/simulate?thread_id={}",
-                            thread.id
-                        );
-                        ([("HX-Push-Url", push_url)], Html(html_res)).into_response()
-                    } else {
-                        Html(html_res).into_response()
+                    match sim_res.ingest_result.thread {
+                        Some(ref thread) => (
+                            [(
+                                "HX-Push-Url",
+                                simulation_thread_url(company_id, channel_id, thread.id),
+                            )],
+                            Html(html_res),
+                        )
+                            .into_response(),
+                        None => Html(html_res).into_response(),
                     }
                 }
                 Err(err) => {
-                    let company = company_use_cases
-                        .get_company(company_id)
-                        .await
-                        .ok()
-                        .flatten();
-                    let channel = channel_use_cases
-                        .get_company_channel(user.id, company_id, channel_id)
-                        .await
-                        .ok()
-                        .flatten();
-
-                    Html(pages::channel_simulation_failure_fragment(
-                        company_id,
-                        channel_id,
-                        company.as_ref(),
-                        channel.as_ref(),
-                        &form.to,
-                        &sender,
-                        form.subject.as_deref().unwrap_or("(No subject)"),
-                        &format!("Simulation execution failed: {err}"),
-                    ))
-                    .into_response()
+                    failure_fragment(&sender, format!("Simulation execution failed: {err}"))
                 }
             }
         }
     }
+}
+
+/// Does the simulated `To:` address resolve to exactly the channel being simulated?
+fn simulation_recipient_matches(
+    to: &str,
+    company: &crate::entities::company::Company,
+    channel: &Channel,
+    app_domain_name: &str,
+) -> bool {
+    parse_recipient_address_pipeline(to, app_domain_name).is_some_and(
+        |(company_slug, channel_slugs, _)| {
+            company_slug.eq_ignore_ascii_case(&company.slug)
+                && !channel_slugs.is_empty()
+                && channel_slugs
+                    .iter()
+                    .all(|slug| slug.eq_ignore_ascii_case(&channel.slug))
+        },
+    )
+}
+
+/// Threading headers that make a simulated message a reply to an existing one.
+fn reply_headers(in_reply_to: Option<&str>) -> Option<String> {
+    let reply_to = in_reply_to.map(str::trim).filter(|s| !s.is_empty())?;
+    Some(format!(
+        "In-Reply-To: {}\nReferences: {}\n",
+        reply_to, reply_to
+    ))
 }
 
 async fn open_simulated_thread_logic(
@@ -967,7 +943,6 @@ async fn open_simulated_thread_logic(
         Ok(Some(c)) => c,
         _ => return Html(pages::error_alert("Company not found.")).into_response(),
     };
-
     let channel = match channel_use_cases
         .get_company_channel(user.id, company_id, channel_id)
         .await
@@ -976,88 +951,25 @@ async fn open_simulated_thread_logic(
         _ => return Html(pages::error_alert("Channel not found.")).into_response(),
     };
 
-    let trimmed = thread_id_input.trim();
-    if trimmed.is_empty() {
-        return Html(pages::channel_simulation_thread_error_fragment(
-            company_id,
-            channel_id,
-            "",
-            "Thread ID cannot be empty",
-            true,
-        ))
-        .into_response();
-    }
-
-    let tid = match Uuid::parse_str(trimmed) {
-        Ok(id) => id,
-        Err(_) => {
-            return Html(pages::channel_simulation_thread_error_fragment(
-                company_id,
-                channel_id,
-                trimmed,
-                "Invalid Thread ID format (must be a valid UUID)",
-                true,
-            ))
-            .into_response();
-        }
-    };
-
-    match thread_use_cases.get_thread(tid).await {
-        Ok(Some(thread)) => {
-            if thread.channel_id != channel_id {
-                return Html(pages::channel_simulation_thread_error_fragment(
-                    company_id,
-                    channel_id,
-                    trimmed,
-                    "Thread does not belong to this channel",
-                    true,
-                ))
-                .into_response();
-            }
-
-            let messages = thread_use_cases
-                .get_thread_history(thread.id)
-                .await
-                .unwrap_or_default();
-
-            let tasks = thread_use_cases
-                .list_company_tasks(company_id, Some(channel_id), None, true)
-                .await
-                .unwrap_or_default();
-
-            let fragment_html = pages::channel_simulation_loaded_thread_fragment(
-                &company,
-                &channel,
-                &config.app_domain_name,
-                &thread,
-                &messages,
-                &tasks,
-                true,
-            );
-
-            let push_url = format!(
-                "/companies/{company_id}/channels/{channel_id}/simulate?thread_id={}",
-                thread.id
-            );
-
-            ([("HX-Push-Url", push_url)], Html(fragment_html)).into_response()
-        }
-        Ok(None) => Html(pages::channel_simulation_thread_error_fragment(
-            company_id,
-            channel_id,
-            trimmed,
-            "Thread not found",
-            true,
-        ))
-        .into_response(),
-        Err(err) => Html(pages::channel_simulation_thread_error_fragment(
-            company_id,
-            channel_id,
-            trimmed,
-            &format!("Failed to retrieve thread: {err}"),
-            true,
-        ))
-        .into_response(),
+    match load_simulation_thread_fragment(
+        &thread_use_cases,
+        &company,
+        &channel,
+        &config.app_domain_name,
+        thread_id_input,
+        true,
+    )
+    .await
+    {
+        Ok((thread, fragment)) => (
+            [(
+                "HX-Push-Url",
+                simulation_thread_url(company_id, channel_id, thread.id),
+            )],
+            Html(fragment),
+        )
+            .into_response(),
+        Err(error_fragment) => Html(error_fragment).into_response(),
     }
 }
 

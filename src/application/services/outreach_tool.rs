@@ -137,10 +137,11 @@ impl Tool for OutreachAndAwaitQuorumTool {
             Ok(input) => input,
             Err(error) => return ToolResult::error(format!("Invalid input: {error}")),
         };
+
         let max_targets = config_usize(&ctx.custom_config, "max_targets", 50);
         let max_timeout_hours = config_u32(&ctx.custom_config, "max_timeout_hours", 720);
         let target_emails = match normalize_targets(
-            input.target_emails,
+            input.target_emails.clone(),
             max_targets,
             &self.context.app_domain_name,
             self.context.company_id,
@@ -153,66 +154,12 @@ impl Tool for OutreachAndAwaitQuorumTool {
             Ok(targets) => targets,
             Err(error) => return ToolResult::error(error),
         };
-        if !input.completion_threshold_percent.is_finite()
-            || input.completion_threshold_percent <= 0.0
-            || input.completion_threshold_percent > 100.0
-        {
-            return ToolResult::error(
-                "completion_threshold_percent must be greater than 0 and at most 100",
-            );
-        }
-        if input.timeout_hours == 0 || input.timeout_hours > max_timeout_hours {
-            return ToolResult::error(format!(
-                "timeout_hours must be between 1 and {max_timeout_hours}"
-            ));
-        }
-        let subject = input.subject.trim();
-        let body = input.body.trim();
-        if subject.is_empty() || subject.chars().count() > 300 {
-            return ToolResult::error("subject must contain between 1 and 300 characters");
-        }
-        if body.is_empty() || body.chars().count() > 20_000 {
-            return ToolResult::error("body must contain between 1 and 20000 characters");
-        }
+        let request = match ValidatedOutreach::from_input(&input, max_timeout_hours) {
+            Ok(request) => request,
+            Err(error) => return ToolResult::error(error),
+        };
 
-        let canonical = serde_json::json!({
-            "task_id": self.context.task_id,
-            "target_emails": target_emails,
-            "completion_threshold_percent": input.completion_threshold_percent,
-            "timeout_hours": input.timeout_hours,
-            "subject": subject,
-            "body": body,
-        });
-        let outreach_key = format!("{:x}", Sha256::digest(canonical.to_string().as_bytes()));
-        let outreach_id = Uuid::new_v4();
-        let expires_at = Utc::now().naive_utc() + Duration::hours(input.timeout_hours as i64);
-        let targets = target_emails
-            .iter()
-            .map(|email| {
-                let outbox_id = Uuid::new_v4();
-                let payload = serde_json::to_value(OutboundEmail {
-                    channel_id: self.context.channel_id,
-                    channel_name: self.context.channel_name.clone(),
-                    channel_slug: self.context.channel_slug.clone(),
-                    company_slug: self.context.company_slug.clone(),
-                    trigger_message_id: self.context.trigger_message_id.clone(),
-                    thread_references: self.context.thread_references.clone(),
-                    recipient_to: email.clone().into(),
-                    recipients_cc: Vec::new(),
-                    subject: subject.to_string(),
-                    body_text: body.to_string(),
-                    hop_count: self.context.hop_count,
-                    trace_channels: self.context.trace_channels.clone(),
-                })
-                .map_err(|error| format!("Failed to serialize outreach email: {error}"))?;
-                Ok(OutreachTargetRequest {
-                    email: email.clone().into(),
-                    outbox_id,
-                    outbox_payload: payload,
-                })
-            })
-            .collect::<Result<Vec<_>, String>>();
-        let targets = match targets {
+        let targets = match self.build_target_requests(&target_emails, &request) {
             Ok(targets) => targets,
             Err(error) => return ToolResult::error(error),
         };
@@ -220,15 +167,15 @@ impl Tool for OutreachAndAwaitQuorumTool {
         let progress = match self
             .persistence
             .create_outreach_and_pause(CreateOutreachRequest {
-                id: outreach_id,
+                id: Uuid::new_v4(),
                 task_id: self.context.task_id,
                 company_id: self.context.company_id,
                 worker_id: self.context.worker_id,
-                outreach_key,
-                required_threshold_percent: input.completion_threshold_percent,
-                expires_at,
-                subject: subject.to_string(),
-                body: body.to_string(),
+                outreach_key: request.idempotency_key(self.context.task_id, &target_emails),
+                required_threshold_percent: request.threshold_percent,
+                expires_at: Utc::now().naive_utc() + Duration::hours(request.timeout_hours as i64),
+                subject: request.subject.to_string(),
+                body: request.body.to_string(),
                 targets,
             })
             .await
@@ -236,9 +183,12 @@ impl Tool for OutreachAndAwaitQuorumTool {
             Ok(progress) => progress,
             Err(error) => return ToolResult::error(format!("Failed to create outreach: {error}")),
         };
+
+        // Suspending parks the whole agent run until the replies arrive or the outreach times out.
         if progress.suspended {
             self.suspended.store(true, Ordering::SeqCst);
         }
+
         let output = OutreachOutput {
             accepted: true,
             status: progress.status.as_str().to_string(),
@@ -258,6 +208,95 @@ impl Tool for OutreachAndAwaitQuorumTool {
             Ok(output) => ToolResult::ok(output),
             Err(error) => ToolResult::error(format!("Failed to serialize tool output: {error}")),
         }
+    }
+}
+
+/// An outreach request whose numbers and text have passed validation.
+struct ValidatedOutreach<'a> {
+    threshold_percent: f64,
+    timeout_hours: u32,
+    subject: &'a str,
+    body: &'a str,
+}
+
+impl<'a> ValidatedOutreach<'a> {
+    fn from_input(input: &'a OutreachInput, max_timeout_hours: u32) -> Result<Self, String> {
+        if !input.completion_threshold_percent.is_finite()
+            || input.completion_threshold_percent <= 0.0
+            || input.completion_threshold_percent > 100.0
+        {
+            return Err("completion_threshold_percent must be greater than 0 and at most 100".into());
+        }
+        if input.timeout_hours == 0 || input.timeout_hours > max_timeout_hours {
+            return Err(format!(
+                "timeout_hours must be between 1 and {max_timeout_hours}"
+            ));
+        }
+        let subject = input.subject.trim();
+        let body = input.body.trim();
+        if subject.is_empty() || subject.chars().count() > 300 {
+            return Err("subject must contain between 1 and 300 characters".into());
+        }
+        if body.is_empty() || body.chars().count() > 20_000 {
+            return Err("body must contain between 1 and 20000 characters".into());
+        }
+
+        Ok(Self {
+            threshold_percent: input.completion_threshold_percent,
+            timeout_hours: input.timeout_hours,
+            subject,
+            body,
+        })
+    }
+
+    /// Hash of everything that defines this outreach, so an agent retrying the same tool call
+    /// re-attaches to the existing outreach instead of mailing everyone twice.
+    fn idempotency_key(&self, task_id: Uuid, target_emails: &[String]) -> String {
+        let canonical = serde_json::json!({
+            "task_id": task_id,
+            "target_emails": target_emails,
+            "completion_threshold_percent": self.threshold_percent,
+            "timeout_hours": self.timeout_hours,
+            "subject": self.subject,
+            "body": self.body,
+        });
+        format!("{:x}", Sha256::digest(canonical.to_string().as_bytes()))
+    }
+}
+
+impl OutreachAndAwaitQuorumTool {
+    /// One queued email per target, each carrying the originating channel's identity so replies
+    /// land back on the same thread.
+    fn build_target_requests(
+        &self,
+        target_emails: &[String],
+        request: &ValidatedOutreach<'_>,
+    ) -> Result<Vec<OutreachTargetRequest>, String> {
+        target_emails
+            .iter()
+            .map(|email| {
+                let payload = serde_json::to_value(OutboundEmail {
+                    channel_id: self.context.channel_id,
+                    channel_name: self.context.channel_name.clone(),
+                    channel_slug: self.context.channel_slug.clone(),
+                    company_slug: self.context.company_slug.clone(),
+                    trigger_message_id: self.context.trigger_message_id.clone(),
+                    thread_references: self.context.thread_references.clone(),
+                    recipient_to: email.clone().into(),
+                    recipients_cc: Vec::new(),
+                    subject: request.subject.to_string(),
+                    body_text: request.body.to_string(),
+                    hop_count: self.context.hop_count,
+                    trace_channels: self.context.trace_channels.clone(),
+                })
+                .map_err(|error| format!("Failed to serialize outreach email: {error}"))?;
+                Ok(OutreachTargetRequest {
+                    email: email.clone().into(),
+                    outbox_id: Uuid::new_v4(),
+                    outbox_payload: payload,
+                })
+            })
+            .collect()
     }
 }
 

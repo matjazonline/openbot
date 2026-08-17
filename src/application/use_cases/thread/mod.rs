@@ -1,0 +1,842 @@
+//! Thread use cases: everything that happens to a message between arriving at the platform and
+//! the agent's reply going back out.
+//!
+//! This module owns the types and the [`ThreadUseCases`] handle; the two pipelines live next to
+//! it in [`ingest`] and [`dispatch`], with their shared helpers in [`support`].
+
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use chrono::NaiveDateTime;
+use uuid::Uuid;
+
+use crate::{
+    adapters::persistence::task::TaskPersistence,
+    adapters::protocols::{
+        EgressRegistry,
+        email::{EmailEgressAdapter, EmailIngressAdapter},
+    },
+    app_error::{AppError, AppResult},
+    domain::monitoring::MonitoringService,
+    entities::{
+        channel::{Channel, ChannelType, ParticipantIdentity},
+        company::Company,
+        message::{Message, MessageDirection, MessageRole},
+        message_contract::NormalizedInboundMessage,
+        task::TokenUsage,
+        thread::Thread,
+        value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
+    },
+    infra::config::AppConfig,
+    services::{
+        email_parser::{ParsedEmail, RawInboundPayload},
+        outbound_dispatcher::{OutboundDispatcher, OutboundEmail, SentEmailResult},
+    },
+    use_cases::{
+        agent::AgentPersistence,
+        approval::ApprovalUseCases,
+        channel::{ChannelPersistence, parse_recipient_address_pipeline},
+        company::CompanyPersistence,
+    },
+};
+
+mod dispatch;
+mod ingest;
+mod support;
+
+#[cfg(test)]
+mod tests;
+
+pub const MAX_THREAD_MESSAGES_PER_HOUR: usize = 60;
+
+#[derive(Clone, Copy)]
+struct InternalChannelSource {
+    company_id: Uuid,
+    channel_id: Uuid,
+}
+
+#[async_trait]
+pub trait ThreadPersistence: Send + Sync {
+    async fn create_thread(
+        &self,
+        channel_id: Uuid,
+        subject: &str,
+        participant_emails: &[EmailAddress],
+    ) -> AppResult<Thread>;
+
+    async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>>;
+
+    async fn list_threads_by_channel_id(
+        &self,
+        channel_id: Uuid,
+        before: Option<(NaiveDateTime, Uuid)>,
+        limit: usize,
+    ) -> AppResult<Vec<Thread>>;
+
+    async fn update_thread_participants(
+        &self,
+        id: Uuid,
+        participant_emails: &[EmailAddress],
+    ) -> AppResult<Thread>;
+
+    async fn find_thread_by_message_ids(
+        &self,
+        channel_id: Uuid,
+        message_ids: &[MessageId],
+    ) -> AppResult<Option<Thread>>;
+
+    async fn find_thread_by_thread_index(
+        &self,
+        channel_id: Uuid,
+        thread_index_prefix: &ThreadIndex,
+    ) -> AppResult<Option<Thread>>;
+
+    async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize>;
+
+    async fn create_message(&self, message: &Message) -> AppResult<Message>;
+
+    async fn get_message_by_message_id(
+        &self,
+        company_id: Uuid,
+        message_id: &MessageId,
+    ) -> AppResult<Option<Message>>;
+
+    async fn find_outbound_reply(
+        &self,
+        thread_id: Uuid,
+        in_reply_to: &MessageId,
+    ) -> AppResult<Option<Message>>;
+
+    async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>>;
+}
+
+#[derive(Clone)]
+pub struct ThreadUseCases {
+    thread_persistence: Arc<dyn ThreadPersistence>,
+    channel_persistence: Arc<dyn ChannelPersistence>,
+    company_persistence: Arc<dyn CompanyPersistence>,
+    task_persistence: Arc<dyn TaskPersistence>,
+    agent_persistence: Option<Arc<dyn AgentPersistence>>,
+    approval_use_cases: Option<Arc<ApprovalUseCases>>,
+    monitoring: Option<Arc<dyn MonitoringService>>,
+    egress_registry: Arc<EgressRegistry>,
+    config: Arc<AppConfig>,
+}
+
+impl ThreadUseCases {
+    pub fn new(
+        thread_persistence: Arc<dyn ThreadPersistence>,
+        channel_persistence: Arc<dyn ChannelPersistence>,
+        company_persistence: Arc<dyn CompanyPersistence>,
+        task_persistence: Arc<dyn TaskPersistence>,
+        config: Arc<AppConfig>,
+    ) -> Self {
+        let egress_registry = Arc::new(
+            EgressRegistry::new().register(Arc::new(EmailEgressAdapter::new(config.clone()))),
+        );
+
+        Self {
+            thread_persistence,
+            channel_persistence,
+            company_persistence,
+            task_persistence,
+            agent_persistence: None,
+            approval_use_cases: None,
+            monitoring: None,
+            egress_registry,
+            config,
+        }
+    }
+
+    pub fn with_egress_registry(mut self, egress_registry: Arc<EgressRegistry>) -> Self {
+        self.egress_registry = egress_registry;
+        self
+    }
+
+    pub fn with_agent_persistence(mut self, agent_persistence: Arc<dyn AgentPersistence>) -> Self {
+        self.agent_persistence = Some(agent_persistence);
+        self
+    }
+
+    pub fn with_approval_use_cases(mut self, approval_use_cases: Arc<ApprovalUseCases>) -> Self {
+        self.approval_use_cases = Some(approval_use_cases);
+        self
+    }
+
+    pub fn get_approval_use_cases(&self) -> Option<Arc<ApprovalUseCases>> {
+        self.approval_use_cases.clone()
+    }
+
+    pub fn with_monitoring(mut self, monitoring: Arc<dyn MonitoringService>) -> Self {
+        self.monitoring = Some(monitoring);
+        self
+    }
+
+    pub fn channel_persistence(&self) -> &Arc<dyn ChannelPersistence> {
+        &self.channel_persistence
+    }
+
+    pub fn company_persistence(&self) -> &Arc<dyn CompanyPersistence> {
+        &self.company_persistence
+    }
+
+    pub fn config(&self) -> &Arc<AppConfig> {
+        &self.config
+    }
+
+    async fn resolve_internal_destination(
+        &self,
+        source_channel_id: Uuid,
+        recipient: &str,
+    ) -> AppResult<Option<(Channel, Channel, Company)>> {
+        let recipient_domain = recipient
+            .trim()
+            .rsplit_once('@')
+            .map(|(_, domain)| domain.trim().to_lowercase())
+            .unwrap_or_default();
+        let app_domain = self.config.app_domain_name.trim().to_lowercase();
+        if recipient_domain != app_domain && !recipient_domain.ends_with(&format!(".{app_domain}"))
+        {
+            return Ok(None);
+        }
+
+        let (company_slug, channel_slugs, is_context_only) =
+            parse_recipient_address_pipeline(recipient, &self.config.app_domain_name).ok_or_else(
+                || AppError::Internal(format!("Invalid platform channel address: {recipient}")),
+            )?;
+        if is_context_only || channel_slugs.len() != 1 {
+            return Err(AppError::Internal(
+                "Internal channel delivery requires one direct channel address".into(),
+            ));
+        }
+
+        let source = self
+            .channel_persistence
+            .get_by_id(source_channel_id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Internal source channel was not found".into()))?;
+        let target = self
+            .channel_persistence
+            .get_by_company_slug_and_channel_slug(&company_slug, &channel_slugs[0])
+            .await?
+            .ok_or_else(|| {
+                AppError::Internal(format!("Platform channel does not exist: {recipient}"))
+            })?;
+        if source.company_id != target.company_id {
+            return Err(AppError::Internal(
+                "Cross-company internal channel delivery is not allowed".into(),
+            ));
+        }
+        if source.id == target.id {
+            return Err(AppError::Internal(
+                "A channel cannot deliver an internal message to itself".into(),
+            ));
+        }
+        if target.agent_ids.as_ref().is_none_or(Vec::is_empty) {
+            return Err(AppError::Internal(format!(
+                "Target channel '{}' has no configured agent",
+                target.slug
+            )));
+        }
+        let company = self
+            .company_persistence
+            .get_by_id(source.company_id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Internal source company was not found".into()))?;
+        if !company.slug.eq_ignore_ascii_case(&company_slug) {
+            return Err(AppError::Internal(
+                "Internal recipient company does not match the source company".into(),
+            ));
+        }
+        Ok(Some((source, target, company)))
+    }
+
+    pub async fn prepare_internal_channel_delivery(
+        &self,
+        email: OutboundEmail,
+        idempotency_key: Option<&str>,
+    ) -> AppResult<Option<SentEmailResult>> {
+        if self
+            .resolve_internal_destination(email.channel_id, &email.recipient_to)
+            .await?
+            .is_none()
+        {
+            return Ok(None);
+        }
+        let prepared = match idempotency_key {
+            Some(key) => OutboundDispatcher::prepare_idempotent(&self.config, email, key)?,
+            None => OutboundDispatcher::prepare(&self.config, email)?,
+        };
+        Ok(Some(prepared))
+    }
+
+    pub async fn ingest_prepared_internal_message(
+        &self,
+        sent: &SentEmailResult,
+    ) -> AppResult<InboundIngestResult> {
+        let source_channel_id = sent.source_channel_id.ok_or_else(|| {
+            AppError::Internal("Internal delivery has no source channel identity".into())
+        })?;
+        let recipient = sent
+            .recipients_to
+            .first()
+            .ok_or_else(|| AppError::Internal("Internal delivery has no recipient".into()))?;
+        let (source, _, company) = self
+            .resolve_internal_destination(source_channel_id, recipient)
+            .await?
+            .ok_or_else(|| AppError::Internal("Recipient is not an internal channel".into()))?;
+        let expected_sender = format!(
+            "{}@{}.{}",
+            source.slug, company.slug, self.config.app_domain_name
+        );
+        if !sent.from_address.eq_ignore_ascii_case(&expected_sender) {
+            return Err(AppError::Internal(
+                "Internal sender address does not match its source channel".into(),
+            ));
+        }
+
+        let norm = NormalizedInboundMessage {
+            message_id: sent.outbound_message_id.clone(),
+            thread_ref: Some(sent.in_reply_to.clone()),
+            references: sent.references.clone(),
+            thread_index: None,
+            sender: ParticipantIdentity::email(sent.from_address.clone()),
+            recipients_to: sent
+                .recipients_to
+                .iter()
+                .cloned()
+                .map(ParticipantIdentity::email)
+                .collect(),
+            recipients_cc: sent
+                .recipients_cc
+                .iter()
+                .cloned()
+                .map(ParticipantIdentity::email)
+                .collect(),
+            subject: sent.subject.clone(),
+            clean_text: sent.body_text.clone(),
+            raw_text: Some(sent.body_text.clone()),
+            raw_html: None,
+            attachments: Vec::new(),
+            is_auto_reply: true,
+            is_forwarded: false,
+            channel_id_header: Some(source_channel_id),
+            hop_count: sent.hop_count,
+            trace_channels: sent.trace_channels.clone(),
+            protocol: ChannelType::Email,
+            spf_status: None,
+            dkim_status: None,
+            dmarc_status: None,
+            spam_score: None,
+            is_context_only: false,
+        };
+        self.ingest_normalized_message_with_source(
+            norm,
+            Some(InternalChannelSource {
+                company_id: company.id,
+                channel_id: source_channel_id,
+            }),
+        )
+        .await
+    }
+
+    pub async fn record_outreach_outbound_message(
+        &self,
+        outbox_id: Uuid,
+        sent: &crate::services::outbound_dispatcher::SentEmailResult,
+    ) -> AppResult<()> {
+        let Some(thread_id) = self
+            .task_persistence
+            .get_outreach_thread_for_outbox(outbox_id)
+            .await?
+        else {
+            return Ok(());
+        };
+        self.thread_persistence
+            .create_message(&Message {
+                id: Uuid::new_v4(),
+                thread_id,
+                message_id: MessageId::from(sent.outbound_message_id.clone()),
+                in_reply_to: Some(MessageId::from(sent.in_reply_to.clone())),
+                references_list: sent
+                    .references
+                    .iter()
+                    .cloned()
+                    .map(MessageId::from)
+                    .collect(),
+                sender: EmailAddress::from(sent.from_address.clone()),
+                recipients_to: sent
+                    .recipients_to
+                    .iter()
+                    .cloned()
+                    .map(EmailAddress::from)
+                    .collect(),
+                recipients_cc: sent
+                    .recipients_cc
+                    .iter()
+                    .cloned()
+                    .map(EmailAddress::from)
+                    .collect(),
+                subject: sent.subject.clone(),
+                clean_text_body: sent.body_text.clone(),
+                raw_text_body: None,
+                raw_html_body: None,
+                attachments: None,
+                direction: MessageDirection::Outbound,
+                role: MessageRole::Agent,
+                thread_index: None,
+                created_at: chrono::Utc::now().naive_utc(),
+            })
+            .await?;
+        Ok(())
+    }
+
+    pub async fn execute_simulation(
+        &self,
+        raw_payload: RawInboundPayload,
+        mode: SimulationMode,
+    ) -> AppResult<SimulationExecutionResult> {
+        let ingest = self.ingest_and_save_inbound_message(raw_payload).await?;
+
+        if !ingest.accepted {
+            return Ok(SimulationExecutionResult {
+                ingest_result: ingest,
+                agent_execution: None,
+                simulation_mode: mode,
+            });
+        }
+
+        let send_email = mode == SimulationMode::Run;
+        let agent_execution = match self.execute_agent_and_dispatch(&ingest, send_email).await {
+            Ok(exec) => exec,
+            Err(err) => Some(AgentExecutionResult {
+                outbound_message_id: None,
+                agent_response: format!("{err}"),
+                email_sent: false,
+                token_usage: None,
+                metadata: None,
+            }),
+        };
+
+        Ok(SimulationExecutionResult {
+            ingest_result: ingest,
+            agent_execution,
+            simulation_mode: mode,
+        })
+    }
+
+    pub async fn handle_bounce_dispatch(&self, ingest: &InboundIngestResult) {
+        if let Some(ref bounce) = ingest.bounce_info {
+            if let Some(adapter) = self.egress_registry.get(&ChannelType::Email) {
+                let _ = adapter.dispatch_bounce(bounce).await;
+            } else {
+                let bounce_body = format_bounce_email_body(bounce, &self.config.app_domain_name);
+                let _ = OutboundDispatcher::send_bounce(
+                    &self.config,
+                    &bounce.recipient_to,
+                    &bounce.original_subject,
+                    &bounce_body,
+                )
+                .await;
+            }
+        }
+    }
+
+    pub async fn process_and_dispatch_email(
+        &self,
+        raw_payload: RawInboundPayload,
+    ) -> AppResult<ProcessEmailResult> {
+        let ingest = self.ingest_and_save_inbound_message(raw_payload).await?;
+        if !ingest.accepted {
+            self.handle_bounce_dispatch(&ingest).await;
+            return Ok(ProcessEmailResult {
+                processed: false,
+                reason: ingest.reason,
+                thread_id: None,
+                inbound_message_id: None,
+                outbound_message_id: None,
+            });
+        }
+
+        let thread_id = ingest.thread.as_ref().map(|t| t.id);
+        let inbound_message_id = ingest
+            .inbound_message
+            .as_ref()
+            .map(|m| m.message_id.to_string());
+
+        let agent_res = self.execute_agent_and_dispatch(&ingest, true).await?;
+        let outbound_msg_id = agent_res.and_then(|r| r.outbound_message_id);
+
+        Ok(ProcessEmailResult {
+            processed: true,
+            reason: None,
+            thread_id,
+            inbound_message_id,
+            outbound_message_id: outbound_msg_id,
+        })
+    }
+
+    pub async fn get_thread(&self, thread_id: Uuid) -> AppResult<Option<Thread>> {
+        self.thread_persistence.get_thread_by_id(thread_id).await
+    }
+
+    pub async fn list_channel_threads(
+        &self,
+        channel_id: Uuid,
+        before: Option<(NaiveDateTime, Uuid)>,
+        limit: usize,
+    ) -> AppResult<Vec<Thread>> {
+        self.thread_persistence
+            .list_threads_by_channel_id(channel_id, before, limit)
+            .await
+    }
+
+    pub async fn get_thread_history(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
+        self.thread_persistence
+            .list_messages_by_thread_id(thread_id)
+            .await
+    }
+
+    pub async fn find_outbound_reply(
+        &self,
+        thread_id: Uuid,
+        in_reply_to: &MessageId,
+    ) -> AppResult<Option<Message>> {
+        self.thread_persistence
+            .find_outbound_reply(thread_id, in_reply_to)
+            .await
+    }
+
+    pub async fn save_message(&self, message: &Message) -> AppResult<Message> {
+        self.thread_persistence.create_message(message).await
+    }
+
+    pub async fn hydrate_ingest_configuration(
+        &self,
+        ingest: &mut InboundIngestResult,
+    ) -> AppResult<()> {
+        if let Some(company) = ingest.company.as_mut() {
+            *company = self
+                .company_persistence
+                .get_by_id(company.id)
+                .await?
+                .ok_or_else(|| {
+                    crate::app_error::AppError::Internal("Task company no longer exists".into())
+                })?;
+        }
+        if let Some(channel) = ingest.channel.as_mut() {
+            let current = self
+                .channel_persistence
+                .get_by_id(channel.id)
+                .await?
+                .ok_or_else(|| {
+                    crate::app_error::AppError::Internal("Task channel no longer exists".into())
+                })?;
+            if ingest
+                .company
+                .as_ref()
+                .is_some_and(|company| company.id != current.company_id)
+            {
+                return Err(crate::app_error::AppError::Internal(
+                    "Task channel does not belong to its company".into(),
+                ));
+            }
+            *channel = current;
+        }
+        for channel_match in &mut ingest.channel_matches {
+            let company = self
+                .company_persistence
+                .get_by_id(channel_match.company.id)
+                .await?
+                .ok_or_else(|| {
+                    crate::app_error::AppError::Internal(
+                        "Task target company no longer exists".into(),
+                    )
+                })?;
+            let channel = self
+                .channel_persistence
+                .get_by_id(channel_match.channel.id)
+                .await?
+                .ok_or_else(|| {
+                    crate::app_error::AppError::Internal(
+                        "Task target channel no longer exists".into(),
+                    )
+                })?;
+            if channel.company_id != company.id {
+                return Err(crate::app_error::AppError::Internal(
+                    "Task target channel does not belong to its company".into(),
+                ));
+            }
+            let thread = self
+                .thread_persistence
+                .get_thread_by_id(channel_match.thread.id)
+                .await?
+                .ok_or_else(|| {
+                    crate::app_error::AppError::Internal(
+                        "Task target thread no longer exists".into(),
+                    )
+                })?;
+            if thread.channel_id != channel.id {
+                return Err(crate::app_error::AppError::Internal(
+                    "Task target thread does not belong to its channel".into(),
+                ));
+            }
+            channel_match.company = company;
+            channel_match.channel = channel;
+            channel_match.thread = thread;
+        }
+        Ok(())
+    }
+
+    pub async fn list_company_tasks(
+        &self,
+        company_id: Uuid,
+        channel_id: Option<Uuid>,
+        status: Option<crate::entities::task::TaskStatus>,
+        sort_asc: bool,
+    ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+        self.task_persistence
+            .list_company_tasks(company_id, channel_id, status, sort_asc)
+            .await
+    }
+
+    pub async fn list_company_tasks_page(
+        &self,
+        company_id: Uuid,
+        channel_id: Option<Uuid>,
+        status: Option<crate::entities::task::TaskStatus>,
+        sort_asc: bool,
+        offset: i64,
+        limit: i64,
+    ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
+        self.task_persistence
+            .list_company_tasks_page(company_id, channel_id, status, sort_asc, offset, limit)
+            .await
+    }
+
+    pub async fn get_task_persistence(&self) -> Arc<dyn TaskPersistence> {
+        self.task_persistence.clone()
+    }
+}
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RecipientRole {
+    To,
+    Cc,
+}
+
+impl RecipientRole {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RecipientRole::To => "to",
+            RecipientRole::Cc => "cc",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelMatch {
+    pub company: Company,
+    pub channel: Channel,
+    pub thread: Thread,
+    pub inbound_message: Message,
+    pub recipient_role: RecipientRole,
+    #[serde(default)]
+    pub step_index: usize,
+    #[serde(default)]
+    pub total_steps: usize,
+}
+
+fn durable_ingest_payload(ingest: &InboundIngestResult) -> serde_json::Value {
+    let mut durable = ingest.clone();
+    if let Some(company) = durable.company.as_mut() {
+        company.api_key = None;
+    }
+    if let Some(channel) = durable.channel.as_mut() {
+        channel.api_key = None;
+        scrub_json_secrets(channel.channel_config.as_mut());
+    }
+    for channel_match in &mut durable.channel_matches {
+        channel_match.company.api_key = None;
+        channel_match.channel.api_key = None;
+        scrub_json_secrets(channel_match.channel.channel_config.as_mut());
+    }
+    serde_json::to_value(durable).unwrap_or_default()
+}
+
+fn scrub_json_secrets(value: Option<&mut serde_json::Value>) {
+    let Some(value) = value else {
+        return;
+    };
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                let normalized = key.to_ascii_lowercase();
+                if matches!(
+                    normalized.as_str(),
+                    "api_key"
+                        | "apikey"
+                        | "access_token"
+                        | "token"
+                        | "secret"
+                        | "secret_key"
+                        | "private_key"
+                        | "app_key"
+                        | "app_secret"
+                        | "auth"
+                        | "authorization"
+                        | "password"
+                        | "bearer"
+                ) {
+                    *value = serde_json::Value::Null;
+                } else {
+                    scrub_json_secrets(Some(value));
+                }
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for value in values {
+                scrub_json_secrets(Some(value));
+            }
+        }
+        _ => {}
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BounceSuggestion {
+    pub invalid_slug: ChannelSlug,
+    pub suggestions: Vec<ChannelSlug>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BounceInfo {
+    pub recipient_to: EmailAddress,
+    pub company_slug: Option<CompanySlug>,
+    pub invalid_slugs: Vec<ChannelSlug>,
+    pub suggestions: Vec<BounceSuggestion>,
+    pub original_subject: String,
+}
+
+pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String {
+    let mut body = String::new();
+    body.push_str("Undeliverable Mail Notification\n\n");
+    body.push_str("Your email could not be delivered because one or more channel addresses were not found or misspelled.\n\n");
+
+    if let Some(ref comp) = bounce.company_slug {
+        body.push_str(&format!("Company Domain: {comp}.{app_domain}\n\n"));
+    }
+
+    body.push_str("Details:\n");
+    for s in &bounce.suggestions {
+        let domain_part = bounce
+            .company_slug
+            .as_deref()
+            .map(|c| format!("{c}.{app_domain}"))
+            .unwrap_or_else(|| app_domain.to_string());
+
+        body.push_str(&format!(
+            "  - Invalid Channel Slug: '{}@{}'\n",
+            s.invalid_slug, domain_part
+        ));
+        if !s.suggestions.is_empty() {
+            body.push_str("    Did you mean:\n");
+            for sug in &s.suggestions {
+                body.push_str(&format!("      * {sug}@{domain_part}\n"));
+            }
+        } else {
+            body.push_str("    No similar channel suggestions found.\n");
+        }
+        body.push('\n');
+    }
+
+    body.push_str("Please check the channel address and try sending your email again.\n");
+    body
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InboundIngestResult {
+    pub accepted: bool,
+    pub reason: Option<String>,
+    pub thread: Option<Thread>,
+    pub inbound_message: Option<Message>,
+    pub company: Option<Company>,
+    pub channel: Option<Channel>,
+    pub parsed_email: Option<ParsedEmail>,
+    pub normalized_message: Option<NormalizedInboundMessage>,
+    pub task_id: Option<Uuid>,
+    #[serde(default)]
+    pub channel_matches: Vec<ChannelMatch>,
+    #[serde(default)]
+    pub bounce_info: Option<BounceInfo>,
+}
+
+impl InboundIngestResult {
+    pub fn rejected(reason: &str) -> Self {
+        Self {
+            accepted: false,
+            reason: Some(reason.to_string()),
+            thread: None,
+            inbound_message: None,
+            company: None,
+            channel: None,
+            parsed_email: None,
+            normalized_message: None,
+            task_id: None,
+            channel_matches: Vec::new(),
+            bounce_info: None,
+        }
+    }
+
+    pub fn rejected_with_bounce(reason: &str, bounce: BounceInfo) -> Self {
+        Self {
+            accepted: false,
+            reason: Some(reason.to_string()),
+            thread: None,
+            inbound_message: None,
+            company: None,
+            channel: None,
+            parsed_email: None,
+            normalized_message: None,
+            task_id: None,
+            channel_matches: Vec::new(),
+            bounce_info: Some(bounce),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SimulationMode {
+    Verify,
+    RunTest,
+    Run,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentExecutionResult {
+    pub outbound_message_id: Option<String>,
+    pub agent_response: String,
+    pub email_sent: bool,
+    pub token_usage: Option<TokenUsage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimulationExecutionResult {
+    pub ingest_result: InboundIngestResult,
+    pub agent_execution: Option<AgentExecutionResult>,
+    pub simulation_mode: SimulationMode,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ProcessEmailResult {
+    pub processed: bool,
+    pub reason: Option<String>,
+    pub thread_id: Option<Uuid>,
+    pub inbound_message_id: Option<String>,
+    pub outbound_message_id: Option<String>,
+}

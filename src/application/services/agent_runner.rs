@@ -810,6 +810,110 @@ impl<'a> AgentRunner<'a> {
             self.history.len()
         );
 
+        let raw_full_prompt = self.compose_prompt();
+        let key = &self.params.api_key;
+
+        // Stage 3: Optional LLM Spam & Guardrail Evaluation (skipped for trusted participants)
+        if !self.skip_spam_guardrail
+            && let Some(ref cfg) = self.app_config
+        {
+            crate::services::llm_guardrail::LlmSpamGuardrail::evaluate(
+                cfg,
+                self.company.as_ref(),
+                self.monitoring.as_ref(),
+                &raw_full_prompt,
+                &self.params.provider,
+                &self.params.model,
+                key,
+            )
+            .await?;
+        }
+
+        let mut config = self.params.config.clone();
+        ensure_config_fields(
+            &mut config,
+            &self.params.provider,
+            &self.params.model,
+            key,
+            None,
+            None,
+        );
+        let config_yaml = serde_yaml::to_string(&config).unwrap_or_default();
+        let (provider_config, base_url, tool_choice) = provider_config_from_agent_config(&config)?;
+
+        let full_prompt = sanitize_text(&raw_full_prompt, Some(key));
+        info!("Full prompt context length: {}", full_prompt.len());
+        if !config_yaml.is_empty() {
+            info!(
+                "Running agent with channel config YAML:\n{}",
+                sanitize_text(&config_yaml, Some(key))
+            );
+        }
+
+        let task = AgentTask {
+            config_yaml,
+            provider_name: self.params.provider.clone(),
+            model_name: self.params.model.clone(),
+            api_key: key.clone(),
+            provider_config,
+            base_url,
+            tool_choice,
+            approval: self
+                .approval_use_cases
+                .clone()
+                .zip(self.approval_context.clone()),
+            outreach: self
+                .task_persistence
+                .clone()
+                .zip(self.channel_persistence.clone())
+                .zip(self.outreach_context.clone())
+                .map(|((tasks, channels), context)| (tasks, channels, context)),
+            recipient_role: self.recipient_role,
+            full_prompt,
+            history_message_count,
+            suspended: Arc::new(AtomicBool::new(false)),
+        };
+
+        // Run on its own task: provider futures are deep, and this keeps the caller's stack shallow.
+        let task_result = tokio::spawn(task.run()).await;
+        let duration_ms = start_time.elapsed().as_millis() as u64;
+
+        match task_result {
+            Ok(Ok(mut output)) => {
+                // Wall-clock time is only known here, after the task has been awaited.
+                if let Some(diagnostics) = output
+                    .metadata
+                    .as_mut()
+                    .and_then(|meta| meta.get_mut("execution_diagnostics"))
+                    .and_then(|value| value.as_object_mut())
+                {
+                    diagnostics.insert("duration_ms".to_string(), serde_json::json!(duration_ms));
+                }
+                self.record_execution(duration_ms, Some(&output.token_usage), None);
+                Ok(output)
+            }
+            Ok(Err(err)) => {
+                let err_msg = sanitize_text(&err.to_string(), Some(key));
+                tracing::warn!("AI Agent execution failed ({err_msg})");
+                self.record_execution(duration_ms, None, Some(err_msg.clone()));
+                Err(anyhow::anyhow!("{err_msg}"))
+            }
+            Err(join_err) => {
+                let err_msg = sanitize_text(&join_err.to_string(), Some(key));
+                tracing::warn!("AI Agent task panicked or was cancelled ({err_msg})");
+                self.record_execution(
+                    duration_ms,
+                    None,
+                    Some(format!("Panicked or cancelled: {}", err_msg)),
+                );
+                Err(anyhow::anyhow!("Task failed: {err_msg}"))
+            }
+        }
+    }
+
+    /// Assemble what the model sees: delivery context, upstream pipeline output, conversation
+    /// history, then the message itself.
+    fn compose_prompt(&self) -> String {
         let delivery_ctx = match self.recipient_role {
             Some(RecipientRole::To) => {
                 "[Delivery Context: Email received via TO field (Primary Target)]\n"
@@ -820,18 +924,15 @@ impl<'a> AgentRunner<'a> {
             None => "",
         };
 
-        let pipeline_ctx_str = if let Some(ref upstream) = self.upstream_pipeline_context {
-            if !upstream.trim().is_empty() {
-                format!(
-                    "[Upstream Pipeline Context from Prior Step Agents]:\n{}\n\n",
-                    upstream.trim()
-                )
-            } else {
-                String::new()
-            }
-        } else {
-            String::new()
-        };
+        let pipeline_ctx = self
+            .upstream_pipeline_context
+            .as_deref()
+            .map(str::trim)
+            .filter(|upstream| !upstream.is_empty())
+            .map(|upstream| {
+                format!("[Upstream Pipeline Context from Prior Step Agents]:\n{upstream}\n\n")
+            })
+            .unwrap_or_default();
 
         let mut history_str = String::new();
         if !self.history.is_empty() {
@@ -850,306 +951,258 @@ impl<'a> AgentRunner<'a> {
             history_str.push_str("\nLatest Inbound Message:\n");
         }
 
-        let raw_full_prompt = format!(
+        format!(
             "{}{}{}{}",
-            delivery_ctx, pipeline_ctx_str, history_str, self.prompt
+            delivery_ctx, pipeline_ctx, history_str, self.prompt
+        )
+    }
+
+    fn record_execution(
+        &self,
+        duration_ms: u64,
+        token_usage: Option<&TokenUsage>,
+        error_type: Option<String>,
+    ) {
+        let Some(ref monitoring) = self.monitoring else {
+            return;
+        };
+        monitoring.record_ai_execution(&AiExecutionMetrics {
+            company_id: self.company_id,
+            channel_id: self.channel_id,
+            agent_id: self.agent_id,
+            provider: self.params.provider.clone(),
+            model: self.params.model.clone(),
+            prompt_tokens: token_usage.map_or(0, |t| t.prompt_tokens as usize),
+            completion_tokens: token_usage.map_or(0, |t| t.completion_tokens as usize),
+            total_tokens: token_usage.map_or(0, |t| t.total_tokens as usize),
+            duration_ms,
+            success: error_type.is_none(),
+            error_type,
+        });
+    }
+}
+
+/// A configured agent run, owned by the spawned task.
+struct AgentTask {
+    config_yaml: String,
+    provider_name: String,
+    model_name: String,
+    api_key: String,
+    provider_config: ai_agents::llm::LLMConfig,
+    base_url: Option<String>,
+    tool_choice: Option<ai_agents::ToolChoice>,
+    approval: Option<(Arc<ApprovalUseCases>, ApprovalContext)>,
+    outreach: Option<(
+        Arc<dyn TaskPersistence>,
+        Arc<dyn ChannelPersistence>,
+        OutreachToolContext,
+    )>,
+    recipient_role: Option<RecipientRole>,
+    full_prompt: String,
+    history_message_count: usize,
+    /// Set by the approval handler or outreach tool when the run parks awaiting a human/other agent.
+    suspended: Arc<AtomicBool>,
+}
+
+impl AgentTask {
+    async fn run(self) -> anyhow::Result<AgentExecutionOutput> {
+        let agent = self.build_agent().await?;
+
+        let safe_prompt_log = sanitize_text(&self.full_prompt, Some(&self.api_key));
+        info!(
+            "Calling agent.chat | provider: '{}', model: '{}', api key set: '{}', prompt: '{}'",
+            self.provider_name,
+            self.model_name,
+            !self.api_key.is_empty(),
+            safe_prompt_log
         );
 
-        let provider_name = &self.params.provider;
-        let model_name = &self.params.model;
-        let key = &self.params.api_key;
+        let response = agent.chat(&self.full_prompt).await?;
+        info!(
+            "{}",
+            sanitize_text(&format!("{:?}", response), Some(&self.api_key))
+        );
 
-        // Stage 3: Optional LLM Spam & Guardrail Evaluation (skipped for trusted participants)
-        if !self.skip_spam_guardrail {
-            if let Some(ref cfg) = self.app_config {
-                crate::services::llm_guardrail::LlmSpamGuardrail::evaluate(
-                    cfg,
-                    self.company.as_ref(),
-                    self.monitoring.as_ref(),
-                    &raw_full_prompt,
-                    provider_name,
-                    model_name,
-                    key,
-                )
-                .await?;
-            }
-        }
+        let clean_content = sanitize_text(&response.content, Some(&self.api_key));
+        let counted = count_tokens(
+            response.metadata.as_ref(),
+            &self.full_prompt,
+            &clean_content,
+        );
 
-        let mut config = self.params.config.clone();
-        ensure_config_fields(&mut config, provider_name, model_name, key, None, None);
+        let clean_meta = response.metadata.as_ref().and_then(|meta| {
+            let val = serde_json::to_value(meta).ok()?;
+            let sanitized = sanitize_text(&val.to_string(), Some(&self.api_key));
+            serde_json::from_str(&sanitized).ok().or(Some(val))
+        });
+        let observability_report = agent
+            .observability()
+            .map(|manager| serde_json::to_value(manager.generate_report()))
+            .transpose()?;
 
-        let config_yaml = serde_yaml::to_string(&config).unwrap_or_default();
-        let (provider_config, base_url, tool_choice) = provider_config_from_agent_config(&config)?;
+        let tool_names: Vec<String> = response
+            .tool_calls
+            .as_ref()
+            .map(|calls| calls.iter().map(|call| call.name.clone()).collect())
+            .unwrap_or_default();
+        let diagnostics = AgentExecutionDiagnostics {
+            // Filled in by the caller, which owns the clock.
+            duration_ms: 0,
+            prompt_characters: self.full_prompt.chars().count(),
+            response_characters: clean_content.chars().count(),
+            history_message_count: self.history_message_count,
+            token_usage_source: counted.source().to_string(),
+            tool_call_count: tool_names.len(),
+            tool_names,
+        };
 
-        let full_prompt = sanitize_text(&raw_full_prompt, Some(key));
-        info!("Full prompt context length: {}", full_prompt.len());
+        let metadata = attach_execution_diagnostics(clean_meta, &diagnostics);
+        let metadata = match observability_report {
+            Some(report) => attach_observability_report(metadata, report),
+            None => metadata,
+        };
 
-        if !config_yaml.is_empty() {
-            info!(
-                "Running agent with channel config YAML:\n{}",
-                sanitize_text(&config_yaml, Some(key))
-            );
-        }
-
-        // Spawn on a separate Tokio task to prevent stack frame overflow on the caller thread
-        let key_for_task = key.clone();
-        let provider_name = provider_name.to_string();
-        let model_name = model_name.to_string();
-        let approval_use_cases = self.approval_use_cases.clone();
-        let approval_context = self.approval_context.clone();
-        let recipient_role = self.recipient_role;
-        let task_persistence = self.task_persistence.clone();
-        let channel_persistence = self.channel_persistence.clone();
-        let outreach_context = self.outreach_context.clone();
-        let suspended = Arc::new(AtomicBool::new(false));
-        let suspended_for_task = suspended.clone();
-
-        let task_result = tokio::spawn(async move {
-            let mut builder = AgentBuilder::from_yaml(&config_yaml)?;
-
-            if let (Some(use_cases), Some(ctx)) = (approval_use_cases, approval_context) {
-                let handler = Arc::new(AgentApprovalHandler {
-                    approval_use_cases: use_cases,
-                    context: ctx,
-                    suspended: suspended_for_task.clone(),
-                });
-                builder = builder.approval_handler(handler);
-            }
-
-            if let Ok(provider_type) = std::str::FromStr::from_str(&provider_name) {
-                let mut provider = ai_agents::UnifiedLLMProvider::from_spec_config(
-                    provider_type,
-                    &model_name,
-                    Some(key_for_task.clone()),
-                    base_url,
-                    provider_config,
-                )?;
-                if let Some(choice) = tool_choice {
-                    provider = provider.with_tool_choice(choice);
-                }
-                builder = builder.llm(std::sync::Arc::new(provider));
+        Ok(AgentExecutionOutput {
+            content: clean_content,
+            token_usage: TokenUsage::new(counted.prompt_tokens, counted.completion_tokens),
+            disposition: if self.suspended.load(Ordering::SeqCst) {
+                AgentExecutionDisposition::Suspended
             } else {
-                builder = builder.auto_configure_llms()?;
-            }
-
-            let mut builder = builder
-                .auto_configure_features()?
-                .auto_configure_mcp()
-                .await?
-                .auto_configure_spawner()
-                .await?;
-            if let (Some(persistence), Some(channel_persistence), Some(context)) =
-                (task_persistence, channel_persistence, outreach_context)
-            {
-                builder = builder.tool(Arc::new(OutreachAndAwaitQuorumTool::new(
-                    persistence,
-                    channel_persistence,
-                    context,
-                    suspended_for_task.clone(),
-                )));
-            }
-            let agent = builder.build()?;
-
-            let role_str = recipient_role.map(|r| r.as_str()).unwrap_or("to");
-            let is_to = role_str == "to";
-            let is_cc = role_str == "cc";
-
-            agent.set_context("recipient_role", serde_json::json!(role_str))?;
-            agent.set_context("is_to", serde_json::json!(is_to))?;
-            agent.set_context("is_cc", serde_json::json!(is_cc))?;
-
-            let safe_prompt_log = sanitize_text(&full_prompt, Some(&key_for_task));
-            info!(
-                "Calling agent.chat | provider: '{}', model: '{}', api key set: '{}', prompt: '{}'",
-                provider_name,
-                model_name,
-                !key_for_task.is_empty(),
-                safe_prompt_log
-            );
-
-            let response = agent.chat(&full_prompt).await?;
-            let safe_response_log = sanitize_text(&format!("{:?}", response), Some(&key_for_task));
-            info!("{}", safe_response_log);
-
-            let clean_content = sanitize_text(&response.content, Some(&key_for_task));
-
-            let mut prompt_tokens = 0;
-            let mut completion_tokens = 0;
-
-            if let Some(ref meta) = response.metadata {
-                let parse_val = |v: &serde_json::Value| -> Option<usize> {
-                    v.as_u64()
-                        .map(|n| n as usize)
-                        .or_else(|| v.as_str().and_then(|s| s.parse::<usize>().ok()))
-                };
-
-                if let Some(p) = meta
-                    .get("prompt_tokens")
-                    .or_else(|| meta.get("input_tokens"))
-                    .and_then(parse_val)
-                {
-                    prompt_tokens = p;
-                }
-                if let Some(c) = meta
-                    .get("completion_tokens")
-                    .or_else(|| meta.get("output_tokens"))
-                    .and_then(parse_val)
-                {
-                    completion_tokens = c;
-                }
-
-                if prompt_tokens == 0 && completion_tokens == 0 {
-                    if let Some(usage) = meta.get("usage") {
-                        if let Some(p) = usage
-                            .get("prompt_tokens")
-                            .or_else(|| usage.get("input_tokens"))
-                            .and_then(parse_val)
-                        {
-                            prompt_tokens = p;
-                        }
-                        if let Some(c) = usage
-                            .get("completion_tokens")
-                            .or_else(|| usage.get("output_tokens"))
-                            .and_then(parse_val)
-                        {
-                            completion_tokens = c;
-                        }
-                    }
-                }
-            }
-
-            let prompt_tokens_estimated = prompt_tokens == 0;
-            let completion_tokens_estimated = completion_tokens == 0;
-            if prompt_tokens_estimated {
-                prompt_tokens = estimate_tokens(&full_prompt);
-            }
-            if completion_tokens_estimated {
-                completion_tokens = estimate_tokens(&clean_content);
-            }
-
-            let token_usage = TokenUsage::new(prompt_tokens, completion_tokens);
-
-            let clean_meta = response.metadata.as_ref().and_then(|meta| {
-                let val = serde_json::to_value(meta).ok()?;
-                let s = val.to_string();
-                let sanitized = sanitize_text(&s, Some(&key_for_task));
-                serde_json::from_str(&sanitized).ok().or(Some(val))
-            });
-
-            let observability_report = agent
-                .observability()
-                .map(|manager| serde_json::to_value(manager.generate_report()))
-                .transpose()?;
-
-            let tool_names = response
-                .tool_calls
-                .as_ref()
-                .map(|calls| calls.iter().map(|call| call.name.clone()).collect())
-                .unwrap_or_else(Vec::new);
-            let token_usage_source = match (prompt_tokens_estimated, completion_tokens_estimated) {
-                (false, false) => "provider",
-                (true, true) => "estimated",
-                _ => "mixed",
-            };
-            let diagnostics = AgentExecutionDiagnostics {
-                duration_ms: 0,
-                prompt_characters: full_prompt.chars().count(),
-                response_characters: clean_content.chars().count(),
-                history_message_count,
-                token_usage_source: token_usage_source.to_string(),
-                tool_call_count: tool_names.len(),
-                tool_names,
-            };
-
-            let metadata = attach_execution_diagnostics(clean_meta, &diagnostics);
-            let metadata = match observability_report {
-                Some(report) => attach_observability_report(metadata, report),
-                None => metadata,
-            };
-
-            Ok::<AgentExecutionOutput, anyhow::Error>(AgentExecutionOutput {
-                content: clean_content,
-                token_usage,
-                disposition: if suspended_for_task.load(Ordering::SeqCst) {
-                    AgentExecutionDisposition::Suspended
-                } else {
-                    AgentExecutionDisposition::Completed
-                },
-                metadata,
-            })
+                AgentExecutionDisposition::Completed
+            },
+            metadata,
         })
-        .await;
+    }
 
-        let duration_ms = start_time.elapsed().as_millis() as u64;
+    async fn build_agent(&self) -> anyhow::Result<ai_agents::RuntimeAgent> {
+        let mut builder = AgentBuilder::from_yaml(&self.config_yaml)?;
 
-        match task_result {
-            Ok(Ok(mut output)) => {
-                if let Some(diagnostics) = output
-                    .metadata
-                    .as_mut()
-                    .and_then(|meta| meta.get_mut("execution_diagnostics"))
-                    .and_then(|value| value.as_object_mut())
-                {
-                    diagnostics.insert("duration_ms".to_string(), serde_json::json!(duration_ms));
-                }
-                if let Some(ref m) = self.monitoring {
-                    m.record_ai_execution(&AiExecutionMetrics {
-                        company_id: self.company_id,
-                        channel_id: self.channel_id,
-                        agent_id: self.agent_id,
-                        provider: self.params.provider.clone(),
-                        model: self.params.model.clone(),
-                        prompt_tokens: output.token_usage.prompt_tokens as usize,
-                        completion_tokens: output.token_usage.completion_tokens as usize,
-                        total_tokens: output.token_usage.total_tokens as usize,
-                        duration_ms,
-                        success: true,
-                        error_type: None,
-                    });
-                }
-                Ok(output)
-            }
-            Ok(Err(err)) => {
-                let err_msg = sanitize_text(&err.to_string(), Some(&key));
-                tracing::warn!("AI Agent execution failed ({err_msg})");
-                if let Some(ref m) = self.monitoring {
-                    m.record_ai_execution(&AiExecutionMetrics {
-                        company_id: self.company_id,
-                        channel_id: self.channel_id,
-                        agent_id: self.agent_id,
-                        provider: self.params.provider.clone(),
-                        model: self.params.model.clone(),
-                        prompt_tokens: 0,
-                        completion_tokens: 0,
-                        total_tokens: 0,
-                        duration_ms,
-                        success: false,
-                        error_type: Some(err_msg.clone()),
-                    });
-                }
-                Err(anyhow::anyhow!("{err_msg}"))
-            }
-            Err(join_err) => {
-                let err_msg = sanitize_text(&join_err.to_string(), Some(&key));
-                tracing::warn!("AI Agent task panicked or was cancelled ({err_msg})");
-                if let Some(ref m) = self.monitoring {
-                    m.record_ai_execution(&AiExecutionMetrics {
-                        company_id: self.company_id,
-                        channel_id: self.channel_id,
-                        agent_id: self.agent_id,
-                        provider: self.params.provider.clone(),
-                        model: self.params.model.clone(),
-                        prompt_tokens: 0,
-                        completion_tokens: 0,
-                        total_tokens: 0,
-                        duration_ms,
-                        success: false,
-                        error_type: Some(format!("Panicked or cancelled: {}", err_msg)),
-                    });
-                }
-                Err(anyhow::anyhow!("Task failed: {err_msg}"))
-            }
+        if let Some((use_cases, context)) = self.approval.clone() {
+            builder = builder.approval_handler(Arc::new(AgentApprovalHandler {
+                approval_use_cases: use_cases,
+                context,
+                suspended: self.suspended.clone(),
+            }));
         }
+
+        // An unrecognized provider name falls back to whatever the environment can configure.
+        if let Ok(provider_type) = std::str::FromStr::from_str(&self.provider_name) {
+            let mut provider = ai_agents::UnifiedLLMProvider::from_spec_config(
+                provider_type,
+                &self.model_name,
+                Some(self.api_key.clone()),
+                self.base_url.clone(),
+                self.provider_config.clone(),
+            )?;
+            if let Some(choice) = self.tool_choice.clone() {
+                provider = provider.with_tool_choice(choice);
+            }
+            builder = builder.llm(std::sync::Arc::new(provider));
+        } else {
+            builder = builder.auto_configure_llms()?;
+        }
+
+        let mut builder = builder
+            .auto_configure_features()?
+            .auto_configure_mcp()
+            .await?
+            .auto_configure_spawner()
+            .await?;
+        if let Some((task_persistence, channel_persistence, context)) = self.outreach.clone() {
+            builder = builder.tool(Arc::new(OutreachAndAwaitQuorumTool::new(
+                task_persistence,
+                channel_persistence,
+                context,
+                self.suspended.clone(),
+            )));
+        }
+
+        let agent = builder.build()?;
+
+        let role_str = self.recipient_role.map(|r| r.as_str()).unwrap_or("to");
+        agent.set_context("recipient_role", serde_json::json!(role_str))?;
+        agent.set_context("is_to", serde_json::json!(role_str == "to"))?;
+        agent.set_context("is_cc", serde_json::json!(role_str == "cc"))?;
+        Ok(agent)
+    }
+}
+
+/// Token counts for one exchange, and whether they came from the provider or from estimation.
+struct CountedTokens {
+    prompt_tokens: usize,
+    completion_tokens: usize,
+    prompt_estimated: bool,
+    completion_estimated: bool,
+}
+
+impl CountedTokens {
+    fn source(&self) -> &'static str {
+        match (self.prompt_estimated, self.completion_estimated) {
+            (false, false) => "provider",
+            (true, true) => "estimated",
+            _ => "mixed",
+        }
+    }
+}
+
+/// Read the provider's token accounting, falling back to a character-based estimate per side.
+///
+/// Providers disagree on where the numbers live (`prompt_tokens`/`input_tokens`, top level or
+/// nested under `usage`), so every shape is probed before giving up on a side.
+fn count_tokens(
+    metadata: Option<&impl serde::Serialize>,
+    prompt: &str,
+    content: &str,
+) -> CountedTokens {
+    let parse_val = |v: &serde_json::Value| -> Option<usize> {
+        v.as_u64()
+            .map(|n| n as usize)
+            .or_else(|| v.as_str().and_then(|s| s.parse::<usize>().ok()))
+    };
+    let read_pair = |value: &serde_json::Value| -> (Option<usize>, Option<usize>) {
+        (
+            value
+                .get("prompt_tokens")
+                .or_else(|| value.get("input_tokens"))
+                .and_then(parse_val),
+            value
+                .get("completion_tokens")
+                .or_else(|| value.get("output_tokens"))
+                .and_then(parse_val),
+        )
+    };
+
+    let meta = metadata.and_then(|meta| serde_json::to_value(meta).ok());
+    let mut prompt_tokens = 0usize;
+    let mut completion_tokens = 0usize;
+    if let Some(ref meta) = meta {
+        let (p, c) = read_pair(meta);
+        prompt_tokens = p.unwrap_or(0);
+        completion_tokens = c.unwrap_or(0);
+        if prompt_tokens == 0
+            && completion_tokens == 0
+            && let Some(usage) = meta.get("usage")
+        {
+            let (p, c) = read_pair(usage);
+            prompt_tokens = p.unwrap_or(prompt_tokens);
+            completion_tokens = c.unwrap_or(completion_tokens);
+        }
+    }
+
+    let prompt_estimated = prompt_tokens == 0;
+    let completion_estimated = completion_tokens == 0;
+    if prompt_estimated {
+        prompt_tokens = estimate_tokens(prompt);
+    }
+    if completion_estimated {
+        completion_tokens = estimate_tokens(content);
+    }
+
+    CountedTokens {
+        prompt_tokens,
+        completion_tokens,
+        prompt_estimated,
+        completion_estimated,
     }
 }
 

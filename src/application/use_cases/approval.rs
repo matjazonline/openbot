@@ -142,281 +142,203 @@ impl ApprovalUseCases {
         Ok(approval)
     }
 
+    /// Apply the decision behind a one-click approval link.
+    ///
+    /// Every exit either reports what the link did or explains why it no longer applies; a link
+    /// that arrives twice is answered, not failed.
     pub async fn process_link_action(
         &self,
         token: &str,
         action: &str,
     ) -> AppResult<(HumanApproval, String)> {
-        let approval = self
-            .approval_persistence
-            .get_approval_by_token(token)
-            .await?
-            .ok_or_else(|| AppError::Internal("Approval request token not found.".into()))?;
+        let approval = self.require_approval(token).await?;
 
         if approval.status != ApprovalStatus::Pending {
-            let msg = format!(
-                "This request was already processed as '{}'.",
-                approval.status.as_str()
-            );
-            return Ok((approval, msg));
+            let message = already_processed_message(&approval);
+            return Ok((approval, message));
         }
 
         let now = Utc::now().naive_utc();
         if approval.expires_at < now {
-            if let Some(expired) = self
-                .approval_persistence
-                .expire_pending_approval(token, now)
-                .await?
-            {
-                return Ok((
-                    expired,
-                    "This confirmation link has expired (24-hour TTL).".into(),
-                ));
-            }
-
-            let current = self
-                .approval_persistence
-                .get_approval_by_token(token)
-                .await?
-                .ok_or_else(|| AppError::Internal("Approval request token not found.".into()))?;
-            let msg = format!(
-                "This request was already processed as '{}'.",
-                current.status.as_str()
-            );
-            return Ok((current, msg));
+            return self.report_unavailable(token, now).await;
         }
 
         let normalized_action = action.to_lowercase();
-        let action_allowed = if approval.action_type == "quorum_timeout" {
-            matches!(
-                normalized_action.as_str(),
-                "proceed_partial" | "extend_24h" | "extend_48h" | "extend" | "reject"
-            )
-        } else {
-            matches!(
-                normalized_action.as_str(),
-                "confirm" | "approved" | "approve" | "reject" | "rejected"
-            )
-        };
-        if !action_allowed {
-            return Err(AppError::Internal(format!(
-                "Action '{}' is not valid for approval type '{}'.",
-                action, approval.action_type
-            )));
-        }
-        let new_status = match normalized_action.as_str() {
-            "confirm" | "approved" | "approve" | "proceed_partial" | "extend_24h"
-            | "extend_48h" | "extend" => ApprovalStatus::Approved,
-            "reject" | "rejected" => ApprovalStatus::Rejected,
-            _ => {
-                return Err(AppError::Internal(format!("Invalid action '{}'.", action)));
-            }
-        };
+        let decision = LinkAction::parse(&normalized_action, &approval.action_type).ok_or_else(
+            || {
+                AppError::Internal(format!(
+                    "Action '{}' is not valid for approval type '{}'.",
+                    action, approval.action_type
+                ))
+            },
+        )?;
 
         let now = Utc::now().naive_utc();
+        // Quorum timeouts carry the chosen option through to the paused task; everything else is a
+        // plain approve/reject state transition.
         let consumed = if approval.action_type == "quorum_timeout" && approval.task_id.is_some() {
             self.approval_persistence
                 .consume_quorum_timeout_action(token, &normalized_action, now)
                 .await?
         } else {
             self.approval_persistence
-                .consume_pending_approval(token, new_status.clone(), now)
+                .consume_pending_approval(token, decision.status(), now)
                 .await?
         };
+        // Losing the race to consume means someone (or the expiry sweep) got there first.
         let Some(updated) = consumed else {
-            if let Some(expired) = self
-                .approval_persistence
-                .expire_pending_approval(token, now)
-                .await?
-            {
-                return Ok((
-                    expired,
-                    "This confirmation link has expired (24-hour TTL).".into(),
-                ));
-            }
-
-            let current = self
-                .approval_persistence
-                .get_approval_by_token(token)
-                .await?
-                .ok_or_else(|| AppError::Internal("Approval request token not found.".into()))?;
-            let msg = format!(
-                "This request was already processed as '{}'.",
-                current.status.as_str()
-            );
-            return Ok((current, msg));
+            return self.report_unavailable(token, now).await;
         };
 
-        let message_text = match normalized_action.as_str() {
-            "proceed_partial" => {
-                if let Some(thread_id) = approval.thread_id {
-                    let sys_msg = Message {
-                        id: Uuid::new_v4(),
-                        thread_id,
-                        message_id: format!(
-                            "<quorum-partial-{}@{}>",
-                            approval.id, self.config.app_domain_name
-                        )
-                        .into(),
-                        in_reply_to: None,
-                        references_list: vec![],
-                        sender: approval.approver_email.clone().into(),
-                        recipients_to: vec![],
-                        recipients_cc: vec![],
-                        subject: format!("[HITL Proceed Partial]: {}", approval.action_title),
-                        clean_text_body: format!(
-                            "Human decision by {}: Proceeding with partial quorum responses.",
-                            approval.approver_email
-                        ),
-                        raw_text_body: None,
-                        raw_html_body: None,
-                        attachments: None,
-                        direction: MessageDirection::Inbound,
-                        role: MessageRole::System,
-                        thread_index: None,
-                        created_at: Utc::now().naive_utc(),
-                    };
-                    let _ = self.thread_persistence.create_message(&sys_msg).await;
-                }
+        let message_text = self.apply_decision(&approval, decision).await;
+        Ok((updated, message_text))
+    }
 
+    /// Carry out the side effects of a decision and describe them for the human who clicked.
+    async fn apply_decision(&self, approval: &HumanApproval, decision: LinkAction) -> String {
+        match decision {
+            LinkAction::ProceedPartial => {
+                self.record_decision_note(
+                    approval,
+                    "quorum-partial",
+                    "HITL Proceed Partial",
+                    format!(
+                        "Human decision by {}: Proceeding with partial quorum responses.",
+                        approval.approver_email
+                    ),
+                )
+                .await;
                 format!(
                     "✓ Action '{}' confirmed: Proceeding with partial data. Channels resumed.",
                     approval.action_title
                 )
             }
-            "extend_24h" | "extend_48h" | "extend" => {
-                let extend_hours = if normalized_action.contains("48") {
-                    48
-                } else {
-                    24
-                };
-                if let Some(thread_id) = approval.thread_id {
-                    let sys_msg = Message {
-                        id: Uuid::new_v4(),
-                        thread_id,
-                        message_id: format!(
-                            "<quorum-extended-{}@{}>",
-                            approval.id, self.config.app_domain_name
-                        )
-                        .into(),
-                        in_reply_to: None,
-                        references_list: vec![],
-                        sender: approval.approver_email.clone().into(),
-                        recipients_to: vec![],
-                        recipients_cc: vec![],
-                        subject: format!("[HITL Timeout Extended]: {}", approval.action_title),
-                        clean_text_body: format!(
-                            "Human decision by {}: Outreach response timeout extended by {} hours.",
-                            approval.approver_email, extend_hours
-                        ),
-                        raw_text_body: None,
-                        raw_html_body: None,
-                        attachments: None,
-                        direction: MessageDirection::Inbound,
-                        role: MessageRole::System,
-                        thread_index: None,
-                        created_at: Utc::now().naive_utc(),
-                    };
-                    let _ = self.thread_persistence.create_message(&sys_msg).await;
-                }
-
+            LinkAction::Extend { hours } => {
+                self.record_decision_note(
+                    approval,
+                    "quorum-extended",
+                    "HITL Timeout Extended",
+                    format!(
+                        "Human decision by {}: Outreach response timeout extended by {} hours.",
+                        approval.approver_email, hours
+                    ),
+                )
+                .await;
                 format!(
                     "✓ Action '{}' confirmed: Outreach timeout extended by {} hours.",
-                    approval.action_title, extend_hours
+                    approval.action_title, hours
                 )
             }
-            _ => match new_status {
-                ApprovalStatus::Approved => {
-                    // Re-queue task if associated
-                    if let Some(task_id) = approval.task_id {
-                        let _ = self.task_persistence.resume_task(task_id).await;
-                    }
-
-                    // Add system message to thread if associated
-                    if let Some(thread_id) = approval.thread_id {
-                        let sys_msg = Message {
-                            id: Uuid::new_v4(),
-                            thread_id,
-                            message_id: format!(
-                                "<approval-granted-{}@{}>",
-                                approval.id, self.config.app_domain_name
-                            )
-                            .into(),
-                            in_reply_to: None,
-                            references_list: vec![],
-                            sender: approval.approver_email.clone().into(),
-                            recipients_to: vec![],
-                            recipients_cc: vec![],
-                            subject: format!("[HITL Granted]: {}", approval.action_title),
-                            clean_text_body: format!(
-                                "Human approval GRANTED by {} for action '{}'.",
-                                approval.approver_email, approval.action_title
-                            ),
-                            raw_text_body: None,
-                            raw_html_body: None,
-                            attachments: None,
-                            direction: MessageDirection::Inbound,
-                            role: MessageRole::System,
-                            thread_index: None,
-                            created_at: Utc::now().naive_utc(),
-                        };
-                        let _ = self.thread_persistence.create_message(&sys_msg).await;
-                    }
-
-                    format!(
-                        "✓ Action '{}' has been CONFIRMED successfully. Associated automated channels have been resumed.",
-                        approval.action_title
-                    )
+            LinkAction::Approve => {
+                if let Some(task_id) = approval.task_id {
+                    let _ = self.task_persistence.resume_task(task_id).await;
                 }
-                ApprovalStatus::Rejected => {
-                    // Stop task if associated
-                    if let Some(task_id) = approval.task_id {
-                        if approval.action_type != "quorum_timeout" {
-                            let _ = self.task_persistence.stop_task(task_id).await;
-                        }
-                    }
-
-                    // Add system message to thread if associated
-                    if let Some(thread_id) = approval.thread_id {
-                        let sys_msg = Message {
-                            id: Uuid::new_v4(),
-                            thread_id,
-                            message_id: format!(
-                                "<approval-rejected-{}@{}>",
-                                approval.id, self.config.app_domain_name
-                            )
-                            .into(),
-                            in_reply_to: None,
-                            references_list: vec![],
-                            sender: approval.approver_email.clone().into(),
-                            recipients_to: vec![],
-                            recipients_cc: vec![],
-                            subject: format!("[HITL Rejected]: {}", approval.action_title),
-                            clean_text_body: format!(
-                                "Human approval REJECTED by {} for action '{}'.",
-                                approval.approver_email, approval.action_title
-                            ),
-                            raw_text_body: None,
-                            raw_html_body: None,
-                            attachments: None,
-                            direction: MessageDirection::Inbound,
-                            role: MessageRole::System,
-                            thread_index: None,
-                            created_at: Utc::now().naive_utc(),
-                        };
-                        let _ = self.thread_persistence.create_message(&sys_msg).await;
-                    }
-
+                self.record_decision_note(
+                    approval,
+                    "approval-granted",
+                    "HITL Granted",
                     format!(
-                        "✗ Action '{}' has been REJECTED. The automated channel task has been cancelled.",
-                        approval.action_title
-                    )
+                        "Human approval GRANTED by {} for action '{}'.",
+                        approval.approver_email, approval.action_title
+                    ),
+                )
+                .await;
+                format!(
+                    "✓ Action '{}' has been CONFIRMED successfully. Associated automated channels have been resumed.",
+                    approval.action_title
+                )
+            }
+            LinkAction::Reject => {
+                // A rejected quorum timeout leaves the task paused for its own timeout handling.
+                if let Some(task_id) = approval.task_id
+                    && approval.action_type != "quorum_timeout"
+                {
+                    let _ = self.task_persistence.stop_task(task_id).await;
                 }
-                _ => String::new(),
-            },
+                self.record_decision_note(
+                    approval,
+                    "approval-rejected",
+                    "HITL Rejected",
+                    format!(
+                        "Human approval REJECTED by {} for action '{}'.",
+                        approval.approver_email, approval.action_title
+                    ),
+                )
+                .await;
+                format!(
+                    "✗ Action '{}' has been REJECTED. The automated channel task has been cancelled.",
+                    approval.action_title
+                )
+            }
+        }
+    }
+
+    /// Append the decision to the originating thread so the conversation records who decided what.
+    ///
+    /// Best-effort: a thread write failure must not undo a decision that is already persisted.
+    async fn record_decision_note(
+        &self,
+        approval: &HumanApproval,
+        message_id_prefix: &str,
+        subject_tag: &str,
+        body: String,
+    ) {
+        let Some(thread_id) = approval.thread_id else {
+            return;
         };
+        let note = Message {
+            id: Uuid::new_v4(),
+            thread_id,
+            message_id: format!(
+                "<{}-{}@{}>",
+                message_id_prefix, approval.id, self.config.app_domain_name
+            )
+            .into(),
+            in_reply_to: None,
+            references_list: vec![],
+            sender: approval.approver_email.clone().into(),
+            recipients_to: vec![],
+            recipients_cc: vec![],
+            subject: format!("[{}]: {}", subject_tag, approval.action_title),
+            clean_text_body: body,
+            raw_text_body: None,
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Inbound,
+            role: MessageRole::System,
+            thread_index: None,
+            created_at: Utc::now().naive_utc(),
+        };
+        let _ = self.thread_persistence.create_message(&note).await;
+    }
 
-        Ok((updated, message_text))
+    async fn require_approval(&self, token: &str) -> AppResult<HumanApproval> {
+        self.approval_persistence
+            .get_approval_by_token(token)
+            .await?
+            .ok_or_else(|| AppError::Internal("Approval request token not found.".into()))
+    }
+
+    /// Explain a link that can no longer be acted on: either it just expired, or its decision was
+    /// already recorded.
+    async fn report_unavailable(
+        &self,
+        token: &str,
+        now: chrono::NaiveDateTime,
+    ) -> AppResult<(HumanApproval, String)> {
+        if let Some(expired) = self
+            .approval_persistence
+            .expire_pending_approval(token, now)
+            .await?
+        {
+            return Ok((
+                expired,
+                "This confirmation link has expired (24-hour TTL).".into(),
+            ));
+        }
+        let current = self.require_approval(token).await?;
+        let message = already_processed_message(&current);
+        Ok((current, message))
     }
 
     pub async fn get_approval_by_token(&self, token: &str) -> AppResult<Option<HumanApproval>> {
@@ -432,6 +354,47 @@ impl ApprovalUseCases {
             .list_approvals_by_channel(company_id, channel_id)
             .await
     }
+}
+
+/// What a one-click approval link asks for, once validated against the approval it belongs to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LinkAction {
+    /// Quorum timeout: continue with whatever responses arrived.
+    ProceedPartial,
+    /// Quorum timeout: wait longer.
+    Extend { hours: u32 },
+    Approve,
+    Reject,
+}
+
+impl LinkAction {
+    /// Parse the query-string action, rejecting verbs that don't belong to this approval type.
+    fn parse(normalized_action: &str, approval_action_type: &str) -> Option<Self> {
+        let is_quorum_timeout = approval_action_type == "quorum_timeout";
+        match normalized_action {
+            "proceed_partial" if is_quorum_timeout => Some(Self::ProceedPartial),
+            "extend_48h" if is_quorum_timeout => Some(Self::Extend { hours: 48 }),
+            "extend_24h" | "extend" if is_quorum_timeout => Some(Self::Extend { hours: 24 }),
+            "confirm" | "approved" | "approve" if !is_quorum_timeout => Some(Self::Approve),
+            "reject" => Some(Self::Reject),
+            "rejected" if !is_quorum_timeout => Some(Self::Reject),
+            _ => None,
+        }
+    }
+
+    fn status(self) -> ApprovalStatus {
+        match self {
+            Self::Reject => ApprovalStatus::Rejected,
+            _ => ApprovalStatus::Approved,
+        }
+    }
+}
+
+fn already_processed_message(approval: &HumanApproval) -> String {
+    format!(
+        "This request was already processed as '{}'.",
+        approval.status.as_str()
+    )
 }
 
 #[cfg(test)]

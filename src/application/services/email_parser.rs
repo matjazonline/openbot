@@ -10,6 +10,10 @@ use serde::{Deserialize, Serialize};
 pub const MAX_CHANNEL_HOPS: u32 = 5;
 pub const RESERVED_CONTEXT_SUFFIXES: &[&str] = &["noagent", "quiet", "message", "msg", "na"];
 
+/// Inline images below this size are treated as signature/decoration rather than content, and are
+/// left out of the agent prompt.
+pub const SMALL_INLINE_IMAGE_BYTES: usize = 10_000;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedEmail {
     pub message_id: String,

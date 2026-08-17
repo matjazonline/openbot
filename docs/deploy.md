@@ -142,11 +142,22 @@ retention. There is no replica and no point-in-time recovery. For a system
 holding mail thread state, add a `pg_dump` to offsite storage before carrying
 anything you care about.
 
-**The app crash-loops while the database is down.** `init_db` connects and
-migrates once during startup and `main` returns `Err` on failure, so during a
-database restart the app machine exits and Fly restarts it until Postgres is
-back. It converges on its own; the crash logs during a database deploy are
-expected, not a separate fault.
+**A running app survives a database outage; a booting one does not.** These are
+two different behaviours, worth keeping straight:
+
+- *Already running.* The process stays up. sqlx's pool reconnects when Postgres
+  returns. Requests touching the database return 500s meanwhile, the task worker
+  logs a warning every 3s and keeps polling (`task_worker.rs`), and the SMTP
+  listener keeps accepting — failed messages are logged and remote senders retry,
+  so inbound mail is deferred rather than lost. No intervention needed.
+- *Booting.* `init_db` connects and runs migrations once at startup, and `main`
+  returns `Err` on failure, so a machine that starts while Postgres is
+  unreachable exits and is restarted by Fly until the database is back. You hit
+  this by deploying both apps at once, or if the app machine happens to restart
+  during database downtime.
+
+Because `/health` is dependency-free, Fly will not recycle a running machine
+during a database outage — which is the intent.
 
 **`/health` is a liveness probe only.** It intentionally touches no
 dependencies, so a database blip does not cause Fly to recycle a process that is
@@ -164,5 +175,11 @@ fly secrets list                          # names only, never values
 ```
 
 Deploying again is just `fly deploy` (app) or
-`fly deploy -c deploy/postgres/fly.toml` (database). Redeploying the database
-restarts Postgres and will bounce the app, per the crash-loop note above.
+`fly deploy -c deploy/postgres/fly.toml` (database).
+
+Redeploying the database replaces its machine, so Postgres is down for roughly
+10-30 seconds. With a single machine on a single volume there is no replica to
+fail over to, so that is real downtime: the app stays up but returns errors for
+any request that needs the database, and recovers by itself. Avoid deploying
+both apps simultaneously — that is the one case where the app crash-loops
+instead of degrading, per the note above.

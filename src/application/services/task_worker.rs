@@ -1,10 +1,18 @@
 use std::sync::Arc;
 use tokio::time::{Duration, sleep};
 use tracing::{error, info, warn};
+use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::task::{TASK_LEASE_SECONDS, TaskPersistence},
+    adapters::persistence::task::{OutboxEmail, TASK_LEASE_SECONDS, TaskPersistence},
+    app_error::AppResult,
     domain::monitoring::{MonitoringService, TaskExecutionMetrics, TaskStatusMetric},
+    entities::{
+        channel::Channel,
+        outreach::DueOutreach,
+        task::BackgroundTask,
+        value_objects::{EmailAddress, MessageId},
+    },
     infra::config::AppConfig,
     services::outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
     use_cases::thread::{InboundIngestResult, ThreadUseCases},
@@ -75,97 +83,94 @@ impl TaskWorker {
             .map_err(|e| e.to_string())?;
 
         for task in tasks {
-            let task_id = task.id;
-            info!("Processing task {} (type = '{}')", task_id, task.task_type);
-
+            info!("Processing task {} (type = '{}')", task.id, task.task_type);
             let start_time = std::time::Instant::now();
             let result = self.execute_single_task_with_lease(&task).await;
             let duration_ms = start_time.elapsed().as_millis() as u64;
-
-            match result {
-                Ok(_) => {
-                    if let Ok(Some(current)) = self.task_persistence.get_task_by_id(task_id).await
-                        && matches!(
-                            current.status,
-                            crate::entities::task::TaskStatus::PendingApproval
-                                | crate::entities::task::TaskStatus::WaitingForThirdPartyReply
-                        )
-                    {
-                        info!(
-                            "Background task {} suspended with status {}",
-                            task_id,
-                            current.status.as_str()
-                        );
-                        continue;
-                    }
-                    info!("Successfully completed background task {}", task_id);
-                    match self
-                        .task_persistence
-                        .mark_task_completed(task_id, self.worker_id)
-                        .await
-                    {
-                        Ok(true) => {}
-                        Ok(false) => warn!(
-                            "Task {} completion ignored because its lease or status changed",
-                            task_id
-                        ),
-                        Err(err) => error!("Failed to complete task {}: {}", task_id, err),
-                    }
-                    if let Some(ref m) = self.monitoring {
-                        m.record_task_execution(&TaskExecutionMetrics {
-                            company_id: Some(task.company_id),
-                            channel_id: Some(task.channel_id),
-                            task_type: task.task_type.clone(),
-                            duration_ms,
-                            status: TaskStatusMetric::Completed,
-                            retry_count: task.retry_count as u32,
-                        });
-                    }
-                }
-                Err(err_msg) => {
-                    warn!("Failed background task {}: {}", task_id, err_msg);
-                    let next_retry = task.retry_count + 1;
-                    let is_dead_letter = next_retry >= task.max_retries;
-
-                    // Exponential backoff: 30s * 2^retry
-                    let backoff_secs = 30 * (1 << next_retry.min(10));
-                    let next_run =
-                        chrono::Utc::now().naive_utc() + chrono::Duration::seconds(backoff_secs);
-
-                    match self
-                        .task_persistence
-                        .mark_task_failed(
-                            task_id,
-                            self.worker_id,
-                            &err_msg,
-                            next_run,
-                            is_dead_letter,
-                        )
-                        .await
-                    {
-                        Ok(true) => {}
-                        Ok(false) => warn!(
-                            "Task {} failure ignored because its lease or status changed",
-                            task_id
-                        ),
-                        Err(err) => error!("Failed to fail task {}: {}", task_id, err),
-                    }
-
-                    if let Some(ref m) = self.monitoring {
-                        m.record_task_execution(&TaskExecutionMetrics {
-                            company_id: Some(task.company_id),
-                            channel_id: Some(task.channel_id),
-                            task_type: task.task_type.clone(),
-                            duration_ms,
-                            status: TaskStatusMetric::Failed,
-                            retry_count: task.retry_count as u32,
-                        });
-                    }
-                }
-            }
+            self.close_out_task(&task, result, duration_ms).await;
         }
 
         Ok(())
+    }
+
+    /// Record the fate of one executed task: completed, suspended awaiting someone else, or failed
+    /// and scheduled for retry.
+    async fn close_out_task(
+        &self,
+        task: &BackgroundTask,
+        result: Result<(), String>,
+        duration_ms: u64,
+    ) {
+        let task_id = task.id;
+        let err_msg = match result {
+            Ok(()) => {
+                // A task that parked itself keeps its own status; it is neither done nor failed.
+                if self.task_is_suspended(task_id).await {
+                    return;
+                }
+                info!("Successfully completed background task {}", task_id);
+                let outcome = self
+                    .task_persistence
+                    .mark_task_completed(task_id, self.worker_id)
+                    .await;
+                report_lease_outcome(task_id, "completion", outcome);
+                self.record_task_metric(task, duration_ms, TaskStatusMetric::Completed);
+                return;
+            }
+            Err(err_msg) => err_msg,
+        };
+
+        warn!("Failed background task {}: {}", task_id, err_msg);
+        let next_retry = task.retry_count + 1;
+        let is_dead_letter = next_retry >= task.max_retries;
+        // Exponential backoff: 30s * 2^retry, capped so the shift can't overflow.
+        let backoff_secs = 30 * (1 << next_retry.min(10));
+        let next_run = chrono::Utc::now().naive_utc() + chrono::Duration::seconds(backoff_secs);
+
+        let outcome = self
+            .task_persistence
+            .mark_task_failed(task_id, self.worker_id, &err_msg, next_run, is_dead_letter)
+            .await;
+        report_lease_outcome(task_id, "failure", outcome);
+        self.record_task_metric(task, duration_ms, TaskStatusMetric::Failed);
+    }
+
+    /// Did the task park itself awaiting a human approval or a third-party reply?
+    async fn task_is_suspended(&self, task_id: Uuid) -> bool {
+        let Ok(Some(current)) = self.task_persistence.get_task_by_id(task_id).await else {
+            return false;
+        };
+        let suspended = matches!(
+            current.status,
+            crate::entities::task::TaskStatus::PendingApproval
+                | crate::entities::task::TaskStatus::WaitingForThirdPartyReply
+        );
+        if suspended {
+            info!(
+                "Background task {} suspended with status {}",
+                task_id,
+                current.status.as_str()
+            );
+        }
+        suspended
+    }
+
+    fn record_task_metric(
+        &self,
+        task: &BackgroundTask,
+        duration_ms: u64,
+        status: TaskStatusMetric,
+    ) {
+        if let Some(ref m) = self.monitoring {
+            m.record_task_execution(&TaskExecutionMetrics {
+                company_id: Some(task.company_id),
+                channel_id: Some(task.channel_id),
+                task_type: task.task_type.clone(),
+                duration_ms,
+                status,
+                retry_count: task.retry_count as u32,
+            });
+        }
     }
 
     async fn process_outbox_emails(&self) -> Result<(), String> {
@@ -180,6 +185,7 @@ impl TaskWorker {
             .map_err(|error| error.to_string())?;
 
         for queued in emails {
+            // The outreach behind this email may have been answered or cancelled since it queued.
             if !self
                 .task_persistence
                 .is_outbox_delivery_active(queued.id)
@@ -192,110 +198,19 @@ impl TaskWorker {
                     .await;
                 continue;
             }
-            let email: OutboundEmail = match serde_json::from_value(queued.payload) {
-                Ok(email) => email,
-                Err(error) => {
+
+            let outbox_id = queued.id;
+            match self.deliver_outbox_email(queued).await {
+                Ok(sent_message_id) => {
                     let _ = self
                         .task_persistence
-                        .mark_outbox_email_failed(queued.id, self.worker_id, &error.to_string())
+                        .mark_outbox_email_sent(outbox_id, self.worker_id, &sent_message_id)
                         .await;
-                    continue;
-                }
-            };
-            let internal_delivery = self
-                .thread_use_cases
-                .prepare_internal_channel_delivery(
-                    email.clone(),
-                    Some(&format!("outbox:{}", queued.id)),
-                )
-                .await;
-            match internal_delivery {
-                Ok(Some(sent)) => {
-                    let delivery_result = async {
-                        self.thread_use_cases
-                            .record_outreach_outbound_message(queued.id, &sent)
-                            .await
-                            .map_err(|error| error.to_string())?;
-                        let ingest = self
-                            .thread_use_cases
-                            .ingest_prepared_internal_message(&sent)
-                            .await
-                            .map_err(|error| error.to_string())?;
-                        if !ingest.accepted
-                            && ingest.reason.as_deref()
-                                != Some("Duplicate Message-ID already processed")
-                        {
-                            return Err(ingest.reason.unwrap_or_else(|| {
-                                "Internal channel delivery was rejected".into()
-                            }));
-                        }
-                        Ok::<(), String>(())
-                    }
-                    .await;
-                    match delivery_result {
-                        Ok(()) => {
-                            let _ = self
-                                .task_persistence
-                                .mark_outbox_email_sent(
-                                    queued.id,
-                                    self.worker_id,
-                                    &sent.outbound_message_id,
-                                )
-                                .await;
-                            info!(
-                                "Delivered outreach outbox {} through trusted internal channel transport",
-                                queued.id
-                            );
-                        }
-                        Err(error) => {
-                            let _ = self
-                                .task_persistence
-                                .mark_outbox_email_failed(queued.id, self.worker_id, &error)
-                                .await;
-                        }
-                    }
-                    continue;
-                }
-                Ok(None) => {}
-                Err(error) => {
-                    let _ = self
-                        .task_persistence
-                        .mark_outbox_email_failed(queued.id, self.worker_id, &error.to_string())
-                        .await;
-                    continue;
-                }
-            }
-            match OutboundDispatcher::send_idempotent(
-                &self.config,
-                email,
-                &format!("outbox:{}", queued.id),
-            )
-            .await
-            {
-                Ok(sent) => {
-                    let _ = self
-                        .task_persistence
-                        .mark_outbox_email_sent(
-                            queued.id,
-                            self.worker_id,
-                            &sent.outbound_message_id,
-                        )
-                        .await;
-                    if let Err(error) = self
-                        .thread_use_cases
-                        .record_outreach_outbound_message(queued.id, &sent)
-                        .await
-                    {
-                        warn!(
-                            "Failed to record sent outreach outbox {} in thread history: {}",
-                            queued.id, error
-                        );
-                    }
                 }
                 Err(error) => {
                     let _ = self
                         .task_persistence
-                        .mark_outbox_email_failed(queued.id, self.worker_id, &error.to_string())
+                        .mark_outbox_email_failed(outbox_id, self.worker_id, &error)
                         .await;
                 }
             }
@@ -303,6 +218,62 @@ impl TaskWorker {
         Ok(())
     }
 
+    /// Send one queued outreach email, preferring the trusted internal transport when the
+    /// recipient is another platform channel. Returns the delivered Message-ID.
+    async fn deliver_outbox_email(&self, queued: OutboxEmail) -> Result<MessageId, String> {
+        let outbox_id = queued.id;
+        let idempotency_key = format!("outbox:{}", outbox_id);
+        let email: OutboundEmail =
+            serde_json::from_value(queued.payload).map_err(|error| error.to_string())?;
+
+        let internal = self
+            .thread_use_cases
+            .prepare_internal_channel_delivery(email.clone(), Some(&idempotency_key))
+            .await
+            .map_err(|error| error.to_string())?;
+
+        if let Some(sent) = internal {
+            self.thread_use_cases
+                .record_outreach_outbound_message(outbox_id, &sent)
+                .await
+                .map_err(|error| error.to_string())?;
+            let ingest = self
+                .thread_use_cases
+                .ingest_prepared_internal_message(&sent)
+                .await
+                .map_err(|error| error.to_string())?;
+            if !ingest.accepted
+                && ingest.reason.as_deref() != Some("Duplicate Message-ID already processed")
+            {
+                return Err(ingest
+                    .reason
+                    .unwrap_or_else(|| "Internal channel delivery was rejected".into()));
+            }
+            info!(
+                "Delivered outreach outbox {} through trusted internal channel transport",
+                outbox_id
+            );
+            return Ok(sent.outbound_message_id);
+        }
+
+        let sent = OutboundDispatcher::send_idempotent(&self.config, email, &idempotency_key)
+            .await
+            .map_err(|error| error.to_string())?;
+        // The email is out; failing to log it in the thread must not re-send it.
+        if let Err(error) = self
+            .thread_use_cases
+            .record_outreach_outbound_message(outbox_id, &sent)
+            .await
+        {
+            warn!(
+                "Failed to record sent outreach outbox {} in thread history: {}",
+                outbox_id, error
+            );
+        }
+        Ok(sent.outbound_message_id)
+    }
+
+    /// Ask a human what to do about outreaches that ran out of time below their response quorum.
     pub async fn check_quorum_timeouts(&self) -> Result<(), String> {
         let now = chrono::Utc::now().naive_utc();
         let outreaches = self
@@ -320,112 +291,124 @@ impl TaskWorker {
             if current_percent >= outreach.required_threshold_percent {
                 continue;
             }
-            let Some(approval_use_cases) = self.thread_use_cases.get_approval_use_cases() else {
-                continue;
-            };
-            let Some(task) = self
-                .task_persistence
-                .get_task_by_id(outreach.task_id)
-                .await
-                .map_err(|error| error.to_string())?
-            else {
-                continue;
-            };
-            let ingest: InboundIngestResult =
-                serde_json::from_value(task.payload.clone()).map_err(|error| error.to_string())?;
-            let channel = ingest.channel.or_else(|| {
-                ingest
-                    .channel_matches
-                    .first()
-                    .map(|matched| matched.channel.clone())
-            });
-            let company = ingest.company.or_else(|| {
-                ingest
-                    .channel_matches
-                    .first()
-                    .map(|matched| matched.company.clone())
-            });
-            let (Some(channel), Some(company)) = (channel, company) else {
-                continue;
-            };
-            let team_approver = self
-                .thread_use_cases
-                .company_persistence()
-                .list_company_team_emails(task.company_id)
-                .await
-                .unwrap_or_default()
-                .into_iter()
-                .next();
-            let approver_email = channel
-                .participant_emails
-                .as_ref()
-                .and_then(|participants| {
-                    participants
-                        .iter()
-                        .find(|email| !email.eq_ignore_ascii_case("@public"))
-                })
-                .cloned()
-                .or(team_approver.map(crate::entities::value_objects::EmailAddress::from))
-                .unwrap_or_default();
-            if approver_email.is_empty() {
-                warn!("No approver configured for outreach task {}", task.id);
-                continue;
-            }
-            if !self
-                .task_persistence
-                .mark_outreach_timeout_pending(outreach.outreach_id)
-                .await
-                .unwrap_or(false)
-            {
-                continue;
-            }
-            info!(
-                "Task {} reached quorum timeout with {:.1}% responses (< {:.1}% required)",
-                outreach.task_id, current_percent, outreach.required_threshold_percent
-            );
-            if let Err(error) = approval_use_cases
-                .create_and_send_approval_request(
-                    task.company_id,
-                    task.channel_id,
-                    &channel.name,
-                    &channel.slug,
-                    &company.slug,
-                    task.thread_id,
-                    Some(task.id),
-                    &format!(
-                        "quorum_timeout_{}_{}",
-                        outreach.outreach_id,
-                        outreach.expires_at.and_utc().timestamp()
-                    ),
-                    &approver_email,
-                    "quorum_timeout",
-                    "Partial Quorum Timeout: Action Required",
-                    &format!(
-                        "Outreach timed out with {}/{} responses ({:.1}%). Required: {:.1}%.",
-                        outreach.response_count,
-                        outreach.target_count,
-                        current_percent,
-                        outreach.required_threshold_percent
-                    ),
-                    serde_json::json!({
-                        "outreach_id": outreach.outreach_id,
-                        "current_percent": current_percent,
-                        "required_percent": outreach.required_threshold_percent,
-                        "current_count": outreach.response_count,
-                        "total_targets": outreach.target_count,
-                    }),
-                )
-                .await
-            {
-                let _ = self
-                    .task_persistence
-                    .restore_outreach_waiting(outreach.outreach_id)
-                    .await;
-                return Err(error.to_string());
-            }
+            self.request_quorum_timeout_decision(&outreach, current_percent)
+                .await?;
         }
 
         Ok(())
+    }
+
+    async fn request_quorum_timeout_decision(
+        &self,
+        outreach: &DueOutreach,
+        current_percent: f64,
+    ) -> Result<(), String> {
+        let Some(approval_use_cases) = self.thread_use_cases.get_approval_use_cases() else {
+            return Ok(());
+        };
+        let Some(task) = self
+            .task_persistence
+            .get_task_by_id(outreach.task_id)
+            .await
+            .map_err(|error| error.to_string())?
+        else {
+            return Ok(());
+        };
+
+        let ingest: InboundIngestResult =
+            serde_json::from_value(task.payload.clone()).map_err(|error| error.to_string())?;
+        let first_match = ingest.channel_matches.first();
+        let channel = ingest
+            .channel
+            .or_else(|| first_match.map(|matched| matched.channel.clone()));
+        let company = ingest
+            .company
+            .or_else(|| first_match.map(|matched| matched.company.clone()));
+        let (Some(channel), Some(company)) = (channel, company) else {
+            return Ok(());
+        };
+
+        let approver_email = match self.approver_for(&channel, task.company_id).await {
+            Some(approver_email) => approver_email,
+            None => {
+                warn!("No approver configured for outreach task {}", task.id);
+                return Ok(());
+            }
+        };
+
+        // Claim the timeout first: only the worker that flips the state may raise the approval.
+        if !self
+            .task_persistence
+            .mark_outreach_timeout_pending(outreach.outreach_id)
+            .await
+            .unwrap_or(false)
+        {
+            return Ok(());
+        }
+        info!(
+            "Task {} reached quorum timeout with {:.1}% responses (< {:.1}% required)",
+            outreach.task_id, current_percent, outreach.required_threshold_percent
+        );
+
+        if let Err(error) = approval_use_cases
+            .create_and_send_approval_request(
+                task.company_id,
+                task.channel_id,
+                &channel.name,
+                &channel.slug,
+                &company.slug,
+                task.thread_id,
+                Some(task.id),
+                &format!(
+                    "quorum_timeout_{}_{}",
+                    outreach.outreach_id,
+                    outreach.expires_at.and_utc().timestamp()
+                ),
+                &approver_email,
+                "quorum_timeout",
+                "Partial Quorum Timeout: Action Required",
+                &format!(
+                    "Outreach timed out with {}/{} responses ({:.1}%). Required: {:.1}%.",
+                    outreach.response_count,
+                    outreach.target_count,
+                    current_percent,
+                    outreach.required_threshold_percent
+                ),
+                serde_json::json!({
+                    "outreach_id": outreach.outreach_id,
+                    "current_percent": current_percent,
+                    "required_percent": outreach.required_threshold_percent,
+                    "current_count": outreach.response_count,
+                    "total_targets": outreach.target_count,
+                }),
+            )
+            .await
+        {
+            // Nobody was asked, so put the outreach back into waiting rather than stranding it.
+            let _ = self
+                .task_persistence
+                .restore_outreach_waiting(outreach.outreach_id)
+                .await;
+            return Err(error.to_string());
+        }
+        Ok(())
+    }
+
+    /// The channel's own approver, falling back to any member of the owning company's team.
+    async fn approver_for(&self, channel: &Channel, company_id: Uuid) -> Option<EmailAddress> {
+        let approver = match channel.preferred_approver() {
+            Some(approver) => Some(approver),
+            None => self
+                .thread_use_cases
+                .company_persistence()
+                .list_company_team_emails(company_id)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .next()
+                .map(EmailAddress::from),
+        };
+        approver.filter(|email| !email.is_empty())
     }
 
     async fn execute_single_task(
@@ -1382,5 +1365,14 @@ mod tests {
                 .unwrap()
                 .contains("API key is missing")
         );
+    }
+}
+
+/// Log when a lease-guarded state change was ignored because the lease or status moved on.
+fn report_lease_outcome(task_id: Uuid, change: &str, outcome: AppResult<bool>) {
+    match outcome {
+        Ok(true) => {}
+        Ok(false) => warn!("Task {task_id} {change} ignored because its lease or status changed"),
+        Err(err) => error!("Failed to record task {task_id} {change}: {err}"),
     }
 }

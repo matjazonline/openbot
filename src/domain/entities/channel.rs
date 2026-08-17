@@ -71,7 +71,55 @@ pub struct Channel {
     pub created_at: chrono::NaiveDateTime,
 }
 
+/// Participant list entry that opens a channel to any sender.
+pub const PUBLIC_PARTICIPANT: &str = "@public";
+
+/// What a channel's participant list says about one sender.
+///
+/// `authorized` decides whether the message may enter the channel at all; `trusted` additionally
+/// waives spam scoring and permits pulling third-party recipients into the thread.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParticipantAccess {
+    pub authorized: bool,
+    pub trusted: bool,
+}
+
 impl Channel {
+    /// The single definition of "may this sender use this channel".
+    ///
+    /// An empty or absent participant list means "company team members only". A list containing
+    /// `@public` opens the channel to anyone, but only explicitly listed senders (or team members)
+    /// are *trusted*.
+    pub fn participant_access(&self, sender: &str, is_team_member: bool) -> ParticipantAccess {
+        match &self.participant_emails {
+            Some(allowed) if !allowed.is_empty() => {
+                let is_public = allowed
+                    .iter()
+                    .any(|e| e.trim().eq_ignore_ascii_case(PUBLIC_PARTICIPANT));
+                let explicitly_listed = allowed.iter().any(|e| {
+                    !e.trim().eq_ignore_ascii_case(PUBLIC_PARTICIPANT)
+                        && e.eq_ignore_ascii_case(sender)
+                });
+                ParticipantAccess {
+                    authorized: is_public || explicitly_listed,
+                    trusted: explicitly_listed || is_team_member,
+                }
+            }
+            _ => ParticipantAccess {
+                authorized: is_team_member,
+                trusted: is_team_member,
+            },
+        }
+    }
+
+    /// Who should be asked to approve an action on this channel: the first listed participant
+    /// that names an actual person rather than the `@public` wildcard.
+    pub fn preferred_approver(&self) -> Option<EmailAddress> {
+        self.participant_emails.as_ref()?.iter()
+            .find(|email| !email.eq_ignore_ascii_case(PUBLIC_PARTICIPANT))
+            .cloned()
+    }
+
     pub fn default_config() -> serde_json::Value {
         serde_json::json!({
             "name": "MinimalAgent",

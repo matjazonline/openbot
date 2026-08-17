@@ -151,7 +151,74 @@ impl SmtpServer {
         let start_time = Instant::now();
         let client_ip = peer_addr.ip();
 
-        // 1. Connection Rate Limiting
+        let Some(_guard) = self.admit_connection(&mut stream, client_ip, start_time).await? else {
+            return Ok(());
+        };
+
+        let (reader, mut writer) = stream.split();
+        let mut reader = BufReader::new(reader);
+
+        let banner = format!(
+            "220 {} ESMTP Service Ready\r\n",
+            self.config.app_domain_name
+        );
+        writer.write_all(banner.as_bytes()).await?;
+        writer.flush().await?;
+
+        let mut state = SmtpState::Command;
+        let mut session = SmtpSession::default();
+        let mut line_buf = String::new();
+
+        loop {
+            line_buf.clear();
+            if reader.read_line(&mut line_buf).await? == 0 {
+                break; // Connection closed
+            }
+            let trimmed = line_buf.trim_end_matches(['\r', '\n']);
+
+            match state {
+                SmtpState::Command => {
+                    let outcome = self
+                        .handle_command(trimmed, &mut session, &mut writer, peer_addr, start_time)
+                        .await?;
+                    writer.flush().await?;
+                    match outcome {
+                        CommandOutcome::Continue => {}
+                        CommandOutcome::EnterData => state = SmtpState::Data,
+                        CommandOutcome::Close => break,
+                    }
+                }
+                SmtpState::Data => {
+                    if trimmed == "." {
+                        self.finish_data_transaction(
+                            &mut session,
+                            &mut writer,
+                            peer_addr,
+                            start_time,
+                        )
+                        .await?;
+                        session.reset_transaction();
+                        state = SmtpState::Command;
+                    } else {
+                        session.push_data_line(&line_buf);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Per-IP connection limiting and DNSBL screening, before a single SMTP verb is read.
+    ///
+    /// `Ok(None)` means the client was turned away and already told why; the returned guard keeps
+    /// the IP's connection count incremented for as long as the caller holds it.
+    async fn admit_connection(
+        &self,
+        stream: &mut TcpStream,
+        client_ip: IpAddr,
+        start_time: Instant,
+    ) -> anyhow::Result<Option<ConnGuard>> {
         let rate_limited = {
             let mut lock = self.active_conns.write().unwrap_or_else(|e| e.into_inner());
             let current = lock.entry(client_ip).or_insert(0);
@@ -165,445 +232,444 @@ impl SmtpServer {
 
         if rate_limited {
             warn!("Connection from {} rejected: Rate limit reached", client_ip);
-            if let Some(ref m) = self.monitoring {
-                m.record_smtp_connection(&SmtpConnectionMetrics {
-                    client_ip,
-                    status: SmtpStatus::BlockedRateLimit,
-                    duration_ms: start_time.elapsed().as_millis() as u64,
-                    mail_from: None,
-                    rcpt_to: None,
-                });
-            }
+            self.record_connection(client_ip, SmtpStatus::BlockedRateLimit, start_time, None, None);
             stream
                 .write_all(b"421 4.7.0 Too many active connections from your IP address\r\n")
                 .await?;
             stream.flush().await?;
-            return Ok(());
+            return Ok(None);
         }
 
-        let _guard = ConnGuard {
+        let guard = ConnGuard {
             ip: client_ip,
             conns: self.active_conns.clone(),
         };
 
-        // 2. DNSBL (RBL) Filtering
-        if self.config.dnsbl_enabled {
-            if let Some(rbl) = check_dnsbl(client_ip, &self.config.dnsbl_servers).await {
-                warn!("Connection from {} blocked by DNSBL {}", client_ip, rbl);
-                if let Some(ref m) = self.monitoring {
-                    m.record_smtp_connection(&SmtpConnectionMetrics {
-                        client_ip,
-                        status: SmtpStatus::BlockedDnsbl,
-                        duration_ms: start_time.elapsed().as_millis() as u64,
-                        mail_from: None,
-                        rcpt_to: None,
-                    });
-                }
-                let msg = format!(
-                    "554 5.7.1 Service unavailable; Client host [{}] blocked using {}\r\n",
-                    client_ip, rbl
-                );
-                stream.write_all(msg.as_bytes()).await?;
-                stream.flush().await?;
-                return Ok(());
-            }
+        if self.config.dnsbl_enabled
+            && let Some(rbl) = check_dnsbl(client_ip, &self.config.dnsbl_servers).await
+        {
+            warn!("Connection from {} blocked by DNSBL {}", client_ip, rbl);
+            self.record_connection(client_ip, SmtpStatus::BlockedDnsbl, start_time, None, None);
+            let msg = format!(
+                "554 5.7.1 Service unavailable; Client host [{}] blocked using {}\r\n",
+                client_ip, rbl
+            );
+            stream.write_all(msg.as_bytes()).await?;
+            stream.flush().await?;
+            return Ok(None);
         }
 
-        let (reader, mut writer) = stream.split();
-        let mut reader = BufReader::new(reader);
+        Ok(Some(guard))
+    }
 
-        // Initial 220 banner
-        let banner = format!(
-            "220 {} ESMTP Service Ready\r\n",
-            self.config.app_domain_name
-        );
-        writer.write_all(banner.as_bytes()).await?;
-        writer.flush().await?;
+    /// One SMTP verb. The caller flushes and applies the returned state change.
+    async fn handle_command<W: tokio::io::AsyncWrite + Unpin>(
+        &self,
+        line: &str,
+        session: &mut SmtpSession,
+        writer: &mut W,
+        peer_addr: std::net::SocketAddr,
+        start_time: Instant,
+    ) -> anyhow::Result<CommandOutcome> {
+        let space_pos = line.find(' ').unwrap_or(line.len());
+        let (cmd_raw, arg_raw) = line.split_at(space_pos);
+        let cmd = cmd_raw.trim().to_uppercase();
+        let arg = arg_raw.trim();
 
-        let mut state = SmtpState::Command;
-        let mut ehlo_domain: Option<String> = None;
-        let mut mailfrom: Option<String> = None;
-        let mut rcpts: Vec<String> = Vec::new();
-        let mut data_buffer = String::new();
-        let mut line_buf = String::new();
-
-        loop {
-            line_buf.clear();
-            let bytes_read = reader.read_line(&mut line_buf).await?;
-            if bytes_read == 0 {
-                break; // Connection closed
-            }
-
-            let trimmed = line_buf.trim_end_matches(['\r', '\n']);
-
-            match state {
-                SmtpState::Command => {
-                    let space_pos = trimmed.find(' ').unwrap_or(trimmed.len());
-                    let (cmd_raw, arg_raw) = trimmed.split_at(space_pos);
-                    let cmd = cmd_raw.trim().to_uppercase();
-                    let arg = arg_raw.trim();
-
-                    match cmd.as_str() {
-                        "HELO" | "EHLO" => {
-                            if !arg.is_empty() {
-                                let is_self_domain =
-                                    arg.eq_ignore_ascii_case(&self.config.app_domain_name);
-                                if is_self_domain
-                                    && self.config.reject_self_domain_helo
-                                    && !client_ip.is_loopback()
-                                {
-                                    warn!(
-                                        "Client {} spoofed local domain {} in EHLO/HELO",
-                                        client_ip, arg
-                                    );
-                                    if let Some(ref m) = self.monitoring {
-                                        m.record_smtp_connection(&SmtpConnectionMetrics {
-                                            client_ip,
-                                            status: SmtpStatus::RejectedHelo,
-                                            duration_ms: start_time.elapsed().as_millis() as u64,
-                                            mail_from: None,
-                                            rcpt_to: None,
-                                        });
-                                    }
-                                    writer.write_all(b"550 5.5.2 Helo command rejected: Host name spoofed\r\n").await?;
-                                    writer.flush().await?;
-                                    return Ok(());
-                                }
-                                ehlo_domain = Some(arg.to_string());
-                            }
-                            let resp = format!(
-                                "250-{} Hello {}\r\n250-SIZE 20971520\r\n250 OK\r\n",
-                                self.config.app_domain_name,
-                                peer_addr.ip()
-                            );
-                            writer.write_all(resp.as_bytes()).await?;
-                        }
-                        "MAIL" => {
-                            if let Some(cap) = MAIL_FROM_RE.captures(arg) {
-                                let raw_addr = cap
-                                    .get(1)
-                                    .or_else(|| cap.get(2))
-                                    .map(|m| m.as_str())
-                                    .unwrap_or_default();
-                                let extracted = extract_email(raw_addr);
-                                mailfrom = Some(extracted);
-                                writer.write_all(b"250 2.1.0 Ok\r\n").await?;
-                            } else {
-                                writer
-                                    .write_all(b"501 Syntax: MAIL FROM:<address>\r\n")
-                                    .await?;
-                            }
-                        }
-                        "RCPT" => {
-                            if mailfrom.is_none() {
-                                writer
-                                    .write_all(b"503 Error: Send MAIL FROM first\r\n")
-                                    .await?;
-                            } else if let Some(cap) = RCPT_TO_RE.captures(arg) {
-                                let raw_addr = cap
-                                    .get(1)
-                                    .or_else(|| cap.get(2))
-                                    .map(|m| m.as_str())
-                                    .unwrap_or_default();
-                                let extracted = extract_email(raw_addr);
-                                rcpts.push(extracted);
-                                writer.write_all(b"250 2.1.5 Ok\r\n").await?;
-                            } else {
-                                writer
-                                    .write_all(b"501 Syntax: RCPT TO:<address>\r\n")
-                                    .await?;
-                            }
-                        }
-                        "DATA" => {
-                            if rcpts.is_empty() {
-                                writer.write_all(b"503 Error: MAIL FROM and RCPT TO must be set before DATA\r\n").await?;
-                            } else {
-                                state = SmtpState::Data;
-                                writer
-                                    .write_all(
-                                        b"354 Start mail input; end with <CR><LF>.<CR><LF>\r\n",
-                                    )
-                                    .await?;
-                            }
-                        }
-                        "RSET" => {
-                            mailfrom = None;
-                            rcpts.clear();
-                            data_buffer.clear();
-                            writer.write_all(b"250 2.0.0 Ok\r\n").await?;
-                        }
-                        "NOOP" => {
-                            writer.write_all(b"250 2.0.0 Ok\r\n").await?;
-                        }
-                        "QUIT" => {
-                            writer.write_all(b"221 2.0.0 Bye\r\n").await?;
-                            writer.flush().await?;
-                            break;
-                        }
-                        _ => {
-                            writer
-                                .write_all(b"500 5.5.1 Command unrecognized\r\n")
-                                .await?;
-                        }
-                    }
-                    writer.flush().await?;
-                }
-                SmtpState::Data => {
-                    if trimmed == "." {
-                        let mut spf_status: Option<String> = None;
-                        let mut dkim_status: Option<String> = None;
-                        let mut dmarc_status: Option<String> = None;
-                        let mut spf_output_obj: Option<mail_auth::SpfOutput> = None;
-
-                        // Perform active DNS SPF, DKIM & DMARC verification via mail-auth
-                        if let Ok(resolver) = mail_auth::MessageAuthenticator::new_quad9() {
-                            if let Some(ref sender) = mailfrom {
-                                let domain = sender.split('@').nth(1).unwrap_or(sender);
-                                let ehlo = ehlo_domain.as_deref().unwrap_or(domain);
-                                let params =
-                                    mail_auth::spf::verify::SpfParameters::verify_mail_from(
-                                        peer_addr.ip(),
-                                        ehlo,
-                                        domain,
-                                        sender,
-                                    );
-                                let spf_res = resolver.verify_spf(params).await;
-                                spf_status = Some(match spf_res.result() {
-                                    mail_auth::SpfResult::Pass => "pass".to_string(),
-                                    mail_auth::SpfResult::Fail => "fail".to_string(),
-                                    mail_auth::SpfResult::SoftFail => "softfail".to_string(),
-                                    mail_auth::SpfResult::Neutral => "neutral".to_string(),
-                                    _ => "none".to_string(),
-                                });
-                                spf_output_obj = Some(spf_res);
-                            }
-
-                            if let Some(auth_msg) =
-                                mail_auth::AuthenticatedMessage::parse(data_buffer.as_bytes())
-                            {
-                                let dkim_outputs_obj = resolver.verify_dkim(&auth_msg).await;
-                                if !dkim_outputs_obj.is_empty() {
-                                    if dkim_outputs_obj
-                                        .iter()
-                                        .all(|s| matches!(s.result(), mail_auth::DkimResult::Pass))
-                                    {
-                                        dkim_status = Some("pass".to_string());
-                                    } else if dkim_outputs_obj.iter().any(|s| {
-                                        matches!(s.result(), mail_auth::DkimResult::Fail(_))
-                                    }) {
-                                        dkim_status = Some("fail".to_string());
-                                    } else {
-                                        dkim_status = Some("none".to_string());
-                                    }
-                                }
-
-                                if let Some(ref spf_output) = spf_output_obj {
-                                    if let Some(ref sender) = mailfrom {
-                                        let domain = sender.split('@').nth(1).unwrap_or(sender);
-                                        let dmarc_params =
-                                            mail_auth::dmarc::verify::DmarcParameters::new(
-                                                &auth_msg,
-                                                &dkim_outputs_obj,
-                                                domain,
-                                                spf_output,
-                                            );
-                                        let dmarc_output =
-                                            resolver.verify_dmarc(dmarc_params).await;
-                                        let dmarc_dkim_pass = matches!(
-                                            dmarc_output.dkim_result(),
-                                            mail_auth::DmarcResult::Pass
-                                        );
-                                        let dmarc_spf_pass = matches!(
-                                            dmarc_output.spf_result(),
-                                            mail_auth::DmarcResult::Pass
-                                        );
-                                        dmarc_status = Some(if dmarc_dkim_pass || dmarc_spf_pass {
-                                            "pass".to_string()
-                                        } else {
-                                            "fail".to_string()
-                                        });
-                                    }
-                                }
-                            }
-                        }
-
-                        let mut raw_payload = parse_raw_mime_to_payload(
-                            data_buffer.as_bytes(),
-                            mailfrom.as_deref(),
-                            rcpts.first().map(|s| s.as_str()),
-                            &rcpts,
-                            spf_status,
-                            dkim_status,
-                            dmarc_status,
+        match cmd.as_str() {
+            "HELO" | "EHLO" => {
+                let client_ip = peer_addr.ip();
+                // A remote client claiming to be us is forging our own domain.
+                if !arg.is_empty() {
+                    if arg.eq_ignore_ascii_case(&self.config.app_domain_name)
+                        && self.config.reject_self_domain_helo
+                        && !client_ip.is_loopback()
+                    {
+                        warn!(
+                            "Client {} spoofed local domain {} in EHLO/HELO",
+                            client_ip, arg
                         );
-
-                        // Stage 1 & Stage 2 Spam Scanner (Run for external senders on public channels; skip for trusted participants)
-                        let mut should_scan_spam = true;
-                        let recipient_str = raw_payload.to.clone();
-                        if let Some((company_slug, channel_slug)) =
-                            parse_recipient_address(&recipient_str, &self.config.app_domain_name)
-                        {
-                            if let Ok(Some(company)) = self
-                                .thread_use_cases
-                                .company_persistence()
-                                .get_by_slug(&company_slug)
-                                .await
-                            {
-                                if let Ok(Some(channel)) = self
-                                    .thread_use_cases
-                                    .channel_persistence()
-                                    .get_by_company_slug_and_channel_slug(
-                                        &company_slug,
-                                        &channel_slug,
-                                    )
-                                    .await
-                                {
-                                    let sender_clean = raw_payload.from.trim();
-                                    let is_team_member = self
-                                        .thread_use_cases
-                                        .company_persistence()
-                                        .is_company_team_member(company.id, sender_clean)
-                                        .await
-                                        .unwrap_or(false);
-
-                                    let is_trusted = match &channel.participant_emails {
-                                        Some(allowed) if !allowed.is_empty() => {
-                                            let explicitly_listed = allowed.iter().any(|e| {
-                                                !e.trim().eq_ignore_ascii_case("@public")
-                                                    && e.eq_ignore_ascii_case(sender_clean)
-                                            });
-                                            explicitly_listed || is_team_member
-                                        }
-                                        _ => is_team_member,
-                                    };
-
-                                    if is_trusted {
-                                        should_scan_spam = false;
-                                    }
-                                }
-                            }
-                        }
-
-                        if should_scan_spam {
-                            let spam_scanner =
-                                crate::services::spam_scanner::SpamScannerService::new(
-                                    self.config.clone(),
-                                );
-                            let scan_res = spam_scanner
-                                .scan(
-                                    data_buffer.as_bytes(),
-                                    raw_payload.subject.as_deref(),
-                                    Some(&raw_payload.from),
-                                    raw_payload.text.as_deref(),
-                                    raw_payload.html.as_deref(),
-                                )
-                                .await;
-
-                            if scan_res.score > 0.0 {
-                                raw_payload.spam_score = Some(scan_res.score);
-                                if let Some(ref m) = self.monitoring {
-                                    m.record_histogram("smtp_spam_score", scan_res.score, &[]);
-                                }
-                            }
-                        }
-
-                        let norm_payload = EmailIngressAdapter::parse(raw_payload, &self.config);
-                        match self
-                            .thread_use_cases
-                            .ingest_normalized_message(norm_payload)
-                            .await
-                        {
-                            Ok(ingest) => {
-                                if let Some(ref m) = self.monitoring {
-                                    let status = if ingest.accepted {
-                                        SmtpStatus::Accepted
-                                    } else {
-                                        match ingest.reason.as_deref() {
-                                            Some("SPF authentication failed") => {
-                                                SmtpStatus::RejectedSpf
-                                            }
-                                            Some("DKIM authentication failed") => {
-                                                SmtpStatus::RejectedDkim
-                                            }
-                                            Some("DMARC authentication failed") => {
-                                                SmtpStatus::RejectedDmarc
-                                            }
-                                            Some("Spam score threshold exceeded") => {
-                                                SmtpStatus::RejectedSpamScore
-                                            }
-                                            Some(r) if r.contains("rate limit") => {
-                                                SmtpStatus::BlockedRateLimit
-                                            }
-                                            Some(r) if r.contains("DNSBL") => {
-                                                SmtpStatus::BlockedDnsbl
-                                            }
-                                            _ => SmtpStatus::Error,
-                                        }
-                                    };
-                                    m.record_smtp_connection(&SmtpConnectionMetrics {
-                                        client_ip,
-                                        status,
-                                        duration_ms: start_time.elapsed().as_millis() as u64,
-                                        mail_from: mailfrom.clone(),
-                                        rcpt_to: rcpts.first().cloned(),
-                                    });
-                                }
-
-                                if ingest.accepted {
-                                    writer
-                                        .write_all(b"250 2.0.0 Message queued for delivery\r\n")
-                                        .await?;
-                                } else {
-                                    let thread_use_cases_bg = self.thread_use_cases.clone();
-                                    let ingest_bg = ingest.clone();
-                                    tokio::spawn(async move {
-                                        thread_use_cases_bg
-                                            .handle_bounce_dispatch(&ingest_bg)
-                                            .await;
-                                    });
-                                    let msg = format!(
-                                        "250 2.0.0 Message processed ({})\r\n",
-                                        ingest.reason.as_deref().unwrap_or("ok")
-                                    );
-                                    writer.write_all(msg.as_bytes()).await?;
-                                }
-                            }
-                            Err(err) => {
-                                warn!("Error ingesting SMTP email: {err}");
-                                if let Some(ref m) = self.monitoring {
-                                    m.record_smtp_connection(&SmtpConnectionMetrics {
-                                        client_ip,
-                                        status: SmtpStatus::Error,
-                                        duration_ms: start_time.elapsed().as_millis() as u64,
-                                        mail_from: mailfrom.clone(),
-                                        rcpt_to: rcpts.first().cloned(),
-                                    });
-                                }
-                                writer
-                                    .write_all(b"451 4.3.0 Local error in processing\r\n")
-                                    .await?;
-                            }
-                        }
+                        self.record_connection(
+                            client_ip,
+                            SmtpStatus::RejectedHelo,
+                            start_time,
+                            None,
+                            None,
+                        );
+                        writer
+                            .write_all(b"550 5.5.2 Helo command rejected: Host name spoofed\r\n")
+                            .await?;
                         writer.flush().await?;
-
-                        mailfrom = None;
-                        rcpts.clear();
-                        data_buffer.clear();
-                        state = SmtpState::Command;
-                    } else {
-                        // Dot un-stuffing per RFC 5321
-                        let line_content = if line_buf.starts_with("..") {
-                            &line_buf[1..]
-                        } else {
-                            &line_buf[..]
-                        };
-                        data_buffer.push_str(line_content);
+                        return Ok(CommandOutcome::Close);
+                    }
+                    session.ehlo_domain = Some(arg.to_string());
+                }
+                let resp = format!(
+                    "250-{} Hello {}\r\n250-SIZE 20971520\r\n250 OK\r\n",
+                    self.config.app_domain_name, client_ip
+                );
+                writer.write_all(resp.as_bytes()).await?;
+            }
+            "MAIL" => match extract_command_address(&MAIL_FROM_RE, arg) {
+                Some(address) => {
+                    session.mailfrom = Some(address);
+                    writer.write_all(b"250 2.1.0 Ok\r\n").await?;
+                }
+                None => {
+                    writer
+                        .write_all(b"501 Syntax: MAIL FROM:<address>\r\n")
+                        .await?;
+                }
+            },
+            "RCPT" => {
+                if session.mailfrom.is_none() {
+                    writer
+                        .write_all(b"503 Error: Send MAIL FROM first\r\n")
+                        .await?;
+                } else {
+                    match extract_command_address(&RCPT_TO_RE, arg) {
+                        Some(address) => {
+                            session.rcpts.push(address);
+                            writer.write_all(b"250 2.1.5 Ok\r\n").await?;
+                        }
+                        None => {
+                            writer.write_all(b"501 Syntax: RCPT TO:<address>\r\n").await?;
+                        }
                     }
                 }
             }
+            "DATA" => {
+                if session.rcpts.is_empty() {
+                    writer
+                        .write_all(
+                            b"503 Error: MAIL FROM and RCPT TO must be set before DATA\r\n",
+                        )
+                        .await?;
+                } else {
+                    writer
+                        .write_all(b"354 Start mail input; end with <CR><LF>.<CR><LF>\r\n")
+                        .await?;
+                    return Ok(CommandOutcome::EnterData);
+                }
+            }
+            "RSET" => {
+                session.reset_transaction();
+                writer.write_all(b"250 2.0.0 Ok\r\n").await?;
+            }
+            "NOOP" => {
+                writer.write_all(b"250 2.0.0 Ok\r\n").await?;
+            }
+            "QUIT" => {
+                writer.write_all(b"221 2.0.0 Bye\r\n").await?;
+                writer.flush().await?;
+                return Ok(CommandOutcome::Close);
+            }
+            _ => {
+                writer
+                    .write_all(b"500 5.5.1 Command unrecognized\r\n")
+                    .await?;
+            }
+        }
+        Ok(CommandOutcome::Continue)
+    }
+
+    /// The terminating `.` arrived: authenticate, score, ingest, and answer the client.
+    async fn finish_data_transaction<W: tokio::io::AsyncWrite + Unpin>(
+        &self,
+        session: &SmtpSession,
+        writer: &mut W,
+        peer_addr: std::net::SocketAddr,
+        start_time: Instant,
+    ) -> anyhow::Result<()> {
+        let client_ip = peer_addr.ip();
+        let auth = self.verify_authentication(session, client_ip).await;
+
+        let mut raw_payload = parse_raw_mime_to_payload(
+            session.data_buffer.as_bytes(),
+            session.mailfrom.as_deref(),
+            session.rcpts.first().map(|s| s.as_str()),
+            &session.rcpts,
+            auth.spf,
+            auth.dkim,
+            auth.dmarc,
+        );
+
+        if self.sender_needs_spam_scan(&raw_payload).await {
+            self.apply_spam_score(session, &mut raw_payload).await;
         }
 
+        let norm_payload = EmailIngressAdapter::parse(raw_payload, &self.config);
+        match self
+            .thread_use_cases
+            .ingest_normalized_message(norm_payload)
+            .await
+        {
+            Ok(ingest) => {
+                self.record_connection(
+                    client_ip,
+                    ingest_status(&ingest),
+                    start_time,
+                    session.mailfrom.clone(),
+                    session.rcpts.first().cloned(),
+                );
+
+                if ingest.accepted {
+                    writer
+                        .write_all(b"250 2.0.0 Message queued for delivery\r\n")
+                        .await?;
+                } else {
+                    // Bounces go out on their own task so a slow SMTP send can't stall this reply.
+                    let thread_use_cases_bg = self.thread_use_cases.clone();
+                    let ingest_bg = ingest.clone();
+                    tokio::spawn(async move {
+                        thread_use_cases_bg.handle_bounce_dispatch(&ingest_bg).await;
+                    });
+                    let msg = format!(
+                        "250 2.0.0 Message processed ({})\r\n",
+                        ingest.reason.as_deref().unwrap_or("ok")
+                    );
+                    writer.write_all(msg.as_bytes()).await?;
+                }
+            }
+            Err(err) => {
+                warn!("Error ingesting SMTP email: {err}");
+                self.record_connection(
+                    client_ip,
+                    SmtpStatus::Error,
+                    start_time,
+                    session.mailfrom.clone(),
+                    session.rcpts.first().cloned(),
+                );
+                writer
+                    .write_all(b"451 4.3.0 Local error in processing\r\n")
+                    .await?;
+            }
+        }
+        writer.flush().await?;
         Ok(())
+    }
+
+    /// Active DNS verification of SPF, DKIM and DMARC for the buffered message.
+    ///
+    /// Every step is best-effort: a resolver or parse failure leaves that verdict as `None`, which
+    /// downstream reads as "not asserted" rather than "failed".
+    async fn verify_authentication(
+        &self,
+        session: &SmtpSession,
+        client_ip: IpAddr,
+    ) -> AuthResults {
+        let mut results = AuthResults::default();
+        let Ok(resolver) = mail_auth::MessageAuthenticator::new_quad9() else {
+            return results;
+        };
+
+        let mut spf_output = None;
+        if let Some(ref sender) = session.mailfrom {
+            let domain = sender.split('@').nth(1).unwrap_or(sender);
+            let ehlo = session.ehlo_domain.as_deref().unwrap_or(domain);
+            let spf_res = resolver
+                .verify_spf(mail_auth::spf::verify::SpfParameters::verify_mail_from(
+                    client_ip, ehlo, domain, sender,
+                ))
+                .await;
+            results.spf = Some(
+                match spf_res.result() {
+                    mail_auth::SpfResult::Pass => "pass",
+                    mail_auth::SpfResult::Fail => "fail",
+                    mail_auth::SpfResult::SoftFail => "softfail",
+                    mail_auth::SpfResult::Neutral => "neutral",
+                    _ => "none",
+                }
+                .to_string(),
+            );
+            spf_output = Some(spf_res);
+        }
+
+        let Some(auth_msg) = mail_auth::AuthenticatedMessage::parse(session.data_buffer.as_bytes())
+        else {
+            return results;
+        };
+
+        let dkim_outputs = resolver.verify_dkim(&auth_msg).await;
+        if !dkim_outputs.is_empty() {
+            results.dkim = Some(
+                if dkim_outputs
+                    .iter()
+                    .all(|s| matches!(s.result(), mail_auth::DkimResult::Pass))
+                {
+                    "pass"
+                } else if dkim_outputs
+                    .iter()
+                    .any(|s| matches!(s.result(), mail_auth::DkimResult::Fail(_)))
+                {
+                    "fail"
+                } else {
+                    "none"
+                }
+                .to_string(),
+            );
+        }
+
+        // DMARC needs an SPF verdict to align against, so it only runs when MAIL FROM was seen.
+        if let (Some(spf_output), Some(sender)) = (spf_output.as_ref(), session.mailfrom.as_ref()) {
+            let domain = sender.split('@').nth(1).unwrap_or(sender);
+            let dmarc_output = resolver
+                .verify_dmarc(mail_auth::dmarc::verify::DmarcParameters::new(
+                    &auth_msg,
+                    &dkim_outputs,
+                    domain,
+                    spf_output,
+                ))
+                .await;
+            let aligned = matches!(dmarc_output.dkim_result(), mail_auth::DmarcResult::Pass)
+                || matches!(dmarc_output.spf_result(), mail_auth::DmarcResult::Pass);
+            results.dmarc = Some(if aligned { "pass" } else { "fail" }.to_string());
+        }
+
+        results
+    }
+
+    /// Spam scanning is for strangers: a sender the destination channel already trusts skips it.
+    async fn sender_needs_spam_scan(&self, raw_payload: &RawInboundPayload) -> bool {
+        let Some((company_slug, channel_slug)) =
+            parse_recipient_address(&raw_payload.to, &self.config.app_domain_name)
+        else {
+            return true;
+        };
+        let Ok(Some(company)) = self
+            .thread_use_cases
+            .company_persistence()
+            .get_by_slug(&company_slug)
+            .await
+        else {
+            return true;
+        };
+        let Ok(Some(channel)) = self
+            .thread_use_cases
+            .channel_persistence()
+            .get_by_company_slug_and_channel_slug(&company_slug, &channel_slug)
+            .await
+        else {
+            return true;
+        };
+
+        let sender = raw_payload.from.trim();
+        let is_team_member = self
+            .thread_use_cases
+            .company_persistence()
+            .is_company_team_member(company.id, sender)
+            .await
+            .unwrap_or(false);
+        !channel.participant_access(sender, is_team_member).trusted
+    }
+
+    async fn apply_spam_score(&self, session: &SmtpSession, raw_payload: &mut RawInboundPayload) {
+        let scanner =
+            crate::services::spam_scanner::SpamScannerService::new(self.config.clone());
+        let scan_res = scanner
+            .scan(
+                session.data_buffer.as_bytes(),
+                raw_payload.subject.as_deref(),
+                Some(&raw_payload.from),
+                raw_payload.text.as_deref(),
+                raw_payload.html.as_deref(),
+            )
+            .await;
+
+        if scan_res.score > 0.0 {
+            raw_payload.spam_score = Some(scan_res.score);
+            if let Some(ref m) = self.monitoring {
+                m.record_histogram("smtp_spam_score", scan_res.score, &[]);
+            }
+        }
+    }
+
+    fn record_connection(
+        &self,
+        client_ip: IpAddr,
+        status: SmtpStatus,
+        start_time: Instant,
+        mail_from: Option<String>,
+        rcpt_to: Option<String>,
+    ) {
+        if let Some(ref m) = self.monitoring {
+            m.record_smtp_connection(&SmtpConnectionMetrics {
+                client_ip,
+                status,
+                duration_ms: start_time.elapsed().as_millis() as u64,
+                mail_from,
+                rcpt_to,
+            });
+        }
+    }
+}
+
+/// Per-connection SMTP transaction state.
+#[derive(Default)]
+struct SmtpSession {
+    ehlo_domain: Option<String>,
+    mailfrom: Option<String>,
+    rcpts: Vec<String>,
+    data_buffer: String,
+}
+
+impl SmtpSession {
+    /// `RSET`, or the end of a message: the greeting survives, the envelope does not.
+    fn reset_transaction(&mut self) {
+        self.mailfrom = None;
+        self.rcpts.clear();
+        self.data_buffer.clear();
+    }
+
+    fn push_data_line(&mut self, raw_line: &str) {
+        // Dot un-stuffing per RFC 5321.
+        let line = if raw_line.starts_with("..") {
+            &raw_line[1..]
+        } else {
+            raw_line
+        };
+        self.data_buffer.push_str(line);
+    }
+}
+
+/// What the command loop should do after one verb.
+enum CommandOutcome {
+    Continue,
+    EnterData,
+    Close,
+}
+
+/// SPF/DKIM/DMARC verdicts, each `None` when the check could not be performed.
+#[derive(Default)]
+struct AuthResults {
+    spf: Option<String>,
+    dkim: Option<String>,
+    dmarc: Option<String>,
+}
+
+fn extract_command_address(re: &regex::Regex, arg: &str) -> Option<String> {
+    let cap = re.captures(arg)?;
+    let raw = cap
+        .get(1)
+        .or_else(|| cap.get(2))
+        .map(|m| m.as_str())
+        .unwrap_or_default();
+    Some(extract_email(raw))
+}
+
+/// Map an ingest rejection reason onto the connection metric it should be counted as.
+fn ingest_status(ingest: &crate::use_cases::thread::InboundIngestResult) -> SmtpStatus {
+    if ingest.accepted {
+        return SmtpStatus::Accepted;
+    }
+    match ingest.reason.as_deref() {
+        Some("SPF authentication failed") => SmtpStatus::RejectedSpf,
+        Some("DKIM authentication failed") => SmtpStatus::RejectedDkim,
+        Some("DMARC authentication failed") => SmtpStatus::RejectedDmarc,
+        Some("Spam score threshold exceeded") => SmtpStatus::RejectedSpamScore,
+        Some(r) if r.contains("rate limit") => SmtpStatus::BlockedRateLimit,
+        Some(r) if r.contains("DNSBL") => SmtpStatus::BlockedDnsbl,
+        _ => SmtpStatus::Error,
     }
 }
 
