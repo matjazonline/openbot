@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
+use crate::entities::value_objects::{EmailAddress, MessageId, ThreadIndex};
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum MessageRole {
@@ -74,12 +76,12 @@ pub struct AttachmentMetadata {
 pub struct Message {
     pub id: Uuid,
     pub thread_id: Uuid,
-    pub message_id: String,
-    pub in_reply_to: Option<String>,
-    pub references_list: Vec<String>,
-    pub sender: String,
-    pub recipients_to: Vec<String>,
-    pub recipients_cc: Vec<String>,
+    pub message_id: MessageId,
+    pub in_reply_to: Option<MessageId>,
+    pub references_list: Vec<MessageId>,
+    pub sender: EmailAddress,
+    pub recipients_to: Vec<EmailAddress>,
+    pub recipients_cc: Vec<EmailAddress>,
     pub subject: String,
     pub clean_text_body: String,
     pub raw_text_body: Option<String>,
@@ -87,6 +89,6 @@ pub struct Message {
     pub attachments: Option<Vec<AttachmentMetadata>>,
     pub direction: MessageDirection,
     pub role: MessageRole,
-    pub thread_index: Option<String>,
+    pub thread_index: Option<ThreadIndex>,
     pub created_at: chrono::NaiveDateTime,
 }

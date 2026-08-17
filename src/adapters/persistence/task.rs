@@ -14,6 +14,7 @@ use crate::{
             OutreachStatus,
         },
         task::{BackgroundTask, TaskStatus},
+        value_objects::MessageId,
     },
 };
 
@@ -99,7 +100,7 @@ pub trait TaskPersistence: Send + Sync {
         _channel_id: Uuid,
         _thread_id: Uuid,
         _sender: &str,
-        _references: &[String],
+        _references: &[MessageId],
     ) -> AppResult<Option<OutreachReplyMatch>> {
         Ok(None)
     }
@@ -336,7 +337,7 @@ impl TaskPersistence for PostgresPersistence {
                        VALUES ($1, $2, $3)"#,
                 )
                 .bind(outreach.id)
-                .bind(&target.email)
+                .bind(target.email.as_str())
                 .bind(target.outbox_id)
                 .execute(&mut *tx)
                 .await
@@ -397,11 +398,12 @@ impl TaskPersistence for PostgresPersistence {
         channel_id: Uuid,
         thread_id: Uuid,
         sender: &str,
-        references: &[String],
+        references: &[MessageId],
     ) -> AppResult<Option<OutreachReplyMatch>> {
         if references.is_empty() {
             return Ok(None);
         }
+        let reference_strs: Vec<&str> = references.iter().map(MessageId::as_str).collect();
         let row = sqlx::query_as::<_, (Uuid, Uuid, String)>(
             r#"SELECT outreach.id, task.id, target.email::text
                FROM task_outreaches outreach
@@ -422,7 +424,7 @@ impl TaskPersistence for PostgresPersistence {
         .bind(channel_id)
         .bind(thread_id)
         .bind(sender.trim())
-        .bind(references)
+        .bind(&reference_strs)
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -431,7 +433,7 @@ impl TaskPersistence for PostgresPersistence {
             row.map(|(outreach_id, task_id, target_email)| OutreachReplyMatch {
                 outreach_id,
                 task_id,
-                target_email,
+                target_email: target_email.into(),
             }),
         )
     }
@@ -459,7 +461,7 @@ impl TaskPersistence for PostgresPersistence {
                WHERE outreach_id = $1 AND email = $2 AND responded_at IS NULL"#,
         )
         .bind(matched.outreach_id)
-        .bind(&matched.target_email)
+        .bind(matched.target_email.as_str())
         .bind(response_message_id)
         .execute(&mut *tx)
         .await
@@ -1428,8 +1430,9 @@ mod tests {
         )
         .await
         .unwrap();
+        let email_addr = crate::entities::value_objects::EmailAddress::from(email.clone());
         let thread = persistence
-            .create_thread(channel.id, "Queue", std::slice::from_ref(&email))
+            .create_thread(channel.id, "Queue", std::slice::from_ref(&email_addr))
             .await
             .unwrap();
         let task = persistence
@@ -1505,11 +1508,12 @@ mod tests {
         )
         .await
         .unwrap();
+        let owner_email_addr = crate::entities::value_objects::EmailAddress::from(owner_email.clone());
         let thread = persistence
             .create_thread(
                 channel.id,
                 "Need response",
-                std::slice::from_ref(&owner_email),
+                std::slice::from_ref(&owner_email_addr),
             )
             .await
             .unwrap();
@@ -1610,7 +1614,7 @@ mod tests {
                 in_reply_to: Some(outbound_message_id.into()),
                 references_list: vec![outbound_message_id.into()],
                 sender: target_email.into(),
-                recipients_to: vec![owner_email.clone()],
+                recipients_to: vec![owner_email.clone().into()],
                 recipients_cc: Vec::new(),
                 subject: "Re: Question".into(),
                 clean_text_body: "Confirmed".into(),

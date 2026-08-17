@@ -6,7 +6,11 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::{channel::Channel, company::Company},
+    entities::{
+        channel::Channel,
+        company::Company,
+        value_objects::{ChannelSlug, CompanySlug},
+    },
     infra::config::AppConfig,
     use_cases::company::CompanyPersistence,
 };
@@ -31,8 +35,8 @@ pub trait ChannelPersistence: Send + Sync {
 
     async fn get_by_company_slug_and_channel_slug(
         &self,
-        company_slug: &str,
-        channel_slug: &str,
+        company_slug: &CompanySlug,
+        channel_slug: &ChannelSlug,
     ) -> AppResult<Option<Channel>>;
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>>;
@@ -412,8 +416,8 @@ pub struct InboundEmail {
 pub struct InboundEmailResult {
     pub resolved: bool,
     pub sender_authorized: bool,
-    pub company_slug: Option<String>,
-    pub channel_slug: Option<String>,
+    pub company_slug: Option<CompanySlug>,
+    pub channel_slug: Option<ChannelSlug>,
     pub company: Option<Company>,
     pub channel: Option<Channel>,
     pub email: InboundEmail,
@@ -498,7 +502,7 @@ pub fn strip_context_suffix_from_slug(raw_slug: &str) -> (String, bool) {
 pub fn parse_recipient_address_pipeline(
     to_str: &str,
     app_domain_name: &str,
-) -> Option<(String, Vec<String>, bool)> {
+) -> Option<(CompanySlug, Vec<ChannelSlug>, bool)> {
     let email_addr = if let (Some(start), Some(end)) = (to_str.find('<'), to_str.rfind('>')) {
         if start < end {
             &to_str[start + 1..end]
@@ -536,7 +540,7 @@ pub fn parse_recipient_address_pipeline(
     }
 
     let mut is_context_only = false;
-    let mut channel_slugs = Vec::new();
+    let mut channel_slugs: Vec<String> = Vec::new();
 
     for part in channel_part.split('+') {
         let (clean_slug, is_context) = strip_context_suffix_from_slug(part);
@@ -552,10 +556,17 @@ pub fn parse_recipient_address_pipeline(
         return None;
     }
 
-    Some((company_slug.to_string(), channel_slugs, is_context_only))
+    Some((
+        CompanySlug::new(company_slug),
+        channel_slugs.into_iter().map(ChannelSlug::new).collect(),
+        is_context_only,
+    ))
 }
 
-pub fn parse_recipient_address(to_str: &str, app_domain_name: &str) -> Option<(String, String)> {
+pub fn parse_recipient_address(
+    to_str: &str,
+    app_domain_name: &str,
+) -> Option<(CompanySlug, ChannelSlug)> {
     parse_recipient_address_pipeline(to_str, app_domain_name)
         .map(|(company, channels, _)| (company, channels[0].clone()))
 }
@@ -591,9 +602,9 @@ pub fn levenshtein_distance(a: &str, b: &str) -> usize {
     dp[m][n]
 }
 
-pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<String> {
+pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<ChannelSlug> {
     let target_clean = target.trim().to_lowercase();
-    let mut matches: Vec<(usize, String)> = Vec::new();
+    let mut matches: Vec<(usize, ChannelSlug)> = Vec::new();
 
     for ch in available {
         let dist = levenshtein_distance(&target_clean, &ch.slug.to_lowercase());
@@ -611,6 +622,7 @@ pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<St
 mod tests {
     use super::*;
     use crate::entities::company::Company;
+    use crate::entities::value_objects::EmailAddress;
     use chrono::Utc;
     use serde_json::json;
     use std::sync::Mutex;
@@ -706,11 +718,12 @@ mod tests {
                 id: Uuid::new_v4(),
                 company_id,
                 name: name.to_string(),
-                slug: slug.to_string(),
+                slug: slug.into(),
                 api_key: api_key.map(|s| s.to_string()),
                 provider: provider.map(|s| s.to_string()),
                 model: model.map(|s| s.to_string()),
-                participant_emails,
+                participant_emails: participant_emails
+                    .map(|emails| emails.into_iter().map(EmailAddress::from).collect()),
                 agent_ids,
                 channel_config,
                 created_at: Utc::now().naive_utc(),
@@ -731,8 +744,8 @@ mod tests {
 
         async fn get_by_company_slug_and_channel_slug(
             &self,
-            _company_slug: &str,
-            channel_slug: &str,
+            _company_slug: &CompanySlug,
+            channel_slug: &ChannelSlug,
         ) -> AppResult<Option<Channel>> {
             Ok(self
                 .channels
@@ -773,11 +786,12 @@ mod tests {
                 .ok_or_else(|| AppError::Internal("Not found".into()))?;
 
             channel.name = name.to_string();
-            channel.slug = slug.to_string();
+            channel.slug = slug.into();
             channel.api_key = api_key.map(|s| s.to_string());
             channel.provider = provider.map(|s| s.to_string());
             channel.model = model.map(|s| s.to_string());
-            channel.participant_emails = participant_emails;
+            channel.participant_emails = participant_emails
+                .map(|emails| emails.into_iter().map(EmailAddress::from).collect());
             channel.agent_ids = agent_ids;
             channel.channel_config = channel_config;
             Ok(channel.clone())
@@ -826,7 +840,7 @@ mod tests {
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -875,7 +889,10 @@ mod tests {
         assert_eq!(channel.api_key.as_deref(), Some("key_123"));
         assert_eq!(channel.provider.as_deref(), Some("openai"));
         assert_eq!(channel.model.as_deref(), Some("gpt-4o"));
-        assert_eq!(channel.participant_emails, Some(emails));
+        assert_eq!(
+            channel.participant_emails,
+            Some(emails.into_iter().map(EmailAddress::from).collect::<Vec<_>>())
+        );
         assert_eq!(channel.agent_ids, Some(agent_ids));
         assert_eq!(channel.channel_config, Some(config));
 
@@ -1023,7 +1040,7 @@ mod tests {
                 id: uuid::Uuid::new_v4(),
                 company_id,
                 name: "Support".to_string(),
-                slug: "support".to_string(),
+                slug: "support".into(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1036,7 +1053,7 @@ mod tests {
                 id: uuid::Uuid::new_v4(),
                 company_id,
                 name: "Billing".to_string(),
-                slug: "billing".to_string(),
+                slug: "billing".into(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1064,7 +1081,7 @@ mod tests {
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1183,7 +1200,7 @@ mod tests {
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,

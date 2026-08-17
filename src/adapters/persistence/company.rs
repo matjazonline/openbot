@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::company::Company,
+    entities::{company::Company, value_objects::CompanySlug},
     use_cases::company::CompanyPersistence,
 };
 
@@ -29,7 +29,7 @@ impl From<CompanyDb> for Company {
             id: db.id,
             user_id: db.user_id,
             name: db.name,
-            slug: db.slug,
+            slug: CompanySlug::from(db.slug),
             api_key: db.api_key,
             provider: db.provider,
             model: db.model,

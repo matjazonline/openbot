@@ -30,13 +30,13 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
         let recipient_to = message
             .recipients_to
             .first()
-            .map(|p| p.identity.clone())
+            .map(|p| p.identity.clone().into())
             .unwrap_or_default();
 
         let recipients_cc = message
             .recipients_cc
             .iter()
-            .map(|p| p.identity.clone())
+            .map(|p| p.identity.clone().into())
             .collect();
 
         let trigger_message_id = message.in_reply_to_ref.clone().unwrap_or_default();
@@ -44,8 +44,8 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
         let outbound = OutboundEmail {
             channel_id: message.channel_id,
             channel_name: "Channel".to_string(),
-            channel_slug: "channel".to_string(),
-            company_slug: "company".to_string(),
+            channel_slug: "channel".into(),
+            company_slug: "company".into(),
             trigger_message_id,
             thread_references: message.references.clone(),
             recipient_to,

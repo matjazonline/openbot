@@ -21,6 +21,7 @@ use crate::{
         outreach::OutreachReplyMatch,
         task::TokenUsage,
         thread::Thread,
+        value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
     },
     infra::config::AppConfig,
     services::{
@@ -56,7 +57,7 @@ pub trait ThreadPersistence: Send + Sync {
         &self,
         channel_id: Uuid,
         subject: &str,
-        participant_emails: &[String],
+        participant_emails: &[EmailAddress],
     ) -> AppResult<Thread>;
 
     async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>>;
@@ -71,19 +72,19 @@ pub trait ThreadPersistence: Send + Sync {
     async fn update_thread_participants(
         &self,
         id: Uuid,
-        participant_emails: &[String],
+        participant_emails: &[EmailAddress],
     ) -> AppResult<Thread>;
 
     async fn find_thread_by_message_ids(
         &self,
         channel_id: Uuid,
-        message_ids: &[String],
+        message_ids: &[MessageId],
     ) -> AppResult<Option<Thread>>;
 
     async fn find_thread_by_thread_index(
         &self,
         channel_id: Uuid,
-        thread_index_prefix: &str,
+        thread_index_prefix: &ThreadIndex,
     ) -> AppResult<Option<Thread>>;
 
     async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize>;
@@ -93,13 +94,13 @@ pub trait ThreadPersistence: Send + Sync {
     async fn get_message_by_message_id(
         &self,
         company_id: Uuid,
-        message_id: &str,
+        message_id: &MessageId,
     ) -> AppResult<Option<Message>>;
 
     async fn find_outbound_reply(
         &self,
         thread_id: Uuid,
-        in_reply_to: &str,
+        in_reply_to: &MessageId,
     ) -> AppResult<Option<Message>>;
 
     async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>>;
@@ -295,15 +296,17 @@ impl ThreadUseCases {
             thread_ref: Some(sent.in_reply_to.clone()),
             references: sent.references.clone(),
             thread_index: None,
-            sender: ParticipantIdentity::email(&sent.from_address),
+            sender: ParticipantIdentity::email(sent.from_address.clone()),
             recipients_to: sent
                 .recipients_to
                 .iter()
+                .cloned()
                 .map(ParticipantIdentity::email)
                 .collect(),
             recipients_cc: sent
                 .recipients_cc
                 .iter()
+                .cloned()
                 .map(ParticipantIdentity::email)
                 .collect(),
             subject: sent.subject.clone(),
@@ -349,12 +352,12 @@ impl ThreadUseCases {
             .create_message(&Message {
                 id: Uuid::new_v4(),
                 thread_id,
-                message_id: sent.outbound_message_id.clone(),
-                in_reply_to: Some(sent.in_reply_to.clone()),
-                references_list: sent.references.clone(),
-                sender: sent.from_address.clone(),
-                recipients_to: sent.recipients_to.clone(),
-                recipients_cc: sent.recipients_cc.clone(),
+                message_id: MessageId::from(sent.outbound_message_id.clone()),
+                in_reply_to: Some(MessageId::from(sent.in_reply_to.clone())),
+                references_list: sent.references.iter().cloned().map(MessageId::from).collect(),
+                sender: EmailAddress::from(sent.from_address.clone()),
+                recipients_to: sent.recipients_to.iter().cloned().map(EmailAddress::from).collect(),
+                recipients_cc: sent.recipients_cc.iter().cloned().map(EmailAddress::from).collect(),
                 subject: sent.subject.clone(),
                 clean_text_body: sent.body_text.clone(),
                 raw_text_body: None,
@@ -392,10 +395,15 @@ impl ThreadUseCases {
         internal_source: Option<InternalChannelSource>,
     ) -> AppResult<InboundIngestResult> {
         let mut parsed = ParsedEmail {
-            message_id: norm.message_id.clone(),
-            in_reply_to: norm.thread_ref.clone(),
-            references: norm.references.clone(),
-            thread_index: norm.thread_index.clone(),
+            message_id: norm.message_id.clone().into_string(),
+            in_reply_to: norm.thread_ref.clone().map(MessageId::into_string),
+            references: norm
+                .references
+                .iter()
+                .cloned()
+                .map(MessageId::into_string)
+                .collect(),
+            thread_index: norm.thread_index.clone().map(ThreadIndex::into_string),
             sender: norm.sender.identity.clone(),
             recipients_to: norm
                 .recipients_to
@@ -501,7 +509,7 @@ impl ThreadUseCases {
 
         let mut invalid_slugs = Vec::new();
         let mut bounce_suggestions = Vec::new();
-        let mut matched_company_slug: Option<String> = None;
+        let mut matched_company_slug: Option<CompanySlug> = None;
         let mut is_address_context_only = false;
         let mut matched_outreach_by_channel: HashMap<Uuid, OutreachReplyMatch> = HashMap::new();
 
@@ -562,11 +570,13 @@ impl ThreadUseCases {
                             // A channel may appear again only when this is the correlated
                             // response to an outreach that is already waiting in that thread.
                             if is_inter_channel && parsed.trace_channels.contains(&channel.id) {
-                                let mut reply_references = Vec::new();
+                                let mut reply_references: Vec<MessageId> = Vec::new();
                                 if let Some(ref reply_id) = parsed.in_reply_to {
-                                    reply_references.push(reply_id.clone());
+                                    reply_references.push(MessageId::from(reply_id.clone()));
                                 }
-                                reply_references.extend(parsed.references.clone());
+                                reply_references.extend(
+                                    parsed.references.iter().cloned().map(MessageId::from),
+                                );
                                 let existing_thread = if reply_references.is_empty() {
                                     None
                                 } else {
@@ -638,11 +648,12 @@ impl ThreadUseCases {
 
                             let mut is_thread_authorized = false;
                             if !is_authorized && !is_inter_channel {
-                                let mut lookup_ids = Vec::new();
+                                let mut lookup_ids: Vec<MessageId> = Vec::new();
                                 if let Some(ref reply_id) = parsed.in_reply_to {
-                                    lookup_ids.push(reply_id.clone());
+                                    lookup_ids.push(MessageId::from(reply_id.clone()));
                                 }
-                                lookup_ids.extend(parsed.references.clone());
+                                lookup_ids
+                                    .extend(parsed.references.iter().cloned().map(MessageId::from));
 
                                 let mut ext_t = if !lookup_ids.is_empty() {
                                     self.thread_persistence
@@ -658,7 +669,10 @@ impl ThreadUseCases {
                                     if let Some(ref idx) = parsed.thread_index {
                                         ext_t = self
                                             .thread_persistence
-                                            .find_thread_by_thread_index(channel.id, idx)
+                                            .find_thread_by_thread_index(
+                                                channel.id,
+                                                &ThreadIndex::from(idx.clone()),
+                                            )
                                             .await
                                             .ok()
                                             .flatten();
@@ -741,7 +755,7 @@ impl ThreadUseCases {
         // Strict pipeline & address validation: If any invalid channel slug was encountered
         if !invalid_slugs.is_empty() {
             let bounce = BounceInfo {
-                recipient_to: parsed.sender.clone(),
+                recipient_to: EmailAddress::from(parsed.sender.clone()),
                 company_slug: matched_company_slug,
                 invalid_slugs,
                 suggestions: bounce_suggestions,
@@ -796,11 +810,11 @@ impl ThreadUseCases {
 
         for (company, channel, role, step_idx, total_steps) in candidate_matches {
             // Thread Resolution
-            let mut lookup_ids = vec![parsed.message_id.clone()];
+            let mut lookup_ids = vec![MessageId::from(parsed.message_id.clone())];
             if let Some(ref reply_id) = parsed.in_reply_to {
-                lookup_ids.push(reply_id.clone());
+                lookup_ids.push(MessageId::from(reply_id.clone()));
             }
-            lookup_ids.extend(parsed.references.clone());
+            lookup_ids.extend(parsed.references.iter().cloned().map(MessageId::from));
 
             let mut existing_thread = self
                 .thread_persistence
@@ -811,7 +825,7 @@ impl ThreadUseCases {
                 if let Some(ref idx) = parsed.thread_index {
                     existing_thread = self
                         .thread_persistence
-                        .find_thread_by_thread_index(channel.id, idx)
+                        .find_thread_by_thread_index(channel.id, &ThreadIndex::from(idx.clone()))
                         .await?;
                 }
             }
@@ -827,11 +841,13 @@ impl ThreadUseCases {
                     if !is_thread_participant
                         && !matched_outreach_by_channel.contains_key(&channel.id)
                     {
-                        let mut reply_references = Vec::new();
+                        let mut reply_references: Vec<MessageId> = Vec::new();
                         if let Some(ref reply_id) = parsed.in_reply_to {
-                            reply_references.push(reply_id.clone());
+                            reply_references.push(MessageId::from(reply_id.clone()));
                         }
-                        reply_references.extend(parsed.references.clone());
+                        reply_references.extend(
+                            parsed.references.iter().cloned().map(MessageId::from),
+                        );
                         if let Some(matched) = self
                             .task_persistence
                             .find_correlated_outreach_reply(
@@ -855,12 +871,12 @@ impl ThreadUseCases {
                         );
 
                         let bounce = BounceInfo {
-                            recipient_to: parsed.sender.clone(),
+                            recipient_to: EmailAddress::from(parsed.sender.clone()),
                             company_slug: Some(company.slug.clone()),
-                            invalid_slugs: vec![format!(
+                            invalid_slugs: vec![ChannelSlug::from(format!(
                                 "Thread {} (Unauthorized Sender: {})",
                                 ext_t.id, sender_clean
-                            )],
+                            ))],
                             suggestions: vec![],
                             original_subject: parsed.subject.clone(),
                         };
@@ -941,9 +957,9 @@ impl ThreadUseCases {
 
                     if !third_party_recipients
                         .iter()
-                        .any(|r: &String| r.eq_ignore_ascii_case(addr_clean))
+                        .any(|r: &EmailAddress| r.eq_ignore_ascii_case(addr_clean))
                     {
-                        third_party_recipients.push(addr_clean.to_string());
+                        third_party_recipients.push(EmailAddress::from(addr_clean.to_string()));
                     }
                 }
             }
@@ -951,7 +967,7 @@ impl ThreadUseCases {
             let thread = match existing_thread {
                 Some(t) if t.channel_id == channel.id => t,
                 _ => {
-                    let mut participants = vec![parsed.sender.clone()];
+                    let mut participants = vec![EmailAddress::from(parsed.sender.clone())];
                     for tp in &third_party_recipients {
                         if !participants.iter().any(|p| p.eq_ignore_ascii_case(tp)) {
                             participants.push(tp.clone());
@@ -985,7 +1001,7 @@ impl ThreadUseCases {
                     .iter()
                     .any(|p| p.eq_ignore_ascii_case(&parsed.sender))
             {
-                current_participants.push(parsed.sender.clone());
+                current_participants.push(EmailAddress::from(parsed.sender.clone()));
                 participant_added = true;
             }
             if is_trusted_participant {
@@ -1065,12 +1081,27 @@ impl ThreadUseCases {
             let inbound_message = Message {
                 id: inbound_msg_id,
                 thread_id: thread.id,
-                message_id: parsed.message_id.clone(),
-                in_reply_to: parsed.in_reply_to.clone(),
-                references_list: parsed.references.clone(),
-                sender: parsed.sender.clone(),
-                recipients_to: parsed.recipients_to.clone(),
-                recipients_cc: parsed.recipients_cc.clone(),
+                message_id: MessageId::from(parsed.message_id.clone()),
+                in_reply_to: parsed.in_reply_to.clone().map(MessageId::from),
+                references_list: parsed
+                    .references
+                    .iter()
+                    .cloned()
+                    .map(MessageId::from)
+                    .collect(),
+                sender: EmailAddress::from(parsed.sender.clone()),
+                recipients_to: parsed
+                    .recipients_to
+                    .iter()
+                    .cloned()
+                    .map(EmailAddress::from)
+                    .collect(),
+                recipients_cc: parsed
+                    .recipients_cc
+                    .iter()
+                    .cloned()
+                    .map(EmailAddress::from)
+                    .collect(),
                 subject: parsed.subject.clone(),
                 clean_text_body,
                 raw_text_body: parsed.raw_text_body.clone(),
@@ -1082,7 +1113,7 @@ impl ThreadUseCases {
                 },
                 direction: MessageDirection::Inbound,
                 role: inbound_role,
-                thread_index: parsed.thread_index.clone(),
+                thread_index: parsed.thread_index.clone().map(ThreadIndex::from),
                 created_at: chrono::Utc::now().naive_utc(),
             };
 
@@ -1292,7 +1323,7 @@ impl ThreadUseCases {
                         .find(|email| !email.eq_ignore_ascii_case("@public"))
                         .cloned()
                 })
-                .or(team_approver)
+                .or(team_approver.map(EmailAddress::from))
                 .unwrap_or_default();
 
             let approval_ctx = AgentRunnerApprovalContext {
@@ -1417,8 +1448,11 @@ impl ThreadUseCases {
                                 channel_name: m.channel.name.clone(),
                                 channel_slug: m.channel.slug.clone(),
                                 company_slug: m.company.slug.clone(),
-                                trigger_message_id: parsed.message_id.clone(),
-                                thread_references,
+                                trigger_message_id: parsed.message_id.clone().into(),
+                                thread_references: thread_references
+                                    .into_iter()
+                                    .map(MessageId::from)
+                                    .collect(),
                                 hop_count: parsed.hop_count,
                                 trace_channels: parsed.trace_channels.clone(),
                                 app_domain_name: self.config.app_domain_name.clone(),
@@ -1523,15 +1557,19 @@ impl ThreadUseCases {
                             .iter()
                             .any(|recipient| recipient.eq_ignore_ascii_case(p))
                     {
-                        outbound_cc.push(p.clone());
+                        outbound_cc.push(p.to_string());
                     }
                 }
             }
 
             let norm_outbound = NormalizedOutboundMessage {
                 thread_id: matches[0].thread.id,
-                in_reply_to_ref: Some(parsed.message_id.clone()),
-                references: references_for_outbound.clone(),
+                in_reply_to_ref: Some(MessageId::from(parsed.message_id.clone())),
+                references: references_for_outbound
+                    .iter()
+                    .cloned()
+                    .map(MessageId::from)
+                    .collect(),
                 recipients_to: vec![ParticipantIdentity::email(&parsed.sender)],
                 recipients_cc: outbound_cc.iter().map(ParticipantIdentity::email).collect(),
                 subject: parsed.subject.clone(),
@@ -1548,10 +1586,13 @@ impl ThreadUseCases {
                 channel_name: primary_channel.name.clone(),
                 channel_slug: primary_channel.slug.clone(),
                 company_slug: primary_company.slug.clone(),
-                trigger_message_id: parsed.message_id.clone(),
-                thread_references: references_for_outbound,
-                recipient_to: parsed.sender.clone(),
-                recipients_cc: outbound_cc,
+                trigger_message_id: parsed.message_id.clone().into(),
+                thread_references: references_for_outbound
+                    .into_iter()
+                    .map(MessageId::from)
+                    .collect(),
+                recipient_to: parsed.sender.clone().into(),
+                recipients_cc: outbound_cc.into_iter().map(EmailAddress::from).collect(),
                 subject: parsed.subject.clone(),
                 body_text: combined_agent_response.clone(),
                 hop_count: parsed.hop_count,
@@ -1607,12 +1648,24 @@ impl ThreadUseCases {
                 let _ = adapter; // Registered egress adapter present
             }
             (
-                sent_result.outbound_message_id,
-                sent_result.in_reply_to,
-                sent_result.references,
-                sent_result.from_address,
-                sent_result.recipients_to,
-                sent_result.recipients_cc,
+                sent_result.outbound_message_id.into_string(),
+                sent_result.in_reply_to.into_string(),
+                sent_result
+                    .references
+                    .into_iter()
+                    .map(MessageId::into_string)
+                    .collect(),
+                sent_result.from_address.into_string(),
+                sent_result
+                    .recipients_to
+                    .into_iter()
+                    .map(EmailAddress::into_string)
+                    .collect(),
+                sent_result
+                    .recipients_cc
+                    .into_iter()
+                    .map(EmailAddress::into_string)
+                    .collect(),
                 sent_result.subject,
                 true,
             )
@@ -1652,12 +1705,12 @@ impl ThreadUseCases {
             let outbound_message = Message {
                 id: outbound_msg_id,
                 thread_id: m.thread.id,
-                message_id: sent_message_id.clone(),
-                in_reply_to: Some(in_reply_to.clone()),
-                references_list: references.clone(),
-                sender: from_address.clone(),
-                recipients_to: recipients_to.clone(),
-                recipients_cc: recipients_cc.clone(),
+                message_id: MessageId::from(sent_message_id.clone()),
+                in_reply_to: Some(MessageId::from(in_reply_to.clone())),
+                references_list: references.iter().cloned().map(MessageId::from).collect(),
+                sender: EmailAddress::from(from_address.clone()),
+                recipients_to: recipients_to.iter().cloned().map(EmailAddress::from).collect(),
+                recipients_cc: recipients_cc.iter().cloned().map(EmailAddress::from).collect(),
                 subject: subject.clone(),
                 clean_text_body: combined_agent_response.clone(),
                 raw_text_body: None,
@@ -1831,7 +1884,7 @@ impl ThreadUseCases {
         let inbound_message_id = ingest
             .inbound_message
             .as_ref()
-            .map(|m| m.message_id.clone());
+            .map(|m| m.message_id.to_string());
 
         let agent_res = self.execute_agent_and_dispatch(&ingest, true).await?;
         let outbound_msg_id = agent_res.and_then(|r| r.outbound_message_id);
@@ -1869,7 +1922,7 @@ impl ThreadUseCases {
     pub async fn find_outbound_reply(
         &self,
         thread_id: Uuid,
-        in_reply_to: &str,
+        in_reply_to: &MessageId,
     ) -> AppResult<Option<Message>> {
         self.thread_persistence
             .find_outbound_reply(thread_id, in_reply_to)
@@ -2077,15 +2130,15 @@ fn scrub_json_secrets(value: Option<&mut serde_json::Value>) {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BounceSuggestion {
-    pub invalid_slug: String,
-    pub suggestions: Vec<String>,
+    pub invalid_slug: ChannelSlug,
+    pub suggestions: Vec<ChannelSlug>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BounceInfo {
-    pub recipient_to: String,
-    pub company_slug: Option<String>,
-    pub invalid_slugs: Vec<String>,
+    pub recipient_to: EmailAddress,
+    pub company_slug: Option<CompanySlug>,
+    pub invalid_slugs: Vec<ChannelSlug>,
     pub suggestions: Vec<BounceSuggestion>,
     pub original_subject: String,
 }
@@ -2374,15 +2427,15 @@ mod tests {
         }
         async fn get_by_company_slug_and_channel_slug(
             &self,
-            _company_slug: &str,
-            channel_slug: &str,
+            _company_slug: &CompanySlug,
+            channel_slug: &ChannelSlug,
         ) -> AppResult<Option<Channel>> {
             Ok(self
                 .channels
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|w| w.slug == channel_slug)
+                .find(|w| &w.slug == channel_slug)
                 .cloned())
         }
         async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
@@ -2425,7 +2478,7 @@ mod tests {
             &self,
             channel_id: Uuid,
             subject: &str,
-            participant_emails: &[String],
+            participant_emails: &[EmailAddress],
         ) -> AppResult<Thread> {
             let thread = Thread {
                 id: Uuid::new_v4(),
@@ -2474,7 +2527,7 @@ mod tests {
         async fn update_thread_participants(
             &self,
             id: Uuid,
-            participant_emails: &[String],
+            participant_emails: &[EmailAddress],
         ) -> AppResult<Thread> {
             let mut list = self.threads.lock().unwrap();
             let thread = list.iter_mut().find(|t| t.id == id).unwrap();
@@ -2485,7 +2538,7 @@ mod tests {
         async fn find_thread_by_message_ids(
             &self,
             channel_id: Uuid,
-            message_ids: &[String],
+            message_ids: &[MessageId],
         ) -> AppResult<Option<Thread>> {
             let thread_id = {
                 let msgs = self.messages.lock().unwrap();
@@ -2505,7 +2558,7 @@ mod tests {
         async fn find_thread_by_thread_index(
             &self,
             channel_id: Uuid,
-            thread_index_prefix: &str,
+            thread_index_prefix: &ThreadIndex,
         ) -> AppResult<Option<Thread>> {
             let thread_id = {
                 let msgs = self.messages.lock().unwrap();
@@ -2514,7 +2567,7 @@ mod tests {
                         m.thread_index
                             .as_deref()
                             .unwrap_or_default()
-                            .starts_with(thread_index_prefix)
+                            .starts_with(thread_index_prefix.as_str())
                     })
                     .map(|m| m.thread_id)
             };
@@ -2544,21 +2597,21 @@ mod tests {
         async fn get_message_by_message_id(
             &self,
             _company_id: Uuid,
-            message_id: &str,
+            message_id: &MessageId,
         ) -> AppResult<Option<Message>> {
             Ok(self
                 .messages
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|m| m.message_id == message_id)
+                .find(|m| &m.message_id == message_id)
                 .cloned())
         }
 
         async fn find_outbound_reply(
             &self,
             thread_id: Uuid,
-            in_reply_to: &str,
+            in_reply_to: &MessageId,
         ) -> AppResult<Option<Message>> {
             Ok(self
                 .messages
@@ -2568,7 +2621,7 @@ mod tests {
                 .find(|message| {
                     message.thread_id == thread_id
                         && message.direction == MessageDirection::Outbound
-                        && message.in_reply_to.as_deref() == Some(in_reply_to)
+                        && message.in_reply_to.as_ref() == Some(in_reply_to)
                 })
                 .cloned())
         }
@@ -2597,7 +2650,7 @@ mod tests {
             channel_id: Uuid,
             thread_id: Uuid,
             sender: &str,
-            references: &[String],
+            references: &[MessageId],
         ) -> AppResult<Option<crate::entities::outreach::OutreachReplyMatch>> {
             let tasks = self.tasks.lock().unwrap();
             Ok(tasks.iter().find_map(|task| {
@@ -2616,7 +2669,7 @@ mod tests {
                         .and_then(|value| Uuid::parse_str(value).ok())
                         .unwrap(),
                     task_id: task.id,
-                    target_email: target.to_string(),
+                    target_email: target.into(),
                 })
             }))
         }
@@ -2909,7 +2962,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -2923,7 +2976,7 @@ mod tests {
                     id: channel_id,
                     company_id,
                     name: "Inbound Flow".to_string(),
-                    slug: "inbound".to_string(),
+                    slug: "inbound".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -2936,7 +2989,7 @@ mod tests {
                     id: source_channel_id,
                     company_id,
                     name: "Source Flow".to_string(),
-                    slug: "source".to_string(),
+                    slug: "source".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -2995,11 +3048,11 @@ mod tests {
                 OutboundEmail {
                     channel_id: source_channel_id,
                     channel_name: "Source Flow".to_string(),
-                    channel_slug: "source".to_string(),
-                    company_slug: "acme".to_string(),
-                    trigger_message_id: "<source@example.com>".to_string(),
+                    channel_slug: "source".into(),
+                    company_slug: "acme".into(),
+                    trigger_message_id: "<source@example.com>".into(),
                     thread_references: Vec::new(),
-                    recipient_to: "inbound@acme.mailagents.com".to_string(),
+                    recipient_to: "inbound@acme.mailagents.com".into(),
                     recipients_cc: Vec::new(),
                     subject: "Test Inter Channel".to_string(),
                     body_text: "Hello".to_string(),
@@ -3031,7 +3084,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -3044,11 +3097,11 @@ mod tests {
                 id: channel_id,
                 company_id,
                 name: "Inbound Flow".to_string(),
-                slug: "inbound".to_string(),
+                slug: "inbound".into(),
                 api_key: None,
                 provider: None,
                 model: None,
-                participant_emails: Some(vec!["@public".to_string()]),
+                participant_emails: Some(vec!["@public".into()]),
                 agent_ids: None,
                 channel_config: None,
                 created_at: Utc::now().naive_utc(),
@@ -3124,7 +3177,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -3137,11 +3190,11 @@ mod tests {
                 id: channel_id,
                 company_id,
                 name: "Inbound Flow".to_string(),
-                slug: "inbound".to_string(),
+                slug: "inbound".into(),
                 api_key: None,
                 provider: None,
                 model: None,
-                participant_emails: Some(vec!["@public".to_string()]),
+                participant_emails: Some(vec!["@public".into()]),
                 agent_ids: None,
                 channel_config: None,
                 created_at: Utc::now().naive_utc(),
@@ -3219,7 +3272,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -3232,7 +3285,7 @@ mod tests {
                 id: channel_id,
                 company_id,
                 name: "Inbound Flow".to_string(),
-                slug: "inbound".to_string(),
+                slug: "inbound".into(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -3314,7 +3367,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -3327,11 +3380,11 @@ mod tests {
                 id: channel_id,
                 company_id,
                 name: "Restricted Flow".to_string(),
-                slug: "restricted".to_string(),
+                slug: "restricted".into(),
                 api_key: None,
                 provider: None,
                 model: None,
-                participant_emails: Some(vec!["alice@example.com".to_string()]),
+                participant_emails: Some(vec!["alice@example.com".into()]),
                 agent_ids: None,
                 channel_config: None,
                 created_at: Utc::now().naive_utc(),
@@ -3410,7 +3463,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -3423,11 +3476,11 @@ mod tests {
                 id: channel_id,
                 company_id,
                 name: "Restricted Flow".to_string(),
-                slug: "restricted".to_string(),
+                slug: "restricted".into(),
                 api_key: None,
                 provider: None,
                 model: None,
-                participant_emails: Some(vec!["alice@example.com".to_string()]),
+                participant_emails: Some(vec!["alice@example.com".into()]),
                 agent_ids: None,
                 channel_config: None,
                 created_at: Utc::now().naive_utc(),
@@ -3504,7 +3557,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -3517,7 +3570,7 @@ mod tests {
                 id: channel_id,
                 company_id,
                 name: "Support Flow".to_string(),
-                slug: "support".to_string(),
+                slug: "support".into(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -3599,7 +3652,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -3613,7 +3666,7 @@ mod tests {
                     id: wf1_id,
                     company_id,
                     name: "Support".to_string(),
-                    slug: "support".to_string(),
+                    slug: "support".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -3626,7 +3679,7 @@ mod tests {
                     id: wf2_id,
                     company_id,
                     name: "Billing".to_string(),
-                    slug: "billing".to_string(),
+                    slug: "billing".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -3717,7 +3770,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -3731,7 +3784,7 @@ mod tests {
                     id: wf1_id,
                     company_id,
                     name: "Support".to_string(),
-                    slug: "support".to_string(),
+                    slug: "support".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -3744,7 +3797,7 @@ mod tests {
                     id: wf2_id,
                     company_id,
                     name: "Billing".to_string(),
-                    slug: "billing".to_string(),
+                    slug: "billing".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -3757,7 +3810,7 @@ mod tests {
                     id: wf3_id,
                     company_id,
                     name: "Legal".to_string(),
-                    slug: "legal".to_string(),
+                    slug: "legal".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -3847,7 +3900,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -3861,7 +3914,7 @@ mod tests {
                     id: Uuid::new_v4(),
                     company_id,
                     name: "Support".to_string(),
-                    slug: "support".to_string(),
+                    slug: "support".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -3874,7 +3927,7 @@ mod tests {
                     id: Uuid::new_v4(),
                     company_id,
                     name: "Billing".to_string(),
-                    slug: "billing".to_string(),
+                    slug: "billing".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -3985,7 +4038,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -3998,7 +4051,7 @@ mod tests {
                 id: channel_id,
                 company_id,
                 name: "Support".to_string(),
-                slug: "support".to_string(),
+                slug: "support".into(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -4125,7 +4178,7 @@ mod tests {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -4145,7 +4198,7 @@ mod tests {
                     id: flow_team_only,
                     company_id,
                     name: "Team Only".to_string(),
-                    slug: "team-only".to_string(),
+                    slug: "team-only".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -4158,11 +4211,11 @@ mod tests {
                     id: flow_public,
                     company_id,
                     name: "Public Flow".to_string(),
-                    slug: "public-flow".to_string(),
+                    slug: "public-flow".into(),
                     api_key: None,
                     provider: None,
                     model: None,
-                    participant_emails: Some(vec!["@public".to_string()]), // Public
+                    participant_emails: Some(vec!["@public".into()]), // Public
                     agent_ids: None,
                     channel_config: None,
                     created_at: Utc::now().naive_utc(),
@@ -4171,11 +4224,11 @@ mod tests {
                     id: flow_explicit,
                     company_id,
                     name: "Explicit Flow".to_string(),
-                    slug: "explicit-flow".to_string(),
+                    slug: "explicit-flow".into(),
                     api_key: None,
                     provider: None,
                     model: None,
-                    participant_emails: Some(vec!["allowed@external.com".to_string()]), // Explicit list
+                    participant_emails: Some(vec!["allowed@external.com".into()]), // Explicit list
                     agent_ids: None,
                     channel_config: None,
                     created_at: Utc::now().naive_utc(),
@@ -4307,7 +4360,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -4320,11 +4373,11 @@ mod tests {
                 id: channel_id,
                 company_id,
                 name: "Support".to_string(),
-                slug: "support".to_string(),
+                slug: "support".into(),
                 api_key: None,
                 provider: None,
                 model: None,
-                participant_emails: Some(vec!["@public".to_string()]),
+                participant_emails: Some(vec!["@public".into()]),
                 agent_ids: None,
                 channel_config: None,
                 created_at: Utc::now().naive_utc(),
@@ -4480,7 +4533,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -4493,11 +4546,11 @@ mod tests {
                     id: channel_a_id,
                     company_id,
                     name: "Agent A".to_string(),
-                    slug: "agent-a".to_string(),
+                    slug: "agent-a".into(),
                     api_key: None,
                     provider: None,
                     model: None,
-                    participant_emails: Some(vec!["@public".to_string()]),
+                    participant_emails: Some(vec!["@public".into()]),
                     agent_ids: Some(vec![Uuid::new_v4()]),
                     channel_config: None,
                     created_at: Utc::now().naive_utc(),
@@ -4506,7 +4559,7 @@ mod tests {
                     id: channel_b_id,
                     company_id,
                     name: "Agent B".to_string(),
-                    slug: "agent-b".to_string(),
+                    slug: "agent-b".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -4550,11 +4603,11 @@ mod tests {
                 OutboundEmail {
                     channel_id: channel_a_id,
                     channel_name: "Agent A".to_string(),
-                    channel_slug: "agent-a".to_string(),
-                    company_slug: "acme".to_string(),
-                    trigger_message_id: "<human-request@example.com>".to_string(),
+                    channel_slug: "agent-a".into(),
+                    company_slug: "acme".into(),
+                    trigger_message_id: "<human-request@example.com>".into(),
                     thread_references: Vec::new(),
-                    recipient_to: "agent-b@acme.mailagents.com".to_string(),
+                    recipient_to: "agent-b@acme.mailagents.com".into(),
                     recipients_cc: Vec::new(),
                     subject: "Acquire data".to_string(),
                     body_text: "Obtain supplier data".to_string(),
@@ -4619,14 +4672,14 @@ mod tests {
                 OutboundEmail {
                     channel_id: channel_b_id,
                     channel_name: "Agent B".to_string(),
-                    channel_slug: "agent-b".to_string(),
-                    company_slug: "acme".to_string(),
+                    channel_slug: "agent-b".into(),
+                    company_slug: "acme".into(),
                     trigger_message_id: call_message_id.clone(),
                     thread_references: vec![
-                        "<human-request@example.com>".to_string(),
+                        "<human-request@example.com>".into(),
                         call_message_id.clone(),
                     ],
-                    recipient_to: "agent-a@acme.mailagents.com".to_string(),
+                    recipient_to: "agent-a@acme.mailagents.com".into(),
                     recipients_cc: Vec::new(),
                     subject: "Acquire data".to_string(),
                     body_text: "Supplier confirmed 2,000 units".to_string(),
@@ -4668,7 +4721,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -4681,7 +4734,7 @@ mod tests {
                     id: channel_a_id,
                     company_id,
                     name: "Agent A".to_string(),
-                    slug: "agent-a".to_string(),
+                    slug: "agent-a".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -4694,7 +4747,7 @@ mod tests {
                     id: channel_b_id,
                     company_id,
                     name: "Agent B".to_string(),
-                    slug: "agent-b".to_string(),
+                    slug: "agent-b".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -4725,11 +4778,11 @@ mod tests {
                 OutboundEmail {
                     channel_id: channel_b_id,
                     channel_name: "Agent B".to_string(),
-                    channel_slug: "agent-b".to_string(),
-                    company_slug: "acme".to_string(),
-                    trigger_message_id: "<unsolicited@example.com>".to_string(),
-                    thread_references: vec!["<unsolicited@example.com>".to_string()],
-                    recipient_to: "agent-a@acme.mailagents.com".to_string(),
+                    channel_slug: "agent-b".into(),
+                    company_slug: "acme".into(),
+                    trigger_message_id: "<unsolicited@example.com>".into(),
+                    thread_references: vec!["<unsolicited@example.com>".into()],
+                    recipient_to: "agent-a@acme.mailagents.com".into(),
                     recipients_cc: Vec::new(),
                     subject: "Unsolicited message".to_string(),
                     body_text: "Spontaneous message".to_string(),
@@ -4763,7 +4816,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -4776,7 +4829,7 @@ mod tests {
                     id: channel_a_id,
                     company_id,
                     name: "Agent A".to_string(),
-                    slug: "agent-a".to_string(),
+                    slug: "agent-a".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -4789,7 +4842,7 @@ mod tests {
                     id: channel_b_id,
                     company_id,
                     name: "Agent B".to_string(),
-                    slug: "agent-b".to_string(),
+                    slug: "agent-b".into(),
                     api_key: None,
                     provider: None,
                     model: None,
@@ -4820,11 +4873,11 @@ mod tests {
                 OutboundEmail {
                     channel_id: channel_a_id,
                     channel_name: "Agent A".to_string(),
-                    channel_slug: "agent-a".to_string(),
-                    company_slug: "acme".to_string(),
-                    trigger_message_id: "<msg@example.com>".to_string(),
+                    channel_slug: "agent-a".into(),
+                    company_slug: "acme".into(),
+                    trigger_message_id: "<msg@example.com>".into(),
                     thread_references: Vec::new(),
-                    recipient_to: "agent-b@acme.mailagents.com".to_string(),
+                    recipient_to: "agent-b@acme.mailagents.com".into(),
                     recipients_cc: Vec::new(),
                     subject: "Deep loop".to_string(),
                     body_text: "Exceeding max hops".to_string(),
@@ -4859,7 +4912,7 @@ mod tests {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -4874,7 +4927,7 @@ mod tests {
                 id: channel_id,
                 company_id,
                 name: "Support Channel".to_string(),
-                slug: "support".to_string(),
+                slug: "support".into(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -5067,7 +5120,7 @@ mod tests {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -5082,7 +5135,7 @@ mod tests {
                 id: channel_id,
                 company_id,
                 name: "Support Channel".to_string(),
-                slug: "support".to_string(),
+                slug: "support".into(),
                 api_key: None,
                 provider: None,
                 model: None,

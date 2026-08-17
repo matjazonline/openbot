@@ -8,7 +8,10 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::channel::Channel,
+    entities::{
+        channel::Channel,
+        value_objects::{ChannelSlug, CompanySlug, EmailAddress},
+    },
     use_cases::channel::ChannelPersistence,
 };
 
@@ -33,11 +36,13 @@ impl From<ChannelDb> for Channel {
             id: db.id,
             company_id: db.company_id,
             name: db.name,
-            slug: db.slug,
+            slug: ChannelSlug::from(db.slug),
             api_key: db.api_key,
             provider: db.provider,
             model: db.model,
-            participant_emails: db.participant_emails,
+            participant_emails: db
+                .participant_emails
+                .map(|emails| emails.into_iter().map(EmailAddress::from).collect()),
             agent_ids: db.agent_ids,
             channel_config: db.channel_config,
             created_at: db.created_at,
@@ -175,16 +180,16 @@ impl ChannelPersistence for PostgresPersistence {
 
     async fn get_by_company_slug_and_channel_slug(
         &self,
-        company_slug: &str,
-        channel_slug: &str,
+        company_slug: &CompanySlug,
+        channel_slug: &ChannelSlug,
     ) -> AppResult<Option<Channel>> {
         let query = format!(
             "{CHANNEL_SELECT} JOIN companies c ON c.id = ch.company_id \
              WHERE c.slug = $1 AND ch.slug = $2"
         );
         let db = sqlx::query_as::<_, ChannelDb>(&query)
-            .bind(company_slug)
-            .bind(channel_slug)
+            .bind(company_slug.as_str())
+            .bind(channel_slug.as_str())
             .fetch_optional(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -390,7 +395,10 @@ mod tests {
         assert_eq!(channel.api_key.as_deref(), Some("ch_key_123"));
         assert_eq!(channel.provider.as_deref(), Some("openai"));
         assert_eq!(channel.model.as_deref(), Some("gpt-4o"));
-        assert_eq!(channel.participant_emails, Some(emails));
+        assert_eq!(
+            channel.participant_emails,
+            Some(emails.into_iter().map(EmailAddress::from).collect::<Vec<_>>())
+        );
         assert_eq!(channel.agent_ids, Some(agent_ids));
         assert_eq!(channel.channel_config, Some(config));
 

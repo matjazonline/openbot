@@ -8,6 +8,7 @@ use crate::{
     entities::{
         approval::{ApprovalStatus, HumanApproval},
         message::{Message, MessageDirection, MessageRole},
+        value_objects::{ChannelSlug, CompanySlug, EmailAddress},
     },
     infra::config::AppConfig,
     services::outbound_dispatcher::OutboundEmail,
@@ -56,12 +57,12 @@ impl ApprovalUseCases {
         company_id: Uuid,
         channel_id: Uuid,
         channel_name: &str,
-        channel_slug: &str,
-        company_slug: &str,
+        channel_slug: &ChannelSlug,
+        company_slug: &CompanySlug,
         thread_id: Option<Uuid>,
         task_id: Option<Uuid>,
         step_key: &str,
-        approver_email: &str,
+        approver_email: &EmailAddress,
         action_type: &str,
         action_title: &str,
         action_summary: &str,
@@ -98,11 +99,11 @@ impl ApprovalUseCases {
         let notification = serde_json::to_value(OutboundEmail {
             channel_id,
             channel_name: channel_name.to_string(),
-            channel_slug: channel_slug.to_string(),
-            company_slug: company_slug.to_string(),
-            trigger_message_id: format!("<approval-{}@{}>", token, domain),
+            channel_slug: channel_slug.clone(),
+            company_slug: company_slug.clone(),
+            trigger_message_id: format!("<approval-{}@{}>", token, domain).into(),
             thread_references: vec![],
-            recipient_to: approver_email.to_string(),
+            recipient_to: approver_email.clone(),
             recipients_cc: vec![],
             subject: format!("[APPROVAL REQUIRED] {}", action_title),
             body_text,
@@ -255,10 +256,11 @@ impl ApprovalUseCases {
                         message_id: format!(
                             "<quorum-partial-{}@{}>",
                             approval.id, self.config.app_domain_name
-                        ),
+                        )
+                        .into(),
                         in_reply_to: None,
                         references_list: vec![],
-                        sender: approval.approver_email.clone(),
+                        sender: approval.approver_email.clone().into(),
                         recipients_to: vec![],
                         recipients_cc: vec![],
                         subject: format!("[HITL Proceed Partial]: {}", approval.action_title),
@@ -295,10 +297,11 @@ impl ApprovalUseCases {
                         message_id: format!(
                             "<quorum-extended-{}@{}>",
                             approval.id, self.config.app_domain_name
-                        ),
+                        )
+                        .into(),
                         in_reply_to: None,
                         references_list: vec![],
-                        sender: approval.approver_email.clone(),
+                        sender: approval.approver_email.clone().into(),
                         recipients_to: vec![],
                         recipients_cc: vec![],
                         subject: format!("[HITL Timeout Extended]: {}", approval.action_title),
@@ -337,10 +340,11 @@ impl ApprovalUseCases {
                             message_id: format!(
                                 "<approval-granted-{}@{}>",
                                 approval.id, self.config.app_domain_name
-                            ),
+                            )
+                            .into(),
                             in_reply_to: None,
                             references_list: vec![],
-                            sender: approval.approver_email.clone(),
+                            sender: approval.approver_email.clone().into(),
                             recipients_to: vec![],
                             recipients_cc: vec![],
                             subject: format!("[HITL Granted]: {}", approval.action_title),
@@ -380,10 +384,11 @@ impl ApprovalUseCases {
                             message_id: format!(
                                 "<approval-rejected-{}@{}>",
                                 approval.id, self.config.app_domain_name
-                            ),
+                            )
+                            .into(),
                             in_reply_to: None,
                             references_list: vec![],
-                            sender: approval.approver_email.clone(),
+                            sender: approval.approver_email.clone().into(),
                             recipients_to: vec![],
                             recipients_cc: vec![],
                             subject: format!("[HITL Rejected]: {}", approval.action_title),
@@ -653,7 +658,7 @@ mod tests {
             &self,
             _channel_id: Uuid,
             _subject: &str,
-            _participant_emails: &[String],
+            _participant_emails: &[crate::entities::value_objects::EmailAddress],
         ) -> AppResult<crate::entities::thread::Thread> {
             unimplemented!()
         }
@@ -674,21 +679,21 @@ mod tests {
         async fn update_thread_participants(
             &self,
             _id: Uuid,
-            _participant_emails: &[String],
+            _participant_emails: &[crate::entities::value_objects::EmailAddress],
         ) -> AppResult<crate::entities::thread::Thread> {
             unimplemented!()
         }
         async fn find_thread_by_message_ids(
             &self,
             _channel_id: Uuid,
-            _message_ids: &[String],
+            _message_ids: &[crate::entities::value_objects::MessageId],
         ) -> AppResult<Option<crate::entities::thread::Thread>> {
             unimplemented!()
         }
         async fn find_thread_by_thread_index(
             &self,
             _channel_id: Uuid,
-            _thread_index_prefix: &str,
+            _thread_index_prefix: &crate::entities::value_objects::ThreadIndex,
         ) -> AppResult<Option<crate::entities::thread::Thread>> {
             unimplemented!()
         }
@@ -705,14 +710,14 @@ mod tests {
         async fn get_message_by_message_id(
             &self,
             _company_id: Uuid,
-            _message_id: &str,
+            _message_id: &crate::entities::value_objects::MessageId,
         ) -> AppResult<Option<Message>> {
             unimplemented!()
         }
         async fn find_outbound_reply(
             &self,
             _thread_id: Uuid,
-            _in_reply_to: &str,
+            _in_reply_to: &crate::entities::value_objects::MessageId,
         ) -> AppResult<Option<Message>> {
             Ok(None)
         }
@@ -770,12 +775,12 @@ mod tests {
                 company_id,
                 channel_id,
                 "Support Channel",
-                "support",
-                "acme",
+                &ChannelSlug::from("support"),
+                &CompanySlug::from("acme"),
                 Some(thread_id),
                 None,
                 "step_key_hash_123",
-                "manager@acme.com",
+                &EmailAddress::from("manager@acme.com"),
                 "tool",
                 "Tool Execution: command",
                 "Execute deploy command",
@@ -791,12 +796,12 @@ mod tests {
                 company_id,
                 channel_id,
                 "Support Channel",
-                "support",
-                "acme",
+                &ChannelSlug::from("support"),
+                &CompanySlug::from("acme"),
                 Some(thread_id),
                 None,
                 "step_key_hash_123",
-                "manager@acme.com",
+                &EmailAddress::from("manager@acme.com"),
                 "tool",
                 "Tool Execution: command",
                 "Execute deploy command",
@@ -1044,12 +1049,12 @@ mod tests {
                 company_id,
                 channel_id,
                 "Support",
-                "support",
-                "acme",
+                &ChannelSlug::from("support"),
+                &CompanySlug::from("acme"),
                 Some(thread_id),
                 None,
                 "step_quorum_timeout_123",
-                "manager@acme.com",
+                &EmailAddress::from("manager@acme.com"),
                 "quorum_timeout",
                 "Partial Quorum Timeout: Action Required",
                 "Received 1/4 responses (25.0%). Required: 50.0%.",
@@ -1072,12 +1077,12 @@ mod tests {
                 company_id,
                 channel_id,
                 "Support",
-                "support",
-                "acme",
+                &ChannelSlug::from("support"),
+                &CompanySlug::from("acme"),
                 Some(thread_id),
                 None,
                 "step_quorum_timeout_456",
-                "manager@acme.com",
+                &EmailAddress::from("manager@acme.com"),
                 "quorum_timeout",
                 "Partial Quorum Timeout: Action Required",
                 "Received 1/4 responses (25.0%). Required: 50.0%.",

@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::entities::value_objects::{ChannelSlug, EmailAddress};
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum ChannelType {
@@ -58,12 +60,12 @@ pub struct Channel {
     pub id: Uuid,
     pub company_id: Uuid,
     pub name: String,
-    pub slug: String,
+    pub slug: ChannelSlug,
     #[serde(skip_serializing)]
     pub api_key: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
-    pub participant_emails: Option<Vec<String>>,
+    pub participant_emails: Option<Vec<EmailAddress>>,
     pub agent_ids: Option<Vec<Uuid>>,
     pub channel_config: Option<serde_json::Value>,
     pub created_at: chrono::NaiveDateTime,

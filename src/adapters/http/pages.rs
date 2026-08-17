@@ -2419,7 +2419,8 @@ pub fn channel_simulation_result_fragment(
         .unwrap_or_else(|| {
             result
                 .company_slug
-                .clone()
+                .as_ref()
+                .map(|s| s.to_string())
                 .unwrap_or_else(|| "N/A".to_string())
         });
 
@@ -2430,7 +2431,8 @@ pub fn channel_simulation_result_fragment(
         .unwrap_or_else(|| {
             result
                 .channel_slug
-                .clone()
+                .as_ref()
+                .map(|s| s.to_string())
                 .unwrap_or_else(|| "N/A".to_string())
         });
 
@@ -2646,7 +2648,7 @@ pub fn channel_simulation_execution_result_fragment(
     let inbound_msg_id = ingest
         .inbound_message
         .as_ref()
-        .map(|m| m.message_id.clone())
+        .map(|m| m.message_id.to_string())
         .unwrap_or_else(|| "N/A".to_string());
 
     let company_name = ingest
@@ -3018,7 +3020,7 @@ pub fn channel_simulation_execution_result_fragment(
 
     let last_msg_id = messages
         .last()
-        .map(|m| m.message_id.clone())
+        .map(|m| m.message_id.to_string())
         .or_else(|| {
             sim_res
                 .agent_execution
@@ -3029,7 +3031,7 @@ pub fn channel_simulation_execution_result_fragment(
             ingest
                 .inbound_message
                 .as_ref()
-                .map(|m| m.message_id.clone())
+                .map(|m| m.message_id.to_string())
         })
         .unwrap_or_default();
 
@@ -3167,7 +3169,7 @@ pub fn channel_simulation_loaded_thread_fragment(
                 .as_ref()
                 .and_then(|e| e.first().cloned())
         })
-        .unwrap_or_else(|| "sender@example.com".to_string());
+        .unwrap_or_else(|| crate::entities::value_objects::EmailAddress::from("sender@example.com"));
 
     let oob_form_swap = format!(
         r##"
@@ -3827,7 +3829,7 @@ pub fn find_task_for_message<'a>(
                 .and_then(|v| v.as_str())
                 .or_else(|| payload.get("outbound_message_id").and_then(|v| v.as_str()))
             {
-                if outbound_id == msg.message_id {
+                if outbound_id == msg.message_id.as_str() {
                     return Some(task);
                 }
             }
@@ -3855,7 +3857,7 @@ pub fn find_task_for_message<'a>(
                 })
                 .or_else(|| payload.get("inbound_message_id").and_then(|v| v.as_str()))
             {
-                if inbound_msg_id == msg.message_id {
+                if inbound_msg_id == msg.message_id.as_str() {
                     return Some(task);
                 }
             }
@@ -4774,10 +4776,10 @@ mod tests {
         let msg_in1 = Message {
             id: Uuid::new_v4(),
             thread_id,
-            message_id: "<in1@test.com>".to_string(),
+            message_id: "<in1@test.com>".into(),
             in_reply_to: None,
             references_list: vec![],
-            sender: "user@test.com".to_string(),
+            sender: "user@test.com".into(),
             recipients_to: vec![],
             recipients_cc: vec![],
             subject: "Hi".to_string(),
@@ -4794,10 +4796,10 @@ mod tests {
         let msg_out1 = Message {
             id: Uuid::new_v4(),
             thread_id,
-            message_id: "<out1@test.com>".to_string(),
-            in_reply_to: Some("<in1@test.com>".to_string()),
+            message_id: "<out1@test.com>".into(),
+            in_reply_to: Some("<in1@test.com>".into()),
             references_list: vec![],
-            sender: "agent@test.com".to_string(),
+            sender: "agent@test.com".into(),
             recipients_to: vec![],
             recipients_cc: vec![],
             subject: "Re: Hi".to_string(),
@@ -4814,10 +4816,10 @@ mod tests {
         let msg_in2 = Message {
             id: Uuid::new_v4(),
             thread_id,
-            message_id: "<in2@test.com>".to_string(),
-            in_reply_to: Some("<out1@test.com>".to_string()),
+            message_id: "<in2@test.com>".into(),
+            in_reply_to: Some("<out1@test.com>".into()),
             references_list: vec![],
-            sender: "user@test.com".to_string(),
+            sender: "user@test.com".into(),
             recipients_to: vec![],
             recipients_cc: vec![],
             subject: "Re: Hi 2".to_string(),
@@ -4834,10 +4836,10 @@ mod tests {
         let msg_out2 = Message {
             id: Uuid::new_v4(),
             thread_id,
-            message_id: "<out2@test.com>".to_string(),
-            in_reply_to: Some("<in2@test.com>".to_string()),
+            message_id: "<out2@test.com>".into(),
+            in_reply_to: Some("<in2@test.com>".into()),
             references_list: vec![],
-            sender: "agent@test.com".to_string(),
+            sender: "agent@test.com".into(),
             recipients_to: vec![],
             recipients_cc: vec![],
             subject: "Re: Hi 2".to_string(),

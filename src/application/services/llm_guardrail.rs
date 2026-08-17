@@ -189,7 +189,7 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Secured Corp".to_string(),
-            slug: "secured".to_string(),
+            slug: "secured".into(),
             api_key: None,
             provider: None,
             model: None,

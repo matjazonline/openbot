@@ -245,7 +245,7 @@ mod tests {
                 id: Uuid::new_v4(),
                 user_id,
                 name: name.to_string(),
-                slug: slug.to_string(),
+                slug: slug.into(),
                 api_key: api_key.map(|s| s.to_string()),
                 provider: provider.map(|s| s.to_string()),
                 model: model.map(|s| s.to_string()),
@@ -304,7 +304,7 @@ mod tests {
                 .ok_or_else(|| AppError::Internal("Not found".into()))?;
 
             company.name = name.to_string();
-            company.slug = slug.to_string();
+            company.slug = slug.into();
             company.api_key = api_key.map(|s| s.to_string());
             company.provider = provider.map(|s| s.to_string());
             company.model = model.map(|s| s.to_string());

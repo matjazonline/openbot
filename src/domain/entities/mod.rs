@@ -10,3 +10,4 @@ pub mod outreach;
 pub mod task;
 pub mod thread;
 pub mod user;
+pub mod value_objects;

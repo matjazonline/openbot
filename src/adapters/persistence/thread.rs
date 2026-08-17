@@ -12,6 +12,7 @@ use crate::{
     entities::{
         message::{AttachmentMetadata, Message, MessageDirection, MessageRole},
         thread::Thread,
+        value_objects::{EmailAddress, MessageId, ThreadIndex},
     },
     use_cases::thread::ThreadPersistence,
 };
@@ -32,7 +33,11 @@ impl From<ThreadDb> for Thread {
             id: db.id,
             channel_id: db.channel_id,
             subject: db.subject,
-            participant_emails: db.participant_emails,
+            participant_emails: db
+                .participant_emails
+                .into_iter()
+                .map(EmailAddress::from)
+                .collect(),
             created_at: db.created_at,
             updated_at: db.updated_at,
         }
@@ -82,12 +87,12 @@ impl TryFrom<MessageDb> for Message {
         Ok(Message {
             id: db.id,
             thread_id: db.thread_id,
-            message_id: db.message_id,
-            in_reply_to: db.in_reply_to,
-            references_list: db.references_list,
-            sender: db.sender,
-            recipients_to: db.recipients_to,
-            recipients_cc: db.recipients_cc,
+            message_id: MessageId::from(db.message_id),
+            in_reply_to: db.in_reply_to.map(MessageId::from),
+            references_list: db.references_list.into_iter().map(MessageId::from).collect(),
+            sender: EmailAddress::from(db.sender),
+            recipients_to: db.recipients_to.into_iter().map(EmailAddress::from).collect(),
+            recipients_cc: db.recipients_cc.into_iter().map(EmailAddress::from).collect(),
             subject: db.subject,
             clean_text_body: db.clean_text_body,
             raw_text_body: db.raw_text_body,
@@ -95,7 +100,7 @@ impl TryFrom<MessageDb> for Message {
             attachments,
             direction,
             role,
-            thread_index: db.thread_index,
+            thread_index: db.thread_index.map(ThreadIndex::from),
             created_at: db.created_at,
         })
     }
@@ -132,7 +137,7 @@ async fn load_thread(pool: &PgPool, id: Uuid) -> AppResult<Option<Thread>> {
     Ok(db.map(Into::into))
 }
 
-fn normalized_participants(participants: &[String]) -> Vec<String> {
+fn normalized_participants(participants: &[EmailAddress]) -> Vec<String> {
     let mut seen = HashSet::new();
     participants
         .iter()
@@ -149,7 +154,7 @@ impl ThreadPersistence for PostgresPersistence {
         &self,
         channel_id: Uuid,
         subject: &str,
-        participant_emails: &[String],
+        participant_emails: &[EmailAddress],
     ) -> AppResult<Thread> {
         let id = Uuid::new_v4();
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
@@ -228,7 +233,7 @@ impl ThreadPersistence for PostgresPersistence {
     async fn update_thread_participants(
         &self,
         id: Uuid,
-        participant_emails: &[String],
+        participant_emails: &[EmailAddress],
     ) -> AppResult<Thread> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         for email in normalized_participants(participant_emails) {
@@ -262,11 +267,12 @@ impl ThreadPersistence for PostgresPersistence {
     async fn find_thread_by_message_ids(
         &self,
         channel_id: Uuid,
-        message_ids: &[String],
+        message_ids: &[MessageId],
     ) -> AppResult<Option<Thread>> {
         if message_ids.is_empty() {
             return Ok(None);
         }
+        let message_id_strs: Vec<&str> = message_ids.iter().map(MessageId::as_str).collect();
 
         let query = format!(
             r#"{THREAD_SELECT}
@@ -278,7 +284,7 @@ impl ThreadPersistence for PostgresPersistence {
         );
         let db = sqlx::query_as::<_, ThreadDb>(&query)
             .bind(channel_id)
-            .bind(message_ids)
+            .bind(&message_id_strs)
             .fetch_optional(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -288,7 +294,7 @@ impl ThreadPersistence for PostgresPersistence {
     async fn find_thread_by_thread_index(
         &self,
         channel_id: Uuid,
-        thread_index: &str,
+        thread_index: &ThreadIndex,
     ) -> AppResult<Option<Thread>> {
         let thread_index = thread_index.trim();
         if thread_index.is_empty() {
@@ -339,6 +345,14 @@ impl ThreadPersistence for PostgresPersistence {
         let content_hash = canonical_message_hash(message, attachments.as_ref());
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
 
+        let references_list: Vec<&str> = message
+            .references_list
+            .iter()
+            .map(MessageId::as_str)
+            .collect();
+        let recipients_to: Vec<&str> = message.recipients_to.iter().map(EmailAddress::as_str).collect();
+        let recipients_cc: Vec<&str> = message.recipients_cc.iter().map(EmailAddress::as_str).collect();
+
         let canonical_id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO email_messages (
                     id, company_id, message_id, content_hash, in_reply_to, references_list, sender,
@@ -354,13 +368,13 @@ impl ThreadPersistence for PostgresPersistence {
         )
         .bind(email_message_id)
         .bind(message.thread_id)
-        .bind(&message.message_id)
+        .bind(message.message_id.as_str())
         .bind(content_hash)
         .bind(message.in_reply_to.as_deref())
-        .bind(&message.references_list)
-        .bind(&message.sender)
-        .bind(&message.recipients_to)
-        .bind(&message.recipients_cc)
+        .bind(&references_list)
+        .bind(message.sender.as_str())
+        .bind(&recipients_to)
+        .bind(&recipients_cc)
         .bind(&message.subject)
         .bind(message.raw_text_body.as_deref())
         .bind(message.raw_html_body.as_deref())
@@ -413,7 +427,7 @@ impl ThreadPersistence for PostgresPersistence {
     async fn get_message_by_message_id(
         &self,
         company_id: Uuid,
-        message_id: &str,
+        message_id: &MessageId,
     ) -> AppResult<Option<Message>> {
         let query = format!(
             "{MESSAGE_SELECT} WHERE em.company_id = $1 AND em.message_id = $2 \
@@ -421,7 +435,7 @@ impl ThreadPersistence for PostgresPersistence {
         );
         let db = sqlx::query_as::<_, MessageDb>(&query)
             .bind(company_id)
-            .bind(message_id)
+            .bind(message_id.as_str())
             .fetch_optional(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -431,7 +445,7 @@ impl ThreadPersistence for PostgresPersistence {
     async fn find_outbound_reply(
         &self,
         thread_id: Uuid,
-        in_reply_to: &str,
+        in_reply_to: &MessageId,
     ) -> AppResult<Option<Message>> {
         let query = format!(
             r#"{MESSAGE_SELECT}
@@ -447,7 +461,7 @@ impl ThreadPersistence for PostgresPersistence {
         );
         let db = sqlx::query_as::<_, MessageDb>(&query)
             .bind(thread_id)
-            .bind(in_reply_to)
+            .bind(in_reply_to.as_str())
             .fetch_optional(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -559,19 +573,20 @@ mod tests {
         )
         .await
         .unwrap();
+        let email_addr = EmailAddress::from(email.clone());
         let first_thread = persistence
-            .create_thread(first_channel.id, "Subject", std::slice::from_ref(&email))
+            .create_thread(first_channel.id, "Subject", std::slice::from_ref(&email_addr))
             .await
             .unwrap();
         let second_thread = persistence
-            .create_thread(second_channel.id, "Subject", std::slice::from_ref(&email))
+            .create_thread(second_channel.id, "Subject", std::slice::from_ref(&email_addr))
             .await
             .unwrap();
         let another_first_thread = persistence
             .create_thread(
                 first_channel.id,
                 "Another subject",
-                std::slice::from_ref(&email),
+                std::slice::from_ref(&email_addr),
             )
             .await
             .unwrap();
@@ -598,10 +613,10 @@ mod tests {
         let message = Message {
             id: Uuid::new_v4(),
             thread_id: first_thread.id,
-            message_id: internet_message_id.clone(),
+            message_id: MessageId::from(internet_message_id.clone()),
             in_reply_to: None,
             references_list: vec![],
-            sender: email.clone(),
+            sender: email_addr.clone(),
             recipients_to: vec!["first@example.com".into()],
             recipients_cc: vec![],
             subject: "Subject".into(),
@@ -634,7 +649,10 @@ mod tests {
         assert_eq!(canonical_count, 1);
         assert_eq!(
             persistence
-                .find_thread_by_message_ids(first_channel.id, &[internet_message_id.clone()])
+                .find_thread_by_message_ids(
+                    first_channel.id,
+                    &[MessageId::from(internet_message_id.clone())]
+                )
                 .await
                 .unwrap()
                 .unwrap()
@@ -643,7 +661,10 @@ mod tests {
         );
         assert_eq!(
             persistence
-                .find_thread_by_message_ids(second_channel.id, &[internet_message_id])
+                .find_thread_by_message_ids(
+                    second_channel.id,
+                    &[MessageId::from(internet_message_id)]
+                )
                 .await
                 .unwrap()
                 .unwrap()
@@ -703,8 +724,9 @@ mod tests {
         )
         .await
         .unwrap();
+        let email_addr = EmailAddress::from(email.clone());
         let thread = persistence
-            .create_thread(channel.id, "Outbox Subject", std::slice::from_ref(&email))
+            .create_thread(channel.id, "Outbox Subject", std::slice::from_ref(&email_addr))
             .await
             .unwrap();
 
@@ -714,10 +736,10 @@ mod tests {
         let outreach_outbound = Message {
             id: Uuid::new_v4(),
             thread_id: thread.id,
-            message_id: outreach_msg_id.clone(),
-            in_reply_to: Some(trigger_msg_id.clone()),
+            message_id: MessageId::from(outreach_msg_id.clone()),
+            in_reply_to: Some(MessageId::from(trigger_msg_id.clone())),
             references_list: vec![],
-            sender: format!("outbox-channel-{suffix}@example.com"),
+            sender: EmailAddress::from(format!("outbox-channel-{suffix}@example.com")),
             recipients_to: vec!["target@example.com".into()],
             recipients_cc: vec![],
             subject: "Outreach".into(),
@@ -780,7 +802,7 @@ mod tests {
 
         // Verify that find_outbound_reply ignores the outreach outbound message
         let found = persistence
-            .find_outbound_reply(thread.id, &trigger_msg_id)
+            .find_outbound_reply(thread.id, &MessageId::from(trigger_msg_id))
             .await
             .unwrap();
         assert!(found.is_none());

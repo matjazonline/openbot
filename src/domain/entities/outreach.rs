@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
+use crate::entities::value_objects::EmailAddress;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum OutreachStatus {
@@ -68,7 +70,7 @@ impl OutreachProgress {
 
 #[derive(Debug, Clone)]
 pub struct OutreachTargetRequest {
-    pub email: String,
+    pub email: EmailAddress,
     pub outbox_id: Uuid,
     pub outbox_payload: serde_json::Value,
 }
@@ -91,7 +93,7 @@ pub struct CreateOutreachRequest {
 pub struct OutreachReplyMatch {
     pub outreach_id: Uuid,
     pub task_id: Uuid,
-    pub target_email: String,
+    pub target_email: EmailAddress,
 }
 
 #[derive(Debug, Clone, PartialEq)]

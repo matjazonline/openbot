@@ -476,7 +476,7 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test Company".to_string(),
-            slug: "test-company".to_string(),
+            slug: "test-company".into(),
             api_key: None,
             provider: None,
             model: None,

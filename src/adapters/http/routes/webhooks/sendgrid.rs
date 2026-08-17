@@ -289,15 +289,15 @@ mod tests {
         }
         async fn get_by_company_slug_and_channel_slug(
             &self,
-            _company_slug: &str,
-            channel_slug: &str,
+            _company_slug: &crate::entities::value_objects::CompanySlug,
+            channel_slug: &crate::entities::value_objects::ChannelSlug,
         ) -> AppResult<Option<Channel>> {
             Ok(self
                 .channels
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|w| w.slug == channel_slug)
+                .find(|w| &w.slug == channel_slug)
                 .cloned())
         }
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
@@ -384,7 +384,7 @@ mod tests {
             &self,
             channel_id: Uuid,
             subject: &str,
-            participant_emails: &[String],
+            participant_emails: &[crate::entities::value_objects::EmailAddress],
         ) -> AppResult<Thread> {
             let thread = Thread {
                 id: Uuid::new_v4(),
@@ -420,7 +420,7 @@ mod tests {
         async fn update_thread_participants(
             &self,
             id: Uuid,
-            participant_emails: &[String],
+            participant_emails: &[crate::entities::value_objects::EmailAddress],
         ) -> AppResult<Thread> {
             let mut list = self.threads.lock().unwrap();
             let thread = list.iter_mut().find(|t| t.id == id).unwrap();
@@ -431,7 +431,7 @@ mod tests {
         async fn find_thread_by_message_ids(
             &self,
             _channel_id: Uuid,
-            message_ids: &[String],
+            message_ids: &[crate::entities::value_objects::MessageId],
         ) -> AppResult<Option<Thread>> {
             let thread_id = {
                 let msgs = self.messages.lock().unwrap();
@@ -448,7 +448,7 @@ mod tests {
         async fn find_thread_by_thread_index(
             &self,
             _channel_id: Uuid,
-            thread_index_prefix: &str,
+            thread_index_prefix: &crate::entities::value_objects::ThreadIndex,
         ) -> AppResult<Option<Thread>> {
             let thread_id = {
                 let msgs = self.messages.lock().unwrap();
@@ -457,7 +457,7 @@ mod tests {
                         m.thread_index
                             .as_deref()
                             .unwrap_or_default()
-                            .starts_with(thread_index_prefix)
+                            .starts_with(thread_index_prefix.as_str())
                     })
                     .map(|m| m.thread_id)
             };
@@ -484,21 +484,21 @@ mod tests {
         async fn get_message_by_message_id(
             &self,
             _company_id: Uuid,
-            message_id: &str,
+            message_id: &crate::entities::value_objects::MessageId,
         ) -> AppResult<Option<Message>> {
             Ok(self
                 .messages
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|m| m.message_id == message_id)
+                .find(|m| &m.message_id == message_id)
                 .cloned())
         }
 
         async fn find_outbound_reply(
             &self,
             thread_id: Uuid,
-            in_reply_to: &str,
+            in_reply_to: &crate::entities::value_objects::MessageId,
         ) -> AppResult<Option<Message>> {
             Ok(self
                 .messages
@@ -508,7 +508,7 @@ mod tests {
                 .find(|message| {
                     message.thread_id == thread_id
                         && message.direction == crate::entities::message::MessageDirection::Outbound
-                        && message.in_reply_to.as_deref() == Some(in_reply_to)
+                        && message.in_reply_to.as_ref() == Some(in_reply_to)
                 })
                 .cloned())
         }
@@ -888,7 +888,7 @@ mod tests {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -902,7 +902,7 @@ mod tests {
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Inbound Flow".to_string(),
-                slug: "inbound".to_string(),
+                slug: "inbound".into(),
                 api_key: None,
                 provider: None,
                 model: None,

@@ -4,14 +4,15 @@ use uuid::Uuid;
 use crate::entities::{
     channel::{ChannelType, ParticipantIdentity},
     message::AttachmentMetadata,
+    value_objects::{MessageId, ThreadIndex},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormalizedInboundMessage {
-    pub message_id: String,
-    pub thread_ref: Option<String>,
-    pub references: Vec<String>,
-    pub thread_index: Option<String>,
+    pub message_id: MessageId,
+    pub thread_ref: Option<MessageId>,
+    pub references: Vec<MessageId>,
+    pub thread_index: Option<ThreadIndex>,
     pub sender: ParticipantIdentity,
     pub recipients_to: Vec<ParticipantIdentity>,
     pub recipients_cc: Vec<ParticipantIdentity>,
@@ -36,8 +37,8 @@ pub struct NormalizedInboundMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormalizedOutboundMessage {
     pub thread_id: Uuid,
-    pub in_reply_to_ref: Option<String>,
-    pub references: Vec<String>,
+    pub in_reply_to_ref: Option<MessageId>,
+    pub references: Vec<MessageId>,
     pub recipients_to: Vec<ParticipantIdentity>,
     pub recipients_cc: Vec<ParticipantIdentity>,
     pub subject: String,

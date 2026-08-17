@@ -543,8 +543,9 @@ mod tests {
         )
         .await
         .unwrap();
+        let email_addr = crate::entities::value_objects::EmailAddress::from(email.clone());
         let thread = persistence
-            .create_thread(channel.id, "Approval", std::slice::from_ref(&email))
+            .create_thread(channel.id, "Approval", std::slice::from_ref(&email_addr))
             .await
             .unwrap();
         let token = Uuid::new_v4().to_string();

@@ -2,6 +2,7 @@ use crate::{
     entities::{
         channel::{ChannelType, ParticipantIdentity},
         message_contract::NormalizedInboundMessage,
+        value_objects::{MessageId, ThreadIndex},
     },
     infra::config::AppConfig,
     services::email_parser::{EmailParser, RawInboundPayload},
@@ -26,10 +27,10 @@ impl EmailIngressAdapter {
             .collect();
 
         NormalizedInboundMessage {
-            message_id: parsed.message_id,
-            thread_ref: parsed.in_reply_to,
-            references: parsed.references,
-            thread_index: parsed.thread_index,
+            message_id: MessageId::from(parsed.message_id),
+            thread_ref: parsed.in_reply_to.map(MessageId::from),
+            references: parsed.references.into_iter().map(MessageId::from).collect(),
+            thread_index: parsed.thread_index.map(ThreadIndex::from),
             sender,
             recipients_to,
             recipients_cc,

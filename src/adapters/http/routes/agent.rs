@@ -691,7 +691,7 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: None,
             provider: None,
             model: None,

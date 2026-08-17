@@ -1,6 +1,9 @@
 use crate::{
     adapters::persistence::task::TaskPersistence,
-    entities::outreach::{CreateOutreachRequest, OutreachTargetRequest},
+    entities::{
+        outreach::{CreateOutreachRequest, OutreachTargetRequest},
+        value_objects::{ChannelSlug, CompanySlug, MessageId},
+    },
     services::outbound_dispatcher::OutboundEmail,
     use_cases::channel::{ChannelPersistence, parse_recipient_address_pipeline},
 };
@@ -33,10 +36,10 @@ pub struct OutreachToolContext {
     pub company_id: Uuid,
     pub channel_id: Uuid,
     pub channel_name: String,
-    pub channel_slug: String,
-    pub company_slug: String,
-    pub trigger_message_id: String,
-    pub thread_references: Vec<String>,
+    pub channel_slug: ChannelSlug,
+    pub company_slug: CompanySlug,
+    pub trigger_message_id: MessageId,
+    pub thread_references: Vec<MessageId>,
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,
     pub app_domain_name: String,
@@ -194,7 +197,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
                     company_slug: self.context.company_slug.clone(),
                     trigger_message_id: self.context.trigger_message_id.clone(),
                     thread_references: self.context.thread_references.clone(),
-                    recipient_to: email.clone(),
+                    recipient_to: email.clone().into(),
                     recipients_cc: Vec::new(),
                     subject: subject.to_string(),
                     body_text: body.to_string(),
@@ -203,7 +206,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
                 })
                 .map_err(|error| format!("Failed to serialize outreach email: {error}"))?;
                 Ok(OutreachTargetRequest {
-                    email: email.clone(),
+                    email: email.clone().into(),
                     outbox_id,
                     outbox_payload: payload,
                 })
@@ -403,13 +406,13 @@ mod tests {
 
         async fn get_by_company_slug_and_channel_slug(
             &self,
-            _company_slug: &str,
-            channel_slug: &str,
+            _company_slug: &crate::entities::value_objects::CompanySlug,
+            channel_slug: &crate::entities::value_objects::ChannelSlug,
         ) -> AppResult<Option<Channel>> {
             Ok(self
                 .channel
                 .clone()
-                .filter(|channel| channel.slug == channel_slug))
+                .filter(|channel| &channel.slug == channel_slug))
         }
 
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
@@ -441,7 +444,7 @@ mod tests {
             id,
             company_id,
             name: slug.to_string(),
-            slug: slug.to_string(),
+            slug: slug.into(),
             api_key: None,
             provider: None,
             model: None,

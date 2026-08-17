@@ -365,7 +365,7 @@ impl TaskWorker {
                         .find(|email| !email.eq_ignore_ascii_case("@public"))
                 })
                 .cloned()
-                .or(team_approver)
+                .or(team_approver.map(crate::entities::value_objects::EmailAddress::from))
                 .unwrap_or_default();
             if approver_email.is_empty() {
                 warn!("No approver configured for outreach task {}", task.id);
@@ -564,10 +564,20 @@ impl TaskWorker {
                     channel_name: channel.name.clone(),
                     channel_slug: channel.slug.clone(),
                     company_slug: company.slug.clone(),
-                    trigger_message_id: parsed.message_id.clone(),
-                    thread_references: parsed.references.clone(),
-                    recipient_to: parsed.sender.clone(),
-                    recipients_cc: parsed.recipients_cc.clone(),
+                    trigger_message_id: parsed.message_id.clone().into(),
+                    thread_references: parsed
+                        .references
+                        .iter()
+                        .cloned()
+                        .map(crate::entities::value_objects::MessageId::from)
+                        .collect(),
+                    recipient_to: parsed.sender.clone().into(),
+                    recipients_cc: parsed
+                        .recipients_cc
+                        .iter()
+                        .cloned()
+                        .map(crate::entities::value_objects::EmailAddress::from)
+                        .collect(),
                     subject: format!("[STOPPED] Re: {}", parsed.subject),
                     body_text: format!(
                         "Notice: The automated channel processing for thread '{}' has been manually stopped by the system administrator.",
@@ -703,8 +713,8 @@ mod tests {
         }
         async fn get_by_company_slug_and_channel_slug(
             &self,
-            _company_slug: &str,
-            _channel_slug: &str,
+            _company_slug: &crate::entities::value_objects::CompanySlug,
+            _channel_slug: &crate::entities::value_objects::ChannelSlug,
         ) -> AppResult<Option<Channel>> {
             unimplemented!()
         }
@@ -740,7 +750,7 @@ mod tests {
             &self,
             _channel_id: Uuid,
             _subject: &str,
-            _participant_emails: &[String],
+            _participant_emails: &[crate::entities::value_objects::EmailAddress],
         ) -> AppResult<Thread> {
             unimplemented!()
         }
@@ -758,21 +768,21 @@ mod tests {
         async fn update_thread_participants(
             &self,
             _id: Uuid,
-            _participant_emails: &[String],
+            _participant_emails: &[crate::entities::value_objects::EmailAddress],
         ) -> AppResult<Thread> {
             unimplemented!()
         }
         async fn find_thread_by_message_ids(
             &self,
             _channel_id: Uuid,
-            _message_ids: &[String],
+            _message_ids: &[crate::entities::value_objects::MessageId],
         ) -> AppResult<Option<Thread>> {
             unimplemented!()
         }
         async fn find_thread_by_thread_index(
             &self,
             _channel_id: Uuid,
-            _thread_index_prefix: &str,
+            _thread_index_prefix: &crate::entities::value_objects::ThreadIndex,
         ) -> AppResult<Option<Thread>> {
             unimplemented!()
         }
@@ -790,14 +800,14 @@ mod tests {
         async fn get_message_by_message_id(
             &self,
             _company_id: Uuid,
-            _message_id: &str,
+            _message_id: &crate::entities::value_objects::MessageId,
         ) -> AppResult<Option<Message>> {
             unimplemented!()
         }
         async fn find_outbound_reply(
             &self,
             thread_id: Uuid,
-            in_reply_to: &str,
+            in_reply_to: &crate::entities::value_objects::MessageId,
         ) -> AppResult<Option<Message>> {
             Ok(self
                 .messages
@@ -807,7 +817,7 @@ mod tests {
                 .find(|message| {
                     message.thread_id == thread_id
                         && message.direction == crate::entities::message::MessageDirection::Outbound
-                        && message.in_reply_to.as_deref() == Some(in_reply_to)
+                        && message.in_reply_to.as_ref() == Some(in_reply_to)
                 })
                 .cloned())
         }
@@ -1224,7 +1234,7 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Test Corp".to_string(),
-            slug: "test".to_string(),
+            slug: "test".into(),
             api_key: None,
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
@@ -1236,7 +1246,7 @@ mod tests {
             id: channel_id,
             company_id,
             name: "Support".to_string(),
-            slug: "support".to_string(),
+            slug: "support".into(),
             api_key: None,
             provider: None,
             model: None,
@@ -1311,18 +1321,18 @@ mod tests {
                 id: thread_id,
                 channel_id,
                 subject: "Help".to_string(),
-                participant_emails: vec!["user@test.com".to_string()],
+                participant_emails: vec!["user@test.com".into()],
                 created_at: chrono::Utc::now().naive_utc(),
                 updated_at: chrono::Utc::now().naive_utc(),
             }),
             inbound_message: Some(crate::entities::message::Message {
                 id: Uuid::new_v4(),
                 thread_id,
-                message_id: "<msg1@test.com>".to_string(),
+                message_id: "<msg1@test.com>".into(),
                 in_reply_to: None,
                 references_list: vec![],
-                sender: "user@test.com".to_string(),
-                recipients_to: vec!["support@test.mailagents.com".to_string()],
+                sender: "user@test.com".into(),
+                recipients_to: vec!["support@test.mailagents.com".into()],
                 recipients_cc: vec![],
                 subject: "Help".to_string(),
                 clean_text_body: "Need help".to_string(),
@@ -1331,7 +1341,7 @@ mod tests {
                 attachments: None,
                 direction: crate::entities::message::MessageDirection::Inbound,
                 role: crate::entities::message::MessageRole::Human,
-                thread_index: Some("1".to_string()),
+                thread_index: Some("1".into()),
                 created_at: chrono::Utc::now().naive_utc(),
             }),
             company: Some(company),

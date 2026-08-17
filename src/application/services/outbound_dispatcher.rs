@@ -2,7 +2,10 @@ use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message as LettreMessage, Tokio1Executor,
     message::{
         Mailbox,
-        header::{ContentType, Header, HeaderName, HeaderValue, InReplyTo, MessageId, References},
+        header::{
+            ContentType, Header, HeaderName, HeaderValue, InReplyTo,
+            MessageId as LettreMessageId, References,
+        },
     },
     transport::smtp::authentication::Credentials,
 };
@@ -12,6 +15,7 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
+    entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId},
     infra::config::AppConfig,
 };
 
@@ -39,12 +43,12 @@ impl Header for CustomHeader {
 pub struct OutboundEmail {
     pub channel_id: Uuid,
     pub channel_name: String,
-    pub channel_slug: String,
-    pub company_slug: String,
-    pub trigger_message_id: String,
-    pub thread_references: Vec<String>,
-    pub recipient_to: String,
-    pub recipients_cc: Vec<String>,
+    pub channel_slug: ChannelSlug,
+    pub company_slug: CompanySlug,
+    pub trigger_message_id: MessageId,
+    pub thread_references: Vec<MessageId>,
+    pub recipient_to: EmailAddress,
+    pub recipients_cc: Vec<EmailAddress>,
     pub subject: String,
     pub body_text: String,
     pub hop_count: u32,
@@ -53,13 +57,13 @@ pub struct OutboundEmail {
 
 #[derive(Debug, Clone)]
 pub struct SentEmailResult {
-    pub outbound_message_id: String,
-    pub in_reply_to: String,
-    pub references: Vec<String>,
-    pub from_address: String,
+    pub outbound_message_id: MessageId,
+    pub in_reply_to: MessageId,
+    pub references: Vec<MessageId>,
+    pub from_address: EmailAddress,
     pub from_name: Option<String>,
-    pub recipients_to: Vec<String>,
-    pub recipients_cc: Vec<String>,
+    pub recipients_to: Vec<EmailAddress>,
+    pub recipients_cc: Vec<EmailAddress>,
     pub subject: String,
     pub body_text: String,
     pub source_channel_id: Option<Uuid>,
@@ -108,13 +112,15 @@ impl OutboundDispatcher {
         email: OutboundEmail,
         outbound_message_id: Option<String>,
     ) -> AppResult<SentEmailResult> {
-        let outbound_message_id = outbound_message_id
-            .unwrap_or_else(|| format!("<{}@{}>", Uuid::new_v4(), config.app_domain_name));
+        let outbound_message_id: MessageId = outbound_message_id
+            .unwrap_or_else(|| format!("<{}@{}>", Uuid::new_v4(), config.app_domain_name))
+            .into();
 
-        let from_email = format!(
+        let from_email: EmailAddress = format!(
             "{}@{}.{}",
             email.channel_slug, email.company_slug, config.app_domain_name
-        );
+        )
+        .into();
         let in_reply_to = email.trigger_message_id.clone();
 
         let mut references = email.thread_references.clone();
@@ -172,7 +178,7 @@ impl OutboundDispatcher {
             prepared
                 .recipients_to
                 .first()
-                .map(String::as_str)
+                .map(|e| e.as_str())
                 .unwrap_or_default()
         );
 
@@ -180,7 +186,7 @@ impl OutboundDispatcher {
             .from_name
             .as_ref()
             .map(|name| format!("\"{name}\" <{}>", prepared.from_address))
-            .unwrap_or_else(|| prepared.from_address.clone());
+            .unwrap_or_else(|| prepared.from_address.to_string());
         let from_mailbox = from_header
             .parse::<Mailbox>()
             .map_err(|e| AppError::Internal(format!("Invalid From address mailbox: {}", e)))?;
@@ -201,9 +207,16 @@ impl OutboundDispatcher {
                 builder = builder.cc(cc_mb);
             }
         }
-        builder = builder.header(MessageId::from(prepared.outbound_message_id.clone()));
-        builder = builder.header(InReplyTo::from(prepared.in_reply_to.clone()));
-        builder = builder.header(References::from(prepared.references.join(" ")));
+        builder = builder.header(LettreMessageId::from(prepared.outbound_message_id.to_string()));
+        builder = builder.header(InReplyTo::from(prepared.in_reply_to.to_string()));
+        builder = builder.header(References::from(
+            prepared
+                .references
+                .iter()
+                .map(MessageId::as_str)
+                .collect::<Vec<_>>()
+                .join(" "),
+        ));
         builder = builder.header(CustomHeader {
             name: HeaderName::new_from_ascii_str("Auto-Submitted"),
             value: "auto-replied".to_string(),
@@ -272,14 +285,15 @@ impl OutboundDispatcher {
 
     pub async fn send_bounce(
         config: &AppConfig,
-        recipient_to: &str,
+        recipient_to: &EmailAddress,
         subject: &str,
         bounce_body: &str,
     ) -> AppResult<SentEmailResult> {
         let outbound_uuid = Uuid::new_v4();
-        let outbound_message_id = format!("<bounce-{}@{}>", outbound_uuid, config.app_domain_name);
+        let outbound_message_id: MessageId =
+            format!("<bounce-{}@{}>", outbound_uuid, config.app_domain_name).into();
 
-        let from_email = format!("mailer-daemon@{}", config.app_domain_name);
+        let from_email: EmailAddress = format!("mailer-daemon@{}", config.app_domain_name).into();
         let from_header_value = format!("\"Mail Agents Server\" <{}>", from_email);
 
         let formatted_subject = if subject.to_lowercase().starts_with("[undeliverable]") {
@@ -330,11 +344,11 @@ impl OutboundDispatcher {
 
         Ok(SentEmailResult {
             outbound_message_id,
-            in_reply_to: String::new(),
+            in_reply_to: MessageId::default(),
             references: vec![],
             from_address: from_email,
             from_name: Some("Mail Agents Server".to_string()),
-            recipients_to: vec![recipient_to.to_string()],
+            recipients_to: vec![recipient_to.clone()],
             recipients_cc: vec![],
             subject: formatted_subject,
             body_text: bounce_body.to_string(),

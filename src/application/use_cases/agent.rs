@@ -605,7 +605,7 @@ mod tests {
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,
