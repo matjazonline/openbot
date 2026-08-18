@@ -209,7 +209,10 @@ pub fn render_agents_selection_full(
     )
 }
 
-pub(crate) fn render_spam_disabled_warning(spam_scan_enabled: bool, initial_disabled: bool) -> String {
+pub(crate) fn render_spam_disabled_warning(
+    spam_scan_enabled: bool,
+    initial_disabled: bool,
+) -> String {
     if spam_scan_enabled {
         String::new()
     } else {
@@ -379,14 +382,37 @@ fn advanced_channel_form(
     )
 }
 
-pub fn channels_page(
-    company: &Company,
-    app_domain_name: &str,
-    channels: &[Channel],
-    agents: &[Agent],
-    spam_scan_enabled: bool,
-) -> String {
-    let list_html = channel_list_fragment(company, app_domain_name, channels, agents);
+/// What the channels page opens with.
+///
+/// The mailbox's "New Channel" / "Edit Channel" buttons link into these states instead of
+/// dropping the user on a page where the form they asked for is still collapsed.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ChannelsPageFocus {
+    pub create_form_open: bool,
+    pub editing_channel_id: Option<Uuid>,
+}
+
+/// Everything the full channels page renders from.
+pub struct ChannelsPage<'a> {
+    pub company: &'a Company,
+    pub app_domain_name: &'a str,
+    pub channels: &'a [Channel],
+    pub agents: &'a [Agent],
+    pub spam_scan_enabled: bool,
+    pub focus: ChannelsPageFocus,
+}
+
+pub fn channels_page(page: &ChannelsPage<'_>) -> String {
+    let ChannelsPage {
+        company,
+        app_domain_name,
+        agents,
+        spam_scan_enabled,
+        focus,
+        ..
+    } = *page;
+
+    let list_html = focused_channel_list(page);
     let agents_selection_html = render_agents_selection(company.id, agents, None, "new");
     let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, true);
     let simple_form = simple_channel_form(company.id);
@@ -397,6 +423,11 @@ pub fn channels_page(
         &agents_selection_html,
         &spam_warning_html,
     );
+    let (card_hidden, card_expanded) = if focus.create_form_open {
+        ("", "true")
+    } else {
+        ("hidden", "false")
+    };
     let content = format!(
         r##"
         <div class="flex items-center justify-between mb-6">
@@ -405,7 +436,7 @@ pub fn channels_page(
                 <h2 class="text-2xl font-bold text-white">{company_name} Channels</h2>
                 <p class="text-slate-400 text-sm mt-0.5">Manage channels for <span class="font-mono text-indigo-300">@{slug}.{app_domain_name}</span></p>
             </div>
-            <button id="channel-form-toggle" type="button" aria-controls="channel-form-card" aria-expanded="false"
+            <button id="channel-form-toggle" type="button" aria-controls="channel-form-card" aria-expanded="{card_expanded}"
                 onclick="const card = document.getElementById('channel-form-card'); const opening = card.classList.contains('hidden'); card.classList.toggle('hidden'); this.setAttribute('aria-expanded', opening);"
                 class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/30 transition cursor-pointer">
                 Add Channel
@@ -415,7 +446,7 @@ pub fn channels_page(
         <div id="response-message" class="mb-6"></div>
 
         <!-- Create Channel Card -->
-        <div id="channel-form-card" class="hidden bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-8">
+        <div id="channel-form-card" class="{card_hidden} bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-8">
             <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
                 <h3 class="text-md font-semibold text-white flex items-center gap-2">
                     <span class="text-emerald-400">+</span> Add New Channel
@@ -458,6 +489,40 @@ pub fn channels_page(
     );
 
     base_layout(&format!("{} Channels", company.name), &content)
+}
+
+/// The channel list as the page wants it: the same rows as everywhere else, except the channel
+/// named by `?edit=` which is rendered already open in its edit form.
+fn focused_channel_list(page: &ChannelsPage<'_>) -> String {
+    let editing = page
+        .focus
+        .editing_channel_id
+        .filter(|id| page.channels.iter().any(|channel| channel.id == *id));
+    let Some(editing_id) = editing else {
+        return channel_list_fragment(
+            page.company,
+            page.app_domain_name,
+            page.channels,
+            page.agents,
+        );
+    };
+
+    page.channels
+        .iter()
+        .map(|channel| {
+            if channel.id == editing_id {
+                channel_edit_fragment(
+                    page.company,
+                    page.app_domain_name,
+                    channel,
+                    page.agents,
+                    page.spam_scan_enabled,
+                )
+            } else {
+                channel_row_fragment(page.company, page.app_domain_name, channel, page.agents)
+            }
+        })
+        .collect()
 }
 
 pub fn channel_list_fragment(

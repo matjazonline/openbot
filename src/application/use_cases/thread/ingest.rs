@@ -216,7 +216,8 @@ impl ThreadUseCases {
                     .find(|c| c.slug.eq_ignore_ascii_case(&channel_slug))
                     .cloned()
                 else {
-                    let suggestions = find_similar_channel_slugs(&channel_slug, &available_channels);
+                    let suggestions =
+                        find_similar_channel_slugs(&channel_slug, &available_channels);
                     invalid_slugs.push(channel_slug.clone());
                     bounce_suggestions.push(BounceSuggestion {
                         invalid_slug: channel_slug,
@@ -527,7 +528,9 @@ impl ThreadUseCases {
             return Ok(ControlFlow::Break(rejection));
         }
 
-        let is_team_member = directory.is_team_member(channel.company_id, &sender).await?;
+        let is_team_member = directory
+            .is_team_member(channel.company_id, &sender)
+            .await?;
         let access = channel.participant_access(&sender, is_team_member);
 
         let third_party_recipients = if access.trusted {
@@ -542,7 +545,10 @@ impl ThreadUseCases {
             None => {
                 let mut participants = vec![EmailAddress::from(parsed.sender.clone())];
                 for recipient in &third_party_recipients {
-                    if !participants.iter().any(|p| p.eq_ignore_ascii_case(recipient)) {
+                    if !participants
+                        .iter()
+                        .any(|p| p.eq_ignore_ascii_case(recipient))
+                    {
                         participants.push(recipient.clone());
                     }
                 }
@@ -688,7 +694,11 @@ impl ThreadUseCases {
         directory: &mut DirectoryCache<'_>,
     ) -> AppResult<Vec<EmailAddress>> {
         let mut third_party: Vec<EmailAddress> = Vec::new();
-        for address in parsed.recipients_to.iter().chain(parsed.recipients_cc.iter()) {
+        for address in parsed
+            .recipients_to
+            .iter()
+            .chain(parsed.recipients_cc.iter())
+        {
             let address = address.trim();
             if address.is_empty() || address.eq_ignore_ascii_case(sender) {
                 continue;
@@ -740,7 +750,10 @@ impl ThreadUseCases {
         }
         if sender_is_trusted {
             for recipient in third_party_recipients {
-                if !participants.iter().any(|p| p.eq_ignore_ascii_case(recipient)) {
+                if !participants
+                    .iter()
+                    .any(|p| p.eq_ignore_ascii_case(recipient))
+                {
                     participants.push(recipient.clone());
                     changed = true;
                 }

@@ -151,7 +151,10 @@ impl SmtpServer {
         let start_time = Instant::now();
         let client_ip = peer_addr.ip();
 
-        let Some(_guard) = self.admit_connection(&mut stream, client_ip, start_time).await? else {
+        let Some(_guard) = self
+            .admit_connection(&mut stream, client_ip, start_time)
+            .await?
+        else {
             return Ok(());
         };
 
@@ -232,7 +235,13 @@ impl SmtpServer {
 
         if rate_limited {
             warn!("Connection from {} rejected: Rate limit reached", client_ip);
-            self.record_connection(client_ip, SmtpStatus::BlockedRateLimit, start_time, None, None);
+            self.record_connection(
+                client_ip,
+                SmtpStatus::BlockedRateLimit,
+                start_time,
+                None,
+                None,
+            );
             stream
                 .write_all(b"421 4.7.0 Too many active connections from your IP address\r\n")
                 .await?;
@@ -333,7 +342,9 @@ impl SmtpServer {
                             writer.write_all(b"250 2.1.5 Ok\r\n").await?;
                         }
                         None => {
-                            writer.write_all(b"501 Syntax: RCPT TO:<address>\r\n").await?;
+                            writer
+                                .write_all(b"501 Syntax: RCPT TO:<address>\r\n")
+                                .await?;
                         }
                     }
                 }
@@ -341,9 +352,7 @@ impl SmtpServer {
             "DATA" => {
                 if session.rcpts.is_empty() {
                     writer
-                        .write_all(
-                            b"503 Error: MAIL FROM and RCPT TO must be set before DATA\r\n",
-                        )
+                        .write_all(b"503 Error: MAIL FROM and RCPT TO must be set before DATA\r\n")
                         .await?;
                 } else {
                     writer
@@ -453,11 +462,7 @@ impl SmtpServer {
     ///
     /// Every step is best-effort: a resolver or parse failure leaves that verdict as `None`, which
     /// downstream reads as "not asserted" rather than "failed".
-    async fn verify_authentication(
-        &self,
-        session: &SmtpSession,
-        client_ip: IpAddr,
-    ) -> AuthResults {
+    async fn verify_authentication(&self, session: &SmtpSession, client_ip: IpAddr) -> AuthResults {
         let mut results = AuthResults::default();
         let Ok(resolver) = mail_auth::MessageAuthenticator::new_quad9() else {
             return results;
@@ -564,8 +569,7 @@ impl SmtpServer {
     }
 
     async fn apply_spam_score(&self, session: &SmtpSession, raw_payload: &mut RawInboundPayload) {
-        let scanner =
-            crate::services::spam_scanner::SpamScannerService::new(self.config.clone());
+        let scanner = crate::services::spam_scanner::SpamScannerService::new(self.config.clone());
         let scan_res = scanner
             .scan(
                 session.data_buffer.as_bytes(),

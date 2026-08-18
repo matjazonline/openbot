@@ -427,11 +427,9 @@ fn default_model_for(provider: &str) -> &'static str {
 
 fn environment_api_key(provider: &str) -> Option<String> {
     match provider {
-        "google" | "gemini" => {
-            std::env::var("GEMINI_API_KEY")
-                .ok()
-                .or_else(|| std::env::var("GOOGLE_API_KEY").ok())
-        }
+        "google" | "gemini" => std::env::var("GEMINI_API_KEY")
+            .ok()
+            .or_else(|| std::env::var("GOOGLE_API_KEY").ok()),
         "openai" => std::env::var("OPENAI_API_KEY").ok(),
         "anthropic" => std::env::var("ANTHROPIC_API_KEY").ok(),
         "groq" => std::env::var("GROQ_API_KEY").ok(),

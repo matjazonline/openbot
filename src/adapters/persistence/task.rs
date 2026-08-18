@@ -1508,7 +1508,8 @@ mod tests {
         )
         .await
         .unwrap();
-        let owner_email_addr = crate::entities::value_objects::EmailAddress::from(owner_email.clone());
+        let owner_email_addr =
+            crate::entities::value_objects::EmailAddress::from(owner_email.clone());
         let thread = persistence
             .create_thread(
                 channel.id,

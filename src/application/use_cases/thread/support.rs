@@ -71,7 +71,11 @@ impl<'a> DirectoryCache<'a> {
 
     /// Team membership feeds authorization decisions, so a persistence failure propagates rather
     /// than silently degrading the sender to "not a member".
-    pub(super) async fn is_team_member(&mut self, company_id: Uuid, sender: &str) -> AppResult<bool> {
+    pub(super) async fn is_team_member(
+        &mut self,
+        company_id: Uuid,
+        sender: &str,
+    ) -> AppResult<bool> {
         let key = (company_id, sender.trim().to_lowercase());
         if let Some(cached) = self.memberships.get(&key) {
             return Ok(*cached);

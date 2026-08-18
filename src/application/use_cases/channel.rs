@@ -892,7 +892,12 @@ mod tests {
         assert_eq!(channel.model.as_deref(), Some("gpt-4o"));
         assert_eq!(
             channel.participant_emails,
-            Some(emails.into_iter().map(EmailAddress::from).collect::<Vec<_>>())
+            Some(
+                emails
+                    .into_iter()
+                    .map(EmailAddress::from)
+                    .collect::<Vec<_>>()
+            )
         );
         assert_eq!(channel.agent_ids, Some(agent_ids));
         assert_eq!(channel.channel_config, Some(config));

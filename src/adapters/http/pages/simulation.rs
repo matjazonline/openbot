@@ -6,7 +6,7 @@ use super::*;
 /// replying within that thread, so the only action offered is starting a fresh one.
 fn simulation_loaded_thread_header(company_id: Uuid, channel_id: Uuid, tid: &str) -> String {
     format!(
-            r##"
+        r##"
             <div id="simulation-form-container">
                 <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-4 mb-6 shadow-md flex items-center justify-between">
                     <div class="flex items-center gap-2 text-sm text-slate-300 font-medium">
@@ -21,9 +21,9 @@ fn simulation_loaded_thread_header(company_id: Uuid, channel_id: Uuid, tid: &str
                 </div>
             </div>
             "##,
-            company_id = company_id,
-            channel_id = channel_id,
-            tid = tid,
+        company_id = company_id,
+        channel_id = channel_id,
+        tid = tid,
     )
 }
 
@@ -36,7 +36,7 @@ fn simulation_compose_form(
     sender_email: &str,
 ) -> String {
     format!(
-            r##"
+        r##"
             <div id="simulation-form-container">
                 <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-6 shadow-md space-y-6">
                     <div>
@@ -131,10 +131,10 @@ fn simulation_compose_form(
                 </div>
             </div>
             "##,
-            company_id = company_id,
-            channel_id = channel_id,
-            target_recipient = target_recipient,
-            sender_email = sender_email,
+        company_id = company_id,
+        channel_id = channel_id,
+        target_recipient = target_recipient,
+        sender_email = sender_email,
     )
 }
 
@@ -152,12 +152,7 @@ pub fn channel_simulation_page(
 
     let form_container_content = match initial_thread_id.filter(|s| !s.trim().is_empty()) {
         Some(tid) => simulation_loaded_thread_header(company.id, channel.id, tid),
-        None => simulation_compose_form(
-            company.id,
-            channel.id,
-            &target_recipient,
-            sender_email,
-        ),
+        None => simulation_compose_form(company.id, channel.id, &target_recipient, sender_email),
     };
 
     let content = format!(
@@ -307,9 +302,9 @@ fn configured_badge(source: &str) -> String {
 
 fn missing_badge(env_vars: Option<&str>) -> String {
     match env_vars {
-        Some(names) => format!(
-            "<span class=\"text-rose-400 font-bold\">Missing / Unset ⚠️ ({names})</span>"
-        ),
+        Some(names) => {
+            format!("<span class=\"text-rose-400 font-bold\">Missing / Unset ⚠️ ({names})</span>")
+        }
         None => "<span class=\"text-rose-400 font-bold\">Missing / Unset ⚠️</span>".to_string(),
     }
 }
@@ -345,7 +340,8 @@ pub fn channel_simulation_failure_fragment(
     error_msg: &str,
 ) -> String {
     let llm = resolve_llm_info(channel, company);
-    let (provider_str, model_str, api_key_status) = (&llm.provider, &llm.model, &llm.api_key_status);
+    let (provider_str, model_str, api_key_status) =
+        (&llm.provider, &llm.model, &llm.api_key_status);
 
     let company_name = company
         .map(|c| format!("{} (/{})", c.name, c.slug))
@@ -555,7 +551,8 @@ pub fn channel_simulation_result_fragment(
     let oob_form_swap = simulation_completed_banner(company_id, channel_id);
 
     let llm = resolve_llm_info(result.channel.as_ref(), result.company.as_ref());
-    let (provider_str, model_str, api_key_status) = (&llm.provider, &llm.model, &llm.api_key_status);
+    let (provider_str, model_str, api_key_status) =
+        (&llm.provider, &llm.model, &llm.api_key_status);
 
     let status_banner = if result.resolved {
         r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-600/60 text-emerald-200 text-sm font-semibold flex items-center gap-2">
@@ -807,7 +804,11 @@ pub(crate) fn thread_history_section(
         .map(|msg| message_bubble(msg, ctx))
         .collect();
     let msg_count = messages.len();
-    let label = if msg_count == 1 { "message" } else { "messages" };
+    let label = if msg_count == 1 {
+        "message"
+    } else {
+        "messages"
+    };
 
     format!(
         r##"
@@ -1354,7 +1355,8 @@ pub fn channel_simulation_execution_result_fragment(
 ) -> String {
     let ingest = &sim_res.ingest_result;
     let llm = resolve_llm_info(ingest.channel.as_ref(), ingest.company.as_ref());
-    let (provider_str, model_str, api_key_status) = (&llm.provider, &llm.model, &llm.api_key_status);
+    let (provider_str, model_str, api_key_status) =
+        (&llm.provider, &llm.model, &llm.api_key_status);
 
     let thread_id_str = ingest
         .thread
@@ -1475,14 +1477,12 @@ pub fn channel_simulation_loaded_thread_fragment(
                 .as_ref()
                 .and_then(|e| e.first().cloned())
         })
-        .unwrap_or_else(|| crate::entities::value_objects::EmailAddress::from("sender@example.com"));
+        .unwrap_or_else(|| {
+            crate::entities::value_objects::EmailAddress::from("sender@example.com")
+        });
 
-    let overview_card = loaded_thread_overview_card(
-        thread,
-        &thread_id_str,
-        &target_recipient,
-        messages.len(),
-    );
+    let overview_card =
+        loaded_thread_overview_card(thread, &thread_id_str, &target_recipient, messages.len());
 
     let llm = resolve_llm_info(Some(channel), Some(company));
     let (provider_str, model_str) = (&llm.provider, &llm.model);

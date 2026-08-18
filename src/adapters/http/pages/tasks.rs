@@ -22,21 +22,18 @@ struct TaskTokenTotals {
 }
 
 fn total_token_usage(tasks: &[BackgroundTask]) -> TaskTokenTotals {
-    tasks
-        .iter()
-        .filter_map(|task| task.token_usage())
-        .fold(
-            TaskTokenTotals {
-                prompt: 0,
-                completion: 0,
-                total: 0,
-            },
-            |acc, usage| TaskTokenTotals {
-                prompt: acc.prompt + usage.prompt_tokens,
-                completion: acc.completion + usage.completion_tokens,
-                total: acc.total + usage.total_tokens,
-            },
-        )
+    tasks.iter().filter_map(|task| task.token_usage()).fold(
+        TaskTokenTotals {
+            prompt: 0,
+            completion: 0,
+            total: 0,
+        },
+        |acc, usage| TaskTokenTotals {
+            prompt: acc.prompt + usage.prompt_tokens,
+            completion: acc.completion + usage.completion_tokens,
+            total: acc.total + usage.total_tokens,
+        },
+    )
 }
 
 fn channel_filter_options(channels: &[Channel], current: Option<Uuid>) -> String {
@@ -69,7 +66,10 @@ fn status_filter_options(current: Option<TaskStatus>) -> String {
     .iter()
     .map(|(value, label)| {
         let selected = if current == *value { "selected" } else { "" };
-        format!("<option value=\"{}\" {}>{}</option>", value, selected, label)
+        format!(
+            "<option value=\"{}\" {}>{}</option>",
+            value, selected, label
+        )
     })
     .collect()
 }

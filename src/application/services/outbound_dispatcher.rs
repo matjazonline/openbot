@@ -3,8 +3,8 @@ use lettre::{
     message::{
         Mailbox,
         header::{
-            ContentType, Header, HeaderName, HeaderValue, InReplyTo,
-            MessageId as LettreMessageId, References,
+            ContentType, Header, HeaderName, HeaderValue, InReplyTo, MessageId as LettreMessageId,
+            References,
         },
     },
     transport::smtp::authentication::Credentials,
@@ -207,7 +207,9 @@ impl OutboundDispatcher {
                 builder = builder.cc(cc_mb);
             }
         }
-        builder = builder.header(LettreMessageId::from(prepared.outbound_message_id.to_string()));
+        builder = builder.header(LettreMessageId::from(
+            prepared.outbound_message_id.to_string(),
+        ));
         builder = builder.header(InReplyTo::from(prepared.in_reply_to.to_string()));
         builder = builder.header(References::from(
             prepared

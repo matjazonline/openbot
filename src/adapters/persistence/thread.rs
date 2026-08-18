@@ -89,10 +89,22 @@ impl TryFrom<MessageDb> for Message {
             thread_id: db.thread_id,
             message_id: MessageId::from(db.message_id),
             in_reply_to: db.in_reply_to.map(MessageId::from),
-            references_list: db.references_list.into_iter().map(MessageId::from).collect(),
+            references_list: db
+                .references_list
+                .into_iter()
+                .map(MessageId::from)
+                .collect(),
             sender: EmailAddress::from(db.sender),
-            recipients_to: db.recipients_to.into_iter().map(EmailAddress::from).collect(),
-            recipients_cc: db.recipients_cc.into_iter().map(EmailAddress::from).collect(),
+            recipients_to: db
+                .recipients_to
+                .into_iter()
+                .map(EmailAddress::from)
+                .collect(),
+            recipients_cc: db
+                .recipients_cc
+                .into_iter()
+                .map(EmailAddress::from)
+                .collect(),
             subject: db.subject,
             clean_text_body: db.clean_text_body,
             raw_text_body: db.raw_text_body,
@@ -350,8 +362,16 @@ impl ThreadPersistence for PostgresPersistence {
             .iter()
             .map(MessageId::as_str)
             .collect();
-        let recipients_to: Vec<&str> = message.recipients_to.iter().map(EmailAddress::as_str).collect();
-        let recipients_cc: Vec<&str> = message.recipients_cc.iter().map(EmailAddress::as_str).collect();
+        let recipients_to: Vec<&str> = message
+            .recipients_to
+            .iter()
+            .map(EmailAddress::as_str)
+            .collect();
+        let recipients_cc: Vec<&str> = message
+            .recipients_cc
+            .iter()
+            .map(EmailAddress::as_str)
+            .collect();
 
         let canonical_id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO email_messages (
@@ -575,11 +595,19 @@ mod tests {
         .unwrap();
         let email_addr = EmailAddress::from(email.clone());
         let first_thread = persistence
-            .create_thread(first_channel.id, "Subject", std::slice::from_ref(&email_addr))
+            .create_thread(
+                first_channel.id,
+                "Subject",
+                std::slice::from_ref(&email_addr),
+            )
             .await
             .unwrap();
         let second_thread = persistence
-            .create_thread(second_channel.id, "Subject", std::slice::from_ref(&email_addr))
+            .create_thread(
+                second_channel.id,
+                "Subject",
+                std::slice::from_ref(&email_addr),
+            )
             .await
             .unwrap();
         let another_first_thread = persistence
@@ -726,7 +754,11 @@ mod tests {
         .unwrap();
         let email_addr = EmailAddress::from(email.clone());
         let thread = persistence
-            .create_thread(channel.id, "Outbox Subject", std::slice::from_ref(&email_addr))
+            .create_thread(
+                channel.id,
+                "Outbox Subject",
+                std::slice::from_ref(&email_addr),
+            )
             .await
             .unwrap();
 
@@ -752,7 +784,10 @@ mod tests {
             thread_index: None,
             created_at: chrono::Utc::now().naive_utc(),
         };
-        persistence.create_message(&outreach_outbound).await.unwrap();
+        persistence
+            .create_message(&outreach_outbound)
+            .await
+            .unwrap();
 
         // Task & outreach setup in DB
         let task_id = Uuid::new_v4();

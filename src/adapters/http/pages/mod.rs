@@ -16,6 +16,7 @@ use crate::entities::{
     message::{Message, MessageDirection, MessageRole},
     task::{BackgroundTask, TaskStatus},
     thread::Thread,
+    value_objects::EmailAddress,
 };
 use crate::use_cases::channel::InboundEmailResult;
 use crate::use_cases::thread::{SimulationExecutionResult, SimulationMode};
@@ -26,6 +27,7 @@ mod auth;
 mod channels;
 mod companies;
 mod layout;
+mod mailbox;
 mod onboarding;
 mod simulation;
 mod tasks;
@@ -36,6 +38,7 @@ pub use auth::*;
 pub use channels::*;
 pub use companies::*;
 pub use layout::*;
+pub use mailbox::*;
 pub use onboarding::*;
 pub use simulation::*;
 pub use tasks::*;

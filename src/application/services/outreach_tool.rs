@@ -225,7 +225,9 @@ impl<'a> ValidatedOutreach<'a> {
             || input.completion_threshold_percent <= 0.0
             || input.completion_threshold_percent > 100.0
         {
-            return Err("completion_threshold_percent must be greater than 0 and at most 100".into());
+            return Err(
+                "completion_threshold_percent must be greater than 0 and at most 100".into(),
+            );
         }
         if input.timeout_hours == 0 || input.timeout_hours > max_timeout_hours {
             return Err(format!(
@@ -617,7 +619,11 @@ mod tests {
         )
         .await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Cross-company channel calls are not allowed"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Cross-company channel calls are not allowed")
+        );
     }
 
     #[tokio::test]

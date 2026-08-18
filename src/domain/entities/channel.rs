@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::entities::value_objects::{ChannelSlug, EmailAddress};
+use crate::entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
@@ -115,9 +115,23 @@ impl Channel {
     /// Who should be asked to approve an action on this channel: the first listed participant
     /// that names an actual person rather than the `@public` wildcard.
     pub fn preferred_approver(&self) -> Option<EmailAddress> {
-        self.participant_emails.as_ref()?.iter()
+        self.participant_emails
+            .as_ref()?
+            .iter()
             .find(|email| !email.eq_ignore_ascii_case(PUBLIC_PARTICIPANT))
             .cloned()
+    }
+
+    /// The address inbound mail reaches this channel on: `{channel}@{company}.{app domain}`.
+    ///
+    /// The same address the simulator sends to and the mailbox composes to, so it lives here
+    /// rather than being re-`format!`ed per page.
+    pub fn inbound_address(
+        &self,
+        company_slug: &CompanySlug,
+        app_domain_name: &str,
+    ) -> EmailAddress {
+        EmailAddress::new(format!("{}@{company_slug}.{app_domain_name}", self.slug))
     }
 
     pub fn default_config() -> serde_json::Value {

@@ -38,8 +38,7 @@ use crate::{
 
 use super::{
     AgentExecutionResult, ChannelMatch, InboundIngestResult, RecipientRole, ThreadUseCases,
-    durable_ingest_payload, scrub_json_secrets,
-    support::outbound_reference_ids,
+    durable_ingest_payload, scrub_json_secrets, support::outbound_reference_ids,
 };
 
 /// Who owns the durable task while the agent runs.
@@ -142,8 +141,10 @@ impl ThreadUseCases {
 
         self.save_outbound_messages(&matches, &delivery, &response)
             .await?;
-        self.record_dispatch_outcome(ingest, parsed, &claim, &run, &delivery, &response, &metadata)
-            .await?;
+        self.record_dispatch_outcome(
+            ingest, parsed, &claim, &run, &delivery, &response, &metadata,
+        )
+        .await?;
 
         Ok(Some(AgentExecutionResult {
             outbound_message_id: Some(delivery.message_id),
@@ -247,7 +248,9 @@ impl ThreadUseCases {
                     loaded
                 }
             };
-            let access = channel_match.channel.participant_access(sender, is_team_member);
+            let access = channel_match
+                .channel
+                .participant_access(sender, is_team_member);
 
             let upstream_context = self
                 .upstream_context_for(&run.outputs, ingest.task_id)
@@ -421,7 +424,8 @@ impl ThreadUseCases {
             ));
         }
         if let Some(task_id) = task_id
-            && let Some(outreach_context) = self.task_persistence.get_outreach_context(task_id).await?
+            && let Some(outreach_context) =
+                self.task_persistence.get_outreach_context(task_id).await?
         {
             context.push_str("--- Outreach Progress ---\n");
             context.push_str(&outreach_context);
@@ -523,7 +527,10 @@ impl ThreadUseCases {
             in_reply_to_ref: Some(MessageId::from(parsed.message_id.clone())),
             references: references.into_iter().map(MessageId::from).collect(),
             recipients_to: vec![ParticipantIdentity::email(&parsed.sender)],
-            recipients_cc: recipients_cc.iter().map(ParticipantIdentity::email).collect(),
+            recipients_cc: recipients_cc
+                .iter()
+                .map(ParticipantIdentity::email)
+                .collect(),
             subject: parsed.subject.clone(),
             content: response.to_string(),
             attachments: vec![],
@@ -593,11 +600,9 @@ impl ThreadUseCases {
             if !ingest.accepted
                 && ingest.reason.as_deref() != Some("Duplicate Message-ID already processed")
             {
-                return Err(AppError::Internal(
-                    ingest
-                        .reason
-                        .unwrap_or_else(|| "Internal channel delivery was rejected".into()),
-                ));
+                return Err(AppError::Internal(ingest.reason.unwrap_or_else(|| {
+                    "Internal channel delivery was rejected".into()
+                })));
             }
             info!(
                 "Delivered agent response {} through trusted internal channel transport",
@@ -606,7 +611,9 @@ impl ThreadUseCases {
             return Ok(prepared);
         }
         match idempotency_key {
-            Some(key) => OutboundDispatcher::send_idempotent(&self.config, outbound_email, key).await,
+            Some(key) => {
+                OutboundDispatcher::send_idempotent(&self.config, outbound_email, key).await
+            }
             None => OutboundDispatcher::send(&self.config, outbound_email).await,
         }
     }
@@ -700,7 +707,8 @@ impl ThreadUseCases {
         metadata: &Option<serde_json::Value>,
     ) -> AppResult<()> {
         if let Some(task_id) = ingest.task_id {
-            let payload = self.dispatch_audit_payload(ingest, parsed, run, delivery, response, metadata);
+            let payload =
+                self.dispatch_audit_payload(ingest, parsed, run, delivery, response, metadata);
             match claim.worker_id {
                 Some(worker_id) => {
                     let _ = self

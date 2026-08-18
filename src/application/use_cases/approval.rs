@@ -164,14 +164,13 @@ impl ApprovalUseCases {
         }
 
         let normalized_action = action.to_lowercase();
-        let decision = LinkAction::parse(&normalized_action, &approval.action_type).ok_or_else(
-            || {
+        let decision =
+            LinkAction::parse(&normalized_action, &approval.action_type).ok_or_else(|| {
                 AppError::Internal(format!(
                     "Action '{}' is not valid for approval type '{}'.",
                     action, approval.action_type
                 ))
-            },
-        )?;
+            })?;
 
         let now = Utc::now().naive_utc();
         // Quorum timeouts carry the chosen option through to the paused task; everything else is a
@@ -362,7 +361,9 @@ enum LinkAction {
     /// Quorum timeout: continue with whatever responses arrived.
     ProceedPartial,
     /// Quorum timeout: wait longer.
-    Extend { hours: u32 },
+    Extend {
+        hours: u32,
+    },
     Approve,
     Reject,
 }

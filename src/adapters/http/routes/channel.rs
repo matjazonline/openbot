@@ -152,7 +152,10 @@ const DEFAULT_THREAD_PAGE_SIZE: usize = 50;
 const MAX_THREAD_PAGE_SIZE: usize = 100;
 const THREAD_CURSOR_TIMESTAMP_FORMAT: &str = "%Y%m%dT%H%M%S%.f";
 
-#[derive(Debug, Clone, Deserialize)]
+/// One page of a channel's threads, newest first.
+///
+/// Shared with the `/ui` mailbox so both thread lists page the same way.
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct ThreadListQuery {
     pub limit: Option<usize>,
     pub cursor: Option<String>,
@@ -184,7 +187,7 @@ fn format_thread_cursor(thread: &Thread) -> String {
     )
 }
 
-async fn load_thread_page(
+pub(crate) async fn load_thread_page(
     thread_use_cases: &ThreadUseCases,
     channel_id: Uuid,
     query: &ThreadListQuery,
@@ -235,6 +238,15 @@ fn parse_config_form(input: Option<String>) -> Result<Option<serde_json::Value>,
     }
 }
 
+/// Which form the page should arrive with open — set by the mailbox's channel buttons.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ChannelsPageQuery {
+    /// `?new=1` opens the create-channel card.
+    pub new: Option<String>,
+    /// `?edit={channel_id}` renders that channel's row as its edit form.
+    pub edit: Option<Uuid>,
+}
+
 /// GET /companies/{company_id}/channels - Full HTML page listing channels (Protected).
 #[instrument(skip(company_use_cases, channel_use_cases, agent_use_cases, config, user))]
 async fn list_channels_page(
@@ -244,6 +256,7 @@ async fn list_channels_page(
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
+    Query(query): Query<ChannelsPageQuery>,
 ) -> impl IntoResponse {
     let company = match company_use_cases.get_company(company_id).await {
         Ok(Some(c)) => c,
@@ -260,13 +273,17 @@ async fn list_channels_page(
         .await
         .unwrap_or_default();
 
-    Html(pages::channels_page(
-        &company,
-        &config.app_domain_name,
-        &channels,
-        &agents,
-        config.is_spam_scan_enabled(),
-    ))
+    Html(pages::channels_page(&pages::ChannelsPage {
+        company: &company,
+        app_domain_name: &config.app_domain_name,
+        channels: &channels,
+        agents: &agents,
+        spam_scan_enabled: config.is_spam_scan_enabled(),
+        focus: pages::ChannelsPageFocus {
+            create_form_open: matches!(query.new.as_deref(), Some("1") | Some("true")),
+            editing_channel_id: query.edit,
+        },
+    }))
 }
 
 /// POST /companies/{company_id}/channels - HTMX create channel (Protected).
@@ -311,12 +328,11 @@ async fn create_channel_handler(
         .map(String::from)
         .unwrap_or_else(|| slugify(&form.name));
 
-    let agent_ids = match resolve_channel_agents(&agent_use_cases, &form, &slug, user.id, company_id)
-        .await
-    {
-        Ok(agent_ids) => agent_ids,
-        Err(message) => return view.render(Some(message)).await,
-    };
+    let agent_ids =
+        match resolve_channel_agents(&agent_use_cases, &form, &slug, user.id, company_id).await {
+            Ok(agent_ids) => agent_ids,
+            Err(message) => return view.render(Some(message)).await,
+        };
 
     let channel_config = match parse_config_form(form.channel_config) {
         Ok(c) => c,
@@ -921,7 +937,9 @@ fn simulation_recipient_matches(
 }
 
 /// Threading headers that make a simulated message a reply to an existing one.
-fn reply_headers(in_reply_to: Option<&str>) -> Option<String> {
+///
+/// Shared with the `/ui` mailbox so a reply sent there threads exactly like a simulated one.
+pub(crate) fn reply_headers(in_reply_to: Option<&str>) -> Option<String> {
     let reply_to = in_reply_to.map(str::trim).filter(|s| !s.is_empty())?;
     Some(format!(
         "In-Reply-To: {}\nReferences: {}\n",
@@ -1301,8 +1319,16 @@ mod tests {
             created_at: Utc::now().naive_utc(),
         };
 
-        let page_html =
-            pages::channels_page(&company, "example.com", &[channel.clone()], &[], true);
+        let channels = [channel.clone()];
+        let page = pages::ChannelsPage {
+            company: &company,
+            app_domain_name: "example.com",
+            channels: &channels,
+            agents: &[],
+            spam_scan_enabled: true,
+            focus: pages::ChannelsPageFocus::default(),
+        };
+        let page_html = pages::channels_page(&page);
         assert!(page_html.contains("Custom Channel Agent"));
         assert!(page_html.contains("LLM Provider (Optional Override)"));
         assert!(page_html.contains("LLM Model (Optional Override)"));
