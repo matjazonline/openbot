@@ -21,9 +21,11 @@ use crate::entities::{
 use crate::use_cases::channel::InboundEmailResult;
 use crate::use_cases::thread::{SimulationExecutionResult, SimulationMode};
 
+mod agent_settings;
 mod agents;
 mod approvals;
 mod auth;
+mod channel_settings;
 mod channels;
 mod companies;
 mod layout;
@@ -32,9 +34,11 @@ mod onboarding;
 mod simulation;
 mod tasks;
 
+pub use agent_settings::*;
 pub use agents::*;
 pub use approvals::*;
 pub use auth::*;
+pub use channel_settings::*;
 pub use channels::*;
 pub use companies::*;
 pub use layout::*;

@@ -9,6 +9,8 @@ pub mod monitoring;
 pub mod onboarding;
 pub mod task;
 pub mod ui;
+pub mod ui_agents;
+pub mod ui_channels;
 pub mod user;
 pub mod webhooks;
 
@@ -28,6 +30,8 @@ pub fn router() -> Router<AppState> {
         .merge(monitoring::router())
         .merge(onboarding::router())
         .merge(ui::router())
+        .merge(ui_agents::router())
+        .merge(ui_channels::router())
         .route_layer(middleware::from_fn(auth::require_auth));
 
     Router::new()

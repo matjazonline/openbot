@@ -17,7 +17,7 @@ pub enum FragmentSwap {
 }
 
 impl FragmentSwap {
-    fn oob_attribute(self) -> &'static str {
+    pub(crate) fn oob_attribute(self) -> &'static str {
         match self {
             FragmentSwap::Inline => "",
             FragmentSwap::OutOfBand => r##" hx-swap-oob="outerHTML""##,
@@ -29,6 +29,66 @@ impl FragmentSwap {
 pub struct MailboxUser<'a> {
     pub username: &'a str,
     pub email: &'a EmailAddress,
+}
+
+/// Which `/ui` workspace a response belongs to, i.e. which rail icon is lit.
+///
+/// Both workspaces render through [`ui_shell`], so this is also what the company switcher needs
+/// to keep a company change inside the workspace the user is already in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UiSection {
+    Mailbox,
+    Channels,
+    Agents,
+}
+
+impl UiSection {
+    /// The `/ui` path this workspace is entered by, without any query string.
+    pub(crate) fn base_path(self) -> &'static str {
+        match self {
+            UiSection::Mailbox => "/ui",
+            UiSection::Channels => "/ui/channels",
+            UiSection::Agents => "/ui/agents",
+        }
+    }
+}
+
+/// The chrome every `/ui` response shares: the top bar, the icon rail, and the HTML shell around
+/// them. Only what sits to the right of the rail differs between workspaces.
+pub struct UiShell<'a> {
+    pub title: &'a str,
+    pub user: &'a MailboxUser<'a>,
+    /// `None` for a user with no company yet — there is nothing for the rail to point at.
+    pub company_id: Option<Uuid>,
+    pub section: UiSection,
+    /// Everything to the right of the icon rail: the sidebar and its panes.
+    pub content: &'a str,
+    /// Workspace-specific JavaScript, appended after the shared [`MAILBOX_SCRIPT`].
+    pub script: &'a str,
+}
+
+/// The full HTML document for one `/ui` response.
+pub fn ui_shell(shell: &UiShell<'_>) -> String {
+    let rail = match shell.company_id {
+        Some(company_id) => icon_rail(company_id, shell.section),
+        None => String::new(),
+    };
+
+    let body = format!(
+        r##"
+    <div class="flex h-screen flex-col">
+        {top_bar}
+        <div class="flex min-h-0 flex-1">
+            {rail}
+            {content}
+        </div>
+    </div>
+        "##,
+        top_bar = top_bar(shell.user),
+        content = shell.content,
+    );
+
+    ui_layout(shell.title, &body, shell.script)
 }
 
 /// The whole mailbox shell for one request.
@@ -94,8 +154,11 @@ pub struct ComposePane<'a> {
 /// scrolled to its newest message — every load is htmx.
 ///
 /// Kept out of the `format!` blocks below so its braces need no escaping.
-const MAILBOX_SCRIPT: &str = r##"        function selectChannelItem(el) {
-            document.querySelectorAll('#channel-menu a').forEach(function (item) {
+const MAILBOX_SCRIPT: &str = r##"        // Scoped to the clicked entry's own list, so every `/ui` sidebar highlights with it.
+        function selectSidebarItem(el) {
+            var menu = el.closest('ul');
+            if (!menu) return;
+            menu.querySelectorAll('a').forEach(function (item) {
                 item.classList.remove('menu-active');
             });
             el.classList.add('menu-active');
@@ -130,8 +193,8 @@ const MAILBOX_SCRIPT: &str = r##"        function selectChannelItem(el) {
             }
         });"##;
 
-/// The HTML shell for every mailbox response: daisyUI over the Tailwind browser build, plus htmx.
-fn mailbox_layout(title: &str, body: &str) -> String {
+/// The HTML shell for every `/ui` response: daisyUI over the Tailwind browser build, plus htmx.
+fn ui_layout(title: &str, body: &str, script: &str) -> String {
     format!(
         r##"<!DOCTYPE html>
 <html lang="en" data-theme="dark" class="h-full">
@@ -148,6 +211,7 @@ fn mailbox_layout(title: &str, body: &str) -> String {
 {body}
     <script>
 {MAILBOX_SCRIPT}
+{script}
     </script>
 </body>
 </html>"##
@@ -166,35 +230,26 @@ pub fn mailbox_page(page: &MailboxPage<'_>) -> String {
         None => empty_thread_column(),
     };
 
-    let body = format!(
-        r##"
-    <div class="flex h-screen flex-col">
-        {top_bar}
-        <div class="flex min-h-0 flex-1">
-            {rail}
-            {sidebar}
-            {thread_column_html}
-            {detail_html}
-        </div>
-    </div>
-        "##,
-        top_bar = top_bar(page.user),
-        rail = icon_rail(page.company.id),
+    let content = format!(
+        "{sidebar}{thread_column_html}{detail_html}",
         sidebar = channel_sidebar(page),
-        thread_column_html = thread_column_html,
         detail_html = page.detail_html,
     );
 
-    mailbox_layout(&format!("{} Mailbox", page.company.name), &body)
+    ui_shell(&UiShell {
+        title: &format!("{} Mailbox", page.company.name),
+        user: page.user,
+        company_id: Some(page.company.id),
+        section: UiSection::Mailbox,
+        content: &content,
+        script: "",
+    })
 }
 
 /// Shown when the signed-in user has no company yet — there is nothing to put in the columns.
 pub fn mailbox_no_company_page(user: &MailboxUser<'_>) -> String {
-    let body = format!(
-        r##"
-    <div class="flex h-screen flex-col">
-        {top_bar}
-        <div class="flex min-h-0 flex-1 items-center justify-center p-8">
+    let content = r##"
+        <div class="flex flex-1 items-center justify-center p-8">
             <div class="card w-full max-w-md bg-base-200 shadow-xl">
                 <div class="card-body items-center text-center">
                     <h2 class="card-title">No companies yet</h2>
@@ -205,12 +260,16 @@ pub fn mailbox_no_company_page(user: &MailboxUser<'_>) -> String {
                 </div>
             </div>
         </div>
-    </div>
-        "##,
-        top_bar = top_bar(user),
-    );
+        "##;
 
-    mailbox_layout("Mailbox", &body)
+    ui_shell(&UiShell {
+        title: "Mailbox",
+        user,
+        company_id: None,
+        section: UiSection::Mailbox,
+        content,
+        script: "",
+    })
 }
 
 /// The bar across the top of every mailbox response: the brand mark on the left, the signed-in
@@ -266,27 +325,35 @@ fn avatar_initial(username: &str) -> String {
         .unwrap_or_else(|| "?".to_string())
 }
 
-/// The slim left rail: brand mark plus links back to the classic pages.
-fn icon_rail(company_id: Uuid) -> String {
+/// The slim left rail: the `/ui` workspaces first, then links out to the classic pages.
+///
+/// The workspace the response belongs to is lit, so the rail says where you are as well as where
+/// you can go.
+fn icon_rail(company_id: Uuid, section: UiSection) -> String {
+    let style = |lit: bool| if lit { "btn-primary" } else { "btn-ghost" };
+
     format!(
         r##"
         <nav class="flex w-16 shrink-0 flex-col items-center gap-2 border-r border-base-300 bg-base-300 py-3">
-            <a href="/ui?company_id={company_id}" class="btn btn-square btn-lg btn-primary text-2xl leading-none" title="Mailbox">✉</a>
-            <a href="/companies/{company_id}/channels" class="btn btn-square btn-lg btn-ghost text-2xl leading-none" title="Channels">#</a>
-            <a href="/companies/{company_id}/agents" class="btn btn-square btn-lg btn-ghost text-2xl leading-none" title="Agents">🤖</a>
+            <a href="/ui?company_id={company_id}" class="btn btn-square btn-lg {mailbox_style} text-2xl leading-none" title="Mailbox">✉</a>
+            <a href="/ui/channels?company_id={company_id}" class="btn btn-square btn-lg {channels_style} text-2xl leading-none" title="Channels">#</a>
+            <a href="/ui/agents?company_id={company_id}" class="btn btn-square btn-lg {agents_style} text-2xl leading-none" title="Agents">🤖</a>
             <a href="/companies/{company_id}/tasks" class="btn btn-square btn-lg btn-ghost text-2xl leading-none" title="Tasks">⚙</a>
             <a href="/companies" class="btn btn-square btn-lg btn-ghost text-2xl leading-none" title="Companies">🏢</a>
             <form method="post" action="/logout" class="mt-auto">
                 <button type="submit" class="btn btn-square btn-lg btn-ghost text-2xl leading-none" title="Log out">⏻</button>
             </form>
         </nav>
-        "##
+        "##,
+        mailbox_style = style(section == UiSection::Mailbox),
+        channels_style = style(section == UiSection::Channels),
+        agents_style = style(section == UiSection::Agents),
     )
 }
 
 /// The channel column: one menu entry per channel, channel actions at the bottom.
 fn channel_sidebar(page: &MailboxPage<'_>) -> String {
-    let company_switcher = company_switcher(page.company, page.companies);
+    let company_switcher = company_switcher(page.company, page.companies, UiSection::Mailbox);
     let items: String = page
         .channels
         .iter()
@@ -321,12 +388,12 @@ fn channel_sidebar(page: &MailboxPage<'_>) -> String {
     )
 }
 
-/// Channel management lives on the classic Channels page, so these link straight into the state
-/// they mean: the create card open, or the selected channel's row already in edit mode.
+/// Channel management is the `/ui` Channels workspace, so these link straight into the state they
+/// mean: the create form open, or the selected channel's settings already loaded.
 fn channel_sidebar_footer(company_id: Uuid, selected_channel: Option<&Channel>) -> String {
     let edit_button = match selected_channel {
         Some(channel) => format!(
-            r##"<a href="/companies/{company_id}/channels?edit={channel_id}#channel-{channel_id}"
+            r##"<a href="/ui/channels?company_id={company_id}&channel_id={channel_id}"
                     class="btn btn-ghost btn-sm btn-block justify-start">✎ Edit Channel</a>"##,
             channel_id = channel.id,
         ),
@@ -336,19 +403,26 @@ fn channel_sidebar_footer(company_id: Uuid, selected_channel: Option<&Channel>) 
     format!(
         r##"
             <div class="space-y-1 border-t border-base-300 p-2">
-                <a href="/companies/{company_id}/channels?new=1#channel-form-card" class="btn btn-ghost btn-sm btn-block justify-start">＋ New Channel</a>
+                <a href="/ui/channels?company_id={company_id}&new=1" class="btn btn-ghost btn-sm btn-block justify-start">＋ New Channel</a>
                 {edit_button}
             </div>
         "##
     )
 }
 
-fn company_switcher(company: &Company, companies: &[Company]) -> String {
+/// The company picker at the top of both sidebars. Switching company stays in the workspace the
+/// user is already in, so `section` decides where the options point.
+pub(crate) fn company_switcher(
+    company: &Company,
+    companies: &[Company],
+    section: UiSection,
+) -> String {
     let options: String = companies
         .iter()
         .map(|c| {
             format!(
-                r##"<li><a href="/ui?company_id={id}" class="{active}">{name}</a></li>"##,
+                r##"<li><a href="{base_path}?company_id={id}" class="{active}">{name}</a></li>"##,
+                base_path = section.base_path(),
                 id = c.id,
                 active = if c.id == company.id {
                     "menu-active"
@@ -401,7 +475,7 @@ fn channel_menu_item(
                         hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
                         hx-target="#thread-column" hx-swap="outerHTML"
                         hx-push-url="/ui?company_id={company_id}&channel_id={channel_id}"
-                        onclick="selectChannelItem(this)">
+                        onclick="selectSidebarItem(this)">
                         <span class="flex w-full items-center gap-2">
                             <span class="truncate">{name}</span>
                             <span class="badge badge-ghost badge-sm font-mono">{slug}</span>
@@ -634,8 +708,8 @@ fn message_bubble_chat(message: &Message) -> String {
     )
 }
 
-/// Why the last send did not go through, above the form that will be retried.
-fn send_error_banner(error: Option<&str>) -> String {
+/// Why the last submit did not go through, above the form that will be retried.
+pub(crate) fn form_error_banner(error: Option<&str>) -> String {
     match error {
         Some(message) => format!(
             r##"<div class="alert alert-error mb-4 text-sm">{}</div>"##,
@@ -715,7 +789,7 @@ pub fn compose_pane(pane: &ComposePane<'_>) -> String {
         from_field = readonly_field("From", pane.sender_email),
         subject = escape_html_text(pane.subject),
         text_body = escape_html_text(pane.text_body),
-        error_html = send_error_banner(pane.error),
+        error_html = form_error_banner(pane.error),
         footer = send_form_footer(
             pane.deliver,
             &format!(
@@ -767,7 +841,7 @@ pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
         from_field = readonly_field("From", pane.sender_email),
         subject_field = readonly_field("Subject", &pane.thread.reply_subject()),
         text_body = escape_html_text(pane.text_body),
-        error_html = send_error_banner(pane.error),
+        error_html = form_error_banner(pane.error),
         footer = send_form_footer(
             pane.deliver,
             &format!(

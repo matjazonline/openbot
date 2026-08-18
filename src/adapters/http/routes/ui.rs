@@ -111,7 +111,7 @@ fn delivery_mode(deliver: bool) -> SimulationMode {
 
 /// The company a mailbox request is scoped to, always picked from the caller's own companies so a
 /// guessed `company_id` cannot reach another user's mail.
-async fn load_scoped_company(
+pub(super) async fn load_scoped_company(
     company_use_cases: &CompanyUseCases,
     user_id: Uuid,
     requested: Option<Uuid>,
@@ -621,7 +621,7 @@ async fn sent_message_response(
 }
 
 /// The signed-in account itself, needed both for the top bar and as the sender of composed mail.
-async fn load_account(user_use_cases: &UserUseCases, user_id: Uuid) -> AppResult<User> {
+pub(super) async fn load_account(user_use_cases: &UserUseCases, user_id: Uuid) -> AppResult<User> {
     user_use_cases
         .get_user_by_id(user_id)
         .await?

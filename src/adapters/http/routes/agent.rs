@@ -18,6 +18,8 @@ use crate::{
     use_cases::{agent::AgentUseCases, company::CompanyUseCases},
 };
 
+use super::channel::{parse_config_form, slugify};
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route(
@@ -63,12 +65,27 @@ pub fn router() -> Router<AppState> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AgentForm {
     pub name: String,
-    pub slug: String,
+    /// Blank falls back to [`slugify`] of the name, so a form need not show the field at all.
+    pub slug: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     pub config_json: Option<String>,
+    /// `"simple"` means `system_prompt` holds instructions to expand, not the prompt itself.
+    pub form_mode: Option<String>,
+}
+
+impl AgentForm {
+    /// The slug this submission means: what was typed, or the name slugified.
+    pub(super) fn slug(&self) -> String {
+        self.slug
+            .as_deref()
+            .map(str::trim)
+            .filter(|slug| !slug.is_empty())
+            .map(String::from)
+            .unwrap_or_else(|| slugify(&self.name))
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -117,13 +134,52 @@ pub struct AgentResponse {
     pub agent: Agent,
 }
 
-fn parse_config_form(input: Option<String>) -> Result<Option<serde_json::Value>, String> {
-    match input {
-        Some(ref s) if !s.trim().is_empty() => serde_json::from_str(s.trim())
-            .map(Some)
-            .map_err(|e| format!("Invalid JSON config: {e}")),
-        _ => Ok(None),
-    }
+/// What an agent answers with when it should not take the company's LLM settings.
+///
+/// The three always travel together and are all `Option<&str>`, so they are passed as one value
+/// rather than three adjacent parameters a call site could put out of order.
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) struct ModelOverrides<'a> {
+    pub provider: Option<&'a str>,
+    pub model: Option<&'a str>,
+    pub api_key: Option<&'a str>,
+}
+
+/// An agent built from plain-language instructions rather than a written system prompt.
+///
+/// Shared by the `/ui` Agents workspace's Simple tab and by
+/// [`super::channel::resolve_channel_agents`], so "type instructions, get a working agent" means
+/// one thing wherever it is offered.
+pub(super) async fn create_agent_from_instructions(
+    agent_use_cases: &AgentUseCases,
+    user_id: Uuid,
+    company_id: Uuid,
+    name: &str,
+    slug: &str,
+    instructions: &str,
+    overrides: ModelOverrides<'_>,
+) -> Result<Agent, String> {
+    // Expansion runs on the company's own credentials: the overrides are what the *agent* will
+    // answer with, not necessarily a model that can write its prompt.
+    let system_prompt = agent_use_cases
+        .generate_system_prompt(user_id, company_id, instructions, None, None, None)
+        .await
+        .map_err(|err| format!("Failed to generate agent prompt: {err}"))?;
+
+    agent_use_cases
+        .create_agent(
+            user_id,
+            company_id,
+            name,
+            slug,
+            overrides.provider,
+            overrides.model,
+            overrides.api_key,
+            Some(&system_prompt),
+            None,
+        )
+        .await
+        .map_err(|err| format!("Failed to create agent: {err}"))
 }
 
 /// GET /companies/{company_id}/agents - Full HTML page listing agents (Protected).
@@ -161,7 +217,7 @@ async fn create_agent_handler(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
-    let config_json = match parse_config_form(form.config_json) {
+    let config_json = match parse_config_form(form.config_json.clone()) {
         Ok(c) => c,
         Err(err) => {
             let error_html = pages::error_alert(&err);
@@ -182,7 +238,7 @@ async fn create_agent_handler(
             user.id,
             company_id,
             &form.name,
-            &form.slug,
+            &form.slug(),
             form.provider.as_deref(),
             form.model.as_deref(),
             form.api_key.as_deref(),
@@ -396,7 +452,7 @@ async fn update_agent_handler(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
-    let config_json = match parse_config_form(form.config_json) {
+    let config_json = match parse_config_form(form.config_json.clone()) {
         Ok(c) => c,
         Err(err) => return Html(pages::error_alert(&err)),
     };
@@ -407,7 +463,7 @@ async fn update_agent_handler(
             company_id,
             agent_id,
             &form.name,
-            &form.slug,
+            &form.slug(),
             form.provider.as_deref(),
             form.model.as_deref(),
             form.api_key.as_deref(),

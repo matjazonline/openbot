@@ -27,6 +27,8 @@ use crate::{
     },
 };
 
+use super::agent::{ModelOverrides, create_agent_from_instructions};
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route(
@@ -116,7 +118,7 @@ pub fn slugify(input: &str) -> String {
     result.trim_matches('-').to_string()
 }
 
-fn parse_agent_ids_form(input: Option<String>) -> Option<Vec<Uuid>> {
+pub(super) fn parse_agent_ids_form(input: Option<String>) -> Option<Vec<Uuid>> {
     input.and_then(|s| {
         let list: Vec<Uuid> = s
             .split(&[',', ' ', ';', '\n'][..])
@@ -218,7 +220,7 @@ pub(crate) async fn load_thread_page(
     })
 }
 
-fn parse_emails_form(input: Option<String>) -> Option<Vec<String>> {
+pub(super) fn parse_emails_form(input: Option<String>) -> Option<Vec<String>> {
     input.and_then(|s| {
         let list: Vec<String> = s
             .split(&[',', '\n', ';'][..])
@@ -229,7 +231,9 @@ fn parse_emails_form(input: Option<String>) -> Option<Vec<String>> {
     })
 }
 
-fn parse_config_form(input: Option<String>) -> Result<Option<serde_json::Value>, String> {
+pub(super) fn parse_config_form(
+    input: Option<String>,
+) -> Result<Option<serde_json::Value>, String> {
     match input {
         Some(ref s) if !s.trim().is_empty() => serde_json::from_str(s.trim())
             .map(Some)
@@ -405,7 +409,7 @@ impl ChannelListView<'_> {
 ///
 /// In "simple" mode the submitted instructions are expanded into a system prompt and saved as a
 /// brand new agent, which is then appended to any explicitly selected ones.
-async fn resolve_channel_agents(
+pub(super) async fn resolve_channel_agents(
     agent_use_cases: &AgentUseCases,
     form: &ChannelForm,
     slug: &str,
@@ -419,38 +423,41 @@ async fn resolve_channel_agents(
         .map(str::trim)
         .filter(|s| !s.is_empty());
 
-    let generated = if form.form_mode.as_deref() == Some("simple") {
-        match instructions {
-            Some(instructions) => Some(
-                agent_use_cases
-                    .generate_system_prompt(user_id, company_id, instructions, None, None, None)
-                    .await
-                    .map_err(|err| format!("Failed to generate agent prompt: {err}"))?,
-            ),
-            None => None,
-        }
-    } else {
-        None
-    };
-
-    let Some(system_prompt) = generated.as_deref().or(instructions) else {
+    let Some(instructions) = instructions else {
         return Ok(agent_ids);
     };
 
-    let agent = agent_use_cases
-        .create_agent(
+    let agent = if form.form_mode.as_deref() == Some("simple") {
+        create_agent_from_instructions(
+            agent_use_cases,
             user_id,
             company_id,
             &form.name,
             slug,
-            form.provider.as_deref(),
-            form.model.as_deref(),
-            form.api_key.as_deref(),
-            Some(system_prompt),
-            None,
+            instructions,
+            ModelOverrides {
+                provider: form.provider.as_deref(),
+                model: form.model.as_deref(),
+                api_key: form.api_key.as_deref(),
+            },
         )
-        .await
-        .map_err(|err| format!("Failed to create agent for channel: {err}"))?;
+        .await?
+    } else {
+        agent_use_cases
+            .create_agent(
+                user_id,
+                company_id,
+                &form.name,
+                slug,
+                form.provider.as_deref(),
+                form.model.as_deref(),
+                form.api_key.as_deref(),
+                Some(instructions),
+                None,
+            )
+            .await
+            .map_err(|err| format!("Failed to create agent for channel: {err}"))?
+    };
 
     let mut ids = agent_ids.unwrap_or_default();
     ids.push(agent.id);
