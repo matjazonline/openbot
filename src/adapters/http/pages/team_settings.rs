@@ -1,0 +1,531 @@
+//! The `/ui` Team workspace: the same shell as the mailbox, with the company's people in the
+//! sidebar — who has joined, and who has been invited but has not.
+//!
+//! The sidebar picks a person and their pane is swapped into `#team-pane` over htmx, the way
+//! picking a channel swaps the Channels pane. Every write re-renders the pane and sends the
+//! sidebar list along out of band, so an invite, a rename or a removal shows up immediately.
+
+use super::*;
+
+/// What the signed-in user may do with this company's team.
+///
+/// Only the owner can invite, edit an invite or remove a member — [`CompanyInviteUseCases`]
+/// rejects everyone else — so the pane renders those actions only for them rather than offering
+/// buttons the server will refuse.
+///
+/// [`CompanyInviteUseCases`]: crate::use_cases::company_invite::CompanyInviteUseCases
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TeamRole {
+    Owner,
+    Member,
+}
+
+impl TeamRole {
+    /// The owner's view is the only one with anything to manage.
+    pub fn manages(self) -> bool {
+        self == TeamRole::Owner
+    }
+}
+
+/// Which sidebar entry is open, if any.
+///
+/// A member and an invite are different things keyed by different ids — a member by the user it
+/// is, an invite by the invite it is — so the selection is one enum rather than two `Option`s
+/// that could both be set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TeamSelection {
+    #[default]
+    None,
+    /// Keyed by the member's `user_id`, which is what removing one takes.
+    Member(Uuid),
+    Invite(Uuid),
+}
+
+/// The people list in the sidebar — the only part of the workspace a write has to refresh.
+pub struct TeamSettingsList<'a> {
+    pub company: &'a Company,
+    pub members: &'a [CompanyMember],
+    pub invites: &'a [CompanyInvite],
+    pub selected: TeamSelection,
+    pub role: TeamRole,
+}
+
+/// The Team workspace for one request.
+pub struct TeamSettingsPage<'a> {
+    pub user: &'a MailboxUser<'a>,
+    pub companies: &'a [Company],
+    pub list: &'a TeamSettingsList<'a>,
+    /// Pre-rendered right-hand pane: a member, an invite, the invite form, or a placeholder.
+    pub pane_html: &'a str,
+}
+
+/// The pane for someone who has joined.
+pub struct MemberPane<'a> {
+    pub company: &'a Company,
+    pub member: &'a CompanyMember,
+    pub role: TeamRole,
+    pub error: Option<&'a str>,
+}
+
+impl MemberPane<'_> {
+    /// Whether this member can be removed here.
+    ///
+    /// The owner is the one member nobody can remove — `remove_company_team_member` refuses it —
+    /// so their pane shows no button rather than one that always fails.
+    fn removable(&self) -> bool {
+        self.role.manages() && self.member.user_id != self.company.user_id
+    }
+}
+
+/// The pane for someone who has been invited.
+pub struct InvitePane<'a> {
+    pub company: &'a Company,
+    pub invite: &'a CompanyInvite,
+    pub role: TeamRole,
+    /// What the user last typed, when a save was rejected; `None` shows the stored invite.
+    pub draft: Option<&'a str>,
+    pub error: Option<&'a str>,
+}
+
+/// The pane for an invite that does not exist yet.
+pub struct InviteCreatePane<'a> {
+    pub company: &'a Company,
+    pub draft: &'a str,
+    pub error: Option<&'a str>,
+}
+
+/// Where an invite stands, as the sidebar and the pane both badge it.
+///
+/// The status arrives from the database as a string; parsing it here once means the badge, the
+/// wording and the ordering cannot disagree about what "pending" means.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InviteStatus {
+    Pending,
+    Accepted,
+    Declined,
+}
+
+impl InviteStatus {
+    fn parse(status: &str) -> Self {
+        match status.trim().to_lowercase().as_str() {
+            "accepted" => InviteStatus::Accepted,
+            "declined" => InviteStatus::Declined,
+            _ => InviteStatus::Pending,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            InviteStatus::Pending => "Pending",
+            InviteStatus::Accepted => "Accepted",
+            InviteStatus::Declined => "Declined",
+        }
+    }
+
+    fn badge_class(self) -> &'static str {
+        match self {
+            InviteStatus::Pending => "badge-warning",
+            InviteStatus::Accepted => "badge-success",
+            InviteStatus::Declined => "badge-error",
+        }
+    }
+
+    /// Pending invites are the ones still waiting on somebody, so they sort to the top.
+    fn sort_key(self) -> u8 {
+        match self {
+            InviteStatus::Pending => 0,
+            InviteStatus::Accepted => 1,
+            InviteStatus::Declined => 2,
+        }
+    }
+}
+
+pub fn team_settings_page(page: &TeamSettingsPage<'_>) -> String {
+    let company = page.list.company;
+    let invite_button = if page.list.role.manages() {
+        format!(
+            r##"
+            <div class="border-t border-base-300 p-2">
+                <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
+                    hx-get="/ui/team/new?company_id={company_id}"
+                    hx-target="#team-pane" hx-swap="outerHTML"
+                    hx-push-url="/ui/team?company_id={company_id}&new=1">＋ Invite Person</button>
+            </div>
+            "##,
+            company_id = company.id,
+        )
+    } else {
+        String::new()
+    };
+
+    let content = format!(
+        r##"
+        <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
+            {company_switcher}
+            {list_html}
+            {invite_button}
+        </aside>
+        {pane_html}
+        "##,
+        company_switcher = company_switcher(company, page.companies, UiSection::Team),
+        list_html = team_settings_list(page.list, FragmentSwap::Inline),
+        pane_html = page.pane_html,
+    );
+
+    ui_shell(&UiShell {
+        title: &format!("{} Team", company.name),
+        user: page.user,
+        company_id: Some(company.id),
+        section: UiSection::Team,
+        content: &content,
+        script: "",
+    })
+}
+
+/// The sidebar: everyone who has joined, then everyone who was invited.
+///
+/// Keyed `#team-menu` so the mailbox's selection highlighting applies here unchanged, and
+/// rendered out of band after a write so an invite or a removal shows up without the pane having
+/// to reload the whole workspace.
+pub fn team_settings_list(list: &TeamSettingsList<'_>, swap: FragmentSwap) -> String {
+    let members = if list.members.is_empty() {
+        r##"<li class="px-3 py-3 text-xs opacity-60">Nobody has joined yet.</li>"##.to_string()
+    } else {
+        list.members
+            .iter()
+            .map(|member| {
+                member_entry(
+                    list.company,
+                    member,
+                    list.selected == TeamSelection::Member(member.user_id),
+                )
+            })
+            .collect()
+    };
+
+    // Only the owner can see invites at all, so a member's sidebar is the joined list and nothing
+    // else — no empty "Invites" heading implying something is being withheld.
+    let invites = if list.role.manages() {
+        let entries = if list.invites.is_empty() {
+            r##"<li class="px-3 py-3 text-xs opacity-60">No invites sent yet.</li>"##.to_string()
+        } else {
+            sorted_invites(list.invites)
+                .into_iter()
+                .map(|invite| {
+                    invite_entry(
+                        list.company.id,
+                        invite,
+                        list.selected == TeamSelection::Invite(invite.id),
+                    )
+                })
+                .collect()
+        };
+
+        format!(r##"<li class="menu-title">Invites</li>{entries}"##)
+    } else {
+        String::new()
+    };
+
+    format!(
+        r##"<ul id="team-menu" class="menu w-full flex-1 flex-nowrap gap-1 overflow-y-auto px-2"{oob}>
+                <li class="menu-title">Members</li>
+                {members}
+                {invites}
+            </ul>"##,
+        oob = swap.oob_attribute(),
+    )
+}
+
+/// The invites the sidebar shows, pending first, so what still needs an answer is at the top.
+fn sorted_invites(invites: &[CompanyInvite]) -> Vec<&CompanyInvite> {
+    let mut sorted: Vec<&CompanyInvite> = invites.iter().collect();
+    sorted.sort_by_key(|invite| {
+        (
+            InviteStatus::parse(&invite.status).sort_key(),
+            invite.created_at,
+        )
+    });
+    sorted
+}
+
+fn member_entry(company: &Company, member: &CompanyMember, selected: bool) -> String {
+    let role = if member.user_id == company.user_id {
+        "owner"
+    } else {
+        member.role.as_str()
+    };
+
+    format!(
+        r##"
+                <li>
+                    <a class="flex flex-col items-start gap-0.5 {active}"
+                        hx-get="/ui/team/members/{user_id}?company_id={company_id}"
+                        hx-target="#team-pane" hx-swap="outerHTML"
+                        hx-push-url="/ui/team?company_id={company_id}&member_id={user_id}"
+                        onclick="selectSidebarItem(this)">
+                        <span class="flex w-full items-center gap-2">
+                            <span class="min-w-0 truncate">{username}</span>
+                            <span class="badge badge-ghost badge-sm shrink-0">{role}</span>
+                        </span>
+                        <span class="w-full truncate font-mono text-[11px] opacity-60">{email}</span>
+                    </a>
+                </li>
+        "##,
+        active = if selected { "menu-active" } else { "" },
+        user_id = member.user_id,
+        company_id = company.id,
+        username = escape_html_text(member_name(member)),
+        role = escape_html_text(role),
+        email = escape_html_text(member.email.as_deref().unwrap_or("")),
+    )
+}
+
+fn invite_entry(company_id: Uuid, invite: &CompanyInvite, selected: bool) -> String {
+    let status = InviteStatus::parse(&invite.status);
+
+    format!(
+        r##"
+                <li>
+                    <a class="flex w-full items-center gap-2 {active}"
+                        hx-get="/ui/team/invites/{invite_id}?company_id={company_id}"
+                        hx-target="#team-pane" hx-swap="outerHTML"
+                        hx-push-url="/ui/team?company_id={company_id}&invite_id={invite_id}"
+                        onclick="selectSidebarItem(this)">
+                        <span class="min-w-0 truncate font-mono text-[13px]">{email}</span>
+                        <span class="badge {badge} badge-sm ml-auto shrink-0">{label}</span>
+                    </a>
+                </li>
+        "##,
+        active = if selected { "menu-active" } else { "" },
+        invite_id = invite.id,
+        email = escape_html_text(&invite.email),
+        badge = status.badge_class(),
+        label = status.label(),
+    )
+}
+
+/// What to call a member whose account has no username on it.
+fn member_name(member: &CompanyMember) -> &str {
+    match member.username.as_deref() {
+        Some(username) if !username.trim().is_empty() => username,
+        _ => member.email.as_deref().unwrap_or("Unknown user"),
+    }
+}
+
+/// The pane before anyone is picked.
+pub fn team_settings_empty_pane(message: &str, swap: FragmentSwap) -> String {
+    format!(
+        r##"
+        <section id="team-pane" class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+            <p class="text-center text-sm opacity-60">{message}</p>
+        </section>
+        "##,
+        oob = swap.oob_attribute(),
+        message = escape_html_text(message),
+    )
+}
+
+pub fn member_pane(pane: &MemberPane<'_>) -> String {
+    let member = pane.member;
+    let is_owner = member.user_id == pane.company.user_id;
+
+    let remove_button = if pane.removable() {
+        format!(
+            r##"<button type="button" class="btn btn-error btn-outline"
+                            hx-delete="/ui/team/members/{user_id}?company_id={company_id}"
+                            hx-target="#team-pane" hx-swap="outerHTML"
+                            hx-confirm="Remove {username} from the {company_name} team? They lose access to its channels and threads."
+                            hx-push-url="/ui/team?company_id={company_id}">Remove from Team</button>"##,
+            user_id = member.user_id,
+            company_id = pane.company.id,
+            username = escape_html_text(member_name(member)),
+            company_name = escape_html_text(&pane.company.name),
+        )
+    } else {
+        String::new()
+    };
+
+    let footnote = if is_owner {
+        "The company owner cannot be removed from their own team."
+    } else if pane.role.manages() {
+        ""
+    } else {
+        "Only the company owner can change who is on the team."
+    };
+
+    format!(
+        r##"
+        <section id="team-pane" class="flex flex-1 flex-col bg-base-100">
+            <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
+                <div class="min-w-0">
+                    <h2 class="truncate text-xl font-bold">{username}</h2>
+                    <p class="truncate font-mono text-xs opacity-60">{email}</p>
+                </div>
+                <span class="badge badge-primary shrink-0">{role}</span>
+            </div>
+            <div class="flex-1 overflow-y-auto px-6 py-4">
+                {error_html}
+                <dl class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div class="rounded-box bg-base-200 px-4 py-3">
+                        <dt class="text-[11px] uppercase tracking-wider opacity-60">Joined</dt>
+                        <dd class="text-sm font-medium">{joined}</dd>
+                    </div>
+                    <div class="rounded-box bg-base-200 px-4 py-3">
+                        <dt class="text-[11px] uppercase tracking-wider opacity-60">Company</dt>
+                        <dd class="truncate text-sm font-medium">{company_name}</dd>
+                    </div>
+                </dl>
+                <p class="mb-4 text-xs opacity-70">A team member is trusted by every channel in this company that has no participant list of its own.</p>
+                <div class="flex items-center gap-3 border-t border-base-300 pt-4">
+                    <button type="button" class="btn btn-ghost"
+                        hx-get="/ui/team/close?company_id={company_id}"
+                        hx-target="#team-pane" hx-swap="outerHTML"
+                        hx-push-url="/ui/team?company_id={company_id}">Close</button>
+                    <div class="ml-auto">{remove_button}</div>
+                </div>
+                <p class="mt-3 text-[11px] opacity-60">{footnote}</p>
+            </div>
+        </section>
+        "##,
+        username = escape_html_text(member_name(member)),
+        email = escape_html_text(member.email.as_deref().unwrap_or("")),
+        role = escape_html_text(if is_owner { "owner" } else { &member.role }),
+        error_html = form_error_banner(pane.error),
+        joined = member.created_at.format("%b %d, %Y"),
+        company_name = escape_html_text(&pane.company.name),
+        company_id = pane.company.id,
+    )
+}
+
+pub fn invite_pane(pane: &InvitePane<'_>) -> String {
+    let invite = pane.invite;
+    let status = InviteStatus::parse(&invite.status);
+    let email = pane.draft.unwrap_or(&invite.email);
+    let company_id = pane.company.id;
+
+    // An invite that has already been answered is a record, not a form: re-sending it to another
+    // address would silently rewrite what somebody already accepted or declined.
+    let body = if status == InviteStatus::Pending && pane.role.manages() {
+        format!(
+            r##"
+                <form hx-put="/ui/team/invites/{invite_id}?company_id={company_id}" hx-target="#team-pane" hx-swap="outerHTML" class="space-y-4">
+                    <label class="form-control w-full">
+                        <div class="label"><span class="label-text text-xs opacity-70">Invited Email</span></div>
+                        <input type="email" name="email" required value="{email}" placeholder="colleague@example.com"
+                            class="input input-bordered w-full font-mono">
+                        <div class="label"><span class="label-text-alt text-[11px] opacity-60">They join the team by accepting this invite from their own account.</span></div>
+                    </label>
+                    <div class="flex items-center gap-3 border-t border-base-300 pt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                            <span class="[.htmx-request_&]:hidden">Save Changes</span>
+                            <span class="hidden [.htmx-request_&]:inline">Saving...</span>
+                        </button>
+                        <button type="button" class="btn btn-ghost"
+                            hx-get="/ui/team/close?company_id={company_id}"
+                            hx-target="#team-pane" hx-swap="outerHTML"
+                            hx-push-url="/ui/team?company_id={company_id}">Cancel</button>
+                        <button type="button" class="btn btn-error btn-outline ml-auto"
+                            hx-delete="/ui/team/invites/{invite_id}?company_id={company_id}"
+                            hx-target="#team-pane" hx-swap="outerHTML"
+                            hx-confirm="Cancel the invite for {email}?"
+                            hx-push-url="/ui/team?company_id={company_id}">Cancel Invite</button>
+                    </div>
+                </form>
+            "##,
+            invite_id = invite.id,
+            email = escape_html_text(email),
+        )
+    } else {
+        let delete_button = if pane.role.manages() {
+            format!(
+                r##"<button type="button" class="btn btn-error btn-outline ml-auto"
+                            hx-delete="/ui/team/invites/{invite_id}?company_id={company_id}"
+                            hx-target="#team-pane" hx-swap="outerHTML"
+                            hx-confirm="Delete the {label} invite for {email}? It only removes the record."
+                            hx-push-url="/ui/team?company_id={company_id}">Delete Record</button>"##,
+                invite_id = invite.id,
+                label = status.label().to_lowercase(),
+                email = escape_html_text(&invite.email),
+            )
+        } else {
+            String::new()
+        };
+
+        format!(
+            r##"
+                <p class="mb-4 text-sm opacity-70">This invite was already {label}, so its address is fixed. Send a new invite to bring somebody else in.</p>
+                <div class="flex items-center gap-3 border-t border-base-300 pt-4">
+                    <button type="button" class="btn btn-ghost"
+                        hx-get="/ui/team/close?company_id={company_id}"
+                        hx-target="#team-pane" hx-swap="outerHTML"
+                        hx-push-url="/ui/team?company_id={company_id}">Close</button>
+                    {delete_button}
+                </div>
+            "##,
+            label = status.label().to_lowercase(),
+        )
+    };
+
+    format!(
+        r##"
+        <section id="team-pane" class="flex flex-1 flex-col bg-base-100">
+            <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
+                <div class="min-w-0">
+                    <h2 class="truncate font-mono text-xl font-bold">{stored_email}</h2>
+                    <p class="text-xs opacity-60">Invited {created_at}</p>
+                </div>
+                <span class="badge {badge} shrink-0">{label}</span>
+            </div>
+            <div class="flex-1 overflow-y-auto px-6 py-4">
+                {error_html}
+                {body}
+            </div>
+        </section>
+        "##,
+        stored_email = escape_html_text(&invite.email),
+        created_at = invite.created_at.format("%b %d, %Y"),
+        badge = status.badge_class(),
+        label = status.label(),
+        error_html = form_error_banner(pane.error),
+    )
+}
+
+pub fn invite_create_pane(pane: &InviteCreatePane<'_>) -> String {
+    format!(
+        r##"
+        <section id="team-pane" class="flex flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-6 py-4">
+                <h2 class="text-xl font-bold">Invite someone to {company_name}</h2>
+                <p class="text-xs opacity-70">They join by accepting the invite from their own account, and are then trusted by every channel with no participant list of its own.</p>
+            </div>
+            <div class="flex-1 overflow-y-auto px-6 py-4">
+                {error_html}
+                <form class="space-y-4" hx-post="/ui/team/invites?company_id={company_id}" hx-target="#team-pane" hx-swap="outerHTML"
+                    hx-disabled-elt="find button[type='submit']">
+                    <label class="form-control w-full">
+                        <div class="label"><span class="label-text text-xs opacity-70">Email Address</span></div>
+                        <input type="email" name="email" required value="{email}" placeholder="colleague@example.com"
+                            class="input input-bordered w-full font-mono">
+                    </label>
+                    <div class="flex items-center gap-3">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                            <span class="[.htmx-request_&]:hidden">Send Invite</span>
+                            <span class="hidden [.htmx-request_&]:inline">Sending...</span>
+                        </button>
+                        <button type="button" class="btn btn-ghost"
+                            hx-get="/ui/team/close?company_id={company_id}"
+                            hx-target="#team-pane" hx-swap="outerHTML"
+                            hx-push-url="/ui/team?company_id={company_id}">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+        "##,
+        company_name = escape_html_text(&pane.company.name),
+        company_id = pane.company.id,
+        error_html = form_error_banner(pane.error),
+        email = escape_html_text(pane.draft),
+    )
+}

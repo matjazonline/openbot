@@ -454,7 +454,7 @@ fn prompt_generator(company_id: Uuid, agent_id: Option<Uuid>, id_prefix: &str) -
                                 placeholder="Answer billing questions politely, and escalate anything about refunds."
                                 class="textarea textarea-bordered w-full text-xs"></textarea>
                             <div class="flex items-center gap-3">
-                                <button type="button" class="btn btn-secondary btn-sm"
+                                <button type="button" class="btn btn-primary btn-outline btn-sm"
                                     hx-post="/ui/agents/generate-prompt?company_id={company_id}"
                                     hx-include="#agent-instructions-{id_prefix}, #agent-provider-{id_prefix}, #agent-model-{id_prefix}, #agent-api-key-{id_prefix}"{vals}
                                     hx-target="#agent-generator-status-{id_prefix}" hx-swap="innerHTML"

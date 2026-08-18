@@ -46,6 +46,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/ui/channels", get(channels_page).post(create_channel))
         .route("/ui/channels/new", get(create_pane))
+        .route("/ui/channels/close", get(close_pane))
         .route(
             "/ui/channels/{channel_id}",
             get(edit_pane).put(update_channel).delete(delete_channel),
@@ -190,6 +191,20 @@ async fn create_pane(
     )))
 }
 
+/// GET /ui/channels/close - Dismiss whichever form the pane holds (Protected).
+///
+/// What Cancel does: the pane goes back to its placeholder and the sidebar loses its highlight,
+/// so cancelling a create and cancelling an edit both leave the workspace in the same state as
+/// arriving at `/ui/channels` with nothing selected.
+#[instrument(skip(workspace))]
+async fn close_pane(
+    workspace: Workspace,
+    Query(query): Query<CompanyQuery>,
+) -> AppResult<Response> {
+    let company = workspace.scoped_company(query.company_id).await?;
+    workspace.view(&company).cleared_response().await
+}
+
 /// GET /ui/channels/{channel_id} - One channel's settings for the pane (Protected).
 #[instrument(skip(workspace))]
 async fn edit_pane(
@@ -328,13 +343,7 @@ async fn delete_channel(
         .delete_channel(workspace.user_id, company.id, channel_id)
         .await?;
 
-    let view = workspace.view(&company);
-    let channels = view.channels().await?;
-    let pane = pages::channel_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline);
-    let list =
-        pages::channel_settings_list(&view.list(&channels, None), pages::FragmentSwap::OutOfBand);
-
-    Ok(Html(format!("{pane}{list}")).into_response())
+    workspace.view(&company).cleared_response().await
 }
 
 /// Everything the workspace renders from, so each handler names its data once.
@@ -411,6 +420,19 @@ impl ChannelSettingsView<'_> {
             draft,
             error,
         })
+    }
+
+    /// The empty pane plus a sidebar with nothing selected — what cancelling a form and deleting
+    /// a channel both leave behind.
+    async fn cleared_response(&self) -> AppResult<Response> {
+        let channels = self.channels().await?;
+        let pane = pages::channel_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline);
+        let list = pages::channel_settings_list(
+            &self.list(&channels, None),
+            pages::FragmentSwap::OutOfBand,
+        );
+
+        Ok(Html(format!("{pane}{list}")).into_response())
     }
 
     /// What every successful write returns: the saved channel's pane, with the sidebar list

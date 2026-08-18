@@ -11,6 +11,9 @@ pub mod task;
 pub mod ui;
 pub mod ui_agents;
 pub mod ui_channels;
+pub mod ui_companies;
+pub mod ui_tasks;
+pub mod ui_team;
 pub mod user;
 pub mod webhooks;
 
@@ -32,6 +35,9 @@ pub fn router() -> Router<AppState> {
         .merge(ui::router())
         .merge(ui_agents::router())
         .merge(ui_channels::router())
+        .merge(ui_companies::router())
+        .merge(ui_tasks::router())
+        .merge(ui_team::router())
         .route_layer(middleware::from_fn(auth::require_auth));
 
     Router::new()

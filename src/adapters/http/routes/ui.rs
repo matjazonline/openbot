@@ -282,8 +282,13 @@ async fn thread_column_fragment(
         "Select a thread, or use Compose to start a new one.",
         pages::FragmentSwap::OutOfBand,
     );
+    let actions = pages::channel_actions(
+        query.company_id,
+        Some(&channel),
+        pages::FragmentSwap::OutOfBand,
+    );
 
-    Ok(Html(format!("{column}{detail}")))
+    Ok(Html(format!("{column}{detail}{actions}")))
 }
 
 /// GET /ui/threads/list - One older page of threads, appended to the open column (Protected).

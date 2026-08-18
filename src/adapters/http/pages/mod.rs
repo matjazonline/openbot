@@ -14,7 +14,7 @@ use crate::entities::{
     company_invite::CompanyInvite,
     company_member::CompanyMember,
     message::{Message, MessageDirection, MessageRole},
-    task::{BackgroundTask, TaskStatus},
+    task::{BackgroundTask, TaskFilter, TaskStatus},
     thread::Thread,
     value_objects::EmailAddress,
 };
@@ -28,11 +28,14 @@ mod auth;
 mod channel_settings;
 mod channels;
 mod companies;
+mod company_settings;
 mod layout;
 mod mailbox;
 mod onboarding;
 mod simulation;
+mod task_monitor;
 mod tasks;
+mod team_settings;
 
 pub use agent_settings::*;
 pub use agents::*;
@@ -41,11 +44,14 @@ pub use auth::*;
 pub use channel_settings::*;
 pub use channels::*;
 pub use companies::*;
+pub use company_settings::*;
 pub use layout::*;
 pub use mailbox::*;
 pub use onboarding::*;
 pub use simulation::*;
+pub use task_monitor::*;
 pub use tasks::*;
+pub use team_settings::*;
 
 #[cfg(test)]
 mod tests;

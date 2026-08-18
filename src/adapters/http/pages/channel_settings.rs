@@ -40,10 +40,18 @@ const CHANNEL_SETTINGS_SCRIPT: &str = r##"        function showChannelTab(advanc
         }
 
         // A channel can run several agents in order, but a urlencoded form keeps only the last
-        // value of a repeated name — so the checkboxes feed one hidden comma-separated field.
+        // value of a repeated name — so the options feed one hidden comma-separated field.
+        //
+        // The options are radios with no `name`: naming them would group them for the browser but
+        // also add a field to the submitted body, and the server still reads only `agent_ids`.
+        // Clearing the siblings here is what makes the group behave like one.
         function syncChannelAgents(el) {
             var form = el.closest('form');
             if (!form) return;
+            var options = form.querySelectorAll('.channel-agent-option');
+            Array.prototype.forEach.call(options, function (option) {
+                if (option !== el) option.checked = false;
+            });
             var target = form.querySelector('input[name="agent_ids"]');
             if (!target) return;
             var checked = form.querySelectorAll('.channel-agent-option:checked');
@@ -203,10 +211,7 @@ fn channel_settings_entry(
                         hx-target="#channel-pane" hx-swap="outerHTML"
                         hx-push-url="/ui/channels?company_id={company_id}&channel_id={channel_id}"
                         onclick="selectSidebarItem(this)">
-                        <span class="flex w-full items-center gap-2">
-                            <span class="min-w-0 truncate">{name}</span>
-                            <span class="badge badge-ghost badge-sm shrink-0 font-mono">{slug}</span>
-                        </span>
+                        <span class="w-full min-w-0 truncate">{name}</span>
                         <span class="w-full truncate font-mono text-[11px] opacity-60">{address}</span>
                     </a>
                 </li>
@@ -214,7 +219,6 @@ fn channel_settings_entry(
         active = if selected { "menu-active" } else { "" },
         channel_id = channel.id,
         name = escape_html_text(&channel.name),
-        slug = escape_html_text(&channel.slug),
         address = escape_html_text(address),
     )
 }
@@ -265,8 +269,9 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
                             <span class="hidden [.htmx-request_&]:inline">Saving...</span>
                         </button>
                         <button type="button" class="btn btn-ghost"
-                            hx-get="/ui/channels/{channel_id}?company_id={company_id}"
-                            hx-target="#channel-pane" hx-swap="outerHTML">Cancel</button>
+                            hx-get="/ui/channels/close?company_id={company_id}"
+                            hx-target="#channel-pane" hx-swap="outerHTML"
+                            hx-push-url="/ui/channels?company_id={company_id}">Cancel</button>
                         <button type="button" class="btn btn-error btn-outline ml-auto"
                             hx-delete="/ui/channels/{channel_id}?company_id={company_id}"
                             hx-target="#channel-pane" hx-swap="outerHTML"
@@ -333,22 +338,34 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
                             placeholder="Describe the agent's role, responsibilities, rules and tone. A full system prompt is generated when the channel is created."
                             class="textarea textarea-bordered w-full font-mono text-xs">{system_prompt}</textarea>
                     </label>
-                    <button type="submit" class="btn btn-primary">
-                        <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
-                        <span class="[.htmx-request_&]:hidden">Create Channel</span>
-                        <span class="hidden [.htmx-request_&]:inline">Creating...</span>
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                            <span class="[.htmx-request_&]:hidden">Create Channel</span>
+                            <span class="hidden [.htmx-request_&]:inline">Creating...</span>
+                        </button>
+                        <button type="button" class="btn btn-ghost"
+                            hx-get="/ui/channels/close?company_id={company_id}"
+                            hx-target="#channel-pane" hx-swap="outerHTML"
+                            hx-push-url="/ui/channels?company_id={company_id}">Cancel</button>
+                    </div>
                 </form>
                 <form id="channel-tab-advanced" class="{advanced_hidden} space-y-4"
                     hx-post="/ui/channels?company_id={company_id}" hx-target="#channel-pane" hx-swap="outerHTML"
                     hx-disabled-elt="find button[type='submit']">
                     <input type="hidden" name="form_mode" value="advanced">
                     {fields}
-                    <button type="submit" class="btn btn-primary">
-                        <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
-                        <span class="[.htmx-request_&]:hidden">Create Channel</span>
-                        <span class="hidden [.htmx-request_&]:inline">Creating...</span>
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                            <span class="[.htmx-request_&]:hidden">Create Channel</span>
+                            <span class="hidden [.htmx-request_&]:inline">Creating...</span>
+                        </button>
+                        <button type="button" class="btn btn-ghost"
+                            hx-get="/ui/channels/close?company_id={company_id}"
+                            hx-target="#channel-pane" hx-swap="outerHTML"
+                            hx-push-url="/ui/channels?company_id={company_id}">Cancel</button>
+                    </div>
                 </form>
             </div>
         </section>
@@ -456,7 +473,7 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
         company_slug = escape_html_text(&fields.company.slug),
         app_domain_name = escape_html_text(fields.app_domain_name),
         slug = escape_html_text(draft.slug),
-        agents_html = agent_checkboxes(
+        agents_html = agent_radios(
             fields.company.id,
             fields.agents,
             draft.agent_ids,
@@ -471,16 +488,12 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
     )
 }
 
-/// The company's agents as checkboxes feeding one hidden `agent_ids` field.
+/// The company's agents as radios feeding one hidden `agent_ids` field.
 ///
 /// Order matters — a channel runs its agents in sequence — so the hidden field is the source of
-/// truth and `syncChannelAgents` keeps it in the order the boxes are listed.
-fn agent_checkboxes(
-    company_id: Uuid,
-    agents: &[Agent],
-    selected: &[Uuid],
-    id_prefix: &str,
-) -> String {
+/// truth and `syncChannelAgents` keeps it in the order the options are listed. A channel stored
+/// with several agents still renders them all selected; picking one collapses the field to it.
+fn agent_radios(company_id: Uuid, agents: &[Agent], selected: &[Uuid], id_prefix: &str) -> String {
     if agents.is_empty() {
         return format!(
             r##"<div class="rounded-box border border-dashed border-base-300 p-4 text-center text-xs opacity-70">
@@ -497,8 +510,8 @@ fn agent_checkboxes(
             format!(
                 r##"
                             <label class="label cursor-pointer justify-start gap-3 rounded-box px-3 py-2 hover:bg-base-300" for="agent-{id_prefix}-{agent_id}">
-                                <input type="checkbox" id="agent-{id_prefix}-{agent_id}" value="{agent_id}" {checked}
-                                    class="channel-agent-option checkbox checkbox-sm checkbox-primary"
+                                <input type="radio" id="agent-{id_prefix}-{agent_id}" value="{agent_id}" {checked}
+                                    class="channel-agent-option radio radio-sm radio-primary"
                                     onchange="syncChannelAgents(this)">
                                 <span class="flex min-w-0 flex-col items-start">
                                     <span class="truncate text-sm">{name}</span>

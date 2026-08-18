@@ -15,13 +15,13 @@ pub struct TaskPagination {
 }
 
 /// Totals across the tasks on this page.
-struct TaskTokenTotals {
-    prompt: usize,
-    completion: usize,
-    total: usize,
+pub(crate) struct TaskTokenTotals {
+    pub(crate) prompt: usize,
+    pub(crate) completion: usize,
+    pub(crate) total: usize,
 }
 
-fn total_token_usage(tasks: &[BackgroundTask]) -> TaskTokenTotals {
+pub(crate) fn total_token_usage(tasks: &[BackgroundTask]) -> TaskTokenTotals {
     tasks.iter().filter_map(|task| task.token_usage()).fold(
         TaskTokenTotals {
             prompt: 0,

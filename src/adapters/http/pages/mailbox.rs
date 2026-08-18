@@ -40,6 +40,9 @@ pub enum UiSection {
     Mailbox,
     Channels,
     Agents,
+    Tasks,
+    Companies,
+    Team,
 }
 
 impl UiSection {
@@ -49,9 +52,34 @@ impl UiSection {
             UiSection::Mailbox => "/ui",
             UiSection::Channels => "/ui/channels",
             UiSection::Agents => "/ui/agents",
+            UiSection::Tasks => "/ui/tasks",
+            UiSection::Companies => "/ui/companies",
+            UiSection::Team => "/ui/team",
         }
     }
 }
+
+/// The confirmation asked for before a session ends: both logout triggers open this rather than
+/// posting straight away, so a stray click on the rail cannot sign anyone out.
+const LOGOUT_MODAL: &str = r##"
+        <dialog id="logout-modal" class="modal">
+            <div class="modal-box">
+                <h3 class="text-lg font-bold">Log out?</h3>
+                <p class="py-4 opacity-70">You will need to sign in again to reach your mailbox.</p>
+                <div class="modal-action">
+                    <form method="dialog">
+                        <button class="btn btn-ghost">Cancel</button>
+                    </form>
+                    <form method="post" action="/logout">
+                        <button type="submit" class="btn btn-error">Log out</button>
+                    </form>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+                <button>close</button>
+            </form>
+        </dialog>
+        "##;
 
 /// The chrome every `/ui` response shares: the top bar, the icon rail, and the HTML shell around
 /// them. Only what sits to the right of the rail differs between workspaces.
@@ -83,6 +111,7 @@ pub fn ui_shell(shell: &UiShell<'_>) -> String {
             {content}
         </div>
     </div>
+    {LOGOUT_MODAL}
         "##,
         top_bar = top_bar(shell.user),
         content = shell.content,
@@ -154,7 +183,11 @@ pub struct ComposePane<'a> {
 /// scrolled to its newest message — every load is htmx.
 ///
 /// Kept out of the `format!` blocks below so its braces need no escaping.
-const MAILBOX_SCRIPT: &str = r##"        // Scoped to the clicked entry's own list, so every `/ui` sidebar highlights with it.
+const MAILBOX_SCRIPT: &str = r##"        function confirmLogout() {
+            document.getElementById('logout-modal').showModal();
+        }
+
+        // Scoped to the clicked entry's own list, so every `/ui` sidebar highlights with it.
         function selectSidebarItem(el) {
             var menu = el.closest('ul');
             if (!menu) return;
@@ -255,7 +288,7 @@ pub fn mailbox_no_company_page(user: &MailboxUser<'_>) -> String {
                     <h2 class="card-title">No companies yet</h2>
                     <p class="text-sm opacity-70">Create a company to get channels, threads and a mailbox.</p>
                     <div class="card-actions mt-4">
-                        <a href="/companies" class="btn btn-primary">Go to Companies</a>
+                        <a href="/ui/companies" class="btn btn-primary">Go to Companies</a>
                     </div>
                 </div>
             </div>
@@ -300,11 +333,9 @@ fn top_bar(user: &MailboxUser<'_>) -> String {
                 </div>
                 <ul tabindex="0" class="menu dropdown-content z-50 mt-1 w-60 rounded-box bg-base-300 p-2 shadow-xl">
                     <li class="menu-title truncate">{email}</li>
-                    <li><a href="/companies">Companies</a></li>
+                    <li><a href="/ui/companies">Companies</a></li>
                     <li>
-                        <form method="post" action="/logout">
-                            <button type="submit" class="w-full text-left">Log out</button>
-                        </form>
+                        <button type="button" class="w-full text-left" onclick="confirmLogout()">Log out</button>
                     </li>
                 </ul>
             </div>
@@ -338,16 +369,19 @@ fn icon_rail(company_id: Uuid, section: UiSection) -> String {
             <a href="/ui?company_id={company_id}" class="btn btn-square btn-lg {mailbox_style} text-2xl leading-none" title="Mailbox">✉</a>
             <a href="/ui/channels?company_id={company_id}" class="btn btn-square btn-lg {channels_style} text-2xl leading-none" title="Channels">#</a>
             <a href="/ui/agents?company_id={company_id}" class="btn btn-square btn-lg {agents_style} text-2xl leading-none" title="Agents">🤖</a>
-            <a href="/companies/{company_id}/tasks" class="btn btn-square btn-lg btn-ghost text-2xl leading-none" title="Tasks">⚙</a>
-            <a href="/companies" class="btn btn-square btn-lg btn-ghost text-2xl leading-none" title="Companies">🏢</a>
-            <form method="post" action="/logout" class="mt-auto">
-                <button type="submit" class="btn btn-square btn-lg btn-ghost text-2xl leading-none" title="Log out">⏻</button>
-            </form>
+            <a href="/ui/tasks?company_id={company_id}" class="btn btn-square btn-lg {tasks_style} text-2xl leading-none" title="Tasks">⚙</a>
+            <a href="/ui/companies?company_id={company_id}" class="btn btn-square btn-lg {companies_style} text-2xl leading-none" title="Companies">🏢</a>
+            <a href="/ui/team?company_id={company_id}" class="btn btn-square btn-lg {team_style} text-2xl leading-none" title="Team">👥</a>
+            <button type="button" class="btn btn-square btn-lg btn-ghost mt-auto text-2xl leading-none"
+                title="Log out" onclick="confirmLogout()">⏻</button>
         </nav>
         "##,
         mailbox_style = style(section == UiSection::Mailbox),
         channels_style = style(section == UiSection::Channels),
         agents_style = style(section == UiSection::Agents),
+        tasks_style = style(section == UiSection::Tasks),
+        companies_style = style(section == UiSection::Companies),
+        team_style = style(section == UiSection::Team),
     )
 }
 
@@ -384,13 +418,21 @@ fn channel_sidebar(page: &MailboxPage<'_>) -> String {
             {footer}
         </aside>
         "##,
-        footer = channel_sidebar_footer(page.company.id, page.selected_channel),
+        footer = channel_actions(page.company.id, page.selected_channel, FragmentSwap::Inline),
     )
 }
 
 /// Channel management is the `/ui` Channels workspace, so these link straight into the state they
 /// mean: the create form open, or the selected channel's settings already loaded.
-fn channel_sidebar_footer(company_id: Uuid, selected_channel: Option<&Channel>) -> String {
+///
+/// Picking a channel only swaps the thread column, so this block is re-rendered out-of-band with
+/// it — otherwise "Edit Channel" would keep pointing at whatever the last full page load selected,
+/// or stay missing entirely when the mailbox was entered without a channel in the URL.
+pub fn channel_actions(
+    company_id: Uuid,
+    selected_channel: Option<&Channel>,
+    swap: FragmentSwap,
+) -> String {
     let edit_button = match selected_channel {
         Some(channel) => format!(
             r##"<a href="/ui/channels?company_id={company_id}&channel_id={channel_id}"
@@ -402,11 +444,12 @@ fn channel_sidebar_footer(company_id: Uuid, selected_channel: Option<&Channel>) 
 
     format!(
         r##"
-            <div class="space-y-1 border-t border-base-300 p-2">
+            <div id="channel-actions" class="space-y-1 border-t border-base-300 p-2"{oob}>
                 <a href="/ui/channels?company_id={company_id}&new=1" class="btn btn-ghost btn-sm btn-block justify-start">＋ New Channel</a>
                 {edit_button}
             </div>
-        "##
+        "##,
+        oob = swap.oob_attribute(),
     )
 }
 

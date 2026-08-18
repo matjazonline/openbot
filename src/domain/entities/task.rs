@@ -102,3 +102,78 @@ impl BackgroundTask {
         }
     }
 }
+
+/// One page of a company's background tasks: which ones, in what order, and how far in.
+///
+/// Both the classic tasks page and the `/ui` Tasks workspace page the same list, so the clamping
+/// and the offset arithmetic live here rather than being re-derived in either adapter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TaskFilter {
+    pub channel_id: Option<Uuid>,
+    pub status: Option<TaskStatus>,
+    /// Oldest first when set; the list is newest first otherwise.
+    pub sort_asc: bool,
+    page: usize,
+    limit: usize,
+}
+
+impl TaskFilter {
+    pub const DEFAULT_PAGE_SIZE: usize = 50;
+    pub const MAX_PAGE_SIZE: usize = 100;
+
+    /// Builds a filter from what a request asked for, clamping the paging to what the list will
+    /// actually serve.
+    pub fn new(
+        channel_id: Option<Uuid>,
+        status: Option<TaskStatus>,
+        sort_asc: bool,
+        page: Option<usize>,
+        limit: Option<usize>,
+    ) -> Self {
+        Self {
+            channel_id,
+            status,
+            sort_asc,
+            page: page.unwrap_or(1).max(1),
+            limit: limit
+                .unwrap_or(Self::DEFAULT_PAGE_SIZE)
+                .clamp(1, Self::MAX_PAGE_SIZE),
+        }
+    }
+
+    pub fn page(&self) -> usize {
+        self.page
+    }
+
+    pub fn limit(&self) -> usize {
+        self.limit
+    }
+
+    /// How many tasks this page skips, saturating rather than wrapping on an absurd `?page=`.
+    pub fn offset(&self) -> i64 {
+        self.page
+            .saturating_sub(1)
+            .saturating_mul(self.limit)
+            .min(i64::MAX as usize) as i64
+    }
+
+    /// One row more than the page needs, so whether a next page exists comes out of the same
+    /// query instead of a second count.
+    pub fn probe_limit(&self) -> i64 {
+        self.limit.saturating_add(1) as i64
+    }
+
+    /// Splits a [`Self::probe_limit`]-sized read into the page itself and whether one follows it.
+    pub fn split_probe(&self, mut tasks: Vec<BackgroundTask>) -> (Vec<BackgroundTask>, bool) {
+        let has_next = tasks.len() > self.limit;
+        tasks.truncate(self.limit);
+        (tasks, has_next)
+    }
+
+    pub fn on_page(self, page: usize) -> Self {
+        Self {
+            page: page.max(1),
+            ..self
+        }
+    }
+}

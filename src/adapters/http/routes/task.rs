@@ -12,13 +12,13 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
-    entities::task::TaskStatus,
+    entities::task::{TaskFilter, TaskStatus},
     services::task_worker::TaskWorker,
     use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
 };
 
-const DEFAULT_TASK_PAGE_SIZE: usize = 50;
-const MAX_TASK_PAGE_SIZE: usize = 100;
+const DEFAULT_TASK_PAGE_SIZE: usize = TaskFilter::DEFAULT_PAGE_SIZE;
+const MAX_TASK_PAGE_SIZE: usize = TaskFilter::MAX_PAGE_SIZE;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -34,7 +34,9 @@ pub fn router() -> Router<AppState> {
         )
 }
 
-fn deserialize_empty_string_as_none<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+pub(super) fn deserialize_empty_string_as_none<'de, D, T>(
+    deserializer: D,
+) -> Result<Option<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
     T: FromStr,
