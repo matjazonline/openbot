@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -59,17 +59,45 @@ pub trait CompanyPersistence: Send + Sync {
                 )
                 .await
             }
-            _ => Err(AppError::Internal("Company not found.".into())),
+            _ => Err(company_not_found()),
         }
     }
     async fn delete_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
         match self.get_by_id(id).await? {
             Some(company) if company.user_id == user_id => self.delete(id).await,
-            _ => Err(AppError::Internal("Company not found.".into())),
+            _ => Err(company_not_found()),
         }
     }
     async fn is_company_team_member(&self, company_id: Uuid, email: &str) -> AppResult<bool>;
     async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>>;
+}
+
+/// Resolve a company the caller owns.
+///
+/// A company that does not exist and a company owned by somebody else are reported *identically*,
+/// on purpose: telling the two apart would let anyone probe ids to enumerate other tenants'
+/// companies. Nothing in the product shows a non-owner a company — `list_by_user_id` returns only
+/// owned rows — so there is no "visible but forbidden" case that would deserve a 403 instead.
+///
+/// The denied attempt is logged, so the signal an operator needs survives even though the caller
+/// is told nothing.
+pub async fn owned_company(
+    persistence: &dyn CompanyPersistence,
+    user_id: Uuid,
+    company_id: Uuid,
+) -> AppResult<Company> {
+    match persistence.get_by_id(company_id).await? {
+        Some(company) if company.user_id == user_id => Ok(company),
+        Some(_) => {
+            warn!("User {user_id} is not the owner of company {company_id}");
+            Err(company_not_found())
+        }
+        None => Err(company_not_found()),
+    }
+}
+
+pub fn company_not_found() -> AppError {
+    AppError::NotFound("Company not found, or you are not its owner.".into())
 }
 
 #[derive(Clone)]
@@ -80,6 +108,15 @@ pub struct CompanyUseCases {
 impl CompanyUseCases {
     pub fn new(persistence: Arc<dyn CompanyPersistence>) -> Self {
         Self { persistence }
+    }
+
+    /// The company, only when the caller owns it.
+    ///
+    /// The method exists because route handlers hold an `Arc<CompanyUseCases>` and cannot reach
+    /// the persistence behind it. See [`owned_company`] for why a company owned by somebody else
+    /// is reported exactly like one that does not exist.
+    pub async fn owned_company(&self, user_id: Uuid, company_id: Uuid) -> AppResult<Company> {
+        owned_company(self.persistence.as_ref(), user_id, company_id).await
     }
 
     #[instrument(skip(self))]
@@ -378,5 +415,45 @@ mod tests {
         use_cases.delete_company(company.id).await.unwrap();
         let list_after = use_cases.list_user_companies(user_id).await.unwrap();
         assert_eq!(list_after.len(), 0);
+    }
+
+    /// The security property, not just the status code: a stranger must not be able to tell a
+    /// company that exists from one that does not.
+    #[tokio::test]
+    async fn a_foreign_company_is_indistinguishable_from_a_missing_one() {
+        let owner = Uuid::new_v4();
+        let stranger = Uuid::new_v4();
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: owner,
+            name: "Acme".into(),
+            slug: "acme".into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now(),
+        };
+        let persistence = MockCompanyPersistence {
+            companies: Mutex::new(vec![company.clone()]),
+        };
+
+        owned_company(&persistence, owner, company.id)
+            .await
+            .expect("the owner gets their company");
+
+        let foreign = owned_company(&persistence, stranger, company.id)
+            .await
+            .unwrap_err();
+        let missing = owned_company(&persistence, stranger, Uuid::new_v4())
+            .await
+            .unwrap_err();
+
+        assert!(matches!(foreign, AppError::NotFound(_)), "{foreign:?}");
+        assert_eq!(
+            foreign.to_string(),
+            missing.to_string(),
+            "a differing message would let an id probe enumerate other tenants"
+        );
     }
 }

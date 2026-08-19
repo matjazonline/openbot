@@ -17,6 +17,8 @@ use crate::{
     use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
 };
 
+use super::company_load_error;
+
 const DEFAULT_TASK_PAGE_SIZE: usize = TaskFilter::DEFAULT_PAGE_SIZE;
 const MAX_TASK_PAGE_SIZE: usize = TaskFilter::MAX_PAGE_SIZE;
 
@@ -83,9 +85,9 @@ async fn list_company_tasks_page(
     Path(company_id): Path<Uuid>,
     Query(query): Query<TaskFilterQuery>,
 ) -> impl IntoResponse {
-    let company = match company_use_cases.get_company(company_id).await {
-        Ok(Some(c)) if c.user_id == _user.id => c,
-        _ => return Html(pages::error_alert("Company not found.")),
+    let company = match company_use_cases.owned_company(_user.id, company_id).await {
+        Ok(company) => company,
+        Err(error) => return Html(pages::error_alert(&company_load_error(&error))),
     };
 
     let channels = channel_use_cases
@@ -222,16 +224,10 @@ async fn filter_company_tasks(
     Path(company_id): Path<Uuid>,
     Query(query): Query<TaskFilterQuery>,
 ) -> impl IntoResponse {
-    let is_owner = company_use_cases
-        .get_company(company_id)
-        .await
-        .ok()
-        .flatten()
-        .is_some_and(|company| company.user_id == _user.id);
-    if !is_owner {
+    if let Err(error) = company_use_cases.owned_company(_user.id, company_id).await {
         return (
             [("HX-Push-Url", format!("/companies/{company_id}/tasks"))],
-            Html(pages::error_alert("Company not found.")),
+            Html(pages::error_alert(&company_load_error(&error))),
         );
     }
 
@@ -290,14 +286,8 @@ async fn stop_company_task(
     _user: AuthenticatedUser,
     Path((company_id, task_id)): Path<(Uuid, Uuid)>,
 ) -> impl IntoResponse {
-    let is_owner = company_use_cases
-        .get_company(company_id)
-        .await
-        .ok()
-        .flatten()
-        .is_some_and(|company| company.user_id == _user.id);
-    if !is_owner {
-        return Html(pages::error_alert("Company not found."));
+    if let Err(error) = company_use_cases.owned_company(_user.id, company_id).await {
+        return Html(pages::error_alert(&company_load_error(&error)));
     }
     let task_persistence = thread_use_cases.get_task_persistence().await;
     if !matches!(task_persistence.get_task_by_id(task_id).await, Ok(Some(task)) if task.company_id == company_id)
@@ -325,14 +315,8 @@ async fn resume_company_task(
     _user: AuthenticatedUser,
     Path((company_id, task_id)): Path<(Uuid, Uuid)>,
 ) -> impl IntoResponse {
-    let is_owner = company_use_cases
-        .get_company(company_id)
-        .await
-        .ok()
-        .flatten()
-        .is_some_and(|company| company.user_id == _user.id);
-    if !is_owner {
-        return Html(pages::error_alert("Company not found."));
+    if let Err(error) = company_use_cases.owned_company(_user.id, company_id).await {
+        return Html(pages::error_alert(&company_load_error(&error)));
     }
     let task_persistence = thread_use_cases.get_task_persistence().await;
     if !matches!(task_persistence.get_task_by_id(task_id).await, Ok(Some(task)) if task.company_id == company_id)

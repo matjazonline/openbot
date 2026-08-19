@@ -20,6 +20,20 @@ pub mod webhooks;
 use axum::{Router, middleware};
 
 use crate::adapters::http::{app_state::AppState, auth};
+use crate::app_error::AppError;
+
+/// What an htmx fragment shows when the company behind a request cannot be loaded.
+///
+/// These routes answer 200 with an alert body because htmx does not swap a 4xx response, so the
+/// status code cannot carry the distinction. The match is what keeps a database fault from being
+/// reported as a routine "not found" — which is what the `.ok().flatten()` these callers used to
+/// do would have done.
+pub(super) fn company_load_error(error: &AppError) -> String {
+    match error {
+        AppError::NotFound(message) => message.clone(),
+        other => format!("Failed to load company: {other}"),
+    }
+}
 
 pub fn router() -> Router<AppState> {
     let protected = Router::new()

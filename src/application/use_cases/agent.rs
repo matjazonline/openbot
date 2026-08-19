@@ -10,9 +10,15 @@ use crate::{
     entities::agent::Agent,
     use_cases::{
         channel::{SlugKind, validate_slug},
-        company::CompanyPersistence,
+        company::{CompanyPersistence, owned_company},
     },
 };
+
+/// An agent belonging to another company is reported exactly like a missing one, so an id probe
+/// cannot tell a foreign agent from a nonexistent one. See [`owned_company`].
+pub fn agent_not_found() -> AppError {
+    AppError::NotFound("Agent not found in this company.".into())
+}
 
 #[async_trait]
 pub trait AgentPersistence: Send + Sync {
@@ -71,18 +77,7 @@ impl AgentUseCases {
     }
 
     async fn verify_company_owner(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        let company = self
-            .company_persistence
-            .get_by_id(company_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
-
-        if company.user_id != user_id {
-            return Err(AppError::Internal(
-                "Unauthorized: only the company owner can manage agents.".into(),
-            ));
-        }
-
+        owned_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         Ok(())
     }
 
@@ -183,12 +178,10 @@ impl AgentUseCases {
             .agent_persistence
             .get_by_id(agent_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Agent not found.".into()))?;
+            .ok_or_else(agent_not_found)?;
 
         if agent.company_id != company_id {
-            return Err(AppError::Internal(
-                "Agent does not belong to this company.".into(),
-            ));
+            return Err(agent_not_found());
         }
 
         let name_trimmed = name.trim();
@@ -239,12 +232,10 @@ impl AgentUseCases {
             .agent_persistence
             .get_by_id(agent_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Agent not found.".into()))?;
+            .ok_or_else(agent_not_found)?;
 
         if agent.company_id != company_id {
-            return Err(AppError::Internal(
-                "Agent does not belong to this company.".into(),
-            ));
+            return Err(agent_not_found());
         }
 
         info!("Deleting agent {} for company {}", agent_id, company_id);

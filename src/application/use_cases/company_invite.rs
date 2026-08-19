@@ -7,8 +7,14 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{company_invite::CompanyInvite, company_member::CompanyMember, user::User},
-    use_cases::company::CompanyPersistence,
+    use_cases::company::{CompanyPersistence, company_not_found, owned_company},
 };
+
+/// An invite belonging to another company is reported exactly like a missing one, so an id probe
+/// cannot tell a foreign invite from a nonexistent one. See [`owned_company`].
+fn invite_not_found() -> AppError {
+    AppError::NotFound("Invite not found in this company.".into())
+}
 
 #[async_trait]
 pub trait CompanyInvitePersistence: Send + Sync {
@@ -51,18 +57,7 @@ impl CompanyInviteUseCases {
     }
 
     async fn verify_company_owner(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        let company = self
-            .company_persistence
-            .get_by_id(company_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
-
-        if company.user_id != user_id {
-            return Err(AppError::Internal(
-                "Unauthorized: only the company owner can manage invites and team members.".into(),
-            ));
-        }
-
+        owned_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         Ok(())
     }
 
@@ -134,12 +129,10 @@ impl CompanyInviteUseCases {
             .invite_persistence
             .get_invite_by_id(invite_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Invite not found.".into()))?;
+            .ok_or_else(invite_not_found)?;
 
         if invite.company_id != company_id {
-            return Err(AppError::Internal(
-                "Invite does not belong to this company.".into(),
-            ));
+            return Err(invite_not_found());
         }
 
         let email_trimmed = new_email.trim().to_lowercase();
@@ -168,12 +161,10 @@ impl CompanyInviteUseCases {
             .invite_persistence
             .get_invite_by_id(invite_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Invite not found.".into()))?;
+            .ok_or_else(invite_not_found)?;
 
         if invite.company_id != company_id {
-            return Err(AppError::Internal(
-                "Invite does not belong to this company.".into(),
-            ));
+            return Err(invite_not_found());
         }
 
         info!("Deleting invite {} for company {}", invite_id, company_id);
@@ -202,7 +193,7 @@ impl CompanyInviteUseCases {
             .invite_persistence
             .get_invite_by_id(invite_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Invite not found.".into()))?;
+            .ok_or_else(invite_not_found)?;
         if !invite.email.eq_ignore_ascii_case(&user.email) {
             return Err(AppError::Internal(
                 "Invite email does not match active user email.".into(),
@@ -232,7 +223,7 @@ impl CompanyInviteUseCases {
             .invite_persistence
             .get_invite_by_id(invite_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Invite not found.".into()))?;
+            .ok_or_else(invite_not_found)?;
         if !invite.email.eq_ignore_ascii_case(&user.email) {
             return Err(AppError::Internal(
                 "Invite email does not match active user email.".into(),
@@ -253,23 +244,23 @@ impl CompanyInviteUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<CompanyMember>> {
-        let company = self
-            .company_persistence
-            .get_by_id(company_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
-
-        if company.user_id != user_id {
-            let members = self
-                .invite_persistence
-                .list_members_by_company(company_id)
-                .await?;
-            if !members.iter().any(|m| m.user_id == user_id) {
-                return Err(AppError::Internal(
-                    "Unauthorized: only company members or owner can view team members.".into(),
-                ));
+        // The one place a non-owner has legitimate access, so it cannot delegate to
+        // `owned_company` outright — but a caller who is neither owner nor member is told exactly
+        // what a stranger asking about a nonexistent company is told.
+        match owned_company(self.company_persistence.as_ref(), user_id, company_id).await {
+            Ok(_) => {}
+            Err(AppError::NotFound(_)) => {
+                let members = self
+                    .invite_persistence
+                    .list_members_by_company(company_id)
+                    .await?;
+                return if members.iter().any(|m| m.user_id == user_id) {
+                    Ok(members)
+                } else {
+                    Err(company_not_found())
+                };
             }
-            return Ok(members);
+            Err(err) => return Err(err),
         }
 
         self.invite_persistence
@@ -516,6 +507,82 @@ mod tests {
                 .retain(|m| !(m.company_id == company_id && m.user_id == user_id));
             Ok(())
         }
+    }
+
+    /// Team-member listing is the one place a non-owner has legitimate access, so it needs its own
+    /// coverage: a member gets in, and anyone else is refused in the same words a stranger hears
+    /// about a company that does not exist.
+    #[tokio::test]
+    async fn members_may_list_the_team_and_everyone_else_is_told_nothing() {
+        let owner_id = Uuid::new_v4();
+        let member_id = Uuid::new_v4();
+        let stranger_id = Uuid::new_v4();
+        let company_id = Uuid::new_v4();
+
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![Company {
+                id: company_id,
+                user_id: owner_id,
+                name: "Acme Corp".to_string(),
+                slug: "acme".into(),
+                api_key: None,
+                provider: None,
+                model: None,
+                enable_llm_spam_guardrail: None,
+                created_at: Utc::now(),
+            }]),
+        });
+        let invite_persistence = Arc::new(MockCompanyInvitePersistence {
+            invites: Mutex::new(Vec::new()),
+            members: Mutex::new(vec![CompanyMember {
+                id: Uuid::new_v4(),
+                company_id,
+                user_id: member_id,
+                username: Some("member".into()),
+                email: Some("member@example.com".into()),
+                role: "member".into(),
+                created_at: Utc::now(),
+            }]),
+        });
+        let use_cases = CompanyInviteUseCases::new(company_persistence, invite_persistence);
+
+        assert_eq!(
+            use_cases
+                .list_company_team_members(owner_id, company_id)
+                .await
+                .unwrap()
+                .len(),
+            1,
+            "the owner still sees the team"
+        );
+        assert_eq!(
+            use_cases
+                .list_company_team_members(member_id, company_id)
+                .await
+                .unwrap()
+                .len(),
+            1,
+            "a member is not the owner but may still read the team"
+        );
+
+        let stranger_err = use_cases
+            .list_company_team_members(stranger_id, company_id)
+            .await
+            .unwrap_err();
+        let missing_err = use_cases
+            .list_company_team_members(stranger_id, Uuid::new_v4())
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(stranger_err, AppError::NotFound(_)),
+            "{stranger_err:?}"
+        );
+        assert_eq!(
+            stranger_err.to_string(),
+            missing_err.to_string(),
+            "telling the two apart would confirm the company exists"
+        );
     }
 
     #[tokio::test]

@@ -315,7 +315,11 @@ impl ApprovalUseCases {
         self.approval_persistence
             .get_approval_by_token(token)
             .await?
-            .ok_or_else(|| AppError::Internal("Approval request token not found.".into()))
+            .ok_or_else(|| {
+                AppError::NotFound(
+                    "This confirmation link is not valid or has already been used.".into(),
+                )
+            })
     }
 
     /// Explain a link that can no longer be acted on: either it just expired, or its decision was
@@ -403,6 +407,35 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use std::sync::Mutex;
+
+    /// The one config every test here uses; kept in one place so a new field is added once.
+    fn test_config() -> Arc<AppConfig> {
+        Arc::new(AppConfig {
+            jwt_secret: "secret".into(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".into(),
+            cors_allowed_origins: vec![],
+            smtp_host: "localhost".into(),
+            smtp_port: 1025,
+            smtp_username: "".into(),
+            smtp_password: "".into(),
+            smtp_from_address: "noreply@mailagents.com".into(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".into(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+        })
+    }
 
     struct MockApprovalPersistence {
         approvals: Mutex<Vec<HumanApproval>>,
@@ -690,6 +723,31 @@ mod tests {
         }
     }
 
+    /// A stale link out of somebody's inbox is routine, not a server fault: it must not answer 500
+    /// with the reason swallowed by `AppError::Internal`.
+    #[tokio::test]
+    async fn an_unknown_approval_token_is_not_found_rather_than_an_internal_error() {
+        let use_cases = ApprovalUseCases::new(
+            Arc::new(MockApprovalPersistence {
+                approvals: Mutex::new(Vec::new()),
+            }),
+            Arc::new(MockTaskPersistence),
+            Arc::new(MockThreadPersistence),
+            test_config(),
+        );
+
+        let error = use_cases
+            .process_link_action("no-such-token", "approve")
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, AppError::NotFound(_)), "{error:?}");
+        assert!(
+            error.to_string().contains("confirmation link"),
+            "the reader needs to know which link failed: {error}"
+        );
+    }
+
     #[tokio::test]
     async fn approval_lifecycle_confirm_and_reject_flow() {
         let approval_persistence = Arc::new(MockApprovalPersistence {
@@ -697,31 +755,7 @@ mod tests {
         });
         let task_persistence = Arc::new(MockTaskPersistence);
         let thread_persistence = Arc::new(MockThreadPersistence);
-        let config = Arc::new(AppConfig {
-            jwt_secret: "secret".into(),
-            access_token_ttl: time::Duration::days(1),
-            refresh_token_ttl: time::Duration::days(30),
-            app_domain_name: "mailagents.com".into(),
-            cors_allowed_origins: vec![],
-            smtp_host: "localhost".into(),
-            smtp_port: 1025,
-            smtp_username: "".into(),
-            smtp_password: "".into(),
-            smtp_from_address: "noreply@mailagents.com".into(),
-            incoming_smtp_enabled: true,
-            incoming_smtp_host: "0.0.0.0".into(),
-            incoming_smtp_port: 2525,
-            max_spam_score: 5.0,
-            dnsbl_enabled: false,
-            dnsbl_servers: vec![],
-            smtp_rate_limit_conns_per_ip: 30,
-            reject_self_domain_helo: true,
-            enable_heuristic_scanner: true,
-            enable_spam_scanner: false,
-            spam_scanner_type: "rspamd".to_string(),
-            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
-        });
+        let config = test_config();
 
         let use_cases = ApprovalUseCases::new(
             approval_persistence.clone(),
@@ -839,31 +873,7 @@ mod tests {
         });
         let task_persistence = Arc::new(MockTaskPersistence);
         let thread_persistence = Arc::new(MockThreadPersistence);
-        let config = Arc::new(AppConfig {
-            jwt_secret: "secret".into(),
-            access_token_ttl: time::Duration::days(1),
-            refresh_token_ttl: time::Duration::days(30),
-            app_domain_name: "mailagents.com".into(),
-            cors_allowed_origins: vec![],
-            smtp_host: "localhost".into(),
-            smtp_port: 1025,
-            smtp_username: "".into(),
-            smtp_password: "".into(),
-            smtp_from_address: "noreply@mailagents.com".into(),
-            incoming_smtp_enabled: true,
-            incoming_smtp_host: "0.0.0.0".into(),
-            incoming_smtp_port: 2525,
-            max_spam_score: 5.0,
-            dnsbl_enabled: false,
-            dnsbl_servers: vec![],
-            smtp_rate_limit_conns_per_ip: 30,
-            reject_self_domain_helo: true,
-            enable_heuristic_scanner: true,
-            enable_spam_scanner: false,
-            spam_scanner_type: "rspamd".to_string(),
-            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
-        });
+        let config = test_config();
 
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
@@ -973,31 +983,7 @@ mod tests {
         });
         let task_persistence = Arc::new(MockTaskPersistence);
         let thread_persistence = Arc::new(MockThreadPersistence);
-        let config = Arc::new(AppConfig {
-            jwt_secret: "secret".into(),
-            access_token_ttl: time::Duration::days(1),
-            refresh_token_ttl: time::Duration::days(30),
-            app_domain_name: "mailagents.com".into(),
-            cors_allowed_origins: vec![],
-            smtp_host: "localhost".into(),
-            smtp_port: 1025,
-            smtp_username: "".into(),
-            smtp_password: "".into(),
-            smtp_from_address: "noreply@mailagents.com".into(),
-            incoming_smtp_enabled: true,
-            incoming_smtp_host: "0.0.0.0".into(),
-            incoming_smtp_port: 2525,
-            max_spam_score: 5.0,
-            dnsbl_enabled: false,
-            dnsbl_servers: vec![],
-            smtp_rate_limit_conns_per_ip: 30,
-            reject_self_domain_helo: true,
-            enable_heuristic_scanner: true,
-            enable_spam_scanner: false,
-            spam_scanner_type: "rspamd".to_string(),
-            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
-        });
+        let config = test_config();
 
         let use_cases = ApprovalUseCases::new(
             approval_persistence,

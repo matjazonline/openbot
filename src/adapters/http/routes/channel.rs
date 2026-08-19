@@ -1247,7 +1247,7 @@ async fn get_channel_json(
     let channel = channel_use_cases
         .get_company_channel(user.id, company_id, channel_id)
         .await?
-        .ok_or_else(|| crate::app_error::AppError::Internal("Channel not found.".into()))?;
+        .ok_or_else(crate::use_cases::channel::channel_not_found)?;
 
     Ok((StatusCode::OK, Json(channel)))
 }

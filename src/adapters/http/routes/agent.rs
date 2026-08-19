@@ -541,7 +541,7 @@ async fn get_agent_json(
     let agent = agent_use_cases
         .get_company_agent(user.id, company_id, agent_id)
         .await?
-        .ok_or_else(|| crate::app_error::AppError::Internal("Agent not found.".into()))?;
+        .ok_or_else(crate::use_cases::agent::agent_not_found)?;
 
     Ok((StatusCode::OK, Json(agent)))
 }

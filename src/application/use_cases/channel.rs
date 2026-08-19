@@ -12,7 +12,7 @@ use crate::{
         value_objects::{ChannelSlug, CompanySlug},
     },
     infra::config::AppConfig,
-    use_cases::company::CompanyPersistence,
+    use_cases::company::{CompanyPersistence, owned_company},
 };
 use serde::{Deserialize, Serialize};
 
@@ -109,6 +109,12 @@ fn blank_to_none(value: &mut Option<String>) {
     }
 }
 
+/// A channel belonging to another company is reported exactly like a missing one, so an id probe
+/// cannot tell a foreign channel from a nonexistent one. See [`owned_company`].
+pub fn channel_not_found() -> AppError {
+    AppError::NotFound("Channel not found in this company.".into())
+}
+
 #[async_trait]
 pub trait ChannelPersistence: Send + Sync {
     async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel>;
@@ -149,18 +155,7 @@ impl ChannelUseCases {
     }
 
     async fn verify_company_owner(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        let company = self
-            .company_persistence
-            .get_by_id(company_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
-
-        if company.user_id != user_id {
-            return Err(AppError::Internal(
-                "Unauthorized: only the company owner can manage channels.".into(),
-            ));
-        }
-
+        owned_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         Ok(())
     }
 
@@ -248,12 +243,10 @@ impl ChannelUseCases {
             .channel_persistence
             .get_by_id(channel_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Channel not found.".into()))?;
+            .ok_or_else(channel_not_found)?;
 
         if channel.company_id != company_id {
-            return Err(AppError::Internal(
-                "Channel does not belong to this company.".into(),
-            ));
+            return Err(channel_not_found());
         }
 
         write.normalize()?;
@@ -280,12 +273,10 @@ impl ChannelUseCases {
             .channel_persistence
             .get_by_id(channel_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Channel not found.".into()))?;
+            .ok_or_else(channel_not_found)?;
 
         if channel.company_id != company_id {
-            return Err(AppError::Internal(
-                "Channel does not belong to this company.".into(),
-            ));
+            return Err(channel_not_found());
         }
 
         info!("Deleting channel {} for company {}", channel_id, company_id);
@@ -824,6 +815,109 @@ mod tests {
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
         })
+    }
+
+    /// `GET` and `PUT` on the same channel must agree, and neither may reveal whether an id it
+    /// refuses belongs to another company or to nothing at all.
+    #[tokio::test]
+    async fn reads_and_writes_refuse_a_foreign_channel_exactly_like_a_missing_one() {
+        let owner_id = Uuid::new_v4();
+        let company_id = Uuid::new_v4();
+        let other_company_id = Uuid::new_v4();
+
+        let company = |id| Company {
+            id,
+            user_id: owner_id,
+            name: "Acme Corp".to_string(),
+            slug: "acme".into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now(),
+        };
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![company(company_id), company(other_company_id)]),
+        });
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(Vec::new()),
+        });
+        let use_cases =
+            ChannelUseCases::new(company_persistence, channel_persistence, test_config(true));
+
+        // The owner owns both companies, so this is a cross-tenant id, not an authorization miss.
+        let foreign = use_cases
+            .create_channel(
+                owner_id,
+                other_company_id,
+                ChannelWrite {
+                    name: "Elsewhere".into(),
+                    slug: "elsewhere".into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
+                false,
+            )
+            .await
+            .unwrap();
+        let missing = Uuid::new_v4();
+
+        // Reads collapse both to `None`, which the route layer renders as one 404.
+        assert!(
+            use_cases
+                .get_company_channel(owner_id, company_id, foreign.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            use_cases
+                .get_company_channel(owner_id, company_id, missing)
+                .await
+                .unwrap()
+                .is_none()
+        );
+
+        let write = || ChannelWrite {
+            name: "Hijack".into(),
+            slug: "hijack".into(),
+            enabled: true,
+            ..ChannelWrite::default()
+        };
+        let foreign_err = use_cases
+            .update_channel(owner_id, company_id, foreign.id, write(), false)
+            .await
+            .unwrap_err();
+        let missing_err = use_cases
+            .update_channel(owner_id, company_id, missing, write(), false)
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(foreign_err, AppError::NotFound(_)),
+            "{foreign_err:?}"
+        );
+        assert_eq!(
+            foreign_err.to_string(),
+            missing_err.to_string(),
+            "a differing message would let an id probe map another company's channels"
+        );
+        assert_eq!(
+            foreign_err.to_string(),
+            channel_not_found().to_string(),
+            "the write path must speak with the same voice as the read path"
+        );
+
+        // The foreign channel is untouched by the refused write.
+        assert_eq!(
+            use_cases
+                .get_company_channel(owner_id, other_company_id, foreign.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .name,
+            "Elsewhere"
+        );
     }
 
     #[tokio::test]
