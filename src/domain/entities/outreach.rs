@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
@@ -54,7 +54,7 @@ pub struct OutreachProgress {
     pub target_count: usize,
     pub response_count: usize,
     pub required_response_count: usize,
-    pub expires_at: NaiveDateTime,
+    pub expires_at: DateTime<Utc>,
     pub suspended: bool,
 }
 
@@ -83,7 +83,7 @@ pub struct CreateOutreachRequest {
     pub worker_id: Uuid,
     pub outreach_key: String,
     pub required_threshold_percent: f64,
-    pub expires_at: NaiveDateTime,
+    pub expires_at: DateTime<Utc>,
     pub subject: String,
     pub body: String,
     pub targets: Vec<OutreachTargetRequest>,
@@ -106,5 +106,5 @@ pub struct DueOutreach {
     pub required_threshold_percent: f64,
     pub target_count: usize,
     pub response_count: usize,
-    pub expires_at: NaiveDateTime,
+    pub expires_at: DateTime<Utc>,
 }

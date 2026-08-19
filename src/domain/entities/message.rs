@@ -90,5 +90,5 @@ pub struct Message {
     pub direction: MessageDirection,
     pub role: MessageRole,
     pub thread_index: Option<ThreadIndex>,
-    pub created_at: chrono::NaiveDateTime,
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }

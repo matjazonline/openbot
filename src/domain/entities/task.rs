@@ -80,11 +80,11 @@ pub struct BackgroundTask {
     pub max_retries: i32,
     pub last_error: Option<String>,
     pub worker_id: Option<Uuid>,
-    pub locked_at: Option<chrono::NaiveDateTime>,
-    pub lock_expires_at: Option<chrono::NaiveDateTime>,
-    pub run_at: chrono::NaiveDateTime,
-    pub created_at: chrono::NaiveDateTime,
-    pub updated_at: chrono::NaiveDateTime,
+    pub locked_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub lock_expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub run_at: chrono::DateTime<chrono::Utc>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl BackgroundTask {

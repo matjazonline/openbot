@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::{
@@ -69,7 +69,7 @@ pub trait ThreadPersistence: Send + Sync {
     async fn list_threads_by_channel_id(
         &self,
         channel_id: Uuid,
-        before: Option<(NaiveDateTime, Uuid)>,
+        before: Option<(DateTime<Utc>, Uuid)>,
         limit: usize,
     ) -> AppResult<Vec<Thread>>;
 
@@ -391,7 +391,7 @@ impl ThreadUseCases {
                 direction: MessageDirection::Outbound,
                 role: MessageRole::Agent,
                 thread_index: None,
-                created_at: chrono::Utc::now().naive_utc(),
+                created_at: chrono::Utc::now(),
             })
             .await?;
         Ok(())
@@ -489,7 +489,7 @@ impl ThreadUseCases {
     pub async fn list_channel_threads(
         &self,
         channel_id: Uuid,
-        before: Option<(NaiveDateTime, Uuid)>,
+        before: Option<(DateTime<Utc>, Uuid)>,
         limit: usize,
     ) -> AppResult<Vec<Thread>> {
         self.thread_persistence

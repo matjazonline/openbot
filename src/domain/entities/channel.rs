@@ -81,7 +81,7 @@ pub struct Channel {
     /// payloads: tasks queued before this field existed must still re-hydrate.
     #[serde(default = "enabled_by_default")]
     pub enabled: bool,
-    pub created_at: chrono::NaiveDateTime,
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
 fn enabled_by_default() -> bool {
@@ -212,7 +212,7 @@ mod tests {
             agent_ids: None,
             channel_config: None,
             enabled: true,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         }
     }
 

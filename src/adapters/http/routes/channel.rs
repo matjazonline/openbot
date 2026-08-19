@@ -7,7 +7,7 @@ use axum::{
     response::{Html, IntoResponse},
     routing::{get, put},
 };
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 use uuid::Uuid;
@@ -195,12 +195,14 @@ pub struct ThreadListResponse {
     pub has_more: bool,
 }
 
-fn parse_thread_cursor(cursor: &str) -> AppResult<(NaiveDateTime, Uuid)> {
+fn parse_thread_cursor(cursor: &str) -> AppResult<(DateTime<Utc>, Uuid)> {
     let (updated_at, id) = cursor
         .rsplit_once('_')
         .ok_or_else(|| AppError::BadRequest("Invalid thread cursor".into()))?;
-    let updated_at = NaiveDateTime::parse_from_str(updated_at, THREAD_CURSOR_TIMESTAMP_FORMAT)
-        .map_err(|_| AppError::BadRequest("Invalid thread cursor".into()))?;
+    let updated_at =
+        chrono::NaiveDateTime::parse_from_str(updated_at, THREAD_CURSOR_TIMESTAMP_FORMAT)
+            .map_err(|_| AppError::BadRequest("Invalid thread cursor".into()))?
+            .and_utc();
     let id =
         Uuid::parse_str(id).map_err(|_| AppError::BadRequest("Invalid thread cursor".into()))?;
     Ok((updated_at, id))
@@ -1326,8 +1328,8 @@ mod tests {
             channel_id: Uuid::new_v4(),
             subject: "Subject".into(),
             participant_emails: vec![],
-            created_at: Utc::now().naive_utc(),
-            updated_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
 
         let cursor = format_thread_cursor(&thread);
@@ -1352,7 +1354,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
 
         let channel = Channel {
@@ -1368,7 +1370,7 @@ mod tests {
             participant_emails: Some(vec!["agent@test.com".into()]),
             agent_ids: None,
             channel_config: Some(json!({ "mode": "async" })),
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
 
         let channels = [channel.clone()];
@@ -1413,8 +1415,8 @@ mod tests {
             channel_id: channel.id,
             subject: "Question <script>".into(),
             participant_emails: vec!["person@example.com".into()],
-            created_at: Utc::now().naive_utc(),
-            updated_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         let threads_page = pages::channel_threads_page(
             &company,
@@ -1553,7 +1555,7 @@ mod tests {
             direction: crate::entities::message::MessageDirection::Inbound,
             role: crate::entities::message::MessageRole::Human,
             thread_index: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
         let test_agent_message = crate::entities::message::Message {
             id: Uuid::new_v4(),
@@ -1572,7 +1574,7 @@ mod tests {
             direction: crate::entities::message::MessageDirection::Outbound,
             role: crate::entities::message::MessageRole::Agent,
             thread_index: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
 
         let run_test_html = pages::channel_simulation_execution_result_fragment(
@@ -1622,8 +1624,8 @@ mod tests {
             channel_id: channel.id,
             subject: "Existing Thread Subject".to_string(),
             participant_emails: vec!["user@test.com".into()],
-            created_at: Utc::now().naive_utc(),
-            updated_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
 
         let loaded_thread_html = pages::channel_simulation_loaded_thread_fragment(

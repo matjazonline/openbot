@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -17,7 +17,7 @@ pub struct CompanyInviteDb {
     pub company_name: Option<String>,
     pub email: String,
     pub status: String,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 impl From<CompanyInviteDb> for CompanyInvite {
@@ -41,7 +41,7 @@ pub struct CompanyMemberDb {
     pub username: Option<String>,
     pub email: Option<String>,
     pub role: String,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 impl From<CompanyMemberDb> for CompanyMember {

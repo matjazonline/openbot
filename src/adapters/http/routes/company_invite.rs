@@ -481,7 +481,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
 
         let invite = CompanyInvite {
@@ -490,7 +490,7 @@ mod tests {
             company_name: Some(company.name.clone()),
             email: "invited@test.com".to_string(),
             status: "pending".to_string(),
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
 
         let member = CompanyMember {
@@ -500,7 +500,7 @@ mod tests {
             username: Some("member1".to_string()),
             email: Some("member1@test.com".to_string()),
             role: "member".to_string(),
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
 
         let page_html = pages::company_invites_page(&company, &[invite.clone()], &[member.clone()]);

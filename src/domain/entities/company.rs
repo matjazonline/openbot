@@ -14,5 +14,5 @@ pub struct Company {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub enable_llm_spam_guardrail: Option<bool>,
-    pub created_at: chrono::NaiveDateTime,
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }

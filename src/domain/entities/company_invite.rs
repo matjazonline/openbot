@@ -8,5 +8,5 @@ pub struct CompanyInvite {
     pub company_name: Option<String>,
     pub email: String,
     pub status: String,
-    pub created_at: chrono::NaiveDateTime,
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }

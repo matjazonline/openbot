@@ -1231,7 +1231,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
         let result = ResolvedAgentParams::new(Some(&company), None, None);
         assert!(result.is_err());
@@ -1251,7 +1251,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
         let result = ResolvedAgentParams::new(Some(&company), None, None);
         assert!(result.is_err());
@@ -1284,7 +1284,7 @@ mod tests {
             participant_emails: None,
             agent_ids: None,
             channel_config: Some(custom_config),
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
         let params = ResolvedAgentParams::new(None, Some(&channel), None)?;
 
@@ -1304,7 +1304,7 @@ mod tests {
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
         let params = ResolvedAgentParams::new(Some(&company), None, None)?;
         let result = AgentRunner::new("Hello world", &params).execute().await;
@@ -1323,7 +1323,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("invalid-custom-model-xyz".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
         let params = ResolvedAgentParams::new(Some(&company), None, None)?;
         let result = AgentRunner::new("Hello world", &params).execute().await;
@@ -1379,7 +1379,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let resolved = ResolvedAgentParams::new(Some(&company), None, None).unwrap();
@@ -1416,7 +1416,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
@@ -1435,7 +1435,7 @@ mod tests {
                 "system_prompt": "Channel prompt",
                 "temperature": 0.2
             })),
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let resolved = ResolvedAgentParams::new(Some(&company), Some(&channel), None).unwrap();
@@ -1471,7 +1471,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
@@ -1491,7 +1491,7 @@ mod tests {
                 "temperature": 0.2,
                 "channel_only_field": true
             })),
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let agent = AgentEntity {
@@ -1507,7 +1507,7 @@ mod tests {
                 "system_prompt": "Agent prompt",
                 "temperature": 0.7
             })),
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let resolved =
@@ -1551,7 +1551,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
@@ -1567,7 +1567,7 @@ mod tests {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let resolved = ResolvedAgentParams::new(Some(&company), Some(&channel), None);
@@ -1591,7 +1591,7 @@ mod tests {
             provider: Some("unsupported_provider".to_string()),
             model: Some("some-model".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let err = ResolvedAgentParams::new(Some(&company), None, None).unwrap_err();
@@ -1619,7 +1619,7 @@ mod tests {
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
@@ -1640,7 +1640,7 @@ mod tests {
                     // model and api_key missing in llm block
                 }
             })),
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let resolved = ResolvedAgentParams::new(Some(&company), Some(&channel), None).unwrap();
@@ -1661,7 +1661,7 @@ mod tests {
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let agent = AgentEntity {
@@ -1674,7 +1674,7 @@ mod tests {
             api_key: None,
             system_prompt: Some("You are a helpful triage assistant.".to_string()),
             config_json: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let resolved = ResolvedAgentParams::new(Some(&company), None, Some(&agent)).unwrap();
@@ -1696,7 +1696,7 @@ mod tests {
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let resolved = ResolvedAgentParams::new(Some(&company), None, None).unwrap();

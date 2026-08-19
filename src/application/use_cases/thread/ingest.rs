@@ -923,6 +923,6 @@ fn build_inbound_message(
             MessageRole::Human
         },
         thread_index: parsed.thread_index.clone().map(ThreadIndex::from),
-        created_at: chrono::Utc::now().naive_utc(),
+        created_at: chrono::Utc::now(),
     }
 }

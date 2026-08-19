@@ -113,7 +113,7 @@ mod test {
                     username: "testuser".to_string(),
                     email: "testuser@gmail.com".to_string(),
                     password_hash: "secret_hash".to_string(),
-                    created_at: chrono::Utc::now().naive_utc(),
+                    created_at: chrono::Utc::now(),
                 }))
             } else {
                 Ok(None)
@@ -127,7 +127,7 @@ mod test {
                     username: "testuser".to_string(),
                     email: "testuser@gmail.com".to_string(),
                     password_hash: "secret_hash".to_string(),
-                    created_at: chrono::Utc::now().naive_utc(),
+                    created_at: chrono::Utc::now(),
                 }))
             } else {
                 Ok(None)
@@ -140,7 +140,7 @@ mod test {
                 username: "testuser".to_string(),
                 email: "testuser@gmail.com".to_string(),
                 password_hash: "secret_hash".to_string(),
-                created_at: chrono::Utc::now().naive_utc(),
+                created_at: chrono::Utc::now(),
             }))
         }
     }

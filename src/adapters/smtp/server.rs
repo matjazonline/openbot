@@ -960,8 +960,8 @@ mod tests {
                 channel_id,
                 subject: subject.to_string(),
                 participant_emails: participant_emails.to_vec(),
-                created_at: Utc::now().naive_utc(),
-                updated_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             };
             self.threads.lock().unwrap().push(thread.clone());
             Ok(thread)
@@ -980,7 +980,7 @@ mod tests {
         async fn list_threads_by_channel_id(
             &self,
             _channel_id: Uuid,
-            _before: Option<(chrono::NaiveDateTime, Uuid)>,
+            _before: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
             _limit: usize,
         ) -> AppResult<Vec<Thread>> {
             unimplemented!()
@@ -1120,9 +1120,9 @@ mod tests {
                 worker_id: None,
                 locked_at: None,
                 lock_expires_at: None,
-                run_at: Utc::now().naive_utc(),
-                created_at: Utc::now().naive_utc(),
-                updated_at: Utc::now().naive_utc(),
+                run_at: Utc::now(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             })
         }
         async fn get_task_by_id(
@@ -1141,7 +1141,7 @@ mod tests {
         async fn claim_pending_tasks(
             &self,
             _worker_id: Uuid,
-            _lock_expires_at: chrono::NaiveDateTime,
+            _lock_expires_at: chrono::DateTime<chrono::Utc>,
             _limit: i64,
         ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
             Ok(vec![])
@@ -1150,7 +1150,7 @@ mod tests {
             &self,
             _id: Uuid,
             _worker_id: Uuid,
-            _lock_expires_at: chrono::NaiveDateTime,
+            _lock_expires_at: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<bool> {
             Ok(true)
         }
@@ -1162,7 +1162,7 @@ mod tests {
             _id: Uuid,
             _worker_id: Uuid,
             _error_msg: &str,
-            _next_run_at: chrono::NaiveDateTime,
+            _next_run_at: chrono::DateTime<chrono::Utc>,
             _is_dead_letter: bool,
         ) -> AppResult<bool> {
             Ok(true)
@@ -1239,7 +1239,7 @@ mod tests {
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             }]),
         });
 
@@ -1257,7 +1257,7 @@ mod tests {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             }]),
         });
 
@@ -1470,7 +1470,7 @@ regis";
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             }]),
         });
 
@@ -1488,7 +1488,7 @@ regis";
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             }]),
         });
 

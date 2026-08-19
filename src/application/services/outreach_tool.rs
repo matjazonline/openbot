@@ -173,7 +173,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
                 worker_id: self.context.worker_id,
                 outreach_key: request.idempotency_key(self.context.task_id, &target_emails),
                 required_threshold_percent: request.threshold_percent,
-                expires_at: Utc::now().naive_utc() + Duration::hours(request.timeout_hours as i64),
+                expires_at: Utc::now() + Duration::hours(request.timeout_hours as i64),
                 subject: request.subject.to_string(),
                 body: request.body.to_string(),
                 targets,
@@ -202,7 +202,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
             } else {
                 0
             },
-            expires_at: progress.expires_at.and_utc().to_rfc3339(),
+            expires_at: progress.expires_at.to_rfc3339(),
         };
         match serde_json::to_string(&output) {
             Ok(output) => ToolResult::ok(output),
@@ -477,7 +477,7 @@ mod tests {
             participant_emails: None,
             agent_ids: Some(vec![Uuid::new_v4()]),
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }
     }
 

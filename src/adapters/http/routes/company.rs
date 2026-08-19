@@ -271,7 +271,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
 
         let page_html = pages::companies_page(&[company.clone()]);
@@ -308,7 +308,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
 
         let row_html = pages::company_row_fragment(&company);

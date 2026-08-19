@@ -392,7 +392,7 @@ mod tests {
                 company_name: Some("Acme".to_string()),
                 email: email.to_string(),
                 status: "pending".to_string(),
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             };
             self.invites.lock().unwrap().push(invite.clone());
             Ok(invite)
@@ -474,7 +474,7 @@ mod tests {
                     username: Some("inviteduser".to_string()),
                     email: Some(user_email.to_string()),
                     role: "member".to_string(),
-                    created_at: Utc::now().naive_utc(),
+                    created_at: Utc::now(),
                 });
             }
             invite.status = "accepted".to_string();
@@ -533,7 +533,7 @@ mod tests {
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             }]),
         });
 
@@ -577,7 +577,7 @@ mod tests {
             username: "newuser".to_string(),
             email: "newuser@example.com".to_string(),
             password_hash: "hash".to_string(),
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
 
         let accepted = use_cases.accept_invite(&user, invite.id).await.unwrap();

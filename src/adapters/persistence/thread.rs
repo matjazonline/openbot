@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
@@ -23,8 +23,8 @@ pub struct ThreadDb {
     pub channel_id: Uuid,
     pub subject: String,
     pub participant_emails: Vec<String>,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl From<ThreadDb> for Thread {
@@ -62,7 +62,7 @@ pub struct MessageDb {
     pub direction: String,
     pub role: String,
     pub thread_index: Option<String>,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 impl TryFrom<MessageDb> for Message {
@@ -207,7 +207,7 @@ impl ThreadPersistence for PostgresPersistence {
     async fn list_threads_by_channel_id(
         &self,
         channel_id: Uuid,
-        before: Option<(NaiveDateTime, Uuid)>,
+        before: Option<(DateTime<Utc>, Uuid)>,
         limit: usize,
     ) -> AppResult<Vec<Thread>> {
         let db = if let Some((updated_at, id)) = before {
@@ -653,7 +653,7 @@ mod tests {
             direction: MessageDirection::Inbound,
             role: MessageRole::Human,
             thread_index: Some("root-index".into()),
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
         persistence.create_message(&message).await.unwrap();
         persistence
@@ -778,7 +778,7 @@ mod tests {
             direction: MessageDirection::Outbound,
             role: MessageRole::Agent,
             thread_index: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
         persistence
             .create_message(&outreach_outbound)
@@ -811,7 +811,7 @@ mod tests {
         .bind(outreach_id)
         .bind(task_id)
         .bind(&suffix)
-        .bind(chrono::Utc::now().naive_utc() + chrono::Duration::hours(1))
+        .bind(chrono::Utc::now() + chrono::Duration::hours(1))
         .execute(&pool)
         .await
         .unwrap();

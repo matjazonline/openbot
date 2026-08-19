@@ -6,7 +6,7 @@ CREATE TABLE channel_slugs (
     channel_id UUID NOT NULL,
     slug CITEXT NOT NULL,
     is_primary BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (channel_id, slug),
     CONSTRAINT channel_slugs_company_slug_key UNIQUE (company_id, slug),
     CONSTRAINT channel_slugs_channel_fk

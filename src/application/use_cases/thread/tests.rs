@@ -198,8 +198,8 @@ impl ThreadPersistence for MockThreadPersistence {
             channel_id,
             subject: subject.to_string(),
             participant_emails: participant_emails.to_vec(),
-            created_at: Utc::now().naive_utc(),
-            updated_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         self.threads.lock().unwrap().push(thread.clone());
         Ok(thread)
@@ -218,7 +218,7 @@ impl ThreadPersistence for MockThreadPersistence {
     async fn list_threads_by_channel_id(
         &self,
         channel_id: Uuid,
-        before: Option<(chrono::NaiveDateTime, Uuid)>,
+        before: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
         limit: usize,
     ) -> AppResult<Vec<Thread>> {
         let mut threads: Vec<_> = self
@@ -404,7 +404,7 @@ impl TaskPersistence for MockTaskPersistence {
             target_count: 1,
             response_count: 1,
             required_response_count: 1,
-            expires_at: Utc::now().naive_utc() + chrono::Duration::hours(1),
+            expires_at: Utc::now() + chrono::Duration::hours(1),
             suspended: false,
         })
     }
@@ -431,9 +431,9 @@ impl TaskPersistence for MockTaskPersistence {
             worker_id: None,
             locked_at: None,
             lock_expires_at: None,
-            run_at: Utc::now().naive_utc(),
-            created_at: Utc::now().naive_utc(),
-            updated_at: Utc::now().naive_utc(),
+            run_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         self.tasks.lock().unwrap().push(task.clone());
         Ok(task)
@@ -463,10 +463,10 @@ impl TaskPersistence for MockTaskPersistence {
     async fn claim_pending_tasks(
         &self,
         worker_id: Uuid,
-        lock_expires_at: chrono::NaiveDateTime,
+        lock_expires_at: chrono::DateTime<chrono::Utc>,
         limit: i64,
     ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-        let now = Utc::now().naive_utc();
+        let now = Utc::now();
         let mut tasks = self.tasks.lock().unwrap();
         let mut claimed = Vec::new();
         for task in tasks
@@ -491,10 +491,10 @@ impl TaskPersistence for MockTaskPersistence {
         &self,
         id: Uuid,
         worker_id: Uuid,
-        lock_expires_at: chrono::NaiveDateTime,
+        lock_expires_at: chrono::DateTime<chrono::Utc>,
     ) -> AppResult<bool> {
         let mut list = self.tasks.lock().unwrap();
-        let now = Utc::now().naive_utc();
+        let now = Utc::now();
         if let Some(t) = list.iter_mut().find(|t| {
             t.id == id && t.status == crate::entities::task::TaskStatus::Pending && t.run_at <= now
         }) {
@@ -510,7 +510,7 @@ impl TaskPersistence for MockTaskPersistence {
 
     async fn mark_task_completed(&self, id: Uuid, worker_id: Uuid) -> AppResult<bool> {
         let mut list = self.tasks.lock().unwrap();
-        let now = Utc::now().naive_utc();
+        let now = Utc::now();
         if let Some(t) = list.iter_mut().find(|t| {
             t.id == id
                 && t.status == crate::entities::task::TaskStatus::Processing
@@ -532,11 +532,11 @@ impl TaskPersistence for MockTaskPersistence {
         id: Uuid,
         worker_id: Uuid,
         error_msg: &str,
-        next_run_at: chrono::NaiveDateTime,
+        next_run_at: chrono::DateTime<chrono::Utc>,
         is_dead_letter: bool,
     ) -> AppResult<bool> {
         let mut list = self.tasks.lock().unwrap();
-        let now = Utc::now().naive_utc();
+        let now = Utc::now();
         if let Some(t) = list.iter_mut().find(|t| {
             t.id == id
                 && t.status == crate::entities::task::TaskStatus::Processing
@@ -599,7 +599,7 @@ impl TaskPersistence for MockTaskPersistence {
             })
             .unwrap();
         t.status = crate::entities::task::TaskStatus::Pending;
-        t.run_at = Utc::now().naive_utc();
+        t.run_at = Utc::now();
         t.worker_id = None;
         t.locked_at = None;
         t.lock_expires_at = None;
@@ -675,7 +675,7 @@ async fn test_inter_channel_hop_limit_rejection() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -693,7 +693,7 @@ async fn test_inter_channel_hop_limit_rejection() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
             Channel {
                 enabled: true,
@@ -708,7 +708,7 @@ async fn test_inter_channel_hop_limit_rejection() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
         ]),
     });
@@ -802,7 +802,7 @@ async fn test_spf_authentication_failure_rejection() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -819,7 +819,7 @@ async fn test_spf_authentication_failure_rejection() {
             participant_emails: Some(vec!["@public".into()]),
             agent_ids: None,
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }]),
     });
 
@@ -898,7 +898,7 @@ async fn test_high_spam_score_rejection() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -915,7 +915,7 @@ async fn test_high_spam_score_rejection() {
             participant_emails: Some(vec!["@public".into()]),
             agent_ids: None,
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }]),
     });
 
@@ -996,7 +996,7 @@ async fn test_dmarc_authentication_failure_rejection() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -1013,7 +1013,7 @@ async fn test_dmarc_authentication_failure_rejection() {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }]),
     });
 
@@ -1094,7 +1094,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -1111,7 +1111,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
             participant_emails: Some(vec!["alice@example.com".into()]),
             agent_ids: None,
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }]),
     });
 
@@ -1193,7 +1193,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -1210,7 +1210,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
             participant_emails: Some(vec!["alice@example.com".into()]),
             agent_ids: None,
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }]),
     });
 
@@ -1290,7 +1290,7 @@ async fn test_channel_in_cc_resolves_properly() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -1307,7 +1307,7 @@ async fn test_channel_in_cc_resolves_properly() {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }]),
     });
 
@@ -1388,7 +1388,7 @@ async fn test_multi_channel_to_and_cc_execution() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -1406,7 +1406,7 @@ async fn test_multi_channel_to_and_cc_execution() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
             Channel {
                 enabled: true,
@@ -1421,7 +1421,7 @@ async fn test_multi_channel_to_and_cc_execution() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
         ]),
     });
@@ -1511,7 +1511,7 @@ async fn test_pipeline_address_chaining_execution() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -1529,7 +1529,7 @@ async fn test_pipeline_address_chaining_execution() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
             Channel {
                 enabled: true,
@@ -1544,7 +1544,7 @@ async fn test_pipeline_address_chaining_execution() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
             Channel {
                 enabled: true,
@@ -1559,7 +1559,7 @@ async fn test_pipeline_address_chaining_execution() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
         ]),
     });
@@ -1648,7 +1648,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -1666,7 +1666,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
             Channel {
                 enabled: true,
@@ -1681,7 +1681,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
         ]),
     });
@@ -1791,7 +1791,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -1808,7 +1808,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }]),
     });
 
@@ -1934,7 +1934,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }],
         vec![(company_id, "team_member@acme.com".to_string())],
     ));
@@ -1958,7 +1958,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 participant_emails: None, // Default = Company Team
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
             Channel {
                 enabled: true,
@@ -1973,7 +1973,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 participant_emails: Some(vec!["@public".into()]), // Public
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
             Channel {
                 enabled: true,
@@ -1988,7 +1988,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 participant_emails: Some(vec!["allowed@external.com".into()]), // Explicit list
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
         ]),
     });
@@ -2123,7 +2123,7 @@ async fn test_sender_verification_and_delegation_target_check() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -2140,7 +2140,7 @@ async fn test_sender_verification_and_delegation_target_check() {
             participant_emails: Some(vec!["@public".into()]),
             agent_ids: None,
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }]),
     });
 
@@ -2305,7 +2305,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
@@ -2322,7 +2322,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
                 participant_emails: Some(vec!["@public".into()]),
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
             Channel {
                 enabled: true,
@@ -2337,7 +2337,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
         ]),
     });
@@ -2409,7 +2409,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
             direction: MessageDirection::Outbound,
             role: MessageRole::Agent,
             thread_index: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         })
         .await
         .unwrap();
@@ -2497,7 +2497,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
@@ -2514,7 +2514,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
             Channel {
                 enabled: true,
@@ -2529,7 +2529,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
         ]),
     });
@@ -2596,7 +2596,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }]));
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
@@ -2613,7 +2613,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
             Channel {
                 enabled: true,
@@ -2628,7 +2628,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             },
         ]),
     });
@@ -2696,7 +2696,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }],
         vec![(company_id, "team@acme.com".to_string())],
     ));
@@ -2715,7 +2715,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
             participant_emails: None, // Default = company team members
             agent_ids: None,
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }]),
     });
 
@@ -2907,7 +2907,7 @@ async fn test_context_only_quiet_mode_ingestion() {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }],
         vec![(company_id, "team@acme.com".to_string())],
     ));
@@ -2926,7 +2926,7 @@ async fn test_context_only_quiet_mode_ingestion() {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }]),
     });
 
@@ -3036,7 +3036,7 @@ fn use_cases_with_channel(enabled: bool, alias_slugs: Vec<ChannelSlug>) -> (Thre
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }],
         vec![(company_id, "team@acme.com".to_string())],
     ));
@@ -3055,7 +3055,7 @@ fn use_cases_with_channel(enabled: bool, alias_slugs: Vec<ChannelSlug>) -> (Thre
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }]),
     });
 

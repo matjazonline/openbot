@@ -365,9 +365,8 @@ impl OutboundDispatcher {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_outbound_dispatcher_constructs_valid_headers() {
-        let config = AppConfig {
+    fn test_config() -> AppConfig {
+        AppConfig {
             jwt_secret: "secret".into(),
             access_token_ttl: time::Duration::days(1),
             refresh_token_ttl: time::Duration::days(30),
@@ -391,9 +390,11 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
-        };
+        }
+    }
 
-        let outbound_email = OutboundEmail {
+    fn test_email() -> OutboundEmail {
+        OutboundEmail {
             channel_id: Uuid::new_v4(),
             channel_name: "Support Bot".into(),
             channel_slug: "support".into(),
@@ -406,9 +407,13 @@ mod tests {
             body_text: "Hello! I am your AI assistant.".into(),
             hop_count: 0,
             trace_channels: Vec::new(),
-        };
+        }
+    }
 
-        let result = OutboundDispatcher::send(&config, outbound_email)
+    #[tokio::test]
+    async fn test_outbound_dispatcher_constructs_valid_headers() {
+        let config = test_config();
+        let result = OutboundDispatcher::send(&config, test_email())
             .await
             .unwrap();
 
@@ -422,5 +427,28 @@ mod tests {
         assert_eq!(result.from_address, "support@acme.mailagents.com");
         assert_eq!(result.recipients_to, vec!["user@example.com"]);
         assert_eq!(result.recipients_cc, vec!["manager@example.com"]);
+    }
+
+    /// The queue-then-deliver split rests on this: whoever queues an email derives its Message-ID
+    /// from the idempotency key and persists it *before* the poller sends, so both sides must
+    /// arrive at the same Message-ID from the same key. If this drifts, the message recorded in the
+    /// thread and the mail actually delivered stop matching, and replies stop threading.
+    #[test]
+    fn prepared_message_id_is_a_pure_function_of_the_idempotency_key() {
+        let config = test_config();
+        let key = "task:1b7f0f9e-0000-4000-8000-000000000000:agent-reply";
+
+        let queued = OutboundDispatcher::prepare_idempotent(&config, test_email(), key).unwrap();
+        let delivered = OutboundDispatcher::prepare_idempotent(&config, test_email(), key).unwrap();
+
+        assert_eq!(queued.outbound_message_id, delivered.outbound_message_id);
+
+        let other =
+            OutboundDispatcher::prepare_idempotent(&config, test_email(), "task:other:agent-reply")
+                .unwrap();
+        assert_ne!(
+            queued.outbound_message_id, other.outbound_message_id,
+            "a different send must not collide onto the same Message-ID"
+        );
     }
 }

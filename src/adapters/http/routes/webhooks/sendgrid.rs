@@ -369,8 +369,8 @@ mod tests {
                 channel_id,
                 subject: subject.to_string(),
                 participant_emails: participant_emails.to_vec(),
-                created_at: Utc::now().naive_utc(),
-                updated_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             };
             self.threads.lock().unwrap().push(thread.clone());
             Ok(thread)
@@ -389,7 +389,7 @@ mod tests {
         async fn list_threads_by_channel_id(
             &self,
             _channel_id: Uuid,
-            _before: Option<(chrono::NaiveDateTime, Uuid)>,
+            _before: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
             _limit: usize,
         ) -> AppResult<Vec<Thread>> {
             unimplemented!()
@@ -531,9 +531,9 @@ mod tests {
                 worker_id: None,
                 locked_at: None,
                 lock_expires_at: None,
-                run_at: Utc::now().naive_utc(),
-                created_at: Utc::now().naive_utc(),
-                updated_at: Utc::now().naive_utc(),
+                run_at: Utc::now(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             };
             self.tasks.lock().unwrap().push(task.clone());
             Ok(task)
@@ -563,10 +563,10 @@ mod tests {
         async fn claim_pending_tasks(
             &self,
             worker_id: Uuid,
-            lock_expires_at: chrono::NaiveDateTime,
+            lock_expires_at: chrono::DateTime<chrono::Utc>,
             limit: i64,
         ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
             let mut tasks = self.tasks.lock().unwrap();
             let mut claimed = Vec::new();
             for task in tasks
@@ -592,10 +592,10 @@ mod tests {
             &self,
             id: Uuid,
             worker_id: Uuid,
-            lock_expires_at: chrono::NaiveDateTime,
+            lock_expires_at: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
                 t.id == id
                     && t.status == crate::entities::task::TaskStatus::Pending
@@ -613,7 +613,7 @@ mod tests {
 
         async fn mark_task_completed(&self, id: Uuid, worker_id: Uuid) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
                 t.id == id
                     && t.status == crate::entities::task::TaskStatus::Processing
@@ -635,11 +635,11 @@ mod tests {
             id: Uuid,
             worker_id: Uuid,
             error_msg: &str,
-            next_run_at: chrono::NaiveDateTime,
+            next_run_at: chrono::DateTime<chrono::Utc>,
             is_dead_letter: bool,
         ) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
                 t.id == id
                     && t.status == crate::entities::task::TaskStatus::Processing
@@ -815,7 +815,7 @@ mod tests {
             _payload: serde_json::Value,
             _notification: serde_json::Value,
             _token: &str,
-            _expires_at: chrono::NaiveDateTime,
+            _expires_at: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<(crate::entities::approval::HumanApproval, bool)> {
             unimplemented!()
         }
@@ -838,14 +838,14 @@ mod tests {
             &self,
             _token: &str,
             _status: crate::entities::approval::ApprovalStatus,
-            _now: chrono::NaiveDateTime,
+            _now: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<Option<crate::entities::approval::HumanApproval>> {
             unimplemented!()
         }
         async fn expire_pending_approval(
             &self,
             _token: &str,
-            _now: chrono::NaiveDateTime,
+            _now: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<Option<crate::entities::approval::HumanApproval>> {
             unimplemented!()
         }
@@ -871,7 +871,7 @@ mod tests {
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             }]),
         });
 
@@ -889,7 +889,7 @@ mod tests {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             }]),
         });
 

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 use std::str::FromStr;
 use uuid::Uuid;
@@ -25,9 +25,9 @@ pub struct HumanApprovalDb {
     pub payload: Value,
     pub token: Uuid,
     pub status: String,
-    pub expires_at: NaiveDateTime,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub expires_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl TryFrom<HumanApprovalDb> for HumanApproval {
@@ -74,7 +74,7 @@ pub trait ApprovalPersistence: Send + Sync {
         payload: Value,
         notification: Value,
         token: &str,
-        expires_at: NaiveDateTime,
+        expires_at: DateTime<Utc>,
     ) -> AppResult<(HumanApproval, bool)>;
 
     async fn find_approval_by_step_key(
@@ -91,14 +91,14 @@ pub trait ApprovalPersistence: Send + Sync {
         &self,
         token: &str,
         status: ApprovalStatus,
-        now: NaiveDateTime,
+        now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>>;
 
     async fn consume_quorum_timeout_action(
         &self,
         _token: &str,
         _action: &str,
-        _now: NaiveDateTime,
+        _now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>> {
         Err(AppError::Internal(
             "Atomic quorum approval persistence is not configured".into(),
@@ -108,7 +108,7 @@ pub trait ApprovalPersistence: Send + Sync {
     async fn expire_pending_approval(
         &self,
         token: &str,
-        now: NaiveDateTime,
+        now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>>;
 
     async fn list_approvals_by_channel(
@@ -134,7 +134,7 @@ impl ApprovalPersistence for PostgresPersistence {
         payload: Value,
         notification: Value,
         token: &str,
-        expires_at: NaiveDateTime,
+        expires_at: DateTime<Utc>,
     ) -> AppResult<(HumanApproval, bool)> {
         let id = Uuid::new_v4();
         let token = Uuid::parse_str(token)
@@ -281,7 +281,7 @@ impl ApprovalPersistence for PostgresPersistence {
         &self,
         token: &str,
         status: ApprovalStatus,
-        now: NaiveDateTime,
+        now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>> {
         let Ok(token) = Uuid::parse_str(token) else {
             return Ok(None);
@@ -310,7 +310,7 @@ impl ApprovalPersistence for PostgresPersistence {
         &self,
         token: &str,
         action: &str,
-        now: NaiveDateTime,
+        now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>> {
         let Ok(token) = Uuid::parse_str(token) else {
             return Ok(None);
@@ -442,7 +442,7 @@ impl ApprovalPersistence for PostgresPersistence {
     async fn expire_pending_approval(
         &self,
         token: &str,
-        now: NaiveDateTime,
+        now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>> {
         let Ok(token) = Uuid::parse_str(token) else {
             return Ok(None);
@@ -563,7 +563,7 @@ mod tests {
                 serde_json::json!({}),
                 serde_json::json!({}),
                 &token,
-                chrono::Utc::now().naive_utc() + chrono::Duration::hours(1),
+                chrono::Utc::now() + chrono::Duration::hours(1),
             )
             .await
             .unwrap();
@@ -586,7 +586,7 @@ mod tests {
             approval.id
         );
 
-        let now = chrono::Utc::now().naive_utc();
+        let now = chrono::Utc::now();
         let (first, second) = tokio::join!(
             persistence.consume_pending_approval(&token, ApprovalStatus::Approved, now),
             persistence.consume_pending_approval(&token, ApprovalStatus::Approved, now)

@@ -752,7 +752,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
 
         let agent = Agent {
@@ -765,7 +765,7 @@ mod tests {
             api_key: Some("sk-test123".to_string()),
             system_prompt: Some("You are a helpful agent.".to_string()),
             config_json: Some(json!({ "temperature": 0.5 })),
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
 
         let row_html = pages::agent_row_fragment(&company, &agent);

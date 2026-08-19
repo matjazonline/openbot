@@ -546,7 +546,7 @@ mod tests {
                 api_key: api_key.map(|s| s.to_string()),
                 system_prompt: system_prompt.map(|s| s.to_string()),
                 config_json,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             };
             self.agents.lock().unwrap().push(agent.clone());
             Ok(agent)
@@ -635,7 +635,7 @@ mod tests {
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             }]),
         });
 

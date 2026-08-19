@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -21,7 +21,7 @@ pub struct AgentDb {
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     pub config_json: Option<serde_json::Value>,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 impl From<AgentDb> for Agent {

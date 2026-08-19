@@ -371,10 +371,21 @@ impl TaskMonitorView<'_> {
             .get_company_channel(self.user_id, self.company.id, task.channel_id)
             .await?;
 
+        // The transport is a separate process and never writes back into the task, so its state is
+        // joined in here, at render time.
+        let deliveries = self
+            .thread_use_cases
+            .get_task_persistence()
+            .await
+            .list_task_deliveries(task.id)
+            .await
+            .unwrap_or_default();
+
         Ok(pages::task_detail_pane(&pages::TaskDetailPane {
             company_id: self.company.id,
             task,
             channel: channel.as_ref(),
+            deliveries: &deliveries,
             error,
         }))
     }

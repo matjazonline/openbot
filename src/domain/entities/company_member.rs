@@ -9,5 +9,5 @@ pub struct CompanyMember {
     pub username: Option<String>,
     pub email: Option<String>,
     pub role: String,
-    pub created_at: chrono::NaiveDateTime,
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }

@@ -240,7 +240,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }
     }
 
@@ -260,7 +260,7 @@ mod tests {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
 
         let company_page = pages::onboarding_company_page(None);

@@ -250,7 +250,7 @@ mod tests {
                 provider: provider.map(|s| s.to_string()),
                 model: model.map(|s| s.to_string()),
                 enable_llm_spam_guardrail,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             };
             self.companies.lock().unwrap().push(company.clone());
             Ok(company)

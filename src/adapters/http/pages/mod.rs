@@ -6,6 +6,7 @@
 use pulldown_cmark::{Options, Parser, html};
 use uuid::Uuid;
 
+use crate::adapters::persistence::task::TaskDelivery;
 use crate::entities::{
     agent::Agent,
     approval::{ApprovalStatus, HumanApproval},

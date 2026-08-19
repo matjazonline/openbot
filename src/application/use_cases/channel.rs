@@ -794,7 +794,7 @@ mod tests {
             agent_ids: write.agent_ids,
             channel_config: write.channel_config,
             enabled: write.enabled,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         }
     }
 
@@ -841,7 +841,7 @@ mod tests {
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             }]),
         });
 
@@ -1122,7 +1122,7 @@ mod tests {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: chrono::Utc::now().naive_utc(),
+                created_at: chrono::Utc::now(),
             },
             Channel {
                 enabled: true,
@@ -1137,7 +1137,7 @@ mod tests {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: chrono::Utc::now().naive_utc(),
+                created_at: chrono::Utc::now(),
             },
         ];
 
@@ -1163,7 +1163,7 @@ mod tests {
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             }]),
         });
 
@@ -1279,7 +1279,7 @@ mod tests {
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
             }]),
         });
 

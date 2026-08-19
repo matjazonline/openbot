@@ -76,7 +76,7 @@ impl TaskWorker {
             .task_persistence
             .claim_pending_tasks(
                 self.worker_id,
-                chrono::Utc::now().naive_utc() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
+                chrono::Utc::now() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
                 1,
             )
             .await
@@ -125,7 +125,7 @@ impl TaskWorker {
         let is_dead_letter = next_retry >= task.max_retries;
         // Exponential backoff: 30s * 2^retry, capped so the shift can't overflow.
         let backoff_secs = 30 * (1 << next_retry.min(10));
-        let next_run = chrono::Utc::now().naive_utc() + chrono::Duration::seconds(backoff_secs);
+        let next_run = chrono::Utc::now() + chrono::Duration::seconds(backoff_secs);
 
         let outcome = self
             .task_persistence
@@ -178,7 +178,7 @@ impl TaskWorker {
             .task_persistence
             .claim_outbox_emails(
                 self.worker_id,
-                chrono::Utc::now().naive_utc() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
+                chrono::Utc::now() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
                 10,
             )
             .await
@@ -222,7 +222,10 @@ impl TaskWorker {
     /// recipient is another platform channel. Returns the delivered Message-ID.
     async fn deliver_outbox_email(&self, queued: OutboxEmail) -> Result<MessageId, String> {
         let outbox_id = queued.id;
-        let idempotency_key = format!("outbox:{}", outbox_id);
+        // Derive from the row's own key, not from its id: the key is stable across every attempt
+        // *and* known to whoever queued the row, so a queuer can persist the outbound message
+        // before delivery and still match the Message-ID that eventually goes out.
+        let idempotency_key = queued.idempotency_key.clone();
         let email: OutboundEmail =
             serde_json::from_value(queued.payload).map_err(|error| error.to_string())?;
 
@@ -275,7 +278,7 @@ impl TaskWorker {
 
     /// Ask a human what to do about outreaches that ran out of time below their response quorum.
     pub async fn check_quorum_timeouts(&self) -> Result<(), String> {
-        let now = chrono::Utc::now().naive_utc();
+        let now = chrono::Utc::now();
         let outreaches = self
             .task_persistence
             .list_due_outreaches(now, 100)
@@ -362,7 +365,7 @@ impl TaskWorker {
                 &format!(
                     "quorum_timeout_{}_{}",
                     outreach.outreach_id,
-                    outreach.expires_at.and_utc().timestamp()
+                    outreach.expires_at.timestamp()
                 ),
                 &approver_email,
                 "quorum_timeout",
@@ -517,7 +520,7 @@ impl TaskWorker {
                         .renew_task_lease(
                             task.id,
                             self.worker_id,
-                            chrono::Utc::now().naive_utc()
+                            chrono::Utc::now()
                                 + chrono::Duration::seconds(TASK_LEASE_SECONDS),
                         )
                         .await
@@ -721,7 +724,7 @@ mod tests {
         async fn list_threads_by_channel_id(
             &self,
             _channel_id: Uuid,
-            _before: Option<(chrono::NaiveDateTime, Uuid)>,
+            _before: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
             _limit: usize,
         ) -> AppResult<Vec<Thread>> {
             unimplemented!()
@@ -822,9 +825,9 @@ mod tests {
                 worker_id: None,
                 locked_at: None,
                 lock_expires_at: None,
-                run_at: Utc::now().naive_utc(),
-                created_at: Utc::now().naive_utc(),
-                updated_at: Utc::now().naive_utc(),
+                run_at: Utc::now(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             };
             self.tasks.lock().unwrap().push(task.clone());
             Ok(task)
@@ -851,11 +854,11 @@ mod tests {
         async fn claim_pending_tasks(
             &self,
             worker_id: Uuid,
-            lock_expires_at: chrono::NaiveDateTime,
+            lock_expires_at: chrono::DateTime<chrono::Utc>,
             limit: i64,
         ) -> AppResult<Vec<BackgroundTask>> {
             let mut list = self.tasks.lock().unwrap();
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
             let mut claimed = Vec::new();
             for task in list
                 .iter_mut()
@@ -879,10 +882,10 @@ mod tests {
             &self,
             id: Uuid,
             worker_id: Uuid,
-            lock_expires_at: chrono::NaiveDateTime,
+            lock_expires_at: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
             if let Some(t) = list
                 .iter_mut()
                 .find(|t| t.id == id && t.status == TaskStatus::Pending && t.run_at <= now)
@@ -899,7 +902,7 @@ mod tests {
 
         async fn mark_task_completed(&self, id: Uuid, worker_id: Uuid) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
                 t.id == id
                     && t.status == TaskStatus::Processing
@@ -921,11 +924,11 @@ mod tests {
             id: Uuid,
             worker_id: Uuid,
             error_msg: &str,
-            next_run_at: chrono::NaiveDateTime,
+            next_run_at: chrono::DateTime<chrono::Utc>,
             is_dead_letter: bool,
         ) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
                 t.id == id
                     && t.status == TaskStatus::Processing
@@ -988,7 +991,7 @@ mod tests {
                 })
                 .unwrap();
             t.status = TaskStatus::Pending;
-            t.run_at = Utc::now().naive_utc();
+            t.run_at = Utc::now();
             t.worker_id = None;
             t.locked_at = None;
             t.lock_expires_at = None;
@@ -1062,24 +1065,16 @@ mod tests {
         let second_worker = Uuid::new_v4();
 
         let first_claim = persistence
-            .claim_pending_tasks(
-                first_worker,
-                Utc::now().naive_utc() + chrono::Duration::minutes(1),
-                1,
-            )
+            .claim_pending_tasks(first_worker, Utc::now() + chrono::Duration::minutes(1), 1)
             .await
             .unwrap();
         assert_eq!(first_claim.len(), 1);
 
         persistence.tasks.lock().unwrap()[0].lock_expires_at =
-            Some(Utc::now().naive_utc() - chrono::Duration::seconds(1));
+            Some(Utc::now() - chrono::Duration::seconds(1));
 
         let second_claim = persistence
-            .claim_pending_tasks(
-                second_worker,
-                Utc::now().naive_utc() + chrono::Duration::minutes(1),
-                1,
-            )
+            .claim_pending_tasks(second_worker, Utc::now() + chrono::Duration::minutes(1), 1)
             .await
             .unwrap();
         assert_eq!(second_claim.len(), 1);
@@ -1201,7 +1196,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
@@ -1217,7 +1212,7 @@ mod tests {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let company_persistence = Arc::new(MockCompanyPersistence {
@@ -1287,8 +1282,8 @@ mod tests {
                 channel_id,
                 subject: "Help".to_string(),
                 participant_emails: vec!["user@test.com".into()],
-                created_at: chrono::Utc::now().naive_utc(),
-                updated_at: chrono::Utc::now().naive_utc(),
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
             }),
             inbound_message: Some(crate::entities::message::Message {
                 id: Uuid::new_v4(),
@@ -1307,7 +1302,7 @@ mod tests {
                 direction: crate::entities::message::MessageDirection::Inbound,
                 role: crate::entities::message::MessageRole::Human,
                 thread_index: Some("1".into()),
-                created_at: chrono::Utc::now().naive_utc(),
+                created_at: chrono::Utc::now(),
             }),
             company: Some(company),
             channel: Some(channel),

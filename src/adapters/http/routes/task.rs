@@ -425,9 +425,9 @@ mod tests {
             worker_id: None,
             locked_at: None,
             lock_expires_at: None,
-            run_at: chrono::Utc::now().naive_utc(),
-            created_at: chrono::Utc::now().naive_utc(),
-            updated_at: chrono::Utc::now().naive_utc(),
+            run_at: chrono::Utc::now(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
         };
 
         let html = pages::task_row_fragment(company_id, &task);
@@ -467,9 +467,9 @@ mod tests {
             worker_id: None,
             locked_at: None,
             lock_expires_at: None,
-            run_at: chrono::Utc::now().naive_utc(),
-            created_at: chrono::Utc::now().naive_utc(),
-            updated_at: chrono::Utc::now().naive_utc(),
+            run_at: chrono::Utc::now(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
         };
 
         let html = pages::task_row_fragment(company_id, &task);
@@ -555,7 +555,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let channel = crate::entities::channel::Channel {
@@ -571,7 +571,7 @@ mod tests {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let html = pages::channel_row_fragment(&company, "example.com", &channel, &[]);
@@ -595,7 +595,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
 
         let task = BackgroundTask {
@@ -622,9 +622,9 @@ mod tests {
             worker_id: None,
             locked_at: None,
             lock_expires_at: None,
-            run_at: chrono::Utc::now().naive_utc(),
-            created_at: chrono::Utc::now().naive_utc(),
-            updated_at: chrono::Utc::now().naive_utc(),
+            run_at: chrono::Utc::now(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
         };
 
         assert_eq!(

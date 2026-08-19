@@ -35,6 +35,11 @@ pub struct TaskDetailPane<'a> {
     pub task: &'a BackgroundTask,
     /// The channel this task ran for, when it is still one of the company's.
     pub channel: Option<&'a Channel>,
+    /// What the transport did with the emails this task produced.
+    ///
+    /// The task never fails because a delivery failed — composition and transport are separate
+    /// processes — so this is the only place an undelivered reply becomes visible.
+    pub deliveries: &'a [TaskDelivery],
     /// Why a stop or resume did not happen, when one was asked for and refused.
     pub error: Option<&'a str>,
 }
@@ -349,6 +354,7 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
                 {error_html}
                 {token_stats}
                 {facts}
+                {deliveries}
                 {last_error}
                 {payload}
             </div>
@@ -363,6 +369,7 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
         error_html = form_error_banner(pane.error),
         token_stats = task_token_stats(task),
         facts = task_facts(pane),
+        deliveries = task_deliveries(pane.deliveries),
         last_error = task_last_error(task),
         payload = render_message_task_parameters_html(&task.payload),
     )
@@ -483,6 +490,76 @@ fn task_facts(pane: &TaskDetailPane<'_>) -> String {
     )
 }
 
+/// The transport's side of the story: one row per email this task handed off.
+///
+/// Renders nothing when the task sent nothing, so tasks that never produce mail are unchanged.
+fn task_deliveries(deliveries: &[TaskDelivery]) -> String {
+    if deliveries.is_empty() {
+        return String::new();
+    }
+
+    let rows: String = deliveries.iter().map(delivery_row).collect();
+    format!(
+        r##"<div class="space-y-2">
+                    <h3 class="text-xs font-semibold uppercase opacity-60">Delivery</h3>
+                    <div class="space-y-2">{rows}</div>
+                </div>"##
+    )
+}
+
+fn delivery_row(delivery: &TaskDelivery) -> String {
+    // A pending row is waiting out its backoff; a failed one has exhausted every attempt and is
+    // the case this whole section exists to surface.
+    let detail = match delivery.status.as_str() {
+        "sent" => match delivery.sent_at {
+            Some(sent_at) => format!("sent {}", format_timestamp(sent_at)),
+            None => "sent".to_string(),
+        },
+        "sending" => "delivering now".to_string(),
+        "failed" => "gave up after every attempt".to_string(),
+        _ => format!("next attempt {}", format_timestamp(delivery.available_at)),
+    };
+
+    let attempts = if delivery.retry_count > 0 {
+        format!(
+            r##"<span class="opacity-60">· {} failed attempt(s)</span>"##,
+            delivery.retry_count
+        )
+    } else {
+        String::new()
+    };
+
+    let error = match delivery.last_error.as_deref() {
+        Some(error) if !error.is_empty() => format!(
+            r##"<div class="mt-1 font-mono text-[11px] opacity-70">{}</div>"##,
+            escape_html_text(error)
+        ),
+        _ => String::new(),
+    };
+
+    format!(
+        r##"<div class="rounded-box border border-base-300 bg-base-200 px-4 py-2 text-xs">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="badge badge-sm {style}">{label}</span>
+                            <span>{detail}</span>
+                            {attempts}
+                        </div>
+                        {error}
+                    </div>"##,
+        style = delivery_status_style(&delivery.status),
+        label = escape_html_text(&delivery.status),
+    )
+}
+
+fn delivery_status_style(status: &str) -> &'static str {
+    match status {
+        "sent" => "badge-success",
+        "sending" => "badge-info animate-pulse",
+        "failed" => "badge-error",
+        _ => "badge-warning",
+    }
+}
+
 fn task_last_error(task: &BackgroundTask) -> String {
     match task.last_error.as_deref() {
         Some(error) if !error.is_empty() => format!(
@@ -497,8 +574,8 @@ fn enqueued_at(task: &BackgroundTask) -> String {
     format_timestamp(task.created_at)
 }
 
-fn format_timestamp(at: chrono::NaiveDateTime) -> String {
-    at.format("%b %d, %H:%M:%S").to_string()
+fn format_timestamp(at: chrono::DateTime<chrono::Utc>) -> String {
+    at.format("%b %d, %H:%M:%S UTC").to_string()
 }
 
 /// The statuses the sidebar filter offers, in the order a task moves through them.

@@ -69,7 +69,7 @@ impl ApprovalUseCases {
         payload: serde_json::Value,
     ) -> AppResult<HumanApproval> {
         let token = Uuid::new_v4().to_string();
-        let expires_at = Utc::now().naive_utc() + chrono::Duration::hours(24);
+        let expires_at = Utc::now() + chrono::Duration::hours(24);
         let domain = &self.config.app_domain_name;
         let confirm_url = format!("http://{}/approvals/{}?action=confirm", domain, token);
         let reject_url = format!("http://{}/approvals/{}?action=reject", domain, token);
@@ -158,7 +158,7 @@ impl ApprovalUseCases {
             return Ok((approval, message));
         }
 
-        let now = Utc::now().naive_utc();
+        let now = Utc::now();
         if approval.expires_at < now {
             return self.report_unavailable(token, now).await;
         }
@@ -172,7 +172,7 @@ impl ApprovalUseCases {
                 ))
             })?;
 
-        let now = Utc::now().naive_utc();
+        let now = Utc::now();
         // Quorum timeouts carry the chosen option through to the paused task; everything else is a
         // plain approve/reject state transition.
         let consumed = if approval.action_type == "quorum_timeout" && approval.task_id.is_some() {
@@ -306,7 +306,7 @@ impl ApprovalUseCases {
             direction: MessageDirection::Inbound,
             role: MessageRole::System,
             thread_index: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
         };
         let _ = self.thread_persistence.create_message(&note).await;
     }
@@ -323,7 +323,7 @@ impl ApprovalUseCases {
     async fn report_unavailable(
         &self,
         token: &str,
-        now: chrono::NaiveDateTime,
+        now: chrono::DateTime<chrono::Utc>,
     ) -> AppResult<(HumanApproval, String)> {
         if let Some(expired) = self
             .approval_persistence
@@ -424,7 +424,7 @@ mod tests {
             payload: serde_json::Value,
             _notification: serde_json::Value,
             token: &str,
-            expires_at: chrono::NaiveDateTime,
+            expires_at: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<(HumanApproval, bool)> {
             let mut approvals = self.approvals.lock().unwrap();
             if let Some(existing) = approvals
@@ -449,8 +449,8 @@ mod tests {
                 token: token.to_string(),
                 status: ApprovalStatus::Pending,
                 expires_at,
-                created_at: Utc::now().naive_utc(),
-                updated_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             };
             approvals.push(approval.clone());
             Ok((approval, true))
@@ -491,7 +491,7 @@ mod tests {
             &self,
             token: &str,
             status: ApprovalStatus,
-            now: chrono::NaiveDateTime,
+            now: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<Option<HumanApproval>> {
             let mut list = self.approvals.lock().unwrap();
             let Some(approval) = list.iter_mut().find(|a| {
@@ -500,14 +500,14 @@ mod tests {
                 return Ok(None);
             };
             approval.status = status;
-            approval.updated_at = Utc::now().naive_utc();
+            approval.updated_at = Utc::now();
             Ok(Some(approval.clone()))
         }
 
         async fn expire_pending_approval(
             &self,
             token: &str,
-            now: chrono::NaiveDateTime,
+            now: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<Option<HumanApproval>> {
             let mut list = self.approvals.lock().unwrap();
             let Some(approval) = list.iter_mut().find(|a| {
@@ -516,7 +516,7 @@ mod tests {
                 return Ok(None);
             };
             approval.status = ApprovalStatus::Expired;
-            approval.updated_at = Utc::now().naive_utc();
+            approval.updated_at = Utc::now();
             Ok(Some(approval.clone()))
         }
 
@@ -565,7 +565,7 @@ mod tests {
         async fn claim_pending_tasks(
             &self,
             _worker_id: Uuid,
-            _lock_expires_at: chrono::NaiveDateTime,
+            _lock_expires_at: chrono::DateTime<chrono::Utc>,
             _limit: i64,
         ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
             unimplemented!()
@@ -574,7 +574,7 @@ mod tests {
             &self,
             _id: Uuid,
             _worker_id: Uuid,
-            _lock_expires_at: chrono::NaiveDateTime,
+            _lock_expires_at: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<bool> {
             Ok(true)
         }
@@ -586,7 +586,7 @@ mod tests {
             _id: Uuid,
             _worker_id: Uuid,
             _error_msg: &str,
-            _next_run_at: chrono::NaiveDateTime,
+            _next_run_at: chrono::DateTime<chrono::Utc>,
             _is_dead_letter: bool,
         ) -> AppResult<bool> {
             Ok(true)
@@ -635,7 +635,7 @@ mod tests {
         async fn list_threads_by_channel_id(
             &self,
             _channel_id: Uuid,
-            _before: Option<(chrono::NaiveDateTime, Uuid)>,
+            _before: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
             _limit: usize,
         ) -> AppResult<Vec<crate::entities::thread::Thread>> {
             unimplemented!()

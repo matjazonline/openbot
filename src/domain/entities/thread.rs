@@ -9,8 +9,8 @@ pub struct Thread {
     pub channel_id: Uuid,
     pub subject: String,
     pub participant_emails: Vec<EmailAddress>,
-    pub created_at: chrono::NaiveDateTime,
-    pub updated_at: chrono::NaiveDateTime,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl Thread {
@@ -35,8 +35,8 @@ mod tests {
             channel_id: Uuid::new_v4(),
             subject: subject.to_string(),
             participant_emails: vec![],
-            created_at: chrono::Utc::now().naive_utc(),
-            updated_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
         }
     }
 

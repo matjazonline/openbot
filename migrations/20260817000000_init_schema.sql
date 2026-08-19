@@ -7,7 +7,7 @@ CREATE TABLE users (
     username CITEXT NOT NULL UNIQUE,
     email CITEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT users_username_not_blank CHECK (btrim(username::text) <> ''),
     CONSTRAINT users_email_not_blank CHECK (btrim(email::text) <> '')
 );
@@ -21,7 +21,7 @@ CREATE TABLE companies (
     provider TEXT,
     model TEXT,
     enable_llm_spam_guardrail BOOLEAN,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT companies_name_not_blank CHECK (btrim(name) <> ''),
     CONSTRAINT companies_slug_format CHECK (
         slug::text = lower(slug::text)
@@ -37,7 +37,7 @@ CREATE TABLE company_invites (
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     email CITEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT company_invites_company_email_key UNIQUE (company_id, email),
     CONSTRAINT company_invites_status_check
         CHECK (status IN ('pending', 'accepted', 'declined'))
@@ -53,7 +53,7 @@ CREATE TABLE company_members (
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role TEXT NOT NULL DEFAULT 'member',
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT company_members_company_user_key UNIQUE (company_id, user_id),
     CONSTRAINT company_members_role_check CHECK (role IN ('member', 'admin'))
 );
@@ -72,7 +72,7 @@ CREATE TABLE agents (
     api_key TEXT,
     system_prompt TEXT,
     config_json JSONB,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT agents_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT agents_company_slug_key UNIQUE (company_id, slug),
     CONSTRAINT agents_name_not_blank CHECK (btrim(name) <> ''),
@@ -98,7 +98,7 @@ CREATE TABLE channels (
     api_key TEXT,
     provider TEXT,
     model TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT channels_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT channels_company_slug_key UNIQUE (company_id, slug),
     CONSTRAINT channels_name_not_blank CHECK (btrim(name) <> ''),
@@ -137,7 +137,7 @@ CREATE INDEX channel_agents_agent_idx ON channel_agents (agent_id, channel_id);
 CREATE TABLE channel_participants (
     channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
     email CITEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (channel_id, email)
 );
 
@@ -150,8 +150,8 @@ CREATE TABLE threads (
     channel_id UUID NOT NULL,
     subject TEXT NOT NULL,
     external_thread_key TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT threads_company_channel_id_key UNIQUE (company_id, channel_id, id),
     CONSTRAINT threads_channel_id_key UNIQUE (channel_id, id),
     CONSTRAINT threads_channel_external_key UNIQUE (channel_id, external_thread_key),
@@ -166,7 +166,7 @@ CREATE INDEX threads_channel_updated_idx
 CREATE TABLE thread_participants (
     thread_id UUID NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
     email CITEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (thread_id, email)
 );
 
@@ -188,7 +188,7 @@ CREATE TABLE email_messages (
     raw_html_body TEXT,
     attachments JSONB,
     thread_index TEXT,
-    received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT email_messages_company_message_key UNIQUE (company_id, message_id),
     CONSTRAINT email_messages_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT email_messages_attachments_array_check CHECK (
@@ -207,7 +207,7 @@ CREATE TABLE thread_messages (
     clean_text_body TEXT NOT NULL,
     direction TEXT NOT NULL,
     role TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT thread_messages_thread_email_key UNIQUE (thread_id, email_message_id),
     CONSTRAINT thread_messages_channel_email_key UNIQUE (channel_id, email_message_id),
     CONSTRAINT thread_messages_thread_fk
@@ -258,12 +258,12 @@ CREATE TABLE background_tasks (
     max_retries INTEGER NOT NULL DEFAULT 3,
     last_error TEXT,
     worker_id UUID,
-    locked_at TIMESTAMP,
-    lock_expires_at TIMESTAMP,
-    wait_expires_at TIMESTAMP,
-    run_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    locked_at TIMESTAMPTZ,
+    lock_expires_at TIMESTAMPTZ,
+    wait_expires_at TIMESTAMPTZ,
+    run_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT background_tasks_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT background_tasks_company_source_key UNIQUE (company_id, source_message_id),
     CONSTRAINT background_tasks_channel_fk
@@ -351,9 +351,9 @@ CREATE TABLE task_outreaches (
     kind TEXT NOT NULL,
     status TEXT NOT NULL,
     required_threshold_percent NUMERIC(5,2),
-    expires_at TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT task_outreaches_kind_check CHECK (kind IN ('delegation', 'quorum')),
     CONSTRAINT task_outreaches_status_check CHECK (
         status IN ('waiting', 'quorum_met', 'timed_out', 'cancelled', 'completed')
@@ -372,7 +372,7 @@ CREATE INDEX task_outreaches_task_idx ON task_outreaches (task_id);
 CREATE TABLE task_outreach_targets (
     outreach_id UUID NOT NULL REFERENCES task_outreaches(id) ON DELETE CASCADE,
     email CITEXT NOT NULL,
-    responded_at TIMESTAMP,
+    responded_at TIMESTAMPTZ,
     response_message_id UUID REFERENCES email_messages(id) ON DELETE SET NULL,
     PRIMARY KEY (outreach_id, email)
 );
@@ -392,8 +392,8 @@ CREATE TABLE task_attempts (
     prompt_tokens INTEGER,
     completion_tokens INTEGER,
     result JSONB,
-    started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    finished_at TIMESTAMP,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMPTZ,
     CONSTRAINT task_attempts_task_attempt_key UNIQUE (task_id, attempt_number),
     CONSTRAINT task_attempts_status_check CHECK (status IN ('processing', 'completed', 'failed')),
     CONSTRAINT task_attempts_token_check CHECK (
@@ -416,9 +416,9 @@ CREATE TABLE human_approvals (
     payload JSONB NOT NULL DEFAULT '{}',
     token UUID NOT NULL UNIQUE,
     status TEXT NOT NULL DEFAULT 'pending',
-    expires_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT human_approvals_thread_step_key UNIQUE NULLS NOT DISTINCT
         (company_id, channel_id, thread_id, step_key),
     CONSTRAINT human_approvals_channel_fk
@@ -454,12 +454,12 @@ CREATE TABLE email_outbox (
     retry_count INTEGER NOT NULL DEFAULT 0,
     last_error TEXT,
     worker_id UUID,
-    locked_at TIMESTAMP,
-    lock_expires_at TIMESTAMP,
-    available_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    sent_at TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    locked_at TIMESTAMPTZ,
+    lock_expires_at TIMESTAMPTZ,
+    available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sent_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT email_outbox_status_check CHECK (status IN ('pending', 'sending', 'sent', 'failed')),
     CONSTRAINT email_outbox_task_fk
         FOREIGN KEY (company_id, task_id)

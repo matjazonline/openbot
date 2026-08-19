@@ -15,7 +15,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::task::{OutboundSendReservation, TASK_LEASE_SECONDS},
+    adapters::persistence::task::{OutboundSend, TASK_LEASE_SECONDS},
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
@@ -178,8 +178,7 @@ impl ThreadUseCases {
             }));
         };
 
-        let lease_expires_at =
-            chrono::Utc::now().naive_utc() + chrono::Duration::seconds(TASK_LEASE_SECONDS);
+        let lease_expires_at = chrono::Utc::now() + chrono::Duration::seconds(TASK_LEASE_SECONDS);
         if !self
             .task_persistence
             .claim_task(task_id, worker_id, lease_expires_at)
@@ -504,7 +503,7 @@ impl ThreadUseCases {
                 .renew_task_lease(
                     task_id,
                     worker_id,
-                    chrono::Utc::now().naive_utc() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
+                    chrono::Utc::now() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
                 )
                 .await?;
             if !renewed {
@@ -515,7 +514,7 @@ impl ThreadUseCases {
         }
 
         let sent = self
-            .deliver_reply_at_most_once(outbound_email, ingest, claim, primary.company.id)
+            .queue_agent_reply(outbound_email, ingest, primary.company.id)
             .await?;
 
         // Registered egress adapters observe the normalized form of what we just sent.
@@ -615,75 +614,59 @@ impl ThreadUseCases {
         }
     }
 
-    /// Send the agent's reply, guaranteeing at most one delivery per task.
+    /// Hand the agent's reply to the transport, exactly once per task.
     ///
-    /// Renewing the lease just before dispatch narrows the race but cannot close it: the renewal
-    /// and the SMTP handshake are not one atomic step, so a worker that stalls past its lease in
-    /// between can still be racing a worker that reclaimed the task. The decisive guard is a row
-    /// keyed on a deterministic idempotency key — `task:{id}:agent-reply` is identical across every
-    /// re-run of the same task — so the unique index, not the timing, decides who delivers.
+    /// Nothing is sent here. The reply is written to the outbox and the poller delivers it, so a
+    /// delivery problem is retried on its own — never by re-running the agent, which would mean a
+    /// second LLM call and possibly different reply text for the same customer email.
     ///
-    /// A task-less caller (simulation, direct ingest) has nothing to key on and simply sends.
-    async fn deliver_reply_at_most_once(
+    /// The returned [`SentEmailResult`] is *prepared*, not sent: `prepare_idempotent` derives the
+    /// Message-ID from the same stable key the poller will send under, so the caller can persist
+    /// the outbound message immediately and still match the mail that eventually goes out.
+    ///
+    /// Two workers racing the same task both compute the same key, so the unique index admits one
+    /// row — and because they also compute the same Message-ID, the loser's thread write collapses
+    /// on `ON CONFLICT (company_id, message_id)` rather than duplicating.
+    ///
+    /// A task-less caller (direct ingest) has nothing to key on and sends inline as before.
+    async fn queue_agent_reply(
         &self,
         outbound_email: OutboundEmail,
         ingest: &InboundIngestResult,
-        claim: &ActiveClaim,
         company_id: Uuid,
     ) -> AppResult<SentEmailResult> {
-        let Some((task_id, worker_id)) = ingest.task_id.zip(claim.worker_id) else {
+        let Some(task_id) = ingest.task_id else {
             return self.send_or_route_internally(outbound_email, None).await;
         };
         let idempotency_key = format!("task:{task_id}:agent-reply");
+        let prepared = OutboundDispatcher::prepare_idempotent(
+            &self.config,
+            outbound_email.clone(),
+            &idempotency_key,
+        )?;
 
-        let reserved = self
+        let queued = self
             .task_persistence
-            .reserve_outbound_send(OutboundSendReservation {
+            .enqueue_outbound_send(OutboundSend {
                 company_id,
                 task_id: Some(task_id),
-                idempotency_key: idempotency_key.clone(),
-                payload: serde_json::to_value(&outbound_email).unwrap_or_default(),
-                worker_id,
-                lock_expires_at: chrono::Utc::now().naive_utc()
-                    + chrono::Duration::seconds(TASK_LEASE_SECONDS),
+                idempotency_key,
+                payload: serde_json::to_value(&outbound_email).map_err(|error| {
+                    AppError::Internal(format!(
+                        "Could not serialise the reply for delivery: {error}"
+                    ))
+                })?,
             })
             .await?;
 
-        let Some(outbox_id) = reserved else {
-            // Another worker owns this reply. Rebuild what it sent rather than sending again: the
-            // Message-ID is a digest of the same key, so the caller's bookkeeping still lines up
-            // and `ON CONFLICT (company_id, message_id)` collapses the duplicate row.
-            warn!(
-                "Agent reply for task {task_id} is already being delivered by another worker; \
-                 skipping duplicate send"
-            );
-            return OutboundDispatcher::prepare_idempotent(
-                &self.config,
-                outbound_email,
-                &idempotency_key,
-            );
-        };
-
-        match self
-            .send_or_route_internally(outbound_email, Some(&idempotency_key))
-            .await
-        {
-            Ok(sent) => {
-                let _ = self
-                    .task_persistence
-                    .mark_outbox_email_sent(outbox_id, worker_id, sent.outbound_message_id.as_str())
-                    .await;
-                Ok(sent)
-            }
-            Err(error) => {
-                // Give the key back, or the task's own retry would be locked out of its own send.
-                let _ = self
-                    .task_persistence
-                    .release_outbound_send(outbox_id, worker_id)
-                    .await;
-                Err(error)
-            }
+        match queued {
+            Some(outbox_id) => info!("Queued agent reply for task {task_id} as outbox {outbox_id}"),
+            None => warn!(
+                "Agent reply for task {task_id} is already queued or delivered; not queueing again"
+            ),
         }
+
+        Ok(prepared)
     }
 
     fn simulated_delivery(&self, primary: &ChannelMatch, parsed: &ParsedEmail) -> OutboundDelivery {
@@ -757,7 +740,7 @@ impl ThreadUseCases {
                     direction: MessageDirection::Outbound,
                     role: MessageRole::Agent,
                     thread_index: None,
-                    created_at: chrono::Utc::now().naive_utc(),
+                    created_at: chrono::Utc::now(),
                 })
                 .await?;
         }
@@ -799,13 +782,7 @@ impl ThreadUseCases {
             if let (Some(task_id), Some(worker_id)) = (ingest.task_id, claim.owned_worker_id) {
                 let _ = self
                     .task_persistence
-                    .mark_task_failed(
-                        task_id,
-                        worker_id,
-                        error,
-                        chrono::Utc::now().naive_utc(),
-                        true,
-                    )
+                    .mark_task_failed(task_id, worker_id, error, chrono::Utc::now(), true)
                     .await;
             }
             return Err(AppError::Internal(error.clone()));
@@ -843,12 +820,12 @@ impl ThreadUseCases {
                     "agent_name": run.primary_agent.as_ref().map(|a| a.name.as_str()),
                     "prompt": parsed.prompt_text,
                     "config": config,
-                    "executed_at": chrono::Utc::now().naive_utc().to_string(),
+                    "executed_at": chrono::Utc::now().to_rfc3339(),
                 })
             }
             None => serde_json::json!({
                 "prompt": parsed.prompt_text,
-                "executed_at": chrono::Utc::now().naive_utc().to_string(),
+                "executed_at": chrono::Utc::now().to_rfc3339(),
             }),
         };
 

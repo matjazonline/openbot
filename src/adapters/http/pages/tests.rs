@@ -46,9 +46,9 @@ fn test_find_task_for_message_multi_task_matching() {
         worker_id: None,
         locked_at: None,
         lock_expires_at: None,
-        run_at: Utc::now().naive_utc(),
-        created_at: Utc::now().naive_utc(),
-        updated_at: Utc::now().naive_utc(),
+        run_at: Utc::now(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     };
 
     let task2 = BackgroundTask {
@@ -73,9 +73,9 @@ fn test_find_task_for_message_multi_task_matching() {
         worker_id: None,
         locked_at: None,
         lock_expires_at: None,
-        run_at: Utc::now().naive_utc(),
-        created_at: Utc::now().naive_utc(),
-        updated_at: Utc::now().naive_utc(),
+        run_at: Utc::now(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     };
 
     let tasks = vec![task1, task2];
@@ -97,7 +97,7 @@ fn test_find_task_for_message_multi_task_matching() {
         direction: MessageDirection::Inbound,
         role: MessageRole::Human,
         thread_index: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     };
 
     let msg_out1 = Message {
@@ -117,7 +117,7 @@ fn test_find_task_for_message_multi_task_matching() {
         direction: MessageDirection::Outbound,
         role: MessageRole::Agent,
         thread_index: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     };
 
     let msg_in2 = Message {
@@ -137,7 +137,7 @@ fn test_find_task_for_message_multi_task_matching() {
         direction: MessageDirection::Inbound,
         role: MessageRole::Human,
         thread_index: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     };
 
     let msg_out2 = Message {
@@ -157,7 +157,7 @@ fn test_find_task_for_message_multi_task_matching() {
         direction: MessageDirection::Outbound,
         role: MessageRole::Agent,
         thread_index: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     };
 
     let matched_in1 = find_task_for_message(&msg_in1, &tasks, None, Some(thread_id)).unwrap();
@@ -212,7 +212,7 @@ fn mailbox_company() -> Company {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }
 }
 
@@ -230,7 +230,7 @@ fn mailbox_channel(company_id: Uuid) -> Channel {
         participant_emails: Some(vec!["person@example.com".into()]),
         agent_ids: None,
         channel_config: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }
 }
 
@@ -240,8 +240,8 @@ fn mailbox_thread(channel_id: Uuid) -> Thread {
         channel_id,
         subject: "Question <script>".to_string(),
         participant_emails: vec!["person@example.com".into()],
-        created_at: Utc::now().naive_utc(),
-        updated_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     }
 }
 
@@ -810,7 +810,7 @@ fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
         api_key: None,
         system_prompt: None,
         config_json: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }
 }
 
@@ -1124,7 +1124,7 @@ fn message_pane_separates_agent_and_human_bubbles() {
         direction: MessageDirection::Inbound,
         role: MessageRole::Human,
         thread_index: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     };
     let outbound = Message {
         id: Uuid::new_v4(),
@@ -1143,7 +1143,7 @@ fn message_pane_separates_agent_and_human_bubbles() {
         direction: MessageDirection::Outbound,
         role: MessageRole::Agent,
         thread_index: None,
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     };
 
     let html = message_pane(&MessagePane {
@@ -1250,9 +1250,9 @@ fn monitored_task(company_id: Uuid, channel_id: Uuid, status: TaskStatus) -> Bac
         worker_id: None,
         locked_at: None,
         lock_expires_at: None,
-        run_at: Utc::now().naive_utc(),
-        created_at: Utc::now().naive_utc(),
-        updated_at: Utc::now().naive_utc(),
+        run_at: Utc::now(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     }
 }
 
@@ -1364,6 +1364,7 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
     };
 
     let html = task_detail_pane(&TaskDetailPane {
+        deliveries: &[],
         company_id: company.id,
         task: &task,
         channel: Some(&channel),
@@ -1397,6 +1398,7 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
         company_id: company.id,
         task: &stopped,
         channel: None,
+        deliveries: &[],
         error: None,
     });
     assert!(stopped_html.contains(&format!("/ui/tasks/{}/resume", stopped.id)));
@@ -1667,7 +1669,7 @@ fn team_member(company_id: Uuid, user_id: Uuid, username: &str, role: &str) -> C
         username: Some(username.to_string()),
         email: Some(format!("{username}@example.com")),
         role: role.to_string(),
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }
 }
 
@@ -1678,7 +1680,7 @@ fn team_invite(company_id: Uuid, email: &str, status: &str) -> CompanyInvite {
         company_name: Some("Acme".to_string()),
         email: email.to_string(),
         status: status.to_string(),
-        created_at: Utc::now().naive_utc(),
+        created_at: Utc::now(),
     }
 }
 
@@ -1913,4 +1915,50 @@ fn the_invite_forms_keep_a_rejected_submit_in_the_form() {
         company.id
     )));
     assert!(rejected_create.contains(r##"hx-get="/ui/team/close?company_id="##));
+}
+
+#[test]
+fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let task = BackgroundTask {
+        ..monitored_task(company.id, channel.id, TaskStatus::Completed)
+    };
+
+    let failed = TaskDelivery {
+        id: Uuid::new_v4(),
+        status: "failed".to_string(),
+        retry_count: 5,
+        last_error: Some("connection refused".to_string()),
+        provider_message_id: None,
+        available_at: chrono::Utc::now(),
+        sent_at: None,
+        created_at: chrono::Utc::now(),
+    };
+
+    let html = task_detail_pane(&TaskDetailPane {
+        deliveries: std::slice::from_ref(&failed),
+        company_id: company.id,
+        task: &task,
+        channel: Some(&channel),
+        error: None,
+    });
+
+    // The task reads as completed, so the delivery section is the only thing that can tell an
+    // operator the reply never actually went out.
+    assert!(html.contains("Delivery"));
+    assert!(html.contains("badge-error"));
+    assert!(html.contains("gave up after every attempt"));
+    assert!(html.contains("connection refused"));
+    assert!(html.contains("5 failed attempt(s)"));
+
+    // A task that sent nothing must not grow an empty section.
+    let quiet = task_detail_pane(&TaskDetailPane {
+        deliveries: &[],
+        company_id: company.id,
+        task: &task,
+        channel: Some(&channel),
+        error: None,
+    });
+    assert!(!quiet.contains("Delivery"));
 }
