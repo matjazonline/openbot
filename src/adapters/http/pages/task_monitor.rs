@@ -39,7 +39,7 @@ pub struct TaskDetailPane<'a> {
     ///
     /// The task never fails because a delivery failed — composition and transport are separate
     /// processes — so this is the only place an undelivered reply becomes visible.
-    pub deliveries: &'a [TaskDelivery],
+    pub deliveries: &'a [OutboxEntry],
     /// Why a stop or resume did not happen, when one was asked for and refused.
     pub error: Option<&'a str>,
 }
@@ -125,17 +125,7 @@ pub fn task_monitor_page(page: &TaskMonitorPage<'_>) -> String {
 /// The form sits outside `#task-list`, so a swap never takes the controls out from under the
 /// pointer; a change resets to the first page simply by not sending one.
 fn task_filter_form(company_id: Uuid, channels: &[Channel], filter: &TaskFilter) -> String {
-    let channel_options: String = channels
-        .iter()
-        .map(|channel| {
-            format!(
-                r##"<option value="{id}"{selected}>{name}</option>"##,
-                id = channel.id,
-                selected = selected_when(filter.channel_id == Some(channel.id)),
-                name = escape_html_text(&channel.name),
-            )
-        })
-        .collect();
+    let channel_options = channel_filter_options(channels, filter.channel_id);
 
     let status_options: String = TASK_STATUS_FILTERS
         .iter()
@@ -174,10 +164,6 @@ fn task_filter_form(company_id: Uuid, channels: &[Channel], filter: &TaskFilter)
         newest_selected = selected_when(!filter.sort_asc),
         oldest_selected = selected_when(filter.sort_asc),
     )
-}
-
-fn selected_when(selected: bool) -> &'static str {
-    if selected { " selected" } else { "" }
 }
 
 /// One filtered page of tasks, rendered out of band after a write so a stop or a resume shows its
@@ -369,7 +355,7 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
         error_html = form_error_banner(pane.error),
         token_stats = task_token_stats(task),
         facts = task_facts(pane),
-        deliveries = task_deliveries(pane.deliveries),
+        deliveries = task_deliveries(pane),
         last_error = task_last_error(task),
         payload = render_message_task_parameters_html(&task.payload),
     )
@@ -466,8 +452,8 @@ fn task_facts(pane: &TaskDetailPane<'_>) -> String {
         ("Channel", channel),
         ("Thread", thread),
         ("Enqueued", enqueued_at(task)),
-        ("Runs at", format_timestamp(task.run_at)),
-        ("Updated", format_timestamp(task.updated_at)),
+        ("Runs at", super::format_time(task.run_at)),
+        ("Updated", super::format_time(task.updated_at)),
         (
             "Retries",
             format!("{}/{}", task.retry_count, task.max_retries),
@@ -493,12 +479,16 @@ fn task_facts(pane: &TaskDetailPane<'_>) -> String {
 /// The transport's side of the story: one row per email this task handed off.
 ///
 /// Renders nothing when the task sent nothing, so tasks that never produce mail are unchanged.
-fn task_deliveries(deliveries: &[TaskDelivery]) -> String {
-    if deliveries.is_empty() {
+fn task_deliveries(pane: &TaskDetailPane<'_>) -> String {
+    if pane.deliveries.is_empty() {
         return String::new();
     }
 
-    let rows: String = deliveries.iter().map(delivery_row).collect();
+    let rows: String = pane
+        .deliveries
+        .iter()
+        .map(|delivery| delivery_row(pane.company_id, delivery))
+        .collect();
     format!(
         r##"<div class="space-y-2">
                     <h3 class="text-xs font-semibold uppercase opacity-60">Delivery</h3>
@@ -507,17 +497,21 @@ fn task_deliveries(deliveries: &[TaskDelivery]) -> String {
     )
 }
 
-fn delivery_row(delivery: &TaskDelivery) -> String {
+/// One queued email, as a link into the Outbox workspace — this row says *that* something went
+/// wrong, and that workspace says what.
+fn delivery_row(company_id: Uuid, delivery: &OutboxEntry) -> String {
     // A pending row is waiting out its backoff; a failed one has exhausted every attempt and is
     // the case this whole section exists to surface.
-    let detail = match delivery.status.as_str() {
-        "sent" => match delivery.sent_at {
-            Some(sent_at) => format!("sent {}", format_timestamp(sent_at)),
+    let detail = match delivery.status {
+        OutboxStatus::Sent => match delivery.sent_at {
+            Some(sent_at) => format!("sent {}", super::format_time(sent_at)),
             None => "sent".to_string(),
         },
-        "sending" => "delivering now".to_string(),
-        "failed" => "gave up after every attempt".to_string(),
-        _ => format!("next attempt {}", format_timestamp(delivery.available_at)),
+        OutboxStatus::Sending => "delivering now".to_string(),
+        OutboxStatus::Failed => "gave up after every attempt".to_string(),
+        OutboxStatus::Pending => {
+            format!("next attempt {}", super::format_time(delivery.available_at))
+        }
     };
 
     let attempts = if delivery.retry_count > 0 {
@@ -538,26 +532,21 @@ fn delivery_row(delivery: &TaskDelivery) -> String {
     };
 
     format!(
-        r##"<div class="rounded-box border border-base-300 bg-base-200 px-4 py-2 text-xs">
+        r##"<a class="block rounded-box border border-base-300 bg-base-200 px-4 py-2 text-xs hover:border-primary"
+                        href="/ui/outbox?company_id={company_id}&entry_id={entry_id}">
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="badge badge-sm {style}">{label}</span>
-                            <span>{detail}</span>
+                            <span class="min-w-0 truncate">{subject}</span>
+                            <span class="opacity-60">{detail}</span>
                             {attempts}
                         </div>
                         {error}
-                    </div>"##,
-        style = delivery_status_style(&delivery.status),
-        label = escape_html_text(&delivery.status),
+                    </a>"##,
+        entry_id = delivery.id,
+        style = outbox_status_style(delivery.status),
+        label = delivery.status.label(),
+        subject = escape_html_text(delivery.subject().unwrap_or("(no subject)")),
     )
-}
-
-fn delivery_status_style(status: &str) -> &'static str {
-    match status {
-        "sent" => "badge-success",
-        "sending" => "badge-info animate-pulse",
-        "failed" => "badge-error",
-        _ => "badge-warning",
-    }
 }
 
 fn task_last_error(task: &BackgroundTask) -> String {
@@ -571,11 +560,7 @@ fn task_last_error(task: &BackgroundTask) -> String {
 }
 
 fn enqueued_at(task: &BackgroundTask) -> String {
-    format_timestamp(task.created_at)
-}
-
-fn format_timestamp(at: chrono::DateTime<chrono::Utc>) -> String {
-    at.format("%b %d, %H:%M:%S UTC").to_string()
+    super::format_time(task.created_at)
 }
 
 /// The statuses the sidebar filter offers, in the order a task moves through them.
@@ -605,7 +590,7 @@ pub(crate) fn task_status_label(status: TaskStatus) -> &'static str {
     }
 }
 
-fn task_status_style(status: TaskStatus) -> &'static str {
+pub(crate) fn task_status_style(status: TaskStatus) -> &'static str {
     match status {
         TaskStatus::Pending => "badge-warning",
         TaskStatus::Processing => "badge-info animate-pulse",

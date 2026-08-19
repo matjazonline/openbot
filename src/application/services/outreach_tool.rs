@@ -170,6 +170,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
                 id: Uuid::new_v4(),
                 task_id: self.context.task_id,
                 company_id: self.context.company_id,
+                channel_id: self.context.channel_id,
                 worker_id: self.context.worker_id,
                 outreach_key: request.idempotency_key(self.context.task_id, &target_emails),
                 required_threshold_percent: request.threshold_percent,

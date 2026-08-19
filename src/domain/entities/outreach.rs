@@ -80,6 +80,8 @@ pub struct CreateOutreachRequest {
     pub id: Uuid,
     pub task_id: Uuid,
     pub company_id: Uuid,
+    /// The channel every target email goes out as.
+    pub channel_id: Uuid,
     pub worker_id: Uuid,
     pub outreach_key: String,
     pub required_threshold_percent: f64,

@@ -1925,15 +1925,11 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
         ..monitored_task(company.id, channel.id, TaskStatus::Completed)
     };
 
-    let failed = TaskDelivery {
-        id: Uuid::new_v4(),
-        status: "failed".to_string(),
+    let failed = OutboxEntry {
+        status: OutboxStatus::Failed,
         retry_count: 5,
         last_error: Some("connection refused".to_string()),
-        provider_message_id: None,
-        available_at: chrono::Utc::now(),
-        sent_at: None,
-        created_at: chrono::Utc::now(),
+        ..queued_email(company.id, Some(channel.id), Some(task.id))
     };
 
     let html = task_detail_pane(&TaskDetailPane {
@@ -1951,6 +1947,11 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
     assert!(html.contains("gave up after every attempt"));
     assert!(html.contains("connection refused"));
     assert!(html.contains("5 failed attempt(s)"));
+    // And it is a way in, not just a report: the row opens the email in the Outbox workspace.
+    assert!(html.contains(&format!(
+        r##"href="/ui/outbox?company_id={}&entry_id={}""##,
+        company.id, failed.id
+    )));
 
     // A task that sent nothing must not grow an empty section.
     let quiet = task_detail_pane(&TaskDetailPane {
@@ -1961,4 +1962,225 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
         error: None,
     });
     assert!(!quiet.contains("Delivery"));
+}
+
+/// One queued email, as the poller would have stored it.
+fn queued_email(company_id: Uuid, channel_id: Option<Uuid>, task_id: Option<Uuid>) -> OutboxEntry {
+    OutboxEntry {
+        id: Uuid::new_v4(),
+        company_id,
+        channel_id,
+        task_id,
+        status: OutboxStatus::Pending,
+        idempotency_key: "task:reply".to_string(),
+        payload: json!({
+            "channel_name": "Support",
+            "recipient_to": "customer@example.com",
+            "recipients_cc": ["cc@example.com"],
+            "subject": "Re: order <script>",
+            "body_text": "On its way.",
+            "api_key": "sk-do-not-render-me",
+        }),
+        retry_count: 0,
+        last_error: None,
+        provider_message_id: None,
+        available_at: Utc::now(),
+        sent_at: None,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    }
+}
+
+fn outbox_filter() -> OutboxFilter {
+    OutboxFilter::new(None, None, false, None, None)
+}
+
+#[test]
+fn outbox_page_lists_queued_email_and_escapes_its_subject() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let entry = queued_email(company.id, Some(channel.id), None);
+    let email = mailbox_account_email();
+    let filter = outbox_filter();
+
+    let list = OutboxList {
+        company: &company,
+        entries: std::slice::from_ref(&entry),
+        filter: &filter,
+        has_next: false,
+        selected_entry_id: Some(entry.id),
+    };
+    let pane = outbox_empty_pane("Select an email.", FragmentSwap::Inline);
+    let html = outbox_page(&OutboxPage {
+        user: &mailbox_user(&email),
+        companies: std::slice::from_ref(&company),
+        channels: std::slice::from_ref(&channel),
+        list: &list,
+        pane_html: &pane,
+    });
+
+    assert!(html.contains("Re: order &lt;script&gt;"));
+    // The shell carries its own <script> tag, so this pins the subject rather than the document.
+    assert!(!html.contains("order <script>"));
+    assert!(html.contains("customer@example.com"));
+    // A queued email is an unsent one, and the summary says so before anything is clicked.
+    assert!(html.contains("1 email · 1 unsent · page 1"));
+    assert!(html.contains("menu-active"));
+    assert!(html.contains(&format!(
+        r##"hx-get="/ui/outbox/{}?company_id={}""##,
+        entry.id, company.id
+    )));
+    // The rail lights the workspace the response belongs to.
+    assert!(html.contains(r##"title="Outbox""##));
+    // The channel filter is what the channel_id column and its index exist to serve.
+    assert!(html.contains(r##"<option value="">All channels</option>"##));
+    assert!(html.contains(&format!(
+        r##"<option value="{}">Inbox</option>"##,
+        channel.id
+    )));
+}
+
+#[test]
+fn outbox_pane_links_a_queued_email_to_the_task_that_wrote_it() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let task = monitored_task(company.id, channel.id, TaskStatus::Completed);
+    let entry = queued_email(company.id, Some(channel.id), Some(task.id));
+
+    let html = outbox_detail_pane(&OutboxDetailPane {
+        company_id: company.id,
+        entry: &entry,
+        task: Some(&task),
+        channel: Some(&channel),
+    });
+
+    let task_url = format!("/ui/tasks?company_id={}&task_id={}", company.id, task.id);
+    assert!(html.contains(&task_url));
+    assert!(html.contains("Open Task"));
+    // The task completed; the email has still not gone out, which is the whole point of the join.
+    assert!(html.contains(task_status_label(TaskStatus::Completed)));
+    assert!(html.contains("Queued · next attempt"));
+    // The live channel names itself, rather than the stale name in the payload.
+    assert!(html.contains(">Inbox<"));
+    assert!(!html.contains(">Support<"));
+    assert!(html.contains("cc@example.com"));
+    assert!(html.contains("task:reply"));
+    // The payload is shown, but secrets in it are not.
+    assert!(html.contains("***masked***"));
+    assert!(!html.contains("sk-do-not-render-me"));
+}
+
+#[test]
+fn outbox_pane_without_a_task_offers_no_link_to_one() {
+    let company = mailbox_company();
+    let entry = OutboxEntry {
+        status: OutboxStatus::Sent,
+        sent_at: Some(Utc::now()),
+        ..queued_email(company.id, None, None)
+    };
+
+    let html = outbox_detail_pane(&OutboxDetailPane {
+        company_id: company.id,
+        entry: &entry,
+        task: None,
+        channel: None,
+    });
+
+    assert!(!html.contains("Open Task"));
+    assert!(!html.contains("/ui/tasks?"));
+    assert!(html.contains("Delivered"));
+    assert!(html.contains("alert-success"));
+    // With no channel to resolve, the pane falls back to the name the payload recorded.
+    assert!(html.contains(">Support<"));
+}
+
+#[test]
+fn outbox_pane_names_a_task_it_cannot_read() {
+    let company = mailbox_company();
+    let task_id = Uuid::new_v4();
+    let entry = queued_email(company.id, None, Some(task_id));
+
+    // The row points at a task, but the caller could not load it — the pane says so rather than
+    // pretending the email came from nowhere.
+    let html = outbox_detail_pane(&OutboxDetailPane {
+        company_id: company.id,
+        entry: &entry,
+        task: None,
+        channel: None,
+    });
+
+    assert!(html.contains("Open Task"));
+    assert!(html.contains("Unavailable"));
+    assert!(html.contains(&task_id.to_string()));
+}
+
+#[test]
+fn outbox_list_says_when_nothing_matches_and_pages_only_when_there_is_more() {
+    let company = mailbox_company();
+    let filter = outbox_filter();
+
+    let empty = outbox_list(
+        &OutboxList {
+            company: &company,
+            entries: &[],
+            filter: &filter,
+            has_next: false,
+            selected_entry_id: None,
+        },
+        FragmentSwap::Inline,
+    );
+    assert!(empty.contains("No queued email matches these filters."));
+    assert!(!empty.contains("Older →"));
+
+    let entry = queued_email(company.id, None, None);
+    let paged = outbox_list(
+        &OutboxList {
+            company: &company,
+            entries: std::slice::from_ref(&entry),
+            filter: &filter,
+            has_next: true,
+            selected_entry_id: None,
+        },
+        FragmentSwap::OutOfBand,
+    );
+    assert!(paged.contains("Older →"));
+    assert!(paged.contains(r##"hx-swap-oob="outerHTML""##));
+    assert!(paged.contains("page=2"));
+}
+
+#[test]
+fn outbox_query_carries_only_what_was_chosen() {
+    let company_id = Uuid::new_v4();
+    let entry_id = Uuid::new_v4();
+
+    let bare = outbox_query(company_id, &outbox_filter(), None);
+    assert_eq!(bare, format!("company_id={company_id}"));
+
+    let channel_id = Uuid::new_v4();
+    let filtered = OutboxFilter::new(
+        Some(channel_id),
+        Some(OutboxStatus::Failed),
+        true,
+        Some(3),
+        Some(10),
+    );
+    let full = outbox_query(company_id, &filtered, Some(entry_id));
+    assert_eq!(
+        full,
+        format!(
+            "company_id={company_id}&channel_id={channel_id}&status=failed&sort=asc&limit=10&page=3&entry_id={entry_id}"
+        )
+    );
+}
+
+#[test]
+fn page_timestamps_render_as_utc_at_three_precisions() {
+    // A fixed instant, so this pins the actual strings rather than just the presence of "UTC".
+    let at = chrono::DateTime::parse_from_rfc3339("2026-08-19T14:48:27.123456Z")
+        .expect("a valid RFC 3339 instant")
+        .with_timezone(&Utc);
+
+    assert_eq!(format_date(at), "Aug 19, 2026 UTC");
+    assert_eq!(format_date_time(at), "Aug 19, 2026 14:48 UTC");
+    assert_eq!(format_time(at), "Aug 19, 14:48:27 UTC");
 }

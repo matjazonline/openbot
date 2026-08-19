@@ -259,7 +259,7 @@ pub fn company_edit_pane(pane: &CompanyEditPane<'_>) -> String {
         name = escape_html_text(&pane.company.name),
         slug = escape_html_text(&pane.company.slug),
         app_domain_name = escape_html_text(pane.app_domain_name),
-        created_at = pane.company.created_at.format("%b %d, %Y"),
+        created_at = super::format_date(pane.company.created_at),
         error_html = form_error_banner(pane.error),
         workspace_links = workspace_links(company_id, pane.counts),
         fields = company_fields(draft),

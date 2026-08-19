@@ -41,6 +41,7 @@ pub enum UiSection {
     Channels,
     Agents,
     Tasks,
+    Outbox,
     Companies,
     Team,
 }
@@ -53,6 +54,7 @@ impl UiSection {
             UiSection::Channels => "/ui/channels",
             UiSection::Agents => "/ui/agents",
             UiSection::Tasks => "/ui/tasks",
+            UiSection::Outbox => "/ui/outbox",
             UiSection::Companies => "/ui/companies",
             UiSection::Team => "/ui/team",
         }
@@ -391,6 +393,7 @@ fn icon_rail(company_id: Uuid, section: UiSection) -> String {
             <a href="/ui/channels?company_id={company_id}" class="btn btn-square btn-lg {channels_style} text-2xl leading-none" title="Channels">#</a>
             <a href="/ui/agents?company_id={company_id}" class="btn btn-square btn-lg {agents_style} text-2xl leading-none" title="Agents">🤖</a>
             <a href="/ui/tasks?company_id={company_id}" class="btn btn-square btn-lg {tasks_style} text-2xl leading-none" title="Tasks">⚙</a>
+            <a href="/ui/outbox?company_id={company_id}" class="btn btn-square btn-lg {outbox_style} text-2xl leading-none" title="Outbox">📤</a>
             <a href="/ui/companies?company_id={company_id}" class="btn btn-square btn-lg {companies_style} text-2xl leading-none" title="Companies">🏢</a>
             <a href="/ui/team?company_id={company_id}" class="btn btn-square btn-lg {team_style} text-2xl leading-none" title="Team">👥</a>
             <button type="button" class="btn btn-square btn-lg btn-ghost mt-auto text-2xl leading-none"
@@ -401,6 +404,7 @@ fn icon_rail(company_id: Uuid, section: UiSection) -> String {
         channels_style = style(section == UiSection::Channels),
         agents_style = style(section == UiSection::Agents),
         tasks_style = style(section == UiSection::Tasks),
+        outbox_style = style(section == UiSection::Outbox),
         companies_style = style(section == UiSection::Companies),
         team_style = style(section == UiSection::Team),
     )
@@ -512,6 +516,29 @@ pub(crate) fn company_switcher(
         "##,
         name = escape_html_text(&company.name),
     )
+}
+
+/// One `<option>` per channel for a `/ui` sidebar filter, with the current one marked.
+///
+/// Shared by the Tasks and Outbox workspaces: both filter the same company's channels the same
+/// way, and a channel must not read differently depending on which queue you are looking at. The
+/// "All channels" option is left to the caller, since only it knows what "all" is called there.
+pub(crate) fn channel_filter_options(channels: &[Channel], selected: Option<Uuid>) -> String {
+    channels
+        .iter()
+        .map(|channel| {
+            format!(
+                r##"<option value="{id}"{selected}>{name}</option>"##,
+                id = channel.id,
+                selected = selected_when(selected == Some(channel.id)),
+                name = escape_html_text(&channel.name),
+            )
+        })
+        .collect()
+}
+
+pub(crate) fn selected_when(selected: bool) -> &'static str {
+    if selected { " selected" } else { "" }
 }
 
 /// Compose is only meaningful inside a channel, so it lives in that channel's thread column header
@@ -651,7 +678,7 @@ fn thread_row(column: &ThreadColumn<'_>, thread: &Thread) -> String {
         channel_id = column.channel.id,
         thread_id = thread.id,
         subject = escape_html_text(&thread.subject),
-        updated_at = thread.updated_at.format("%b %d, %H:%M"),
+        updated_at = super::format_date_time(thread.updated_at),
         participants = participants,
     )
 }
@@ -804,7 +831,7 @@ fn message_bubble_chat(message: &Message) -> String {
         side = if is_agent { "chat-end" } else { "chat-start" },
         bubble_class = if is_agent { "chat-bubble-primary" } else { "" },
         sender = escape_html_text(&message.sender),
-        created_at = message.created_at.format("%b %d, %Y %H:%M"),
+        created_at = super::format_date_time(message.created_at),
         subject = escape_html_text(&message.subject),
         body = body,
     )

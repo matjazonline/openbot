@@ -215,11 +215,12 @@ impl ApprovalPersistence for PostgresPersistence {
 
             sqlx::query(
                 r#"INSERT INTO email_outbox (
-                        id, company_id, task_id, idempotency_key, payload
-                   ) VALUES ($1, $2, $3, $4, $5)"#,
+                        id, company_id, channel_id, task_id, idempotency_key, payload
+                   ) VALUES ($1, $2, $3, $4, $5, $6)"#,
             )
             .bind(Uuid::new_v4())
             .bind(company_id)
+            .bind(channel_id)
             .bind(task_id)
             .bind(format!("approval:{}", db.id))
             .bind(notification)

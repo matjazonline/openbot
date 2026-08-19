@@ -391,7 +391,7 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
         email = escape_html_text(member.email.as_deref().unwrap_or("")),
         role = escape_html_text(if is_owner { "owner" } else { &member.role }),
         error_html = form_error_banner(pane.error),
-        joined = member.created_at.format("%b %d, %Y"),
+        joined = super::format_date(member.created_at),
         company_name = escape_html_text(&pane.company.name),
         company_id = pane.company.id,
     )
@@ -484,7 +484,7 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
         </section>
         "##,
         stored_email = escape_html_text(&invite.email),
-        created_at = invite.created_at.format("%b %d, %Y"),
+        created_at = super::format_date(invite.created_at),
         badge = status.badge_class(),
         label = status.label(),
         error_html = form_error_banner(pane.error),

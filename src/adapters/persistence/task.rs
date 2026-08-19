@@ -9,6 +9,7 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
+        outbox::{OutboxEntry, OutboxStatus},
         outreach::{
             CreateOutreachRequest, DueOutreach, OutreachProgress, OutreachReplyMatch,
             OutreachStatus,
@@ -87,29 +88,65 @@ impl TryFrom<BackgroundTaskDb> for BackgroundTask {
     }
 }
 
-/// One delivery attempt-set as the task view sees it: what the transport did with an email this
-/// task produced.
-///
-/// Read-only, and deliberately so — the task and the transport are separate processes, and this is
-/// the join the UI makes at render time, not a channel either one writes through.
-#[derive(sqlx::FromRow, Debug, Clone)]
-pub struct TaskDelivery {
+/// One `email_outbox` row as stored, before its `TEXT` status is parsed.
+#[derive(sqlx::FromRow, Debug)]
+pub struct OutboxEntryDb {
     pub id: Uuid,
+    pub company_id: Uuid,
+    pub channel_id: Option<Uuid>,
+    pub task_id: Option<Uuid>,
     pub status: String,
+    pub idempotency_key: String,
+    pub payload: Value,
     pub retry_count: i32,
     pub last_error: Option<String>,
     pub provider_message_id: Option<String>,
-    /// When the next attempt becomes eligible, while the row is still pending.
     pub available_at: DateTime<Utc>,
     pub sent_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
+
+impl TryFrom<OutboxEntryDb> for OutboxEntry {
+    type Error = AppError;
+
+    fn try_from(db: OutboxEntryDb) -> AppResult<Self> {
+        let status =
+            OutboxStatus::from_str(&db.status).map_err(|e| AppError::Internal(e.to_string()))?;
+
+        Ok(OutboxEntry {
+            id: db.id,
+            company_id: db.company_id,
+            channel_id: db.channel_id,
+            task_id: db.task_id,
+            status,
+            idempotency_key: db.idempotency_key,
+            payload: db.payload,
+            retry_count: db.retry_count,
+            last_error: db.last_error,
+            provider_message_id: db.provider_message_id,
+            available_at: db.available_at,
+            sent_at: db.sent_at,
+            created_at: db.created_at,
+            updated_at: db.updated_at,
+        })
+    }
+}
+
+/// The columns [`OutboxEntryDb`] reads, named once so the list and the single-row read cannot
+/// select different shapes.
+const OUTBOX_COLUMNS: &str = r#"id, company_id, channel_id, task_id, status, idempotency_key, payload,
+              retry_count, last_error, provider_message_id, available_at, sent_at,
+              created_at, updated_at"#;
 
 /// One email handed to the transport for delivery.
 ///
 /// A struct rather than four positional parameters, two of which are `Uuid`.
 pub struct OutboundSend {
     pub company_id: Uuid,
+    /// The channel this email goes out as. Unlike `task_id` it is not a lifecycle join — it is the
+    /// dimension the outbox is filtered by.
+    pub channel_id: Uuid,
     /// The task whose work produced this email. Carries no lifecycle meaning — it is the join the
     /// task view uses to show delivery state, nothing writes back through it.
     pub task_id: Option<Uuid>,
@@ -207,8 +244,34 @@ pub trait TaskPersistence: Send + Sync {
     ///
     /// Exists so the task view can show delivery state without the transport writing back into the
     /// task. The default returns nothing, which renders as "no deliveries".
-    async fn list_task_deliveries(&self, _task_id: Uuid) -> AppResult<Vec<TaskDelivery>> {
+    /// What the transport did with the emails one task produced.
+    ///
+    /// Read-only, and deliberately so — the task and the transport are separate processes, and
+    /// this is the join the UI makes at render time, not a channel either one writes through.
+    async fn list_task_deliveries(&self, _task_id: Uuid) -> AppResult<Vec<OutboxEntry>> {
         Ok(Vec::new())
+    }
+
+    /// One filtered page of the company's outbox, newest first unless `sort_asc`.
+    ///
+    /// `limit` is the caller's probe size, so whether a further page exists comes back with the
+    /// page itself; see [`crate::entities::outbox::OutboxFilter::probe_limit`].
+    async fn list_company_outbox_page(
+        &self,
+        _company_id: Uuid,
+        _channel_id: Option<Uuid>,
+        _status: Option<OutboxStatus>,
+        _sort_asc: bool,
+        _offset: i64,
+        _limit: i64,
+    ) -> AppResult<Vec<OutboxEntry>> {
+        Ok(Vec::new())
+    }
+
+    /// One outbox row by id. The caller checks its `company_id` before showing it — the id comes
+    /// from a URL.
+    async fn get_outbox_entry(&self, _outbox_id: Uuid) -> AppResult<Option<OutboxEntry>> {
+        Ok(None)
     }
 
     /// Hand one email to the transport, exactly once per `idempotency_key`.
@@ -376,11 +439,12 @@ impl TaskPersistence for PostgresPersistence {
             for (position, target) in request.targets.iter().enumerate() {
                 sqlx::query(
                     r#"INSERT INTO email_outbox (
-                            id, company_id, task_id, idempotency_key, payload
-                       ) VALUES ($1, $2, $3, $4, $5)"#,
+                            id, company_id, channel_id, task_id, idempotency_key, payload
+                       ) VALUES ($1, $2, $3, $4, $5, $6)"#,
                 )
                 .bind(target.outbox_id)
                 .bind(request.company_id)
+                .bind(request.channel_id)
                 .bind(request.task_id)
                 .bind(format!("outreach:{}:target:{}", outreach.id, position))
                 .bind(&target.outbox_payload)
@@ -802,18 +866,16 @@ impl TaskPersistence for PostgresPersistence {
         .map_err(AppError::from)
     }
 
-    async fn list_task_deliveries(&self, task_id: Uuid) -> AppResult<Vec<TaskDelivery>> {
-        sqlx::query_as::<_, TaskDelivery>(
-            r#"SELECT id, status, retry_count, last_error, provider_message_id,
-                      available_at, sent_at, created_at
-               FROM email_outbox
-               WHERE task_id = $1
-               ORDER BY created_at, id"#,
-        )
+    async fn list_task_deliveries(&self, task_id: Uuid) -> AppResult<Vec<OutboxEntry>> {
+        let db_list = sqlx::query_as::<_, OutboxEntryDb>(&format!(
+            "SELECT {OUTBOX_COLUMNS} FROM email_outbox WHERE task_id = $1 ORDER BY created_at, id"
+        ))
         .bind(task_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(AppError::from)
+        .map_err(AppError::from)?;
+
+        db_list.into_iter().map(OutboxEntry::try_from).collect()
     }
 
     async fn enqueue_outbound_send(&self, send: OutboundSend) -> AppResult<Option<Uuid>> {
@@ -821,13 +883,15 @@ impl TaskPersistence for PostgresPersistence {
         // The row lands 'pending' with no worker or lease — the outbox poller claims it, so a
         // caller that dies right after queueing still gets its email delivered.
         let row: Option<(Uuid,)> = sqlx::query_as(
-            r#"INSERT INTO email_outbox (id, company_id, task_id, idempotency_key, payload)
-               VALUES ($1, $2, $3, $4, $5)
+            r#"INSERT INTO email_outbox (
+                    id, company_id, channel_id, task_id, idempotency_key, payload
+               ) VALUES ($1, $2, $3, $4, $5, $6)
                ON CONFLICT (idempotency_key) DO NOTHING
                RETURNING id"#,
         )
         .bind(Uuid::new_v4())
         .bind(send.company_id)
+        .bind(send.channel_id)
         .bind(send.task_id)
         .bind(&send.idempotency_key)
         .bind(&send.payload)
@@ -1361,6 +1425,64 @@ impl TaskPersistence for PostgresPersistence {
         }
         Ok(tasks)
     }
+
+    async fn list_company_outbox_page(
+        &self,
+        company_id: Uuid,
+        channel_id: Option<Uuid>,
+        status: Option<OutboxStatus>,
+        sort_asc: bool,
+        offset: i64,
+        limit: i64,
+    ) -> AppResult<Vec<OutboxEntry>> {
+        let mut query = QueryBuilder::<Postgres>::new(format!(
+            "SELECT {OUTBOX_COLUMNS} FROM email_outbox WHERE company_id = "
+        ));
+        query.push_bind(company_id);
+        if let Some(channel_id) = channel_id {
+            query.push(" AND channel_id = ").push_bind(channel_id);
+        }
+        if let Some(status) = status {
+            query.push(" AND status = ").push_bind(status.as_str());
+        }
+        // Matches `email_outbox_company_created_idx`, or the channel-qualified
+        // `email_outbox_company_channel_created_idx` when one is asked for; ties are broken by id
+        // so paging cannot show the same row twice.
+        if sort_asc {
+            query.push(" ORDER BY created_at ASC, id ASC");
+        } else {
+            query.push(" ORDER BY created_at DESC, id DESC");
+        }
+        query
+            .push(" LIMIT ")
+            .push_bind(limit)
+            .push(" OFFSET ")
+            .push_bind(offset);
+
+        let db_list = query
+            .build_query_as::<OutboxEntryDb>()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+
+        let mut entries = Vec::new();
+        for db in db_list {
+            entries.push(db.try_into()?);
+        }
+        Ok(entries)
+    }
+
+    async fn get_outbox_entry(&self, outbox_id: Uuid) -> AppResult<Option<OutboxEntry>> {
+        let db = sqlx::query_as::<_, OutboxEntryDb>(&format!(
+            "SELECT {OUTBOX_COLUMNS} FROM email_outbox WHERE id = $1"
+        ))
+        .bind(outbox_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        db.map(OutboxEntry::try_from).transpose()
+    }
 }
 
 fn required_response_count(target_count: i64, threshold_percent: f64) -> usize {
@@ -1606,9 +1728,23 @@ mod tests {
         .await
         .unwrap();
 
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Enqueue".into(),
+                slug: "enqueue".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+
         let key = format!("task:{suffix}:agent-reply");
         let send = || OutboundSend {
             company_id: company.id,
+            channel_id: channel.id,
             task_id: None,
             idempotency_key: key.clone(),
             payload: serde_json::json!({}),
@@ -1641,6 +1777,107 @@ mod tests {
         assert!(
             worker_id.is_none(),
             "queueing must not claim the row; the outbox poller does that"
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn the_outbox_lists_one_channel_at_a_time() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            return;
+        };
+        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+            return;
+        };
+        sqlx::migrate!().run(&pool).await.unwrap();
+
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("outbox_channel_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            "Outbox Channel Test",
+            &format!("outbox-channel-{suffix}"),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let mut channels = Vec::new();
+        for name in ["Support", "Billing"] {
+            let channel = ChannelPersistence::create(
+                &persistence,
+                company.id,
+                ChannelWrite {
+                    name: name.into(),
+                    slug: name.to_lowercase().into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
+            )
+            .await
+            .unwrap();
+            persistence
+                .enqueue_outbound_send(OutboundSend {
+                    company_id: company.id,
+                    channel_id: channel.id,
+                    task_id: None,
+                    idempotency_key: format!("{suffix}:{name}"),
+                    payload: serde_json::json!({ "subject": name }),
+                })
+                .await
+                .unwrap()
+                .unwrap();
+            channels.push(channel);
+        }
+
+        // Unfiltered, the company sees both channels' mail.
+        let all = persistence
+            .list_company_outbox_page(company.id, None, None, false, 0, 50)
+            .await
+            .unwrap();
+        assert_eq!(all.len(), 2);
+
+        // Filtered, it sees exactly one — the whole point of promoting the channel out of the
+        // payload and indexing it.
+        let support = persistence
+            .list_company_outbox_page(company.id, Some(channels[0].id), None, false, 0, 50)
+            .await
+            .unwrap();
+        assert_eq!(support.len(), 1);
+        assert_eq!(support[0].channel_id, Some(channels[0].id));
+        assert_eq!(support[0].subject(), Some("Support"));
+
+        // Deleting the channel must not delete the record that mail went out for it.
+        ChannelPersistence::delete(&persistence, channels[0].id)
+            .await
+            .unwrap();
+        let orphaned = persistence
+            .list_company_outbox_page(company.id, None, None, false, 0, 50)
+            .await
+            .unwrap();
+        assert_eq!(orphaned.len(), 2);
+        assert!(
+            orphaned
+                .iter()
+                .any(|entry| entry.subject() == Some("Support") && entry.channel_id.is_none()),
+            "a deleted channel must null the column, not cascade the send record away"
         );
 
         CompanyPersistence::delete(&persistence, company.id)
@@ -1709,6 +1946,7 @@ mod tests {
         let outbox_id = persistence
             .enqueue_outbound_send(OutboundSend {
                 company_id: company.id,
+                channel_id: channel.id,
                 task_id: Some(task.id),
                 idempotency_key: format!("task:{}:agent-reply", task.id),
                 payload: serde_json::json!({}),
@@ -1720,7 +1958,7 @@ mod tests {
         let deliveries = persistence.list_task_deliveries(task.id).await.unwrap();
         assert_eq!(deliveries.len(), 1);
         assert_eq!(deliveries[0].id, outbox_id);
-        assert_eq!(deliveries[0].status, "pending");
+        assert_eq!(deliveries[0].status, OutboxStatus::Pending);
         assert_eq!(deliveries[0].retry_count, 0);
         assert!(deliveries[0].sent_at.is_none());
 
@@ -1735,7 +1973,7 @@ mod tests {
         .unwrap();
 
         let deliveries = persistence.list_task_deliveries(task.id).await.unwrap();
-        assert_eq!(deliveries[0].status, "failed");
+        assert_eq!(deliveries[0].status, OutboxStatus::Failed);
         assert_eq!(deliveries[0].retry_count, 5);
         assert_eq!(deliveries[0].last_error.as_deref(), Some("no route"));
 
@@ -1850,6 +2088,7 @@ mod tests {
                 id: outreach_id,
                 task_id: task.id,
                 company_id: company.id,
+                channel_id: channel.id,
                 worker_id,
                 outreach_key: "integration-outreach".into(),
                 required_threshold_percent: 100.0,

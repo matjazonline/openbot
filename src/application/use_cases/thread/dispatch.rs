@@ -649,6 +649,7 @@ impl ThreadUseCases {
             .task_persistence
             .enqueue_outbound_send(OutboundSend {
                 company_id,
+                channel_id: outbound_email.channel_id,
                 task_id: Some(task_id),
                 idempotency_key,
                 payload: serde_json::to_value(&outbound_email).map_err(|error| {

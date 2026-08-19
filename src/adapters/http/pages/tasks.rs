@@ -603,7 +603,7 @@ pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> Strin
 }
 
 pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
-    let created_at_str = task.created_at.format("%b %d, %H:%M:%S").to_string();
+    let created_at_str = super::format_time(task.created_at);
     let status_badge = match task.status {
         TaskStatus::Pending => {
             r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-950 text-amber-300 border border-amber-700/50">Pending</span>"#

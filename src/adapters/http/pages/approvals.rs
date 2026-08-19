@@ -83,7 +83,7 @@ pub fn approval_details_page(approval: &HumanApproval) -> String {
         action_summary = approval.action_summary,
         approver_email = approval.approver_email,
         action_type = approval.action_type,
-        expires_at = approval.expires_at,
+        expires_at = super::format_date_time(approval.expires_at),
         confirm_link = confirm_link,
         reject_link = reject_link,
     );
@@ -123,7 +123,7 @@ pub fn channel_approvals_fragment(approvals: &[HumanApproval]) -> String {
                 badge = badge,
                 action_summary = a.action_summary,
                 approver = a.approver_email,
-                created_at = a.created_at,
+                created_at = super::format_date_time(a.created_at),
             )
         })
         .collect();

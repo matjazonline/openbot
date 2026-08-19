@@ -99,7 +99,7 @@ pub fn company_list_fragment(companies: &[Company]) -> String {
 }
 
 pub fn company_row_fragment(company: &Company) -> String {
-    let created_at_str = company.created_at.format("%b %d, %Y").to_string();
+    let created_at_str = super::format_date(company.created_at);
     format!(
         r##"
         <div id="company-{id}" onclick="selectCompany('{id}')" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-slate-600 transition shadow-sm cursor-pointer">
@@ -288,7 +288,7 @@ pub fn company_invite_list_fragment(company_id: Uuid, invites: &[CompanyInvite])
 }
 
 pub fn company_invite_row_fragment(company_id: Uuid, invite: &CompanyInvite) -> String {
-    let created_at_str = invite.created_at.format("%b %d, %Y").to_string();
+    let created_at_str = super::format_date(invite.created_at);
     let status_badge = match invite.status.as_str() {
         "accepted" => {
             r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950 text-emerald-300 border border-emerald-700/50">Accepted</span>"#
@@ -373,7 +373,7 @@ pub fn company_team_list_fragment(company_id: Uuid, members: &[CompanyMember]) -
 }
 
 pub fn company_team_row_fragment(company_id: Uuid, member: &CompanyMember) -> String {
-    let created_at_str = member.created_at.format("%b %d, %Y").to_string();
+    let created_at_str = super::format_date(member.created_at);
     let username_display = member.username.as_deref().unwrap_or("Unknown User");
     let email_display = member.email.as_deref().unwrap_or("");
 
@@ -447,7 +447,7 @@ pub fn user_invite_list_fragment(invites: &[CompanyInvite]) -> String {
 
 pub fn user_invite_row_fragment(invite: &CompanyInvite) -> String {
     let company_name = invite.company_name.as_deref().unwrap_or("Unknown Company");
-    let created_at_str = invite.created_at.format("%b %d, %Y").to_string();
+    let created_at_str = super::format_date(invite.created_at);
 
     let action_buttons = match invite.status.as_str() {
         "accepted" => r#"<span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700/50">Accepted</span>"#.to_string(),

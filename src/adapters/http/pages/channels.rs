@@ -629,7 +629,7 @@ pub fn channel_thread_list_fragment(
                     subject = escape_html_text(&thread.subject),
                     participants = participants,
                     thread_id = thread.id,
-                    updated_at = thread.updated_at.format("%b %d, %Y %H:%M"),
+                    updated_at = super::format_date_time(thread.updated_at),
                     company_id = company_id,
                     channel_id = channel_id,
                 )
@@ -670,7 +670,7 @@ pub fn channel_row_fragment(
     channel: &Channel,
     agents: &[Agent],
 ) -> String {
-    let created_at_str = channel.created_at.format("%b %d, %Y").to_string();
+    let created_at_str = super::format_date(channel.created_at);
     let emails_str = match &channel.participant_emails {
         Some(emails) if !emails.is_empty() => emails.join(", "),
         _ => "None".to_string(),

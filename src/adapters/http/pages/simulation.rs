@@ -721,7 +721,7 @@ pub(crate) fn message_task_payload(
 /// One message in the thread history: an indigo agent card or a slate inbound card.
 pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> String {
     let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
-    let created_at = msg.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+    let created_at = super::format_date_time(msg.created_at);
     let params_html =
         render_message_task_parameters_html(&message_task_payload(msg, is_agent, &created_at, ctx));
 
@@ -1585,8 +1585,8 @@ pub(crate) fn loaded_thread_overview_card(
         </div>
         "##,
         subject = thread.subject,
-        created_at_fmt = thread.created_at.format("%Y-%m-%d %H:%M:%S UTC"),
-        updated_at_fmt = thread.updated_at.format("%Y-%m-%d %H:%M:%S UTC"),
+        created_at_fmt = super::format_date_time(thread.created_at),
+        updated_at_fmt = super::format_date_time(thread.updated_at),
     )
 }
 

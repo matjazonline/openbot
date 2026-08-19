@@ -822,11 +822,13 @@ mod tests {
         let outbox_id = Uuid::new_v4();
         sqlx::query(
             r#"INSERT INTO email_outbox (
-                    id, company_id, task_id, idempotency_key, payload, status, provider_message_id
-               ) VALUES ($1, $2, $3, $4, '{}', 'sent', $5)"#,
+                    id, company_id, channel_id, task_id, idempotency_key, payload, status,
+                    provider_message_id
+               ) VALUES ($1, $2, $3, $4, $5, '{}', 'sent', $6)"#,
         )
         .bind(outbox_id)
         .bind(company.id)
+        .bind(channel.id)
         .bind(task_id)
         .bind(format!("outreach:{suffix}:target:0"))
         .bind(&outreach_msg_id)
