@@ -76,6 +76,14 @@ pub struct SmtpServer {
     thread_use_cases: Arc<ThreadUseCases>,
     config: Arc<AppConfig>,
     monitoring: Option<Arc<dyn MonitoringService>>,
+    /// Live connection count per client IP, enforcing `smtp_rate_limit_conns_per_ip`.
+    ///
+    /// **This counter is process-local, so the limit is per instance, not per deployment.** Running
+    /// N servers behind one address means a single IP can hold N × `smtp_rate_limit_conns_per_ip`
+    /// connections in total. That is a deliberate trade — it needs no shared state on the hot
+    /// connection-accept path — but it means the configured number is a per-machine budget, and
+    /// scaling out quietly loosens the effective limit. Enforcing a true global cap would require
+    /// moving this to shared storage (Postgres or Redis) and paying a round trip per connection.
     active_conns: Arc<RwLock<HashMap<IpAddr, usize>>>,
 }
 
@@ -836,7 +844,9 @@ mod tests {
         app_error::AppResult,
         entities::{channel::Channel, company::Company, message::Message, thread::Thread},
         use_cases::{
-            channel::ChannelPersistence, company::CompanyPersistence, thread::ThreadPersistence,
+            channel::{ChannelPersistence, ChannelWrite},
+            company::CompanyPersistence,
+            thread::ThreadPersistence,
         },
     };
 
@@ -902,18 +912,7 @@ mod tests {
 
     #[async_trait]
     impl ChannelPersistence for MockChannelPersistence {
-        async fn create(
-            &self,
-            _company_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _participant_emails: Option<Vec<String>>,
-            _agent_ids: Option<Vec<Uuid>>,
-            _channel_config: Option<serde_json::Value>,
-        ) -> AppResult<Channel> {
+        async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
             unimplemented!()
         }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
@@ -929,24 +928,13 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|w| &w.slug == channel_slug)
+                .find(|w| w.matches_slug(channel_slug))
                 .cloned())
         }
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(self.channels.lock().unwrap().clone())
         }
-        async fn update(
-            &self,
-            _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _participant_emails: Option<Vec<String>>,
-            _agent_ids: Option<Vec<Uuid>>,
-            _channel_config: Option<serde_json::Value>,
-        ) -> AppResult<Channel> {
+        async fn update(&self, _id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
@@ -1257,10 +1245,12 @@ mod tests {
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
+                enabled: true,
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Inbound Flow".to_string(),
                 slug: "inbound".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1486,10 +1476,12 @@ regis";
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
+                enabled: true,
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Reg Channel".to_string(),
                 slug: "network".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,

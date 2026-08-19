@@ -529,7 +529,9 @@ mod tests {
     use super::*;
     use crate::entities::message::{MessageDirection, MessageRole};
     use crate::use_cases::{
-        channel::ChannelPersistence, company::CompanyPersistence, user::UserPersistence,
+        channel::{ChannelPersistence, ChannelWrite},
+        company::CompanyPersistence,
+        user::UserPersistence,
     };
 
     #[tokio::test]
@@ -568,28 +570,24 @@ mod tests {
         let first_channel = ChannelPersistence::create(
             &persistence,
             company.id,
-            "First",
-            "first",
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            ChannelWrite {
+                name: "First".into(),
+                slug: "first".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
         )
         .await
         .unwrap();
         let second_channel = ChannelPersistence::create(
             &persistence,
             company.id,
-            "Second",
-            "second",
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            ChannelWrite {
+                name: "Second".into(),
+                slug: "second".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -741,14 +739,12 @@ mod tests {
         let channel = ChannelPersistence::create(
             &persistence,
             company.id,
-            "Outbox Channel",
-            &format!("outbox-channel-{suffix}"),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            ChannelWrite {
+                name: "Outbox Channel".into(),
+                slug: format!("outbox-channel-{suffix}"),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -802,33 +798,46 @@ mod tests {
         .await
         .unwrap();
 
+        // `target_count` / `response_count` are not columns: both are derived by counting
+        // `task_outreach_targets` (see `task.rs`), and the single target inserted below is what
+        // makes this outreach one-of-one awaiting a reply.
         let outreach_id = Uuid::new_v4();
         sqlx::query(
-            "INSERT INTO task_outreaches (id, task_id, status, required_threshold_percent, target_count, response_count) VALUES ($1, $2, 'waiting', 100.0, 1, 0)",
+            r#"INSERT INTO task_outreaches (
+                    id, task_id, outreach_key, status, required_threshold_percent,
+                    expires_at, subject, body
+               ) VALUES ($1, $2, $3, 'waiting', 100.0, $4, 'Outreach', 'Outreach body')"#,
         )
         .bind(outreach_id)
         .bind(task_id)
+        .bind(&suffix)
+        .bind(chrono::Utc::now().naive_utc() + chrono::Duration::hours(1))
         .execute(&pool)
         .await
         .unwrap();
 
+        // `email_outbox` reaches a thread through its task, not directly: it has no channel_id or
+        // thread_id. `provider_message_id` is the only field the exclusion in `find_outbound_reply`
+        // matches on, and `idempotency_key` is unique across the table.
         let outbox_id = Uuid::new_v4();
         sqlx::query(
-            "INSERT INTO email_outbox (id, company_id, channel_id, thread_id, status, payload, provider_message_id) VALUES ($1, $2, $3, $4, 'sent', '{}', $5)",
+            r#"INSERT INTO email_outbox (
+                    id, company_id, task_id, idempotency_key, payload, status, provider_message_id
+               ) VALUES ($1, $2, $3, $4, '{}', 'sent', $5)"#,
         )
         .bind(outbox_id)
         .bind(company.id)
-        .bind(channel.id)
-        .bind(thread.id)
+        .bind(task_id)
+        .bind(format!("outreach:{suffix}:target:0"))
         .bind(&outreach_msg_id)
         .execute(&pool)
         .await
         .unwrap();
 
+        // Keyed by (outreach_id, email); there is no surrogate id column.
         sqlx::query(
-            "INSERT INTO task_outreach_targets (id, outreach_id, email, outbox_id) VALUES ($1, $2, 'target@example.com', $3)",
+            "INSERT INTO task_outreach_targets (outreach_id, email, outbox_id) VALUES ($1, 'target@example.com', $2)",
         )
-        .bind(Uuid::new_v4())
         .bind(outreach_id)
         .bind(outbox_id)
         .execute(&pool)

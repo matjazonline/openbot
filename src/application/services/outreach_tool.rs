@@ -381,6 +381,9 @@ async fn normalize_targets(
             if channel.id == source_channel_id {
                 return Err(format!("A channel cannot call itself: {email}"));
             }
+            if !channel.enabled {
+                return Err(format!("Target channel is disabled: {email}"));
+            }
             if channel.agent_ids.as_ref().is_none_or(Vec::is_empty) {
                 return Err(format!("Target channel has no configured agent: {email}"));
             }
@@ -417,7 +420,9 @@ fn config_u32(config: &Value, key: &str, default: u32) -> u32 {
 mod tests {
     use super::*;
     use crate::{
-        app_error::AppResult, entities::channel::Channel, use_cases::channel::ChannelPersistence,
+        app_error::AppResult,
+        entities::channel::Channel,
+        use_cases::channel::{ChannelPersistence, ChannelWrite},
     };
 
     struct MockChannelPersistence {
@@ -426,18 +431,7 @@ mod tests {
 
     #[async_trait]
     impl ChannelPersistence for MockChannelPersistence {
-        async fn create(
-            &self,
-            _company_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _participant_emails: Option<Vec<String>>,
-            _agent_ids: Option<Vec<Uuid>>,
-            _channel_config: Option<Value>,
-        ) -> AppResult<Channel> {
+        async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
             unimplemented!()
         }
 
@@ -460,18 +454,7 @@ mod tests {
             Ok(self.channel.clone().into_iter().collect())
         }
 
-        async fn update(
-            &self,
-            _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _participant_emails: Option<Vec<String>>,
-            _agent_ids: Option<Vec<Uuid>>,
-            _channel_config: Option<Value>,
-        ) -> AppResult<Channel> {
+        async fn update(&self, _id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
             unimplemented!()
         }
 
@@ -482,10 +465,12 @@ mod tests {
 
     fn channel(id: Uuid, company_id: Uuid, slug: &str) -> Channel {
         Channel {
+            enabled: true,
             id,
             company_id,
             name: slug.to_string(),
             slug: slug.into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,

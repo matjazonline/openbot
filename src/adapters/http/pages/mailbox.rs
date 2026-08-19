@@ -212,6 +212,22 @@ const MAILBOX_SCRIPT: &str = r##"        function confirmLogout() {
             }
         }
 
+        // Enter sends, Shift+Enter keeps writing — the chat convention, not the textarea one.
+        function composerKeydown(event) {
+            if (event.key !== 'Enter' || event.shiftKey) return;
+            event.preventDefault();
+            if (event.target.value.trim() === '') return;
+            if (event.target.form) {
+                event.target.form.requestSubmit();
+            }
+        }
+
+        // The box starts one line tall and grows with the message, up to its max height.
+        function autoGrowComposer(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+        }
+
         // Tailwind's browser build styles the page after it is parsed, so on a direct /ui load the
         // pane has nothing to scroll until everything has been applied.
         window.addEventListener('load', scrollMessagesToBottom);
@@ -223,6 +239,11 @@ const MAILBOX_SCRIPT: &str = r##"        function confirmLogout() {
             if (settled && settled.nodeType === 1 &&
                 (settled.id === 'message-scroll' || settled.querySelector('#message-scroll'))) {
                 scrollMessagesToBottom();
+                // A sent message swaps the whole pane, so hand the caret back to the new box.
+                var composer = document.getElementById('thread-composer');
+                if (composer) {
+                    composer.focus();
+                }
             }
         });"##;
 
@@ -521,7 +542,7 @@ fn channel_menu_item(
                         onclick="selectSidebarItem(this)">
                         <span class="flex w-full items-center gap-2">
                             <span class="truncate">{name}</span>
-                            <span class="badge badge-ghost badge-sm font-mono">{slug}</span>
+                            <span class="badge badge-ghost badge-sm font-mono">{slug}</span>{disabled_badge}
                         </span>
                         <span class="w-full truncate font-mono text-[11px] opacity-60">{address}</span>
                     </a>
@@ -531,6 +552,7 @@ fn channel_menu_item(
         channel_id = channel.id,
         name = escape_html_text(&channel.name),
         slug = escape_html_text(&channel.slug),
+        disabled_badge = disabled_badge(channel),
         address = escape_html_text(address),
     )
 }
@@ -704,6 +726,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
             <div id="message-scroll" class="flex-1 space-y-1 overflow-y-auto px-6 py-4">
                 {messages_html}
             </div>
+            {composer}
         </section>
         "##,
         subject = escape_html_text(&pane.thread.subject),
@@ -712,6 +735,42 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         company_id = pane.company_id,
         channel_id = pane.channel.id,
         messages_html = messages_html,
+        composer = thread_composer(pane),
+    )
+}
+
+/// The chat-style send box under the messages: one line that grows as it is typed, sending into
+/// the open thread without leaving the pane.
+///
+/// It posts to the same `/ui/reply` endpoint as the header's "New Message" form, so a rejected
+/// message comes back as that fuller form with the text kept and the reason on top.
+fn thread_composer(pane: &MessagePane<'_>) -> String {
+    format!(
+        r##"
+            <form class="border-t border-base-300 px-6 py-3" hx-post="/ui/reply"
+                hx-target="#detail-pane" hx-swap="outerHTML">
+                <input type="hidden" name="company_id" value="{company_id}">
+                <input type="hidden" name="channel_id" value="{channel_id}">
+                <input type="hidden" name="thread_id" value="{thread_id}">
+                <div class="flex items-end gap-2">
+                    <textarea id="thread-composer" name="text_body" rows="1" required
+                        placeholder="Write a message... (Enter to send, Shift+Enter for a new line)"
+                        class="textarea textarea-bordered max-h-40 min-h-12 flex-1 resize-none text-sm"
+                        onkeydown="composerKeydown(event)" oninput="autoGrowComposer(this)"></textarea>
+                    <button type="submit" class="btn btn-primary" title="Send">
+                        <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                        <span class="[.htmx-request_&]:hidden">Send</span>
+                    </button>
+                </div>
+                <label class="label mt-1 cursor-pointer justify-start gap-2 p-0">
+                    <input type="checkbox" name="deliver" value="true" class="toggle toggle-primary toggle-xs">
+                    <span class="label-text text-xs opacity-60">Deliver the agent reply by email (off keeps it in-app)</span>
+                </label>
+            </form>
+        "##,
+        company_id = pane.company_id,
+        channel_id = pane.channel.id,
+        thread_id = pane.thread.id,
     )
 }
 

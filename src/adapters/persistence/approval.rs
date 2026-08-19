@@ -493,7 +493,9 @@ impl ApprovalPersistence for PostgresPersistence {
 mod tests {
     use super::*;
     use crate::use_cases::{
-        channel::ChannelPersistence, company::CompanyPersistence, thread::ThreadPersistence,
+        channel::{ChannelPersistence, ChannelWrite},
+        company::CompanyPersistence,
+        thread::ThreadPersistence,
         user::UserPersistence,
     };
 
@@ -532,14 +534,12 @@ mod tests {
         let channel = ChannelPersistence::create(
             &persistence,
             company.id,
-            "Approval",
-            "approval",
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            ChannelWrite {
+                name: "Approval".into(),
+                slug: "approval".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
         )
         .await
         .unwrap();

@@ -268,6 +268,7 @@ fn simple_channel_form(company_id: Uuid) -> String {
         r##"            <form id="simple-channel-form" hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']" class="space-y-4" data-company-id="{company_id}"
                 hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('channel-form-card').classList.add('hidden'); document.getElementById('channel-form-toggle').setAttribute('aria-expanded', 'false'); }}">
                 <input type="hidden" name="form_mode" value="simple">
+                <input type="hidden" name="enabled" value="true">
                 <div>
                     <label for="simple_channel_name" class="block text-xs font-medium text-slate-300 mb-1">Channel Name</label>
                     <input type="text" id="simple_channel_name" name="name" required
@@ -308,6 +309,7 @@ fn advanced_channel_form(
         r##"            <form id="advanced-channel-form" hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" class="hidden space-y-4" data-company-id="{company_id}"
                 hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('channel-form-card').classList.add('hidden'); document.getElementById('channel-form-toggle').setAttribute('aria-expanded', 'false'); }}">
                 <input type="hidden" name="form_mode" value="advanced">
+                <input type="hidden" name="enabled" value="true">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label for="channel_name" class="block text-xs font-medium text-slate-300 mb-1">Channel Name</label>
@@ -322,6 +324,14 @@ fn advanced_channel_form(
                             class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                             placeholder="inbound-email-handler">
                     </div>
+                </div>
+
+                <div>
+                    <label for="channel_alias_slugs" class="block text-xs font-medium text-slate-300 mb-1">Alias Slugs (Optional)</label>
+                    <input type="text" id="channel_alias_slugs" name="alias_slugs"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                        placeholder="sales, help, contact">
+                    <p class="text-[11px] text-slate-400 mt-1">Comma-separated extra addresses at <code class="text-indigo-300">@{slug}.{app_domain_name}</code>. Replies go back out from the address the mail arrived on.</p>
                 </div>
 
                 <div>
@@ -692,6 +702,11 @@ pub fn channel_row_fragment(
         "Default (Company)"
     };
     let display_slug = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
+    let disabled_badge = if channel.enabled {
+        ""
+    } else {
+        r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-600">Disabled</span>"#
+    };
 
     format!(
         r##"
@@ -701,6 +716,7 @@ pub fn channel_row_fragment(
                     <div class="flex items-center gap-3">
                         <h4 class="text-md font-semibold text-white">{name}</h4>
                         <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-emerald-950/90 text-emerald-300 border border-emerald-700/50">{display_slug}</span>
+                        {disabled_badge}
                     </div>
                     <p class="text-xs text-slate-400 mt-1">Created on {created_at_str}</p>
                 </div>
@@ -782,6 +798,7 @@ pub fn channel_edit_fragment(
         Some(emails) => emails.join(", "),
         None => String::new(),
     };
+    let alias_slugs_str = super::channel_settings::stored_alias_slugs(channel);
     let config_str = match &channel.channel_config {
         Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
         None => String::new(),
@@ -834,6 +851,14 @@ pub fn channel_edit_fragment(
             </div>
 
             <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Alias Slugs (Optional)</label>
+                <input type="text" name="alias_slugs" value="{alias_slugs_str}"
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                    placeholder="sales, help, contact">
+                <p class="text-[11px] text-slate-400 mt-1">Comma-separated extra addresses at <code class="text-indigo-300">@{company_slug}.{app_domain_name}</code>. Replies go back out from the address the mail arrived on.</p>
+            </div>
+
+            <div>
                 <label class="block text-xs font-medium text-slate-300 mb-1">Select Agents (Multiple allowed)</label>
                 {agents_selection_html}
             </div>
@@ -879,6 +904,16 @@ pub fn channel_edit_fragment(
                     </div>
                 </div>
             </div>
+            <div>
+                <label class="flex items-start gap-2.5 cursor-pointer">
+                    <input type="checkbox" name="enabled" value="true" {enabled_checked}
+                        class="mt-0.5 rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-emerald-500">
+                    <span class="text-xs text-slate-300">
+                        <span class="font-medium">Channel enabled</span>
+                        <span class="block text-[11px] text-slate-400">Unticking this keeps the channel and its threads, but mail to its address bounces back to the sender.</span>
+                    </span>
+                </label>
+            </div>
             {spam_warning_html}
             <div class="flex items-center justify-end gap-2">
                 <button type="button" hx-get="/companies/{company_id}/channels/{channel_id}/cancel" hx-target="#channel-{channel_id}" hx-swap="outerHTML"
@@ -896,6 +931,7 @@ pub fn channel_edit_fragment(
         company_id = company.id,
         name = channel.name,
         slug = channel.slug,
+        enabled_checked = if channel.enabled { "checked" } else { "" },
         company_slug = company.slug,
         app_domain_name = app_domain_name,
         emails_str = emails_str,

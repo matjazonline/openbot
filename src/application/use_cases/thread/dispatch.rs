@@ -11,11 +11,11 @@
 
 use std::collections::HashMap;
 
-use tracing::info;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::task::TASK_LEASE_SECONDS,
+    adapters::persistence::task::{OutboundSendReservation, TASK_LEASE_SECONDS},
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
@@ -31,7 +31,7 @@ use crate::{
             ResolvedAgentParams,
         },
         email_parser::ParsedEmail,
-        outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
+        outbound_dispatcher::{OutboundDispatcher, OutboundEmail, SentEmailResult},
         outreach_tool::OutreachToolContext,
     },
 };
@@ -372,7 +372,7 @@ impl ThreadUseCases {
             company_id: channel_match.company.id,
             channel_id: channel_match.channel.id,
             channel_name: channel_match.channel.name.clone(),
-            channel_slug: channel_match.channel.slug.clone(),
+            channel_slug: channel_match.reply_slug(),
             company_slug: channel_match.company.slug.clone(),
             thread_id: Some(channel_match.thread.id),
             task_id: ingest.task_id,
@@ -393,7 +393,7 @@ impl ThreadUseCases {
             company_id: channel_match.company.id,
             channel_id: channel_match.channel.id,
             channel_name: channel_match.channel.name.clone(),
-            channel_slug: channel_match.channel.slug.clone(),
+            channel_slug: channel_match.reply_slug(),
             company_slug: channel_match.company.slug.clone(),
             trigger_message_id: parsed.message_id.clone().into(),
             thread_references: outbound_reference_ids(parsed)
@@ -481,7 +481,7 @@ impl ThreadUseCases {
         let outbound_email = OutboundEmail {
             channel_id: primary.channel.id,
             channel_name: primary.channel.name.clone(),
-            channel_slug: primary.channel.slug.clone(),
+            channel_slug: primary.reply_slug(),
             company_slug: primary.company.slug.clone(),
             trigger_message_id: parsed.message_id.clone().into(),
             thread_references: references.iter().cloned().map(MessageId::from).collect(),
@@ -514,11 +514,8 @@ impl ThreadUseCases {
             }
         }
 
-        let idempotency_key = ingest
-            .task_id
-            .map(|task_id| format!("task:{task_id}:agent-reply"));
         let sent = self
-            .send_or_route_internally(outbound_email, idempotency_key.as_deref())
+            .deliver_reply_at_most_once(outbound_email, ingest, claim, primary.company.id)
             .await?;
 
         // Registered egress adapters observe the normalized form of what we just sent.
@@ -618,6 +615,77 @@ impl ThreadUseCases {
         }
     }
 
+    /// Send the agent's reply, guaranteeing at most one delivery per task.
+    ///
+    /// Renewing the lease just before dispatch narrows the race but cannot close it: the renewal
+    /// and the SMTP handshake are not one atomic step, so a worker that stalls past its lease in
+    /// between can still be racing a worker that reclaimed the task. The decisive guard is a row
+    /// keyed on a deterministic idempotency key — `task:{id}:agent-reply` is identical across every
+    /// re-run of the same task — so the unique index, not the timing, decides who delivers.
+    ///
+    /// A task-less caller (simulation, direct ingest) has nothing to key on and simply sends.
+    async fn deliver_reply_at_most_once(
+        &self,
+        outbound_email: OutboundEmail,
+        ingest: &InboundIngestResult,
+        claim: &ActiveClaim,
+        company_id: Uuid,
+    ) -> AppResult<SentEmailResult> {
+        let Some((task_id, worker_id)) = ingest.task_id.zip(claim.worker_id) else {
+            return self.send_or_route_internally(outbound_email, None).await;
+        };
+        let idempotency_key = format!("task:{task_id}:agent-reply");
+
+        let reserved = self
+            .task_persistence
+            .reserve_outbound_send(OutboundSendReservation {
+                company_id,
+                task_id: Some(task_id),
+                idempotency_key: idempotency_key.clone(),
+                payload: serde_json::to_value(&outbound_email).unwrap_or_default(),
+                worker_id,
+                lock_expires_at: chrono::Utc::now().naive_utc()
+                    + chrono::Duration::seconds(TASK_LEASE_SECONDS),
+            })
+            .await?;
+
+        let Some(outbox_id) = reserved else {
+            // Another worker owns this reply. Rebuild what it sent rather than sending again: the
+            // Message-ID is a digest of the same key, so the caller's bookkeeping still lines up
+            // and `ON CONFLICT (company_id, message_id)` collapses the duplicate row.
+            warn!(
+                "Agent reply for task {task_id} is already being delivered by another worker; \
+                 skipping duplicate send"
+            );
+            return OutboundDispatcher::prepare_idempotent(
+                &self.config,
+                outbound_email,
+                &idempotency_key,
+            );
+        };
+
+        match self
+            .send_or_route_internally(outbound_email, Some(&idempotency_key))
+            .await
+        {
+            Ok(sent) => {
+                let _ = self
+                    .task_persistence
+                    .mark_outbox_email_sent(outbox_id, worker_id, sent.outbound_message_id.as_str())
+                    .await;
+                Ok(sent)
+            }
+            Err(error) => {
+                // Give the key back, or the task's own retry would be locked out of its own send.
+                let _ = self
+                    .task_persistence
+                    .release_outbound_send(outbox_id, worker_id)
+                    .await;
+                Err(error)
+            }
+        }
+    }
+
     fn simulated_delivery(&self, primary: &ChannelMatch, parsed: &ParsedEmail) -> OutboundDelivery {
         let message_id = format!(
             "<simulated-test-{}@{}>",
@@ -633,7 +701,9 @@ impl ThreadUseCases {
             references: parsed.references.clone(),
             from_address: format!(
                 "{}@{}.{}",
-                primary.channel.slug, primary.company.slug, self.config.app_domain_name
+                primary.reply_slug(),
+                primary.company.slug,
+                self.config.app_domain_name
             ),
             recipients_to: vec![parsed.sender.clone()],
             recipients_cc: parsed.recipients_cc.clone(),
@@ -831,6 +901,7 @@ fn channel_matches_of(ingest: &InboundIngestResult) -> Option<Vec<ChannelMatch>>
     Some(vec![ChannelMatch {
         company: company.clone(),
         channel: channel.clone(),
+        matched_slug: None,
         thread: thread.clone(),
         inbound_message: inbound_message.clone(),
         recipient_role: RecipientRole::To,

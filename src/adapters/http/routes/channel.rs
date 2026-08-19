@@ -20,7 +20,7 @@ use crate::{
     services::email_parser::RawInboundPayload,
     use_cases::{
         agent::AgentUseCases,
-        channel::{ChannelUseCases, parse_recipient_address_pipeline},
+        channel::{ChannelUseCases, ChannelWrite, parse_recipient_address_pipeline},
         company::CompanyUseCases,
         thread::{SimulationMode, ThreadUseCases},
         user::UserUseCases,
@@ -83,6 +83,7 @@ pub fn router() -> Router<AppState> {
 pub struct ChannelForm {
     pub name: String,
     pub slug: Option<String>,
+    pub alias_slugs: Option<String>,
     pub system_prompt: Option<String>,
     pub form_mode: Option<String>,
     pub api_key: Option<String>,
@@ -92,6 +93,26 @@ pub struct ChannelForm {
     pub agent_ids: Option<String>,
     pub channel_config: Option<String>,
     pub confirm_spam_disabled: Option<String>,
+    pub enabled: Option<String>,
+}
+
+impl ChannelForm {
+    /// Whether the "Channel enabled" box was ticked.
+    ///
+    /// An unchecked checkbox submits no key at all, and every channel form posts its whole field
+    /// set, so an absent value genuinely means the user unticked it.
+    pub fn enabled(&self) -> bool {
+        checkbox_ticked(self.enabled.as_deref())
+    }
+
+    pub fn confirm_spam_disabled(&self) -> bool {
+        checkbox_ticked(self.confirm_spam_disabled.as_deref())
+    }
+}
+
+/// The two shapes a browser sends for a ticked checkbox, in one place.
+fn checkbox_ticked(value: Option<&str>) -> bool {
+    matches!(value, Some("true") | Some("on"))
 }
 
 pub fn slugify(input: &str) -> String {
@@ -134,6 +155,8 @@ pub(super) fn parse_agent_ids_form(input: Option<String>) -> Option<Vec<Uuid>> {
 pub struct ChannelJsonPayload {
     pub name: String,
     pub slug: Option<String>,
+    /// A PUT replaces the alias set wholesale, like every other field here.
+    pub alias_slugs: Option<Vec<String>>,
     pub system_prompt: Option<String>,
     pub api_key: Option<String>,
     pub provider: Option<String>,
@@ -142,6 +165,8 @@ pub struct ChannelJsonPayload {
     pub agent_ids: Option<Vec<Uuid>>,
     pub channel_config: Option<serde_json::Value>,
     pub confirm_spam_disabled: Option<bool>,
+    /// Omitted means enabled: like every other field here, a PUT replaces rather than patches.
+    pub enabled: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -221,14 +246,20 @@ pub(crate) async fn load_thread_page(
 }
 
 pub(super) fn parse_emails_form(input: Option<String>) -> Option<Vec<String>> {
-    input.and_then(|s| {
-        let list: Vec<String> = s
-            .split(&[',', '\n', ';'][..])
-            .map(|e| e.trim().to_string())
-            .filter(|e| !e.is_empty())
-            .collect();
-        if list.is_empty() { None } else { Some(list) }
-    })
+    let list = parse_list_form(input);
+    if list.is_empty() { None } else { Some(list) }
+}
+
+/// Split one comma/newline/semicolon-separated textarea into its non-blank entries.
+pub(super) fn parse_list_form(input: Option<String>) -> Vec<String> {
+    input
+        .map(|s| {
+            s.split(&[',', '\n', ';'][..])
+                .map(|e| e.trim().to_string())
+                .filter(|e| !e.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 pub(super) fn parse_config_form(
@@ -338,29 +369,28 @@ async fn create_channel_handler(
             Err(message) => return view.render(Some(message)).await,
         };
 
+    let confirm_spam_disabled = form.confirm_spam_disabled();
+    let enabled = form.enabled();
+
     let channel_config = match parse_config_form(form.channel_config) {
         Ok(c) => c,
         Err(err) => return view.render(Some(err)).await,
     };
 
-    let confirm_spam_disabled = matches!(
-        form.confirm_spam_disabled.as_deref(),
-        Some("true") | Some("on")
-    );
+    let write = ChannelWrite {
+        enabled,
+        name: form.name,
+        slug,
+        alias_slugs: parse_list_form(form.alias_slugs),
+        api_key: form.api_key,
+        provider: form.provider,
+        model: form.model,
+        participant_emails: parse_emails_form(form.participant_emails),
+        agent_ids,
+        channel_config,
+    };
     match channel_use_cases
-        .create_channel(
-            user.id,
-            company_id,
-            &form.name,
-            &slug,
-            form.api_key.as_deref(),
-            form.provider.as_deref(),
-            form.model.as_deref(),
-            parse_emails_form(form.participant_emails),
-            agent_ids,
-            channel_config,
-            confirm_spam_disabled,
-        )
+        .create_channel(user.id, company_id, write, confirm_spam_disabled)
         .await
     {
         Ok(_) => view.render(None).await,
@@ -571,14 +601,27 @@ async fn update_channel_handler(
         .map(String::from)
         .unwrap_or_else(|| slugify(&form.name));
 
+    let confirm_spam_disabled = form.confirm_spam_disabled();
+    let enabled = form.enabled();
     let emails = parse_emails_form(form.participant_emails);
     let agent_ids = parse_agent_ids_form(form.agent_ids);
-    let confirm_spam_disabled = form.confirm_spam_disabled.as_deref() == Some("true")
-        || form.confirm_spam_disabled.as_deref() == Some("on");
 
     let channel_config = match parse_config_form(form.channel_config) {
         Ok(c) => c,
         Err(err) => return Html(pages::error_alert(&err)),
+    };
+
+    let write = ChannelWrite {
+        name: form.name,
+        slug,
+        alias_slugs: parse_list_form(form.alias_slugs),
+        api_key: form.api_key,
+        provider: form.provider,
+        model: form.model,
+        participant_emails: emails,
+        agent_ids,
+        channel_config,
+        enabled,
     };
 
     match channel_use_cases
@@ -586,14 +629,7 @@ async fn update_channel_handler(
             user.id,
             company_id,
             channel_id,
-            &form.name,
-            &slug,
-            form.api_key.as_deref(),
-            form.provider.as_deref(),
-            form.model.as_deref(),
-            emails,
-            agent_ids,
-            channel_config,
+            write,
             confirm_spam_disabled,
         )
         .await
@@ -1174,20 +1210,21 @@ async fn create_channel_json(
         }
     }
 
+    let write = ChannelWrite {
+        name: payload.name,
+        slug,
+        alias_slugs: payload.alias_slugs.unwrap_or_default(),
+        api_key: payload.api_key,
+        provider: payload.provider,
+        model: payload.model,
+        participant_emails: payload.participant_emails,
+        agent_ids,
+        channel_config: payload.channel_config,
+        enabled: payload.enabled.unwrap_or(true),
+    };
+
     let channel = channel_use_cases
-        .create_channel(
-            user.id,
-            company_id,
-            &payload.name,
-            &slug,
-            payload.api_key.as_deref(),
-            payload.provider.as_deref(),
-            payload.model.as_deref(),
-            payload.participant_emails,
-            agent_ids,
-            payload.channel_config,
-            confirm_spam_disabled,
-        )
+        .create_channel(user.id, company_id, write, confirm_spam_disabled)
         .await?;
 
     Ok((
@@ -1229,19 +1266,25 @@ async fn update_channel_json(
         .map(String::from)
         .unwrap_or_else(|| slugify(&payload.name));
 
+    let write = ChannelWrite {
+        name: payload.name,
+        slug,
+        alias_slugs: payload.alias_slugs.unwrap_or_default(),
+        api_key: payload.api_key,
+        provider: payload.provider,
+        model: payload.model,
+        participant_emails: payload.participant_emails,
+        agent_ids: payload.agent_ids,
+        channel_config: payload.channel_config,
+        enabled: payload.enabled.unwrap_or(true),
+    };
+
     let channel = channel_use_cases
         .update_channel(
             user.id,
             company_id,
             channel_id,
-            &payload.name,
-            &slug,
-            payload.api_key.as_deref(),
-            payload.provider.as_deref(),
-            payload.model.as_deref(),
-            payload.participant_emails,
-            payload.agent_ids,
-            payload.channel_config,
+            write,
             confirm_spam_disabled,
         )
         .await?;
@@ -1313,10 +1356,12 @@ mod tests {
         };
 
         let channel = Channel {
+            enabled: true,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Auto Dispatcher".to_string(),
             slug: "auto-dispatcher".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,

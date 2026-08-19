@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        channel::Channel,
+        channel::{Channel, PUBLIC_PARTICIPANT},
         company::Company,
         value_objects::{ChannelSlug, CompanySlug},
     },
@@ -16,20 +16,102 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+/// Everything one channel write sets, so create and update cannot drift apart and so a caller
+/// cannot transpose two same-typed arguments in a nine-parameter list.
+///
+/// Values reach persistence already normalized — see [`ChannelWrite::normalize`].
+#[derive(Debug, Clone, Default)]
+pub struct ChannelWrite {
+    pub name: String,
+    pub slug: String,
+    /// Extra local parts the channel also answers on. Replaced wholesale by every write.
+    pub alias_slugs: Vec<String>,
+    pub api_key: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub participant_emails: Option<Vec<String>>,
+    pub agent_ids: Option<Vec<Uuid>>,
+    pub channel_config: Option<serde_json::Value>,
+    pub enabled: bool,
+}
+
+impl ChannelWrite {
+    /// Trim and lower-case the fields that have canonical forms, and drop the blanks. Runs once,
+    /// in the use case, so every entry point stores the same shape.
+    fn normalize(&mut self) -> AppResult<()> {
+        self.name = self.name.trim().to_string();
+        self.slug = self.slug.trim().to_lowercase().replace(' ', "-");
+
+        if self.name.is_empty() {
+            return Err(AppError::BadRequest(
+                "The channel name cannot be empty.".into(),
+            ));
+        }
+        if self.slug.is_empty() {
+            return Err(AppError::BadRequest(
+                "The channel address cannot be empty.".into(),
+            ));
+        }
+        validate_slug(&self.slug, SlugKind::ChannelAddress)?;
+        self.normalize_alias_slugs()?;
+
+        blank_to_none(&mut self.api_key);
+        blank_to_none(&mut self.provider);
+        blank_to_none(&mut self.model);
+
+        if let Some(emails) = self.participant_emails.as_mut() {
+            emails.retain_mut(|email| {
+                *email = email.trim().to_lowercase();
+                !email.is_empty() && email.contains('@')
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Aliases go through the same canonicalization and reserved-suffix rules as the primary
+    /// slug, then lose blanks, duplicates and any repeat of the primary slug — the database
+    /// would reject that last one as a self-collision.
+    fn normalize_alias_slugs(&mut self) -> AppResult<()> {
+        let mut seen = std::collections::HashSet::new();
+        let mut aliases = Vec::with_capacity(self.alias_slugs.len());
+
+        for alias in std::mem::take(&mut self.alias_slugs) {
+            let alias = alias.trim().to_lowercase().replace(' ', "-");
+            if alias.is_empty() || alias == self.slug {
+                continue;
+            }
+            validate_slug(&alias, SlugKind::ChannelAlias)?;
+            if seen.insert(alias.clone()) {
+                aliases.push(alias);
+            }
+        }
+
+        self.alias_slugs = aliases;
+        Ok(())
+    }
+
+    /// Whether the participant list opens this channel to anyone — the only case the spam
+    /// interlock applies to.
+    fn is_public(&self) -> bool {
+        self.participant_emails
+            .as_ref()
+            .is_some_and(|emails| emails.iter().any(|e| e == PUBLIC_PARTICIPANT))
+    }
+}
+
+fn blank_to_none(value: &mut Option<String>) {
+    if let Some(inner) = value.as_mut() {
+        *inner = inner.trim().to_string();
+        if inner.is_empty() {
+            *value = None;
+        }
+    }
+}
+
 #[async_trait]
 pub trait ChannelPersistence: Send + Sync {
-    async fn create(
-        &self,
-        company_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        participant_emails: Option<Vec<String>>,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
-    ) -> AppResult<Channel>;
+    async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel>;
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>>;
 
@@ -41,18 +123,7 @@ pub trait ChannelPersistence: Send + Sync {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>>;
 
-    async fn update(
-        &self,
-        id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        participant_emails: Option<Vec<String>>,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
-    ) -> AppResult<Channel>;
+    async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel>;
 
     async fn delete(&self, id: Uuid) -> AppResult<()>;
 }
@@ -98,70 +169,35 @@ impl ChannelUseCases {
         &self,
         user_id: Uuid,
         company_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        participant_emails: Option<Vec<String>>,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
+        mut write: ChannelWrite,
         confirm_spam_disabled: bool,
     ) -> AppResult<Channel> {
         self.verify_company_owner(user_id, company_id).await?;
 
-        let name_trimmed = name.trim();
-        let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
-
-        if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::Internal(
-                "Channel name and slug cannot be empty.".into(),
-            ));
-        }
-
-        validate_slug(&slug_clean)?;
-
-        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
-
-        let cleaned_emails = participant_emails.map(|emails| {
-            emails
-                .into_iter()
-                .map(|e| e.trim().to_lowercase())
-                .filter(|e| !e.is_empty() && e.contains('@'))
-                .collect::<Vec<_>>()
-        });
-
-        let is_public = cleaned_emails
-            .as_ref()
-            .map(|emails| emails.iter().any(|e| e == "@public"))
-            .unwrap_or(false);
-
-        if is_public && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
-            return Err(AppError::Internal(
-                "Spam scanning is disabled in server configuration. Saving a public channel (@public) requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
-            ));
-        }
+        write.normalize()?;
+        self.check_spam_interlock(&write, confirm_spam_disabled)?;
 
         info!(
             "Creating channel '{}' ({}) for company {}",
-            name_trimmed, slug_clean, company_id
+            write.name, write.slug, company_id
         );
 
-        self.channel_persistence
-            .create(
-                company_id,
-                name_trimmed,
-                &slug_clean,
-                api_key_clean,
-                provider_clean,
-                model_clean,
-                cleaned_emails,
-                agent_ids,
-                channel_config,
-            )
-            .await
+        self.channel_persistence.create(company_id, write).await
+    }
+
+    /// A channel open to `@public` must not be saved while the server has no spam scanning at all,
+    /// unless the caller explicitly says it knows.
+    fn check_spam_interlock(
+        &self,
+        write: &ChannelWrite,
+        confirm_spam_disabled: bool,
+    ) -> AppResult<()> {
+        if write.is_public() && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
+            return Err(AppError::BadRequest(
+                "Spam scanning is disabled in server configuration. Saving a public channel (@public) requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
+            ));
+        }
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -203,14 +239,7 @@ impl ChannelUseCases {
         user_id: Uuid,
         company_id: Uuid,
         channel_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        participant_emails: Option<Vec<String>>,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
+        mut write: ChannelWrite,
         confirm_spam_disabled: bool,
     ) -> AppResult<Channel> {
         self.verify_company_owner(user_id, company_id).await?;
@@ -227,58 +256,15 @@ impl ChannelUseCases {
             ));
         }
 
-        let name_trimmed = name.trim();
-        let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
-
-        if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::Internal(
-                "Channel name and slug cannot be empty.".into(),
-            ));
-        }
-
-        validate_slug(&slug_clean)?;
-
-        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
-
-        let cleaned_emails = participant_emails.map(|emails| {
-            emails
-                .into_iter()
-                .map(|e| e.trim().to_lowercase())
-                .filter(|e| !e.is_empty() && e.contains('@'))
-                .collect::<Vec<_>>()
-        });
-
-        let is_public = cleaned_emails
-            .as_ref()
-            .map(|emails| emails.iter().any(|e| e == "@public"))
-            .unwrap_or(false);
-
-        if is_public && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
-            return Err(AppError::Internal(
-                "Spam scanning is disabled in server configuration. Saving a public channel (@public) requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
-            ));
-        }
+        write.normalize()?;
+        self.check_spam_interlock(&write, confirm_spam_disabled)?;
 
         info!(
-            "Updating channel {} for company {}: {} ({})",
-            channel_id, company_id, name_trimmed, slug_clean
+            "Updating channel {} for company {}: {} ({}), enabled={}",
+            channel_id, company_id, write.name, write.slug, write.enabled
         );
 
-        self.channel_persistence
-            .update(
-                channel_id,
-                name_trimmed,
-                &slug_clean,
-                api_key_clean,
-                provider_clean,
-                model_clean,
-                cleaned_emails,
-                agent_ids,
-                channel_config,
-            )
-            .await
+        self.channel_persistence.update(channel_id, write).await
     }
 
     #[instrument(skip(self))]
@@ -436,10 +422,35 @@ pub fn extract_email_address(input: &str) -> String {
     email_addr.trim().to_lowercase()
 }
 
-pub fn validate_slug(slug: &str) -> AppResult<()> {
+/// Which field a slug came from, so a rejection can name the input the user has to fix instead of
+/// saying "slug" for three different form fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SlugKind {
+    ChannelAddress,
+    ChannelAlias,
+    AgentSlug,
+}
+
+impl SlugKind {
+    fn noun(self) -> &'static str {
+        match self {
+            SlugKind::ChannelAddress => "channel address",
+            SlugKind::ChannelAlias => "channel alias",
+            SlugKind::AgentSlug => "agent slug",
+        }
+    }
+}
+
+/// A malformed slug is user input, not a server fault, so every rejection here is a
+/// [`AppError::BadRequest`] — `Internal` renders as a bare "Internal error" with the message
+/// dropped, which is exactly what the person filling in the form needs to see.
+pub fn validate_slug(slug: &str, kind: SlugKind) -> AppResult<()> {
     let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
     if slug_clean.is_empty() {
-        return Err(AppError::Internal("Slug cannot be empty.".into()));
+        return Err(AppError::BadRequest(format!(
+            "The {} cannot be empty.",
+            kind.noun()
+        )));
     }
 
     for suffix in crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES {
@@ -454,9 +465,13 @@ pub fn validate_slug(slug: &str) -> AppResult<()> {
             || slug_clean.ends_with(&dash_s)
             || slug_clean.ends_with(&underscore_s)
         {
-            return Err(AppError::Internal(format!(
-                "Invalid slug '{}': Slugs cannot equal or end with reserved context-only mode suffixes (noagent, quiet, message, msg, na).",
-                slug_clean
+            return Err(AppError::BadRequest(format!(
+                "Invalid {} '{}': it cannot be, or end with, one of the reserved suffixes {} \
+                 (optionally preceded by '.', '+', '-' or '_'). Those mark an address as \
+                 context-only, so a channel named after one could never be replied to.",
+                kind.noun(),
+                slug_clean,
+                crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES.join(", ")
             )));
         }
     }
@@ -606,11 +621,11 @@ pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<Ch
     let target_clean = target.trim().to_lowercase();
     let mut matches: Vec<(usize, ChannelSlug)> = Vec::new();
 
-    for ch in available {
-        let dist = levenshtein_distance(&target_clean, &ch.slug.to_lowercase());
-        let max_dist = (ch.slug.len() / 2).max(2);
+    for slug in available.iter().flat_map(Channel::slugs) {
+        let dist = levenshtein_distance(&target_clean, &slug.to_lowercase());
+        let max_dist = (slug.len() / 2).max(2);
         if dist <= max_dist && dist > 0 {
-            matches.push((dist, ch.slug.clone()));
+            matches.push((dist, slug.clone()));
         }
     }
 
@@ -702,32 +717,8 @@ mod tests {
 
     #[async_trait]
     impl ChannelPersistence for MockChannelPersistence {
-        async fn create(
-            &self,
-            company_id: Uuid,
-            name: &str,
-            slug: &str,
-            api_key: Option<&str>,
-            provider: Option<&str>,
-            model: Option<&str>,
-            participant_emails: Option<Vec<String>>,
-            agent_ids: Option<Vec<Uuid>>,
-            channel_config: Option<serde_json::Value>,
-        ) -> AppResult<Channel> {
-            let channel = Channel {
-                id: Uuid::new_v4(),
-                company_id,
-                name: name.to_string(),
-                slug: slug.into(),
-                api_key: api_key.map(|s| s.to_string()),
-                provider: provider.map(|s| s.to_string()),
-                model: model.map(|s| s.to_string()),
-                participant_emails: participant_emails
-                    .map(|emails| emails.into_iter().map(EmailAddress::from).collect()),
-                agent_ids,
-                channel_config,
-                created_at: Utc::now().naive_utc(),
-            };
+        async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
+            let channel = channel_from_write(Uuid::new_v4(), company_id, write);
             self.channels.lock().unwrap().push(channel.clone());
             Ok(channel)
         }
@@ -767,39 +758,43 @@ mod tests {
                 .collect())
         }
 
-        async fn update(
-            &self,
-            id: Uuid,
-            name: &str,
-            slug: &str,
-            api_key: Option<&str>,
-            provider: Option<&str>,
-            model: Option<&str>,
-            participant_emails: Option<Vec<String>>,
-            agent_ids: Option<Vec<Uuid>>,
-            channel_config: Option<serde_json::Value>,
-        ) -> AppResult<Channel> {
+        async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
             let mut list = self.channels.lock().unwrap();
-            let channel = list
+            let existing = list
                 .iter_mut()
                 .find(|w| w.id == id)
                 .ok_or_else(|| AppError::Internal("Not found".into()))?;
 
-            channel.name = name.to_string();
-            channel.slug = slug.into();
-            channel.api_key = api_key.map(|s| s.to_string());
-            channel.provider = provider.map(|s| s.to_string());
-            channel.model = model.map(|s| s.to_string());
-            channel.participant_emails = participant_emails
-                .map(|emails| emails.into_iter().map(EmailAddress::from).collect());
-            channel.agent_ids = agent_ids;
-            channel.channel_config = channel_config;
-            Ok(channel.clone())
+            *existing = Channel {
+                created_at: existing.created_at,
+                ..channel_from_write(id, existing.company_id, write)
+            };
+            Ok(existing.clone())
         }
 
         async fn delete(&self, id: Uuid) -> AppResult<()> {
             self.channels.lock().unwrap().retain(|w| w.id != id);
             Ok(())
+        }
+    }
+
+    fn channel_from_write(id: Uuid, company_id: Uuid, write: ChannelWrite) -> Channel {
+        Channel {
+            id,
+            company_id,
+            name: write.name,
+            slug: write.slug.into(),
+            alias_slugs: Vec::new(),
+            api_key: write.api_key,
+            provider: write.provider,
+            model: write.model,
+            participant_emails: write
+                .participant_emails
+                .map(|emails| emails.into_iter().map(EmailAddress::from).collect()),
+            agent_ids: write.agent_ids,
+            channel_config: write.channel_config,
+            enabled: write.enabled,
+            created_at: Utc::now().naive_utc(),
         }
     }
 
@@ -872,14 +867,18 @@ mod tests {
             .create_channel(
                 owner_id,
                 company_id,
-                "Support Flow",
-                "support-flow",
-                Some("key_123"),
-                Some("openai"),
-                Some("gpt-4o"),
-                Some(emails.clone()),
-                Some(agent_ids.clone()),
-                Some(config.clone()),
+                ChannelWrite {
+                    name: "Support Flow".into(),
+                    slug: "support-flow".into(),
+                    api_key: Some("key_123".into()),
+                    provider: Some("openai".into()),
+                    model: Some("gpt-4o".into()),
+                    participant_emails: Some(emails.clone()),
+                    agent_ids: Some(agent_ids.clone()),
+                    channel_config: Some(config.clone()),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await
@@ -908,14 +907,12 @@ mod tests {
             .create_channel(
                 non_owner_id,
                 company_id,
-                "Hacker Flow",
-                "hacker-flow",
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
+                ChannelWrite {
+                    name: "Hacker Flow".into(),
+                    slug: "hacker-flow".into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await;
@@ -935,14 +932,13 @@ mod tests {
                 owner_id,
                 company_id,
                 channel.id,
-                "Updated Flow",
-                "updated-flow",
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some(updated_config.clone()),
+                ChannelWrite {
+                    name: "Updated Flow".into(),
+                    slug: "updated-flow".into(),
+                    channel_config: Some(updated_config.clone()),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await
@@ -1023,16 +1019,87 @@ mod tests {
     }
 
     #[test]
-    fn test_slug_validation_reserved_suffixes() {
-        assert!(validate_slug("support").is_ok());
-        assert!(validate_slug("tech-help").is_ok());
+    fn normalize_canonicalizes_and_dedupes_alias_slugs() {
+        let mut write = ChannelWrite {
+            name: "Support".into(),
+            slug: "support".into(),
+            alias_slugs: vec![
+                "  Sales  ".into(),
+                "Customer Care".into(),
+                "sales".into(),
+                "support".into(),
+                "   ".into(),
+            ],
+            enabled: true,
+            ..ChannelWrite::default()
+        };
 
-        assert!(validate_slug("quiet").is_err());
-        assert!(validate_slug("noagent").is_err());
-        assert!(validate_slug("support.quiet").is_err());
-        assert!(validate_slug("support-noagent").is_err());
-        assert!(validate_slug("sales_message").is_err());
-        assert!(validate_slug("bot+na").is_err());
+        write.normalize().unwrap();
+
+        // Lower-cased and space-hyphenated, blanks and duplicates dropped, and the alias that
+        // repeats the canonical slug removed — the database would reject that as a self-collision.
+        assert_eq!(write.alias_slugs, vec!["sales", "customer-care"]);
+    }
+
+    #[test]
+    fn normalize_rejects_an_alias_ending_in_a_reserved_suffix() {
+        let mut write = ChannelWrite {
+            name: "Support".into(),
+            slug: "support".into(),
+            alias_slugs: vec!["sales-quiet".into()],
+            enabled: true,
+            ..ChannelWrite::default()
+        };
+
+        let err = write.normalize().unwrap_err().to_string();
+        assert!(err.contains("sales-quiet"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn test_slug_validation_reserved_suffixes() {
+        let check = |slug| validate_slug(slug, SlugKind::ChannelAddress);
+
+        assert!(check("support").is_ok());
+        assert!(check("tech-help").is_ok());
+
+        assert!(check("quiet").is_err());
+        assert!(check("noagent").is_err());
+        assert!(check("support.quiet").is_err());
+        assert!(check("support-noagent").is_err());
+        assert!(check("sales_message").is_err());
+        assert!(check("bot+na").is_err());
+    }
+
+    /// A rejected slug is user input: the message must survive to the client, name the field the
+    /// user typed into, and say which values are reserved.
+    #[test]
+    fn rejected_slugs_are_bad_requests_that_name_the_field_and_the_reason() {
+        let alias_err = validate_slug("ops-quiet", SlugKind::ChannelAlias).unwrap_err();
+        assert!(
+            matches!(alias_err, AppError::BadRequest(_)),
+            "Internal drops the message on the way out: {alias_err:?}"
+        );
+        let message = alias_err.to_string();
+        assert!(message.contains("channel alias"), "{message}");
+        assert!(message.contains("ops-quiet"), "{message}");
+        assert!(
+            message.contains("noagent, quiet, message, msg, na"),
+            "{message}"
+        );
+
+        // The same value from the address field names that field instead.
+        let address_message = validate_slug("ops-quiet", SlugKind::ChannelAddress)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            address_message.contains("channel address"),
+            "{address_message}"
+        );
+
+        let empty_message = validate_slug("  ", SlugKind::AgentSlug)
+            .unwrap_err()
+            .to_string();
+        assert!(empty_message.contains("agent slug"), "{empty_message}");
     }
 
     #[test]
@@ -1043,10 +1110,12 @@ mod tests {
         let company_id = uuid::Uuid::new_v4();
         let available = vec![
             Channel {
+                enabled: true,
                 id: uuid::Uuid::new_v4(),
                 company_id,
                 name: "Support".to_string(),
                 slug: "support".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1056,10 +1125,12 @@ mod tests {
                 created_at: chrono::Utc::now().naive_utc(),
             },
             Channel {
+                enabled: true,
                 id: uuid::Uuid::new_v4(),
                 company_id,
                 name: "Billing".to_string(),
                 slug: "billing".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1107,14 +1178,12 @@ mod tests {
             .create_channel(
                 owner_id,
                 company_id,
-                "Support Flow",
-                "support",
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
+                ChannelWrite {
+                    name: "Support Flow".into(),
+                    slug: "support".into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await
@@ -1146,14 +1215,13 @@ mod tests {
             .create_channel(
                 owner_id,
                 company_id,
-                "Restricted Flow",
-                "restricted",
-                None,
-                None,
-                None,
-                Some(vec!["agent@example.com".to_string()]),
-                None,
-                None,
+                ChannelWrite {
+                    name: "Restricted Flow".into(),
+                    slug: "restricted".into(),
+                    participant_emails: Some(vec!["agent@example.com".to_string()]),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await
@@ -1228,14 +1296,13 @@ mod tests {
             .create_channel(
                 owner_id,
                 company_id,
-                "Public Flow",
-                "public",
-                None,
-                None,
-                None,
-                Some(vec!["@public".to_string()]),
-                None,
-                None,
+                ChannelWrite {
+                    name: "Public Flow".into(),
+                    slug: "public".into(),
+                    participant_emails: Some(vec!["@public".to_string()]),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await;
@@ -1251,14 +1318,13 @@ mod tests {
             .create_channel(
                 owner_id,
                 company_id,
-                "Public Flow",
-                "public",
-                None,
-                None,
-                None,
-                Some(vec!["@public".to_string()]),
-                None,
-                None,
+                ChannelWrite {
+                    name: "Public Flow".into(),
+                    slug: "public".into(),
+                    participant_emails: Some(vec!["@public".to_string()]),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 true,
             )
             .await;
@@ -1269,14 +1335,13 @@ mod tests {
             .create_channel(
                 owner_id,
                 company_id,
-                "Restricted Flow",
-                "restricted",
-                None,
-                None,
-                None,
-                Some(vec!["allowed@example.com".to_string()]),
-                None,
-                None,
+                ChannelWrite {
+                    name: "Restricted Flow".into(),
+                    slug: "restricted".into(),
+                    participant_emails: Some(vec!["allowed@example.com".to_string()]),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await;

@@ -232,6 +232,12 @@ impl ThreadUseCases {
                 "A channel cannot deliver an internal message to itself".into(),
             ));
         }
+        if !target.enabled {
+            return Err(AppError::Internal(format!(
+                "Target channel '{}' is disabled",
+                target.slug
+            )));
+        }
         if target.agent_ids.as_ref().is_none_or(Vec::is_empty) {
             return Err(AppError::Internal(format!(
                 "Target channel '{}' has no configured agent",
@@ -641,6 +647,13 @@ impl RecipientRole {
 pub struct ChannelMatch {
     pub company: Company,
     pub channel: Channel,
+    /// The address this message actually arrived on — an alias, or the canonical slug.
+    ///
+    /// Optional because durable task payloads written before aliases existed carry no value, and
+    /// `ChannelSlug::default()` is the empty string, which would silently send from
+    /// `@company.domain`.
+    #[serde(default)]
+    pub matched_slug: Option<ChannelSlug>,
     pub thread: Thread,
     pub inbound_message: Message,
     pub recipient_role: RecipientRole,
@@ -648,6 +661,16 @@ pub struct ChannelMatch {
     pub step_index: usize,
     #[serde(default)]
     pub total_steps: usize,
+}
+
+impl ChannelMatch {
+    /// The slug a reply goes out from: the alias the sender wrote to, falling back to the
+    /// channel's canonical slug for matches recorded before aliases existed.
+    pub fn reply_slug(&self) -> ChannelSlug {
+        self.matched_slug
+            .clone()
+            .unwrap_or_else(|| self.channel.slug.clone())
+    }
 }
 
 fn durable_ingest_payload(ingest: &InboundIngestResult) -> serde_json::Value {
@@ -717,14 +740,27 @@ pub struct BounceInfo {
     pub recipient_to: EmailAddress,
     pub company_slug: Option<CompanySlug>,
     pub invalid_slugs: Vec<ChannelSlug>,
+    /// Channels that exist but are switched off. Defaulted on deserialize so bounces queued
+    /// before this field existed still re-hydrate.
+    #[serde(default)]
+    pub disabled_slugs: Vec<ChannelSlug>,
     pub suggestions: Vec<BounceSuggestion>,
     pub original_subject: String,
 }
 
 pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String {
+    let domain_part = bounce
+        .company_slug
+        .as_deref()
+        .map(|c| format!("{c}.{app_domain}"))
+        .unwrap_or_else(|| app_domain.to_string());
+
     let mut body = String::new();
     body.push_str("Undeliverable Mail Notification\n\n");
-    body.push_str("Your email could not be delivered because one or more channel addresses were not found or misspelled.\n\n");
+    body.push_str(&format!(
+        "Your email could not be delivered because {}.\n\n",
+        bounce_cause(bounce)
+    ));
 
     if let Some(ref comp) = bounce.company_slug {
         body.push_str(&format!("Company Domain: {comp}.{app_domain}\n\n"));
@@ -732,12 +768,6 @@ pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String
 
     body.push_str("Details:\n");
     for s in &bounce.suggestions {
-        let domain_part = bounce
-            .company_slug
-            .as_deref()
-            .map(|c| format!("{c}.{app_domain}"))
-            .unwrap_or_else(|| app_domain.to_string());
-
         body.push_str(&format!(
             "  - Invalid Channel Slug: '{}@{}'\n",
             s.invalid_slug, domain_part
@@ -753,8 +783,30 @@ pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String
         body.push('\n');
     }
 
+    for slug in &bounce.disabled_slugs {
+        body.push_str(&format!(
+            "  - Disabled Channel: '{slug}@{domain_part}'\n    This address is correct, but the \
+             channel is currently switched off and is not accepting mail.\n\n"
+        ));
+    }
+
     body.push_str("Please check the channel address and try sending your email again.\n");
     body
+}
+
+/// The one sentence that says why a bounce happened, for both bounce renderers.
+pub fn bounce_cause(bounce: &BounceInfo) -> &'static str {
+    match (
+        !bounce.invalid_slugs.is_empty(),
+        !bounce.disabled_slugs.is_empty(),
+    ) {
+        (true, true) => {
+            "one or more channel addresses were not found or misspelled, and one or more are disabled"
+        }
+        (true, false) => "one or more channel addresses were not found or misspelled",
+        (false, true) => "one or more channels are currently disabled",
+        (false, false) => "the message could not be routed",
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

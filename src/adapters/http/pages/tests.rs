@@ -218,10 +218,12 @@ fn mailbox_company() -> Company {
 
 fn mailbox_channel(company_id: Uuid) -> Channel {
     Channel {
+        enabled: true,
         id: Uuid::new_v4(),
         company_id,
         name: "Inbox".to_string(),
         slug: "inbox".into(),
+        alias_slugs: Vec::new(),
         api_key: None,
         provider: None,
         model: None,
@@ -1162,6 +1164,12 @@ fn message_pane_separates_agent_and_human_bubbles() {
         "/ui/reply?company_id={}&channel_id={}&thread_id={}",
         company.id, channel.id, thread.id
     )));
+
+    // The chat composer under the messages posts into this same thread.
+    assert!(html.contains("id=\"thread-composer\""));
+    assert!(html.contains("hx-post=\"/ui/reply\""));
+    assert!(html.contains(&format!("name=\"thread_id\" value=\"{}\"", thread.id)));
+    assert!(html.contains(&format!("name=\"channel_id\" value=\"{}\"", channel.id)));
 }
 
 #[test]

@@ -82,10 +82,12 @@ pub struct ChannelSettingsPage<'a> {
 ///
 /// The Advanced create form and the edit form take exactly these fields, which is why they share
 /// one renderer; only the URL they submit to differs.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ChannelDraft<'a> {
     pub name: &'a str,
     pub slug: &'a str,
+    /// Extra addresses the channel answers on, as the comma-separated list the form submits.
+    pub alias_slugs: &'a str,
     /// Simple mode only: the instructions the server expands into an agent.
     pub system_prompt: &'a str,
     pub participant_emails: &'a str,
@@ -96,6 +98,28 @@ pub struct ChannelDraft<'a> {
     pub channel_config: &'a str,
     /// Whether the create pane should open on the Advanced tab.
     pub advanced: bool,
+    /// Whether the channel takes traffic. A new channel starts enabled, which is why this type
+    /// hand-writes `Default` instead of deriving it.
+    pub enabled: bool,
+}
+
+impl Default for ChannelDraft<'_> {
+    fn default() -> Self {
+        Self {
+            name: "",
+            slug: "",
+            alias_slugs: "",
+            system_prompt: "",
+            participant_emails: "",
+            agent_ids: &[],
+            provider: "",
+            model: "",
+            api_key: "",
+            channel_config: "",
+            advanced: false,
+            enabled: true,
+        }
+    }
 }
 
 impl ChannelDraft<'_> {
@@ -211,7 +235,9 @@ fn channel_settings_entry(
                         hx-target="#channel-pane" hx-swap="outerHTML"
                         hx-push-url="/ui/channels?company_id={company_id}&channel_id={channel_id}"
                         onclick="selectSidebarItem(this)">
-                        <span class="w-full min-w-0 truncate">{name}</span>
+                        <span class="flex w-full min-w-0 items-center gap-2">
+                            <span class="min-w-0 truncate">{name}</span>{disabled_badge}
+                        </span>
                         <span class="w-full truncate font-mono text-[11px] opacity-60">{address}</span>
                     </a>
                 </li>
@@ -219,8 +245,18 @@ fn channel_settings_entry(
         active = if selected { "menu-active" } else { "" },
         channel_id = channel.id,
         name = escape_html_text(&channel.name),
+        disabled_badge = disabled_badge(channel),
         address = escape_html_text(address),
     )
+}
+
+/// The "off" marker on a channel, so the state is visible without opening its settings.
+pub fn disabled_badge(channel: &Channel) -> &'static str {
+    if channel.enabled {
+        ""
+    } else {
+        r#"<span class="badge badge-ghost badge-sm shrink-0 opacity-70">Disabled</span>"#
+    }
 }
 
 /// The pane before a channel is picked.
@@ -238,8 +274,9 @@ pub fn channel_settings_empty_pane(message: &str, swap: FragmentSwap) -> String 
 
 pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
     let participants = stored_participants(pane.channel);
+    let aliases = stored_alias_slugs(pane.channel);
     let config = stored_config(pane.channel);
-    let stored = stored_draft(pane.channel, &participants, &config);
+    let stored = stored_draft(pane.channel, &participants, &aliases, &config);
     let draft = pane.draft.unwrap_or(&stored);
     let company_id = pane.company.id;
     let channel_id = pane.channel.id;
@@ -283,11 +320,11 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
         </section>
         "##,
         name = escape_html_text(&pane.channel.name),
-        address = escape_html_text(
-            &pane
-                .channel
-                .inbound_address(&pane.company.slug, pane.app_domain_name)
-        ),
+        address = escape_html_text(&all_addresses(
+            pane.channel,
+            pane.company,
+            pane.app_domain_name
+        )),
         error_html = form_error_banner(pane.error),
         fields = channel_fields(&ChannelFields {
             company: pane.company,
@@ -327,6 +364,8 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
                     hx-post="/ui/channels?company_id={company_id}" hx-target="#channel-pane" hx-swap="outerHTML"
                     hx-disabled-elt="find button[type='submit']">
                     <input type="hidden" name="form_mode" value="simple">
+                    <!-- Simple mode has no on/off control, and an absent checkbox reads as "off". -->
+                    <input type="hidden" name="enabled" value="true">
                     <label class="form-control w-full">
                         <div class="label"><span class="label-text text-xs opacity-70">Channel Name</span></div>
                         <input type="text" name="name" required value="{name}" placeholder="Inbound Email Handler"
@@ -428,6 +467,13 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                                 class="input input-bordered w-full font-mono">
                         </label>
                     </div>
+                    <label class="form-control w-full">
+                        <div class="label"><span class="label-text text-xs opacity-70">Alias Addresses (@{company_slug}.{app_domain_name})</span></div>
+                        <input type="text" name="alias_slugs" value="{alias_slugs}" autocomplete="off"
+                            placeholder="sales, help, contact"
+                            class="input input-bordered w-full font-mono">
+                        <div class="label"><span class="label-text-alt text-[11px] opacity-60">Comma-separated. Mail to any of these reaches this channel, and replies go back out from the address it arrived on.</span></div>
+                    </label>
                     <div class="form-control w-full">
                         <div class="label"><span class="label-text text-xs opacity-70">Agents</span></div>
                         {agents_html}
@@ -467,12 +513,22 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                             </label>
                         </div>
                     </details>
+                    <div class="form-control w-full">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
+                            <input type="checkbox" name="enabled" value="true" class="checkbox checkbox-sm mt-0.5"{enabled_checked}>
+                            <span class="text-xs">
+                                <span class="font-semibold">Channel enabled</span>
+                                <span class="block opacity-70">Unticking this keeps the channel and its threads, but mail sent to its address bounces back to the sender, and other channels can no longer hand work to it.</span>
+                            </span>
+                        </label>
+                    </div>
                     {spam_html}
         "##,
         name = escape_html_text(draft.name),
         company_slug = escape_html_text(&fields.company.slug),
         app_domain_name = escape_html_text(fields.app_domain_name),
         slug = escape_html_text(draft.slug),
+        alias_slugs = escape_html_text(draft.alias_slugs),
         agents_html = agent_radios(
             fields.company.id,
             fields.agents,
@@ -484,6 +540,7 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
         model = escape_html_text(draft.model),
         api_key = escape_html_text(draft.api_key),
         channel_config = escape_html_text(draft.channel_config),
+        enabled_checked = if draft.enabled { " checked" } else { "" },
         spam_html = spam_disabled_confirmation(fields.spam_scan_enabled, draft.is_public()),
     )
 }
@@ -586,11 +643,13 @@ fn spam_disabled_confirmation(spam_scan_enabled: bool, is_public: bool) -> Strin
 fn stored_draft<'a>(
     channel: &'a Channel,
     participant_emails: &'a str,
+    alias_slugs: &'a str,
     channel_config: &'a str,
 ) -> ChannelDraft<'a> {
     ChannelDraft {
         name: &channel.name,
         slug: &channel.slug,
+        alias_slugs,
         system_prompt: "",
         participant_emails,
         agent_ids: channel.agent_ids.as_deref().unwrap_or(&[]),
@@ -599,7 +658,28 @@ fn stored_draft<'a>(
         api_key: channel.api_key.as_deref().unwrap_or(""),
         channel_config,
         advanced: true,
+        enabled: channel.enabled,
     }
+}
+
+/// Every address the channel answers on, canonical first, for the pane's identity line.
+fn all_addresses(channel: &Channel, company: &Company, app_domain_name: &str) -> String {
+    channel
+        .inbound_addresses(&company.slug, app_domain_name)
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(" · ")
+}
+
+/// The channel's alias addresses as the comma-separated list the form submits.
+pub fn stored_alias_slugs(channel: &Channel) -> String {
+    channel
+        .alias_slugs
+        .iter()
+        .map(|slug| slug.as_str())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// The channel's participants as the comma-separated list the form submits.

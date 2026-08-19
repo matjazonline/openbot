@@ -29,14 +29,16 @@ use crate::{
     entities::{agent::Agent, channel::Channel, company::Company, value_objects::EmailAddress},
     infra::config::AppConfig,
     use_cases::{
-        agent::AgentUseCases, channel::ChannelUseCases, company::CompanyUseCases,
+        agent::AgentUseCases,
+        channel::{ChannelUseCases, ChannelWrite},
+        company::CompanyUseCases,
         user::UserUseCases,
     },
 };
 
 use super::{
     channel::{
-        ChannelForm, parse_agent_ids_form, parse_config_form, parse_emails_form,
+        ChannelForm, parse_agent_ids_form, parse_config_form, parse_emails_form, parse_list_form,
         resolve_channel_agents, slugify,
     },
     ui::{load_account, load_scoped_company},
@@ -258,15 +260,8 @@ async fn create_channel(
         .create_channel(
             workspace.user_id,
             company.id,
-            &submitted.form.name,
-            &submitted.slug,
-            submitted.form.api_key.as_deref(),
-            submitted.form.provider.as_deref(),
-            submitted.form.model.as_deref(),
-            parse_emails_form(submitted.form.participant_emails.clone()),
-            agent_ids,
-            channel_config,
-            submitted.confirm_spam_disabled(),
+            submitted.write(agent_ids, channel_config),
+            submitted.form.confirm_spam_disabled(),
         )
         .await;
 
@@ -312,15 +307,8 @@ async fn update_channel(
             workspace.user_id,
             company.id,
             channel_id,
-            &submitted.form.name,
-            &submitted.slug,
-            submitted.form.api_key.as_deref(),
-            submitted.form.provider.as_deref(),
-            submitted.form.model.as_deref(),
-            parse_emails_form(submitted.form.participant_emails.clone()),
-            Some(submitted.agent_ids.clone()),
-            channel_config,
-            submitted.confirm_spam_disabled(),
+            submitted.write(Some(submitted.agent_ids.clone()), channel_config),
+            submitted.form.confirm_spam_disabled(),
         )
         .await;
 
@@ -491,6 +479,7 @@ impl SubmittedChannel {
         pages::ChannelDraft {
             name: &self.form.name,
             slug: &self.slug,
+            alias_slugs: self.form.alias_slugs.as_deref().unwrap_or(""),
             system_prompt: self.form.system_prompt.as_deref().unwrap_or(""),
             participant_emails: self.form.participant_emails.as_deref().unwrap_or(""),
             agent_ids: &self.agent_ids,
@@ -499,13 +488,28 @@ impl SubmittedChannel {
             api_key: self.form.api_key.as_deref().unwrap_or(""),
             channel_config: self.form.channel_config.as_deref().unwrap_or(""),
             advanced: self.form.form_mode.as_deref() != Some("simple"),
+            enabled: self.form.enabled(),
         }
     }
 
-    fn confirm_spam_disabled(&self) -> bool {
-        matches!(
-            self.form.confirm_spam_disabled.as_deref(),
-            Some("true") | Some("on")
-        )
+    /// The write this submission asks for. `agent_ids` and `channel_config` are passed in because
+    /// each handler resolves them differently (create may mint an agent; update reuses the list).
+    fn write(
+        &self,
+        agent_ids: Option<Vec<Uuid>>,
+        channel_config: Option<serde_json::Value>,
+    ) -> ChannelWrite {
+        ChannelWrite {
+            name: self.form.name.clone(),
+            slug: self.slug.clone(),
+            alias_slugs: parse_list_form(self.form.alias_slugs.clone()),
+            api_key: self.form.api_key.clone(),
+            provider: self.form.provider.clone(),
+            model: self.form.model.clone(),
+            participant_emails: parse_emails_form(self.form.participant_emails.clone()),
+            agent_ids,
+            channel_config,
+            enabled: self.form.enabled(),
+        }
     }
 }

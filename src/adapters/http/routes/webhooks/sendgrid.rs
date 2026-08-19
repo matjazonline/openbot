@@ -200,7 +200,7 @@ mod tests {
         entities::{channel::Channel, company::Company, message::Message, thread::Thread},
         infra::config::AppConfig,
         use_cases::{
-            channel::{ChannelPersistence, ChannelUseCases},
+            channel::{ChannelPersistence, ChannelUseCases, ChannelWrite},
             company::CompanyPersistence,
             company_invite::CompanyInvitePersistence,
             thread::ThreadPersistence,
@@ -270,18 +270,7 @@ mod tests {
 
     #[async_trait]
     impl ChannelPersistence for MockChannelPersistence {
-        async fn create(
-            &self,
-            _company_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _participant_emails: Option<Vec<String>>,
-            _agent_ids: Option<Vec<Uuid>>,
-            _channel_config: Option<serde_json::Value>,
-        ) -> AppResult<Channel> {
+        async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
             unimplemented!()
         }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
@@ -297,24 +286,13 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|w| &w.slug == channel_slug)
+                .find(|w| w.matches_slug(channel_slug))
                 .cloned())
         }
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(self.channels.lock().unwrap().clone())
         }
-        async fn update(
-            &self,
-            _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _participant_emails: Option<Vec<String>>,
-            _agent_ids: Option<Vec<Uuid>>,
-            _channel_config: Option<serde_json::Value>,
-        ) -> AppResult<Channel> {
+        async fn update(&self, _id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
@@ -899,10 +877,12 @@ mod tests {
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
+                enabled: true,
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Inbound Flow".to_string(),
                 slug: "inbound".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,

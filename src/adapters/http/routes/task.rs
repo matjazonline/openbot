@@ -559,10 +559,12 @@ mod tests {
         };
 
         let channel = crate::entities::channel::Channel {
+            enabled: true,
             id: channel_id,
             company_id,
             name: "Test WF".to_string(),
             slug: "test-wf".into(),
+            alias_slugs: Vec::new(),
             provider: None,
             model: None,
             api_key: None,

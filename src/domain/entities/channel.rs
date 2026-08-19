@@ -61,6 +61,12 @@ pub struct Channel {
     pub company_id: Uuid,
     pub name: String,
     pub slug: ChannelSlug,
+    /// Extra local parts this channel also answers on, canonical [`Channel::slug`] excluded.
+    ///
+    /// Defaulted on deserialize for the same reason as `enabled`: durable `background_tasks`
+    /// payloads written before aliases existed must still re-hydrate.
+    #[serde(default)]
+    pub alias_slugs: Vec<ChannelSlug>,
     #[serde(skip_serializing)]
     pub api_key: Option<String>,
     pub provider: Option<String>,
@@ -68,7 +74,18 @@ pub struct Channel {
     pub participant_emails: Option<Vec<EmailAddress>>,
     pub agent_ids: Option<Vec<Uuid>>,
     pub channel_config: Option<serde_json::Value>,
+    /// Whether the channel takes traffic at all. A disabled channel keeps its threads and tasks
+    /// but bounces inbound mail and cannot be an internal delivery target.
+    ///
+    /// Defaulted on deserialize because `Channel` is stored inside durable `background_tasks`
+    /// payloads: tasks queued before this field existed must still re-hydrate.
+    #[serde(default = "enabled_by_default")]
+    pub enabled: bool,
     pub created_at: chrono::NaiveDateTime,
+}
+
+fn enabled_by_default() -> bool {
+    true
 }
 
 /// Participant list entry that opens a channel to any sender.
@@ -122,6 +139,16 @@ impl Channel {
             .cloned()
     }
 
+    /// Every local part this channel answers on: the canonical slug first, then its aliases.
+    pub fn slugs(&self) -> impl Iterator<Item = &ChannelSlug> {
+        std::iter::once(&self.slug).chain(self.alias_slugs.iter())
+    }
+
+    /// The single definition of "does this addressed slug reach this channel".
+    pub fn matches_slug(&self, slug: &str) -> bool {
+        self.slugs().any(|own| own.eq_ignore_ascii_case(slug))
+    }
+
     /// The address inbound mail reaches this channel on: `{channel}@{company}.{app domain}`.
     ///
     /// The same address the simulator sends to and the mailbox composes to, so it lives here
@@ -131,7 +158,27 @@ impl Channel {
         company_slug: &CompanySlug,
         app_domain_name: &str,
     ) -> EmailAddress {
-        EmailAddress::new(format!("{}@{company_slug}.{app_domain_name}", self.slug))
+        Self::address_for(&self.slug, company_slug, app_domain_name)
+    }
+
+    /// Every address this channel is reachable at, canonical first.
+    pub fn inbound_addresses(
+        &self,
+        company_slug: &CompanySlug,
+        app_domain_name: &str,
+    ) -> Vec<EmailAddress> {
+        self.slugs()
+            .map(|slug| Self::address_for(slug, company_slug, app_domain_name))
+            .collect()
+    }
+
+    /// The address form, for a slug that may be an alias rather than [`Channel::slug`].
+    pub fn address_for(
+        channel_slug: &ChannelSlug,
+        company_slug: &CompanySlug,
+        app_domain_name: &str,
+    ) -> EmailAddress {
+        EmailAddress::new(format!("{channel_slug}@{company_slug}.{app_domain_name}"))
     }
 
     pub fn default_config() -> serde_json::Value {
@@ -144,5 +191,64 @@ impl Channel {
               "api_key": null
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn channel_with_aliases(aliases: &[&str]) -> Channel {
+        Channel {
+            id: Uuid::new_v4(),
+            company_id: Uuid::new_v4(),
+            name: "Support".to_string(),
+            slug: "support".into(),
+            alias_slugs: aliases.iter().map(|a| ChannelSlug::from(*a)).collect(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: None,
+            channel_config: None,
+            enabled: true,
+            created_at: chrono::Utc::now().naive_utc(),
+        }
+    }
+
+    #[test]
+    fn matches_slug_accepts_canonical_and_alias_case_insensitively() {
+        let channel = channel_with_aliases(&["sales", "help"]);
+
+        assert!(channel.matches_slug("support"));
+        assert!(channel.matches_slug("SALES"));
+        assert!(channel.matches_slug("Help"));
+        assert!(!channel.matches_slug("billing"));
+    }
+
+    #[test]
+    fn addresses_list_the_canonical_slug_first() {
+        let channel = channel_with_aliases(&["sales"]);
+        let addresses = channel.inbound_addresses(&CompanySlug::from("acme"), "mailagents.com");
+
+        assert_eq!(
+            addresses,
+            vec![
+                EmailAddress::from("support@acme.mailagents.com"),
+                EmailAddress::from("sales@acme.mailagents.com"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_channel_without_aliases_answers_on_one_address_only() {
+        let channel = channel_with_aliases(&[]);
+
+        assert!(channel.matches_slug("support"));
+        assert!(!channel.matches_slug("sales"));
+        assert_eq!(
+            channel.inbound_addresses(&CompanySlug::from("acme"), "mailagents.com"),
+            vec![channel.inbound_address(&CompanySlug::from("acme"), "mailagents.com")]
+        );
     }
 }

@@ -1272,10 +1272,12 @@ mod tests {
             }
         });
         let channel = Channel {
+            enabled: true,
             id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
             name: "Test".to_string(),
             slug: "test".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
@@ -1418,10 +1420,12 @@ mod tests {
         };
 
         let channel = Channel {
+            enabled: true,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
             slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: Some("channel-api-key".to_string()),
             provider: Some("openai".to_string()),
             model: None, // Should keep company's model
@@ -1471,10 +1475,12 @@ mod tests {
         };
 
         let channel = Channel {
+            enabled: true,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
             slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: Some("channel-api-key".to_string()),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
@@ -1549,10 +1555,12 @@ mod tests {
         };
 
         let channel = Channel {
+            enabled: true,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
             slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: Some("".to_string()),
             provider: Some("   ".to_string()),
             model: Some("".to_string()),
@@ -1615,10 +1623,12 @@ mod tests {
         };
 
         let channel = Channel {
+            enabled: true,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
             slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,

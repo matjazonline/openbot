@@ -46,6 +46,8 @@ use super::{
 struct CandidateMatch {
     company: Company,
     channel: Channel,
+    /// The slug the envelope actually named — an alias, or the channel's canonical slug.
+    matched_slug: ChannelSlug,
     role: RecipientRole,
     step_index: usize,
     total_steps: usize,
@@ -58,6 +60,60 @@ struct ResolvedCandidates {
     outreach_by_channel: HashMap<Uuid, OutreachReplyMatch>,
     /// A `+quiet`-style address suffix asked for context-only ingestion.
     address_context_only: bool,
+}
+
+/// The slugs on the To/Cc line that cannot be delivered to, and why.
+///
+/// Owning both cases in one place keeps the bounce decision — reason string and `BounceInfo` —
+/// out of the middle of the address loop.
+#[derive(Default)]
+struct UndeliverableSlugs {
+    /// Slugs that name no channel in the company.
+    invalid: Vec<ChannelSlug>,
+    /// Slugs that name a real channel whose owner has switched it off.
+    disabled: Vec<ChannelSlug>,
+    /// Spelling hints, one per entry in `invalid`.
+    suggestions: Vec<BounceSuggestion>,
+}
+
+impl UndeliverableSlugs {
+    fn unknown(&mut self, slug: ChannelSlug, available: &[Channel]) {
+        let suggestions = find_similar_channel_slugs(&slug, available);
+        self.invalid.push(slug.clone());
+        self.suggestions.push(BounceSuggestion {
+            invalid_slug: slug,
+            suggestions,
+        });
+    }
+
+    fn disabled(&mut self, slug: ChannelSlug) {
+        self.disabled.push(slug);
+    }
+
+    /// Why the message bounces, or `None` when every address was deliverable.
+    ///
+    /// A misspelling is reported ahead of a disabled channel: the sender can act on a typo, and
+    /// the bounce body lists both sets regardless.
+    fn reason(&self) -> Option<&'static str> {
+        if !self.invalid.is_empty() {
+            Some("Channel address not found or misspelled")
+        } else if !self.disabled.is_empty() {
+            Some("Channel is disabled")
+        } else {
+            None
+        }
+    }
+
+    fn into_bounce(self, parsed: &ParsedEmail, company_slug: Option<CompanySlug>) -> BounceInfo {
+        BounceInfo {
+            recipient_to: EmailAddress::from(parsed.sender.clone()),
+            company_slug,
+            invalid_slugs: self.invalid,
+            disabled_slugs: self.disabled,
+            suggestions: self.suggestions,
+            original_subject: parsed.subject.clone(),
+        }
+    }
 }
 
 /// Why a single candidate channel did or didn't make it into the match list.
@@ -183,8 +239,7 @@ impl ThreadUseCases {
         };
         let mut seen_channels = std::collections::HashSet::new();
         let mut unauthorized_count = 0usize;
-        let mut invalid_slugs: Vec<ChannelSlug> = Vec::new();
-        let mut bounce_suggestions: Vec<BounceSuggestion> = Vec::new();
+        let mut undeliverable = UndeliverableSlugs::default();
         let mut matched_company_slug: Option<CompanySlug> = None;
 
         for (address, role) in addresses {
@@ -213,18 +268,23 @@ impl ThreadUseCases {
             for (step_index, channel_slug) in channel_slugs.into_iter().enumerate() {
                 let Some(channel) = available_channels
                     .iter()
-                    .find(|c| c.slug.eq_ignore_ascii_case(&channel_slug))
+                    .find(|c| c.matches_slug(&channel_slug))
                     .cloned()
                 else {
-                    let suggestions =
-                        find_similar_channel_slugs(&channel_slug, &available_channels);
-                    invalid_slugs.push(channel_slug.clone());
-                    bounce_suggestions.push(BounceSuggestion {
-                        invalid_slug: channel_slug,
-                        suggestions,
-                    });
+                    undeliverable.unknown(channel_slug, &available_channels);
                     continue;
                 };
+
+                // Disabled is undeliverable for everyone, so it is decided here rather than in
+                // `evaluate_channel_candidate`, which only rules on *this sender's* access.
+                if !channel.enabled {
+                    warn!(
+                        "Channel '{}' is disabled; bouncing message {}",
+                        channel.slug, parsed.message_id
+                    );
+                    undeliverable.disabled(channel_slug);
+                    continue;
+                }
 
                 if seen_channels.contains(&channel.id) {
                     continue;
@@ -248,6 +308,7 @@ impl ThreadUseCases {
                         resolved.matches.push(CandidateMatch {
                             company: company.clone(),
                             channel,
+                            matched_slug: channel_slug,
                             role,
                             step_index,
                             total_steps,
@@ -257,19 +318,13 @@ impl ThreadUseCases {
             }
         }
 
-        // A pipeline is all-or-nothing: one misspelled hop bounces the whole message so the sender
-        // learns about the typo instead of silently losing a step.
-        if !invalid_slugs.is_empty() {
+        // A pipeline is all-or-nothing: one undeliverable hop bounces the whole message so the
+        // sender learns about the typo (or the closed channel) instead of silently losing a step.
+        if let Some(reason) = undeliverable.reason() {
             return Ok(ControlFlow::Break(
                 InboundIngestResult::rejected_with_bounce(
-                    "Channel address not found or misspelled",
-                    BounceInfo {
-                        recipient_to: EmailAddress::from(parsed.sender.clone()),
-                        company_slug: matched_company_slug,
-                        invalid_slugs,
-                        suggestions: bounce_suggestions,
-                        original_subject: parsed.subject.clone(),
-                    },
+                    reason,
+                    undeliverable.into_bounce(parsed, matched_company_slug),
                 ),
             ));
         }
@@ -498,6 +553,7 @@ impl ThreadUseCases {
         let CandidateMatch {
             company,
             channel,
+            matched_slug,
             role,
             step_index,
             total_steps,
@@ -617,6 +673,7 @@ impl ThreadUseCases {
             channel_match: ChannelMatch {
                 company,
                 channel,
+                matched_slug: Some(matched_slug),
                 thread,
                 inbound_message,
                 recipient_role: role,
@@ -678,6 +735,7 @@ impl ThreadUseCases {
                         "Thread {} (Unauthorized Sender: {})",
                         thread.id, sender
                     ))],
+                    disabled_slugs: vec![],
                     suggestions: vec![],
                     original_subject: parsed.subject.clone(),
                 },

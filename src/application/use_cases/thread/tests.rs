@@ -1,7 +1,7 @@
 use super::*;
 use crate::entities::channel::Channel;
 use crate::services::email_parser::MAX_CHANNEL_HOPS;
-use crate::use_cases::channel::ChannelPersistence;
+use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use chrono::Utc;
 use std::sync::Mutex;
 
@@ -137,18 +137,7 @@ struct MockChannelPersistence {
 
 #[async_trait]
 impl ChannelPersistence for MockChannelPersistence {
-    async fn create(
-        &self,
-        _company_id: Uuid,
-        _name: &str,
-        _slug: &str,
-        _api_key: Option<&str>,
-        _provider: Option<&str>,
-        _model: Option<&str>,
-        _participant_emails: Option<Vec<String>>,
-        _agent_ids: Option<Vec<Uuid>>,
-        _channel_config: Option<serde_json::Value>,
-    ) -> AppResult<Channel> {
+    async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
         unimplemented!()
     }
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>> {
@@ -170,7 +159,7 @@ impl ChannelPersistence for MockChannelPersistence {
             .lock()
             .unwrap()
             .iter()
-            .find(|w| &w.slug == channel_slug)
+            .find(|w| w.matches_slug(channel_slug))
             .cloned())
     }
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
@@ -183,18 +172,7 @@ impl ChannelPersistence for MockChannelPersistence {
             .cloned()
             .collect())
     }
-    async fn update(
-        &self,
-        _id: Uuid,
-        _name: &str,
-        _slug: &str,
-        _api_key: Option<&str>,
-        _provider: Option<&str>,
-        _model: Option<&str>,
-        _participant_emails: Option<Vec<String>>,
-        _agent_ids: Option<Vec<Uuid>>,
-        _channel_config: Option<serde_json::Value>,
-    ) -> AppResult<Channel> {
+    async fn update(&self, _id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
         unimplemented!()
     }
     async fn delete(&self, _id: Uuid) -> AppResult<()> {
@@ -703,10 +681,12 @@ async fn test_inter_channel_hop_limit_rejection() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                enabled: true,
                 id: channel_id,
                 company_id,
                 name: "Inbound Flow".to_string(),
                 slug: "inbound".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -716,10 +696,12 @@ async fn test_inter_channel_hop_limit_rejection() {
                 created_at: Utc::now().naive_utc(),
             },
             Channel {
+                enabled: true,
                 id: source_channel_id,
                 company_id,
                 name: "Source Flow".to_string(),
                 slug: "source".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -825,10 +807,12 @@ async fn test_spf_authentication_failure_rejection() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            enabled: true,
             id: channel_id,
             company_id,
             name: "Inbound Flow".to_string(),
             slug: "inbound".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
@@ -919,10 +903,12 @@ async fn test_high_spam_score_rejection() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            enabled: true,
             id: channel_id,
             company_id,
             name: "Inbound Flow".to_string(),
             slug: "inbound".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
@@ -1015,10 +1001,12 @@ async fn test_dmarc_authentication_failure_rejection() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            enabled: true,
             id: channel_id,
             company_id,
             name: "Inbound Flow".to_string(),
             slug: "inbound".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
@@ -1111,10 +1099,12 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            enabled: true,
             id: channel_id,
             company_id,
             name: "Restricted Flow".to_string(),
             slug: "restricted".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
@@ -1208,10 +1198,12 @@ async fn test_participant_sender_bypasses_spam_checks() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            enabled: true,
             id: channel_id,
             company_id,
             name: "Restricted Flow".to_string(),
             slug: "restricted".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
@@ -1303,10 +1295,12 @@ async fn test_channel_in_cc_resolves_properly() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            enabled: true,
             id: channel_id,
             company_id,
             name: "Support Flow".to_string(),
             slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
@@ -1400,10 +1394,12 @@ async fn test_multi_channel_to_and_cc_execution() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                enabled: true,
                 id: wf1_id,
                 company_id,
                 name: "Support".to_string(),
                 slug: "support".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1413,10 +1409,12 @@ async fn test_multi_channel_to_and_cc_execution() {
                 created_at: Utc::now().naive_utc(),
             },
             Channel {
+                enabled: true,
                 id: wf2_id,
                 company_id,
                 name: "Billing".to_string(),
                 slug: "billing".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1519,10 +1517,12 @@ async fn test_pipeline_address_chaining_execution() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                enabled: true,
                 id: wf1_id,
                 company_id,
                 name: "Support".to_string(),
                 slug: "support".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1532,10 +1532,12 @@ async fn test_pipeline_address_chaining_execution() {
                 created_at: Utc::now().naive_utc(),
             },
             Channel {
+                enabled: true,
                 id: wf2_id,
                 company_id,
                 name: "Billing".to_string(),
                 slug: "billing".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1545,10 +1547,12 @@ async fn test_pipeline_address_chaining_execution() {
                 created_at: Utc::now().naive_utc(),
             },
             Channel {
+                enabled: true,
                 id: wf3_id,
                 company_id,
                 name: "Legal".to_string(),
                 slug: "legal".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1650,10 +1654,12 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                enabled: true,
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Support".to_string(),
                 slug: "support".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1663,10 +1669,12 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 created_at: Utc::now().naive_utc(),
             },
             Channel {
+                enabled: true,
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Billing".to_string(),
                 slug: "billing".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1788,10 +1796,12 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            enabled: true,
             id: channel_id,
             company_id,
             name: "Support".to_string(),
             slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
@@ -1936,10 +1946,12 @@ async fn test_participant_modes_company_team_public_and_explicit() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                enabled: true,
                 id: flow_team_only,
                 company_id,
                 name: "Team Only".to_string(),
                 slug: "team-only".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1949,10 +1961,12 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 created_at: Utc::now().naive_utc(),
             },
             Channel {
+                enabled: true,
                 id: flow_public,
                 company_id,
                 name: "Public Flow".to_string(),
                 slug: "public-flow".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -1962,10 +1976,12 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 created_at: Utc::now().naive_utc(),
             },
             Channel {
+                enabled: true,
                 id: flow_explicit,
                 company_id,
                 name: "Explicit Flow".to_string(),
                 slug: "explicit-flow".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -2112,10 +2128,12 @@ async fn test_sender_verification_and_delegation_target_check() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            enabled: true,
             id: channel_id,
             company_id,
             name: "Support".to_string(),
             slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
@@ -2292,10 +2310,12 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                enabled: true,
                 id: channel_a_id,
                 company_id,
                 name: "Agent A".to_string(),
                 slug: "agent-a".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -2305,10 +2325,12 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
                 created_at: Utc::now().naive_utc(),
             },
             Channel {
+                enabled: true,
                 id: channel_b_id,
                 company_id,
                 name: "Agent B".to_string(),
                 slug: "agent-b".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -2480,10 +2502,12 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                enabled: true,
                 id: channel_a_id,
                 company_id,
                 name: "Agent A".to_string(),
                 slug: "agent-a".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -2493,10 +2517,12 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 created_at: Utc::now().naive_utc(),
             },
             Channel {
+                enabled: true,
                 id: channel_b_id,
                 company_id,
                 name: "Agent B".to_string(),
                 slug: "agent-b".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -2575,10 +2601,12 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                enabled: true,
                 id: channel_a_id,
                 company_id,
                 name: "Agent A".to_string(),
                 slug: "agent-a".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -2588,10 +2616,12 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 created_at: Utc::now().naive_utc(),
             },
             Channel {
+                enabled: true,
                 id: channel_b_id,
                 company_id,
                 name: "Agent B".to_string(),
                 slug: "agent-b".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
@@ -2673,10 +2703,12 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            enabled: true,
             id: channel_id,
             company_id,
             name: "Support Channel".to_string(),
             slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
@@ -2882,10 +2914,12 @@ async fn test_context_only_quiet_mode_ingestion() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            enabled: true,
             id: channel_id,
             company_id,
             name: "Support Channel".to_string(),
             slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
@@ -2977,4 +3011,190 @@ async fn test_context_only_quiet_mode_ingestion() {
     let parsed_body = res_quiet_body.parsed_email.unwrap();
     assert!(parsed_body.is_context_only);
     assert_eq!(parsed_body.clean_text_body, "Additional background note");
+}
+
+/// One company with a `support` channel whose on/off state the caller picks, wired for ingest.
+fn use_cases_with_channel_enabled(enabled: bool) -> (ThreadUseCases, Uuid) {
+    use_cases_with_channel(enabled, Vec::new())
+}
+
+fn use_cases_with_channel_aliases(alias_slugs: Vec<ChannelSlug>) -> (ThreadUseCases, Uuid) {
+    use_cases_with_channel(true, alias_slugs)
+}
+
+fn use_cases_with_channel(enabled: bool, alias_slugs: Vec<ChannelSlug>) -> (ThreadUseCases, Uuid) {
+    let company_id = Uuid::new_v4();
+    let channel_id = Uuid::new_v4();
+
+    let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
+        vec![Company {
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now().naive_utc(),
+        }],
+        vec![(company_id, "team@acme.com".to_string())],
+    ));
+
+    let channel_persistence = Arc::new(MockChannelPersistence {
+        channels: Mutex::new(vec![Channel {
+            enabled,
+            id: channel_id,
+            company_id,
+            name: "Support Channel".to_string(),
+            slug: "support".into(),
+            alias_slugs,
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: None,
+            channel_config: None,
+            created_at: Utc::now().naive_utc(),
+        }]),
+    });
+
+    let thread_use_cases = ThreadUseCases::new(
+        Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        }),
+        channel_persistence,
+        company_persistence,
+        Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        }),
+        internal_test_config(),
+    );
+
+    (thread_use_cases, channel_id)
+}
+
+fn message_to_support() -> RawInboundPayload {
+    RawInboundPayload {
+        to: "support@acme.mailagents.com".to_string(),
+        from: "team@acme.com".to_string(),
+        subject: Some("Hello".to_string()),
+        text: Some("Anyone there?".to_string()),
+        ..Default::default()
+    }
+}
+
+#[tokio::test]
+async fn disabled_channel_bounces_inbound_mail() {
+    let (thread_use_cases, _) = use_cases_with_channel_enabled(false);
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(message_to_support())
+        .await
+        .unwrap();
+
+    assert!(!result.accepted);
+    assert_eq!(result.reason.as_deref(), Some("Channel is disabled"));
+
+    let bounce = result
+        .bounce_info
+        .expect("a disabled channel bounces rather than dropping the message");
+    assert_eq!(bounce.disabled_slugs, vec![ChannelSlug::from("support")]);
+    assert!(
+        bounce.invalid_slugs.is_empty(),
+        "a disabled channel is not a misspelling"
+    );
+    assert_eq!(bounce.recipient_to, EmailAddress::from("team@acme.com"));
+
+    let body = format_bounce_email_body(&bounce, "mailagents.com");
+    assert!(body.contains("support@acme.mailagents.com"));
+    assert!(body.contains("switched off"));
+    assert!(!body.contains("Did you mean"));
+}
+
+#[tokio::test]
+async fn enabled_channel_still_accepts_the_same_message() {
+    let (thread_use_cases, channel_id) = use_cases_with_channel_enabled(true);
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(message_to_support())
+        .await
+        .unwrap();
+
+    assert!(result.accepted, "reason: {:?}", result.reason);
+    assert_eq!(result.thread.unwrap().channel_id, channel_id);
+}
+
+#[tokio::test]
+async fn alias_address_reaches_the_channel_and_is_replied_from() {
+    let (thread_use_cases, channel_id) = use_cases_with_channel_aliases(vec!["sales".into()]);
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(RawInboundPayload {
+            to: "sales@acme.mailagents.com".to_string(),
+            ..message_to_support()
+        })
+        .await
+        .unwrap();
+
+    assert!(result.accepted, "reason: {:?}", result.reason);
+    assert_eq!(result.channel_matches.len(), 1);
+
+    let matched = &result.channel_matches[0];
+    assert_eq!(matched.channel.id, channel_id);
+    assert_eq!(matched.channel.slug, "support");
+    // The reply must go back out on the address the sender wrote to, not the canonical slug.
+    assert_eq!(matched.reply_slug(), ChannelSlug::from("sales"));
+}
+
+#[tokio::test]
+async fn alias_and_canonical_slug_in_one_pipeline_ingest_once() {
+    let (thread_use_cases, channel_id) = use_cases_with_channel_aliases(vec!["sales".into()]);
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(RawInboundPayload {
+            to: "sales+support@acme.mailagents.com".to_string(),
+            ..message_to_support()
+        })
+        .await
+        .unwrap();
+
+    assert!(result.accepted, "reason: {:?}", result.reason);
+    assert_eq!(
+        result.channel_matches.len(),
+        1,
+        "two names for one channel are still one delivery"
+    );
+    assert_eq!(result.channel_matches[0].channel.id, channel_id);
+    // The first address on the envelope wins, so the reply stays on the alias.
+    assert_eq!(
+        result.channel_matches[0].reply_slug(),
+        ChannelSlug::from("sales")
+    );
+}
+
+#[tokio::test]
+async fn unknown_slug_is_still_a_bounce_when_the_channel_has_aliases() {
+    let (thread_use_cases, _) = use_cases_with_channel_aliases(vec!["sales".into()]);
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(RawInboundPayload {
+            to: "salez@acme.mailagents.com".to_string(),
+            ..message_to_support()
+        })
+        .await
+        .unwrap();
+
+    assert!(!result.accepted);
+    let bounce = result.bounce_info.expect("a misspelled alias bounces");
+    assert_eq!(bounce.invalid_slugs, vec![ChannelSlug::from("salez")]);
+    assert!(
+        bounce
+            .suggestions
+            .iter()
+            .any(|s| s.suggestions.contains(&ChannelSlug::from("sales"))),
+        "aliases are offered as did-you-mean suggestions: {:?}",
+        bounce.suggestions
+    );
 }

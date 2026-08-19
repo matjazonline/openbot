@@ -8,7 +8,10 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::agent::Agent,
-    use_cases::{channel::validate_slug, company::CompanyPersistence},
+    use_cases::{
+        channel::{SlugKind, validate_slug},
+        company::CompanyPersistence,
+    },
 };
 
 #[async_trait]
@@ -102,12 +105,12 @@ impl AgentUseCases {
         let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
 
         if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::Internal(
-                "Agent name and slug cannot be empty.".into(),
+            return Err(AppError::BadRequest(
+                "The agent name and slug cannot be empty.".into(),
             ));
         }
 
-        validate_slug(&slug_clean)?;
+        validate_slug(&slug_clean, SlugKind::AgentSlug)?;
 
         let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
         let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
@@ -192,12 +195,12 @@ impl AgentUseCases {
         let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
 
         if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::Internal(
-                "Agent name and slug cannot be empty.".into(),
+            return Err(AppError::BadRequest(
+                "The agent name and slug cannot be empty.".into(),
             ));
         }
 
-        validate_slug(&slug_clean)?;
+        validate_slug(&slug_clean, SlugKind::AgentSlug)?;
 
         let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
         let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());

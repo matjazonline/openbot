@@ -670,25 +670,14 @@ mod tests {
         }
     }
 
-    use crate::use_cases::channel::ChannelPersistence;
+    use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 
     struct MockChannelPersistence {
         channel: Option<Channel>,
     }
     #[async_trait]
     impl ChannelPersistence for MockChannelPersistence {
-        async fn create(
-            &self,
-            _company_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _participant_emails: Option<Vec<String>>,
-            _agent_ids: Option<Vec<Uuid>>,
-            _channel_config: Option<serde_json::Value>,
-        ) -> AppResult<Channel> {
+        async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
             unimplemented!()
         }
         async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>> {
@@ -704,18 +693,7 @@ mod tests {
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(vec![])
         }
-        async fn update(
-            &self,
-            _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _participant_emails: Option<Vec<String>>,
-            _agent_ids: Option<Vec<Uuid>>,
-            _channel_config: Option<serde_json::Value>,
-        ) -> AppResult<Channel> {
+        async fn update(&self, _id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
@@ -1227,10 +1205,12 @@ mod tests {
         };
 
         let channel = Channel {
+            enabled: true,
             id: channel_id,
             company_id,
             name: "Support".to_string(),
             slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,

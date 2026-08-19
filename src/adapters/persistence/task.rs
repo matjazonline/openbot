@@ -83,6 +83,20 @@ impl TryFrom<BackgroundTaskDb> for BackgroundTask {
     }
 }
 
+/// One attempt to become the single sender of one email.
+///
+/// A struct rather than six positional parameters, three of which are `Uuid`.
+pub struct OutboundSendReservation {
+    pub company_id: Uuid,
+    pub task_id: Option<Uuid>,
+    /// Stable across retries of the same logical send — that is what makes it a lock.
+    pub idempotency_key: String,
+    /// The `OutboundEmail` to deliver, so a crashed reservation is still recoverable.
+    pub payload: serde_json::Value,
+    pub worker_id: Uuid,
+    pub lock_expires_at: NaiveDateTime,
+}
+
 #[async_trait]
 pub trait TaskPersistence: Send + Sync {
     async fn create_outreach_and_pause(
@@ -163,6 +177,26 @@ pub trait TaskPersistence: Send + Sync {
         _worker_id: Uuid,
         _error: &str,
     ) -> AppResult<bool> {
+        Ok(true)
+    }
+
+    /// Claim the exclusive right to send one email identified by `idempotency_key`.
+    ///
+    /// `Some(outbox_id)` means this caller won and must deliver, then call
+    /// [`TaskPersistence::mark_outbox_email_sent`] on success or
+    /// [`TaskPersistence::release_outbound_send`] on failure. `None` means another worker already
+    /// holds or completed this exact send, and this caller must **not** deliver it.
+    ///
+    /// The default grants an untracked reservation, so test doubles keep the ordinary send path.
+    async fn reserve_outbound_send(
+        &self,
+        _reservation: OutboundSendReservation,
+    ) -> AppResult<Option<Uuid>> {
+        Ok(Some(Uuid::new_v4()))
+    }
+
+    /// Hand back a reservation whose delivery failed, so a task retry may send it.
+    async fn release_outbound_send(&self, _outbox_id: Uuid, _worker_id: Uuid) -> AppResult<bool> {
         Ok(true)
     }
 
@@ -744,6 +778,50 @@ impl TaskPersistence for PostgresPersistence {
         .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)
+    }
+
+    async fn reserve_outbound_send(
+        &self,
+        reservation: OutboundSendReservation,
+    ) -> AppResult<Option<Uuid>> {
+        // The unique index on `idempotency_key` is the lock: whoever inserts first sends. The row
+        // lands as 'sending' with a lease, which the outbox poller skips while the lease is alive,
+        // so a healthy sender is never raced — and a crashed one is picked up once it lapses.
+        let row: Option<(Uuid,)> = sqlx::query_as(
+            r#"INSERT INTO email_outbox (
+                    id, company_id, task_id, idempotency_key, payload,
+                    status, worker_id, locked_at, lock_expires_at
+               ) VALUES ($1, $2, $3, $4, $5, 'sending', $6, CURRENT_TIMESTAMP, $7)
+               ON CONFLICT (idempotency_key) DO NOTHING
+               RETURNING id"#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(reservation.company_id)
+        .bind(reservation.task_id)
+        .bind(&reservation.idempotency_key)
+        .bind(&reservation.payload)
+        .bind(reservation.worker_id)
+        .bind(reservation.lock_expires_at)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(row.map(|(id,)| id))
+    }
+
+    async fn release_outbound_send(&self, outbox_id: Uuid, worker_id: Uuid) -> AppResult<bool> {
+        // Delete rather than mark failed: the key must be free for the task retry to re-reserve,
+        // and a reservation whose send never landed is not a delivery worth keeping a record of.
+        let result = sqlx::query(
+            "DELETE FROM email_outbox WHERE id = $1 AND worker_id = $2 AND status = 'sending'",
+        )
+        .bind(outbox_id)
+        .bind(worker_id)
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(result.rows_affected() > 0)
     }
 
     async fn mark_outbox_email_sent(
@@ -1372,7 +1450,9 @@ mod tests {
     use crate::entities::message::{Message, MessageDirection, MessageRole};
     use crate::services::outbound_dispatcher::OutboundEmail;
     use crate::use_cases::{
-        channel::ChannelPersistence, company::CompanyPersistence, thread::ThreadPersistence,
+        channel::{ChannelPersistence, ChannelWrite},
+        company::CompanyPersistence,
+        thread::ThreadPersistence,
         user::UserPersistence,
     };
 
@@ -1392,7 +1472,7 @@ mod tests {
         let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
             return;
         };
-        let persistence = PostgresPersistence::new(pool);
+        let persistence = PostgresPersistence::new(pool.clone());
         let suffix = Uuid::new_v4().simple().to_string();
         let username = format!("queue_owner_{suffix}");
         let email = format!("{username}@example.com");
@@ -1419,14 +1499,12 @@ mod tests {
         let channel = ChannelPersistence::create(
             &persistence,
             company.id,
-            "Queue",
-            "queue",
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            ChannelWrite {
+                name: "Queue".into(),
+                slug: "queue".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -1446,6 +1524,18 @@ mod tests {
             .await
             .unwrap();
 
+        // `claim_pending_tasks` polls the whole queue ordered by `run_at`, not this company's slice
+        // of it. Backdate this task so it sorts ahead of anything a concurrently running test has
+        // enqueued; otherwise both single-slot workers can fill up on other tasks and never reach
+        // this one. Keeping the limit at 1 also means this test steals at most one foreign task.
+        sqlx::query(
+            "UPDATE background_tasks SET run_at = CURRENT_TIMESTAMP - INTERVAL '1 hour' WHERE id = $1",
+        )
+        .bind(task.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
         let first_worker = Uuid::new_v4();
         let second_worker = Uuid::new_v4();
         let expires_at = chrono::Utc::now().naive_utc() + chrono::Duration::minutes(5);
@@ -1454,8 +1544,100 @@ mod tests {
             persistence.claim_pending_tasks(second_worker, expires_at, 1)
         );
         let claimed: Vec<_> = first.unwrap().into_iter().chain(second.unwrap()).collect();
-        assert_eq!(claimed.len(), 1);
-        assert_eq!(claimed[0].id, task.id);
+
+        // The invariant that matters is that *this* task went to exactly one worker — asserting on
+        // the combined queue total would count whatever else the other worker legitimately claimed.
+        assert_eq!(
+            claimed.iter().filter(|claim| claim.id == task.id).count(),
+            1,
+            "a pending task must be claimed by exactly one worker"
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn only_one_worker_reserves_an_outbound_send() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            return;
+        };
+        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("reserve_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            "Reserve Test",
+            &format!("reserve-test-{suffix}"),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let key = format!("task:{suffix}:agent-reply");
+        let reservation = |worker_id| OutboundSendReservation {
+            company_id: company.id,
+            task_id: None,
+            idempotency_key: key.clone(),
+            payload: serde_json::json!({}),
+            worker_id,
+            lock_expires_at: chrono::Utc::now().naive_utc() + chrono::Duration::minutes(15),
+        };
+
+        // Two workers race for the same logical send; exactly one may deliver it.
+        let first_worker = Uuid::new_v4();
+        let second_worker = Uuid::new_v4();
+        let (first, second) = tokio::join!(
+            persistence.reserve_outbound_send(reservation(first_worker)),
+            persistence.reserve_outbound_send(reservation(second_worker))
+        );
+        let winners: Vec<_> = [first.unwrap(), second.unwrap()]
+            .into_iter()
+            .flatten()
+            .collect();
+        assert_eq!(
+            winners.len(),
+            1,
+            "the unique idempotency key must admit exactly one sender"
+        );
+
+        // A failed delivery hands the key back, or the task's own retry could never send.
+        let outbox_id = winners[0];
+        assert!(
+            persistence
+                .release_outbound_send(outbox_id, first_worker)
+                .await
+                .unwrap()
+                || persistence
+                    .release_outbound_send(outbox_id, second_worker)
+                    .await
+                    .unwrap()
+        );
+        let after_release = persistence
+            .reserve_outbound_send(reservation(Uuid::new_v4()))
+            .await
+            .unwrap();
+        assert!(
+            after_release.is_some(),
+            "a released key must be reservable again"
+        );
 
         CompanyPersistence::delete(&persistence, company.id)
             .await
@@ -1497,14 +1679,13 @@ mod tests {
         let channel = ChannelPersistence::create(
             &persistence,
             company.id,
-            "Outreach",
-            "outreach",
-            None,
-            None,
-            None,
-            Some(vec![owner_email.clone()]),
-            None,
-            None,
+            ChannelWrite {
+                name: "Outreach".into(),
+                slug: "outreach".into(),
+                participant_emails: Some(vec![owner_email.clone()]),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
         )
         .await
         .unwrap();

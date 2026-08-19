@@ -12,7 +12,11 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     infra::config::AppConfig,
-    use_cases::{agent::AgentUseCases, channel::ChannelUseCases, company::CompanyUseCases},
+    use_cases::{
+        agent::AgentUseCases,
+        channel::{ChannelUseCases, ChannelWrite},
+        company::CompanyUseCases,
+    },
 };
 
 use super::channel::slugify;
@@ -162,20 +166,16 @@ async fn create_channel(
         }
     };
 
+    let write = ChannelWrite {
+        name: form.name.clone(),
+        slug,
+        agent_ids: Some(vec![agent.id]),
+        enabled: true,
+        ..ChannelWrite::default()
+    };
+
     match channel_use_cases
-        .create_channel(
-            user.id,
-            company_id,
-            &form.name,
-            &slug,
-            None,
-            None,
-            None,
-            None,
-            Some(vec![agent.id]),
-            None,
-            false,
-        )
+        .create_channel(user.id, company_id, write, false)
         .await
     {
         Ok(channel) => Redirect::to(&format!(
@@ -248,10 +248,12 @@ mod tests {
     fn onboarding_pages_render_each_step() {
         let company = company();
         let channel = Channel {
+            enabled: true,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Customer Support".to_string(),
             slug: "customer-support".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
