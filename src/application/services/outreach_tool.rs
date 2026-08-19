@@ -467,6 +467,7 @@ mod tests {
     fn channel(id: Uuid, company_id: Uuid, slug: &str) -> Channel {
         Channel {
             enabled: true,
+            add_3rd_party: true,
             id,
             company_id,
             name: slug.to_string(),

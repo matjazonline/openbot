@@ -38,7 +38,8 @@ use crate::{
 
 use super::{
     AgentExecutionResult, ChannelMatch, InboundIngestResult, RecipientRole, ThreadUseCases,
-    durable_ingest_payload, scrub_json_secrets, support::outbound_reference_ids,
+    durable_ingest_payload, scrub_json_secrets,
+    support::{DirectoryCache, outbound_reference_ids},
 };
 
 /// Who owns the durable task while the agent runs.
@@ -471,11 +472,11 @@ impl ThreadUseCases {
     ) -> AppResult<OutboundDelivery> {
         let primary = &matches[0];
         if !send_email {
-            return Ok(self.simulated_delivery(primary, parsed));
+            return self.simulated_delivery(primary, parsed).await;
         }
 
         let references = outbound_reference_ids(parsed);
-        let recipients_cc = self.outbound_cc_for(primary, parsed);
+        let recipients_cc = self.outbound_cc_for(primary, parsed).await?;
 
         let outbound_email = OutboundEmail {
             channel_id: primary.channel.id,
@@ -561,11 +562,19 @@ impl ThreadUseCases {
         })
     }
 
-    /// Keep channel participants (other than `@public` and the sender) on the reply's CC list.
-    fn outbound_cc_for(&self, primary: &ChannelMatch, parsed: &ParsedEmail) -> Vec<String> {
-        let mut recipients_cc = parsed.recipients_cc.clone();
+    /// Who the agent's reply is copied to: whoever the inbound mail copied, plus this channel's
+    /// participants (other than `@public` and the sender).
+    ///
+    /// A channel with `add_3rd_party` off first loses every outsider from the inbound Cc line, so
+    /// the reply reaches only the platform's own addresses and the channel's own people.
+    pub(super) async fn outbound_cc_for(
+        &self,
+        primary: &ChannelMatch,
+        parsed: &ParsedEmail,
+    ) -> AppResult<Vec<String>> {
+        let mut recipients_cc = self.inbound_cc_for(primary, parsed).await?;
         let Some(participants) = primary.channel.participant_emails.as_ref() else {
-            return recipients_cc;
+            return Ok(recipients_cc);
         };
         for participant in participants {
             if participant.eq_ignore_ascii_case(PUBLIC_PARTICIPANT)
@@ -578,7 +587,31 @@ impl ThreadUseCases {
             }
             recipients_cc.push(participant.to_string());
         }
-        recipients_cc
+        Ok(recipients_cc)
+    }
+
+    /// The inbound Cc line, minus the outsiders a channel with `add_3rd_party` off refuses to
+    /// copy. Platform addresses survive the filter — pipeline steps ride the Cc line.
+    async fn inbound_cc_for(
+        &self,
+        primary: &ChannelMatch,
+        parsed: &ParsedEmail,
+    ) -> AppResult<Vec<String>> {
+        if primary.channel.add_3rd_party {
+            return Ok(parsed.recipients_cc.clone());
+        }
+        let mut directory = DirectoryCache::new(self);
+        let mut kept = Vec::with_capacity(parsed.recipients_cc.len());
+        for address in &parsed.recipients_cc {
+            if self
+                .is_third_party_address(address, &parsed.sender, &mut directory)
+                .await?
+            {
+                continue;
+            }
+            kept.push(address.clone());
+        }
+        Ok(kept)
     }
 
     /// Deliver over the trusted in-process transport when the recipient is another platform
@@ -670,7 +703,11 @@ impl ThreadUseCases {
         Ok(prepared)
     }
 
-    fn simulated_delivery(&self, primary: &ChannelMatch, parsed: &ParsedEmail) -> OutboundDelivery {
+    async fn simulated_delivery(
+        &self,
+        primary: &ChannelMatch,
+        parsed: &ParsedEmail,
+    ) -> AppResult<OutboundDelivery> {
         let message_id = format!(
             "<simulated-test-{}@{}>",
             Uuid::new_v4(),
@@ -679,7 +716,7 @@ impl ThreadUseCases {
         info!(
             "Simulation test mode (Run_Test): Skipped SMTP email dispatch for Message-ID {message_id}"
         );
-        OutboundDelivery {
+        Ok(OutboundDelivery {
             message_id,
             in_reply_to: parsed.message_id.clone(),
             references: parsed.references.clone(),
@@ -690,14 +727,14 @@ impl ThreadUseCases {
                 self.config.app_domain_name
             ),
             recipients_to: vec![parsed.sender.clone()],
-            recipients_cc: parsed.recipients_cc.clone(),
+            recipients_cc: self.outbound_cc_for(primary, parsed).await?,
             subject: if parsed.subject.to_lowercase().starts_with("re:") {
                 parsed.subject.clone()
             } else {
                 format!("Re: {}", parsed.subject)
             },
             email_sent: false,
-        }
+        })
     }
 
     /// The reply is stored in every thread it answered, so each channel's history stays complete.

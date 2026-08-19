@@ -171,6 +171,7 @@ async fn create_channel(
         slug,
         agent_ids: Some(vec![agent.id]),
         enabled: true,
+        add_3rd_party: true,
         ..ChannelWrite::default()
     };
 
@@ -249,6 +250,7 @@ mod tests {
         let company = company();
         let channel = Channel {
             enabled: true,
+            add_3rd_party: true,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Customer Support".to_string(),

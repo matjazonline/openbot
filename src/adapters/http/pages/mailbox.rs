@@ -134,6 +134,8 @@ pub struct MailboxPage<'a> {
     pub threads: &'a [Thread],
     pub next_cursor: Option<&'a str>,
     pub selected_thread_id: Option<Uuid>,
+    /// What each listed thread is doing, for the row badges.
+    pub activity: &'a HashMap<Uuid, ThreadActivity>,
     /// Pre-rendered right-hand pane: messages, the compose form, or a placeholder.
     pub detail_html: &'a str,
 }
@@ -145,6 +147,8 @@ pub struct ThreadColumn<'a> {
     pub threads: &'a [Thread],
     pub next_cursor: Option<&'a str>,
     pub selected_thread_id: Option<Uuid>,
+    /// What each thread is doing, for the row badges. Threads with nothing in flight are absent.
+    pub activity: &'a HashMap<Uuid, ThreadActivity>,
 }
 
 /// The detail pane showing one thread's messages.
@@ -153,6 +157,8 @@ pub struct MessagePane<'a> {
     pub channel: &'a Channel,
     pub thread: &'a Thread,
     pub messages: &'a [Message],
+    /// What this thread is doing right now, for the strip above the composer.
+    pub activity: Option<ThreadActivity>,
 }
 
 /// The detail pane showing the new-message form for a thread that is already open.
@@ -204,6 +210,34 @@ const MAILBOX_SCRIPT: &str = r##"        function confirmLogout() {
                 row.classList.remove('bg-base-300');
             });
             el.classList.add('bg-base-300');
+            // Opening a thread is reading it, so its reply mark has done its job.
+            clearReplyMark(el);
+        }
+
+        function clearReplyMark(row) {
+            var mark = row.querySelector('.thread-mark');
+            if (mark) {
+                mark.textContent = '';
+                mark.removeAttribute('title');
+            }
+        }
+
+        // Mark threads whose agent answered while the reader was looking elsewhere.
+        //
+        // This is deliberately a client-side, in-session signal rather than a stored unread flag:
+        // it means "this happened while you were watching", so a reload starting clean is correct
+        // rather than a bug. The open thread never gets a mark -- the reply is already on screen.
+        function markLiveAgentReplies(list) {
+            var pane = document.getElementById('detail-pane');
+            var openThreadId = pane ? pane.dataset.threadId : null;
+
+            list.querySelectorAll('.thread-row[data-last-role="agent"]').forEach(function (row) {
+                if (row.dataset.threadId === openThreadId) return;
+                var mark = row.querySelector('.thread-mark');
+                if (!mark) return;
+                mark.textContent = '✓';
+                mark.title = 'Agent replied';
+            });
         }
 
         // A thread reads newest-last, so opening one should land on its latest message.
@@ -234,9 +268,102 @@ const MAILBOX_SCRIPT: &str = r##"        function confirmLogout() {
         // pane has nothing to scroll until everything has been applied.
         window.addEventListener('load', scrollMessagesToBottom);
 
+        // A streamed message is appended through htmx's normal swap machinery, so it reaches the
+        // afterSettle handler below too. That handler is written for a *whole pane* arriving and
+        // would steal the caret back from a half-typed draft, so streaming marks itself out.
+        var streamingMessage = false;
+
+        // Whether the reader is at the live edge of the conversation. Someone who scrolled up is
+        // reading history, and an arriving message must not yank them back down.
+        function messagesAreAtBottom(pane) {
+            return pane.scrollHeight - pane.scrollTop - pane.clientHeight < 80;
+        }
+
+        var wasAtBottomBeforeStream = true;
+
+        document.body.addEventListener('htmx:sseBeforeMessage', function () {
+            streamingMessage = true;
+            var pane = document.getElementById('message-scroll');
+            wasAtBottomBeforeStream = !pane || messagesAreAtBottom(pane);
+        });
+
+        // A thread that receives a message is bumped to the top of its column, so the live row
+        // arrives as an insert at the top and the copy further down is now stale. Removing it
+        // *after* the insert is what turns "insert" into "move", and it leaves every other row --
+        // including any older pages loaded on demand -- exactly where it was.
+        function dedupeThreadRow(list) {
+            var rows = list.querySelectorAll('.thread-row[data-thread-id]');
+            var seen = {};
+            rows.forEach(function (row) {
+                var id = row.dataset.threadId;
+                if (!seen[id]) {
+                    seen[id] = row;
+                    return;
+                }
+                // The stale copy knows two things the stream cannot: whether this thread is the
+                // one this browser has open, and whether its reply is still unread.
+                if (row.classList.contains('bg-base-300')) {
+                    seen[id].classList.add('bg-base-300');
+                }
+                var staleMark = row.querySelector('.thread-mark');
+                var freshMark = seen[id].querySelector('.thread-mark');
+                if (staleMark && freshMark && staleMark.textContent && !freshMark.textContent) {
+                    freshMark.textContent = staleMark.textContent;
+                    freshMark.title = staleMark.title;
+                }
+                row.remove();
+            });
+        }
+
+        // Appending rather than replacing is the whole point of the live stream: the draft, the
+        // caret and the scroll position all survive a message arriving mid-sentence.
+        document.body.addEventListener('htmx:sseMessage', function (event) {
+            var swapped = event.target;
+
+            // A thread row's badge redraws in place; nothing about the messages changed.
+            if (swapped && swapped.classList && swapped.classList.contains('thread-activity')) {
+                return;
+            }
+
+            // The open thread's activity strip appearing makes the pane taller, which would push
+            // the newest message out of view for someone sitting at the live edge.
+            if (swapped && swapped.id === 'thread-activity') {
+                if (wasAtBottomBeforeStream) {
+                    scrollMessagesToBottom();
+                }
+                return;
+            }
+
+            if (swapped && swapped.id === 'thread-list') {
+                dedupeThreadRow(swapped);
+                markLiveAgentReplies(swapped);
+                // The channel is no longer empty, so its placeholder must go.
+                var noThreads = swapped.querySelector('.no-threads');
+                if (noThreads) {
+                    noThreads.remove();
+                }
+                return;
+            }
+
+            // The thread is no longer empty, so its placeholder must go.
+            var placeholder = document.getElementById('no-messages');
+            if (placeholder) {
+                placeholder.remove();
+            }
+            if (wasAtBottomBeforeStream) {
+                scrollMessagesToBottom();
+            }
+        });
+
         // Only the swaps that bring in the messages themselves: paging the thread column must not
         // yank an already-open thread back down.
         document.body.addEventListener('htmx:afterSettle', function (event) {
+            // A streamed append settles here too, and it has already decided about scrolling. The
+            // flag is cleared here rather than on sseMessage because this event fires *after* it.
+            if (streamingMessage) {
+                streamingMessage = false;
+                return;
+            }
             var settled = event.target;
             if (settled && settled.nodeType === 1 &&
                 (settled.id === 'message-scroll' || settled.querySelector('#message-scroll'))) {
@@ -262,6 +389,7 @@ fn ui_layout(title: &str, body: &str, script: &str) -> String {
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://unpkg.com/htmx-ext-sse@2.2.3/sse.js"></script>
 </head>
 <body class="h-full overflow-hidden bg-base-100 text-base-content">
 {body}
@@ -282,6 +410,7 @@ pub fn mailbox_page(page: &MailboxPage<'_>) -> String {
             threads: page.threads,
             next_cursor: page.next_cursor,
             selected_thread_id: page.selected_thread_id,
+            activity: page.activity,
         }),
         None => empty_thread_column(),
     };
@@ -600,9 +729,19 @@ pub fn empty_thread_column() -> String {
 }
 
 pub fn thread_column(column: &ThreadColumn<'_>) -> String {
+    // Where the live column resumes from: the *newest* thread on the page. The column is sorted
+    // newest-first, so that is the first row, not the last one.
+    let after = column
+        .threads
+        .first()
+        .map(|thread| format!("&after={}", thread.cursor()))
+        .unwrap_or_default();
+
     format!(
         r##"
-        <section id="thread-column" class="flex w-96 shrink-0 flex-col border-r border-base-300 bg-base-100">
+        <section id="thread-column" class="flex w-96 shrink-0 flex-col border-r border-base-300 bg-base-100"
+            hx-ext="sse"
+            sse-connect="/ui/threads/events?company_id={company_id}&channel_id={channel_id}{after}">
             <div class="flex items-center justify-between gap-2 border-b border-base-300 px-4 py-3">
                 <div class="min-w-0">
                     <h2 class="truncate text-lg font-bold">{channel_name}</h2>
@@ -615,7 +754,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
                         hx-target="#thread-column" hx-swap="outerHTML">⟳</button>
                 </div>
             </div>
-            <div id="thread-list" class="flex-1 overflow-y-auto">
+            {list_open}
                 {list_html}
             </div>
         </section>
@@ -623,6 +762,8 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
         channel_name = escape_html_text(&column.channel.name),
         company_id = column.company_id,
         channel_id = column.channel.id,
+        after = after,
+        list_open = thread_list_open_tag(FragmentSwap::Inline),
         compose_button = compose_button(column.company_id, column.channel),
         list_html = thread_list_fragment(column, FragmentSwap::Inline),
     )
@@ -632,7 +773,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
 pub fn thread_list_fragment(column: &ThreadColumn<'_>, swap: FragmentSwap) -> String {
     let cards = if column.threads.is_empty() && swap == FragmentSwap::Inline {
         r##"
-            <p class="p-6 text-center text-sm opacity-60">No threads in this channel yet. Use Compose to start one.</p>
+            <p class="no-threads p-6 text-center text-sm opacity-60">No threads in this channel yet. Use Compose to start one.</p>
         "##
         .to_string()
     } else {
@@ -649,17 +790,110 @@ pub fn thread_list_fragment(column: &ThreadColumn<'_>, swap: FragmentSwap) -> St
     )
 }
 
+/// A thread row's activity mark, or nothing at all.
+///
+/// The column deliberately says less than the open thread does. A run in progress gets no mark
+/// here at all: the reader is not waiting on threads they have not opened, and the arriving reply
+/// is what they want to notice. Only a thread that has *stalled* -- blocked on a person, or failed
+/// -- earns a glyph, quiet and unanimated, with the wording on hover.
+pub fn thread_activity_mark(activity: Option<ThreadActivity>) -> String {
+    match activity.filter(|activity| activity.needs_attention()) {
+        None => String::new(),
+        Some(activity) => format!(
+            r##"<span class="shrink-0 text-sm leading-none {tint}" title="{label}">{mark}</span>"##,
+            tint = if activity == ThreadActivity::Failed {
+                "text-error"
+            } else {
+                "opacity-60"
+            },
+            label = escape_html_text(activity.label()),
+            mark = activity.mark(),
+        ),
+    }
+}
+
+/// A thread row's activity slot: an element the live column can swap into on its own.
+///
+/// Each row listens on its own event name so a status change redraws only that badge. Reusing the
+/// column's `thread` event would insert the whole row at the top of the list, moving a thread
+/// merely because its task changed state -- a reorder nobody asked for.
+///
+/// `hx-target="this"` is not decoration. htmx attributes are inherited, and this slot lives inside
+/// a row button carrying `hx-target="#detail-pane"`; without pinning the target, every badge
+/// update swapped itself over the whole open conversation.
+fn thread_activity_slot(thread_id: Uuid, activity: Option<ThreadActivity>) -> String {
+    format!(
+        r##"<span class="thread-activity" sse-swap="{event}" hx-target="this" hx-swap="innerHTML">{mark}</span>"##,
+        event = thread_activity_event(thread_id),
+        mark = thread_activity_mark(activity),
+    )
+}
+
+/// The SSE event name carrying one thread's activity. Shared with the stream that emits it.
+pub fn thread_activity_event(thread_id: Uuid) -> String {
+    format!("activity-{thread_id}")
+}
+
+/// The strip under the open thread's messages: a spinner while an agent is working, a plain badge
+/// while it is blocked, and nothing when the thread is idle.
+///
+/// Unlike the column, this says everything it knows. The reader is here, waiting on this thread,
+/// so "Agent replying…" is the answer to the question they are actually asking -- where the same
+/// badge on a row they are not looking at would just be noise.
+///
+/// The spinner is shown only for work actually in progress. A thread parked on an approval gets a
+/// badge with no spinner, because something spinning forever reads as broken rather than blocked.
+pub fn thread_activity_strip(activity: Option<ThreadActivity>) -> String {
+    let Some(activity) = activity else {
+        return String::new();
+    };
+
+    let spinner = if activity == ThreadActivity::Working {
+        r##"<span class="loading loading-dots loading-sm"></span>"##
+    } else {
+        ""
+    };
+
+    format!(
+        r##"<div class="flex items-center gap-2 border-t border-base-300 px-6 py-2 text-xs opacity-70">{spinner}<span class="badge badge-sm shrink-0 {style}">{label}</span></div>"##,
+        style = task_status_style(activity.task_status()),
+        label = escape_html_text(activity.label()),
+    )
+}
+
 fn thread_row(column: &ThreadColumn<'_>, thread: &Thread) -> String {
+    thread_row_fragment(
+        column.company_id,
+        column.channel,
+        thread,
+        column.selected_thread_id == Some(thread.id),
+        column.activity.get(&thread.id).copied(),
+        None,
+    )
+}
+
+/// One thread card on its own, for the live column stream.
+///
+/// The same function renders the cards inside the column, so a row that streams in is
+/// indistinguishable from one that came with the page.
+pub fn thread_row_fragment(
+    company_id: Uuid,
+    channel: &Channel,
+    thread: &Thread,
+    selected: bool,
+    activity: Option<ThreadActivity>,
+    last_role: Option<MessageRole>,
+) -> String {
     let participants = if thread.participant_emails.is_empty() {
         "No participants".to_string()
     } else {
         escape_html_text(&thread.participant_emails.join(", "))
     };
-    let selected = column.selected_thread_id == Some(thread.id);
+    let channel_id = channel.id;
 
     format!(
         r##"
-                <button type="button"
+                <button type="button" data-thread-id="{thread_id}"{last_role}
                     class="thread-row block w-full border-b border-base-300 px-4 py-3 text-left transition hover:bg-base-200 {active}"
                     hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
                     hx-target="#detail-pane" hx-swap="outerHTML"
@@ -667,17 +901,28 @@ fn thread_row(column: &ThreadColumn<'_>, thread: &Thread) -> String {
                     onclick="selectThreadRow(this)">
                     <div class="flex items-baseline justify-between gap-2">
                         <span class="truncate font-semibold">{subject}</span>
-                        <span class="shrink-0 text-xs opacity-60">{updated_at}</span>
+                        <span class="flex shrink-0 items-center gap-1.5">
+                            <span class="thread-mark text-sm leading-none text-success"></span>
+                            {activity_slot}
+                            <span class="text-xs opacity-60">{updated_at}</span>
+                        </span>
                     </div>
                     <div class="truncate text-xs opacity-70">{participants}</div>
                     <div class="truncate font-mono text-[11px] opacity-40">{thread_id}</div>
                 </button>
         "##,
         active = if selected { "bg-base-300" } else { "" },
-        company_id = column.company_id,
-        channel_id = column.channel.id,
+        company_id = company_id,
+        channel_id = channel_id,
         thread_id = thread.id,
         subject = escape_html_text(&thread.subject),
+        activity_slot = thread_activity_slot(thread.id, activity),
+        // Only rows arriving over the stream carry this: the reply mark means "while you were
+        // watching", so a freshly rendered page has nothing to mark and needs no lookup.
+        last_role = match last_role {
+            Some(role) => format!(r##" data-last-role="{}""##, role.as_str()),
+            None => String::new(),
+        },
         updated_at = super::format_date_time(thread.updated_at),
         participants = participants,
     )
@@ -724,15 +969,26 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
     };
 
     let messages_html = if pane.messages.is_empty() {
-        r##"<p class="p-6 text-center text-sm opacity-60">This thread has no messages yet.</p>"##
+        // `id` so the first streamed message can clear it -- see `removeEmptyMessagePlaceholder`.
+        r##"<p id="no-messages" class="p-6 text-center text-sm opacity-60">This thread has no messages yet.</p>"##
             .to_string()
     } else {
         pane.messages.iter().map(message_bubble_chat).collect()
     };
 
+    // Where the live stream should resume from: the newest message already on the page, so a
+    // message that lands between this render and the browser connecting is not missed. An empty
+    // thread has nothing to resume from, and streams from its start.
+    let after = pane
+        .messages
+        .last()
+        .map(|message| format!("&after={}", message.cursor()))
+        .unwrap_or_default();
+
     format!(
         r##"
-        <section id="detail-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="detail-pane" data-thread-id="{thread_id}" class="flex flex-1 flex-col bg-base-100" hx-ext="sse"
+            sse-connect="/ui/events?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}{after}">
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
                 <div class="min-w-0">
                     <h2 class="truncate text-xl font-bold">{subject}</h2>
@@ -750,9 +1006,11 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                         class="btn btn-outline btn-sm">Open in Simulator</a>
                 </div>
             </div>
-            <div id="message-scroll" class="flex-1 space-y-1 overflow-y-auto px-6 py-4">
+            <div id="message-scroll" class="flex-1 space-y-1 overflow-y-auto px-6 py-4"
+                sse-swap="message" hx-swap="beforeend">
                 {messages_html}
             </div>
+            <div id="thread-activity" sse-swap="activity" hx-target="this" hx-swap="innerHTML">{activity_strip}</div>
             {composer}
         </section>
         "##,
@@ -761,7 +1019,9 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         thread_id = pane.thread.id,
         company_id = pane.company_id,
         channel_id = pane.channel.id,
+        after = after,
         messages_html = messages_html,
+        activity_strip = thread_activity_strip(pane.activity),
         composer = thread_composer(pane),
     )
 }
@@ -802,7 +1062,11 @@ fn thread_composer(pane: &MessagePane<'_>) -> String {
 }
 
 /// One message as a daisyUI chat bubble: agent replies on the right, everyone else on the left.
-fn message_bubble_chat(message: &Message) -> String {
+///
+/// Public because the live message stream (`/ui/events`) renders bubbles one at a time as they
+/// arrive. Both paths share this one definition, so a bubble that streams in is indistinguishable
+/// from one that came with the page.
+pub fn message_bubble_chat(message: &Message) -> String {
     let is_agent =
         message.role == MessageRole::Agent || message.direction == MessageDirection::Outbound;
     let body = if is_agent {
@@ -984,10 +1248,25 @@ pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
     )
 }
 
+/// The opening tag of the thread list, in one place.
+///
+/// The container is rendered twice -- inline inside the column, and out of band after this client
+/// sends a message -- and it carries the attributes that make the column live. Splitting those
+/// across two string literals is what silently stopped the live column after the first send: the
+/// out-of-band copy replaced the element with one that had no `sse-swap`, and nothing streamed
+/// into it again until a full reload.
+fn thread_list_open_tag(swap: FragmentSwap) -> String {
+    format!(
+        r##"<div id="thread-list" class="flex-1 overflow-y-auto" sse-swap="thread" hx-swap="afterbegin"{oob}>"##,
+        oob = swap.oob_attribute(),
+    )
+}
+
 /// The thread list re-rendered out of band, so a freshly composed thread shows up in the column.
 pub fn thread_list_oob(column: &ThreadColumn<'_>) -> String {
     format!(
-        r##"<div id="thread-list" class="flex-1 overflow-y-auto" hx-swap-oob="outerHTML">{list_html}</div>"##,
+        "{list_open}{list_html}</div>",
+        list_open = thread_list_open_tag(FragmentSwap::OutOfBand),
         list_html = thread_list_fragment(column, FragmentSwap::Inline),
     )
 }

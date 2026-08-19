@@ -269,6 +269,7 @@ fn simple_channel_form(company_id: Uuid) -> String {
                 hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('channel-form-card').classList.add('hidden'); document.getElementById('channel-form-toggle').setAttribute('aria-expanded', 'false'); }}">
                 <input type="hidden" name="form_mode" value="simple">
                 <input type="hidden" name="enabled" value="true">
+                <input type="hidden" name="add_3rd_party" value="true">
                 <div>
                     <label for="simple_channel_name" class="block text-xs font-medium text-slate-300 mb-1">Channel Name</label>
                     <input type="text" id="simple_channel_name" name="name" required
@@ -310,6 +311,7 @@ fn advanced_channel_form(
                 hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('channel-form-card').classList.add('hidden'); document.getElementById('channel-form-toggle').setAttribute('aria-expanded', 'false'); }}">
                 <input type="hidden" name="form_mode" value="advanced">
                 <input type="hidden" name="enabled" value="true">
+                <input type="hidden" name="add_3rd_party" value="true">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label for="channel_name" class="block text-xs font-medium text-slate-300 mb-1">Channel Name</label>
@@ -914,6 +916,16 @@ pub fn channel_edit_fragment(
                     </span>
                 </label>
             </div>
+            <div>
+                <label class="flex items-start gap-2.5 cursor-pointer">
+                    <input type="checkbox" name="add_3rd_party" value="true" {add_3rd_party_checked}
+                        class="mt-0.5 rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-emerald-500">
+                    <span class="text-xs text-slate-300">
+                        <span class="font-medium">Add CC'd outsiders to threads</span>
+                        <span class="block text-[11px] text-slate-400">Unticking this keeps the channel internal: people outside your team are never added to a thread and are never copied on the agent's reply.</span>
+                    </span>
+                </label>
+            </div>
             {spam_warning_html}
             <div class="flex items-center justify-end gap-2">
                 <button type="button" hx-get="/companies/{company_id}/channels/{channel_id}/cancel" hx-target="#channel-{channel_id}" hx-swap="outerHTML"
@@ -932,6 +944,7 @@ pub fn channel_edit_fragment(
         name = channel.name,
         slug = channel.slug,
         enabled_checked = if channel.enabled { "checked" } else { "" },
+        add_3rd_party_checked = if channel.add_3rd_party { "checked" } else { "" },
         company_slug = company.slug,
         app_domain_name = app_domain_name,
         emails_str = emails_str,

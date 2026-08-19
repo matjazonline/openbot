@@ -1273,6 +1273,7 @@ mod tests {
         });
         let channel = Channel {
             enabled: true,
+            add_3rd_party: true,
             id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
             name: "Test".to_string(),
@@ -1421,6 +1422,7 @@ mod tests {
 
         let channel = Channel {
             enabled: true,
+            add_3rd_party: true,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
@@ -1476,6 +1478,7 @@ mod tests {
 
         let channel = Channel {
             enabled: true,
+            add_3rd_party: true,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
@@ -1556,6 +1559,7 @@ mod tests {
 
         let channel = Channel {
             enabled: true,
+            add_3rd_party: true,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
@@ -1624,6 +1628,7 @@ mod tests {
 
         let channel = Channel {
             enabled: true,
+            add_3rd_party: true,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),

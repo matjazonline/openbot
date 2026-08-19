@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::entities::cursor::ThreadCursor;
 use crate::entities::value_objects::EmailAddress;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -14,6 +15,12 @@ pub struct Thread {
 }
 
 impl Thread {
+    /// This thread's position in its channel's newest-first column — where paging continues from,
+    /// and where a live column resumes from.
+    pub fn cursor(&self) -> ThreadCursor {
+        ThreadCursor::new(self.updated_at, self.id)
+    }
+
     /// The subject a further message in this thread carries: `Re:` once, never `Re: Re:`.
     pub fn reply_subject(&self) -> String {
         let subject = self.subject.trim();

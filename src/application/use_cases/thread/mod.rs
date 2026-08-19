@@ -4,10 +4,10 @@
 //! This module owns the types and the [`ThreadUseCases`] handle; the two pipelines live next to
 //! it in [`ingest`] and [`dispatch`], with their shared helpers in [`support`].
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::{
@@ -21,9 +21,10 @@ use crate::{
     entities::{
         channel::{Channel, ChannelType, ParticipantIdentity},
         company::Company,
+        cursor::{MessageCursor, ThreadCursor},
         message::{Message, MessageDirection, MessageRole},
         message_contract::NormalizedInboundMessage,
-        task::TokenUsage,
+        task::{ThreadActivity, TokenUsage},
         thread::Thread,
         value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
     },
@@ -69,7 +70,28 @@ pub trait ThreadPersistence: Send + Sync {
     async fn list_threads_by_channel_id(
         &self,
         channel_id: Uuid,
-        before: Option<(DateTime<Utc>, Uuid)>,
+        before: Option<ThreadCursor>,
+        limit: usize,
+    ) -> AppResult<Vec<Thread>>;
+
+    /// Who sent the newest message in each of these threads.
+    ///
+    /// Only the live column asks for this, to tell an agent's reply apart from a person's message
+    /// when marking a thread the reader does not have open. A default of "nothing known" is a safe
+    /// degradation -- the mark is simply not shown -- so test doubles need not implement it.
+    async fn list_thread_last_roles(
+        &self,
+        _thread_ids: &[Uuid],
+    ) -> AppResult<HashMap<Uuid, MessageRole>> {
+        Ok(HashMap::new())
+    }
+
+    /// The channel's threads touched since `after`, oldest first — what a live column has not
+    /// reflected yet. `None` means from the start of the channel.
+    async fn list_threads_updated_after(
+        &self,
+        channel_id: Uuid,
+        after: Option<ThreadCursor>,
         limit: usize,
     ) -> AppResult<Vec<Thread>>;
 
@@ -108,6 +130,15 @@ pub trait ThreadPersistence: Send + Sync {
     ) -> AppResult<Option<Message>>;
 
     async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>>;
+
+    /// The thread's messages newer than `after`, oldest first — what a live reader has not seen
+    /// yet. `None` means from the start of the thread.
+    async fn list_messages_after(
+        &self,
+        thread_id: Uuid,
+        after: Option<MessageCursor>,
+        limit: usize,
+    ) -> AppResult<Vec<Message>>;
 }
 
 #[derive(Clone)]
@@ -489,7 +520,7 @@ impl ThreadUseCases {
     pub async fn list_channel_threads(
         &self,
         channel_id: Uuid,
-        before: Option<(DateTime<Utc>, Uuid)>,
+        before: Option<ThreadCursor>,
         limit: usize,
     ) -> AppResult<Vec<Thread>> {
         self.thread_persistence
@@ -497,9 +528,50 @@ impl ThreadUseCases {
             .await
     }
 
+    /// Who sent the newest message in each of these threads, for the live column's reply mark.
+    pub async fn thread_last_roles(
+        &self,
+        thread_ids: &[Uuid],
+    ) -> AppResult<HashMap<Uuid, MessageRole>> {
+        self.thread_persistence
+            .list_thread_last_roles(thread_ids)
+            .await
+    }
+
+    /// The threads a live column is missing, oldest first.
+    ///
+    /// Cursor-driven for the same reason the message stream is: one call covers a single bumped
+    /// thread, a burst that overflowed the broadcast channel, and a reconnect after an outage.
+    pub async fn get_channel_threads_after(
+        &self,
+        channel_id: Uuid,
+        after: Option<ThreadCursor>,
+        limit: usize,
+    ) -> AppResult<Vec<Thread>> {
+        self.thread_persistence
+            .list_threads_updated_after(channel_id, after, limit)
+            .await
+    }
+
     pub async fn get_thread_history(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
         self.thread_persistence
             .list_messages_by_thread_id(thread_id)
+            .await
+    }
+
+    /// The messages a live reader is missing, oldest first.
+    ///
+    /// Driving the message stream off a cursor rather than off the notification payload means one
+    /// call covers three cases with the same code: a single new message, a burst that overflowed
+    /// the broadcast channel, and a reconnect after the connection dropped.
+    pub async fn get_thread_messages_after(
+        &self,
+        thread_id: Uuid,
+        after: Option<MessageCursor>,
+        limit: usize,
+    ) -> AppResult<Vec<Message>> {
+        self.thread_persistence
+            .list_messages_after(thread_id, after, limit)
             .await
     }
 
@@ -622,6 +694,17 @@ impl ThreadUseCases {
 
     pub async fn get_task_persistence(&self) -> Arc<dyn TaskPersistence> {
         self.task_persistence.clone()
+    }
+
+    /// What each of these threads is currently doing, for the mailbox's activity indicators.
+    ///
+    /// Threads with nothing in flight are absent from the map rather than present-and-idle, so a
+    /// caller renders "no badge" by finding nothing.
+    pub async fn thread_activity(
+        &self,
+        thread_ids: &[Uuid],
+    ) -> AppResult<HashMap<Uuid, ThreadActivity>> {
+        self.task_persistence.list_thread_activity(thread_ids).await
     }
 }
 

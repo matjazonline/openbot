@@ -202,6 +202,12 @@ fn test_task_parameters_render_execution_diagnostics() {
     assert!(html.contains("Observed: 3 events / 1 LLM calls"));
 }
 
+/// None of these fixtures has a task in flight; the activity states have their own tests below.
+fn no_activity() -> &'static HashMap<Uuid, ThreadActivity> {
+    static EMPTY: std::sync::OnceLock<HashMap<Uuid, ThreadActivity>> = std::sync::OnceLock::new();
+    EMPTY.get_or_init(HashMap::new)
+}
+
 fn mailbox_company() -> Company {
     Company {
         id: Uuid::new_v4(),
@@ -219,6 +225,7 @@ fn mailbox_company() -> Company {
 fn mailbox_channel(company_id: Uuid) -> Channel {
     Channel {
         enabled: true,
+        add_3rd_party: true,
         id: Uuid::new_v4(),
         company_id,
         name: "Inbox".to_string(),
@@ -274,6 +281,7 @@ fn mailbox_page_renders_three_columns_and_escapes_thread_subjects() {
         threads: std::slice::from_ref(&thread),
         next_cursor: Some("next_cursor"),
         selected_thread_id: None,
+        activity: no_activity(),
         detail_html: &detail,
     });
 
@@ -309,6 +317,7 @@ fn top_bar_shows_the_logo_and_the_signed_in_account() {
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
+        activity: no_activity(),
         detail_html: &detail,
     });
 
@@ -346,6 +355,7 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
+        activity: no_activity(),
         detail_html: &detail,
     });
     // Without a channel there is no thread column, so there is nowhere for Compose to sit.
@@ -362,6 +372,7 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
+        activity: no_activity(),
         detail_html: &detail,
     });
     assert!(with_channel.contains("id=\"compose-button\""));
@@ -379,6 +390,7 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
+        activity: no_activity(),
     });
     assert!(column.contains("id=\"compose-button\""));
 }
@@ -400,6 +412,7 @@ fn channel_sidebar_lists_addresses_and_offers_channel_actions() {
             threads: &[],
             next_cursor: None,
             selected_thread_id: None,
+            activity: no_activity(),
             detail_html: &detail,
         })
     };
@@ -455,6 +468,7 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
+        activity: no_activity(),
         detail_html: &detail,
     });
 
@@ -870,6 +884,44 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
     assert!(!html.contains("confirm_spam_disabled"));
 }
 
+/// The third-party switch is a checkbox, and an unticked checkbox submits no key at all — so the
+/// pane has to render its stored state, or saving an unrelated field would silently flip it.
+#[test]
+fn channel_edit_pane_reflects_the_stored_third_party_setting() {
+    let company = mailbox_company();
+
+    let open = channel_edit_pane(&ChannelEditPane {
+        company: &company,
+        app_domain_name: "example.com",
+        channel: &mailbox_channel(company.id),
+        agents: &[],
+        spam_scan_enabled: true,
+        draft: None,
+        error: None,
+    });
+    assert!(open.contains(
+        r#"name="add_3rd_party" value="true" class="checkbox checkbox-sm mt-0.5" checked"#
+    ));
+
+    let closed_channel = Channel {
+        add_3rd_party: false,
+        ..mailbox_channel(company.id)
+    };
+    let closed = channel_edit_pane(&ChannelEditPane {
+        company: &company,
+        app_domain_name: "example.com",
+        channel: &closed_channel,
+        agents: &[],
+        spam_scan_enabled: true,
+        draft: None,
+        error: None,
+    });
+    assert!(
+        closed
+            .contains(r#"name="add_3rd_party" value="true" class="checkbox checkbox-sm mt-0.5">"#)
+    );
+}
+
 #[test]
 fn channel_edit_pane_keeps_a_rejected_save_in_the_form() {
     let company = mailbox_company();
@@ -1093,6 +1145,7 @@ fn appended_thread_page_swaps_pagination_out_of_band() {
             threads: std::slice::from_ref(&thread),
             next_cursor: None,
             selected_thread_id: None,
+            activity: no_activity(),
         },
         FragmentSwap::OutOfBand,
     );
@@ -1151,6 +1204,7 @@ fn message_pane_separates_agent_and_human_bubbles() {
         channel: &channel,
         thread: &thread,
         messages: &[inbound, outbound],
+        activity: None,
     });
 
     assert!(html.contains("chat chat-start"));
@@ -1170,6 +1224,378 @@ fn message_pane_separates_agent_and_human_bubbles() {
     assert!(html.contains("hx-post=\"/ui/reply\""));
     assert!(html.contains(&format!("name=\"thread_id\" value=\"{}\"", thread.id)));
     assert!(html.contains(&format!("name=\"channel_id\" value=\"{}\"", channel.id)));
+}
+
+/// One message, so the live-stream tests below can say what they mean without 18 lines of struct.
+fn mailbox_message(thread_id: Uuid, body: &str) -> Message {
+    Message {
+        id: Uuid::new_v4(),
+        thread_id,
+        message_id: "<live@test.com>".into(),
+        in_reply_to: None,
+        references_list: vec![],
+        sender: "person@example.com".into(),
+        recipients_to: vec![],
+        recipients_cc: vec![],
+        subject: "Question".to_string(),
+        clean_text_body: body.to_string(),
+        raw_text_body: None,
+        raw_html_body: None,
+        attachments: None,
+        direction: MessageDirection::Inbound,
+        role: MessageRole::Human,
+        thread_index: None,
+        created_at: Utc::now(),
+    }
+}
+
+#[test]
+fn message_pane_streams_new_messages_from_where_it_was_rendered() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let newest = mailbox_message(thread.id, "the latest word");
+
+    let html = message_pane(&MessagePane {
+        company_id: company.id,
+        channel: &channel,
+        thread: &thread,
+        messages: &[mailbox_message(thread.id, "older"), newest.clone()],
+        activity: None,
+    });
+
+    // The connection lives on the pane, so every existing pane swap tears it down and rebuilds it
+    // without any lifecycle code of its own.
+    assert!(html.contains("hx-ext=\"sse\""));
+    assert!(html.contains(&format!(
+        "sse-connect=\"/ui/events?company_id={}&channel_id={}&thread_id={}&after={}\"",
+        company.id,
+        channel.id,
+        thread.id,
+        newest.cursor()
+    )));
+
+    // Appending is what leaves a half-typed draft and the scroll position alone.
+    assert!(html.contains("sse-swap=\"message\" hx-swap=\"beforeend\""));
+}
+
+/// An empty thread has no high-water mark to resume from, and streams from its start. Sending
+/// `after=` empty would be a cursor the server has to reject.
+#[test]
+fn message_pane_omits_the_resume_cursor_for_an_empty_thread() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+
+    let html = message_pane(&MessagePane {
+        company_id: company.id,
+        channel: &channel,
+        thread: &thread,
+        messages: &[],
+        activity: None,
+    });
+
+    assert!(html.contains(&format!(
+        "sse-connect=\"/ui/events?company_id={}&channel_id={}&thread_id={}\"",
+        company.id, channel.id, thread.id
+    )));
+    assert!(!html.contains("&after="));
+    // The first streamed message clears this, so it needs an id to be found by.
+    assert!(html.contains("id=\"no-messages\""));
+}
+
+#[test]
+fn thread_column_streams_touched_threads_from_where_it_was_rendered() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let newest = mailbox_thread(channel.id);
+    let older = Thread {
+        id: Uuid::new_v4(),
+        updated_at: newest.updated_at - chrono::Duration::hours(1),
+        ..newest.clone()
+    };
+
+    let html = thread_column(&ThreadColumn {
+        company_id: company.id,
+        channel: &channel,
+        // The column is newest-first, so the resume cursor is the *first* row, not the last.
+        threads: &[newest.clone(), older],
+        next_cursor: None,
+        selected_thread_id: None,
+        activity: no_activity(),
+    });
+
+    assert!(html.contains("hx-ext=\"sse\""));
+    assert!(html.contains(&format!(
+        "sse-connect=\"/ui/threads/events?company_id={}&channel_id={}&after={}\"",
+        company.id,
+        channel.id,
+        newest.cursor()
+    )));
+
+    // A bumped thread arrives as an insert at the top; the client drops the stale copy below.
+    assert!(html.contains("sse-swap=\"thread\" hx-swap=\"afterbegin\""));
+    assert!(html.contains(&format!("data-thread-id=\"{}\"", newest.id)));
+}
+
+/// The container is rendered twice; both must stay live. Rendering it out of band without the
+/// streaming attributes is what silently killed the live column after this client's first send.
+#[test]
+fn the_out_of_band_thread_list_stays_live() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+
+    let oob = thread_list_oob(&ThreadColumn {
+        company_id: company.id,
+        channel: &channel,
+        threads: std::slice::from_ref(&thread),
+        next_cursor: None,
+        selected_thread_id: Some(thread.id),
+        activity: no_activity(),
+    });
+
+    assert!(oob.contains("hx-swap-oob=\"outerHTML\""));
+    assert!(oob.contains("sse-swap=\"thread\""));
+    assert!(oob.contains("hx-swap=\"afterbegin\""));
+}
+
+/// An empty channel has no high-water mark, and streams from its start.
+#[test]
+fn thread_column_omits_the_resume_cursor_for_an_empty_channel() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+
+    let html = thread_column(&ThreadColumn {
+        company_id: company.id,
+        channel: &channel,
+        threads: &[],
+        next_cursor: None,
+        selected_thread_id: None,
+        activity: no_activity(),
+    });
+
+    assert!(html.contains(&format!(
+        "sse-connect=\"/ui/threads/events?company_id={}&channel_id={}\"",
+        company.id, channel.id
+    )));
+    assert!(!html.contains("&after="));
+    // The first streamed row clears this, so the client needs to find it.
+    assert!(html.contains("no-threads"));
+}
+
+/// Same contract as the message bubbles: what streams in must match what a reload renders.
+#[test]
+fn a_streamed_thread_row_is_identical_to_one_rendered_with_the_column() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+
+    let column = thread_column(&ThreadColumn {
+        company_id: company.id,
+        channel: &channel,
+        threads: std::slice::from_ref(&thread),
+        next_cursor: None,
+        selected_thread_id: None,
+        activity: no_activity(),
+    });
+
+    assert!(
+        column
+            .contains(thread_row_fragment(company.id, &channel, &thread, false, None, None).trim())
+    );
+}
+
+/// The stream cannot know which thread this browser has open, so it always renders unselected —
+/// the client re-applies the highlight. The selected form still has to exist for the page render.
+#[test]
+fn thread_row_marks_only_the_selected_thread() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+
+    assert!(
+        thread_row_fragment(company.id, &channel, &thread, true, None, None)
+            .contains("bg-base-300")
+    );
+    assert!(
+        !thread_row_fragment(company.id, &channel, &thread, false, None, None)
+            .contains("bg-base-300")
+    );
+}
+
+#[test]
+fn a_thread_row_carries_its_own_activity_slot() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+
+    let idle = thread_row_fragment(company.id, &channel, &thread, false, None, None);
+    let working = thread_row_fragment(
+        company.id,
+        &channel,
+        &thread,
+        false,
+        Some(ThreadActivity::Working),
+        None,
+    );
+
+    // Its own event name, so a status change redraws just this badge. Sharing the column's
+    // `thread` event would re-insert the whole row at the top and move the thread.
+    let slot = format!("sse-swap=\"activity-{}\"", thread.id);
+    assert!(idle.contains(&slot));
+    assert!(working.contains(&slot));
+    assert!(idle.contains("hx-swap=\"innerHTML\""));
+    // The slot sits inside a row button that targets `#detail-pane`, and htmx inherits attributes:
+    // without pinning the target, a badge update swaps itself over the open conversation.
+    assert!(idle.contains("hx-target=\"this\""));
+
+    // An idle thread has the slot but nothing in it, so a mark can be streamed in later.
+    assert!(!idle.contains("title="));
+
+    // A run in progress earns no mark in the column at all. The reader is not waiting on threads
+    // they have not opened, and an animated badge there fires *after* the reply has landed,
+    // because the mailbox enqueues a durable task alongside its inline agent run.
+    assert_eq!(
+        working, idle,
+        "a working thread must look exactly like an idle one in the column"
+    );
+
+    // A thread that has stalled does earn one -- quiet, unanimated, wording on hover.
+    let blocked = thread_row_fragment(
+        company.id,
+        &channel,
+        &thread,
+        false,
+        Some(ThreadActivity::WaitingApproval),
+        None,
+    );
+    assert!(blocked.contains("⏳"));
+    assert!(blocked.contains(r#"title="Waiting for approval""#));
+    assert!(!blocked.contains("animate-pulse"));
+}
+
+/// The reply mark is client-side and only ever applies to rows arriving over the stream, so the
+/// row has to say who spoke last -- but only when the stream renders it.
+#[test]
+fn only_streamed_rows_say_who_spoke_last() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+
+    let from_page = thread_row_fragment(company.id, &channel, &thread, false, None, None);
+    assert!(!from_page.contains("data-last-role"));
+    assert!(from_page.contains(r#"<span class="thread-mark"#));
+
+    let streamed = thread_row_fragment(
+        company.id,
+        &channel,
+        &thread,
+        false,
+        None,
+        Some(MessageRole::Agent),
+    );
+    assert!(streamed.contains(r#"data-last-role="agent""#));
+
+    let from_person = thread_row_fragment(
+        company.id,
+        &channel,
+        &thread,
+        false,
+        None,
+        Some(MessageRole::Human),
+    );
+    assert!(from_person.contains(r#"data-last-role="human""#));
+}
+
+/// The column tells the client which thread is already on screen, so a reply the reader is looking
+/// at is never marked as something they missed.
+#[test]
+fn the_open_thread_is_identifiable_from_the_pane() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+
+    let html = message_pane(&MessagePane {
+        company_id: company.id,
+        channel: &channel,
+        thread: &thread,
+        messages: &[],
+        activity: None,
+    });
+
+    assert!(html.contains(&format!(r#"data-thread-id="{}""#, thread.id)));
+}
+
+/// The spinner is for work actually in progress. A thread parked on an approval gets a badge with
+/// no spinner — something spinning forever reads as broken rather than blocked.
+#[test]
+fn only_a_running_agent_gets_a_spinner() {
+    let working = thread_activity_strip(Some(ThreadActivity::Working));
+    assert!(working.contains("loading loading-dots"));
+    assert!(working.contains("Agent replying"));
+
+    for blocked in [
+        ThreadActivity::Queued,
+        ThreadActivity::WaitingApproval,
+        ThreadActivity::WaitingReply,
+        ThreadActivity::Failed,
+    ] {
+        let strip = thread_activity_strip(Some(blocked));
+        assert!(!strip.contains("loading"), "{blocked:?} must not spin");
+        assert!(strip.contains(blocked.label()));
+    }
+
+    // An idle thread renders nothing, which is what clears the strip.
+    assert!(thread_activity_strip(None).is_empty());
+}
+
+#[test]
+fn the_message_pane_has_a_slot_for_the_activity_strip() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+
+    let html = message_pane(&MessagePane {
+        company_id: company.id,
+        channel: &channel,
+        thread: &thread,
+        messages: &[],
+        activity: Some(ThreadActivity::Working),
+    });
+
+    assert!(html.contains(
+        "id=\"thread-activity\" sse-swap=\"activity\" hx-target=\"this\" hx-swap=\"innerHTML\""
+    ));
+    assert!(html.contains("loading loading-dots"));
+
+    // The strip sits outside the scroll area: `#message-scroll` appends with `beforeend`, so a
+    // strip inside it would end up above every later message instead of under all of them.
+    let scroll_start = html.find("id=\"message-scroll\"").unwrap();
+    let scroll_end = html.find("id=\"thread-activity\"").unwrap();
+    assert!(scroll_start < scroll_end);
+    assert!(html[scroll_start..scroll_end].contains("</div>"));
+}
+
+/// The stream sends bubbles rendered by `message_bubble_chat` while the page renders them inside
+/// `message_pane`. If those two ever diverge, a live message would look different from the same
+/// message after a reload.
+#[test]
+fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let message = mailbox_message(thread.id, "Plain <b>text</b> body");
+
+    let pane = message_pane(&MessagePane {
+        company_id: company.id,
+        channel: &channel,
+        thread: &thread,
+        messages: std::slice::from_ref(&message),
+        activity: None,
+    });
+
+    assert!(pane.contains(message_bubble_chat(&message).trim()));
 }
 
 #[test]

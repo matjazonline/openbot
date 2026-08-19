@@ -5,7 +5,7 @@ use sqlx::PgPool;
 
 use crate::{
     domain::monitoring::MonitoringService,
-    infra::config::AppConfig,
+    infra::{config::AppConfig, events::MailboxEvents},
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
         company::CompanyUseCases, company_invite::CompanyInviteUseCases, thread::ThreadUseCases,
@@ -25,6 +25,8 @@ pub struct AppState {
     pub agent_use_cases: Arc<AgentUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
     pub approval_use_cases: Arc<ApprovalUseCases>,
+    /// Committed messages, for the mailbox's live message stream.
+    pub events: MailboxEvents,
 }
 
 impl FromRef<AppState> for PgPool {
@@ -84,5 +86,11 @@ impl FromRef<AppState> for Arc<ThreadUseCases> {
 impl FromRef<AppState> for Arc<ApprovalUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.approval_use_cases.clone()
+    }
+}
+
+impl FromRef<AppState> for MailboxEvents {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.events.clone()
     }
 }

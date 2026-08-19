@@ -2136,6 +2136,7 @@ dependencies = [
  "ammonia",
  "anyhow",
  "argon2",
+ "async-stream",
  "async-trait",
  "axum",
  "axum-extra",
@@ -2158,6 +2159,7 @@ dependencies = [
  "thiserror 2.0.16",
  "time",
  "tokio",
+ "tokio-stream",
  "tower",
  "tower-http",
  "tracing",
@@ -4014,6 +4016,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]

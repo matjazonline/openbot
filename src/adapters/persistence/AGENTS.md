@@ -1,6 +1,8 @@
 These rules apply whenever you change the **model**: adding, renaming, retyping or removing a field
 on a persisted domain entity (`src/domain/entities/*`), or changing the table behind one. They are
-in addition to `src/AGENTS.md`, which still governs style — read the sqlx section there too.
+in addition to `src/AGENTS.md`, which still governs style — read the sqlx section there too. The
+last section here, on SQL style, applies to any query you touch in this directory, model change or
+not.
 
 A one-field change is never one edit. It lands in seven places, and the compiler only finds five of
 them. Work the list in order; the two it cannot find are steps 2 and 7.
@@ -154,3 +156,36 @@ Finally, extend the round-trip assertion rather than only adding the field. A mo
 done until a test writes the new value, reads it back, and asserts it survived — create, then update,
 then re-read, as `postgres_channel_persistence_works` does for `enabled`. A field that is bound on
 `INSERT` but forgotten in `UPDATE` passes every other check.
+
+# Write SQL for the reader, not for the character count
+
+The runtime queries in step 7 have no compile-time check, so the *reader* is the type system.
+Optional syntax that a human has to reconstruct is not worth the keystrokes it saves.
+
+**Always write `AS` for a table alias.** `UPDATE email_outbox outbox` (`task.rs:854`) reads as two
+table names before it reads as one aliased one; `UPDATE background_tasks AS task` (`task.rs:1171`) —
+the same query shape, three hundred lines away — does not. Same rule for `FROM` and `JOIN` targets
+and for CTE column lists. Column aliases in the `SELECT` list already use `AS` throughout
+(`em.sender::text AS sender`, `CASE ch.access_mode ... END AS participant_emails`); table aliases get
+the same treatment.
+
+**Alias to a word, not an initial.** `FROM threads t` / `JOIN email_messages em ON em.id =
+tm.email_message_id` forces the reader to hold a decoder ring for the length of the query, and the
+ring is per-query — `a` is `agents` in `agent.rs:100` and `accepted` in `company_invite.rs:196`. The
+anti-examples are `t`/`tm` (`thread.rs:129,138`), `ch`/`cs`/`cp`/`ca` (`channel.rs:57-83`) and
+`i`/`a`/`m` (`company_invite.rs`). The model to copy is `task.rs`: `task_outreaches AS outreach`,
+`email_outbox AS outbox`, `task_outreach_targets AS target`.
+
+These aliases leak. The shared `SELECT` consts from step 3 are `format!`ed into a `WHERE`/`JOIN`
+clause at thirteen call sites that spell the alias themselves —
+`format!("{CHANNEL_SELECT} WHERE ch.id = $1")` — so renaming one is a cross-file edit. Do it when
+you're already changing that query, not as a sweep.
+
+**Name the columns instead of `SELECT *`.** `SELECT * FROM human_approvals` (`approval.rs:244, 269,
+321, 477`) feeds a `query_as::<_, ApprovalDb>`, so the row struct and the table are coupled by column
+name and order with nothing stating either. A shared column const is the fix — `task.rs` already does
+this with `OUTBOX_COLUMNS`, and step 3 makes that const the one place you edit per model change.
+
+None of this is licence to reformat a query you aren't otherwise touching, and it is not an argument
+against genuinely dense SQL: a `CASE` expression or a window function that carries real logic stays.
+The target is syntax that is optional *and* load-bearing for comprehension.

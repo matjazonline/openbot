@@ -218,7 +218,7 @@ impl ThreadPersistence for MockThreadPersistence {
     async fn list_threads_by_channel_id(
         &self,
         channel_id: Uuid,
-        before: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
+        before: Option<ThreadCursor>,
         limit: usize,
     ) -> AppResult<Vec<Thread>> {
         let mut threads: Vec<_> = self
@@ -227,10 +227,34 @@ impl ThreadPersistence for MockThreadPersistence {
             .unwrap()
             .iter()
             .filter(|thread| thread.channel_id == channel_id)
-            .filter(|thread| before.is_none_or(|cursor| (thread.updated_at, thread.id) < cursor))
+            .filter(|thread| {
+                before.is_none_or(|cursor| {
+                    (thread.updated_at, thread.id) < (cursor.updated_at, cursor.id)
+                })
+            })
             .cloned()
             .collect();
         threads.sort_by_key(|thread| std::cmp::Reverse((thread.updated_at, thread.id)));
+        threads.truncate(limit);
+        Ok(threads)
+    }
+
+    async fn list_threads_updated_after(
+        &self,
+        channel_id: Uuid,
+        after: Option<ThreadCursor>,
+        limit: usize,
+    ) -> AppResult<Vec<Thread>> {
+        let mut threads: Vec<Thread> = self
+            .threads
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|t| t.channel_id == channel_id)
+            .filter(|t| after.is_none_or(|cursor| t.cursor() > cursor))
+            .cloned()
+            .collect();
+        threads.sort_by_key(|t| t.cursor());
         threads.truncate(limit);
         Ok(threads)
     }
@@ -346,6 +370,26 @@ impl ThreadPersistence for MockThreadPersistence {
             .filter(|m| m.thread_id == thread_id)
             .cloned()
             .collect())
+    }
+
+    async fn list_messages_after(
+        &self,
+        thread_id: Uuid,
+        after: Option<MessageCursor>,
+        limit: usize,
+    ) -> AppResult<Vec<Message>> {
+        let mut messages: Vec<Message> = self
+            .messages
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|m| m.thread_id == thread_id)
+            .filter(|m| after.is_none_or(|cursor| m.cursor() > cursor))
+            .cloned()
+            .collect();
+        messages.sort_by_key(|m| m.cursor());
+        messages.truncate(limit);
+        Ok(messages)
     }
 }
 
@@ -682,6 +726,7 @@ async fn test_inter_channel_hop_limit_rejection() {
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: channel_id,
                 company_id,
                 name: "Inbound Flow".to_string(),
@@ -697,6 +742,7 @@ async fn test_inter_channel_hop_limit_rejection() {
             },
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: source_channel_id,
                 company_id,
                 name: "Source Flow".to_string(),
@@ -808,6 +854,7 @@ async fn test_spf_authentication_failure_rejection() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
             enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Inbound Flow".to_string(),
@@ -904,6 +951,7 @@ async fn test_high_spam_score_rejection() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
             enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Inbound Flow".to_string(),
@@ -1002,6 +1050,7 @@ async fn test_dmarc_authentication_failure_rejection() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
             enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Inbound Flow".to_string(),
@@ -1100,6 +1149,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
             enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Restricted Flow".to_string(),
@@ -1199,6 +1249,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
             enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Restricted Flow".to_string(),
@@ -1296,6 +1347,7 @@ async fn test_channel_in_cc_resolves_properly() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
             enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Support Flow".to_string(),
@@ -1395,6 +1447,7 @@ async fn test_multi_channel_to_and_cc_execution() {
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: wf1_id,
                 company_id,
                 name: "Support".to_string(),
@@ -1410,6 +1463,7 @@ async fn test_multi_channel_to_and_cc_execution() {
             },
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: wf2_id,
                 company_id,
                 name: "Billing".to_string(),
@@ -1518,6 +1572,7 @@ async fn test_pipeline_address_chaining_execution() {
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: wf1_id,
                 company_id,
                 name: "Support".to_string(),
@@ -1533,6 +1588,7 @@ async fn test_pipeline_address_chaining_execution() {
             },
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: wf2_id,
                 company_id,
                 name: "Billing".to_string(),
@@ -1548,6 +1604,7 @@ async fn test_pipeline_address_chaining_execution() {
             },
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: wf3_id,
                 company_id,
                 name: "Legal".to_string(),
@@ -1655,6 +1712,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Support".to_string(),
@@ -1670,6 +1728,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
             },
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Billing".to_string(),
@@ -1797,6 +1856,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
             enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Support".to_string(),
@@ -1947,6 +2007,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: flow_team_only,
                 company_id,
                 name: "Team Only".to_string(),
@@ -1962,6 +2023,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
             },
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: flow_public,
                 company_id,
                 name: "Public Flow".to_string(),
@@ -1977,6 +2039,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
             },
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: flow_explicit,
                 company_id,
                 name: "Explicit Flow".to_string(),
@@ -2129,6 +2192,7 @@ async fn test_sender_verification_and_delegation_target_check() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
             enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Support".to_string(),
@@ -2311,6 +2375,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: channel_a_id,
                 company_id,
                 name: "Agent A".to_string(),
@@ -2326,6 +2391,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
             },
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: channel_b_id,
                 company_id,
                 name: "Agent B".to_string(),
@@ -2503,6 +2569,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: channel_a_id,
                 company_id,
                 name: "Agent A".to_string(),
@@ -2518,6 +2585,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
             },
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: channel_b_id,
                 company_id,
                 name: "Agent B".to_string(),
@@ -2602,6 +2670,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: channel_a_id,
                 company_id,
                 name: "Agent A".to_string(),
@@ -2617,6 +2686,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
             },
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: channel_b_id,
                 company_id,
                 name: "Agent B".to_string(),
@@ -2704,6 +2774,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
             enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Support Channel".to_string(),
@@ -2915,6 +2986,7 @@ async fn test_context_only_quiet_mode_ingestion() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
             enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Support Channel".to_string(),
@@ -3013,16 +3085,52 @@ async fn test_context_only_quiet_mode_ingestion() {
     assert_eq!(parsed_body.clean_text_body, "Additional background note");
 }
 
+/// The `support` channel one of these fixtures builds.
+///
+/// Named fields rather than positional arguments: `enabled` and `add_3rd_party` are same-typed
+/// switches that a positional call could silently transpose.
+struct TestChannel {
+    enabled: bool,
+    add_3rd_party: bool,
+    alias_slugs: Vec<ChannelSlug>,
+    participant_emails: Option<Vec<EmailAddress>>,
+}
+
+impl Default for TestChannel {
+    /// A plain team-only channel, taking traffic and pulling CC'd outsiders onto its threads —
+    /// what every channel is until someone changes it.
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            add_3rd_party: true,
+            alias_slugs: Vec::new(),
+            participant_emails: None,
+        }
+    }
+}
+
 /// One company with a `support` channel whose on/off state the caller picks, wired for ingest.
 fn use_cases_with_channel_enabled(enabled: bool) -> (ThreadUseCases, Uuid) {
-    use_cases_with_channel(enabled, Vec::new())
+    use_cases_with_channel(TestChannel {
+        enabled,
+        ..TestChannel::default()
+    })
 }
 
 fn use_cases_with_channel_aliases(alias_slugs: Vec<ChannelSlug>) -> (ThreadUseCases, Uuid) {
-    use_cases_with_channel(true, alias_slugs)
+    use_cases_with_channel(TestChannel {
+        alias_slugs,
+        ..TestChannel::default()
+    })
 }
 
-fn use_cases_with_channel(enabled: bool, alias_slugs: Vec<ChannelSlug>) -> (ThreadUseCases, Uuid) {
+fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
+    let TestChannel {
+        enabled,
+        add_3rd_party,
+        alias_slugs,
+        participant_emails,
+    } = spec;
     let company_id = Uuid::new_v4();
     let channel_id = Uuid::new_v4();
 
@@ -3044,6 +3152,7 @@ fn use_cases_with_channel(enabled: bool, alias_slugs: Vec<ChannelSlug>) -> (Thre
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
             enabled,
+            add_3rd_party,
             id: channel_id,
             company_id,
             name: "Support Channel".to_string(),
@@ -3052,7 +3161,7 @@ fn use_cases_with_channel(enabled: bool, alias_slugs: Vec<ChannelSlug>) -> (Thre
             api_key: None,
             provider: None,
             model: None,
-            participant_emails: None,
+            participant_emails,
             agent_ids: None,
             channel_config: None,
             created_at: Utc::now(),
@@ -3073,6 +3182,215 @@ fn use_cases_with_channel(enabled: bool, alias_slugs: Vec<ChannelSlug>) -> (Thre
     );
 
     (thread_use_cases, channel_id)
+}
+
+/// A message from a team member that copies someone outside the platform.
+fn message_to_support_cc_outsider() -> RawInboundPayload {
+    RawInboundPayload {
+        headers: Some("Message-ID: <cc-outsider@acme.com>\n".to_string()),
+        to: "support@acme.mailagents.com".to_string(),
+        cc: Some("client@external.com".to_string()),
+        from: "team@acme.com".to_string(),
+        subject: Some("Client inquiry".to_string()),
+        text: Some("Looping the client in".to_string()),
+        ..Default::default()
+    }
+}
+
+fn participants_of(result: &InboundIngestResult) -> Vec<String> {
+    result
+        .thread
+        .as_ref()
+        .unwrap()
+        .participant_emails
+        .iter()
+        .map(ToString::to_string)
+        .collect()
+}
+
+/// The flag off makes the channel internal: the CC'd outsider is not recorded on the thread, and
+/// so does not inherit the thread's standing invitation to post into it.
+#[tokio::test]
+async fn a_closed_channel_keeps_cc_d_outsiders_off_the_thread() {
+    let (thread_use_cases, _) = use_cases_with_channel(TestChannel {
+        add_3rd_party: false,
+        ..TestChannel::default()
+    });
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(message_to_support_cc_outsider())
+        .await
+        .unwrap();
+
+    assert!(result.accepted);
+    assert_eq!(participants_of(&result), vec!["team@acme.com".to_string()]);
+}
+
+/// The same message on the default channel, so the test above is pinned to the flag rather than to
+/// something else about the fixture.
+#[tokio::test]
+async fn an_open_channel_still_adds_cc_d_outsiders_to_the_thread() {
+    let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(message_to_support_cc_outsider())
+        .await
+        .unwrap();
+
+    assert!(result.accepted);
+    assert!(
+        participants_of(&result)
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case("client@external.com"))
+    );
+}
+
+/// The flag narrows, it never widens. A `@public` channel admits any sender, but an admitted
+/// stranger is still not *trusted*, so turning the flag on does not let them attach whoever they
+/// like to the thread — and every such address would otherwise gain the right to post into it.
+#[tokio::test]
+async fn an_untrusted_sender_cannot_add_outsiders_even_with_the_flag_on() {
+    let (thread_use_cases, _) = use_cases_with_channel(TestChannel {
+        participant_emails: Some(vec!["@public".into()]),
+        ..TestChannel::default()
+    });
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(RawInboundPayload {
+            headers: Some("Message-ID: <stranger@external.com>\n".to_string()),
+            to: "support@acme.mailagents.com".to_string(),
+            cc: Some("accomplice@external.com".to_string()),
+            from: "stranger@external.com".to_string(),
+            subject: Some("Hello".to_string()),
+            text: Some("Bringing a friend".to_string()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    assert!(result.accepted);
+    assert_eq!(
+        participants_of(&result),
+        vec!["stranger@external.com".to_string()]
+    );
+}
+
+/// The outsider's own reply-all. Never having joined the thread, they have no way into it — the
+/// thread membership that `add_3rd_party` withholds is exactly what would have let them in.
+///
+/// On a team-only channel they are turned away by the channel ACL, before the thread is consulted
+/// at all, which is a silent drop rather than a bounce. That is the pre-existing shape of an
+/// unauthorized sender, and this test pins it so the difference from the `@public` case below is
+/// deliberate rather than accidental.
+#[tokio::test]
+async fn a_closed_channel_refuses_the_outsider_s_own_reply() {
+    let (thread_use_cases, _) = use_cases_with_channel(TestChannel {
+        add_3rd_party: false,
+        ..TestChannel::default()
+    });
+
+    thread_use_cases
+        .ingest_and_save_inbound_message(message_to_support_cc_outsider())
+        .await
+        .unwrap();
+
+    let reply = thread_use_cases
+        .ingest_and_save_inbound_message(outsider_reply())
+        .await
+        .unwrap();
+
+    assert!(!reply.accepted);
+    assert_eq!(
+        reply.reason.as_deref(),
+        Some("Sender unauthorized for channel")
+    );
+}
+
+/// Where the channel ACL does admit the sender, the thread is consulted, and refusing them there
+/// is a bounce — they get told, rather than having their mail disappear.
+#[tokio::test]
+async fn a_closed_public_channel_bounces_the_outsider_s_own_reply() {
+    let (thread_use_cases, _) = use_cases_with_channel(TestChannel {
+        add_3rd_party: false,
+        participant_emails: Some(vec!["@public".into(), "team@acme.com".into()]),
+        ..TestChannel::default()
+    });
+
+    thread_use_cases
+        .ingest_and_save_inbound_message(message_to_support_cc_outsider())
+        .await
+        .unwrap();
+
+    let reply = thread_use_cases
+        .ingest_and_save_inbound_message(outsider_reply())
+        .await
+        .unwrap();
+
+    assert!(!reply.accepted);
+    assert!(reply.bounce_info.is_some(), "the sender must be told why");
+}
+
+/// The CC'd outsider answering the message that copied them.
+fn outsider_reply() -> RawInboundPayload {
+    RawInboundPayload {
+        headers: Some(
+            "Message-ID: <outsider-reply@external.com>\nIn-Reply-To: <cc-outsider@acme.com>\n"
+                .to_string(),
+        ),
+        to: "support@acme.mailagents.com".to_string(),
+        from: "client@external.com".to_string(),
+        subject: Some("Re: Client inquiry".to_string()),
+        text: Some("Replying to all".to_string()),
+        ..Default::default()
+    }
+}
+
+/// The reply's Cc is where "never copied on the agent's reply" is actually enforced: the inbound
+/// Cc line is the only thing that decides who a reply reaches, and thread membership never enters
+/// into it. Platform addresses survive the filter — a pipeline's later steps ride the Cc line.
+#[tokio::test]
+async fn a_closed_channel_drops_outsiders_from_the_reply_cc() {
+    let (thread_use_cases, _) = use_cases_with_channel(TestChannel {
+        add_3rd_party: false,
+        ..TestChannel::default()
+    });
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(message_to_support_cc_outsider())
+        .await
+        .unwrap();
+
+    let mut parsed = result.parsed_email.clone().unwrap();
+    parsed.recipients_cc = vec![
+        "client@external.com".to_string(),
+        "support@acme.mailagents.com".to_string(),
+    ];
+
+    let cc = thread_use_cases
+        .outbound_cc_for(&result.channel_matches[0], &parsed)
+        .await
+        .unwrap();
+
+    assert_eq!(cc, vec!["support@acme.mailagents.com".to_string()]);
+}
+
+/// The default channel copies everyone the inbound message copied, as it always has.
+#[tokio::test]
+async fn an_open_channel_keeps_outsiders_on_the_reply_cc() {
+    let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(message_to_support_cc_outsider())
+        .await
+        .unwrap();
+
+    let parsed = result.parsed_email.clone().unwrap();
+    let cc = thread_use_cases
+        .outbound_cc_for(&result.channel_matches[0], &parsed)
+        .await
+        .unwrap();
+
+    assert!(cc.iter().any(|to| to == "client@external.com"));
 }
 
 fn message_to_support() -> RawInboundPayload {

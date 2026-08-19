@@ -5,6 +5,7 @@
 
 use chrono::{DateTime, Utc};
 use pulldown_cmark::{Options, Parser, html};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::entities::{
@@ -16,7 +17,7 @@ use crate::entities::{
     company_member::CompanyMember,
     message::{Message, MessageDirection, MessageRole},
     outbox::{OutboxEntry, OutboxFilter, OutboxStatus},
-    task::{BackgroundTask, TaskFilter, TaskStatus},
+    task::{BackgroundTask, TaskFilter, TaskStatus, ThreadActivity},
     thread::Thread,
     value_objects::EmailAddress,
 };

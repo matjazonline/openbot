@@ -33,6 +33,8 @@ pub struct ChannelWrite {
     pub agent_ids: Option<Vec<Uuid>>,
     pub channel_config: Option<serde_json::Value>,
     pub enabled: bool,
+    /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
+    pub add_3rd_party: bool,
 }
 
 impl ChannelWrite {
@@ -785,6 +787,7 @@ mod tests {
             agent_ids: write.agent_ids,
             channel_config: write.channel_config,
             enabled: write.enabled,
+            add_3rd_party: write.add_3rd_party,
             created_at: Utc::now(),
         }
     }
@@ -1205,6 +1208,7 @@ mod tests {
         let available = vec![
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: uuid::Uuid::new_v4(),
                 company_id,
                 name: "Support".to_string(),
@@ -1220,6 +1224,7 @@ mod tests {
             },
             Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: uuid::Uuid::new_v4(),
                 company_id,
                 name: "Billing".to_string(),

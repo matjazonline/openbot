@@ -2,9 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
+use crate::entities::cursor::MessageCursor;
 use crate::entities::value_objects::{EmailAddress, MessageId, ThreadIndex};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum MessageRole {
     Human,
@@ -91,4 +92,14 @@ pub struct Message {
     pub role: MessageRole,
     pub thread_index: Option<ThreadIndex>,
     pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl Message {
+    /// This message's position in its thread — what a reader resumes a live stream from.
+    pub fn cursor(&self) -> MessageCursor {
+        MessageCursor {
+            created_at: self.created_at,
+            id: self.id,
+        }
+    }
 }

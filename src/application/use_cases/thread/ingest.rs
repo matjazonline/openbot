@@ -589,7 +589,10 @@ impl ThreadUseCases {
             .await?;
         let access = channel.participant_access(&sender, is_team_member);
 
-        let third_party_recipients = if access.trusted {
+        // A third party joins the thread only when the sender is trusted *and* the channel
+        // permits it: the flag can narrow who gets pulled in, never widen it.
+        let pull_third_parties = access.trusted && channel.add_3rd_party;
+        let third_party_recipients = if pull_third_parties {
             self.collect_third_party_recipients(parsed, &sender, directory)
                 .await?
         } else {
@@ -633,7 +636,7 @@ impl ThreadUseCases {
                 thread,
                 parsed,
                 &third_party_recipients,
-                access.trusted,
+                pull_third_parties,
                 !outreach_by_channel.contains_key(&channel.id),
             )
             .await?;
@@ -758,10 +761,10 @@ impl ThreadUseCases {
             .chain(parsed.recipients_cc.iter())
         {
             let address = address.trim();
-            if address.is_empty() || address.eq_ignore_ascii_case(sender) {
-                continue;
-            }
-            if self.is_platform_channel_address(address, directory).await? {
+            if !self
+                .is_third_party_address(address, sender, directory)
+                .await?
+            {
                 continue;
             }
             if !third_party
@@ -772,6 +775,23 @@ impl ThreadUseCases {
             }
         }
         Ok(third_party)
+    }
+
+    /// Whether this address belongs to someone outside the platform.
+    ///
+    /// The single definition of "third party": it decides both who is pulled onto a thread at
+    /// ingest and who is dropped from an agent reply's Cc when a channel has `add_3rd_party` off.
+    pub(super) async fn is_third_party_address(
+        &self,
+        address: &str,
+        sender: &str,
+        directory: &mut DirectoryCache<'_>,
+    ) -> AppResult<bool> {
+        let address = address.trim();
+        if address.is_empty() || address.eq_ignore_ascii_case(sender) {
+            return Ok(false);
+        }
+        Ok(!self.is_platform_channel_address(address, directory).await?)
     }
 
     async fn is_platform_channel_address(

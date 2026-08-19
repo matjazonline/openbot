@@ -489,6 +489,7 @@ impl SubmittedChannel {
             channel_config: self.form.channel_config.as_deref().unwrap_or(""),
             advanced: self.form.form_mode.as_deref() != Some("simple"),
             enabled: self.form.enabled(),
+            add_3rd_party: self.form.add_3rd_party(),
         }
     }
 
@@ -510,6 +511,7 @@ impl SubmittedChannel {
             agent_ids,
             channel_config,
             enabled: self.form.enabled(),
+            add_3rd_party: self.form.add_3rd_party(),
         }
     }
 }

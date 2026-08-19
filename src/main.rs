@@ -4,7 +4,7 @@ use tracing::info;
 
 use mail_agents::{
     adapters::smtp::SmtpServer,
-    infra::{app::create_app, setup::init_app_state},
+    infra::{app::create_app, events::run_mailbox_event_listener, setup::init_app_state},
     services::task_worker::TaskWorker,
 };
 
@@ -36,6 +36,14 @@ async fn main() -> anyhow::Result<()> {
     );
 
     tokio::spawn(smtp_server.start_server_loop(shutdown_rx.resubscribe()));
+
+    // Republish committed messages to open mailboxes. It listens on the database rather than
+    // in-process because the writer is usually the task worker or the SMTP loop above.
+    tokio::spawn(run_mailbox_event_listener(
+        app_state.db.clone(),
+        app_state.events.clone(),
+        shutdown_rx.resubscribe(),
+    ));
 
     let app = create_app(app_state);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();

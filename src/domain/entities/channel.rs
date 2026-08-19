@@ -79,12 +79,21 @@ pub struct Channel {
     ///
     /// Defaulted on deserialize because `Channel` is stored inside durable `background_tasks`
     /// payloads: tasks queued before this field existed must still re-hydrate.
-    #[serde(default = "enabled_by_default")]
+    #[serde(default = "default_true")]
     pub enabled: bool,
+    /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
+    ///
+    /// Off means the channel is internal: a third party is neither added to
+    /// `Thread::participant_emails` nor copied on the agent's reply. Because thread membership is
+    /// itself an authorization grant, their later mail to the channel then bounces.
+    ///
+    /// Defaulted on deserialize for the same reason as `enabled`.
+    #[serde(default = "default_true")]
+    pub add_3rd_party: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-fn enabled_by_default() -> bool {
+fn default_true() -> bool {
     true
 }
 
@@ -212,6 +221,7 @@ mod tests {
             agent_ids: None,
             channel_config: None,
             enabled: true,
+            add_3rd_party: true,
             created_at: chrono::Utc::now(),
         }
     }

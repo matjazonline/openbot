@@ -7,7 +7,6 @@ use axum::{
     response::{Html, IntoResponse},
     routing::{get, put},
 };
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 use uuid::Uuid;
@@ -15,7 +14,7 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
-    entities::{channel::Channel, thread::Thread},
+    entities::{channel::Channel, cursor::ThreadCursor, thread::Thread},
     infra::config::AppConfig,
     services::email_parser::RawInboundPayload,
     use_cases::{
@@ -94,6 +93,7 @@ pub struct ChannelForm {
     pub channel_config: Option<String>,
     pub confirm_spam_disabled: Option<String>,
     pub enabled: Option<String>,
+    pub add_3rd_party: Option<String>,
 }
 
 impl ChannelForm {
@@ -103,6 +103,12 @@ impl ChannelForm {
     /// set, so an absent value genuinely means the user unticked it.
     pub fn enabled(&self) -> bool {
         checkbox_ticked(self.enabled.as_deref())
+    }
+
+    /// Whether the "Add CC'd outsiders to threads" box was ticked. Same absent-means-unticked
+    /// reasoning as [`ChannelForm::enabled`].
+    pub fn add_3rd_party(&self) -> bool {
+        checkbox_ticked(self.add_3rd_party.as_deref())
     }
 
     pub fn confirm_spam_disabled(&self) -> bool {
@@ -167,6 +173,8 @@ pub struct ChannelJsonPayload {
     pub confirm_spam_disabled: Option<bool>,
     /// Omitted means enabled: like every other field here, a PUT replaces rather than patches.
     pub enabled: Option<bool>,
+    /// Omitted means on, for the same reason as `enabled`.
+    pub add_3rd_party: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -177,7 +185,6 @@ pub struct ChannelResponse {
 
 const DEFAULT_THREAD_PAGE_SIZE: usize = 50;
 const MAX_THREAD_PAGE_SIZE: usize = 100;
-const THREAD_CURSOR_TIMESTAMP_FORMAT: &str = "%Y%m%dT%H%M%S%.f";
 
 /// One page of a channel's threads, newest first.
 ///
@@ -195,25 +202,10 @@ pub struct ThreadListResponse {
     pub has_more: bool,
 }
 
-fn parse_thread_cursor(cursor: &str) -> AppResult<(DateTime<Utc>, Uuid)> {
-    let (updated_at, id) = cursor
-        .rsplit_once('_')
-        .ok_or_else(|| AppError::BadRequest("Invalid thread cursor".into()))?;
-    let updated_at =
-        chrono::NaiveDateTime::parse_from_str(updated_at, THREAD_CURSOR_TIMESTAMP_FORMAT)
-            .map_err(|_| AppError::BadRequest("Invalid thread cursor".into()))?
-            .and_utc();
-    let id =
-        Uuid::parse_str(id).map_err(|_| AppError::BadRequest("Invalid thread cursor".into()))?;
-    Ok((updated_at, id))
-}
-
-fn format_thread_cursor(thread: &Thread) -> String {
-    format!(
-        "{}_{}",
-        thread.updated_at.format(THREAD_CURSOR_TIMESTAMP_FORMAT),
-        thread.id
-    )
+fn parse_thread_cursor(cursor: &str) -> AppResult<ThreadCursor> {
+    cursor
+        .parse()
+        .map_err(|_| AppError::BadRequest("Invalid thread cursor".into()))
 }
 
 pub(crate) async fn load_thread_page(
@@ -238,7 +230,7 @@ pub(crate) async fn load_thread_page(
         .await?;
     let has_more = threads.len() > limit;
     threads.truncate(limit);
-    let next_cursor = has_more.then(|| format_thread_cursor(&threads[threads.len() - 1]));
+    let next_cursor = has_more.then(|| threads[threads.len() - 1].cursor().to_string());
 
     Ok(ThreadListResponse {
         threads,
@@ -373,6 +365,7 @@ async fn create_channel_handler(
 
     let confirm_spam_disabled = form.confirm_spam_disabled();
     let enabled = form.enabled();
+    let add_3rd_party = form.add_3rd_party();
 
     let channel_config = match parse_config_form(form.channel_config) {
         Ok(c) => c,
@@ -381,6 +374,7 @@ async fn create_channel_handler(
 
     let write = ChannelWrite {
         enabled,
+        add_3rd_party,
         name: form.name,
         slug,
         alias_slugs: parse_list_form(form.alias_slugs),
@@ -605,6 +599,7 @@ async fn update_channel_handler(
 
     let confirm_spam_disabled = form.confirm_spam_disabled();
     let enabled = form.enabled();
+    let add_3rd_party = form.add_3rd_party();
     let emails = parse_emails_form(form.participant_emails);
     let agent_ids = parse_agent_ids_form(form.agent_ids);
 
@@ -624,6 +619,7 @@ async fn update_channel_handler(
         agent_ids,
         channel_config,
         enabled,
+        add_3rd_party,
     };
 
     match channel_use_cases
@@ -1223,6 +1219,7 @@ async fn create_channel_json(
         agent_ids,
         channel_config: payload.channel_config,
         enabled: payload.enabled.unwrap_or(true),
+        add_3rd_party: payload.add_3rd_party.unwrap_or(true),
     };
 
     let channel = channel_use_cases
@@ -1279,6 +1276,7 @@ async fn update_channel_json(
         agent_ids: payload.agent_ids,
         channel_config: payload.channel_config,
         enabled: payload.enabled.unwrap_or(true),
+        add_3rd_party: payload.add_3rd_party.unwrap_or(true),
     };
 
     let channel = channel_use_cases
@@ -1332,11 +1330,8 @@ mod tests {
             updated_at: Utc::now(),
         };
 
-        let cursor = format_thread_cursor(&thread);
-        assert_eq!(
-            parse_thread_cursor(&cursor).unwrap(),
-            (thread.updated_at, thread.id)
-        );
+        let cursor = thread.cursor().to_string();
+        assert_eq!(parse_thread_cursor(&cursor).unwrap(), thread.cursor());
         assert!(matches!(
             parse_thread_cursor("invalid"),
             Err(AppError::BadRequest(_))
@@ -1359,6 +1354,7 @@ mod tests {
 
         let channel = Channel {
             enabled: true,
+            add_3rd_party: true,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Auto Dispatcher".to_string(),

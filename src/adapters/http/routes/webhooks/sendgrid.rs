@@ -197,7 +197,13 @@ mod tests {
 
     use crate::{
         app_error::AppResult,
-        entities::{channel::Channel, company::Company, message::Message, thread::Thread},
+        entities::{
+            channel::Channel,
+            company::Company,
+            cursor::{MessageCursor, ThreadCursor},
+            message::Message,
+            thread::Thread,
+        },
         infra::config::AppConfig,
         use_cases::{
             channel::{ChannelPersistence, ChannelUseCases, ChannelWrite},
@@ -389,10 +395,30 @@ mod tests {
         async fn list_threads_by_channel_id(
             &self,
             _channel_id: Uuid,
-            _before: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
+            _before: Option<ThreadCursor>,
             _limit: usize,
         ) -> AppResult<Vec<Thread>> {
             unimplemented!()
+        }
+
+        async fn list_threads_updated_after(
+            &self,
+            channel_id: Uuid,
+            after: Option<ThreadCursor>,
+            limit: usize,
+        ) -> AppResult<Vec<Thread>> {
+            let mut threads: Vec<Thread> = self
+                .threads
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|t| t.channel_id == channel_id)
+                .filter(|t| after.is_none_or(|cursor| t.cursor() > cursor))
+                .cloned()
+                .collect();
+            threads.sort_by_key(|t| t.cursor());
+            threads.truncate(limit);
+            Ok(threads)
         }
 
         async fn update_thread_participants(
@@ -500,6 +526,26 @@ mod tests {
                 .filter(|m| m.thread_id == thread_id)
                 .cloned()
                 .collect())
+        }
+
+        async fn list_messages_after(
+            &self,
+            thread_id: Uuid,
+            after: Option<MessageCursor>,
+            limit: usize,
+        ) -> AppResult<Vec<Message>> {
+            let mut messages: Vec<Message> = self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m| m.thread_id == thread_id)
+                .filter(|m| after.is_none_or(|cursor| m.cursor() > cursor))
+                .cloned()
+                .collect();
+            messages.sort_by_key(|m| m.cursor());
+            messages.truncate(limit);
+            Ok(messages)
         }
     }
 
@@ -878,6 +924,7 @@ mod tests {
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
                 enabled: true,
+                add_3rd_party: true,
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Inbound Flow".to_string(),
@@ -978,6 +1025,7 @@ mod tests {
             )),
             thread_use_cases,
             approval_use_cases,
+            events: crate::infra::events::MailboxEvents::new(),
         };
 
         let app = router().with_state(app_state);

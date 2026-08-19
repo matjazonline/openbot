@@ -5,7 +5,9 @@ use crate::{
         protocols::{EgressRegistry, email::EmailEgressAdapter},
     },
     domain::monitoring::MonitoringService,
-    infra::{argon2_password_hasher, config::AppConfig, postgres_persistence},
+    infra::{
+        argon2_password_hasher, config::AppConfig, events::MailboxEvents, postgres_persistence,
+    },
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
         company::CompanyUseCases, company_invite::CompanyInviteUseCases, thread::ThreadUseCases,
@@ -73,6 +75,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         agent_use_cases: Arc::new(agent_use_cases),
         thread_use_cases,
         approval_use_cases,
+        events: MailboxEvents::new(),
     })
 }
 

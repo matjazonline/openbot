@@ -8,6 +8,8 @@ axum = { version = "0.8", features = ["multipart"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+async-stream = "0.3"
 sqlx = { version = "0.8", features = ["postgres", "runtime-tokio-rustls", "macros", "uuid", "chrono", "json"] }
 dotenvy = "0.15"
 tower = "0.5"

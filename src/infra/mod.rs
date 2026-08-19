@@ -6,6 +6,7 @@ use crate::{
 pub mod app;
 pub mod config;
 pub mod db;
+pub mod events;
 pub mod setup;
 
 pub async fn postgres_persistence() -> anyhow::Result<PostgresPersistence> {

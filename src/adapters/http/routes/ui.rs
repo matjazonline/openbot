@@ -5,25 +5,42 @@
 //! are swapped independently over htmx. Thread paging reuses the cursor helpers in
 //! [`super::channel`] so both thread lists page identically.
 
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    convert::Infallible,
+    str::FromStr,
+    sync::Arc,
+};
 
 use axum::{
     Form, Router,
     extract::{Query, State},
-    response::{Html, IntoResponse, Response},
+    http::HeaderMap,
+    response::{
+        Html, IntoResponse, Response,
+        sse::{Event, KeepAlive, Sse},
+    },
     routing::get,
 };
 use serde::Deserialize;
-use tracing::instrument;
+use tokio_stream::{
+    Stream, StreamExt,
+    wrappers::{BroadcastStream, errors::BroadcastStreamRecvError},
+};
+use tracing::{debug, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
     entities::{
-        channel::Channel, company::Company, thread::Thread, user::User, value_objects::EmailAddress,
+        channel::Channel, company::Company, task::ThreadActivity, thread::Thread, user::User,
+        value_objects::EmailAddress,
     },
-    infra::config::AppConfig,
+    infra::{
+        config::AppConfig,
+        events::{MailboxEvent, MailboxEvents},
+    },
     services::email_parser::RawInboundPayload,
     use_cases::{
         channel::ChannelUseCases,
@@ -41,6 +58,8 @@ pub fn router() -> Router<AppState> {
         .route("/ui/threads", get(thread_column_fragment))
         .route("/ui/threads/list", get(thread_page_fragment))
         .route("/ui/messages", get(message_pane_fragment))
+        .route("/ui/events", get(thread_message_stream))
+        .route("/ui/threads/events", get(thread_column_stream))
         .route("/ui/compose", get(compose_form).post(create_thread))
         .route("/ui/reply", get(reply_form).post(send_reply))
 }
@@ -72,6 +91,23 @@ pub struct ThreadQuery {
     pub company_id: Uuid,
     pub channel_id: Uuid,
     pub thread_id: Uuid,
+}
+
+/// A channel whose thread column to stream, plus the newest thread the column was rendered with.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChannelStreamQuery {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub after: Option<String>,
+}
+
+/// A thread to stream, plus the newest message the page was rendered with.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ThreadStreamQuery {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub thread_id: Uuid,
+    pub after: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -161,6 +197,30 @@ fn empty_thread_page() -> ThreadListResponse {
     }
 }
 
+/// What each thread in a rendered page is doing, in one batched lookup.
+///
+/// Every column render goes through this rather than asking per row: a page is up to 50 threads,
+/// and a query each would be 50 round trips for a badge most of them do not have.
+async fn page_activity(
+    thread_use_cases: &ThreadUseCases,
+    threads: &[Thread],
+) -> AppResult<HashMap<Uuid, ThreadActivity>> {
+    let ids: Vec<Uuid> = threads.iter().map(|thread| thread.id).collect();
+    thread_use_cases.thread_activity(&ids).await
+}
+
+/// What one thread is doing, for the strip under its messages.
+async fn thread_activity(
+    thread_use_cases: &ThreadUseCases,
+    thread_id: Uuid,
+) -> AppResult<Option<ThreadActivity>> {
+    Ok(thread_use_cases
+        .thread_activity(&[thread_id])
+        .await?
+        .get(&thread_id)
+        .copied())
+}
+
 async fn render_message_pane(
     thread_use_cases: &ThreadUseCases,
     company_id: Uuid,
@@ -173,6 +233,7 @@ async fn render_message_pane(
         channel,
         thread,
         messages: &messages,
+        activity: thread_activity(thread_use_cases, thread.id).await?,
     }))
 }
 
@@ -252,6 +313,7 @@ async fn mailbox_page(
         threads: &thread_page.threads,
         next_cursor: thread_page.next_cursor.as_deref(),
         selected_thread_id: selected_thread.as_ref().map(|thread| thread.id),
+        activity: &page_activity(&thread_use_cases, &thread_page.threads).await?,
         detail_html: &detail_html,
     })))
 }
@@ -271,12 +333,14 @@ async fn thread_column_fragment(
 
     let page = load_thread_page(&thread_use_cases, channel.id, &ThreadListQuery::default()).await?;
 
+    let activity = page_activity(&thread_use_cases, &page.threads).await?;
     let column = pages::thread_column(&pages::ThreadColumn {
         company_id: query.company_id,
         channel: &channel,
         threads: &page.threads,
         next_cursor: page.next_cursor.as_deref(),
         selected_thread_id: None,
+        activity: &activity,
     });
     let detail = pages::empty_detail_pane(
         "Select a thread, or use Compose to start a new one.",
@@ -314,6 +378,7 @@ async fn thread_page_fragment(
     )
     .await?;
 
+    let activity = page_activity(&thread_use_cases, &page.threads).await?;
     Ok(Html(pages::thread_list_fragment(
         &pages::ThreadColumn {
             company_id: query.company_id,
@@ -321,6 +386,7 @@ async fn thread_page_fragment(
             threads: &page.threads,
             next_cursor: page.next_cursor.as_deref(),
             selected_thread_id: None,
+            activity: &activity,
         },
         pages::FragmentSwap::OutOfBand,
     )))
@@ -345,6 +411,301 @@ async fn message_pane_fragment(
     Ok(Html(
         render_message_pane(&thread_use_cases, query.company_id, &channel, &thread).await?,
     ))
+}
+
+/// How far ahead of a reader one wake-up may catch them up. A reader further behind than this
+/// gets the rest on the next event, rather than one query loading an unbounded backlog.
+const STREAM_BATCH_LIMIT: usize = 50;
+
+/// Where a live stream resumes from, in order of authority.
+///
+/// `Last-Event-ID` is the browser's own record of the last bubble it rendered, replayed
+/// automatically when a dropped connection is re-established — so it beats anything the page was
+/// rendered with. The `after` parameter is that page render's own high-water mark, which covers a
+/// message landing between the render and the browser connecting. With neither, the thread streams
+/// from its start, which is right for a thread that rendered empty.
+fn resume_cursor<C: FromStr>(headers: &HeaderMap, after: Option<&str>) -> Option<C> {
+    headers
+        .get("last-event-id")
+        .and_then(|value| value.to_str().ok())
+        .or(after)
+        .and_then(|raw| raw.parse().ok())
+}
+
+/// Why a stream woke up.
+enum Wake {
+    /// A specific event this reader cares about.
+    Event(MailboxEvent),
+    /// Events were dropped because this reader fell behind. *What* was missed is unknown, so the
+    /// reader has to refresh everything it tracks rather than guess.
+    Lagged,
+}
+
+/// Wake-ups for one reader, filtered to the events they care about.
+///
+/// Nothing downstream trusts the event as data: a message wake-up sends the reader back to its
+/// cursor query and an activity wake-up sends it back to the database for current state. That is
+/// why lag is survivable and is turned into a [`Wake::Lagged`] rather than an error. Filtering
+/// happens after the caller's authorization check, so no id from another company is observable.
+///
+/// The `use<Matches>` bound is load-bearing: without it Rust 2024 has the returned stream capture
+/// the `&MailboxEvents` borrow, and an SSE response has to be `'static`. Only the subscription —
+/// which `subscribe` hands back owned — actually outlives this call.
+fn wake_ups<Matches>(
+    events: &MailboxEvents,
+    label: &'static str,
+    matches: Matches,
+) -> impl Stream<Item = Wake> + Send + use<Matches>
+where
+    Matches: Fn(&MailboxEvent) -> bool + Send + 'static,
+{
+    BroadcastStream::new(events.subscribe()).filter_map(move |event| match event {
+        Ok(event) => matches(&event).then_some(Wake::Event(event)),
+        Err(BroadcastStreamRecvError::Lagged(missed)) => {
+            debug!(missed, stream = label, "Live stream lagged, catching up");
+            Some(Wake::Lagged)
+        }
+    })
+}
+
+/// GET /ui/events - The open thread's messages as they are persisted (Protected).
+///
+/// Each event is one rendered chat bubble, appended to `#message-scroll` by htmx's SSE extension.
+/// The `id:` on every event is that message's cursor, which is what makes reconnects resume
+/// exactly where the reader left off.
+#[instrument(skip(channel_use_cases, thread_use_cases, events, user, headers))]
+async fn thread_message_stream(
+    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(events): State<MailboxEvents>,
+    user: AuthenticatedUser,
+    headers: HeaderMap,
+    Query(query): Query<ThreadStreamQuery>,
+) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
+    // Authorize once, here: the stream that follows filters on ids alone, so nothing past this
+    // point re-checks ownership.
+    let channel = channel_use_cases
+        .get_company_channel(user.id, query.company_id, query.channel_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+    let thread = load_channel_thread(&thread_use_cases, channel.id, query.thread_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+
+    let mut cursor = resume_cursor(&headers, query.after.as_deref());
+    let thread_id = thread.id;
+    let mut wake_ups = Box::pin(wake_ups(&events, "messages", move |event| {
+        event.is_message_in_thread(thread_id) || event.is_activity_in_thread(thread_id)
+    }));
+
+    let stream = async_stream::stream! {
+        // Both start true so a connect emits the reader's backlog and the current activity, rather
+        // than leaving a freshly opened thread blank until something happens to change.
+        let mut pending_messages = true;
+        let mut pending_activity = true;
+
+        loop {
+            if pending_activity {
+                pending_activity = false;
+                match thread_activity(&thread_use_cases, thread_id).await {
+                    // Activity is state, not an append: it carries no cursor and is re-read whole
+                    // every time, which is also what makes it correct after a reconnect. An idle
+                    // thread renders as an empty strip, clearing whatever was there.
+                    Ok(activity) => {
+                        yield Ok(Event::default()
+                            .event("activity")
+                            .data(pages::thread_activity_strip(activity)));
+                    }
+                    Err(error) => {
+                        warn!(%error, %thread_id, "Thread activity query failed");
+                        return;
+                    }
+                }
+            }
+
+            if pending_messages {
+                match thread_use_cases
+                    .get_thread_messages_after(thread_id, cursor, STREAM_BATCH_LIMIT)
+                    .await
+                {
+                    Ok(messages) => {
+                        for message in &messages {
+                            cursor = Some(message.cursor());
+                            yield Ok(Event::default()
+                                .id(message.cursor().to_string())
+                                .event("message")
+                                .data(pages::message_bubble_chat(message)));
+                        }
+                        // A full batch means the reader is still behind; keep going rather than
+                        // waiting for an event that may never come.
+                        pending_messages = messages.len() == STREAM_BATCH_LIMIT;
+                        if pending_messages {
+                            continue;
+                        }
+                    }
+                    // Ending the stream makes the browser reconnect with `Last-Event-ID`, which
+                    // resumes from the same cursor -- the right response to a transient failure.
+                    Err(error) => {
+                        warn!(%error, %thread_id, "Message stream query failed");
+                        return;
+                    }
+                }
+            }
+
+            match wake_ups.next().await {
+                Some(Wake::Event(MailboxEvent::MessageCommitted(_))) => pending_messages = true,
+                Some(Wake::Event(MailboxEvent::ActivityChanged(_))) => pending_activity = true,
+                // Something was missed and there is no telling what, so redo both.
+                Some(Wake::Lagged) => {
+                    pending_messages = true;
+                    pending_activity = true;
+                }
+                None => return,
+            }
+        }
+    };
+
+    // Without the heartbeat an idle stream looks dead to the proxy in front of the app and is
+    // dropped after a minute or two.
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+}
+
+/// GET /ui/threads/events - The channel's thread column as threads are touched (Protected).
+///
+/// Each event is one rendered thread card, inserted at the top of `#thread-list`. A thread that
+/// receives a message is bumped to the top of the column, so "insert at top, drop the stale copy"
+/// is the whole reordering — and it leaves any older pages the reader loaded on demand in place,
+/// which re-rendering the first page would not.
+#[instrument(skip(channel_use_cases, thread_use_cases, events, user, headers))]
+async fn thread_column_stream(
+    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(events): State<MailboxEvents>,
+    user: AuthenticatedUser,
+    headers: HeaderMap,
+    Query(query): Query<ChannelStreamQuery>,
+) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
+    // Authorize once, here: the stream that follows filters on ids alone.
+    let channel = channel_use_cases
+        .get_company_channel(user.id, query.company_id, query.channel_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+
+    let company_id = query.company_id;
+    let mut cursor = resume_cursor(&headers, query.after.as_deref());
+    let channel_id = channel.id;
+    let mut wake_ups = Box::pin(wake_ups(&events, "threads", move |event| {
+        event.is_message_in_channel(channel_id) || event.is_activity_in_channel(channel_id)
+    }));
+
+    let stream = async_stream::stream! {
+        let mut pending_rows = true;
+        // Threads whose badge is out of date. Kept as a set of ids rather than a flag because a
+        // status change must redraw *only* that badge: re-sending the row would insert it at the
+        // top of the column and move a thread for no reason a reader could see.
+        let mut stale_badges: HashSet<Uuid> = HashSet::new();
+
+        loop {
+            if !stale_badges.is_empty() {
+                let ids: Vec<Uuid> = stale_badges.drain().collect();
+                match thread_use_cases.thread_activity(&ids).await {
+                    Ok(activity) => {
+                        for id in ids {
+                            // A thread absent from the map has gone idle, and an empty payload is
+                            // what clears its badge.
+                            yield Ok(Event::default()
+                                .event(pages::thread_activity_event(id))
+                                .data(pages::thread_activity_mark(activity.get(&id).copied())));
+                        }
+                    }
+                    Err(error) => {
+                        warn!(%error, %channel_id, "Thread activity query failed");
+                        return;
+                    }
+                }
+            }
+
+            if pending_rows {
+                match thread_use_cases
+                    .get_channel_threads_after(channel_id, cursor, STREAM_BATCH_LIMIT)
+                    .await
+                {
+                    Ok(threads) => {
+                        // A streamed row must arrive with its badge already on it, or a thread
+                        // bumped mid-run would blink back to "idle" until its next status change.
+                        let ids: Vec<Uuid> = threads.iter().map(|thread| thread.id).collect();
+                        let activity = match thread_use_cases.thread_activity(&ids).await {
+                            Ok(activity) => activity,
+                            Err(error) => {
+                                warn!(%error, %channel_id, "Thread activity query failed");
+                                return;
+                            }
+                        };
+                        // Who spoke last, so the client can mark an agent's reply and stay quiet
+                        // about a person's message. Only streamed rows need it.
+                        let last_roles = match thread_use_cases.thread_last_roles(&ids).await {
+                            Ok(roles) => roles,
+                            Err(error) => {
+                                warn!(%error, %channel_id, "Thread last-role query failed");
+                                return;
+                            }
+                        };
+
+                        // Oldest first, so the newest is inserted last and ends up on top.
+                        for thread in &threads {
+                            cursor = Some(thread.cursor());
+                            yield Ok(Event::default()
+                                .id(thread.cursor().to_string())
+                                .event("thread")
+                                // Selection is a per-browser fact the server cannot know, so the
+                                // row streams unselected and the client re-applies the highlight.
+                                .data(pages::thread_row_fragment(
+                                    company_id,
+                                    &channel,
+                                    thread,
+                                    false,
+                                    activity.get(&thread.id).copied(),
+                                    last_roles.get(&thread.id).copied(),
+                                )));
+                        }
+                        pending_rows = threads.len() == STREAM_BATCH_LIMIT;
+                        if pending_rows {
+                            continue;
+                        }
+                    }
+                    Err(error) => {
+                        warn!(%error, %channel_id, "Thread column stream query failed");
+                        return;
+                    }
+                }
+            }
+
+            match wake_ups.next().await {
+                Some(Wake::Event(MailboxEvent::MessageCommitted(_))) => pending_rows = true,
+                Some(Wake::Event(MailboxEvent::ActivityChanged(scope))) => {
+                    stale_badges.insert(scope.thread_id);
+                }
+                // What was missed is unknown, so redraw the rows and every badge the column is
+                // likely to be showing rather than leave a stale spinner behind.
+                Some(Wake::Lagged) => {
+                    pending_rows = true;
+                    match thread_use_cases
+                        .list_channel_threads(channel_id, None, STREAM_BATCH_LIMIT)
+                        .await
+                    {
+                        Ok(threads) => stale_badges.extend(threads.iter().map(|t| t.id)),
+                        Err(error) => {
+                            warn!(%error, %channel_id, "Thread column catch-up query failed");
+                            return;
+                        }
+                    }
+                }
+                None => return,
+            }
+        }
+    };
+
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }
 
 /// GET /ui/compose - The new-thread form for the selected channel (Protected).
@@ -604,12 +965,14 @@ async fn sent_message_response(
 ) -> AppResult<Response> {
     let pane = render_message_pane(thread_use_cases, company_id, channel, thread).await?;
     let page = load_thread_page(thread_use_cases, channel.id, &ThreadListQuery::default()).await?;
+    let activity = page_activity(thread_use_cases, &page.threads).await?;
     let refreshed_list = pages::thread_list_oob(&pages::ThreadColumn {
         company_id,
         channel,
         threads: &page.threads,
         next_cursor: page.next_cursor.as_deref(),
         selected_thread_id: Some(thread.id),
+        activity: &activity,
     });
 
     Ok((

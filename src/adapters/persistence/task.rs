@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use sqlx::{Postgres, QueryBuilder};
+use std::collections::HashMap;
 use std::str::FromStr;
 use uuid::Uuid;
 
@@ -14,7 +15,7 @@ use crate::{
             CreateOutreachRequest, DueOutreach, OutreachProgress, OutreachReplyMatch,
             OutreachStatus,
         },
-        task::{BackgroundTask, TaskStatus},
+        task::{BackgroundTask, TaskStatus, ThreadActivity},
         value_objects::MessageId,
     },
 };
@@ -139,6 +140,27 @@ const OUTBOX_COLUMNS: &str = r#"id, company_id, channel_id, task_id, status, ide
               retry_count, last_error, provider_message_id, available_at, sent_at,
               created_at, updated_at"#;
 
+/// The most delivery attempts one outbox row gets before it is dead-lettered.
+const OUTBOX_MAX_ATTEMPTS: i32 = 5;
+
+/// The `SET` clause that ends one delivery attempt: count it, back off, and dead-letter once the
+/// attempts run out. `error_sql` is however that statement names the error — a bind parameter or a
+/// literal.
+///
+/// Shared so an attempt that failed outright and one that stranded its lease age at the same rate.
+/// A row that only ever expires must still reach `failed`; while expiry was uncounted, the poller
+/// redelivered such a row every lease period forever.
+fn outbox_attempt_failed_set(error_sql: &str) -> String {
+    format!(
+        r#"SET status = CASE WHEN retry_count + 1 >= {OUTBOX_MAX_ATTEMPTS} THEN 'failed' ELSE 'pending' END,
+                   retry_count = retry_count + 1, last_error = {error_sql},
+                   available_at = CURRENT_TIMESTAMP
+                       + make_interval(secs => power(2, LEAST(retry_count + 1, 8))::double precision),
+                   worker_id = NULL, locked_at = NULL, lock_expires_at = NULL,
+                   updated_at = CURRENT_TIMESTAMP"#
+    )
+}
+
 /// One email handed to the transport for delivery.
 ///
 /// A struct rather than four positional parameters, two of which are `Uuid`.
@@ -159,6 +181,18 @@ pub struct OutboundSend {
 
 #[async_trait]
 pub trait TaskPersistence: Send + Sync {
+    /// What each of these threads is currently doing, for the mailbox's activity indicators.
+    ///
+    /// Batched deliberately: the thread column renders up to a full page of rows at once, and one
+    /// query per row would be a page-load's worth of round trips. Threads with nothing in flight
+    /// are simply absent from the map.
+    async fn list_thread_activity(
+        &self,
+        _thread_ids: &[Uuid],
+    ) -> AppResult<HashMap<Uuid, ThreadActivity>> {
+        Ok(HashMap::new())
+    }
+
     async fn create_outreach_and_pause(
         &self,
         _request: CreateOutreachRequest,
@@ -238,6 +272,28 @@ pub trait TaskPersistence: Send + Sync {
         _error: &str,
     ) -> AppResult<bool> {
         Ok(true)
+    }
+
+    /// Dead-letter one claimed delivery outright, without spending its remaining attempts.
+    ///
+    /// For a failure that cannot come out differently next time — a payload that will not
+    /// deserialize, say. Retrying those only delays the same verdict by five backoffs.
+    async fn mark_outbox_email_dead(
+        &self,
+        _id: Uuid,
+        _worker_id: Uuid,
+        _error: &str,
+    ) -> AppResult<bool> {
+        Ok(true)
+    }
+
+    /// End every delivery whose lease has run out, counting each as a spent attempt.
+    ///
+    /// A claimed row whose worker died — or whose status write never landed — is otherwise stuck
+    /// in `sending` with its attempt count untouched, so it is redelivered every lease period and
+    /// never reaches the dead-letter cap. Returns how many rows were reaped.
+    async fn reap_expired_outbox_leases(&self) -> AppResult<u64> {
+        Ok(0)
     }
 
     /// Every delivery this task handed to the transport, oldest first.
@@ -397,8 +453,61 @@ pub trait TaskPersistence: Send + Sync {
     }
 }
 
+/// One row of the per-thread activity lookup.
+#[derive(sqlx::FromRow)]
+struct ThreadActivityDb {
+    thread_id: Uuid,
+    status: String,
+    lock_expires_at: Option<DateTime<Utc>>,
+}
+
 #[async_trait]
 impl TaskPersistence for PostgresPersistence {
+    async fn list_thread_activity(
+        &self,
+        thread_ids: &[Uuid],
+    ) -> AppResult<HashMap<Uuid, ThreadActivity>> {
+        if thread_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        // `DISTINCT ON` keeps only each thread's most recently touched unfinished task, so a
+        // thread that has been through several runs reports the current one rather than a stale
+        // dead letter. Terminal statuses are excluded here rather than mapped to `None` later, to
+        // keep the index scan on `background_tasks_thread_idx` narrow.
+        let rows = sqlx::query_as::<_, ThreadActivityDb>(
+            r#"SELECT DISTINCT ON (thread_id) thread_id, status, lock_expires_at
+               FROM background_tasks
+               WHERE thread_id = ANY($1)
+                 AND status IN ('pending', 'processing', 'pending_approval',
+                                'waiting_for_third_party_reply', 'dead_letter')
+               ORDER BY thread_id, updated_at DESC, id DESC"#,
+        )
+        .bind(thread_ids)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        let now = Utc::now();
+        rows.into_iter()
+            .map(|row| {
+                let status = TaskStatus::from_str(&row.status)
+                    .map_err(|error| AppError::Internal(error.to_string()))?;
+                Ok((
+                    row.thread_id,
+                    ThreadActivity::from_task(status, row.lock_expires_at, now),
+                ))
+            })
+            // A status the filter admitted always maps to some activity, but flattening here means
+            // a future status added to the query cannot show up as a badge nobody chose.
+            .filter_map(|entry: AppResult<_>| match entry {
+                Ok((thread_id, Some(activity))) => Some(Ok((thread_id, activity))),
+                Ok((_, None)) => None,
+                Err(error) => Some(Err(error)),
+            })
+            .collect()
+    }
+
     async fn create_outreach_and_pause(
         &self,
         request: CreateOutreachRequest,
@@ -842,11 +951,12 @@ impl TaskPersistence for PostgresPersistence {
         lock_expires_at: DateTime<Utc>,
         limit: i64,
     ) -> AppResult<Vec<OutboxEmail>> {
+        // Only `pending` rows: an expired `sending` lease is reaped into `pending` first, by
+        // `reap_expired_outbox_leases`, so that redelivery is a counted attempt.
         sqlx::query_as::<_, OutboxEmail>(
             r#"WITH claimable AS (
                    SELECT id FROM email_outbox
-                   WHERE (status = 'pending' AND available_at <= CURRENT_TIMESTAMP)
-                      OR (status = 'sending' AND lock_expires_at <= CURRENT_TIMESTAMP)
+                   WHERE status = 'pending' AND available_at <= CURRENT_TIMESTAMP
                    ORDER BY available_at, id
                    FOR UPDATE SKIP LOCKED
                    LIMIT $1
@@ -930,12 +1040,29 @@ impl TaskPersistence for PostgresPersistence {
         worker_id: Uuid,
         error: &str,
     ) -> AppResult<bool> {
+        let result = sqlx::query(&format!(
+            "UPDATE email_outbox {}
+             WHERE id = $1 AND status = 'sending' AND worker_id = $2",
+            outbox_attempt_failed_set("$3")
+        ))
+        .bind(id)
+        .bind(worker_id)
+        .bind(error)
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    async fn mark_outbox_email_dead(
+        &self,
+        id: Uuid,
+        worker_id: Uuid,
+        error: &str,
+    ) -> AppResult<bool> {
         let result = sqlx::query(
             r#"UPDATE email_outbox
-               SET status = CASE WHEN retry_count + 1 >= 5 THEN 'failed' ELSE 'pending' END,
-                   retry_count = retry_count + 1, last_error = $3,
-                   available_at = CURRENT_TIMESTAMP
-                       + make_interval(secs => power(2, LEAST(retry_count + 1, 8))::double precision),
+               SET status = 'failed', retry_count = retry_count + 1, last_error = $3,
                    worker_id = NULL, locked_at = NULL, lock_expires_at = NULL,
                    updated_at = CURRENT_TIMESTAMP
                WHERE id = $1 AND status = 'sending' AND worker_id = $2"#,
@@ -947,6 +1074,20 @@ impl TaskPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
         Ok(result.rows_affected() == 1)
+    }
+
+    async fn reap_expired_outbox_leases(&self) -> AppResult<u64> {
+        // Hits `email_outbox_sending_lease_idx`. No worker guard: the lease is expired, so by
+        // definition no worker still holds a claim on the row.
+        let result = sqlx::query(&format!(
+            "UPDATE email_outbox {}
+             WHERE status = 'sending' AND lock_expires_at <= CURRENT_TIMESTAMP",
+            outbox_attempt_failed_set("'Delivery lease expired without a result'")
+        ))
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(result.rows_affected())
     }
 
     async fn get_outreach_thread_for_outbox(&self, outbox_id: Uuid) -> AppResult<Option<Uuid>> {
@@ -1600,6 +1741,156 @@ mod tests {
         assert_eq!(required_response_count(10, 20.0), 2);
     }
 
+    /// The mailbox asks for a whole page of threads at once, and each thread must report the state
+    /// of its *current* run rather than whichever task happens to be found first.
+    #[tokio::test]
+    async fn thread_activity_reports_the_latest_task_per_thread() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            return;
+        };
+        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("activity_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            "Activity Test",
+            &format!("activity-test-{suffix}"),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Activity".into(),
+                slug: "activity".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let email_addr = crate::entities::value_objects::EmailAddress::from(email.clone());
+
+        let mut threads = Vec::new();
+        for subject in ["running", "blocked", "finished", "superseded"] {
+            threads.push(
+                persistence
+                    .create_thread(channel.id, subject, std::slice::from_ref(&email_addr))
+                    .await
+                    .unwrap(),
+            );
+        }
+
+        let enqueue = async |thread_id: Uuid| {
+            persistence
+                .enqueue_task(
+                    company.id,
+                    channel.id,
+                    Some(thread_id),
+                    "email_agent_dispatch",
+                    serde_json::json!({}),
+                )
+                .await
+                .unwrap()
+        };
+
+        let running = enqueue(threads[0].id).await;
+        let blocked = enqueue(threads[1].id).await;
+        let finished = enqueue(threads[2].id).await;
+        let old = enqueue(threads[3].id).await;
+        let current = enqueue(threads[3].id).await;
+
+        // `background_tasks_lease_check` requires the three lease columns to be all set or all
+        // null, so they move together here exactly as the worker moves them.
+        let set_status = async |id: Uuid, status: &str, lease: Option<DateTime<Utc>>| {
+            sqlx::query(
+                "UPDATE background_tasks
+                 SET status = $2,
+                     lock_expires_at = $3,
+                     worker_id = CASE WHEN $3::timestamptz IS NULL THEN NULL ELSE gen_random_uuid() END,
+                     -- Derived from the lease, not from now: the check also demands
+                     -- lock_expires_at > locked_at, and an expired lease is set in the past.
+                     locked_at = $3::timestamptz - interval '10 minutes',
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $1",
+            )
+            .bind(id)
+            .bind(status)
+            .bind(lease)
+            .execute(&pool)
+            .await
+            .unwrap();
+        };
+
+        let live_lease = Utc::now() + chrono::Duration::minutes(5);
+        set_status(running.id, "processing", Some(live_lease)).await;
+        set_status(blocked.id, "pending_approval", None).await;
+        set_status(finished.id, "completed", None).await;
+        // Older task on the same thread ended badly; the newer one is what the reader should see.
+        set_status(old.id, "dead_letter", None).await;
+        set_status(current.id, "processing", Some(live_lease)).await;
+
+        let ids: Vec<Uuid> = threads.iter().map(|thread| thread.id).collect();
+        let activity = persistence.list_thread_activity(&ids).await.unwrap();
+
+        assert_eq!(activity.get(&threads[0].id), Some(&ThreadActivity::Working));
+        assert_eq!(
+            activity.get(&threads[1].id),
+            Some(&ThreadActivity::WaitingApproval)
+        );
+        assert_eq!(
+            activity.get(&threads[2].id),
+            None,
+            "a finished thread reports nothing at all, rather than an idle badge"
+        );
+        assert_eq!(
+            activity.get(&threads[3].id),
+            Some(&ThreadActivity::Working),
+            "the newest task wins over an older dead letter on the same thread"
+        );
+
+        // An abandoned worker leaves `processing` behind; that is queued work, not a live agent.
+        set_status(
+            running.id,
+            "processing",
+            Some(Utc::now() - chrono::Duration::minutes(5)),
+        )
+        .await;
+        let activity = persistence.list_thread_activity(&ids).await.unwrap();
+        assert_eq!(activity.get(&threads[0].id), Some(&ThreadActivity::Queued));
+
+        assert!(
+            persistence
+                .list_thread_activity(&[])
+                .await
+                .unwrap()
+                .is_empty(),
+            "an empty page must not hit the database"
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
     #[tokio::test]
     async fn concurrent_workers_claim_a_task_once() {
         let Ok(database_url) = std::env::var("DATABASE_URL") else {
@@ -1878,6 +2169,232 @@ mod tests {
                 .iter()
                 .any(|entry| entry.subject() == Some("Support") && entry.channel_id.is_none()),
             "a deleted channel must null the column, not cascade the send record away"
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_expired_delivery_lease_costs_an_attempt_and_reaches_the_cap() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            return;
+        };
+        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+            return;
+        };
+        sqlx::migrate!().run(&pool).await.unwrap();
+
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("reap_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            "Reap Test",
+            &format!("reap-test-{suffix}"),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Reap".into(),
+                slug: "reap".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let outbox_id = persistence
+            .enqueue_outbound_send(OutboundSend {
+                company_id: company.id,
+                channel_id: channel.id,
+                task_id: None,
+                idempotency_key: format!("reap:{suffix}"),
+                payload: serde_json::json!({}),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        let state = async |id: Uuid| -> (String, i32, bool) {
+            sqlx::query_as::<_, (String, i32, bool)>(
+                "SELECT status, retry_count, available_at > CURRENT_TIMESTAMP
+                 FROM email_outbox WHERE id = $1",
+            )
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        };
+        let worker_id = Uuid::new_v4();
+        let claimed_ours = async |limit: i64| -> bool {
+            persistence
+                .claim_outbox_emails(worker_id, Utc::now() + chrono::Duration::minutes(15), limit)
+                .await
+                .unwrap()
+                .iter()
+                .any(|email| email.id == outbox_id)
+        };
+
+        assert!(
+            claimed_ours(50).await,
+            "a pending row is the poller's to take"
+        );
+
+        // A lease that is still running belongs to the worker holding it.
+        persistence.reap_expired_outbox_leases().await.unwrap();
+        assert_eq!(state(outbox_id).await.0, "sending");
+
+        // Now the worker dies mid-delivery: the lease lapses with no result ever written. Before
+        // expiry was counted, this row came back every lease period at retry_count 0, forever.
+        // Two attempts are already spent so the backoff is long enough to observe.
+        sqlx::query(
+            "UPDATE email_outbox SET retry_count = 2, lock_expires_at = CURRENT_TIMESTAMP
+             - interval '1 minute' WHERE id = $1",
+        )
+        .bind(outbox_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(persistence.reap_expired_outbox_leases().await.unwrap() >= 1);
+        assert_eq!(
+            state(outbox_id).await,
+            ("pending".to_string(), 3, true),
+            "a lapsed lease spends an attempt and backs the row off"
+        );
+        assert!(
+            !claimed_ours(50).await,
+            "the backoff must hold the row back, or the reaper is just a slower redelivery loop"
+        );
+
+        // One attempt short of the cap: the next lapse is terminal, without any worker having
+        // managed to write a failure.
+        sqlx::query(
+            "UPDATE email_outbox SET status = 'sending', retry_count = 4,
+                 lock_expires_at = CURRENT_TIMESTAMP - interval '1 minute' WHERE id = $1",
+        )
+        .bind(outbox_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        persistence.reap_expired_outbox_leases().await.unwrap();
+        assert_eq!(state(outbox_id).await.0, "failed");
+        assert!(!claimed_ours(50).await);
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_undeliverable_payload_is_dead_lettered_on_the_first_attempt() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            return;
+        };
+        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+            return;
+        };
+        sqlx::migrate!().run(&pool).await.unwrap();
+
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("dead_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            "Dead Letter Test",
+            &format!("dead-letter-{suffix}"),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Dead".into(),
+                slug: "dead".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let outbox_id = persistence
+            .enqueue_outbound_send(OutboundSend {
+                company_id: company.id,
+                channel_id: channel.id,
+                task_id: None,
+                idempotency_key: format!("dead:{suffix}"),
+                payload: serde_json::json!({ "not": "an OutboundEmail" }),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        let worker_id = Uuid::new_v4();
+        persistence
+            .claim_outbox_emails(worker_id, Utc::now() + chrono::Duration::minutes(15), 50)
+            .await
+            .unwrap();
+
+        // Only the worker holding the lease may dead-letter the row.
+        assert!(
+            !persistence
+                .mark_outbox_email_dead(outbox_id, Uuid::new_v4(), "wrong worker")
+                .await
+                .unwrap()
+        );
+        assert!(
+            persistence
+                .mark_outbox_email_dead(outbox_id, worker_id, "payload will never deserialize")
+                .await
+                .unwrap()
+        );
+
+        let entry = persistence
+            .get_outbox_entry(outbox_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(entry.status, OutboxStatus::Failed);
+        assert_eq!(
+            entry.last_error.as_deref(),
+            Some("payload will never deserialize")
         );
 
         CompanyPersistence::delete(&persistence, company.id)

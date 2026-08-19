@@ -29,6 +29,7 @@ pub struct ChannelDb {
     pub agent_ids: Option<Vec<Uuid>>,
     pub channel_config: Option<serde_json::Value>,
     pub enabled: bool,
+    pub add_3rd_party: bool,
     pub created_at: DateTime<Utc>,
 }
 
@@ -49,6 +50,7 @@ impl From<ChannelDb> for Channel {
             agent_ids: db.agent_ids,
             channel_config: db.channel_config,
             enabled: db.enabled,
+            add_3rd_party: db.add_3rd_party,
             created_at: db.created_at,
         }
     }
@@ -77,7 +79,7 @@ const CHANNEL_SELECT: &str = r#"
            END AS participant_emails,
            (SELECT array_agg(ca.agent_id ORDER BY ca.position)
             FROM channel_agents ca WHERE ca.channel_id = ch.id) AS agent_ids,
-           ch.channel_config, ch.enabled, ch.created_at
+           ch.channel_config, ch.enabled, ch.add_3rd_party, ch.created_at
     FROM channels ch
 "#;
 
@@ -173,8 +175,8 @@ impl ChannelPersistence for PostgresPersistence {
         sqlx::query(
             r#"INSERT INTO channels (
                     id, company_id, name, access_mode, api_key, provider, model,
-                    channel_config, enabled
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"#,
+                    channel_config, enabled, add_3rd_party
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
         )
         .bind(uuid)
         .bind(company_id)
@@ -185,6 +187,7 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(write.model)
         .bind(write.channel_config)
         .bind(write.enabled)
+        .bind(write.add_3rd_party)
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -263,8 +266,9 @@ impl ChannelPersistence for PostgresPersistence {
         let result = sqlx::query(
             r#"UPDATE channels
                SET name = $1, access_mode = $2, api_key = $3,
-                   provider = $4, model = $5, channel_config = $6, enabled = $7
-               WHERE id = $8"#,
+                   provider = $4, model = $5, channel_config = $6, enabled = $7,
+                   add_3rd_party = $8
+               WHERE id = $9"#,
         )
         .bind(write.name)
         .bind(access_mode)
@@ -273,6 +277,7 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(write.model)
         .bind(write.channel_config)
         .bind(write.enabled)
+        .bind(write.add_3rd_party)
         .bind(id)
         .execute(&mut *tx)
         .await
@@ -439,6 +444,9 @@ mod tests {
                 agent_ids: Some(agent_ids.clone()),
                 channel_config: Some(config.clone()),
                 enabled: true,
+                // Deliberately the opposite of `enabled`, so a swapped pair of same-typed binds
+                // cannot pass this test.
+                add_3rd_party: false,
             },
         )
         .await
@@ -461,6 +469,7 @@ mod tests {
         assert_eq!(channel.agent_ids, Some(agent_ids));
         assert_eq!(channel.channel_config, Some(config));
         assert!(channel.enabled);
+        assert!(!channel.add_3rd_party);
 
         // 2. Get by ID
         let fetched = ChannelPersistence::get_by_id(&persistence, channel.id)
@@ -483,6 +492,7 @@ mod tests {
                 name: "Inbound Email V2".into(),
                 slug: "inbound-email-v2".into(),
                 enabled: false,
+                add_3rd_party: true,
                 ..ChannelWrite::default()
             },
         )
@@ -492,12 +502,17 @@ mod tests {
         assert_eq!(updated.api_key, None);
         assert_eq!(updated.participant_emails, None);
         assert!(!updated.enabled, "the off switch must survive a round trip");
+        assert!(
+            updated.add_3rd_party,
+            "the third-party switch must survive a round trip"
+        );
 
         let reread = ChannelPersistence::get_by_id(&persistence, channel.id)
             .await
             .unwrap()
             .unwrap();
         assert!(!reread.enabled);
+        assert!(reread.add_3rd_party);
 
         // 5. Delete
         ChannelPersistence::delete(&persistence, channel.id)

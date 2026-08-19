@@ -18,6 +18,20 @@ use crate::{
     use_cases::thread::{InboundIngestResult, ThreadUseCases},
 };
 
+/// Why one outbox delivery did not happen, and therefore whether trying again could help.
+enum DeliveryFailure {
+    /// Transport or database trouble: costs an attempt, comes back after a backoff.
+    Retryable(String),
+    /// Nothing about a later attempt would be different, so spend none of them.
+    Permanent(String),
+}
+
+impl DeliveryFailure {
+    fn retryable(error: impl std::fmt::Display) -> Self {
+        Self::Retryable(error.to_string())
+    }
+}
+
 pub struct TaskWorker {
     task_persistence: Arc<dyn TaskPersistence>,
     thread_use_cases: Arc<ThreadUseCases>,
@@ -69,7 +83,10 @@ impl TaskWorker {
     }
 
     pub async fn process_next_batch(&self) -> Result<(), String> {
-        self.process_outbox_emails().await?;
+        // A stalled outbox must not also stall task execution: these are two queues sharing a tick.
+        if let Err(error) = self.process_outbox_emails().await {
+            warn!("Error draining the email outbox: {}", error);
+        }
         let _ = self.check_quorum_timeouts().await;
 
         let tasks = self
@@ -113,7 +130,7 @@ impl TaskWorker {
                     .task_persistence
                     .mark_task_completed(task_id, self.worker_id)
                     .await;
-                report_lease_outcome(task_id, "completion", outcome);
+                report_outcome("Task", task_id, "completion", outcome);
                 self.record_task_metric(task, duration_ms, TaskStatusMetric::Completed);
                 return;
             }
@@ -131,7 +148,7 @@ impl TaskWorker {
             .task_persistence
             .mark_task_failed(task_id, self.worker_id, &err_msg, next_run, is_dead_letter)
             .await;
-        report_lease_outcome(task_id, "failure", outcome);
+        report_outcome("Task", task_id, "failure", outcome);
         self.record_task_metric(task, duration_ms, TaskStatusMetric::Failed);
     }
 
@@ -174,6 +191,17 @@ impl TaskWorker {
     }
 
     async fn process_outbox_emails(&self) -> Result<(), String> {
+        // Before claiming anything: give back the rows whose delivery never reported a result, so
+        // each of those redeliveries costs an attempt and a poison row eventually dead-letters.
+        match self.task_persistence.reap_expired_outbox_leases().await {
+            Ok(0) => {}
+            Ok(reaped) => warn!(
+                "Reaped {} outbox deliveries whose lease had expired",
+                reaped
+            ),
+            Err(error) => warn!("Failed to reap expired outbox leases: {}", error),
+        }
+
         let emails = self
             .task_persistence
             .claim_outbox_emails(
@@ -185,72 +213,105 @@ impl TaskWorker {
             .map_err(|error| error.to_string())?;
 
         for queued in emails {
+            let outbox_id = queued.id;
             // The outreach behind this email may have been answered or cancelled since it queued.
-            if !self
+            match self
                 .task_persistence
-                .is_outbox_delivery_active(queued.id)
+                .is_outbox_delivery_active(outbox_id)
                 .await
-                .unwrap_or(false)
             {
-                let _ = self
-                    .task_persistence
-                    .cancel_claimed_outbox(queued.id, self.worker_id)
-                    .await;
-                continue;
+                Ok(true) => {}
+                Ok(false) => {
+                    let outcome = self
+                        .task_persistence
+                        .cancel_claimed_outbox(outbox_id, self.worker_id)
+                        .await;
+                    report_outcome("Outbox", outbox_id, "cancellation", outcome);
+                    continue;
+                }
+                // Unknown is not closed: fail the attempt so it comes back with backoff, rather
+                // than cancelling an email the outreach may still be waiting on.
+                Err(error) => {
+                    warn!(
+                        "Could not tell whether outbox {} is still wanted: {}",
+                        outbox_id, error
+                    );
+                    self.record_outbox_failure(outbox_id, &error.to_string())
+                        .await;
+                    continue;
+                }
             }
 
-            let outbox_id = queued.id;
             match self.deliver_outbox_email(queued).await {
                 Ok(sent_message_id) => {
-                    let _ = self
+                    let outcome = self
                         .task_persistence
                         .mark_outbox_email_sent(outbox_id, self.worker_id, &sent_message_id)
                         .await;
+                    report_outcome("Outbox", outbox_id, "delivery", outcome);
                 }
-                Err(error) => {
-                    let _ = self
+                Err(DeliveryFailure::Retryable(error)) => {
+                    self.record_outbox_failure(outbox_id, &error).await;
+                }
+                Err(DeliveryFailure::Permanent(error)) => {
+                    warn!("Outbox {} can never be delivered: {}", outbox_id, error);
+                    let outcome = self
                         .task_persistence
-                        .mark_outbox_email_failed(outbox_id, self.worker_id, &error)
+                        .mark_outbox_email_dead(outbox_id, self.worker_id, &error)
                         .await;
+                    report_outcome("Outbox", outbox_id, "dead-lettering", outcome);
                 }
             }
         }
         Ok(())
     }
 
+    /// End this delivery attempt: back off and retry, or dead-letter once the attempts run out.
+    async fn record_outbox_failure(&self, outbox_id: Uuid, error: &str) {
+        let outcome = self
+            .task_persistence
+            .mark_outbox_email_failed(outbox_id, self.worker_id, error)
+            .await;
+        report_outcome("Outbox", outbox_id, "failure", outcome);
+    }
+
     /// Send one queued outreach email, preferring the trusted internal transport when the
     /// recipient is another platform channel. Returns the delivered Message-ID.
-    async fn deliver_outbox_email(&self, queued: OutboxEmail) -> Result<MessageId, String> {
+    async fn deliver_outbox_email(
+        &self,
+        queued: OutboxEmail,
+    ) -> Result<MessageId, DeliveryFailure> {
         let outbox_id = queued.id;
         // Derive from the row's own key, not from its id: the key is stable across every attempt
         // *and* known to whoever queued the row, so a queuer can persist the outbound message
         // before delivery and still match the Message-ID that eventually goes out.
         let idempotency_key = queued.idempotency_key.clone();
-        let email: OutboundEmail =
-            serde_json::from_value(queued.payload).map_err(|error| error.to_string())?;
+        // A payload that will not deserialize will not deserialize on the fifth attempt either.
+        let email: OutboundEmail = serde_json::from_value(queued.payload)
+            .map_err(|error| DeliveryFailure::Permanent(error.to_string()))?;
 
         let internal = self
             .thread_use_cases
             .prepare_internal_channel_delivery(email.clone(), Some(&idempotency_key))
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(DeliveryFailure::retryable)?;
 
         if let Some(sent) = internal {
             self.thread_use_cases
                 .record_outreach_outbound_message(outbox_id, &sent)
                 .await
-                .map_err(|error| error.to_string())?;
+                .map_err(DeliveryFailure::retryable)?;
             let ingest = self
                 .thread_use_cases
                 .ingest_prepared_internal_message(&sent)
                 .await
-                .map_err(|error| error.to_string())?;
+                .map_err(DeliveryFailure::retryable)?;
             if !ingest.accepted
                 && ingest.reason.as_deref() != Some("Duplicate Message-ID already processed")
             {
-                return Err(ingest
-                    .reason
-                    .unwrap_or_else(|| "Internal channel delivery was rejected".into()));
+                return Err(DeliveryFailure::Retryable(ingest.reason.unwrap_or_else(
+                    || "Internal channel delivery was rejected".into(),
+                )));
             }
             info!(
                 "Delivered outreach outbox {} through trusted internal channel transport",
@@ -261,7 +322,7 @@ impl TaskWorker {
 
         let sent = OutboundDispatcher::send_idempotent(&self.config, email, &idempotency_key)
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(DeliveryFailure::retryable)?;
         // The email is out; failing to log it in the thread must not re-send it.
         if let Err(error) = self
             .thread_use_cases
@@ -617,6 +678,7 @@ mod tests {
         entities::{
             channel::Channel,
             company::Company,
+            cursor::{MessageCursor, ThreadCursor},
             message::Message,
             task::{BackgroundTask, TaskStatus},
             thread::Thread,
@@ -706,6 +768,7 @@ mod tests {
 
     struct MockThreadPersistence {
         messages: Mutex<Vec<Message>>,
+        threads: Mutex<Vec<Thread>>,
     }
 
     #[async_trait]
@@ -724,10 +787,30 @@ mod tests {
         async fn list_threads_by_channel_id(
             &self,
             _channel_id: Uuid,
-            _before: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
+            _before: Option<ThreadCursor>,
             _limit: usize,
         ) -> AppResult<Vec<Thread>> {
             unimplemented!()
+        }
+
+        async fn list_threads_updated_after(
+            &self,
+            channel_id: Uuid,
+            after: Option<ThreadCursor>,
+            limit: usize,
+        ) -> AppResult<Vec<Thread>> {
+            let mut threads: Vec<Thread> = self
+                .threads
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|t| t.channel_id == channel_id)
+                .filter(|t| after.is_none_or(|cursor| t.cursor() > cursor))
+                .cloned()
+                .collect();
+            threads.sort_by_key(|t| t.cursor());
+            threads.truncate(limit);
+            Ok(threads)
         }
         async fn update_thread_participants(
             &self,
@@ -794,6 +877,26 @@ mod tests {
                 .filter(|m| m.thread_id == thread_id)
                 .cloned()
                 .collect())
+        }
+
+        async fn list_messages_after(
+            &self,
+            thread_id: Uuid,
+            after: Option<MessageCursor>,
+            limit: usize,
+        ) -> AppResult<Vec<Message>> {
+            let mut messages: Vec<Message> = self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m| m.thread_id == thread_id)
+                .filter(|m| after.is_none_or(|cursor| m.cursor() > cursor))
+                .cloned()
+                .collect();
+            messages.sort_by_key(|m| m.cursor());
+            messages.truncate(limit);
+            Ok(messages)
         }
     }
 
@@ -1100,6 +1203,7 @@ mod tests {
         });
         let thread_persistence = Arc::new(MockThreadPersistence {
             messages: Mutex::new(Vec::new()),
+            threads: Mutex::new(Vec::new()),
         });
         let company_persistence = Arc::new(MockCompanyPersistence { company: None });
         let channel_persistence = Arc::new(MockChannelPersistence { channel: None });
@@ -1185,6 +1289,7 @@ mod tests {
         });
         let thread_persistence = Arc::new(MockThreadPersistence {
             messages: Mutex::new(Vec::new()),
+            threads: Mutex::new(Vec::new()),
         });
 
         let company = crate::entities::company::Company {
@@ -1201,6 +1306,7 @@ mod tests {
 
         let channel = Channel {
             enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Support".to_string(),
@@ -1344,10 +1450,16 @@ mod tests {
 }
 
 /// Log when a lease-guarded state change was ignored because the lease or status moved on.
-fn report_lease_outcome(task_id: Uuid, change: &str, outcome: AppResult<bool>) {
+///
+/// Both queues need this: a status write that quietly does nothing leaves its row claimed, and a
+/// claimed row that never reports a result is redelivered — or re-executed — on every lease
+/// expiry after that.
+fn report_outcome(subject: &str, id: Uuid, change: &str, outcome: AppResult<bool>) {
     match outcome {
         Ok(true) => {}
-        Ok(false) => warn!("Task {task_id} {change} ignored because its lease or status changed"),
-        Err(err) => error!("Failed to record task {task_id} {change}: {err}"),
+        Ok(false) => {
+            warn!("{subject} {id} {change} ignored because its lease or status changed")
+        }
+        Err(err) => error!("Failed to record {subject} {id} {change}: {err}"),
     }
 }

@@ -3,13 +3,17 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
-use std::{collections::HashSet, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 use uuid::Uuid;
 
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
+        cursor::{MessageCursor, ThreadCursor},
         message::{AttachmentMetadata, Message, MessageDirection, MessageRole},
         thread::Thread,
         value_objects::{EmailAddress, MessageId, ThreadIndex},
@@ -207,10 +211,10 @@ impl ThreadPersistence for PostgresPersistence {
     async fn list_threads_by_channel_id(
         &self,
         channel_id: Uuid,
-        before: Option<(DateTime<Utc>, Uuid)>,
+        before: Option<ThreadCursor>,
         limit: usize,
     ) -> AppResult<Vec<Thread>> {
-        let db = if let Some((updated_at, id)) = before {
+        let db = if let Some(ThreadCursor { updated_at, id }) = before {
             let query = format!(
                 r#"{THREAD_SELECT}
                    WHERE t.channel_id = $1 AND (t.updated_at, t.id) < ($2, $3)
@@ -238,6 +242,64 @@ impl ThreadPersistence for PostgresPersistence {
                 .await
         }
         .map_err(AppError::from)?;
+
+        Ok(db.into_iter().map(Into::into).collect())
+    }
+
+    async fn list_thread_last_roles(
+        &self,
+        thread_ids: &[Uuid],
+    ) -> AppResult<HashMap<Uuid, MessageRole>> {
+        if thread_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        // `DISTINCT ON` with the column's own sort key, so this rides
+        // `thread_messages_thread_created_idx` instead of reading each thread's history.
+        let rows: Vec<(Uuid, String)> = sqlx::query_as(
+            r#"SELECT DISTINCT ON (thread_id) thread_id, role
+               FROM thread_messages
+               WHERE thread_id = ANY($1)
+               ORDER BY thread_id, created_at DESC, id DESC"#,
+        )
+        .bind(thread_ids)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        rows.into_iter()
+            .map(|(thread_id, role)| {
+                let role = MessageRole::from_str(&role)
+                    .map_err(|error| AppError::Internal(error.to_string()))?;
+                Ok((thread_id, role))
+            })
+            .collect()
+    }
+
+    async fn list_threads_updated_after(
+        &self,
+        channel_id: Uuid,
+        after: Option<ThreadCursor>,
+        limit: usize,
+    ) -> AppResult<Vec<Thread>> {
+        // The mirror of the paging query above: that one reads *backwards* into history, this one
+        // reads forwards from what a live column has already shown. Ascending, so a batch can be
+        // applied in order and the newest ends up on top.
+        let query = format!(
+            r#"{THREAD_SELECT}
+               WHERE t.channel_id = $1
+                 AND ($2::timestamptz IS NULL OR (t.updated_at, t.id) > ($2, $3))
+               ORDER BY t.updated_at ASC, t.id ASC
+               LIMIT $4"#
+        );
+        let db = sqlx::query_as::<_, ThreadDb>(&query)
+            .bind(channel_id)
+            .bind(after.map(|cursor| cursor.updated_at))
+            .bind(after.map(|cursor| cursor.id))
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?;
 
         Ok(db.into_iter().map(Into::into).collect())
     }
@@ -505,6 +567,36 @@ impl ThreadPersistence for PostgresPersistence {
             .map_err(AppError::from)?;
         db.into_iter().map(TryInto::try_into).collect()
     }
+
+    async fn list_messages_after(
+        &self,
+        thread_id: Uuid,
+        after: Option<MessageCursor>,
+        limit: usize,
+    ) -> AppResult<Vec<Message>> {
+        // Ascending and unwrapped, unlike `list_messages_by_thread_id`: this reads *forwards* from
+        // a known point, so there is no newest-N window to reverse. `(created_at, id)` as a row
+        // comparison matches `thread_messages_thread_created_idx` exactly.
+        let query = format!(
+            r#"{MESSAGE_SELECT}
+               WHERE tm.thread_id = $1
+                 AND ($2::timestamptz IS NULL OR (tm.created_at, tm.id) > ($2, $3))
+               ORDER BY tm.created_at ASC, tm.id ASC
+               LIMIT $4"#
+        );
+        let db = sqlx::query_as::<_, MessageDb>(&query)
+            .bind(thread_id)
+            // Both sides stay `timestamptz`. Binding a naive value instead would make Postgres
+            // promote it through the *session* `TimeZone` to compare it, so the same cursor would
+            // mean different instants on a UTC server and a local one.
+            .bind(after.map(|cursor| cursor.created_at))
+            .bind(after.map(|cursor| cursor.id))
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        db.into_iter().map(TryInto::try_into).collect()
+    }
 }
 
 fn canonical_message_hash(message: &Message, attachments: Option<&Value>) -> Vec<u8> {
@@ -622,7 +714,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(first_page.len(), 1);
-        let cursor = (first_page[0].updated_at, first_page[0].id);
+        let cursor = first_page[0].cursor();
         let second_page = persistence
             .list_threads_by_channel_id(first_channel.id, Some(cursor), 1)
             .await
@@ -854,6 +946,421 @@ mod tests {
         assert!(found.is_none());
 
         CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// A user, company, channel and thread to hang messages off, so the streaming tests below say
+    /// only what they are actually about.
+    struct ThreadFixture {
+        persistence: PostgresPersistence,
+        pool: PgPool,
+        company_id: Uuid,
+        thread: Thread,
+    }
+
+    /// `None` when there is no database to talk to — these tests skip rather than fail, matching
+    /// the others in this module.
+    async fn thread_fixture(label: &str) -> Option<ThreadFixture> {
+        let database_url = std::env::var("DATABASE_URL").ok()?;
+        let pool = sqlx::PgPool::connect(&database_url).await.ok()?;
+        let persistence = PostgresPersistence::new(pool.clone());
+
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("{label}_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            "Stream Test",
+            // Slugs are hyphen-only; the label reads as a Rust identifier.
+            &format!("{}-{suffix}", label.replace('_', "-")),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Stream".into(),
+                slug: "stream".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let thread = persistence
+            .create_thread(
+                channel.id,
+                "Subject",
+                std::slice::from_ref(&EmailAddress::from(email.clone())),
+            )
+            .await
+            .unwrap();
+
+        Some(ThreadFixture {
+            persistence,
+            pool,
+            company_id: company.id,
+            thread,
+        })
+    }
+
+    /// One message in `thread`, distinguishable by its body and pinned to `created_at` so the
+    /// cursor's tie-break can be exercised deliberately.
+    fn streamed_message(thread_id: Uuid, body: &str, created_at: DateTime<Utc>) -> Message {
+        Message {
+            id: Uuid::new_v4(),
+            thread_id,
+            message_id: MessageId::from(format!("<{}@example.com>", Uuid::new_v4())),
+            in_reply_to: None,
+            references_list: vec![],
+            sender: EmailAddress::from("sender@example.com"),
+            recipients_to: vec!["recipient@example.com".into()],
+            recipients_cc: vec![],
+            subject: "Subject".into(),
+            clean_text_body: body.into(),
+            raw_text_body: Some(body.into()),
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            thread_index: None,
+            created_at,
+        }
+    }
+
+    fn bodies(messages: &[Message]) -> Vec<&str> {
+        messages
+            .iter()
+            .map(|message| message.clean_text_body.as_str())
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn list_messages_after_reads_forward_from_a_cursor() {
+        let Some(fixture) = thread_fixture("stream_forward").await else {
+            return;
+        };
+        let base = chrono::Utc::now();
+
+        let mut saved = Vec::new();
+        for (offset, body) in [(0, "first"), (1, "second"), (2, "third")] {
+            saved.push(
+                fixture
+                    .persistence
+                    .create_message(&streamed_message(
+                        fixture.thread.id,
+                        body,
+                        base + chrono::Duration::seconds(offset),
+                    ))
+                    .await
+                    .unwrap(),
+            );
+        }
+
+        // No cursor: a reader joining an empty pane gets the whole thread, oldest first.
+        let all = fixture
+            .persistence
+            .list_messages_after(fixture.thread.id, None, 50)
+            .await
+            .unwrap();
+        assert_eq!(bodies(&all), ["first", "second", "third"]);
+
+        // Resuming excludes the message the cursor names -- it has already been rendered.
+        let after_first = fixture
+            .persistence
+            .list_messages_after(fixture.thread.id, Some(saved[0].cursor()), 50)
+            .await
+            .unwrap();
+        assert_eq!(bodies(&after_first), ["second", "third"]);
+
+        // A reader who is up to date gets nothing, rather than the thread again.
+        let after_last = fixture
+            .persistence
+            .list_messages_after(fixture.thread.id, Some(saved[2].cursor()), 50)
+            .await
+            .unwrap();
+        assert!(after_last.is_empty());
+
+        // The batch limit is what stops one wake-up loading an unbounded backlog.
+        let limited = fixture
+            .persistence
+            .list_messages_after(fixture.thread.id, None, 2)
+            .await
+            .unwrap();
+        assert_eq!(bodies(&limited), ["first", "second"]);
+
+        CompanyPersistence::delete(&fixture.persistence, fixture.company_id)
+            .await
+            .unwrap();
+    }
+
+    /// Messages saved in one transaction share a timestamp, so a timestamp-only cursor would skip
+    /// or repeat them. This is the case the `(created_at, id)` comparison exists for.
+    #[tokio::test]
+    async fn list_messages_after_breaks_timestamp_ties_by_id() {
+        let Some(fixture) = thread_fixture("stream_ties").await else {
+            return;
+        };
+        let shared = chrono::Utc::now();
+
+        let mut saved = Vec::new();
+        for body in ["one", "two", "three"] {
+            saved.push(
+                fixture
+                    .persistence
+                    .create_message(&streamed_message(fixture.thread.id, body, shared))
+                    .await
+                    .unwrap(),
+            );
+        }
+        saved.sort_by_key(|message| message.cursor());
+
+        let all = fixture
+            .persistence
+            .list_messages_after(fixture.thread.id, None, 50)
+            .await
+            .unwrap();
+        assert_eq!(
+            all.iter().map(|m| m.id).collect::<Vec<_>>(),
+            saved.iter().map(|m| m.id).collect::<Vec<_>>(),
+            "same instant, so ordering falls to the id"
+        );
+
+        // Resuming from the middle of a tie must return exactly the rest of it.
+        let rest = fixture
+            .persistence
+            .list_messages_after(fixture.thread.id, Some(saved[0].cursor()), 50)
+            .await
+            .unwrap();
+        assert_eq!(
+            rest.iter().map(|m| m.id).collect::<Vec<_>>(),
+            saved[1..].iter().map(|m| m.id).collect::<Vec<_>>()
+        );
+
+        CompanyPersistence::delete(&fixture.persistence, fixture.company_id)
+            .await
+            .unwrap();
+    }
+
+    /// The mirror of the message stream, one level up: a thread whose message just landed must
+    /// surface in its channel's live column, and a column that reconnects must not replay threads
+    /// it already shows.
+    #[tokio::test]
+    async fn list_threads_updated_after_reads_forward_from_a_cursor() {
+        let Some(fixture) = thread_fixture("stream_column").await else {
+            return;
+        };
+
+        // `updated_at` is set by the database, and `create_message` bumps it -- so the ordering
+        // here is established the same way it is in production, not by writing timestamps.
+        let mut threads = vec![fixture.thread.clone()];
+        for subject in ["second", "third"] {
+            threads.push(
+                fixture
+                    .persistence
+                    .create_thread(
+                        fixture.thread.channel_id,
+                        subject,
+                        &[EmailAddress::from("someone@example.com")],
+                    )
+                    .await
+                    .unwrap(),
+            );
+        }
+
+        let all = fixture
+            .persistence
+            .list_threads_updated_after(fixture.thread.channel_id, None, 50)
+            .await
+            .unwrap();
+        assert_eq!(all.len(), 3, "no cursor means the whole channel");
+        assert!(
+            all.windows(2)
+                .all(|pair| pair[0].cursor() < pair[1].cursor()),
+            "oldest first, so the newest is applied last and lands on top"
+        );
+
+        let after_first = fixture
+            .persistence
+            .list_threads_updated_after(fixture.thread.channel_id, Some(all[0].cursor()), 50)
+            .await
+            .unwrap();
+        assert_eq!(after_first.len(), 2);
+
+        let caught_up = fixture
+            .persistence
+            .list_threads_updated_after(fixture.thread.channel_id, Some(all[2].cursor()), 50)
+            .await
+            .unwrap();
+        assert!(caught_up.is_empty());
+
+        // A message bumps its thread past every other one, which is exactly what makes the live
+        // column reorder rather than just grow.
+        let oldest = &threads[0];
+        fixture
+            .persistence
+            .create_message(&streamed_message(oldest.id, "bump", chrono::Utc::now()))
+            .await
+            .unwrap();
+
+        let bumped = fixture
+            .persistence
+            .list_threads_updated_after(fixture.thread.channel_id, Some(all[2].cursor()), 50)
+            .await
+            .unwrap();
+        assert_eq!(
+            bumped.iter().map(|t| t.id).collect::<Vec<_>>(),
+            vec![oldest.id],
+            "only the bumped thread is newer than what the column already showed"
+        );
+
+        CompanyPersistence::delete(&fixture.persistence, fixture.company_id)
+            .await
+            .unwrap();
+    }
+
+    /// The first notification for `thread_id`, or `None` if none arrives within `timeout`.
+    ///
+    /// `LISTEN` is database-wide, so a listener sees every thread's messages -- including those of
+    /// tests running beside this one. Filtering here is not test scaffolding: it is what the SSE
+    /// handler does with each broadcast event, for the same reason.
+    async fn notification_for(
+        listener: &mut sqlx::postgres::PgListener,
+        thread_id: Uuid,
+        timeout: std::time::Duration,
+    ) -> Option<serde_json::Value> {
+        tokio::time::timeout(timeout, async {
+            loop {
+                let notification = listener.recv().await.unwrap();
+                let payload: serde_json::Value =
+                    serde_json::from_str(notification.payload()).expect("payload should be JSON");
+                if payload["thread_id"].as_str() == Some(&thread_id.to_string()) {
+                    return payload;
+                }
+            }
+        })
+        .await
+        .ok()
+    }
+
+    /// The link between a committed message and an open mailbox. Without the trigger firing,
+    /// nothing else in the live path runs.
+    #[tokio::test]
+    async fn committing_a_message_notifies_listeners() {
+        let Some(fixture) = thread_fixture("stream_notify").await else {
+            return;
+        };
+
+        let mut listener = sqlx::postgres::PgListener::connect_with(&fixture.pool)
+            .await
+            .unwrap();
+        listener.listen("thread_message").await.unwrap();
+
+        fixture
+            .persistence
+            .create_message(&streamed_message(
+                fixture.thread.id,
+                "live",
+                chrono::Utc::now(),
+            ))
+            .await
+            .unwrap();
+
+        let payload = notification_for(
+            &mut listener,
+            fixture.thread.id,
+            std::time::Duration::from_secs(5),
+        )
+        .await
+        .expect("expected a notification for this thread within 5s");
+
+        assert_eq!(
+            payload["channel_id"].as_str().unwrap(),
+            fixture.thread.channel_id.to_string()
+        );
+        assert_eq!(
+            payload["company_id"].as_str().unwrap(),
+            fixture.company_id.to_string()
+        );
+
+        CompanyPersistence::delete(&fixture.persistence, fixture.company_id)
+            .await
+            .unwrap();
+    }
+
+    /// The notification is bound to the writing transaction, so a rolled-back message must never
+    /// be announced -- a reader would query for it and find nothing.
+    #[tokio::test]
+    async fn a_rolled_back_message_is_not_announced() {
+        let Some(fixture) = thread_fixture("stream_rollback").await else {
+            return;
+        };
+
+        let mut listener = sqlx::postgres::PgListener::connect_with(&fixture.pool)
+            .await
+            .unwrap();
+        listener.listen("thread_message").await.unwrap();
+
+        let email_message_id = Uuid::new_v4();
+        let mut tx = fixture.pool.begin().await.unwrap();
+        sqlx::query(
+            r#"INSERT INTO email_messages (id, company_id, message_id, content_hash, sender, subject)
+               VALUES ($1, $2, $3, '\x00'::bytea, 'sender@example.com', 'Subject')"#,
+        )
+        .bind(email_message_id)
+        .bind(fixture.company_id)
+        .bind(format!("<{email_message_id}@example.com>"))
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        let inserted = sqlx::query(
+            r#"INSERT INTO thread_messages (
+                   id, company_id, channel_id, thread_id, email_message_id,
+                   clean_text_body, direction, role
+               )
+               SELECT $1, company_id, channel_id, id, $2, 'rolled back', 'inbound', 'human'
+               FROM threads WHERE id = $3"#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(email_message_id)
+        .bind(fixture.thread.id)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        // Without this the rollback below would prove nothing: the row has to have really been
+        // written for its absence afterwards to mean anything.
+        assert_eq!(inserted.rows_affected(), 1);
+
+        tx.rollback().await.unwrap();
+
+        // Nothing committed, so nothing may arrive for this thread.
+        assert!(
+            notification_for(
+                &mut listener,
+                fixture.thread.id,
+                std::time::Duration::from_secs(1)
+            )
+            .await
+            .is_none(),
+            "a rolled-back message must not notify"
+        );
+
+        CompanyPersistence::delete(&fixture.persistence, fixture.company_id)
             .await
             .unwrap();
     }

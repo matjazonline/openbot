@@ -101,6 +101,8 @@ pub struct ChannelDraft<'a> {
     /// Whether the channel takes traffic. A new channel starts enabled, which is why this type
     /// hand-writes `Default` instead of deriving it.
     pub enabled: bool,
+    /// Whether CC'd outsiders may join this channel's threads. Starts on, like `enabled`.
+    pub add_3rd_party: bool,
 }
 
 impl Default for ChannelDraft<'_> {
@@ -118,6 +120,7 @@ impl Default for ChannelDraft<'_> {
             channel_config: "",
             advanced: false,
             enabled: true,
+            add_3rd_party: true,
         }
     }
 }
@@ -364,8 +367,9 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
                     hx-post="/ui/channels?company_id={company_id}" hx-target="#channel-pane" hx-swap="outerHTML"
                     hx-disabled-elt="find button[type='submit']">
                     <input type="hidden" name="form_mode" value="simple">
-                    <!-- Simple mode has no on/off control, and an absent checkbox reads as "off". -->
+                    <!-- Simple mode has no on/off controls, and an absent checkbox reads as "off". -->
                     <input type="hidden" name="enabled" value="true">
+                    <input type="hidden" name="add_3rd_party" value="true">
                     <label class="form-control w-full">
                         <div class="label"><span class="label-text text-xs opacity-70">Channel Name</span></div>
                         <input type="text" name="name" required value="{name}" placeholder="Inbound Email Handler"
@@ -522,6 +526,15 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                             </span>
                         </label>
                     </div>
+                    <div class="form-control w-full">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
+                            <input type="checkbox" name="add_3rd_party" value="true" class="checkbox checkbox-sm mt-0.5"{add_3rd_party_checked}>
+                            <span class="text-xs">
+                                <span class="font-semibold">Add CC'd outsiders to threads</span>
+                                <span class="block opacity-70">Unticking this keeps the channel internal: people outside your team who are CC'd on a message are never added to the thread and are never copied on the agent's reply, and mail they send to this channel bounces.</span>
+                            </span>
+                        </label>
+                    </div>
                     {spam_html}
         "##,
         name = escape_html_text(draft.name),
@@ -541,6 +554,7 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
         api_key = escape_html_text(draft.api_key),
         channel_config = escape_html_text(draft.channel_config),
         enabled_checked = if draft.enabled { " checked" } else { "" },
+        add_3rd_party_checked = if draft.add_3rd_party { " checked" } else { "" },
         spam_html = spam_disabled_confirmation(fields.spam_scan_enabled, draft.is_public()),
     )
 }
@@ -659,6 +673,7 @@ fn stored_draft<'a>(
         channel_config,
         advanced: true,
         enabled: channel.enabled,
+        add_3rd_party: channel.add_3rd_party,
     }
 }
 

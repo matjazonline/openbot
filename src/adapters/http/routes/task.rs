@@ -544,6 +544,7 @@ mod tests {
 
         let channel = crate::entities::channel::Channel {
             enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Test WF".to_string(),

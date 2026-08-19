@@ -405,6 +405,10 @@ fn already_processed_message(approval: &HumanApproval) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::{
+        cursor::{MessageCursor, ThreadCursor},
+        thread::Thread,
+    };
     use async_trait::async_trait;
     use std::sync::Mutex;
 
@@ -668,9 +672,18 @@ mod tests {
         async fn list_threads_by_channel_id(
             &self,
             _channel_id: Uuid,
-            _before: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
+            _before: Option<ThreadCursor>,
             _limit: usize,
         ) -> AppResult<Vec<crate::entities::thread::Thread>> {
+            unimplemented!()
+        }
+
+        async fn list_threads_updated_after(
+            &self,
+            _channel_id: Uuid,
+            _after: Option<ThreadCursor>,
+            _limit: usize,
+        ) -> AppResult<Vec<Thread>> {
             unimplemented!()
         }
         async fn update_thread_participants(
@@ -719,6 +732,15 @@ mod tests {
             Ok(None)
         }
         async fn list_messages_by_thread_id(&self, _thread_id: Uuid) -> AppResult<Vec<Message>> {
+            unimplemented!()
+        }
+
+        async fn list_messages_after(
+            &self,
+            _thread_id: Uuid,
+            _after: Option<MessageCursor>,
+            _limit: usize,
+        ) -> AppResult<Vec<Message>> {
             unimplemented!()
         }
     }
