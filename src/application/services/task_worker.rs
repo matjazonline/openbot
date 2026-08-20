@@ -1,11 +1,15 @@
+use std::future::Future;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 use tokio::time::{Duration, sleep};
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::task::{OutboxEmail, TASK_LEASE_SECONDS, TaskPersistence},
-    app_error::AppResult,
+    adapters::persistence::task::{
+        Leased, OutboxEmail, TASK_LEASE_SECONDS, TaskLease, TaskPersistence, report_outcome,
+        while_leased,
+    },
     domain::monitoring::{MonitoringService, TaskExecutionMetrics, TaskStatusMetric},
     entities::{
         channel::Channel,
@@ -17,6 +21,89 @@ use crate::{
     services::outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
     use_cases::thread::{InboundIngestResult, ThreadUseCases},
 };
+
+/// How long the task loop waits before looking for work again. This is the whole delay between a
+/// message being ingested and its agent starting, so it is short: the claim is one index scan
+/// against `background_tasks_pending_ready_idx`, which costs nothing to run twice a second against
+/// an empty queue.
+const TASK_POLL_INTERVAL: Duration = Duration::from_millis(500);
+
+/// How long the outbox loop waits. It runs on its own cadence rather than behind an agent run, so a
+/// queued reply goes out within half a second instead of whenever the current task happens to end.
+const OUTBOX_POLL_INTERVAL: Duration = Duration::from_millis(500);
+
+/// How often the slow lane runs. Quorum timeouts and expired delivery leases are measured in
+/// minutes; checking them at queue cadence scans a hundred outreaches to find nothing.
+const MAINTENANCE_INTERVAL: Duration = Duration::from_secs(30);
+
+/// How long to wait after an iteration that failed outright. Without it a Postgres outage fills the
+/// log twice a second per loop rather than once every few seconds.
+const ERROR_BACKOFF: Duration = Duration::from_secs(5);
+
+/// How many tasks one iteration claims. One, because the run happens inline on the loop — running
+/// two agents at once is a different decision from how often to look for one.
+const TASK_CLAIM_BATCH: i64 = 1;
+
+/// How many queued emails one iteration claims.
+const OUTBOX_CLAIM_BATCH: i64 = 10;
+
+/// What one poll iteration found, and therefore whether its loop should pause before the next one.
+#[derive(Debug, PartialEq, Eq)]
+enum Polled {
+    /// The batch came back short, so the queue is empty for now.
+    Idle,
+    /// The batch came back full, so there is probably more behind it.
+    MoreWaiting,
+}
+
+/// A full batch probably has more behind it; a short one emptied the queue.
+fn polled(claimed: usize, batch_size: i64) -> Polled {
+    if claimed as i64 >= batch_size {
+        Polled::MoreWaiting
+    } else {
+        Polled::Idle
+    }
+}
+
+/// Run `step` against `state` until shutdown: straight back round while it reports more waiting, on
+/// `interval` once the queue is empty, and after [`ERROR_BACKOFF`] when it failed.
+///
+/// The work runs at the top of the loop rather than after the first sleep, so a queue that already
+/// has something in it at startup is served immediately.
+///
+/// Shutdown is only observed between iterations. That is deliberate: an agent run cut off midway
+/// through writing its result is worse than one that finishes while the process is winding down —
+/// the lease is what protects a run that outlives its process, not cancellation here.
+async fn poll_until_shutdown<State, Work>(
+    name: &'static str,
+    interval: Duration,
+    mut shutdown: broadcast::Receiver<()>,
+    state: Arc<State>,
+    step: fn(Arc<State>) -> Work,
+) where
+    Work: Future<Output = Result<Polled, String>>,
+{
+    loop {
+        let pause = match step(Arc::clone(&state)).await {
+            Ok(Polled::MoreWaiting) => Duration::ZERO,
+            Ok(Polled::Idle) => interval,
+            Err(error) => {
+                warn!("Error in the {} poll loop: {}", name, error);
+                ERROR_BACKOFF
+            }
+        };
+
+        tokio::select! {
+            _ = shutdown.recv() => {
+                info!("Shutdown signal received. Stopping the {} poll loop...", name);
+                return;
+            }
+            // Even a zero pause goes through the select, so a fast-draining loop stays
+            // interruptible.
+            _ = sleep(pause) => {}
+        }
+    }
+}
 
 /// Why one outbox delivery did not happen, and therefore whether trying again could help.
 enum DeliveryFailure {
@@ -60,45 +147,59 @@ impl TaskWorker {
         self
     }
 
-    /// Continuous background poller running every 3 seconds
+    /// Run the worker's three poll loops until shutdown.
+    ///
+    /// They are separate on purpose. A task run holds its loop for as long as the agent takes --
+    /// seconds, sometimes minutes — and while the outbox shared that tick, no reply went out for
+    /// the whole of it. Maintenance is split off for the opposite reason: its deadlines are minutes
+    /// away, so it must not be re-run every time the queue loops look.
     pub async fn start_worker_loop(
         self: Arc<Self>,
-        mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
+        shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     ) {
-        info!("Starting Background Task Worker Loop (poll_interval = 3s)...");
+        info!(
+            "Starting Background Task Worker (tasks every {:?}, outbox every {:?}, maintenance every {:?})...",
+            TASK_POLL_INTERVAL, OUTBOX_POLL_INTERVAL, MAINTENANCE_INTERVAL
+        );
 
-        loop {
-            tokio::select! {
-                _ = shutdown_rx.recv() => {
-                    info!("Shutdown signal received. Stopping Background Task Worker Loop...");
-                    break;
-                }
-                _ = sleep(Duration::from_secs(3)) => {
-                    if let Err(err) = self.process_next_batch().await {
-                        warn!("Error in background task poller iteration: {}", err);
-                    }
-                }
-            }
-        }
+        let tasks = tokio::spawn(poll_until_shutdown(
+            "task",
+            TASK_POLL_INTERVAL,
+            shutdown_rx.resubscribe(),
+            Arc::clone(&self),
+            |worker| async move { worker.process_next_task_batch().await },
+        ));
+        let outbox = tokio::spawn(poll_until_shutdown(
+            "outbox",
+            OUTBOX_POLL_INTERVAL,
+            shutdown_rx.resubscribe(),
+            Arc::clone(&self),
+            |worker| async move { worker.process_outbox_emails().await },
+        ));
+        let maintenance = tokio::spawn(poll_until_shutdown(
+            "maintenance",
+            MAINTENANCE_INTERVAL,
+            shutdown_rx,
+            self,
+            |worker| async move { worker.run_maintenance().await },
+        ));
+
+        let _ = tokio::join!(tasks, outbox, maintenance);
     }
 
-    pub async fn process_next_batch(&self) -> Result<(), String> {
-        // A stalled outbox must not also stall task execution: these are two queues sharing a tick.
-        if let Err(error) = self.process_outbox_emails().await {
-            warn!("Error draining the email outbox: {}", error);
-        }
-        let _ = self.check_quorum_timeouts().await;
-
+    /// Claim and run the next due task.
+    async fn process_next_task_batch(&self) -> Result<Polled, String> {
         let tasks = self
             .task_persistence
             .claim_pending_tasks(
                 self.worker_id,
                 chrono::Utc::now() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
-                1,
+                TASK_CLAIM_BATCH,
             )
             .await
             .map_err(|e| e.to_string())?;
 
+        let claimed = tasks.len();
         for task in tasks {
             info!("Processing task {} (type = '{}')", task.id, task.task_type);
             let start_time = std::time::Instant::now();
@@ -107,7 +208,25 @@ impl TaskWorker {
             self.close_out_task(&task, result, duration_ms).await;
         }
 
-        Ok(())
+        Ok(polled(claimed, TASK_CLAIM_BATCH))
+    }
+
+    /// The slow lane: work whose deadlines are minutes away, kept off the queue loops so that
+    /// shortening their interval does not multiply it.
+    async fn run_maintenance(&self) -> Result<Polled, String> {
+        // Give back the outbox rows whose delivery never reported a result, so each of those
+        // redeliveries costs an attempt and a poison row eventually dead-letters.
+        match self.task_persistence.reap_expired_outbox_leases().await {
+            Ok(0) => {}
+            Ok(reaped) => warn!(
+                "Reaped {} outbox deliveries whose lease had expired",
+                reaped
+            ),
+            Err(error) => warn!("Failed to reap expired outbox leases: {}", error),
+        }
+
+        self.check_quorum_timeouts().await?;
+        Ok(Polled::Idle)
     }
 
     /// Record the fate of one executed task: completed, suspended awaiting someone else, or failed
@@ -190,28 +309,20 @@ impl TaskWorker {
         }
     }
 
-    async fn process_outbox_emails(&self) -> Result<(), String> {
-        // Before claiming anything: give back the rows whose delivery never reported a result, so
-        // each of those redeliveries costs an attempt and a poison row eventually dead-letters.
-        match self.task_persistence.reap_expired_outbox_leases().await {
-            Ok(0) => {}
-            Ok(reaped) => warn!(
-                "Reaped {} outbox deliveries whose lease had expired",
-                reaped
-            ),
-            Err(error) => warn!("Failed to reap expired outbox leases: {}", error),
-        }
-
+    /// Deliver the next batch of queued emails. Reaping expired delivery leases belongs to
+    /// [`Self::run_maintenance`], which runs on the lease's own timescale rather than this one.
+    async fn process_outbox_emails(&self) -> Result<Polled, String> {
         let emails = self
             .task_persistence
             .claim_outbox_emails(
                 self.worker_id,
                 chrono::Utc::now() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
-                10,
+                OUTBOX_CLAIM_BATCH,
             )
             .await
             .map_err(|error| error.to_string())?;
 
+        let claimed = emails.len();
         for queued in emails {
             let outbox_id = queued.id;
             // The outreach behind this email may have been answered or cancelled since it queued.
@@ -263,7 +374,7 @@ impl TaskWorker {
                 }
             }
         }
-        Ok(())
+        Ok(polled(claimed, OUTBOX_CLAIM_BATCH))
     }
 
     /// End this delivery attempt: back off and retry, or dead-letter once the attempts run out.
@@ -554,8 +665,12 @@ impl TaskWorker {
         let mut ingest_exec = ingest.clone();
         ingest_exec.task_id = Some(task.id);
 
+        // Whether the reply is really sent was decided when the message came in, not here: a
+        // mailbox send can ask to stay in-app, and this worker is a different process from the one
+        // that took the request.
+        let deliver = ingest_exec.deliver;
         self.thread_use_cases
-            .execute_claimed_agent_task_and_dispatch(&ingest_exec, true, self.worker_id)
+            .execute_claimed_agent_task_and_dispatch(&ingest_exec, deliver, self.worker_id)
             .await
             .map_err(|e| e.to_string())?;
 
@@ -566,31 +681,17 @@ impl TaskWorker {
         &self,
         task: &crate::entities::task::BackgroundTask,
     ) -> Result<(), String> {
-        let execution = self.execute_single_task(task);
-        tokio::pin!(execution);
-        let mut heartbeat =
-            tokio::time::interval(Duration::from_secs((TASK_LEASE_SECONDS / 3).max(1) as u64));
-        heartbeat.tick().await;
-
-        loop {
-            tokio::select! {
-                result = &mut execution => return result,
-                _ = heartbeat.tick() => {
-                    let renewed = self
-                        .task_persistence
-                        .renew_task_lease(
-                            task.id,
-                            self.worker_id,
-                            chrono::Utc::now()
-                                + chrono::Duration::seconds(TASK_LEASE_SECONDS),
-                        )
-                        .await
-                        .map_err(|error| error.to_string())?;
-                    if !renewed {
-                        return Err("Task lease was lost during execution".to_string());
-                    }
-                }
-            }
+        let lease = TaskLease::worker(self.worker_id);
+        match while_leased(
+            &*self.task_persistence,
+            task.id,
+            &lease,
+            self.execute_single_task(task),
+        )
+        .await
+        {
+            Leased::Finished(result) => result,
+            Leased::Lost => Err("Task lease was lost during execution".to_string()),
         }
     }
 
@@ -900,12 +1001,31 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
     struct MockTaskPersistence {
         tasks: Mutex<Vec<BackgroundTask>>,
+        /// Lease renewals seen, so a test can prove the heartbeat actually fired.
+        renewals: Mutex<usize>,
+        /// How many renewals to grant before reporting the lease gone. `None` grants every one.
+        renewals_before_loss: Option<usize>,
     }
 
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        async fn renew_task_lease(
+            &self,
+            _id: Uuid,
+            _worker_id: Uuid,
+            _lock_expires_at: chrono::DateTime<Utc>,
+        ) -> AppResult<bool> {
+            let mut renewals = self.renewals.lock().unwrap();
+            *renewals += 1;
+            Ok(match self.renewals_before_loss {
+                Some(granted) => *renewals <= granted,
+                None => true,
+            })
+        }
+
         async fn enqueue_task(
             &self,
             company_id: Uuid,
@@ -1149,11 +1269,166 @@ mod tests {
         }
     }
 
+    /// The driver runs before it sleeps. A queue with something already in it at startup must be
+    /// served now, not one interval from now — that delay was the whole cost of the old loop.
+    #[tokio::test(start_paused = true)]
+    async fn the_first_iteration_does_not_wait_for_the_interval() {
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+
+        let counter = Arc::clone(&calls);
+        let driver = tokio::spawn(poll_until_shutdown(
+            "test",
+            Duration::from_secs(3600),
+            shutdown_rx,
+            counter,
+            |calls| async move {
+                calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(Polled::Idle)
+            },
+        ));
+
+        // Only yields — no clock advance at all, so anything that ran did so before the sleep.
+        tokio::task::yield_now().await;
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+        let _ = shutdown_tx.send(());
+        driver.await.unwrap();
+    }
+
+    /// A full batch means more is behind it. Draining a backlog one interval at a time is what the
+    /// old one-task-per-tick loop did, and it is what `MoreWaiting` exists to avoid.
+    #[tokio::test(start_paused = true)]
+    async fn a_full_batch_comes_straight_back_without_pausing() {
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+
+        let counter = Arc::clone(&calls);
+        let driver = tokio::spawn(poll_until_shutdown(
+            "test",
+            Duration::from_secs(3600),
+            shutdown_rx,
+            counter,
+            |calls| async move {
+                // Three full batches, then the queue is empty.
+                let seen = calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(if seen < 2 {
+                    Polled::MoreWaiting
+                } else {
+                    Polled::Idle
+                })
+            },
+        ));
+
+        // Still no clock advance: all three iterations have to fit before the first real pause.
+        for _ in 0..8 {
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 3);
+
+        let _ = shutdown_tx.send(());
+        driver.await.unwrap();
+    }
+
+    /// A failing iteration backs off rather than retrying at queue cadence — at 500ms a database
+    /// outage would otherwise log twice a second, per loop.
+    #[tokio::test(start_paused = true)]
+    async fn a_failed_iteration_backs_off_instead_of_spinning() {
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+
+        let counter = Arc::clone(&calls);
+        let driver = tokio::spawn(poll_until_shutdown(
+            "test",
+            Duration::from_millis(500),
+            shutdown_rx,
+            counter,
+            |calls| async move {
+                calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Err("database is unreachable".to_string())
+            },
+        ));
+
+        // One poll interval in, a spinning loop would already have run again.
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+        tokio::time::sleep(ERROR_BACKOFF).await;
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+
+        let _ = shutdown_tx.send(());
+        driver.await.unwrap();
+    }
+
+    /// Every loop must come down on the shared shutdown broadcast, or the process hangs past its
+    /// drain deadline waiting for a poller that is still sleeping.
+    #[tokio::test(start_paused = true)]
+    async fn shutdown_stops_a_loop_that_is_between_iterations() {
+        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+
+        let driver = tokio::spawn(poll_until_shutdown(
+            "test",
+            Duration::from_secs(3600),
+            shutdown_rx,
+            Arc::new(()),
+            |_| async move { Ok(Polled::Idle) },
+        ));
+
+        tokio::task::yield_now().await;
+        let _ = shutdown_tx.send(());
+
+        // No clock advance: the loop must not have to wait out its hour-long pause to notice.
+        driver.await.unwrap();
+    }
+
+    /// A run longer than one lease term must keep its claim, or the poller reclaims a task that is
+    /// still being worked on and the same agent runs twice.
+    #[tokio::test(start_paused = true)]
+    async fn work_outliving_its_lease_term_keeps_renewing() {
+        let persistence = MockTaskPersistence::default();
+        let lease = TaskLease::worker(Uuid::new_v4());
+
+        // 1000s of work against a 900s lease: beats land at 300s, 600s and 900s.
+        let outcome = while_leased(
+            &persistence,
+            Uuid::new_v4(),
+            &lease,
+            tokio::time::sleep(Duration::from_secs(1000)),
+        )
+        .await;
+
+        assert!(matches!(outcome, Leased::Finished(())));
+        assert_eq!(*persistence.renewals.lock().unwrap(), 3);
+    }
+
+    /// Losing the lease means someone else owns the task now. The work must be dropped rather than
+    /// left to finish and write a result over theirs.
+    #[tokio::test(start_paused = true)]
+    async fn a_lost_lease_abandons_the_work() {
+        let persistence = MockTaskPersistence {
+            renewals_before_loss: Some(1),
+            ..Default::default()
+        };
+        let lease = TaskLease::worker(Uuid::new_v4());
+        let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+        let ran = Arc::clone(&finished);
+        let outcome = while_leased(&persistence, Uuid::new_v4(), &lease, async move {
+            tokio::time::sleep(Duration::from_secs(6000)).await;
+            ran.store(true, std::sync::atomic::Ordering::SeqCst);
+        })
+        .await;
+
+        assert!(matches!(outcome, Leased::Lost));
+        assert!(
+            !finished.load(std::sync::atomic::Ordering::SeqCst),
+            "work must be dropped the moment the lease is gone"
+        );
+    }
+
     #[tokio::test]
     async fn expired_lease_is_reclaimed_and_stale_worker_cannot_complete() {
-        let persistence = MockTaskPersistence {
-            tasks: Mutex::new(Vec::new()),
-        };
+        let persistence = MockTaskPersistence::default();
         let task = persistence
             .enqueue_task(
                 Uuid::new_v4(),
@@ -1198,9 +1473,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_task_worker_stop_and_resume_flow() {
-        let task_persistence = Arc::new(MockTaskPersistence {
-            tasks: Mutex::new(Vec::new()),
-        });
+        let task_persistence = Arc::new(MockTaskPersistence::default());
         let thread_persistence = Arc::new(MockThreadPersistence {
             messages: Mutex::new(Vec::new()),
             threads: Mutex::new(Vec::new()),
@@ -1284,9 +1557,7 @@ mod tests {
         let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
 
-        let task_persistence = Arc::new(MockTaskPersistence {
-            tasks: Mutex::new(Vec::new()),
-        });
+        let task_persistence = Arc::new(MockTaskPersistence::default());
         let thread_persistence = Arc::new(MockThreadPersistence {
             messages: Mutex::new(Vec::new()),
             threads: Mutex::new(Vec::new()),
@@ -1415,6 +1686,7 @@ mod tests {
             parsed_email: Some(parsed_email),
             normalized_message: None,
             task_id: None,
+            deliver: true,
             channel_matches: vec![],
             bounce_info: None,
         };
@@ -1431,7 +1703,7 @@ mod tests {
             .await
             .unwrap();
 
-        worker.process_next_batch().await.unwrap();
+        worker.process_next_task_batch().await.unwrap();
 
         let failed_task = task_persistence
             .get_task_by_id(task.id)
@@ -1446,20 +1718,5 @@ mod tests {
                 .unwrap()
                 .contains("API key is missing")
         );
-    }
-}
-
-/// Log when a lease-guarded state change was ignored because the lease or status moved on.
-///
-/// Both queues need this: a status write that quietly does nothing leaves its row claimed, and a
-/// claimed row that never reports a result is redelivered — or re-executed — on every lease
-/// expiry after that.
-fn report_outcome(subject: &str, id: Uuid, change: &str, outcome: AppResult<bool>) {
-    match outcome {
-        Ok(true) => {}
-        Ok(false) => {
-            warn!("{subject} {id} {change} ignored because its lease or status changed")
-        }
-        Err(err) => error!("Failed to record {subject} {id} {change}: {err}"),
     }
 }

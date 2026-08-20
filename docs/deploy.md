@@ -160,10 +160,11 @@ anything you care about.
 two different behaviours, worth keeping straight:
 
 - *Already running.* The process stays up. sqlx's pool reconnects when Postgres
-  returns. Requests touching the database return 500s meanwhile, the task worker
-  logs a warning every 3s and keeps polling (`task_worker.rs`), and the SMTP
-  listener keeps accepting — failed messages are logged and remote senders retry,
-  so inbound mail is deferred rather than lost. No intervention needed.
+  returns. Requests touching the database return 500s meanwhile, each of the
+  task worker's loops logs a warning and backs off for 5s before polling again
+  (`ERROR_BACKOFF` in `task_worker.rs`), and the SMTP listener keeps accepting —
+  failed messages are logged and remote senders retry, so inbound mail is
+  deferred rather than lost. No intervention needed.
 - *Booting.* `init_db` connects and runs migrations once at startup, and `main`
   returns `Err` on failure, so a machine that starts while Postgres is
   unreachable exits and is restarted by Fly until the database is back. You hit

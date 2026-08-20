@@ -790,21 +790,26 @@ pub fn thread_list_fragment(column: &ThreadColumn<'_>, swap: FragmentSwap) -> St
     )
 }
 
-/// A thread row's activity mark, or nothing at all.
+/// A thread row's activity mark, or nothing at all when the thread is idle.
 ///
-/// The column deliberately says less than the open thread does. A run in progress gets no mark
-/// here at all: the reader is not waiting on threads they have not opened, and the arriving reply
-/// is what they want to notice. Only a thread that has *stalled* -- blocked on a person, or failed
-/// -- earns a glyph, quiet and unanimated, with the wording on hover.
+/// Every state gets a glyph, because every state now tells the reader something they cannot see
+/// from the messages: the agent has not started, or is answering, or has stopped and needs a
+/// person. Only a live run animates -- it is the one thing that will resolve on its own -- and only
+/// a failure takes a colour. The rest stay quiet, with the wording on hover.
 pub fn thread_activity_mark(activity: Option<ThreadActivity>) -> String {
-    match activity.filter(|activity| activity.needs_attention()) {
+    match activity {
         None => String::new(),
         Some(activity) => format!(
-            r##"<span class="shrink-0 text-sm leading-none {tint}" title="{label}">{mark}</span>"##,
+            r##"<span class="shrink-0 text-sm leading-none {tint}{pulse}" title="{label}">{mark}</span>"##,
             tint = if activity == ThreadActivity::Failed {
                 "text-error"
             } else {
                 "opacity-60"
+            },
+            pulse = if activity.is_running() {
+                " animate-pulse"
+            } else {
+                ""
             },
             label = escape_html_text(activity.label()),
             mark = activity.mark(),

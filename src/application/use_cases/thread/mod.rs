@@ -43,6 +43,7 @@ use crate::{
 
 mod dispatch;
 mod ingest;
+pub use ingest::ReplyDelivery;
 mod support;
 
 #[cfg(test)]
@@ -373,6 +374,7 @@ impl ThreadUseCases {
                 company_id: company.id,
                 channel_id: source_channel_id,
             }),
+            ingest::ReplyDelivery::Send,
         )
         .await
     }
@@ -428,38 +430,17 @@ impl ThreadUseCases {
         Ok(())
     }
 
-    pub async fn execute_simulation(
+    /// Take in a message composed in the mailbox and queue its agent run.
+    ///
+    /// Returns as soon as the message is committed. The worker picks the task up on its next poll
+    /// and the reply reaches the open thread over the message stream — the same route every piece
+    /// of real inbound mail already takes.
+    pub async fn queue_inbound_for_agent(
         &self,
         raw_payload: RawInboundPayload,
-        mode: SimulationMode,
-    ) -> AppResult<SimulationExecutionResult> {
-        let ingest = self.ingest_and_save_inbound_message(raw_payload).await?;
-
-        if !ingest.accepted {
-            return Ok(SimulationExecutionResult {
-                ingest_result: ingest,
-                agent_execution: None,
-                simulation_mode: mode,
-            });
-        }
-
-        let send_email = mode == SimulationMode::Run;
-        let agent_execution = match self.execute_agent_and_dispatch(&ingest, send_email).await {
-            Ok(exec) => exec,
-            Err(err) => Some(AgentExecutionResult {
-                outbound_message_id: None,
-                agent_response: format!("{err}"),
-                email_sent: false,
-                token_usage: None,
-                metadata: None,
-            }),
-        };
-
-        Ok(SimulationExecutionResult {
-            ingest_result: ingest,
-            agent_execution,
-            simulation_mode: mode,
-        })
+        delivery: ReplyDelivery,
+    ) -> AppResult<InboundIngestResult> {
+        self.ingest_composed_message(raw_payload, delivery).await
     }
 
     pub async fn handle_bounce_dispatch(&self, ingest: &InboundIngestResult) {
@@ -477,40 +458,6 @@ impl ThreadUseCases {
                 .await;
             }
         }
-    }
-
-    pub async fn process_and_dispatch_email(
-        &self,
-        raw_payload: RawInboundPayload,
-    ) -> AppResult<ProcessEmailResult> {
-        let ingest = self.ingest_and_save_inbound_message(raw_payload).await?;
-        if !ingest.accepted {
-            self.handle_bounce_dispatch(&ingest).await;
-            return Ok(ProcessEmailResult {
-                processed: false,
-                reason: ingest.reason,
-                thread_id: None,
-                inbound_message_id: None,
-                outbound_message_id: None,
-            });
-        }
-
-        let thread_id = ingest.thread.as_ref().map(|t| t.id);
-        let inbound_message_id = ingest
-            .inbound_message
-            .as_ref()
-            .map(|m| m.message_id.to_string());
-
-        let agent_res = self.execute_agent_and_dispatch(&ingest, true).await?;
-        let outbound_msg_id = agent_res.and_then(|r| r.outbound_message_id);
-
-        Ok(ProcessEmailResult {
-            processed: true,
-            reason: None,
-            thread_id,
-            inbound_message_id,
-            outbound_message_id: outbound_msg_id,
-        })
     }
 
     pub async fn get_thread(&self, thread_id: Uuid) -> AppResult<Option<Thread>> {
@@ -903,6 +850,11 @@ pub struct InboundIngestResult {
     pub parsed_email: Option<ParsedEmail>,
     pub normalized_message: Option<NormalizedInboundMessage>,
     pub task_id: Option<Uuid>,
+    /// Whether the agent's reply should actually leave the building. Real inbound mail always gets
+    /// a real answer; a mailbox send can ask to stay in-app. Defaults true so task rows written
+    /// before this field existed still deliver.
+    #[serde(default = "delivers_by_default")]
+    pub deliver: bool,
     #[serde(default)]
     pub channel_matches: Vec<ChannelMatch>,
     #[serde(default)]
@@ -921,6 +873,7 @@ impl InboundIngestResult {
             parsed_email: None,
             normalized_message: None,
             task_id: None,
+            deliver: true,
             channel_matches: Vec::new(),
             bounce_info: None,
         }
@@ -937,6 +890,7 @@ impl InboundIngestResult {
             parsed_email: None,
             normalized_message: None,
             task_id: None,
+            deliver: true,
             channel_matches: Vec::new(),
             bounce_info: Some(bounce),
         }
@@ -960,18 +914,7 @@ pub struct AgentExecutionResult {
     pub metadata: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SimulationExecutionResult {
-    pub ingest_result: InboundIngestResult,
-    pub agent_execution: Option<AgentExecutionResult>,
-    pub simulation_mode: SimulationMode,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ProcessEmailResult {
-    pub processed: bool,
-    pub reason: Option<String>,
-    pub thread_id: Option<Uuid>,
-    pub inbound_message_id: Option<String>,
-    pub outbound_message_id: Option<String>,
+/// Real mail is always answered for real; only a mailbox send can ask otherwise.
+fn delivers_by_default() -> bool {
+    true
 }

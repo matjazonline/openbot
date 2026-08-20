@@ -38,3 +38,7 @@ reqwest = { version = "0.12", features = ["json"] }
 pulldown-cmark = "0.13"
 ammonia = "4"
 
+[dev-dependencies]
+# `#[tokio::test(start_paused = true)]`, so lease-heartbeat tests run in virtual time instead of
+# sleeping through a real 60-second lease term.
+tokio = { version = "1", features = ["full", "test-util"] }

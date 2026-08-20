@@ -1,13 +1,17 @@
-use std::sync::Arc;
+use std::{convert::Infallible, sync::Arc};
 
 use axum::{
     Form, Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    response::{Html, IntoResponse},
+    response::{
+        Html, IntoResponse,
+        sse::{Event, KeepAlive, Sse},
+    },
     routing::{get, put},
 };
 use serde::{Deserialize, Serialize};
+use tokio_stream::{Stream, StreamExt};
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -15,18 +19,19 @@ use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
     entities::{channel::Channel, cursor::ThreadCursor, thread::Thread},
-    infra::config::AppConfig,
+    infra::{config::AppConfig, events::MailboxEvents},
     services::email_parser::RawInboundPayload,
     use_cases::{
         agent::AgentUseCases,
         channel::{ChannelUseCases, ChannelWrite, parse_recipient_address_pipeline},
         company::CompanyUseCases,
-        thread::{SimulationMode, ThreadUseCases},
+        thread::{ReplyDelivery, SimulationMode, ThreadUseCases},
         user::UserUseCases,
     },
 };
 
 use super::agent::{ModelOverrides, create_agent_from_instructions};
+use super::ui::wake_ups;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -49,6 +54,10 @@ pub fn router() -> Router<AppState> {
         .route(
             "/companies/{company_id}/channels/{id}/simulate",
             get(simulate_channel_page).post(simulate_channel_handler),
+        )
+        .route(
+            "/companies/{company_id}/channels/{id}/simulate/events",
+            get(simulation_stream),
         )
         .route(
             "/companies/{company_id}/channels/{id}/simulate/thread",
@@ -921,41 +930,134 @@ async fn simulate_channel_handler(
                 ..Default::default()
             };
 
-            match thread_use_cases.execute_simulation(raw_payload, mode).await {
-                Ok(sim_res) => {
-                    let messages = match sim_res.ingest_result.thread {
-                        Some(ref thread) => thread_use_cases
-                            .get_thread_history(thread.id)
-                            .await
-                            .unwrap_or_default(),
-                        None => Vec::new(),
-                    };
-                    let tasks = thread_use_cases
-                        .list_company_tasks(company_id, Some(channel_id), None, true)
-                        .await
-                        .unwrap_or_default();
-
-                    let html_res = pages::channel_simulation_execution_result_fragment(
-                        company_id, channel_id, &sim_res, &messages, &tasks,
-                    );
-
-                    match sim_res.ingest_result.thread {
-                        Some(ref thread) => (
-                            [(
-                                "HX-Push-Url",
-                                simulation_thread_url(company_id, channel_id, thread.id),
-                            )],
-                            Html(html_res),
-                        )
-                            .into_response(),
-                        None => Html(html_res).into_response(),
-                    }
-                }
+            // Queued like any other message: the worker runs the agent and the view below fills
+            // itself in over its own stream.
+            let ingest = match thread_use_cases
+                .queue_inbound_for_agent(raw_payload, delivery_for(mode))
+                .await
+            {
+                Ok(ingest) => ingest,
                 Err(err) => {
-                    failure_fragment(&sender, format!("Simulation execution failed: {err}"))
+                    return failure_fragment(
+                        &sender,
+                        format!("Simulation execution failed: {err}"),
+                    );
+                }
+            };
+            let Some(thread) = ingest.thread.as_ref() else {
+                let reason = ingest
+                    .reason
+                    .unwrap_or_else(|| "The channel rejected this message.".to_string());
+                return failure_fragment(&sender, reason);
+            };
+
+            match load_simulation_thread_fragment(
+                &thread_use_cases,
+                &company,
+                &channel,
+                &config.app_domain_name,
+                &thread.id.to_string(),
+                true,
+            )
+            .await
+            {
+                Ok((thread, fragment)) => (
+                    [(
+                        "HX-Push-Url",
+                        simulation_thread_url(company_id, channel_id, thread.id),
+                    )],
+                    Html(pages::simulation_live_view(
+                        company_id, channel_id, thread.id, &fragment,
+                    )),
+                )
+                    .into_response(),
+                Err(error_fragment) => Html(error_fragment).into_response(),
+            }
+        }
+    }
+}
+
+/// GET /companies/{company_id}/channels/{id}/simulate/events - A simulated thread as the worker
+/// works through it (Protected).
+///
+/// The simulation page used to run its agent inside the POST and print the result once. Now the run
+/// is queued like every other message, so the page starts out showing only what was sent and fills
+/// in from here. Every commit or status change on the thread re-renders the view whole: this is a
+/// debugging page, and re-reading it in full is simpler and more honest than patching it in pieces.
+#[instrument(skip(company_use_cases, channel_use_cases, thread_use_cases, events, user))]
+async fn simulation_stream(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(events): State<MailboxEvents>,
+    user: AuthenticatedUser,
+    Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
+    Query(params): Query<OpenThreadParams>,
+) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
+    // Authorize once, here: the stream that follows filters on ids alone, so nothing past this
+    // point re-checks ownership.
+    let company = company_use_cases
+        .get_company(company_id)
+        .await?
+        .filter(|company| company.user_id == user.id)
+        .ok_or_else(|| AppError::NotFound("Company not found".into()))?;
+    let channel = channel_use_cases
+        .get_company_channel(user.id, company_id, channel_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+    let thread_id = params
+        .thread_id
+        .as_deref()
+        .unwrap_or_default()
+        .trim()
+        .parse::<Uuid>()
+        .map_err(|_| AppError::NotFound("Thread not found".into()))?;
+    let thread = thread_use_cases
+        .get_thread(thread_id)
+        .await?
+        .filter(|thread| thread.channel_id == channel_id)
+        .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+
+    let mut wake_ups = Box::pin(wake_ups(&events, "simulation", move |event| {
+        event.is_message_in_thread(thread_id) || event.is_activity_in_thread(thread_id)
+    }));
+    let app_domain_name = thread_use_cases.config().app_domain_name.clone();
+
+    let stream = async_stream::stream! {
+        // A lagged subscriber needs no special handling: the next render reads current state.
+        while wake_ups.next().await.is_some() {
+            // `include_oob: false` -- the out-of-band form reset belongs to the POST that started
+            // this run, not to every update after it.
+            let rendered = load_simulation_thread_fragment(
+                &thread_use_cases,
+                &company,
+                &channel,
+                &app_domain_name,
+                &thread.id.to_string(),
+                false,
+            )
+            .await;
+            match rendered {
+                Ok((_, fragment)) => {
+                    yield Ok(Event::default().event("simulation").data(fragment));
+                }
+                Err(error_fragment) => {
+                    yield Ok(Event::default().event("simulation").data(error_fragment));
+                    return;
                 }
             }
         }
+    };
+
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+}
+
+/// A simulation asks for a real send only in `Run` mode; `RunTest` keeps the answer in-app.
+fn delivery_for(mode: SimulationMode) -> ReplyDelivery {
+    if mode == SimulationMode::Run {
+        ReplyDelivery::Send
+    } else {
+        ReplyDelivery::InAppOnly
     }
 }
 
@@ -1025,7 +1127,9 @@ async fn open_simulated_thread_logic(
                 "HX-Push-Url",
                 simulation_thread_url(company_id, channel_id, thread.id),
             )],
-            Html(fragment),
+            Html(pages::simulation_live_view(
+                company_id, channel_id, thread.id, &fragment,
+            )),
         )
             .into_response(),
         Err(error_fragment) => Html(error_fragment).into_response(),
@@ -1487,53 +1591,6 @@ mod tests {
             pages::channel_simulation_result_fragment(company.id, channel.id, &sim_result);
         assert!(sim_result_html.contains("Webhook Triggered & Channel Resolved Successfully!"));
 
-        let full_sim_res = crate::use_cases::thread::SimulationExecutionResult {
-            ingest_result: crate::use_cases::thread::InboundIngestResult {
-                accepted: true,
-                reason: None,
-                thread: None,
-                inbound_message: None,
-                company: Some(company.clone()),
-                channel: Some(channel.clone()),
-                normalized_message: None,
-                channel_matches: vec![],
-                bounce_info: None,
-                parsed_email: Some(crate::services::email_parser::ParsedEmail {
-                    message_id: "<msg1@test>".to_string(),
-                    in_reply_to: None,
-                    references: vec![],
-                    thread_index: None,
-                    sender: "agent@test.com".to_string(),
-                    recipients_to: vec!["auto-dispatcher@acme.example.com".to_string()],
-                    recipients_cc: vec![],
-                    subject: "Test".to_string(),
-                    clean_text_body: "Body text".to_string(),
-                    raw_text_body: None,
-                    raw_html_body: None,
-                    attachments: vec![],
-                    prompt_text: "Body text".to_string(),
-                    is_auto_reply: false,
-                    is_forwarded: false,
-                    channel_id_header: None,
-                    hop_count: 0,
-                    trace_channels: vec![],
-                    spf_status: Some("pass".to_string()),
-                    dkim_status: Some("pass".to_string()),
-                    dmarc_status: Some("pass".to_string()),
-                    spam_score: None,
-                    is_context_only: false,
-                }),
-                task_id: None,
-            },
-            agent_execution: Some(crate::use_cases::thread::AgentExecutionResult {
-                outbound_message_id: Some("<out1@test>".to_string()),
-                agent_response: "## Agent Result\n\n**Hello** from Agent".to_string(),
-                email_sent: false,
-                token_usage: Some(crate::entities::task::TokenUsage::new(10, 5)),
-                metadata: None,
-            }),
-            simulation_mode: crate::use_cases::thread::SimulationMode::RunTest,
-        };
         let test_message = crate::entities::message::Message {
             id: Uuid::new_v4(),
             thread_id: Uuid::new_v4(),
@@ -1572,31 +1629,6 @@ mod tests {
             thread_index: None,
             created_at: Utc::now(),
         };
-
-        let run_test_html = pages::channel_simulation_execution_result_fragment(
-            company.id,
-            channel.id,
-            &full_sim_res,
-            &[test_message.clone(), test_agent_message.clone()],
-            &[],
-        );
-        assert!(run_test_html.contains("Run_Test"));
-        assert!(run_test_html.contains("Skipped (Run_Test Dry-Run)"));
-        assert!(run_test_html.contains("<h2>Agent Result</h2>"));
-        assert!(run_test_html.contains("<strong>Hello</strong> from Agent"));
-        assert!(run_test_html.contains("<h3>Thread Result</h3>"));
-        assert!(run_test_html.contains("<li><strong>First</strong> item</li>"));
-        assert!(run_test_html.contains("Task Execution Parameters"));
-        assert!(run_test_html.contains("LLM Provider:"));
-        assert!(run_test_html.contains("LLM Model:"));
-        assert!(run_test_html.contains("API Key Status:"));
-        assert!(run_test_html.contains("hx-swap-oob=\"outerHTML\""));
-        assert!(run_test_html.contains("Simulate New Thread"));
-        assert!(run_test_html.contains("Simulate Reply Webhook Call"));
-        assert!(run_test_html.contains("Trigger Reply Webhook Simulation"));
-        assert!(run_test_html.contains("Simulating..."));
-        assert!(run_test_html.contains("value=\"<out1@test>\""));
-        assert!(run_test_html.contains("Thread History"));
 
         let fail_html = pages::channel_simulation_failure_fragment(
             company.id,

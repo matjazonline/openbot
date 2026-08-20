@@ -45,7 +45,7 @@ use crate::{
     use_cases::{
         channel::ChannelUseCases,
         company::CompanyUseCases,
-        thread::{SimulationMode, ThreadUseCases},
+        thread::{ReplyDelivery, ThreadUseCases},
         user::UserUseCases,
     },
 };
@@ -136,12 +136,12 @@ fn delivery_requested(deliver: Option<&str>) -> bool {
     matches!(deliver, Some("true") | Some("on"))
 }
 
-/// Delivering means running the channel for real; otherwise the agent's reply stays in-app.
-fn delivery_mode(deliver: bool) -> SimulationMode {
+/// Delivering means the agent's reply is really emailed; otherwise it stays in the mailbox.
+fn delivery_mode(deliver: bool) -> ReplyDelivery {
     if deliver {
-        SimulationMode::Run
+        ReplyDelivery::Send
     } else {
-        SimulationMode::RunTest
+        ReplyDelivery::InAppOnly
     }
 }
 
@@ -433,7 +433,7 @@ fn resume_cursor<C: FromStr>(headers: &HeaderMap, after: Option<&str>) -> Option
 }
 
 /// Why a stream woke up.
-enum Wake {
+pub(super) enum Wake {
     /// A specific event this reader cares about.
     Event(MailboxEvent),
     /// Events were dropped because this reader fell behind. *What* was missed is unknown, so the
@@ -451,7 +451,7 @@ enum Wake {
 /// The `use<Matches>` bound is load-bearing: without it Rust 2024 has the returned stream capture
 /// the `&MailboxEvents` borrow, and an SSE response has to be `'static`. Only the subscription —
 /// which `subscribe` hands back owned — actually outlives this call.
-fn wake_ups<Matches>(
+pub(super) fn wake_ups<Matches>(
     events: &MailboxEvents,
     label: &'static str,
     matches: Matches,
@@ -805,17 +805,16 @@ async fn create_thread(
         text: Some(text_body.clone()),
         ..Default::default()
     };
-    let result = match thread_use_cases
-        .execute_simulation(payload, delivery_mode(deliver))
+    let ingest = match thread_use_cases
+        .queue_inbound_for_agent(payload, delivery_mode(deliver))
         .await
     {
-        Ok(result) => result,
+        Ok(ingest) => ingest,
         Err(err) => return Ok(compose_error(format!("Failed to send message: {err}"))),
     };
 
-    let Some(thread) = result.ingest_result.thread else {
-        let reason = result
-            .ingest_result
+    let Some(thread) = ingest.thread else {
+        let reason = ingest
             .reason
             .unwrap_or_else(|| "The channel rejected this message.".to_string());
         return Ok(compose_error(reason));
@@ -937,17 +936,16 @@ async fn send_reply(
         ..Default::default()
     };
 
-    let result = match thread_use_cases
-        .execute_simulation(payload, delivery_mode(deliver))
+    let ingest = match thread_use_cases
+        .queue_inbound_for_agent(payload, delivery_mode(deliver))
         .await
     {
-        Ok(result) => result,
+        Ok(ingest) => ingest,
         Err(err) => return Ok(reply_error(format!("Failed to send message: {err}"))),
     };
 
-    let Some(sent_thread) = result.ingest_result.thread else {
-        let reason = result
-            .ingest_result
+    let Some(sent_thread) = ingest.thread else {
+        let reason = ingest
             .reason
             .unwrap_or_else(|| "The channel rejected this message.".to_string());
         return Ok(reply_error(reason));

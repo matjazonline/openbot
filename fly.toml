@@ -1,6 +1,10 @@
 app = "mail-agents-server"
 primary_region = "fra"
 
+# A mailbox send holds its request open until the agent answers, up to the 15s inline wait before
+# the run is detached. The 5s default would SIGKILL the machine mid-request on every deploy.
+kill_timeout = "30s"
+
 [build]
 
 [env]

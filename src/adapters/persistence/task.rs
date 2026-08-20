@@ -3,7 +3,10 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 use sqlx::{Postgres, QueryBuilder};
 use std::collections::HashMap;
+use std::future::Future;
 use std::str::FromStr;
+use std::time::Duration;
+use tracing::{error, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -21,6 +24,106 @@ use crate::{
 };
 
 pub const TASK_LEASE_SECONDS: i64 = 15 * 60;
+
+/// Taking a task's lease. Only a task that is still pending and already due can be claimed, so two
+/// callers racing for the same row leave exactly one of them holding it.
+const CLAIM_TASK_SQL: &str = r#"UPDATE background_tasks
+   SET status = 'processing', worker_id = $2, locked_at = CURRENT_TIMESTAMP,
+       lock_expires_at = $3, updated_at = CURRENT_TIMESTAMP
+   WHERE id = $1 AND status = 'pending' AND run_at <= CURRENT_TIMESTAMP"#;
+
+/// Log when a lease-guarded state change was ignored because the lease or status moved on.
+///
+/// Both queues need this, and so does the inline dispatch path: a status write that quietly does
+/// nothing leaves its row claimed, and a claimed row that never reports a result is redelivered —
+/// or re-executed — on every lease expiry after that.
+pub fn report_outcome(subject: &str, id: Uuid, change: &str, outcome: AppResult<bool>) {
+    match outcome {
+        Ok(true) => {}
+        Ok(false) => {
+            warn!("{subject} {id} {change} ignored because its lease or status changed")
+        }
+        Err(err) => error!("Failed to record {subject} {id} {change}: {err}"),
+    }
+}
+
+/// A claim on a task: who holds it, and for how long at a time. Holding the *duration* rather than
+/// a computed deadline is what lets a lease extend itself — a precomputed `expires_at` is only ever
+/// right at the instant it was made, and every renewal after that has to guess the interval again.
+#[derive(Clone, Copy, Debug)]
+pub struct TaskLease {
+    pub worker_id: Uuid,
+    ttl: chrono::Duration,
+}
+
+impl TaskLease {
+    /// A worker's lease on a queued task: long, because the worker heartbeats it.
+    pub fn worker(worker_id: Uuid) -> Self {
+        Self::new(worker_id, TASK_LEASE_SECONDS)
+    }
+
+    fn new(worker_id: Uuid, ttl_seconds: i64) -> Self {
+        Self {
+            worker_id,
+            ttl: chrono::Duration::seconds(ttl_seconds),
+        }
+    }
+
+    /// The deadline a claim or renewal made *now* should carry.
+    pub fn expires_at(&self) -> DateTime<Utc> {
+        Utc::now() + self.ttl
+    }
+
+    /// How often to renew: a third of the term, so two beats can be missed before it lapses.
+    pub fn heartbeat(&self) -> Duration {
+        Duration::from_secs((self.ttl.num_seconds() / 3).max(1) as u64)
+    }
+}
+
+/// What became of work run under a lease.
+pub enum Leased<T> {
+    Finished(T),
+    /// The lease could not be renewed — the task was stopped, another worker took it over, or the
+    /// database is unreachable. Whatever this run was doing, it is no longer the run of record and
+    /// must not report a result.
+    Lost,
+}
+
+/// Run `work` while keeping `lease` alive, renewing on every [`TaskLease::heartbeat`].
+///
+/// Both queues need this. The worker holds a lease across a task it polled for; an inline dispatch
+/// holds one across a request. Neither can assume its work finishes inside a single lease term, and
+/// a lapsed lease means a second run of the same agent.
+pub async fn while_leased<F: Future>(
+    persistence: &dyn TaskPersistence,
+    task_id: Uuid,
+    lease: &TaskLease,
+    work: F,
+) -> Leased<F::Output> {
+    tokio::pin!(work);
+    let mut heartbeat = tokio::time::interval(lease.heartbeat());
+    // The first tick completes immediately; spend it here rather than renewing a lease just taken.
+    heartbeat.tick().await;
+
+    loop {
+        tokio::select! {
+            output = &mut work => return Leased::Finished(output),
+            _ = heartbeat.tick() => {
+                match persistence
+                    .renew_task_lease(task_id, lease.worker_id, lease.expires_at())
+                    .await
+                {
+                    Ok(true) => {}
+                    Ok(false) => return Leased::Lost,
+                    Err(error) => {
+                        error!("Failed to renew the lease on task {task_id}: {error}");
+                        return Leased::Lost;
+                    }
+                }
+            }
+        }
+    }
+}
 
 #[derive(sqlx::FromRow, Debug)]
 pub struct BackgroundTaskDb {
@@ -1146,56 +1249,13 @@ impl TaskPersistence for PostgresPersistence {
         task_type: &str,
         payload: Value,
     ) -> AppResult<BackgroundTask> {
-        let id = Uuid::new_v4();
-        let source_message_id = payload
-            .pointer("/inbound_message/message_id")
-            .and_then(Value::as_str)
-            .map(str::to_owned);
-        let targets = task_targets(&payload, company_id, channel_id, thread_id)?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let db = sqlx::query_as::<_, BackgroundTaskDb>(
-            r#"INSERT INTO background_tasks (
-                    id, company_id, channel_id, thread_id, source_message_id,
-                    task_type, status, payload
-               )
-               VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
-               ON CONFLICT (company_id, source_message_id)
-               DO UPDATE SET source_message_id = EXCLUDED.source_message_id
-               RETURNING id, company_id, channel_id, thread_id, task_type, status, payload,
-                          retry_count, max_retries, last_error, worker_id, locked_at, lock_expires_at,
-                          run_at, created_at, updated_at"#,
+        let task = insert_task(
+            &mut tx, company_id, channel_id, thread_id, task_type, payload,
         )
-        .bind(id)
-        .bind(company_id)
-        .bind(channel_id)
-        .bind(thread_id)
-        .bind(source_message_id)
-        .bind(task_type)
-        .bind(payload)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-
-        for (position, target) in targets.into_iter().enumerate() {
-            sqlx::query(
-                r#"INSERT INTO task_channel_targets (
-                        task_id, company_id, channel_id, thread_id, recipient_role, position
-                   ) VALUES ($1, $2, $3, $4, $5, $6)
-                   ON CONFLICT (task_id, channel_id) DO NOTHING"#,
-            )
-            .bind(db.id)
-            .bind(company_id)
-            .bind(target.channel_id)
-            .bind(target.thread_id)
-            .bind(target.recipient_role)
-            .bind(position as i32)
-            .execute(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
-        }
-
+        .await?;
         tx.commit().await.map_err(AppError::from)?;
-        db.try_into()
+        Ok(task)
     }
 
     async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<BackgroundTask>> {
@@ -1342,18 +1402,13 @@ impl TaskPersistence for PostgresPersistence {
         worker_id: Uuid,
         lock_expires_at: DateTime<Utc>,
     ) -> AppResult<bool> {
-        let res = sqlx::query(
-            r#"UPDATE background_tasks
-               SET status = 'processing', worker_id = $2, locked_at = CURRENT_TIMESTAMP,
-                   lock_expires_at = $3, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $1 AND status = 'pending' AND run_at <= CURRENT_TIMESTAMP"#,
-        )
-        .bind(id)
-        .bind(worker_id)
-        .bind(lock_expires_at)
-        .execute(&self.pool)
-        .await
-        .map_err(AppError::from)?;
+        let res = sqlx::query(CLAIM_TASK_SQL)
+            .bind(id)
+            .bind(worker_id)
+            .bind(lock_expires_at)
+            .execute(&self.pool)
+            .await
+            .map_err(AppError::from)?;
 
         Ok(res.rows_affected() > 0)
     }
@@ -1651,6 +1706,67 @@ fn outreach_progress(
         expires_at: outreach.expires_at,
         suspended,
     }
+}
+
+/// The SQL half of enqueueing: the task row and its channel-target fan-out, which have to commit
+/// together. The `ON CONFLICT` clause makes a redelivered source message return the task it already
+/// has rather than starting a second run of it.
+async fn insert_task(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    company_id: Uuid,
+    channel_id: Uuid,
+    thread_id: Option<Uuid>,
+    task_type: &str,
+    payload: Value,
+) -> AppResult<BackgroundTask> {
+    let id = Uuid::new_v4();
+    let source_message_id = payload
+        .pointer("/inbound_message/message_id")
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    let targets = task_targets(&payload, company_id, channel_id, thread_id)?;
+    let db = sqlx::query_as::<_, BackgroundTaskDb>(
+        r#"INSERT INTO background_tasks (
+                id, company_id, channel_id, thread_id, source_message_id,
+                task_type, status, payload
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
+           ON CONFLICT (company_id, source_message_id)
+           DO UPDATE SET source_message_id = EXCLUDED.source_message_id
+           RETURNING id, company_id, channel_id, thread_id, task_type, status, payload,
+                      retry_count, max_retries, last_error, worker_id, locked_at, lock_expires_at,
+                      run_at, created_at, updated_at"#,
+    )
+    .bind(id)
+    .bind(company_id)
+    .bind(channel_id)
+    .bind(thread_id)
+    .bind(source_message_id)
+    .bind(task_type)
+    .bind(payload)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+
+    for (position, target) in targets.into_iter().enumerate() {
+        sqlx::query(
+            r#"INSERT INTO task_channel_targets (
+                    task_id, company_id, channel_id, thread_id, recipient_role, position
+               ) VALUES ($1, $2, $3, $4, $5, $6)
+               ON CONFLICT (task_id, channel_id) DO NOTHING"#,
+        )
+        .bind(db.id)
+        .bind(company_id)
+        .bind(target.channel_id)
+        .bind(target.thread_id)
+        .bind(target.recipient_role)
+        .bind(position as i32)
+        .execute(&mut **tx)
+        .await
+        .map_err(AppError::from)?;
+    }
+
+    db.try_into()
 }
 
 struct TaskTarget {

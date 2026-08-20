@@ -22,7 +22,6 @@ use crate::entities::{
     value_objects::EmailAddress,
 };
 use crate::use_cases::channel::InboundEmailResult;
-use crate::use_cases::thread::{SimulationExecutionResult, SimulationMode};
 
 mod agent_settings;
 mod agents;

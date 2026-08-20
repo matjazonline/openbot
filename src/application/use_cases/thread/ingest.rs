@@ -42,6 +42,28 @@ use super::{
     },
 };
 
+/// The one task type this pipeline produces.
+const AGENT_DISPATCH_TASK: &str = "email_agent_dispatch";
+
+/// Whether the agent's reply to this message should actually be sent.
+///
+/// This is a property of the *message*, not of the run, which is why it has to survive into the
+/// durable payload: the worker that eventually answers is a different process from the one that
+/// took the message in, and it has no other way to know what was asked for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReplyDelivery {
+    /// Answer for real. Every message that arrived over SMTP or a webhook, and every internal hop.
+    Send,
+    /// Run the agent but keep the answer in the mailbox — a send the user marked as a test.
+    InAppOnly,
+}
+
+impl ReplyDelivery {
+    fn sends_email(self) -> bool {
+        matches!(self, ReplyDelivery::Send)
+    }
+}
+
 /// A company/channel pair that passed authorization, before its thread exists.
 struct CandidateMatch {
     company: Company,
@@ -150,13 +172,26 @@ impl ThreadUseCases {
         &self,
         norm: NormalizedInboundMessage,
     ) -> AppResult<InboundIngestResult> {
-        self.ingest_normalized_message_with_source(norm, None).await
+        self.ingest_normalized_message_with_source(norm, None, ReplyDelivery::Send)
+            .await
+    }
+
+    /// Ingest a message composed in the mailbox, which may ask for its reply to stay in-app.
+    pub(super) async fn ingest_composed_message(
+        &self,
+        raw_payload: RawInboundPayload,
+        delivery: ReplyDelivery,
+    ) -> AppResult<InboundIngestResult> {
+        let norm = EmailIngressAdapter::parse(raw_payload, &self.config);
+        self.ingest_normalized_message_with_source(norm, None, delivery)
+            .await
     }
 
     pub(super) async fn ingest_normalized_message_with_source(
         &self,
         norm: NormalizedInboundMessage,
         internal_source: Option<InternalChannelSource>,
+        delivery: ReplyDelivery,
     ) -> AppResult<InboundIngestResult> {
         let mut parsed = parsed_email_from_normalized(&norm);
         info!(
@@ -208,7 +243,7 @@ impl ThreadUseCases {
             }
         }
 
-        self.finalize_ingest(parsed, norm, channel_matches, context_only)
+        self.finalize_ingest(parsed, norm, channel_matches, context_only, delivery)
             .await
     }
 
@@ -854,6 +889,7 @@ impl ThreadUseCases {
         norm: NormalizedInboundMessage,
         channel_matches: Vec<ChannelMatch>,
         context_only: bool,
+        delivery: ReplyDelivery,
     ) -> AppResult<InboundIngestResult> {
         let first = channel_matches[0].clone();
         let context_only = context_only || parsed.is_context_only || norm.is_context_only;
@@ -872,6 +908,7 @@ impl ThreadUseCases {
             parsed_email: Some(parsed),
             normalized_message: Some(norm),
             task_id: None,
+            deliver: delivery.sends_email(),
             channel_matches,
             bounce_info: None,
         };
@@ -891,7 +928,7 @@ impl ThreadUseCases {
                 first.company.id,
                 first.channel.id,
                 Some(first.thread.id),
-                "email_agent_dispatch",
+                AGENT_DISPATCH_TASK,
                 durable_ingest_payload(&result),
             )
             .await?;

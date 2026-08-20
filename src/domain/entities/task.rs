@@ -114,30 +114,24 @@ impl ThreadActivity {
         }
     }
 
-    /// Whether this state is worth marking on a thread the reader does not have open.
+    /// Whether a run is under way right now, as opposed to parked or finished.
     ///
-    /// Work in progress is not. A reader scanning the column is not waiting on runs in threads
-    /// they have not opened, and the reply landing is the signal that matters there -- an animated
-    /// "replying" badge on those rows is noise, and because the mailbox enqueues a durable task
-    /// alongside its inline agent run, it usually appears *after* the reply is already visible.
-    ///
-    /// What earns a mark is a thread that has stopped progressing on its own and needs a person.
-    pub fn needs_attention(self) -> bool {
-        match self {
-            ThreadActivity::Working | ThreadActivity::Queued => false,
-            ThreadActivity::WaitingApproval
-            | ThreadActivity::WaitingReply
-            | ThreadActivity::Failed => true,
-        }
+    /// The column animates only this one: it is the single state that is expected to resolve on its
+    /// own, without anybody doing anything.
+    pub fn is_running(self) -> bool {
+        matches!(self, ThreadActivity::Working)
     }
 
     /// A single character standing in for this state in the thread column, where there is room for
     /// a mark but not for a sentence. The full wording rides along as the element's `title`.
+    ///
+    /// Every agent run goes through the worker, so `Queued` and `Working` now arrive *before* the
+    /// reply rather than after it, and a reader scanning the column has something real to learn
+    /// from them. They share a glyph on purpose: a queued task is picked up within a poll interval,
+    /// and swapping shapes that fast reads as a flicker rather than as progress.
     pub fn mark(self) -> &'static str {
         match self {
-            // Never rendered in the column -- see `needs_attention` -- but a total match keeps a
-            // new variant from silently defaulting to blank.
-            ThreadActivity::Working | ThreadActivity::Queued => "",
+            ThreadActivity::Queued | ThreadActivity::Working => "•",
             ThreadActivity::WaitingApproval => "⏳",
             ThreadActivity::WaitingReply => "✉",
             ThreadActivity::Failed => "⚠",
@@ -374,8 +368,8 @@ mod tests {
                 Some(activity)
             );
             assert!(!activity.label().is_empty());
-            // Only the states that stall get a column mark, and every one of those has a glyph.
-            assert_eq!(!activity.mark().is_empty(), activity.needs_attention());
+            // Every state a thread can be in says something in the column.
+            assert!(!activity.mark().is_empty());
         }
     }
 }

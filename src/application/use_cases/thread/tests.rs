@@ -704,6 +704,41 @@ impl TaskPersistence for MockTaskPersistence {
     }
 }
 
+/// A task row written before the delivery choice was persisted has no `deliver` key, and the
+/// worker that picks it up must answer it for real. Defaulting the other way would silently
+/// swallow every reply still sitting in the queue across a deploy.
+#[test]
+fn a_payload_without_a_delivery_choice_still_delivers() {
+    let legacy: InboundIngestResult = serde_json::from_value(serde_json::json!({
+        "accepted": true,
+        "reason": null,
+        "thread": null,
+        "inbound_message": null,
+        "company": null,
+        "channel": null,
+        "parsed_email": null,
+        "normalized_message": null,
+        "task_id": null,
+    }))
+    .expect("a payload predating the field must still deserialize");
+    assert!(legacy.deliver);
+
+    let in_app: InboundIngestResult = serde_json::from_value(serde_json::json!({
+        "accepted": true,
+        "reason": null,
+        "thread": null,
+        "inbound_message": null,
+        "company": null,
+        "channel": null,
+        "parsed_email": null,
+        "normalized_message": null,
+        "task_id": null,
+        "deliver": false,
+    }))
+    .expect("an in-app-only payload must deserialize");
+    assert!(!in_app.deliver);
+}
+
 #[tokio::test]
 async fn test_inter_channel_hop_limit_rejection() {
     let company_id = Uuid::new_v4();

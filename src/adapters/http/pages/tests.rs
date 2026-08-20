@@ -1453,15 +1453,32 @@ fn a_thread_row_carries_its_own_activity_slot() {
     // An idle thread has the slot but nothing in it, so a mark can be streamed in later.
     assert!(!idle.contains("title="));
 
-    // A run in progress earns no mark in the column at all. The reader is not waiting on threads
-    // they have not opened, and an animated badge there fires *after* the reply has landed,
-    // because the mailbox enqueues a durable task alongside its inline agent run.
-    assert_eq!(
+    // Every agent run goes through the worker, so a run in progress leads the reply rather than
+    // trailing it -- and it is the one state that resolves on its own, so it is the one that
+    // animates.
+    assert_ne!(
         working, idle,
-        "a working thread must look exactly like an idle one in the column"
+        "a working thread must be distinguishable from an idle one"
     );
+    assert!(working.contains("•"));
+    assert!(working.contains(r#"title="Agent replying…""#));
+    assert!(working.contains("animate-pulse"));
 
-    // A thread that has stalled does earn one -- quiet, unanimated, wording on hover.
+    // Queued shares the glyph but not the animation: it is picked up within a poll interval, and
+    // changing shape that fast reads as a flicker rather than as progress.
+    let queued = thread_row_fragment(
+        company.id,
+        &channel,
+        &thread,
+        false,
+        Some(ThreadActivity::Queued),
+        None,
+    );
+    assert!(queued.contains("•"));
+    assert!(queued.contains(r#"title="Queued""#));
+    assert!(!queued.contains("animate-pulse"));
+
+    // A thread that has stalled earns its own glyph -- quiet, unanimated, wording on hover.
     let blocked = thread_row_fragment(
         company.id,
         &channel,

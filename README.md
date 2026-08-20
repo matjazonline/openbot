@@ -59,7 +59,7 @@ Email clients append the entire historical thread below newly typed text. Feedin
 
 ### 3.4 Background Task Queue & Worker
 - **Durable Task Store (`background_tasks`):** Ingests inbound emails synchronously and enqueues background processing tasks, allowing the webhook to return `HTTP 200 OK` in < 100ms.
-- **Task Worker Poller (`TaskWorker`):** Every 3 seconds, processes up to 10 outbox emails, checks quorum timeouts, and claims at most one task. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
+- **Task Worker Poller (`TaskWorker`):** Three independent loops so that a long agent run cannot hold up mail delivery. The task loop claims at most one due task every 500ms; the outbox loop claims and sends up to 10 emails every 500ms; a maintenance loop reaps expired delivery leases and checks quorum timeouts every 30 seconds. A loop that finds a full batch comes straight back without pausing, and one whose iteration failed backs off for 5 seconds. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
 - **Leased Execution:** Claims use `FOR UPDATE SKIP LOCKED` and a 15-minute lease. Background executions renew the lease every 5 minutes, and an expired lease can be reclaimed by another worker.
 - **Shutdown:** `Ctrl+C` broadcasts a shutdown signal to the worker and SMTP listener. The loops exit when control returns to their outer `select`; spawned worker and SMTP tasks are not explicitly awaited before runtime shutdown.
 
@@ -99,13 +99,18 @@ flowchart TD
 
     ENQUEUE --> PENDING
 
-    subgraph Worker[TaskWorker iteration every 3 seconds]
-        TICK[Poll iteration]
-        OUTBOX_STEP[Claim and send up to 10 outbox emails]
-        QUORUM[Check up to 100 due quorum waits]
+    subgraph Worker[TaskWorker poll loops]
+        TASK_TICK[Task loop<br/>every 500ms]
         CLAIM[Atomically claim one due task<br/>FOR UPDATE SKIP LOCKED]
+        OUTBOX_TICK[Outbox loop<br/>every 500ms]
+        OUTBOX_STEP[Claim and send up to 10 outbox emails]
+        MAINT_TICK[Maintenance loop<br/>every 30s]
+        REAP[Reap expired delivery leases]
+        QUORUM[Check up to 100 due quorum waits]
 
-        TICK --> OUTBOX_STEP --> QUORUM --> CLAIM
+        TASK_TICK --> CLAIM
+        OUTBOX_TICK --> OUTBOX_STEP
+        MAINT_TICK --> REAP --> QUORUM
     end
 
     PENDING -->|due| CLAIM

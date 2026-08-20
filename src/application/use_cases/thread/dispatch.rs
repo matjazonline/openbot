@@ -15,7 +15,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::task::{OutboundSend, TASK_LEASE_SECONDS},
+    adapters::persistence::task::{OutboundSend, TASK_LEASE_SECONDS, report_outcome},
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
@@ -42,21 +42,11 @@ use super::{
     support::{DirectoryCache, outbound_reference_ids},
 };
 
-/// Who owns the durable task while the agent runs.
+/// The worker running this dispatch, which already holds the task's lease and will close the task
+/// out itself once this returns.
 #[derive(Debug, Clone, Copy)]
-enum TaskClaim {
-    /// The caller already holds the lease (the background worker path).
-    Held(Uuid),
-    /// This call must take the lease itself (the inline/simulation path).
-    TakeHere,
-}
-
-/// The lease actually in force for this dispatch.
 struct ActiveClaim {
-    /// Whoever holds the lease, whether inherited from the caller or taken here.
-    worker_id: Option<Uuid>,
-    /// Set only when *this* call took the lease, and so is responsible for closing the task out.
-    owned_worker_id: Option<Uuid>,
+    worker_id: Uuid,
 }
 
 /// One agent's contribution to the reply.
@@ -90,38 +80,28 @@ struct OutboundDelivery {
 }
 
 impl ThreadUseCases {
-    pub async fn execute_agent_and_dispatch(
-        &self,
-        ingest: &InboundIngestResult,
-        send_email: bool,
-    ) -> AppResult<Option<AgentExecutionResult>> {
-        self.dispatch(ingest, send_email, TaskClaim::TakeHere).await
-    }
-
     pub async fn execute_claimed_agent_task_and_dispatch(
         &self,
         ingest: &InboundIngestResult,
         send_email: bool,
         worker_id: Uuid,
     ) -> AppResult<Option<AgentExecutionResult>> {
-        self.dispatch(ingest, send_email, TaskClaim::Held(worker_id))
-            .await
-    }
-
-    async fn dispatch(
-        &self,
-        ingest: &InboundIngestResult,
-        send_email: bool,
-        claim: TaskClaim,
-    ) -> AppResult<Option<AgentExecutionResult>> {
         if let Some(message_id) = context_only_message_id(ingest) {
             info!("Skipping agent execution for context-only message ID {message_id}");
             return Ok(None);
         }
+        self.run_claimed_dispatch(ingest, send_email, &ActiveClaim { worker_id })
+            .await
+    }
 
-        let Some(claim) = self.acquire_claim(ingest, claim).await? else {
-            return Ok(None);
-        };
+    /// The dispatch proper: run the agents, deliver the reply, and record what happened on the
+    /// task. Marking the task done is the worker's job, not this one's.
+    async fn run_claimed_dispatch(
+        &self,
+        ingest: &InboundIngestResult,
+        send_email: bool,
+        claim: &ActiveClaim,
+    ) -> AppResult<Option<AgentExecutionResult>> {
         let Some(parsed) = ingest.parsed_email.as_ref() else {
             return Ok(None);
         };
@@ -129,7 +109,7 @@ impl ThreadUseCases {
             return Ok(None);
         };
 
-        let Some(run) = self.run_agents(&matches, parsed, ingest, &claim).await? else {
+        let Some(run) = self.run_agents(&matches, parsed, ingest, claim).await? else {
             info!("Agent execution suspended for task approval or outreach");
             return Ok(None);
         };
@@ -137,15 +117,13 @@ impl ThreadUseCases {
         let response = self.combine_responses(&run.outputs);
         let metadata = combine_metadata(&run.outputs);
         let delivery = self
-            .deliver_agent_response(&matches, parsed, ingest, &claim, &response, send_email)
+            .deliver_agent_response(&matches, parsed, ingest, claim, &response, send_email)
             .await?;
 
         self.save_outbound_messages(&matches, &delivery, &response)
             .await?;
-        self.record_dispatch_outcome(
-            ingest, parsed, &claim, &run, &delivery, &response, &metadata,
-        )
-        .await?;
+        self.record_dispatch_outcome(ingest, parsed, claim, &run, &delivery, &response, &metadata)
+            .await?;
 
         Ok(Some(AgentExecutionResult {
             outbound_message_id: Some(delivery.message_id),
@@ -153,47 +131,6 @@ impl ThreadUseCases {
             email_sent: delivery.email_sent,
             token_usage: Some(TokenUsage::new(run.prompt_tokens, run.completion_tokens)),
             metadata,
-        }))
-    }
-
-    /// Take the task lease unless the caller already holds it. `Ok(None)` means another worker got
-    /// there first and this dispatch must not duplicate the send.
-    async fn acquire_claim(
-        &self,
-        ingest: &InboundIngestResult,
-        claim: TaskClaim,
-    ) -> AppResult<Option<ActiveClaim>> {
-        let worker_id = match claim {
-            TaskClaim::Held(worker_id) => {
-                return Ok(Some(ActiveClaim {
-                    worker_id: Some(worker_id),
-                    owned_worker_id: None,
-                }));
-            }
-            TaskClaim::TakeHere => Uuid::new_v4(),
-        };
-        let Some(task_id) = ingest.task_id else {
-            return Ok(Some(ActiveClaim {
-                worker_id: None,
-                owned_worker_id: None,
-            }));
-        };
-
-        let lease_expires_at = chrono::Utc::now() + chrono::Duration::seconds(TASK_LEASE_SECONDS);
-        if !self
-            .task_persistence
-            .claim_task(task_id, worker_id, lease_expires_at)
-            .await?
-        {
-            info!(
-                "Task {task_id} already claimed or completed by another worker, skipping duplicate dispatch"
-            );
-            return Ok(None);
-        }
-        info!("Successfully claimed task {task_id} for execution");
-        Ok(Some(ActiveClaim {
-            worker_id: Some(worker_id),
-            owned_worker_id: Some(worker_id),
         }))
     }
 
@@ -275,11 +212,16 @@ impl ThreadUseCases {
                             Some(channel_match.channel.id),
                             agent.as_ref().map(|a| a.id),
                         );
-                    if let (Some(task_id), Some(worker_id)) = (ingest.task_id, claim.worker_id) {
+                    if let Some(task_id) = ingest.task_id {
                         runner = runner.outreach_tool(
                             self.task_persistence.clone(),
                             self.channel_persistence.clone(),
-                            self.outreach_context_for(channel_match, parsed, task_id, worker_id),
+                            self.outreach_context_for(
+                                channel_match,
+                                parsed,
+                                task_id,
+                                claim.worker_id,
+                            ),
                         );
                     }
                     runner.execute().await
@@ -498,12 +440,12 @@ impl ThreadUseCases {
         };
 
         // The lease must still be ours at the moment of sending, or two workers could both reply.
-        if let (Some(task_id), Some(worker_id)) = (ingest.task_id, claim.worker_id) {
+        if let Some(task_id) = ingest.task_id {
             let renewed = self
                 .task_persistence
                 .renew_task_lease(
                     task_id,
-                    worker_id,
+                    claim.worker_id,
                     chrono::Utc::now() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
                 )
                 .await?;
@@ -785,8 +727,8 @@ impl ThreadUseCases {
         Ok(())
     }
 
-    /// Write the audit payload back onto the task, then close it out — failing it (for retry) when
-    /// the primary agent errored.
+    /// Write the audit payload back onto the task, and surface a failed agent run to the worker,
+    /// which owns the retry decision.
     async fn record_dispatch_outcome(
         &self,
         ingest: &InboundIngestResult,
@@ -800,40 +742,21 @@ impl ThreadUseCases {
         if let Some(task_id) = ingest.task_id {
             let payload =
                 self.dispatch_audit_payload(ingest, parsed, run, delivery, response, metadata);
-            match claim.worker_id {
-                Some(worker_id) => {
-                    let _ = self
-                        .task_persistence
-                        .update_claimed_task_payload(task_id, worker_id, payload)
-                        .await;
-                }
-                None => {
-                    let _ = self
-                        .task_persistence
-                        .update_task_payload(task_id, payload)
-                        .await;
-                }
-            }
+            let outcome = self
+                .task_persistence
+                .update_claimed_task_payload(task_id, claim.worker_id, payload)
+                .await;
+            report_outcome("Task", task_id, "payload update", outcome);
         }
 
+        // Failing the run is reported upwards rather than written here: the worker owns the lease
+        // and turns this error into the retry-or-dead-letter decision in `close_out_task`.
         if let Some(ref error) = run.primary_error {
-            if let (Some(task_id), Some(worker_id)) = (ingest.task_id, claim.owned_worker_id) {
-                let _ = self
-                    .task_persistence
-                    .mark_task_failed(task_id, worker_id, error, chrono::Utc::now(), true)
-                    .await;
-            }
             return Err(AppError::Internal(error.clone()));
         }
 
         if let Some(task_id) = ingest.task_id {
             self.task_persistence.complete_outreach(task_id).await?;
-        }
-        if let (Some(task_id), Some(worker_id)) = (ingest.task_id, claim.owned_worker_id) {
-            let _ = self
-                .task_persistence
-                .mark_task_completed(task_id, worker_id)
-                .await;
         }
         Ok(())
     }
