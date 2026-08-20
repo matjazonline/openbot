@@ -1510,6 +1510,7 @@ mod tests {
                 "system_prompt": "Agent prompt",
                 "temperature": 0.7
             })),
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -1679,6 +1680,7 @@ mod tests {
             api_key: None,
             system_prompt: Some("You are a helpful triage assistant.".to_string()),
             config_json: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 

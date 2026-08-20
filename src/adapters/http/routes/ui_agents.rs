@@ -26,7 +26,12 @@ use crate::{
         pages,
     },
     app_error::{AppError, AppResult},
-    entities::{agent::Agent, channel::Channel, company::Company, value_objects::EmailAddress},
+    entities::{
+        agent::Agent,
+        channel::Channel,
+        company::Company,
+        value_objects::{AvatarUrl, EmailAddress},
+    },
     use_cases::{
         agent::AgentUseCases, channel::ChannelUseCases, company::CompanyUseCases,
         user::UserUseCases,
@@ -36,7 +41,7 @@ use crate::{
 use super::{
     agent::{AgentForm, ModelOverrides, create_agent_from_instructions},
     channel::parse_config_form,
-    ui::{load_account, load_scoped_company},
+    ui::{load_account, load_scoped_company, workspace_user},
 };
 
 pub fn router() -> Router<AppState> {
@@ -149,10 +154,7 @@ async fn agents_page(
 ) -> AppResult<Html<String>> {
     let account = load_account(&workspace.user_use_cases, workspace.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let workspace_user = pages::MailboxUser {
-        username: &account.username,
-        email: &account_email,
-    };
+    let workspace_user = workspace_user(&account, &account_email);
 
     let (companies, company) = load_scoped_company(
         &workspace.company_use_cases,
@@ -275,6 +277,11 @@ async fn create_agent(
         Ok(Html(view.create_pane(&submitted.draft(), Some(&message))).into_response())
     };
 
+    let avatar_url = match &submitted.avatar_url {
+        Ok(avatar) => avatar.clone(),
+        Err(message) => return rejected(message.clone()),
+    };
+
     let created = if submitted.is_simple() {
         create_agent_from_instructions(
             &workspace.agent_use_cases,
@@ -284,6 +291,7 @@ async fn create_agent(
             &submitted.slug,
             submitted.form.system_prompt.as_deref().unwrap_or_default(),
             submitted.overrides(),
+            avatar_url.as_ref(),
         )
         .await
     } else {
@@ -304,6 +312,7 @@ async fn create_agent(
                 submitted.form.api_key.as_deref(),
                 submitted.form.system_prompt.as_deref(),
                 config_json,
+                avatar_url.as_ref(),
             )
             .await
             .map_err(|err| format!("Failed to create agent: {err}"))
@@ -328,8 +337,11 @@ async fn update_agent(
     let stored = view.agent(agent_id).await?;
     let submitted = SubmittedAgent::new(form);
 
-    let config_json = match parse_config_form(submitted.form.config_json.clone()) {
-        Ok(config) => config,
+    let fields = parse_config_form(submitted.form.config_json.clone())
+        .and_then(|config_json| Ok((config_json, submitted.avatar_url.clone()?)));
+
+    let (config_json, avatar_url) = match fields {
+        Ok(fields) => fields,
         Err(message) => {
             return Ok(Html(
                 view.edit_pane(&stored, Some(&submitted.draft()), Some(&message))
@@ -352,6 +364,7 @@ async fn update_agent(
             submitted.form.api_key.as_deref(),
             submitted.form.system_prompt.as_deref(),
             config_json,
+            avatar_url.as_ref(),
         )
         .await;
 
@@ -501,12 +514,20 @@ impl AgentSettingsView<'_> {
 struct SubmittedAgent {
     form: AgentForm,
     slug: String,
+    /// The avatar as parsed, or why it was refused. Kept as the `Result` so a bad URL comes back
+    /// as the filled-in form with the reason on top, the way a bad config JSON does.
+    avatar_url: Result<Option<AvatarUrl>, String>,
 }
 
 impl SubmittedAgent {
     fn new(form: AgentForm) -> Self {
         let slug = form.slug();
-        Self { form, slug }
+        let avatar_url = form.avatar_url();
+        Self {
+            form,
+            slug,
+            avatar_url,
+        }
     }
 
     /// Whether `system_prompt` holds instructions to expand rather than the prompt itself.
@@ -531,6 +552,7 @@ impl SubmittedAgent {
             model: self.form.model.as_deref().unwrap_or(""),
             api_key: self.form.api_key.as_deref().unwrap_or(""),
             config_json: self.form.config_json.as_deref().unwrap_or(""),
+            avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
             advanced: !self.is_simple(),
         }
     }

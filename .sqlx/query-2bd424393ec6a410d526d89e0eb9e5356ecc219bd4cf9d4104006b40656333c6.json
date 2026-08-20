@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT m.id, m.company_id, m.user_id, u.username as \"username?\", u.email as \"email?\", m.role, m.created_at as \"created_at!\"\n               FROM company_members m\n               JOIN users u ON u.id = m.user_id\n               WHERE m.company_id = $1\n               ORDER BY m.created_at ASC, m.id ASC LIMIT 200",
+  "query": "SELECT m.id, m.company_id, m.user_id, u.username as \"username?\", u.email as \"email?\", u.avatar_url, m.role, m.created_at as \"created_at!\"\n               FROM company_members m\n               JOIN users u ON u.id = m.user_id\n               WHERE m.company_id = $1\n               ORDER BY m.created_at ASC, m.id ASC LIMIT 200",
   "describe": {
     "columns": [
       {
@@ -40,11 +40,16 @@
       },
       {
         "ordinal": 5,
-        "name": "role",
+        "name": "avatar_url",
         "type_info": "Text"
       },
       {
         "ordinal": 6,
+        "name": "role",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
         "name": "created_at!",
         "type_info": "Timestamptz"
       }
@@ -60,9 +65,10 @@
       false,
       false,
       false,
+      true,
       false,
       false
     ]
   },
-  "hash": "a38bfcf082666e08d3625c61e43f4d13100cf18deeb13dcb9159408ce0dc16db"
+  "hash": "2bd424393ec6a410d526d89e0eb9e5356ecc219bd4cf9d4104006b40656333c6"
 }

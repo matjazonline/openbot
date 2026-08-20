@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, username, email, password_hash, created_at as \"created_at!\" FROM users WHERE email = $1",
+  "query": "SELECT id, username, email, password_hash, avatar_url, created_at as \"created_at!\" FROM users WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -35,18 +35,18 @@
       },
       {
         "ordinal": 4,
+        "name": "avatar_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
         "name": "created_at!",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        {
-          "Custom": {
-            "name": "citext",
-            "kind": "Simple"
-          }
-        }
+        "Uuid"
       ]
     },
     "nullable": [
@@ -54,8 +54,9 @@
       false,
       false,
       false,
+      true,
       false
     ]
   },
-  "hash": "9926445e22ccf9c9ad209cf0fbbed97b3cef03633dcc350f1a63f1a66414894e"
+  "hash": "d88a2a564f59f81be44af8625efc4f13399a36242541a4a84f623fdf43712e92"
 }

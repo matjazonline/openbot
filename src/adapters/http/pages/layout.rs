@@ -387,6 +387,78 @@ pub fn error_alert(message: &str) -> String {
     )
 }
 
+/// How big an avatar bubble is drawn, by where it sits rather than by a raw class: the three
+/// places `/ui` shows a face should not each pick their own size.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AvatarSize {
+    /// A sidebar row -- a channel's agents, a company's team.
+    Row,
+    /// The account button in the top bar.
+    Bar,
+    /// The header of an open pane.
+    Header,
+}
+
+impl AvatarSize {
+    fn bubble_class(self) -> &'static str {
+        match self {
+            AvatarSize::Row => "w-8",
+            AvatarSize::Bar => "w-9",
+            AvatarSize::Header => "w-12",
+        }
+    }
+
+    fn letter_class(self) -> &'static str {
+        match self {
+            AvatarSize::Row => "text-xs",
+            AvatarSize::Bar => "text-sm",
+            AvatarSize::Header => "text-lg",
+        }
+    }
+}
+
+/// The face shown for a user or an agent: their picture when they have one, the first letter of
+/// their name when they do not.
+///
+/// The letter is always rendered underneath, and the picture sits on top of it -- an avatar URL
+/// that 404s or is blocked drops its `<img>` and reveals the letter, rather than leaving the hole
+/// a bare broken image would.
+pub(crate) fn avatar_bubble(
+    avatar_url: Option<&AvatarUrl>,
+    name: &str,
+    size: AvatarSize,
+) -> String {
+    let picture = match avatar_url {
+        Some(url) => format!(
+            r##"<img src="{url}" alt="" loading="lazy" onerror="this.remove()"
+                            class="absolute inset-0 h-full w-full rounded-full object-cover">"##,
+            url = escape_html_text(url.as_str()),
+        ),
+        None => String::new(),
+    };
+
+    format!(
+        r##"<div class="avatar avatar-placeholder shrink-0">
+                    <div class="relative {bubble_class} rounded-full bg-primary text-primary-content">
+                        <span class="{letter_class} font-bold">{initial}</span>
+                        {picture}
+                    </div>
+                </div>"##,
+        bubble_class = size.bubble_class(),
+        letter_class = size.letter_class(),
+        initial = escape_html_text(&avatar_initial(name)),
+    )
+}
+
+/// The letter in an avatar bubble: the first character of whatever the thing is called.
+fn avatar_initial(name: &str) -> String {
+    name.trim()
+        .chars()
+        .next()
+        .map(|first| first.to_uppercase().to_string())
+        .unwrap_or_else(|| "?".to_string())
+}
+
 pub(crate) fn escape_html_text(value: &str) -> String {
     value
         .replace('&', "&amp;")

@@ -13,7 +13,7 @@ use axum::{
     extract::{FromRequestParts, Path, Query},
     http::request::Parts,
     response::{Html, IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, post, put},
 };
 use serde::Deserialize;
 use tracing::instrument;
@@ -27,15 +27,17 @@ use crate::{
     },
     app_error::{AppError, AppResult},
     entities::{
-        company::Company, company_invite::CompanyInvite, company_member::CompanyMember,
-        value_objects::EmailAddress,
+        company::Company,
+        company_invite::CompanyInvite,
+        company_member::CompanyMember,
+        value_objects::{AvatarUrl, EmailAddress},
     },
     use_cases::{
         company::CompanyUseCases, company_invite::CompanyInviteUseCases, user::UserUseCases,
     },
 };
 
-use super::ui::{load_account, load_scoped_company};
+use super::ui::{load_account, load_scoped_company, workspace_user};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -51,6 +53,7 @@ pub fn router() -> Router<AppState> {
             "/ui/team/members/{user_id}",
             get(member_pane).delete(remove_member),
         )
+        .route("/ui/team/members/{user_id}/avatar", put(set_member_avatar))
 }
 
 /// What the workspace has selected, all optional so `/ui/team` alone is a valid entry point.
@@ -74,6 +77,13 @@ pub struct CompanyQuery {
 #[derive(Debug, Clone, Deserialize)]
 pub struct InviteForm {
     pub email: String,
+}
+
+/// The avatar field from a member's own pane. Blank means "back to my initial", which is why it is
+/// a plain `String` rather than an `Option`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AvatarForm {
+    pub avatar_url: String,
 }
 
 const NO_SELECTION: &str = "Select someone to see their access, or invite a new person.";
@@ -133,10 +143,7 @@ async fn team_page(
 ) -> AppResult<Html<String>> {
     let account = load_account(&workspace.user_use_cases, workspace.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let workspace_user = pages::MailboxUser {
-        username: &account.username,
-        email: &account_email,
-    };
+    let workspace_user = workspace_user(&account, &account_email);
 
     let (companies, company) = load_scoped_company(
         &workspace.company_use_cases,
@@ -221,6 +228,69 @@ async fn member_pane(
     let member = view.member(user_id).await?;
 
     Ok(Html(view.member_pane(&member, None)))
+}
+
+/// PUT /ui/team/members/{user_id}/avatar - Save your own profile picture (Protected).
+///
+/// An avatar belongs to the account, not to the membership, so this refuses any `user_id` but the
+/// caller's -- being the company owner does not make somebody else's picture yours to set.
+#[instrument(skip(workspace, form))]
+async fn set_member_avatar(
+    workspace: Workspace,
+    Path(user_id): Path<Uuid>,
+    Query(query): Query<CompanyQuery>,
+    Form(form): Form<AvatarForm>,
+) -> AppResult<Response> {
+    if user_id != workspace.user_id {
+        return Err(AppError::BadRequest(
+            "You can only change your own avatar.".into(),
+        ));
+    }
+
+    let company = workspace.scoped_company(query.company_id).await?;
+    let view = workspace.view(&company);
+
+    let avatar_url = match AvatarUrl::parse(&form.avatar_url) {
+        Ok(avatar_url) => avatar_url,
+        Err(message) => {
+            let member = view.member(user_id).await?;
+            return Ok(Html(view.member_pane_with_draft(
+                &member,
+                Some(&form.avatar_url),
+                Some(&message),
+            ))
+            .into_response());
+        }
+    };
+
+    let saved = match workspace
+        .user_use_cases
+        .set_avatar(user_id, avatar_url.as_ref())
+        .await
+    {
+        Ok(saved) => saved,
+        Err(err) => {
+            let member = view.member(user_id).await?;
+            return Ok(Html(view.member_pane_with_draft(
+                &member,
+                Some(&form.avatar_url),
+                Some(&format!("Failed to save avatar: {err}")),
+            ))
+            .into_response());
+        }
+    };
+
+    // Re-read the member so the pane and the sidebar both show what was just stored, and send the
+    // top bar's own avatar along -- it is chrome no pane swap would otherwise touch.
+    let member = view.member(user_id).await?;
+    let pane = format!(
+        "{}{}",
+        view.member_pane(&member, None),
+        pages::account_avatar_oob(&saved.username, saved.avatar_url.as_ref()),
+    );
+
+    view.saved_response(TeamSelection::Member(user_id), pane)
+        .await
 }
 
 /// GET /ui/team/invites/{invite_id} - One invite for the pane (Protected).
@@ -441,10 +511,22 @@ impl TeamView<'_> {
     }
 
     fn member_pane(&self, member: &CompanyMember, error: Option<&str>) -> String {
+        self.member_pane_with_draft(member, None, error)
+    }
+
+    /// The same pane with the avatar field kept as typed, for a save that was rejected.
+    fn member_pane_with_draft(
+        &self,
+        member: &CompanyMember,
+        avatar_draft: Option<&str>,
+        error: Option<&str>,
+    ) -> String {
         pages::member_pane(&pages::MemberPane {
             company: self.company,
             member,
             role: self.role(),
+            viewer_id: self.user_id,
+            avatar_draft,
             error,
         })
     }

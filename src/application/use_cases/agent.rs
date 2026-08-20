@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::agent::Agent,
+    entities::{agent::Agent, value_objects::AvatarUrl},
     use_cases::{
         channel::{SlugKind, validate_slug},
         company::{CompanyPersistence, owned_company},
@@ -32,6 +32,7 @@ pub trait AgentPersistence: Send + Sync {
         api_key: Option<&str>,
         system_prompt: Option<&str>,
         config_json: Option<serde_json::Value>,
+        avatar_url: Option<&AvatarUrl>,
     ) -> AppResult<Agent>;
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>>;
@@ -54,6 +55,7 @@ pub trait AgentPersistence: Send + Sync {
         api_key: Option<&str>,
         system_prompt: Option<&str>,
         config_json: Option<serde_json::Value>,
+        avatar_url: Option<&AvatarUrl>,
     ) -> AppResult<Agent>;
 
     async fn delete(&self, id: Uuid) -> AppResult<()>;
@@ -93,6 +95,7 @@ impl AgentUseCases {
         api_key: Option<&str>,
         system_prompt: Option<&str>,
         config_json: Option<serde_json::Value>,
+        avatar_url: Option<&AvatarUrl>,
     ) -> AppResult<Agent> {
         self.verify_company_owner(user_id, company_id).await?;
 
@@ -127,6 +130,7 @@ impl AgentUseCases {
                 api_key_clean,
                 system_prompt_clean,
                 config_json,
+                avatar_url,
             )
             .await
     }
@@ -171,6 +175,7 @@ impl AgentUseCases {
         api_key: Option<&str>,
         system_prompt: Option<&str>,
         config_json: Option<serde_json::Value>,
+        avatar_url: Option<&AvatarUrl>,
     ) -> AppResult<Agent> {
         self.verify_company_owner(user_id, company_id).await?;
 
@@ -215,6 +220,7 @@ impl AgentUseCases {
                 api_key_clean,
                 system_prompt_clean,
                 config_json,
+                avatar_url,
             )
             .await
     }
@@ -526,6 +532,7 @@ mod tests {
             api_key: Option<&str>,
             system_prompt: Option<&str>,
             config_json: Option<serde_json::Value>,
+            avatar_url: Option<&AvatarUrl>,
         ) -> AppResult<Agent> {
             let agent = Agent {
                 id: Uuid::new_v4(),
@@ -537,6 +544,7 @@ mod tests {
                 api_key: api_key.map(|s| s.to_string()),
                 system_prompt: system_prompt.map(|s| s.to_string()),
                 config_json,
+                avatar_url: avatar_url.cloned(),
                 created_at: Utc::now(),
             };
             self.agents.lock().unwrap().push(agent.clone());
@@ -588,6 +596,7 @@ mod tests {
             api_key: Option<&str>,
             system_prompt: Option<&str>,
             config_json: Option<serde_json::Value>,
+            avatar_url: Option<&AvatarUrl>,
         ) -> AppResult<Agent> {
             let mut list = self.agents.lock().unwrap();
             let agent = list
@@ -602,6 +611,7 @@ mod tests {
             agent.api_key = api_key.map(|s| s.to_string());
             agent.system_prompt = system_prompt.map(|s| s.to_string());
             agent.config_json = config_json;
+            agent.avatar_url = avatar_url.cloned();
             Ok(agent.clone())
         }
 
@@ -648,6 +658,7 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
             )
             .await;
         assert!(invalid_res.is_err());
@@ -666,6 +677,7 @@ mod tests {
                 Some("key_123"),
                 Some("Prompt"),
                 Some(config.clone()),
+                None,
             )
             .await
             .unwrap();
@@ -686,6 +698,7 @@ mod tests {
                 company_id,
                 "Hacker Bot",
                 "hacker-bot",
+                None,
                 None,
                 None,
                 None,
@@ -716,6 +729,7 @@ mod tests {
                 None,
                 None,
                 Some(updated_config.clone()),
+                None,
             )
             .await
             .unwrap();

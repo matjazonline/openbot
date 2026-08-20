@@ -63,6 +63,7 @@ pub struct AgentDraft<'a> {
     pub model: &'a str,
     pub api_key: &'a str,
     pub config_json: &'a str,
+    pub avatar_url: &'a str,
     /// Whether the create pane should open on the Advanced tab.
     pub advanced: bool,
 }
@@ -150,21 +151,25 @@ fn agent_settings_entry(company_id: Uuid, agent: &Agent, selected: bool) -> Stri
     format!(
         r##"
                 <li>
-                    <a class="flex flex-col items-start gap-0.5 {active}"
+                    <a class="flex items-center gap-3 {active}"
                         hx-get="/ui/agents/{agent_id}?company_id={company_id}"
                         hx-target="#agent-pane" hx-swap="outerHTML"
                         hx-push-url="/ui/agents?company_id={company_id}&agent_id={agent_id}"
                         onclick="selectSidebarItem(this)">
-                        <span class="flex w-full items-center gap-2">
-                            <span class="min-w-0 truncate">{name}</span>
-                            <span class="badge badge-ghost badge-sm shrink-0 font-mono">@{slug}</span>
+                        {avatar}
+                        <span class="flex min-w-0 flex-col items-start gap-0.5">
+                            <span class="flex w-full items-center gap-2">
+                                <span class="min-w-0 truncate">{name}</span>
+                                <span class="badge badge-ghost badge-sm shrink-0 font-mono">@{slug}</span>
+                            </span>
+                            <span class="w-full truncate font-mono text-[11px] opacity-60">{model}</span>
                         </span>
-                        <span class="w-full truncate font-mono text-[11px] opacity-60">{model}</span>
                     </a>
                 </li>
         "##,
         active = if selected { "menu-active" } else { "" },
         agent_id = agent.id,
+        avatar = avatar_bubble(agent.avatar_url.as_ref(), &agent.name, AvatarSize::Row),
         name = escape_html_text(&agent.name),
         slug = escape_html_text(&agent.slug),
         model = escape_html_text(&agent_model_summary(agent)),
@@ -205,9 +210,12 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
         r##"
         <section id="agent-pane" class="flex flex-1 flex-col bg-base-100">
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
-                <div class="min-w-0">
-                    <h2 class="truncate text-xl font-bold">{name}</h2>
-                    <p class="truncate font-mono text-xs opacity-60">@{slug} · {model}</p>
+                <div class="flex min-w-0 items-center gap-3">
+                    {avatar}
+                    <div class="min-w-0">
+                        <h2 class="truncate text-xl font-bold">{name}</h2>
+                        <p class="truncate font-mono text-xs opacity-60">@{slug} · {model}</p>
+                    </div>
                 </div>
             </div>
             <div class="flex-1 overflow-y-auto px-6 py-4">
@@ -235,6 +243,11 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
             </div>
         </section>
         "##,
+        avatar = avatar_bubble(
+            pane.agent.avatar_url.as_ref(),
+            &pane.agent.name,
+            AvatarSize::Header
+        ),
         name = escape_html_text(&pane.agent.name),
         slug = escape_html_text(&pane.agent.slug),
         model = escape_html_text(&agent_model_summary(pane.agent)),
@@ -282,6 +295,11 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                             class="input input-bordered w-full">
                     </label>
                     <label class="form-control w-full">
+                        <div class="label"><span class="label-text text-xs opacity-70">Avatar URL</span></div>
+                        <input type="url" name="avatar_url" value="{avatar_url}" placeholder="https://example.com/agent.png"
+                            class="input input-bordered w-full font-mono text-sm">
+                    </label>
+                    <label class="form-control w-full">
                         <div class="label"><span class="label-text text-xs opacity-70">Agent Instructions</span></div>
                         <textarea name="system_prompt" rows="6" required
                             placeholder="Describe the agent's role, responsibilities, rules and tone. A full system prompt is generated when the agent is created."
@@ -313,6 +331,7 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
         simple_active = active(!pane.draft.advanced),
         advanced_active = active(pane.draft.advanced),
         name = escape_html_text(pane.draft.name),
+        avatar_url = escape_html_text(pane.draft.avatar_url),
         system_prompt = escape_html_text(pane.draft.system_prompt),
         fields = agent_fields(&AgentFields {
             company_id: pane.company.id,
@@ -366,6 +385,12 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                                 class="input input-bordered w-full font-mono">
                         </label>
                     </div>
+                    <label class="form-control w-full">
+                        <div class="label"><span class="label-text text-xs opacity-70">Avatar URL</span></div>
+                        <input type="url" name="avatar_url" value="{avatar_url}" placeholder="https://example.com/agent.png"
+                            class="input input-bordered w-full font-mono text-sm">
+                        <div class="label"><span class="label-text-alt text-[11px] opacity-60">The picture shown beside this agent. Leave it empty for its initial.</span></div>
+                    </label>
                     <div class="form-control w-full">
                         <div class="label justify-between">
                             <span class="label-text text-xs opacity-70">System Prompt</span>
@@ -412,6 +437,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         model = escape_html_text(draft.model),
         api_key = escape_html_text(draft.api_key),
         config_json = escape_html_text(draft.config_json),
+        avatar_url = escape_html_text(draft.avatar_url),
     )
 }
 
@@ -539,6 +565,11 @@ fn stored_draft<'a>(agent: &'a Agent, config_json: &'a str) -> AgentDraft<'a> {
         model: agent.model.as_deref().unwrap_or(""),
         api_key: agent.api_key.as_deref().unwrap_or(""),
         config_json,
+        avatar_url: agent
+            .avatar_url
+            .as_ref()
+            .map(AvatarUrl::as_str)
+            .unwrap_or(""),
         advanced: true,
     }
 }

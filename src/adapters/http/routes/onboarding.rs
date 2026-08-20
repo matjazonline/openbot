@@ -153,6 +153,7 @@ async fn create_channel(
             None,
             Some(&system_prompt),
             None,
+            None,
         )
         .await
     {

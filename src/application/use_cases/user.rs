@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::user::User,
+    entities::{user::User, value_objects::AvatarUrl},
 };
 
 #[async_trait]
@@ -17,6 +17,14 @@ pub trait UserPersistence: Send + Sync {
     async fn get_by_email(&self, email: &str) -> AppResult<Option<User>>;
     async fn get_by_username(&self, username: &str) -> AppResult<Option<User>>;
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<User>>;
+
+    /// Stores the account's profile picture, or clears it with `None`. `Ok(None)` means no such
+    /// user, so a stale session cannot silently write nothing.
+    async fn update_avatar_url(
+        &self,
+        id: Uuid,
+        avatar_url: Option<&AvatarUrl>,
+    ) -> AppResult<Option<User>>;
 }
 
 pub trait UserCredentialsHasher: Send + Sync {
@@ -81,6 +89,20 @@ impl UserUseCases {
     pub async fn get_user_by_id(&self, id: Uuid) -> AppResult<Option<User>> {
         self.persistence.get_by_id(id).await
     }
+
+    /// Points the account at a new profile picture, or back at its letter bubble with `None`.
+    ///
+    /// The URL arrives already parsed: [`AvatarUrl::parse`] is what rejects a scheme no `<img>`
+    /// should be pointed at, and it runs where the form is read.
+    #[instrument(skip(self))]
+    pub async fn set_avatar(&self, id: Uuid, avatar_url: Option<&AvatarUrl>) -> AppResult<User> {
+        info!("Updating avatar for user {id}...");
+
+        self.persistence
+            .update_avatar_url(id, avatar_url)
+            .await?
+            .ok_or_else(|| AppError::NotFound("User not found".into()))
+    }
 }
 
 #[cfg(test)]
@@ -113,6 +135,7 @@ mod test {
                     username: "testuser".to_string(),
                     email: "testuser@gmail.com".to_string(),
                     password_hash: "secret_hash".to_string(),
+                    avatar_url: None,
                     created_at: chrono::Utc::now(),
                 }))
             } else {
@@ -127,6 +150,7 @@ mod test {
                     username: "testuser".to_string(),
                     email: "testuser@gmail.com".to_string(),
                     password_hash: "secret_hash".to_string(),
+                    avatar_url: None,
                     created_at: chrono::Utc::now(),
                 }))
             } else {
@@ -140,6 +164,22 @@ mod test {
                 username: "testuser".to_string(),
                 email: "testuser@gmail.com".to_string(),
                 password_hash: "secret_hash".to_string(),
+                avatar_url: None,
+                created_at: chrono::Utc::now(),
+            }))
+        }
+
+        async fn update_avatar_url(
+            &self,
+            id: Uuid,
+            avatar_url: Option<&AvatarUrl>,
+        ) -> AppResult<Option<User>> {
+            Ok(Some(User {
+                id,
+                username: "testuser".to_string(),
+                email: "testuser@gmail.com".to_string(),
+                password_hash: "secret_hash".to_string(),
+                avatar_url: avatar_url.cloned(),
                 created_at: chrono::Utc::now(),
             }))
         }

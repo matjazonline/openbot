@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::entities::value_objects::AvatarUrl;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Agent {
     pub id: Uuid,
@@ -13,6 +15,8 @@ pub struct Agent {
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     pub config_json: Option<serde_json::Value>,
+    /// The picture shown next to the agent's name; `None` renders as a letter bubble.
+    pub avatar_url: Option<AvatarUrl>,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 

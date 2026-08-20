@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::agent::Agent,
+    entities::{agent::Agent, value_objects::AvatarUrl},
     use_cases::agent::AgentPersistence,
 };
 
@@ -21,6 +21,7 @@ pub struct AgentDb {
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     pub config_json: Option<serde_json::Value>,
+    pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -36,6 +37,7 @@ impl From<AgentDb> for Agent {
             api_key: db.api_key,
             system_prompt: db.system_prompt,
             config_json: db.config_json,
+            avatar_url: db.avatar_url.map(AvatarUrl::from),
             created_at: db.created_at,
         }
     }
@@ -53,13 +55,14 @@ impl AgentPersistence for PostgresPersistence {
         api_key: Option<&str>,
         system_prompt: Option<&str>,
         config_json: Option<serde_json::Value>,
+        avatar_url: Option<&AvatarUrl>,
     ) -> AppResult<Agent> {
         let uuid = Uuid::new_v4();
 
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, config_json)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, config_json, created_at"#,
+            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, config_json, avatar_url)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, config_json, avatar_url, created_at"#,
         )
         .bind(uuid)
         .bind(company_id)
@@ -70,6 +73,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(api_key)
         .bind(system_prompt)
         .bind(config_json)
+        .bind(avatar_url.map(AvatarUrl::as_str))
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -79,7 +83,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>> {
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, config_json, created_at
+            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, config_json, avatar_url, created_at
                FROM agents WHERE id = $1"#,
         )
         .bind(id)
@@ -96,7 +100,7 @@ impl AgentPersistence for PostgresPersistence {
         agent_slug: &str,
     ) -> AppResult<Option<Agent>> {
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT a.id, a.company_id, a.name, a.slug, a.provider, a.model, a.api_key, a.system_prompt, a.config_json, a.created_at
+            r#"SELECT a.id, a.company_id, a.name, a.slug, a.provider, a.model, a.api_key, a.system_prompt, a.config_json, a.avatar_url, a.created_at
                FROM agents a
                JOIN companies c ON c.id = a.company_id
                WHERE c.slug = $1 AND a.slug = $2"#,
@@ -112,7 +116,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>> {
         let db_list = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, config_json, created_at
+            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, config_json, avatar_url, created_at
                FROM agents WHERE company_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -134,12 +138,13 @@ impl AgentPersistence for PostgresPersistence {
         api_key: Option<&str>,
         system_prompt: Option<&str>,
         config_json: Option<serde_json::Value>,
+        avatar_url: Option<&AvatarUrl>,
     ) -> AppResult<Agent> {
         let db = sqlx::query_as::<_, AgentDb>(
             r#"UPDATE agents
-               SET name = $1, slug = $2, provider = $3, model = $4, api_key = $5, system_prompt = $6, config_json = $7
-               WHERE id = $8
-               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, config_json, created_at"#,
+               SET name = $1, slug = $2, provider = $3, model = $4, api_key = $5, system_prompt = $6, config_json = $7, avatar_url = $8
+               WHERE id = $9
+               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, config_json, avatar_url, created_at"#,
         )
         .bind(name)
         .bind(slug)
@@ -148,6 +153,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(api_key)
         .bind(system_prompt)
         .bind(config_json)
+        .bind(avatar_url.map(AvatarUrl::as_str))
         .bind(id)
         .fetch_one(&self.pool)
         .await
@@ -218,6 +224,7 @@ mod tests {
             Some("key_123"),
             Some("You are a helpful support agent."),
             Some(config.clone()),
+            Some(&AvatarUrl::from("https://example.com/support.png")),
         )
         .await
         .unwrap();
@@ -232,6 +239,10 @@ mod tests {
             Some("You are a helpful support agent.")
         );
         assert_eq!(agent.config_json, Some(config));
+        assert_eq!(
+            agent.avatar_url,
+            Some(AvatarUrl::from("https://example.com/support.png"))
+        );
 
         let fetched = AgentPersistence::get_by_id(&persistence, agent.id)
             .await
@@ -254,11 +265,14 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .unwrap();
         assert_eq!(updated.name, "Support Agent V2");
         assert_eq!(updated.api_key, None);
+        // Clearing the field clears the picture -- a blank avatar box is how one is removed.
+        assert_eq!(updated.avatar_url, None);
 
         AgentPersistence::delete(&persistence, agent.id)
             .await

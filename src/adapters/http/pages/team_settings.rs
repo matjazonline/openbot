@@ -64,10 +64,23 @@ pub struct MemberPane<'a> {
     pub company: &'a Company,
     pub member: &'a CompanyMember,
     pub role: TeamRole,
+    /// The signed-in user, so the pane can tell "this is you" from "this is a colleague".
+    pub viewer_id: Uuid,
+    /// What the user last typed in the avatar field, when a save was rejected; `None` shows the
+    /// stored URL.
+    pub avatar_draft: Option<&'a str>,
     pub error: Option<&'a str>,
 }
 
 impl MemberPane<'_> {
+    /// Whether this pane is the viewer looking at themselves.
+    ///
+    /// An avatar is a property of an account, not of a membership, so it is editable in exactly
+    /// one pane: your own. Nobody -- owner included -- sets somebody else's picture.
+    fn is_self(&self) -> bool {
+        self.member.user_id == self.viewer_id
+    }
+
     /// Whether this member can be removed here.
     ///
     /// The owner is the one member nobody can remove — `remove_company_team_member` refuses it —
@@ -258,22 +271,30 @@ fn member_entry(company: &Company, member: &CompanyMember, selected: bool) -> St
     format!(
         r##"
                 <li>
-                    <a class="flex flex-col items-start gap-0.5 {active}"
+                    <a class="flex items-center gap-3 {active}"
                         hx-get="/ui/team/members/{user_id}?company_id={company_id}"
                         hx-target="#team-pane" hx-swap="outerHTML"
                         hx-push-url="/ui/team?company_id={company_id}&member_id={user_id}"
                         onclick="selectSidebarItem(this)">
-                        <span class="flex w-full items-center gap-2">
-                            <span class="min-w-0 truncate">{username}</span>
-                            <span class="badge badge-ghost badge-sm shrink-0">{role}</span>
+                        {avatar}
+                        <span class="flex min-w-0 flex-col items-start gap-0.5">
+                            <span class="flex w-full items-center gap-2">
+                                <span class="min-w-0 truncate">{username}</span>
+                                <span class="badge badge-ghost badge-sm shrink-0">{role}</span>
+                            </span>
+                            <span class="w-full truncate font-mono text-[11px] opacity-60">{email}</span>
                         </span>
-                        <span class="w-full truncate font-mono text-[11px] opacity-60">{email}</span>
                     </a>
                 </li>
         "##,
         active = if selected { "menu-active" } else { "" },
         user_id = member.user_id,
         company_id = company.id,
+        avatar = avatar_bubble(
+            member.avatar_url.as_ref(),
+            member_name(member),
+            AvatarSize::Row
+        ),
         username = escape_html_text(member_name(member)),
         role = escape_html_text(role),
         email = escape_html_text(member.email.as_deref().unwrap_or("")),
@@ -357,14 +378,18 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
         r##"
         <section id="team-pane" class="flex flex-1 flex-col bg-base-100">
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
-                <div class="min-w-0">
-                    <h2 class="truncate text-xl font-bold">{username}</h2>
-                    <p class="truncate font-mono text-xs opacity-60">{email}</p>
+                <div class="flex min-w-0 items-center gap-3">
+                    {avatar}
+                    <div class="min-w-0">
+                        <h2 class="truncate text-xl font-bold">{username}</h2>
+                        <p class="truncate font-mono text-xs opacity-60">{email}</p>
+                    </div>
                 </div>
                 <span class="badge badge-primary shrink-0">{role}</span>
             </div>
             <div class="flex-1 overflow-y-auto px-6 py-4">
                 {error_html}
+                {avatar_form}
                 <dl class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div class="rounded-box bg-base-200 px-4 py-3">
                         <dt class="text-[11px] uppercase tracking-wider opacity-60">Joined</dt>
@@ -387,13 +412,60 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
             </div>
         </section>
         "##,
+        avatar = avatar_bubble(
+            member.avatar_url.as_ref(),
+            member_name(member),
+            AvatarSize::Header
+        ),
         username = escape_html_text(member_name(member)),
         email = escape_html_text(member.email.as_deref().unwrap_or("")),
         role = escape_html_text(if is_owner { "owner" } else { &member.role }),
         error_html = form_error_banner(pane.error),
+        avatar_form = avatar_form(pane),
         joined = super::format_date(member.created_at),
         company_name = escape_html_text(&pane.company.name),
         company_id = pane.company.id,
+    )
+}
+
+/// The avatar field, shown only in your own pane.
+///
+/// A blank field is how a picture is removed, which is why the input is never `required` and the
+/// button says Save rather than Set.
+fn avatar_form(pane: &MemberPane<'_>) -> String {
+    if !pane.is_self() {
+        return String::new();
+    }
+
+    let stored = pane
+        .member
+        .avatar_url
+        .as_ref()
+        .map(AvatarUrl::as_str)
+        .unwrap_or("");
+
+    format!(
+        r##"
+                <form class="mb-6 rounded-box bg-base-200 px-4 py-3"
+                    hx-put="/ui/team/members/{user_id}/avatar?company_id={company_id}"
+                    hx-target="#team-pane" hx-swap="outerHTML"
+                    hx-disabled-elt="find button[type='submit']">
+                    <label class="form-control w-full">
+                        <div class="label"><span class="label-text text-xs opacity-70">Your Avatar URL</span></div>
+                        <input type="url" name="avatar_url" value="{avatar_url}" placeholder="https://example.com/me.png"
+                            class="input input-bordered w-full font-mono text-sm">
+                        <div class="label"><span class="label-text-alt text-[11px] opacity-60">Shown wherever you appear in the app. Leave it empty to go back to your initial.</span></div>
+                    </label>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>
+                        <span class="[.htmx-request_&]:hidden">Save Avatar</span>
+                        <span class="hidden [.htmx-request_&]:inline">Saving...</span>
+                    </button>
+                </form>
+        "##,
+        user_id = pane.member.user_id,
+        company_id = pane.company.id,
+        avatar_url = escape_html_text(pane.avatar_draft.unwrap_or(stored)),
     )
 }
 

@@ -320,6 +320,7 @@ mod tests {
             _api_key: Option<&str>,
             _system_prompt: Option<&str>,
             _config_json: Option<serde_json::Value>,
+            _avatar_url: Option<&crate::entities::value_objects::AvatarUrl>,
         ) -> AppResult<crate::entities::agent::Agent> {
             unimplemented!()
         }
@@ -349,6 +350,7 @@ mod tests {
             _api_key: Option<&str>,
             _system_prompt: Option<&str>,
             _config_json: Option<serde_json::Value>,
+            _avatar_url: Option<&crate::entities::value_objects::AvatarUrl>,
         ) -> AppResult<crate::entities::agent::Agent> {
             unimplemented!()
         }
@@ -776,6 +778,13 @@ mod tests {
             unimplemented!()
         }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::user::User>> {
+            unimplemented!()
+        }
+        async fn update_avatar_url(
+            &self,
+            _id: Uuid,
+            _avatar_url: Option<&crate::entities::value_objects::AvatarUrl>,
+        ) -> AppResult<Option<crate::entities::user::User>> {
             unimplemented!()
         }
     }

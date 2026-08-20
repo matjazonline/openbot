@@ -6,7 +6,9 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::{company_invite::CompanyInvite, company_member::CompanyMember},
+    entities::{
+        company_invite::CompanyInvite, company_member::CompanyMember, value_objects::AvatarUrl,
+    },
     use_cases::company_invite::CompanyInvitePersistence,
 };
 
@@ -40,6 +42,7 @@ pub struct CompanyMemberDb {
     pub user_id: Uuid,
     pub username: Option<String>,
     pub email: Option<String>,
+    pub avatar_url: Option<String>,
     pub role: String,
     pub created_at: DateTime<Utc>,
 }
@@ -52,6 +55,7 @@ impl From<CompanyMemberDb> for CompanyMember {
             user_id: db.user_id,
             username: db.username,
             email: db.email,
+            avatar_url: db.avatar_url.map(AvatarUrl::from),
             role: db.role,
             created_at: db.created_at,
         }
@@ -239,7 +243,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
     async fn list_members_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyMember>> {
         let db_list = sqlx::query_as!(
             CompanyMemberDb,
-            r#"SELECT m.id, m.company_id, m.user_id, u.username as "username?", u.email as "email?", m.role, m.created_at as "created_at!"
+            r#"SELECT m.id, m.company_id, m.user_id, u.username as "username?", u.email as "email?", u.avatar_url, m.role, m.created_at as "created_at!"
                FROM company_members m
                JOIN users u ON u.id = m.user_id
                WHERE m.company_id = $1

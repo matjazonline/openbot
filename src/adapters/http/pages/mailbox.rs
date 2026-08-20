@@ -27,8 +27,12 @@ impl FragmentSwap {
 
 /// Who the mailbox is rendered for, as the top bar shows them.
 pub struct MailboxUser<'a> {
+    /// Their account id, which is what their own Team pane is keyed by.
+    pub id: Uuid,
     pub username: &'a str,
     pub email: &'a EmailAddress,
+    /// Their profile picture; `None` falls back to the letter bubble.
+    pub avatar_url: Option<&'a AvatarUrl>,
 }
 
 /// Which `/ui` workspace a response belongs to, i.e. which rail icon is lit.
@@ -117,7 +121,7 @@ pub fn ui_shell(shell: &UiShell<'_>) -> String {
     </div>
     {LOGOUT_MODAL}
         "##,
-        top_bar = top_bar(shell.user),
+        top_bar = top_bar(shell.user, shell.company_id),
         content = shell.content,
     );
 
@@ -159,6 +163,8 @@ pub struct MessagePane<'a> {
     pub channel: &'a Channel,
     pub thread: &'a Thread,
     pub messages: &'a [Message],
+    /// The face and name the agent side of this thread is drawn with -- see [`message_bubble_chat`].
+    pub agent: Option<&'a Agent>,
     /// What this thread is doing right now, for the strip above the composer.
     pub activity: Option<ThreadActivity>,
 }
@@ -193,7 +199,27 @@ pub struct ComposePane<'a> {
 /// scrolled to its newest message — every load is htmx.
 ///
 /// Kept out of the `format!` blocks below so its braces need no escaping.
-const MAILBOX_SCRIPT: &str = r##"        function confirmLogout() {
+const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox already repaints the page by itself -- daisyUI matches
+        // on `:root:has(.theme-controller[value=light]:checked)`. All this does is write the
+        // choice down for the next request and put `data-theme` back in agreement with the box,
+        // so THEME_INIT_SCRIPT can restore it before the next paint.
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            try { localStorage.setItem('ui_theme', theme); } catch (e) {}
+        }
+
+        // The reverse direction, on load: THEME_INIT_SCRIPT ran before this markup existed, so the
+        // box has to be caught up with the theme it chose.
+        function syncThemeController() {
+            var toggle = document.getElementById('theme-toggle');
+            if (toggle) {
+                toggle.checked = document.documentElement.getAttribute('data-theme') === 'light';
+            }
+        }
+
+        syncThemeController();
+
+        function confirmLogout() {
             document.getElementById('logout-modal').showModal();
         }
 
@@ -378,6 +404,22 @@ const MAILBOX_SCRIPT: &str = r##"        function confirmLogout() {
             }
         });"##;
 
+/// Applies the reader's saved theme before the first paint, so returning to a light-theme page
+/// never flashes dark first. That is why it is inline in `<head>` rather than in
+/// [`MAILBOX_SCRIPT`] at the end of `<body>` -- from there it would arrive after the paint.
+///
+/// With nothing saved yet we follow the operating system, and fall back to dark, which is what
+/// `/ui` looked like before there was a choice to make.
+const THEME_INIT_SCRIPT: &str = r#"
+        (function () {
+            var saved = null;
+            try { saved = localStorage.getItem('ui_theme'); } catch (e) {}
+            if (saved !== 'light' && saved !== 'dark') {
+                saved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+            }
+            document.documentElement.setAttribute('data-theme', saved);
+        })();"#;
+
 /// The HTML shell for every `/ui` response: daisyUI over the Tailwind browser build, plus htmx.
 fn ui_layout(title: &str, body: &str, script: &str) -> String {
     format!(
@@ -389,6 +431,7 @@ fn ui_layout(title: &str, body: &str, script: &str) -> String {
     <title>{title} - Mail Agents</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <script>{THEME_INIT_SCRIPT}</script>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx-ext-sse@2.2.3/sse.js"></script>
@@ -459,55 +502,87 @@ pub fn mailbox_no_company_page(user: &MailboxUser<'_>) -> String {
     })
 }
 
+/// The light/dark switch in the top bar: daisyUI's `theme-controller` checkbox wrapped in a
+/// `swap`, so the box flips the theme in CSS on its own and the icon rotates with it.
+/// `applyTheme` in [`MAILBOX_SCRIPT`] only has to write the choice down and keep `data-theme`
+/// in agreement with the box.
+///
+/// The icon shows the theme the click would take you *to*, not the one you are already in.
+const THEME_CONTROLLER: &str = r##"
+                <label class="swap swap-rotate btn btn-ghost btn-circle" title="Switch between light and dark">
+                    <input id="theme-toggle" type="checkbox" class="theme-controller" value="light"
+                        aria-label="Switch between light and dark"
+                        onchange="applyTheme(this.checked ? 'light' : 'dark')" />
+                    <svg class="swap-off h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
+                    </svg>
+                    <svg class="swap-on h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+                    </svg>
+                </label>
+"##;
+
 /// The bar across the top of every mailbox response: the brand mark on the left, the signed-in
 /// account on the right. It sits above all four columns, so it is the one piece of chrome that
 /// never moves when htmx swaps a column.
 ///
 /// The logo keeps a white plate behind it: half the wordmark is near-black navy, which all but
 /// disappears straight on the dark theme's bar.
-fn top_bar(user: &MailboxUser<'_>) -> String {
+fn top_bar(user: &MailboxUser<'_>, company_id: Option<Uuid>) -> String {
+    // Profile lives in the Team workspace -- your own pane there is where the avatar is set -- so
+    // the entry only appears once there is a company whose team you are on.
+    let profile_entry = match company_id {
+        Some(company_id) => format!(
+            r##"<li><a href="/ui/team?company_id={company_id}&member_id={user_id}">Profile</a></li>"##,
+            user_id = user.id,
+        ),
+        None => String::new(),
+    };
+
     format!(
         r##"
-        <header class="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-base-300 bg-base-200 px-4">
+        <header class="navbar h-16 min-h-16 shrink-0 justify-between gap-4 border-b border-base-300 bg-base-200 px-4">
             <a href="/ui" class="flex items-center" title="ArgoInbox">
                 <img src="/assets/argo-inbox-logo.png" alt="ArgoInbox"
                     class="h-11 w-auto rounded-lg bg-white px-2 py-1">
             </a>
-            <div class="dropdown dropdown-end">
-                <div tabindex="0" role="button" class="btn btn-ghost h-auto gap-3 px-2 py-1">
-                    <div class="hidden text-right leading-tight sm:block">
-                        <div class="text-sm font-semibold">{username}</div>
-                        <div class="text-[11px] font-normal opacity-60">{email}</div>
-                    </div>
-                    <div class="avatar avatar-placeholder">
-                        <div class="w-9 rounded-full bg-primary text-primary-content">
-                            <span class="text-sm font-bold">{initial}</span>
+            <div class="flex items-center gap-1">
+{THEME_CONTROLLER}
+                <div class="dropdown dropdown-end">
+                    <div tabindex="0" role="button" class="btn btn-ghost h-auto gap-3 px-2 py-1">
+                        <div class="hidden text-right leading-tight sm:block">
+                            <div class="text-sm font-semibold">{username}</div>
+                            <div class="text-[11px] font-normal opacity-60">{email}</div>
                         </div>
+                        <div id="account-avatar">{avatar}</div>
                     </div>
+                    <ul tabindex="0" class="menu menu-sm dropdown-content z-50 mt-3 w-60 rounded-box bg-base-300 p-2 shadow-xl">
+                        <li class="menu-title truncate">{email}</li>
+                        {profile_entry}
+                        <li><a href="/ui/companies">Companies</a></li>
+                        <li>
+                            <button type="button" class="w-full text-left" onclick="confirmLogout()">Log out</button>
+                        </li>
+                    </ul>
                 </div>
-                <ul tabindex="0" class="menu dropdown-content z-50 mt-1 w-60 rounded-box bg-base-300 p-2 shadow-xl">
-                    <li class="menu-title truncate">{email}</li>
-                    <li><a href="/ui/companies">Companies</a></li>
-                    <li>
-                        <button type="button" class="w-full text-left" onclick="confirmLogout()">Log out</button>
-                    </li>
-                </ul>
             </div>
         </header>
         "##,
         username = escape_html_text(user.username),
         email = escape_html_text(user.email),
-        initial = escape_html_text(&avatar_initial(user.username)),
+        avatar = avatar_bubble(user.avatar_url, user.username, AvatarSize::Bar),
     )
 }
 
-/// The letter in the avatar bubble: the account's own initial, since there are no profile pictures.
-fn avatar_initial(username: &str) -> String {
-    username
-        .chars()
-        .next()
-        .map(|first| first.to_uppercase().to_string())
-        .unwrap_or_else(|| "?".to_string())
+/// The top bar's avatar on its own, swapped out of band after the account's picture changes.
+///
+/// The bar is the one piece of chrome an htmx swap never replaces, so without this the reader
+/// would keep seeing their old face until the next full page load.
+pub fn account_avatar_oob(username: &str, avatar_url: Option<&AvatarUrl>) -> String {
+    format!(
+        r##"<div id="account-avatar" hx-swap-oob="outerHTML">{avatar}</div>"##,
+        avatar = avatar_bubble(avatar_url, username, AvatarSize::Bar),
+    )
 }
 
 /// The slim left rail: the `/ui` workspaces first, then links out to the classic pages.
@@ -681,7 +756,7 @@ fn compose_button(company_id: Uuid, channel: &Channel) -> String {
         r##"<button id="compose-button" type="button" class="btn btn-primary btn-sm"
                     title="Start a new thread in this channel"
                     hx-get="/ui/compose?company_id={company_id}&channel_id={channel_id}"
-                    hx-target="#detail-pane" hx-swap="outerHTML">✎ Compose</button>"##,
+                    hx-target="#detail-pane" hx-swap="outerHTML">✎ New Thread</button>"##,
         channel_id = channel.id,
     )
 }
@@ -777,7 +852,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
 pub fn thread_list_fragment(column: &ThreadColumn<'_>, swap: FragmentSwap) -> String {
     let cards = if column.threads.is_empty() && swap == FragmentSwap::Inline {
         r##"
-            <p class="no-threads p-6 text-center text-sm opacity-60">No threads in this channel yet. Use Compose to start one.</p>
+            <p class="no-threads p-6 text-center text-sm opacity-60">No threads in this channel yet. Use New Thread to start one.</p>
         "##
         .to_string()
     } else {
@@ -982,7 +1057,10 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         r##"<p id="no-messages" class="p-6 text-center text-sm opacity-60">This thread has no messages yet.</p>"##
             .to_string()
     } else {
-        pane.messages.iter().map(message_bubble_chat).collect()
+        pane.messages
+            .iter()
+            .map(|message| message_bubble_chat(message, pane.agent))
+            .collect()
     };
 
     // Where the live stream should resume from: the newest message already on the page, so a
@@ -1075,7 +1153,13 @@ fn thread_composer(pane: &MessagePane<'_>) -> String {
 /// Public because the live message stream (`/ui/events`) renders bubbles one at a time as they
 /// arrive. Both paths share this one definition, so a bubble that streams in is indistinguishable
 /// from one that came with the page.
-pub fn message_bubble_chat(message: &Message) -> String {
+/// One message as a daisyUI chat row: the writer's face, then their name and the time, the bubble,
+/// and the subject underneath.
+///
+/// `agent` is the channel's agent when it runs exactly one, and is what the agent side is drawn as.
+/// A reply is stored with the *channel's* address as its sender rather than the agent that wrote
+/// it, so with a stack of agents there is no one face to show and the address stands in.
+pub fn message_bubble_chat(message: &Message, agent: Option<&Agent>) -> String {
     let is_agent =
         message.role == MessageRole::Agent || message.direction == MessageDirection::Outbound;
     let body = if is_agent {
@@ -1090,11 +1174,17 @@ pub fn message_bubble_chat(message: &Message) -> String {
         )
     };
 
+    let (writer, avatar_url) = match (is_agent, agent) {
+        (true, Some(agent)) => (agent.name.as_str(), agent.avatar_url.as_ref()),
+        _ => (message.sender.as_str(), None),
+    };
+
     format!(
         r##"
                 <div class="chat {side}">
+                    <div class="chat-image">{avatar}</div>
                     <div class="chat-header gap-1 opacity-70">
-                        {sender}
+                        {writer}
                         <time class="text-xs opacity-60">{created_at}</time>
                     </div>
                     <div class="chat-bubble {bubble_class} max-w-2xl text-sm">{body}</div>
@@ -1103,7 +1193,8 @@ pub fn message_bubble_chat(message: &Message) -> String {
         "##,
         side = if is_agent { "chat-end" } else { "chat-start" },
         bubble_class = if is_agent { "chat-bubble-primary" } else { "" },
-        sender = escape_html_text(&message.sender),
+        avatar = avatar_bubble(avatar_url, writer, AvatarSize::Row),
+        writer = escape_html_text(writer),
         created_at = super::format_date_time(message.created_at),
         subject = escape_html_text(&message.subject),
         body = body,

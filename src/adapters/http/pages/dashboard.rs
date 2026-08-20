@@ -953,8 +953,10 @@ mod tests {
         let snapshot = snapshot();
         let email = crate::entities::value_objects::EmailAddress::from("ops@example.test");
         let user = MailboxUser {
+            id: Uuid::new_v4(),
             username: "ops",
             email: &email,
+            avatar_url: None,
         };
         let process = ProcessGauges::default();
         let html = dashboard_page(&page(
@@ -986,8 +988,10 @@ mod tests {
         let snapshot = snapshot();
         let email = crate::entities::value_objects::EmailAddress::from("ops@example.test");
         let user = MailboxUser {
+            id: Uuid::new_v4(),
             username: "ops",
             email: &email,
+            avatar_url: None,
         };
         let process = ProcessGauges::default();
         let html = dashboard_page(&page(
@@ -1034,8 +1038,10 @@ mod tests {
     ) -> String {
         let email = crate::entities::value_objects::EmailAddress::from("ops@example.test");
         let user = MailboxUser {
+            id: Uuid::new_v4(),
             username: "ops",
             email: &email,
+            avatar_url: None,
         };
         let process = ProcessGauges::default();
         dashboard_panels(&DashboardPage {

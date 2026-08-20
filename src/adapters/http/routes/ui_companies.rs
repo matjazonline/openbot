@@ -37,7 +37,7 @@ use crate::{
 
 use super::{
     channel::slugify,
-    ui::{load_account, load_scoped_company},
+    ui::{load_account, load_scoped_company, workspace_user},
 };
 
 pub fn router() -> Router<AppState> {
@@ -208,10 +208,7 @@ async fn companies_page(
 ) -> AppResult<Html<String>> {
     let account = load_account(&workspace.user_use_cases, workspace.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let workspace_user = pages::MailboxUser {
-        username: &account.username,
-        email: &account_email,
-    };
+    let workspace_user = workspace_user(&account, &account_email);
 
     let (companies, company) = load_scoped_company(
         &workspace.company_use_cases,

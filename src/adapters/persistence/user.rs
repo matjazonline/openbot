@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::user::User,
+    entities::{user::User, value_objects::AvatarUrl},
     use_cases::user::UserPersistence,
 };
 
@@ -17,6 +17,7 @@ pub struct UserDb {
     pub username: String,
     pub email: String,
     pub password_hash: String,
+    pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -27,6 +28,7 @@ impl From<UserDb> for User {
             username: user_db.username,
             email: user_db.email,
             password_hash: user_db.password_hash,
+            avatar_url: user_db.avatar_url.map(AvatarUrl::from),
             created_at: user_db.created_at,
         }
     }
@@ -54,7 +56,7 @@ impl UserPersistence for PostgresPersistence {
     async fn get_by_email(&self, email: &str) -> AppResult<Option<User>> {
         let result = sqlx::query_as!(
             UserDb,
-            r#"SELECT id, username, email, password_hash, created_at as "created_at!" FROM users WHERE email = $1"#,
+            r#"SELECT id, username, email, password_hash, avatar_url, created_at as "created_at!" FROM users WHERE email = $1"#,
             email
         )
         .fetch_optional(&self.pool)
@@ -67,7 +69,7 @@ impl UserPersistence for PostgresPersistence {
     async fn get_by_username(&self, username: &str) -> AppResult<Option<User>> {
         let result = sqlx::query_as!(
             UserDb,
-            r#"SELECT id, username, email, password_hash, created_at as "created_at!" FROM users WHERE username = $1"#,
+            r#"SELECT id, username, email, password_hash, avatar_url, created_at as "created_at!" FROM users WHERE username = $1"#,
             username
         )
         .fetch_optional(&self.pool)
@@ -80,8 +82,27 @@ impl UserPersistence for PostgresPersistence {
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<User>> {
         let result = sqlx::query_as!(
             UserDb,
-            r#"SELECT id, username, email, password_hash, created_at as "created_at!" FROM users WHERE id = $1"#,
+            r#"SELECT id, username, email, password_hash, avatar_url, created_at as "created_at!" FROM users WHERE id = $1"#,
             id
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(result.map(Into::into))
+    }
+
+    async fn update_avatar_url(
+        &self,
+        id: Uuid,
+        avatar_url: Option<&AvatarUrl>,
+    ) -> AppResult<Option<User>> {
+        let result = sqlx::query_as!(
+            UserDb,
+            r#"UPDATE users SET avatar_url = $2 WHERE id = $1
+               RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
+            id,
+            avatar_url.map(AvatarUrl::as_str)
         )
         .fetch_optional(&self.pool)
         .await

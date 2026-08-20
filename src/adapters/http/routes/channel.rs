@@ -475,6 +475,7 @@ pub(super) async fn resolve_channel_agents(
                 model: form.model.as_deref(),
                 api_key: form.api_key.as_deref(),
             },
+            None,
         )
         .await?
     } else {
@@ -488,6 +489,7 @@ pub(super) async fn resolve_channel_agents(
                 form.model.as_deref(),
                 form.api_key.as_deref(),
                 Some(instructions),
+                None,
                 None,
             )
             .await
@@ -1303,6 +1305,7 @@ async fn create_channel_json(
                     payload.model.as_deref(),
                     payload.api_key.as_deref(),
                     Some(prompt_trimmed),
+                    None,
                     None,
                 )
                 .await?;

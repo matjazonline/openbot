@@ -34,8 +34,8 @@ use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
     entities::{
-        channel::Channel, company::Company, task::ThreadActivity, thread::Thread, user::User,
-        value_objects::EmailAddress,
+        agent::Agent, channel::Channel, company::Company, task::ThreadActivity, thread::Thread,
+        user::User, value_objects::EmailAddress,
     },
     infra::{
         config::AppConfig,
@@ -43,6 +43,7 @@ use crate::{
     },
     services::email_parser::RawInboundPayload,
     use_cases::{
+        agent::AgentUseCases,
         channel::ChannelUseCases,
         company::CompanyUseCases,
         thread::{ReplyDelivery, ThreadUseCases},
@@ -221,11 +222,31 @@ async fn thread_activity(
         .copied())
 }
 
+/// The face and name the agent side of a thread is drawn with.
+///
+/// A reply is stored with the *channel's* address as its sender, not the agent that wrote it, so
+/// the agent is only unambiguous while the channel runs exactly one. With a stack of them the
+/// messages stay on the address they were sent from -- better a plain address than the wrong face.
+async fn channel_agent(
+    agent_use_cases: &AgentUseCases,
+    user_id: Uuid,
+    channel: &Channel,
+) -> AppResult<Option<Agent>> {
+    let [agent_id] = channel.agent_ids.as_deref().unwrap_or_default() else {
+        return Ok(None);
+    };
+
+    agent_use_cases
+        .get_company_agent(user_id, channel.company_id, *agent_id)
+        .await
+}
+
 async fn render_message_pane(
     thread_use_cases: &ThreadUseCases,
     company_id: Uuid,
     channel: &Channel,
     thread: &Thread,
+    agent: Option<&Agent>,
 ) -> AppResult<String> {
     let messages = thread_use_cases.get_thread_history(thread.id).await?;
     Ok(pages::message_pane(&pages::MessagePane {
@@ -233,6 +254,7 @@ async fn render_message_pane(
         channel,
         thread,
         messages: &messages,
+        agent,
         activity: thread_activity(thread_use_cases, thread.id).await?,
     }))
 }
@@ -242,6 +264,7 @@ async fn render_message_pane(
     company_use_cases,
     channel_use_cases,
     thread_use_cases,
+    agent_use_cases,
     user_use_cases,
     config,
     user
@@ -250,6 +273,7 @@ async fn mailbox_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
@@ -257,10 +281,7 @@ async fn mailbox_page(
 ) -> AppResult<Html<String>> {
     let account = load_account(&user_use_cases, user.id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let mailbox_user = pages::MailboxUser {
-        username: &account.username,
-        email: &account_email,
-    };
+    let mailbox_user = workspace_user(&account, &account_email);
 
     let (companies, company) =
         load_scoped_company(&company_use_cases, user.id, query.company_id).await?;
@@ -291,10 +312,18 @@ async fn mailbox_page(
 
     let detail_html = match (selected_channel, &selected_thread) {
         (Some(channel), Some(thread)) => {
-            render_message_pane(&thread_use_cases, company.id, channel, thread).await?
+            let agent = channel_agent(&agent_use_cases, user.id, channel).await?;
+            render_message_pane(
+                &thread_use_cases,
+                company.id,
+                channel,
+                thread,
+                agent.as_ref(),
+            )
+            .await?
         }
         (Some(_), None) => pages::empty_detail_pane(
-            "Select a thread, or use Compose to start a new one.",
+            "Select a thread, or use New Thread to start a new one.",
             pages::FragmentSwap::Inline,
         ),
         (None, _) => pages::empty_detail_pane(
@@ -343,7 +372,7 @@ async fn thread_column_fragment(
         activity: &activity,
     });
     let detail = pages::empty_detail_pane(
-        "Select a thread, or use Compose to start a new one.",
+        "Select a thread, or use New Thread to start a new one.",
         pages::FragmentSwap::OutOfBand,
     );
     let actions = pages::channel_actions(
@@ -393,10 +422,11 @@ async fn thread_page_fragment(
 }
 
 /// GET /ui/messages - The messages of one thread (Protected).
-#[instrument(skip(channel_use_cases, thread_use_cases, user))]
+#[instrument(skip(channel_use_cases, thread_use_cases, agent_use_cases, user))]
 async fn message_pane_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
     user: AuthenticatedUser,
     Query(query): Query<ThreadQuery>,
 ) -> AppResult<Html<String>> {
@@ -408,8 +438,17 @@ async fn message_pane_fragment(
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
 
+    let agent = channel_agent(&agent_use_cases, user.id, &channel).await?;
+
     Ok(Html(
-        render_message_pane(&thread_use_cases, query.company_id, &channel, &thread).await?,
+        render_message_pane(
+            &thread_use_cases,
+            query.company_id,
+            &channel,
+            &thread,
+            agent.as_ref(),
+        )
+        .await?,
     ))
 }
 
@@ -473,10 +512,18 @@ where
 /// Each event is one rendered chat bubble, appended to `#message-scroll` by htmx's SSE extension.
 /// The `id:` on every event is that message's cursor, which is what makes reconnects resume
 /// exactly where the reader left off.
-#[instrument(skip(channel_use_cases, thread_use_cases, events, user, headers))]
+#[instrument(skip(
+    channel_use_cases,
+    thread_use_cases,
+    agent_use_cases,
+    events,
+    user,
+    headers
+))]
 async fn thread_message_stream(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(events): State<MailboxEvents>,
     user: AuthenticatedUser,
     headers: HeaderMap,
@@ -491,6 +538,10 @@ async fn thread_message_stream(
     let thread = load_channel_thread(&thread_use_cases, channel.id, query.thread_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+
+    // Resolved once, up here: the stream is authorized already and the channel's agent does not
+    // change under it, so every bubble it renders can borrow this rather than re-query.
+    let agent = channel_agent(&agent_use_cases, user.id, &channel).await?;
 
     let mut cursor = resume_cursor(&headers, query.after.as_deref());
     let thread_id = thread.id;
@@ -534,7 +585,7 @@ async fn thread_message_stream(
                             yield Ok(Event::default()
                                 .id(message.cursor().to_string())
                                 .event("message")
-                                .data(pages::message_bubble_chat(message)));
+                                .data(pages::message_bubble_chat(message, agent.as_ref())));
                         }
                         // A full batch means the reader is still behind; keep going rather than
                         // waiting for an event that may never come.
@@ -749,6 +800,7 @@ async fn compose_form(
     company_use_cases,
     channel_use_cases,
     thread_use_cases,
+    agent_use_cases,
     user_use_cases,
     config,
     user,
@@ -758,6 +810,7 @@ async fn create_thread(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
@@ -820,7 +873,16 @@ async fn create_thread(
         return Ok(compose_error(reason));
     };
 
-    sent_message_response(&thread_use_cases, company.id, &channel, &thread).await
+    let agent = channel_agent(&agent_use_cases, user.id, &channel).await?;
+
+    sent_message_response(
+        &thread_use_cases,
+        company.id,
+        &channel,
+        &thread,
+        agent.as_ref(),
+    )
+    .await
 }
 
 /// GET /ui/reply - The new-message form for the open thread (Protected).
@@ -874,6 +936,7 @@ async fn reply_form(
     company_use_cases,
     channel_use_cases,
     thread_use_cases,
+    agent_use_cases,
     user_use_cases,
     config,
     user,
@@ -883,6 +946,7 @@ async fn send_reply(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
@@ -951,7 +1015,16 @@ async fn send_reply(
         return Ok(reply_error(reason));
     };
 
-    sent_message_response(&thread_use_cases, company.id, &channel, &sent_thread).await
+    let agent = channel_agent(&agent_use_cases, user.id, &channel).await?;
+
+    sent_message_response(
+        &thread_use_cases,
+        company.id,
+        &channel,
+        &sent_thread,
+        agent.as_ref(),
+    )
+    .await
 }
 
 /// What both send forms return: the thread's messages, with its column refreshed beside them.
@@ -960,8 +1033,9 @@ async fn sent_message_response(
     company_id: Uuid,
     channel: &Channel,
     thread: &Thread,
+    agent: Option<&Agent>,
 ) -> AppResult<Response> {
-    let pane = render_message_pane(thread_use_cases, company_id, channel, thread).await?;
+    let pane = render_message_pane(thread_use_cases, company_id, channel, thread, agent).await?;
     let page = load_thread_page(thread_use_cases, channel.id, &ThreadListQuery::default()).await?;
     let activity = page_activity(thread_use_cases, &page.threads).await?;
     let refreshed_list = pages::thread_list_oob(&pages::ThreadColumn {
@@ -987,6 +1061,22 @@ async fn sent_message_response(
 }
 
 /// The signed-in account itself, needed both for the top bar and as the sender of composed mail.
+/// The signed-in account as every `/ui` shell renders it.
+///
+/// The address is passed in rather than derived here because the caller already needs it as an
+/// [`EmailAddress`] of its own, and the shell borrows both for the length of the render.
+pub(super) fn workspace_user<'a>(
+    account: &'a User,
+    account_email: &'a EmailAddress,
+) -> pages::MailboxUser<'a> {
+    pages::MailboxUser {
+        id: account.id,
+        username: &account.username,
+        email: account_email,
+        avatar_url: account.avatar_url.as_ref(),
+    }
+}
+
 pub(super) async fn load_account(user_use_cases: &UserUseCases, user_id: Uuid) -> AppResult<User> {
     user_use_cases
         .get_user_by_id(user_id)

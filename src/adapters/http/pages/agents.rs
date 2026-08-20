@@ -127,6 +127,11 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                             <input type="text" id="agent_slug" name="slug" required
                                 placeholder="triage-bot" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
                         </div>
+                        <div>
+                            <label for="agent_avatar_url" class="block text-xs font-medium text-slate-300 mb-1">Avatar URL</label>
+                            <input type="url" id="agent_avatar_url" name="avatar_url"
+                                placeholder="https://example.com/agent.png" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -228,6 +233,7 @@ pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
         <div id="agent-row-{agent_id}" class="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition hover:border-slate-600">
             <div class="space-y-1">
                 <div class="flex items-center gap-2">
+                    {avatar}
                     <span class="font-bold text-white text-base">{name}</span>
                     <span class="text-xs font-mono text-indigo-300 bg-indigo-950/60 border border-indigo-800/50 px-2 py-0.5 rounded">@{slug}</span>
                     {api_key_badge}
@@ -253,6 +259,7 @@ pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
         "##,
         agent_id = agent_id,
         company_id = company_id,
+        avatar = avatar_bubble(agent.avatar_url.as_ref(), name, AvatarSize::Row),
         name = name,
         slug = slug,
         provider = provider,
@@ -271,6 +278,11 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
     let provider = agent.provider.as_deref().unwrap_or("");
     let model = agent.model.as_deref().unwrap_or("");
     let api_key = agent.api_key.as_deref().unwrap_or("");
+    let avatar_url = agent
+        .avatar_url
+        .as_ref()
+        .map(AvatarUrl::as_str)
+        .unwrap_or("");
     let system_prompt = agent.system_prompt.as_deref().unwrap_or("");
     let config_json_str = agent
         .config_json
@@ -300,6 +312,10 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1">Slug</label>
                         <input type="text" name="slug" value="{slug}" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Avatar URL</label>
+                        <input type="url" name="avatar_url" value="{avatar_url}" placeholder="https://example.com/agent.png" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
                     </div>
                 </div>
 
@@ -344,6 +360,7 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
         company_id = company_id,
         name = name,
         slug = slug,
+        avatar_url = avatar_url,
         provider = provider,
         model = model,
         api_key = api_key,

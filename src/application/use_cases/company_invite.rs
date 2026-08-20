@@ -464,6 +464,7 @@ mod tests {
                     user_id,
                     username: Some("inviteduser".to_string()),
                     email: Some(user_email.to_string()),
+                    avatar_url: None,
                     role: "member".to_string(),
                     created_at: Utc::now(),
                 });
@@ -540,6 +541,7 @@ mod tests {
                 user_id: member_id,
                 username: Some("member".into()),
                 email: Some("member@example.com".into()),
+                avatar_url: None,
                 role: "member".into(),
                 created_at: Utc::now(),
             }]),
@@ -644,6 +646,7 @@ mod tests {
             username: "newuser".to_string(),
             email: "newuser@example.com".to_string(),
             password_hash: "hash".to_string(),
+            avatar_url: None,
             created_at: Utc::now(),
         };
 

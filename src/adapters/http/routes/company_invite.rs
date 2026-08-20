@@ -499,6 +499,7 @@ mod tests {
             user_id: Uuid::new_v4(),
             username: Some("member1".to_string()),
             email: Some("member1@test.com".to_string()),
+            avatar_url: None,
             role: "member".to_string(),
             created_at: Utc::now(),
         };

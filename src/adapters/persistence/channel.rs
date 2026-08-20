@@ -407,6 +407,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -415,6 +416,7 @@ mod tests {
             company.id,
             "Secondary Agent",
             "secondary-agent",
+            None,
             None,
             None,
             None,

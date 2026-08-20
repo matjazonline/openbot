@@ -46,7 +46,7 @@ use crate::{
     use_cases::{company::CompanyUseCases, user::UserUseCases},
 };
 
-use super::ui::{load_account, load_scoped_company};
+use super::ui::{load_account, load_scoped_company, workspace_user};
 
 /// How often a connected dashboard re-reads. Slow enough that a room full of open tabs is not a
 /// load generator, fast enough that a queue draining is visibly a queue draining.
@@ -198,10 +198,7 @@ async fn dashboard_page(
 ) -> AppResult<Html<String>> {
     let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let user = pages::MailboxUser {
-        username: &account.username,
-        email: &account_email,
-    };
+    let user = workspace_user(&account, &account_email);
 
     let scope = DashboardScope::resolve(&dashboard, &account_email, query.company_id).await?;
 
@@ -232,10 +229,7 @@ async fn dashboard_panels_fragment(
 ) -> AppResult<Response> {
     let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let user = pages::MailboxUser {
-        username: &account.username,
-        email: &account_email,
-    };
+    let user = workspace_user(&account, &account_email);
 
     let scope = DashboardScope::resolve(&dashboard, &account_email, query.company_id).await?;
     let window = DashboardWindow::last_hour();
@@ -259,10 +253,7 @@ async fn dashboard_stream(
     let window = DashboardWindow::last_hour();
 
     let stream = async_stream::stream! {
-        let user = pages::MailboxUser {
-            username: &account.username,
-            email: &account_email,
-        };
+        let user = workspace_user(&account, &account_email);
         let mut ticker = tokio::time::interval(TICK);
         // The first tick is immediate. Spend it: a reader that just connected wants the current
         // numbers, not the ones from five seconds hence.

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, username, email, password_hash, created_at as \"created_at!\" FROM users WHERE username = $1",
+  "query": "SELECT id, username, email, password_hash, avatar_url, created_at as \"created_at!\" FROM users WHERE email = $1",
   "describe": {
     "columns": [
       {
@@ -35,6 +35,11 @@
       },
       {
         "ordinal": 4,
+        "name": "avatar_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
         "name": "created_at!",
         "type_info": "Timestamptz"
       }
@@ -54,8 +59,9 @@
       false,
       false,
       false,
+      true,
       false
     ]
   },
-  "hash": "c298c657ac0560b79ca4aa9edbd8e44fdc745be40583195b765798e89337b7ad"
+  "hash": "872cc706c767080c851877071c59cc9c91e75e05ac74d4816db6b451b399e7aa"
 }

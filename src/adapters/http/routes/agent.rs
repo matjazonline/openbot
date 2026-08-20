@@ -13,8 +13,8 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
-    app_error::AppResult,
-    entities::agent::Agent,
+    app_error::{AppError, AppResult},
+    entities::{agent::Agent, value_objects::AvatarUrl},
     use_cases::{agent::AgentUseCases, company::CompanyUseCases},
 };
 
@@ -72,11 +72,20 @@ pub struct AgentForm {
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     pub config_json: Option<String>,
+    pub avatar_url: Option<String>,
     /// `"simple"` means `system_prompt` holds instructions to expand, not the prompt itself.
     pub form_mode: Option<String>,
 }
 
 impl AgentForm {
+    /// The avatar this submission means, or why it cannot be stored.
+    ///
+    /// A form that has no avatar field at all clears nothing and stores nothing -- the same as one
+    /// submitted blank, since a blank field is how an avatar is removed.
+    pub(super) fn avatar_url(&self) -> Result<Option<AvatarUrl>, String> {
+        AvatarUrl::parse(self.avatar_url.as_deref().unwrap_or_default())
+    }
+
     /// The slug this submission means: what was typed, or the name slugified.
     pub(super) fn slug(&self) -> String {
         self.slug
@@ -126,6 +135,14 @@ pub struct AgentJsonPayload {
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     pub config_json: Option<serde_json::Value>,
+    pub avatar_url: Option<String>,
+}
+
+impl AgentJsonPayload {
+    /// The avatar this payload means, or why it cannot be stored.
+    fn avatar_url(&self) -> Result<Option<AvatarUrl>, String> {
+        AvatarUrl::parse(self.avatar_url.as_deref().unwrap_or_default())
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -158,6 +175,7 @@ pub(super) async fn create_agent_from_instructions(
     slug: &str,
     instructions: &str,
     overrides: ModelOverrides<'_>,
+    avatar_url: Option<&AvatarUrl>,
 ) -> Result<Agent, String> {
     // Expansion runs on the company's own credentials: the overrides are what the *agent* will
     // answer with, not necessarily a model that can write its prompt.
@@ -177,6 +195,7 @@ pub(super) async fn create_agent_from_instructions(
             overrides.api_key,
             Some(&system_prompt),
             None,
+            avatar_url,
         )
         .await
         .map_err(|err| format!("Failed to create agent: {err}"))
@@ -217,8 +236,11 @@ async fn create_agent_handler(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
-    let config_json = match parse_config_form(form.config_json.clone()) {
-        Ok(c) => c,
+    let submitted = parse_config_form(form.config_json.clone())
+        .and_then(|config_json| Ok((config_json, form.avatar_url()?)));
+
+    let (config_json, avatar_url) = match submitted {
+        Ok(fields) => fields,
         Err(err) => {
             let error_html = pages::error_alert(&err);
             let agents = agent_use_cases
@@ -244,6 +266,7 @@ async fn create_agent_handler(
             form.api_key.as_deref(),
             form.system_prompt.as_deref(),
             config_json,
+            avatar_url.as_ref(),
         )
         .await
     {
@@ -361,6 +384,7 @@ async fn create_agent_inline_handler(
             api_key.as_deref(),
             system_prompt.as_deref(),
             config_json,
+            None,
         )
         .await
     {
@@ -452,8 +476,11 @@ async fn update_agent_handler(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
-    let config_json = match parse_config_form(form.config_json.clone()) {
-        Ok(c) => c,
+    let submitted = parse_config_form(form.config_json.clone())
+        .and_then(|config_json| Ok((config_json, form.avatar_url()?)));
+
+    let (config_json, avatar_url) = match submitted {
+        Ok(fields) => fields,
         Err(err) => return Html(pages::error_alert(&err)),
     };
 
@@ -469,6 +496,7 @@ async fn update_agent_handler(
             form.api_key.as_deref(),
             form.system_prompt.as_deref(),
             config_json,
+            avatar_url.as_ref(),
         )
         .await
     {
@@ -509,6 +537,8 @@ async fn create_agent_json(
     Path(company_id): Path<Uuid>,
     Json(payload): Json<AgentJsonPayload>,
 ) -> AppResult<impl IntoResponse> {
+    let avatar_url = payload.avatar_url().map_err(AppError::BadRequest)?;
+
     let agent = agent_use_cases
         .create_agent(
             user.id,
@@ -519,7 +549,8 @@ async fn create_agent_json(
             payload.model.as_deref(),
             payload.api_key.as_deref(),
             payload.system_prompt.as_deref(),
-            payload.config_json,
+            payload.config_json.clone(),
+            avatar_url.as_ref(),
         )
         .await?;
 
@@ -553,6 +584,8 @@ async fn update_agent_json(
     Path((company_id, agent_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<AgentJsonPayload>,
 ) -> AppResult<impl IntoResponse> {
+    let avatar_url = payload.avatar_url().map_err(AppError::BadRequest)?;
+
     let agent = agent_use_cases
         .update_agent(
             user.id,
@@ -564,7 +597,8 @@ async fn update_agent_json(
             payload.model.as_deref(),
             payload.api_key.as_deref(),
             payload.system_prompt.as_deref(),
-            payload.config_json,
+            payload.config_json.clone(),
+            avatar_url.as_ref(),
         )
         .await?;
 
@@ -765,6 +799,7 @@ mod tests {
             api_key: Some("sk-test123".to_string()),
             system_prompt: Some("You are a helpful agent.".to_string()),
             config_json: Some(json!({ "temperature": 0.5 })),
+            avatar_url: None,
             created_at: Utc::now(),
         };
 

@@ -258,8 +258,10 @@ fn mailbox_account_email() -> EmailAddress {
 
 fn mailbox_user(email: &EmailAddress) -> MailboxUser<'_> {
     MailboxUser {
+        id: Uuid::new_v4(),
         username: "dana",
         email,
+        avatar_url: None,
     }
 }
 
@@ -297,14 +299,64 @@ fn mailbox_page_renders_three_columns_and_escapes_thread_subjects() {
 }
 
 #[test]
+fn top_bar_carries_a_theme_controller_that_survives_a_reload() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let detail = empty_detail_pane("Select a thread.", FragmentSwap::Inline);
+    let email = EmailAddress::from("dana@example.com");
+    let user = MailboxUser {
+        id: Uuid::new_v4(),
+        username: "dana",
+        email: &email,
+        avatar_url: None,
+    };
+
+    let html = mailbox_page(&MailboxPage {
+        user: &user,
+        company: &company,
+        companies: std::slice::from_ref(&company),
+        app_domain_name: "example.com",
+        channels: std::slice::from_ref(&channel),
+        selected_channel: Some(&channel),
+        threads: &[],
+        next_cursor: None,
+        selected_thread_id: None,
+        activity: no_activity(),
+        detail_html: &detail,
+    });
+
+    // daisyUI switches the theme off the checkbox alone -- it matches
+    // `:root:has(input.theme-controller[value=light]:checked)`, so both the class and the value
+    // are load-bearing, not decoration.
+    assert!(html.contains(r##"type="checkbox" class="theme-controller" value="light""##));
+    assert!(html.contains("swap-rotate"));
+
+    // The choice has to outlive the response: written on change, re-applied before the next paint.
+    assert!(html.contains("localStorage.setItem('ui_theme', theme)"));
+    assert!(html.contains("localStorage.getItem('ui_theme')"));
+
+    // The restore runs in `<head>`, ahead of the body, or a light-theme reload flashes dark.
+    let head = &html[..html.find("<body").expect("a body")];
+    assert!(head.contains("document.documentElement.setAttribute('data-theme', saved)"));
+
+    // ...and the box is caught up with whatever that restore chose.
+    assert!(html.contains("syncThemeController();"));
+
+    // Every `/ui` page shares the bar, so the switch is on all of them.
+    assert!(mailbox_no_company_page(&user).contains(r##"class="theme-controller""##));
+}
+
+#[test]
 fn top_bar_shows_the_logo_and_the_signed_in_account() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
     let detail = empty_detail_pane("Select a thread.", FragmentSwap::Inline);
     let email = EmailAddress::from("dana<script>@example.com");
     let user = MailboxUser {
+        id: Uuid::new_v4(),
         username: "dana",
         email: &email,
+        avatar_url: None,
     };
 
     let html = mailbox_page(&MailboxPage {
@@ -637,6 +689,51 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
 }
 
 #[test]
+fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
+    let company = mailbox_company();
+    let pictured = Agent {
+        avatar_url: Some(AvatarUrl::from("https://example.com/triage.png")),
+        ..settings_agent(company.id, "Triage", "triage")
+    };
+    let plain = settings_agent(company.id, "Plain", "plain");
+
+    let html = agent_edit_pane(&AgentEditPane {
+        company: &company,
+        agent: &pictured,
+        used_by: &[],
+        draft: None,
+        error: None,
+    });
+    assert!(html.contains(r#"src="https://example.com/triage.png""#));
+    // The form round-trips it, so saving from this pane cannot silently clear the picture.
+    assert!(html.contains(r#"name="avatar_url" value="https://example.com/triage.png""#));
+    // The letter is rendered underneath, for a URL that fails to load.
+    assert!(html.contains(">T</span>"));
+
+    let plain_html = agent_edit_pane(&AgentEditPane {
+        company: &company,
+        agent: &plain,
+        used_by: &[],
+        draft: None,
+        error: None,
+    });
+    assert!(!plain_html.contains("<img"));
+    assert!(plain_html.contains(">P</span>"));
+
+    // The sidebar shows the same face as the pane.
+    let agents = [pictured];
+    let list = agent_settings_list(
+        &AgentSettingsList {
+            company: &company,
+            agents: &agents,
+            selected_agent_id: None,
+        },
+        FragmentSwap::Inline,
+    );
+    assert!(list.contains(r#"src="https://example.com/triage.png""#));
+}
+
+#[test]
 fn agent_edit_pane_lists_the_channels_running_the_agent() {
     let company = mailbox_company();
     let agent = settings_agent(company.id, "Triage", "triage");
@@ -824,6 +921,7 @@ fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
         api_key: None,
         system_prompt: None,
         config_json: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }
 }
@@ -1204,6 +1302,7 @@ fn message_pane_separates_agent_and_human_bubbles() {
         channel: &channel,
         thread: &thread,
         messages: &[inbound, outbound],
+        agent: None,
         activity: None,
     });
 
@@ -1261,6 +1360,7 @@ fn message_pane_streams_new_messages_from_where_it_was_rendered() {
         channel: &channel,
         thread: &thread,
         messages: &[mailbox_message(thread.id, "older"), newest.clone()],
+        agent: None,
         activity: None,
     });
 
@@ -1292,6 +1392,7 @@ fn message_pane_omits_the_resume_cursor_for_an_empty_thread() {
         channel: &channel,
         thread: &thread,
         messages: &[],
+        agent: None,
         activity: None,
     });
 
@@ -1538,6 +1639,7 @@ fn the_open_thread_is_identifiable_from_the_pane() {
         channel: &channel,
         thread: &thread,
         messages: &[],
+        agent: None,
         activity: None,
     });
 
@@ -1578,6 +1680,7 @@ fn the_message_pane_has_a_slot_for_the_activity_strip() {
         channel: &channel,
         thread: &thread,
         messages: &[],
+        agent: None,
         activity: Some(ThreadActivity::Working),
     });
 
@@ -1592,6 +1695,38 @@ fn the_message_pane_has_a_slot_for_the_activity_strip() {
     let scroll_end = html.find("id=\"thread-activity\"").unwrap();
     assert!(scroll_start < scroll_end);
     assert!(html[scroll_start..scroll_end].contains("</div>"));
+}
+
+#[test]
+fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
+    let company = mailbox_company();
+    let thread = mailbox_thread(mailbox_channel(company.id).id);
+    let agent = Agent {
+        avatar_url: Some(AvatarUrl::from("https://example.com/triage.png")),
+        ..settings_agent(company.id, "Triage", "triage")
+    };
+
+    let reply = Message {
+        role: MessageRole::Agent,
+        direction: MessageDirection::Outbound,
+        sender: EmailAddress::from("support@acme.mailagents.com"),
+        ..mailbox_message(thread.id, "The reply.")
+    };
+    let html = message_bubble_chat(&reply, Some(&agent));
+    assert!(html.contains("chat-image"));
+    assert!(html.contains(r#"src="https://example.com/triage.png""#));
+    assert!(html.contains("Triage"));
+
+    // With no single agent behind the channel, the address it was sent from stands in.
+    let anonymous = message_bubble_chat(&reply, None);
+    assert!(!anonymous.contains("<img"));
+    assert!(anonymous.contains("support@acme.mailagents.com"));
+
+    // An inbound message is its sender's, whichever agent answers the channel.
+    let inbound = mailbox_message(thread.id, "The question.");
+    let inbound_html = message_bubble_chat(&inbound, Some(&agent));
+    assert!(!inbound_html.contains("<img"));
+    assert!(inbound_html.contains(inbound.sender.as_str()));
 }
 
 /// The stream sends bubbles rendered by `message_bubble_chat` while the page renders them inside
@@ -1609,10 +1744,11 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
         channel: &channel,
         thread: &thread,
         messages: std::slice::from_ref(&message),
+        agent: None,
         activity: None,
     });
 
-    assert!(pane.contains(message_bubble_chat(&message).trim()));
+    assert!(pane.contains(message_bubble_chat(&message, None).trim()));
 }
 
 #[test]
@@ -2111,6 +2247,7 @@ fn team_member(company_id: Uuid, user_id: Uuid, username: &str, role: &str) -> C
         user_id,
         username: Some(username.to_string()),
         email: Some(format!("{username}@example.com")),
+        avatar_url: None,
         role: role.to_string(),
         created_at: Utc::now(),
     }
@@ -2253,6 +2390,8 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
         company: &company,
         member: &sam,
         role: TeamRole::Owner,
+        viewer_id: Uuid::new_v4(),
+        avatar_draft: None,
         error: None,
     });
     assert!(removable.contains(&format!(
@@ -2266,6 +2405,8 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
         company: &company,
         member: &owner,
         role: TeamRole::Owner,
+        viewer_id: Uuid::new_v4(),
+        avatar_draft: None,
         error: None,
     });
     assert!(!owner_pane.contains("hx-delete="));
@@ -2278,10 +2419,60 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
         company: &company,
         member: &sam,
         role: TeamRole::Member,
+        viewer_id: Uuid::new_v4(),
+        avatar_draft: None,
         error: None,
     });
     assert!(!read_only.contains("hx-delete="));
     assert!(read_only.contains("Only the company owner"));
+}
+
+#[test]
+fn only_your_own_member_pane_offers_the_avatar_field() {
+    let company = mailbox_company();
+    let dana = CompanyMember {
+        avatar_url: Some(AvatarUrl::from("https://example.com/dana.png")),
+        ..team_member(company.id, Uuid::new_v4(), "dana", "member")
+    };
+
+    let own = member_pane(&MemberPane {
+        company: &company,
+        member: &dana,
+        role: TeamRole::Member,
+        viewer_id: dana.user_id,
+        avatar_draft: None,
+        error: None,
+    });
+    assert!(own.contains(&format!(
+        r##"hx-put="/ui/team/members/{}/avatar?company_id={}""##,
+        dana.user_id, company.id
+    )));
+    assert!(own.contains(r#"value="https://example.com/dana.png""#));
+    assert!(own.contains(r#"src="https://example.com/dana.png""#));
+
+    // The owner looking at somebody else sees their picture but no way to change it.
+    let someone_else = member_pane(&MemberPane {
+        company: &company,
+        member: &dana,
+        role: TeamRole::Owner,
+        viewer_id: company.user_id,
+        avatar_draft: None,
+        error: None,
+    });
+    assert!(!someone_else.contains("/avatar?company_id="));
+    assert!(someone_else.contains(r#"src="https://example.com/dana.png""#));
+
+    // A rejected save comes back with what was typed, not with what is stored.
+    let rejected = member_pane(&MemberPane {
+        company: &company,
+        member: &dana,
+        role: TeamRole::Member,
+        viewer_id: dana.user_id,
+        avatar_draft: Some("javascript:alert(1)"),
+        error: Some("An avatar URL must start with http:// or https://."),
+    });
+    assert!(rejected.contains(r#"value="javascript:alert(1)""#));
+    assert!(rejected.contains("must start with http://"));
 }
 
 #[test]

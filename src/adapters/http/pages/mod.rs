@@ -19,7 +19,7 @@ use crate::entities::{
     outbox::{OutboxEntry, OutboxFilter, OutboxStatus},
     task::{BackgroundTask, TaskFilter, TaskStatus, ThreadActivity},
     thread::Thread,
-    value_objects::EmailAddress,
+    value_objects::{AvatarUrl, EmailAddress},
 };
 use crate::use_cases::channel::InboundEmailResult;
 
