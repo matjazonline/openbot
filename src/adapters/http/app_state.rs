@@ -4,6 +4,7 @@ use axum::extract::FromRef;
 use sqlx::PgPool;
 
 use crate::{
+    adapters::persistence::dashboard::DashboardPersistence,
     domain::monitoring::MonitoringService,
     infra::{config::AppConfig, events::MailboxEvents},
     use_cases::{
@@ -25,6 +26,8 @@ pub struct AppState {
     pub agent_use_cases: Arc<AgentUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
     pub approval_use_cases: Arc<ApprovalUseCases>,
+    /// Read-only aggregates behind `/ui/dashboard`.
+    pub dashboard_persistence: Arc<dyn DashboardPersistence>,
     /// Committed messages, for the mailbox's live message stream.
     pub events: MailboxEvents,
 }
@@ -86,6 +89,12 @@ impl FromRef<AppState> for Arc<ThreadUseCases> {
 impl FromRef<AppState> for Arc<ApprovalUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.approval_use_cases.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn DashboardPersistence> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.dashboard_persistence.clone()
     }
 }
 

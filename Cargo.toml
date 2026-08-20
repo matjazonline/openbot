@@ -40,5 +40,5 @@ ammonia = "4"
 
 [dev-dependencies]
 # `#[tokio::test(start_paused = true)]`, so lease-heartbeat tests run in virtual time instead of
-# sleeping through a real 60-second lease term.
+# sleeping through a real 15-minute lease term.
 tokio = { version = "1", features = ["full", "test-util"] }

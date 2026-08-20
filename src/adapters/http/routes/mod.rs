@@ -12,6 +12,7 @@ pub mod ui;
 pub mod ui_agents;
 pub mod ui_channels;
 pub mod ui_companies;
+pub mod ui_dashboard;
 pub mod ui_outbox;
 pub mod ui_tasks;
 pub mod ui_team;
@@ -51,6 +52,7 @@ pub fn router() -> Router<AppState> {
         .merge(ui_agents::router())
         .merge(ui_channels::router())
         .merge(ui_companies::router())
+        .merge(ui_dashboard::router())
         .merge(ui_outbox::router())
         .merge(ui_tasks::router())
         .merge(ui_team::router())

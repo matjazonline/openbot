@@ -619,6 +619,7 @@ fn canonical_message_hash(message: &Message, attachments: Option<&Value>) -> Vec
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::test_support::test_pool;
     use crate::entities::message::{MessageDirection, MessageRole};
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
@@ -628,10 +629,7 @@ mod tests {
 
     #[tokio::test]
     async fn one_email_can_be_associated_with_isolated_channel_threads() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
-            return;
-        };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+        let Some(pool) = test_pool().await else {
             return;
         };
         let persistence = PostgresPersistence::new(pool.clone());
@@ -797,10 +795,7 @@ mod tests {
 
     #[tokio::test]
     async fn find_outbound_reply_excludes_outreach_outbox_messages() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
-            return;
-        };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+        let Some(pool) = test_pool().await else {
             return;
         };
         let persistence = PostgresPersistence::new(pool.clone());
@@ -962,8 +957,7 @@ mod tests {
     /// `None` when there is no database to talk to — these tests skip rather than fail, matching
     /// the others in this module.
     async fn thread_fixture(label: &str) -> Option<ThreadFixture> {
-        let database_url = std::env::var("DATABASE_URL").ok()?;
-        let pool = sqlx::PgPool::connect(&database_url).await.ok()?;
+        let pool = test_pool().await?;
         let persistence = PostgresPersistence::new(pool.clone());
 
         let suffix = Uuid::new_v4().simple().to_string();

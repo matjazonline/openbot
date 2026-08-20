@@ -169,20 +169,15 @@ impl AgentPersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::test_support::test_pool;
     use crate::use_cases::company::CompanyPersistence;
     use crate::use_cases::user::UserPersistence;
     use serde_json::json;
 
     #[tokio::test]
     async fn postgres_agent_persistence_works() {
-        let database_url = match std::env::var("DATABASE_URL") {
-            Ok(url) => url,
-            Err(_) => return,
-        };
-
-        let pool = match sqlx::PgPool::connect(&database_url).await {
-            Ok(p) => p,
-            Err(_) => return,
+        let Some(pool) = test_pool().await else {
+            return;
         };
 
         let persistence = PostgresPersistence::new(pool);

@@ -7,7 +7,10 @@ pub mod approval;
 pub mod channel;
 pub mod company;
 pub mod company_invite;
+pub mod dashboard;
 pub mod task;
+#[cfg(test)]
+pub mod test_support;
 pub mod thread;
 pub mod user;
 
@@ -45,17 +48,13 @@ mod tests {
     //! with no `DATABASE_URL` set.
 
     use chrono::{DateTime, Utc};
-    use sqlx::PgPool;
     use uuid::Uuid;
 
     /// Stands in for a client that picks up the server's `timezone` setting instead of pinning UTC,
     /// the way `psql` and `fly postgres connect` do.
     const NON_UTC_SESSION_TIMEZONE: &str = "Europe/Ljubljana";
 
-    async fn test_pool() -> Option<PgPool> {
-        let url = std::env::var("DATABASE_URL").ok()?;
-        PgPool::connect(&url).await.ok()
-    }
+    use crate::adapters::persistence::test_support::test_pool;
 
     #[tokio::test]
     async fn every_timestamp_column_carries_a_timezone() {

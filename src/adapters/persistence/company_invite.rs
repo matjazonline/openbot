@@ -270,19 +270,14 @@ impl CompanyInvitePersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::test_support::test_pool;
     use crate::use_cases::company::CompanyPersistence;
     use crate::use_cases::user::UserPersistence;
 
     #[tokio::test]
     async fn postgres_company_invite_and_member_persistence_works() {
-        let database_url = match std::env::var("DATABASE_URL") {
-            Ok(url) => url,
-            Err(_) => return, // Skip test if DATABASE_URL is not set
-        };
-
-        let pool = match sqlx::PgPool::connect(&database_url).await {
-            Ok(p) => p,
-            Err(_) => return,
+        let Some(pool) = test_pool().await else {
+            return;
         };
 
         let persistence = PostgresPersistence::new(pool);

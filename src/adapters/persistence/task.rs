@@ -18,7 +18,10 @@ use crate::{
             CreateOutreachRequest, DueOutreach, OutreachProgress, OutreachReplyMatch,
             OutreachStatus,
         },
-        task::{BackgroundTask, TaskStatus, ThreadActivity},
+        task::{
+            BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskStatus, ThreadActivity,
+            TokenUsage,
+        },
         value_objects::MessageId,
     },
 };
@@ -31,6 +34,26 @@ const CLAIM_TASK_SQL: &str = r#"UPDATE background_tasks
    SET status = 'processing', worker_id = $2, locked_at = CURRENT_TIMESTAMP,
        lock_expires_at = $3, updated_at = CURRENT_TIMESTAMP
    WHERE id = $1 AND status = 'pending' AND run_at <= CURRENT_TIMESTAMP"#;
+
+/// Open the ledger row for one attempt.
+///
+/// The conflict is not an error and not a duplicate: a task whose lease lapsed is re-claimed with
+/// its `retry_count` untouched — `mark_task_failed` never ran — so the new run carries the same
+/// attempt number as the run that vanished. That earlier run reported nothing, so its half-written
+/// row is reset here rather than left to be read as a finished attempt that took forever.
+const BEGIN_ATTEMPT_SQL: &str = r#"INSERT INTO task_attempts
+       (id, task_id, attempt_number, status, started_at)
+   VALUES ($1, $2, $3, 'processing', CURRENT_TIMESTAMP)
+   ON CONFLICT (task_id, attempt_number) DO UPDATE
+      SET status = 'processing', started_at = CURRENT_TIMESTAMP, finished_at = NULL,
+          error = NULL, prompt_tokens = NULL, completion_tokens = NULL"#;
+
+/// Close the ledger row, but only while it is still the open one. If another worker took the task
+/// over and reopened the row, this run is no longer the run of record and must not overwrite it.
+const FINISH_ATTEMPT_SQL: &str = r#"UPDATE task_attempts
+   SET status = $3, error = $4, prompt_tokens = $5, completion_tokens = $6,
+       finished_at = CURRENT_TIMESTAMP
+   WHERE task_id = $1 AND attempt_number = $2 AND status = 'processing'"#;
 
 /// Log when a lease-guarded state change was ignored because the lease or status moved on.
 ///
@@ -91,9 +114,8 @@ pub enum Leased<T> {
 
 /// Run `work` while keeping `lease` alive, renewing on every [`TaskLease::heartbeat`].
 ///
-/// Both queues need this. The worker holds a lease across a task it polled for; an inline dispatch
-/// holds one across a request. Neither can assume its work finishes inside a single lease term, and
-/// a lapsed lease means a second run of the same agent.
+/// The worker holds a lease across a task it polled for, and cannot assume that task finishes
+/// inside a single lease term — a lapsed lease means a second run of the same agent.
 pub async fn while_leased<F: Future>(
     persistence: &dyn TaskPersistence,
     task_id: Uuid,
@@ -494,6 +516,24 @@ pub trait TaskPersistence: Send + Sync {
         _worker_id: Uuid,
         _lock_expires_at: DateTime<Utc>,
     ) -> AppResult<bool> {
+        Ok(true)
+    }
+
+    /// Open a `task_attempts` row for a run that is starting, so its duration and token cost have
+    /// somewhere to land.
+    ///
+    /// Defaulted to a no-op for the same reason as [`Self::renew_task_lease`]: the hand-written
+    /// mocks across the suite assert on queue transitions, and this ledger is not one.
+    async fn begin_task_attempt(&self, attempt: TaskAttemptRef) -> AppResult<()> {
+        let _ = attempt;
+        Ok(())
+    }
+
+    /// Close the row opened by [`Self::begin_task_attempt`]. `false` means the row was not still
+    /// open — another worker took the task over — and the caller's numbers are not the ones of
+    /// record.
+    async fn finish_task_attempt(&self, outcome: &TaskAttemptOutcome) -> AppResult<bool> {
+        let _ = outcome;
         Ok(true)
     }
 
@@ -1353,6 +1393,41 @@ impl TaskPersistence for PostgresPersistence {
         Ok(result.rows_affected() == 1)
     }
 
+    async fn begin_task_attempt(&self, attempt: TaskAttemptRef) -> AppResult<()> {
+        sqlx::query(BEGIN_ATTEMPT_SQL)
+            .bind(Uuid::new_v4())
+            .bind(attempt.task_id)
+            .bind(attempt.attempt_number)
+            .execute(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        Ok(())
+    }
+
+    async fn finish_task_attempt(&self, outcome: &TaskAttemptOutcome) -> AppResult<bool> {
+        // `usize` tokens into an `INTEGER` column: clamp rather than wrap, so an absurd count is
+        // recorded as saturated instead of negative — the CHECK constraint rejects negatives.
+        let tokens = |pick: fn(&TokenUsage) -> usize| {
+            outcome
+                .tokens
+                .as_ref()
+                .map(|usage| i32::try_from(pick(usage)).unwrap_or(i32::MAX))
+        };
+
+        let result = sqlx::query(FINISH_ATTEMPT_SQL)
+            .bind(outcome.attempt.task_id)
+            .bind(outcome.attempt.attempt_number)
+            .bind(outcome.status.as_str())
+            .bind(outcome.error.as_deref())
+            .bind(tokens(|usage| usage.prompt_tokens))
+            .bind(tokens(|usage| usage.completion_tokens))
+            .execute(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+
+        Ok(result.rows_affected() == 1)
+    }
+
     async fn claim_pending_tasks(
         &self,
         worker_id: Uuid,
@@ -1840,6 +1915,7 @@ fn json_uuid(value: &Value, pointer: &str) -> AppResult<Uuid> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::test_support::test_pool;
     use crate::entities::message::{Message, MessageDirection, MessageRole};
     use crate::services::outbound_dispatcher::OutboundEmail;
     use crate::use_cases::{
@@ -1861,10 +1937,7 @@ mod tests {
     /// of its *current* run rather than whichever task happens to be found first.
     #[tokio::test]
     async fn thread_activity_reports_the_latest_task_per_thread() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
-            return;
-        };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+        let Some(pool) = test_pool().await else {
             return;
         };
         let persistence = PostgresPersistence::new(pool.clone());
@@ -2009,10 +2082,7 @@ mod tests {
 
     #[tokio::test]
     async fn concurrent_workers_claim_a_task_once() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
-            return;
-        };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+        let Some(pool) = test_pool().await else {
             return;
         };
         let persistence = PostgresPersistence::new(pool.clone());
@@ -2097,6 +2167,28 @@ mod tests {
             "a pending task must be claimed by exactly one worker"
         );
 
+        // Two claims, one of which is ours by construction — so the other necessarily took someone
+        // else's task, and it now holds a five-minute lease on it. Hand it straight back: whichever
+        // test queued it is about to find its own task already claimed and fail on a state it never
+        // set. Releasing to 'pending' is where a reaped lease lands anyway.
+        let borrowed: Vec<Uuid> = claimed
+            .iter()
+            .map(|claim| claim.id)
+            .filter(|id| *id != task.id)
+            .collect();
+        if !borrowed.is_empty() {
+            sqlx::query(
+                "UPDATE background_tasks
+                    SET status = 'pending', worker_id = NULL, locked_at = NULL,
+                        lock_expires_at = NULL
+                  WHERE id = ANY($1)",
+            )
+            .bind(&borrowed)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
         CompanyPersistence::delete(&persistence, company.id)
             .await
             .unwrap();
@@ -2104,10 +2196,7 @@ mod tests {
 
     #[tokio::test]
     async fn only_one_worker_queues_an_outbound_send() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
-            return;
-        };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+        let Some(pool) = test_pool().await else {
             return;
         };
         let persistence = PostgresPersistence::new(pool.clone());
@@ -2173,6 +2262,21 @@ mod tests {
             "the unique idempotency key must admit exactly one send"
         );
 
+        // Put the row out of reach before asking what state it is in. Claiming is unscoped by
+        // design — `claim_outbox_emails` takes any `pending` row whose `available_at` has arrived,
+        // because that is what a real poller does — so a concurrent test would otherwise claim this
+        // row and the assertions below would be reporting on that, not on what queueing did.
+        // Pushing `available_at` out excludes it from every claim set without changing the columns
+        // under test.
+        sqlx::query(
+            "UPDATE email_outbox SET available_at = CURRENT_TIMESTAMP + interval '1 hour'
+             WHERE id = $1",
+        )
+        .bind(queued[0])
+        .execute(&pool)
+        .await
+        .unwrap();
+
         // The row is left for the poller to claim: 'pending', unleased, and not owned by anyone.
         let (status, worker_id): (String, Option<Uuid>) =
             sqlx::query_as("SELECT status, worker_id FROM email_outbox WHERE id = $1")
@@ -2193,13 +2297,9 @@ mod tests {
 
     #[tokio::test]
     async fn the_outbox_lists_one_channel_at_a_time() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+        let Some(pool) = test_pool().await else {
             return;
         };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
-            return;
-        };
-        sqlx::migrate!().run(&pool).await.unwrap();
 
         let persistence = PostgresPersistence::new(pool.clone());
         let suffix = Uuid::new_v4().simple().to_string();
@@ -2294,13 +2394,9 @@ mod tests {
 
     #[tokio::test]
     async fn an_expired_delivery_lease_costs_an_attempt_and_reaches_the_cap() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+        let Some(pool) = test_pool().await else {
             return;
         };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
-            return;
-        };
-        sqlx::migrate!().run(&pool).await.unwrap();
 
         let persistence = PostgresPersistence::new(pool.clone());
         let suffix = Uuid::new_v4().simple().to_string();
@@ -2361,18 +2457,53 @@ mod tests {
             .await
             .unwrap()
         };
+        // Claiming is the subject here, so this calls the real query rather than leasing the row
+        // by hand — but the query is unscoped by design and would take whatever else is queued.
+        // `claim_outbox_emails` orders by `(available_at, id)`, so backdating this row sorts it
+        // ahead of every neighbour and a LIMIT of 1 then claims precisely it. The release below
+        // covers the rest: once the backoff pushes this row into the future it stops sorting first,
+        // and the claim would otherwise carry off whichever row did.
+        sqlx::query(
+            "UPDATE email_outbox SET available_at = CURRENT_TIMESTAMP - interval '1 hour'
+             WHERE id = $1",
+        )
+        .bind(outbox_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
         let worker_id = Uuid::new_v4();
         let claimed_ours = async |limit: i64| -> bool {
-            persistence
+            let claimed = persistence
                 .claim_outbox_emails(worker_id, Utc::now() + chrono::Duration::minutes(15), limit)
                 .await
-                .unwrap()
+                .unwrap();
+            let ours = claimed.iter().any(|email| email.id == outbox_id);
+
+            let borrowed: Vec<Uuid> = claimed
                 .iter()
-                .any(|email| email.id == outbox_id)
+                .map(|email| email.id)
+                .filter(|id| *id != outbox_id)
+                .collect();
+            if !borrowed.is_empty() {
+                sqlx::query(
+                    "UPDATE email_outbox
+                        SET status = 'pending', worker_id = NULL, locked_at = NULL,
+                            lock_expires_at = NULL
+                      WHERE id = ANY($1) AND worker_id = $2",
+                )
+                .bind(&borrowed)
+                .bind(worker_id)
+                .execute(&pool)
+                .await
+                .unwrap();
+            }
+
+            ours
         };
 
         assert!(
-            claimed_ours(50).await,
+            claimed_ours(1).await,
             "a pending row is the poller's to take"
         );
 
@@ -2399,7 +2530,7 @@ mod tests {
             "a lapsed lease spends an attempt and backs the row off"
         );
         assert!(
-            !claimed_ours(50).await,
+            !claimed_ours(1).await,
             "the backoff must hold the row back, or the reaper is just a slower redelivery loop"
         );
 
@@ -2416,7 +2547,7 @@ mod tests {
 
         persistence.reap_expired_outbox_leases().await.unwrap();
         assert_eq!(state(outbox_id).await.0, "failed");
-        assert!(!claimed_ours(50).await);
+        assert!(!claimed_ours(1).await);
 
         CompanyPersistence::delete(&persistence, company.id)
             .await
@@ -2425,13 +2556,9 @@ mod tests {
 
     #[tokio::test]
     async fn an_undeliverable_payload_is_dead_lettered_on_the_first_attempt() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+        let Some(pool) = test_pool().await else {
             return;
         };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
-            return;
-        };
-        sqlx::migrate!().run(&pool).await.unwrap();
 
         let persistence = PostgresPersistence::new(pool.clone());
         let suffix = Uuid::new_v4().simple().to_string();
@@ -2482,11 +2609,23 @@ mod tests {
             .unwrap()
             .unwrap();
 
+        // Take the lease on this row alone, rather than calling `claim_outbox_emails`. Claiming is
+        // setup here, not the subject — what is under test is the `worker_id` guard below — and the
+        // real claim is unscoped: it would take up to `limit` rows belonging to whatever else is
+        // running, and could equally lose this row to another claimer before the guard is reached.
         let worker_id = Uuid::new_v4();
-        persistence
-            .claim_outbox_emails(worker_id, Utc::now() + chrono::Duration::minutes(15), 50)
-            .await
-            .unwrap();
+        let leased = sqlx::query(
+            "UPDATE email_outbox
+                SET status = 'sending', worker_id = $2, locked_at = CURRENT_TIMESTAMP,
+                    lock_expires_at = CURRENT_TIMESTAMP + interval '15 minutes'
+              WHERE id = $1",
+        )
+        .bind(outbox_id)
+        .bind(worker_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert_eq!(leased.rows_affected(), 1, "the row exists and is now ours");
 
         // Only the worker holding the lease may dead-letter the row.
         assert!(
@@ -2520,10 +2659,7 @@ mod tests {
 
     #[tokio::test]
     async fn task_deliveries_are_visible_without_the_transport_writing_back() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
-            return;
-        };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+        let Some(pool) = test_pool().await else {
             return;
         };
         let persistence = PostgresPersistence::new(pool.clone());
@@ -2588,6 +2724,18 @@ mod tests {
             .unwrap()
             .unwrap();
 
+        // This test asserts the row is still `Pending`, so it must not be claimable while it does:
+        // claiming is unscoped, and a concurrent poller taking the row would move it to 'sending'.
+        // A future `available_at` puts it outside every claim set without touching `status`.
+        sqlx::query(
+            "UPDATE email_outbox SET available_at = CURRENT_TIMESTAMP + interval '1 hour'
+             WHERE id = $1",
+        )
+        .bind(outbox_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
         let deliveries = persistence.list_task_deliveries(task.id).await.unwrap();
         assert_eq!(deliveries.len(), 1);
         assert_eq!(deliveries[0].id, outbox_id);
@@ -2624,13 +2772,9 @@ mod tests {
 
     #[tokio::test]
     async fn outreach_reply_reaches_quorum_and_resumes_task() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+        let Some(pool) = test_pool().await else {
             return;
         };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
-            return;
-        };
-        sqlx::migrate!().run(&pool).await.unwrap();
         let persistence = PostgresPersistence::new(pool);
         let suffix = Uuid::new_v4().simple().to_string();
         let owner_email = format!("outreach_owner_{suffix}@example.com");

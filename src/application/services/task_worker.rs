@@ -14,7 +14,7 @@ use crate::{
     entities::{
         channel::Channel,
         outreach::DueOutreach,
-        task::BackgroundTask,
+        task::{BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus},
         value_objects::{EmailAddress, MessageId},
     },
     infra::config::AppConfig,
@@ -238,13 +238,35 @@ impl TaskWorker {
         duration_ms: u64,
     ) {
         let task_id = task.id;
+        // The row as it stands *now*, not as it was claimed: the run writes its token usage into
+        // the payload and may have parked itself, and both of those are read below.
+        let current = match self.task_persistence.get_task_by_id(task_id).await {
+            Ok(current) => current,
+            Err(error) => {
+                warn!("Could not re-read task {task_id} to close it out: {error}");
+                None
+            }
+        };
+
         let err_msg = match result {
             Ok(()) => {
                 // A task that parked itself keeps its own status; it is neither done nor failed.
-                if self.task_is_suspended(task_id).await {
+                // Its attempt stays open too — the resume runs under the same number.
+                let suspended = current
+                    .as_ref()
+                    .map(|task| task.status)
+                    .filter(|status| status.is_suspended());
+                if let Some(status) = suspended {
+                    info!(
+                        "Background task {} suspended with status {}",
+                        task_id,
+                        status.as_str()
+                    );
                     return;
                 }
                 info!("Successfully completed background task {}", task_id);
+                self.close_out_attempt(task, current.as_ref(), TaskAttemptStatus::Completed, None)
+                    .await;
                 let outcome = self
                     .task_persistence
                     .mark_task_completed(task_id, self.worker_id)
@@ -257,6 +279,13 @@ impl TaskWorker {
         };
 
         warn!("Failed background task {}: {}", task_id, err_msg);
+        self.close_out_attempt(
+            task,
+            current.as_ref(),
+            TaskAttemptStatus::Failed,
+            Some(err_msg.clone()),
+        )
+        .await;
         let next_retry = task.retry_count + 1;
         let is_dead_letter = next_retry >= task.max_retries;
         // Exponential backoff: 30s * 2^retry, capped so the shift can't overflow.
@@ -271,24 +300,36 @@ impl TaskWorker {
         self.record_task_metric(task, duration_ms, TaskStatusMetric::Failed);
     }
 
-    /// Did the task park itself awaiting a human approval or a third-party reply?
-    async fn task_is_suspended(&self, task_id: Uuid) -> bool {
-        let Ok(Some(current)) = self.task_persistence.get_task_by_id(task_id).await else {
-            return false;
+    /// Close this run's row in the attempt ledger, which is what the dashboard reads duration and
+    /// token spend from.
+    ///
+    /// Written before the queue transition rather than after: this records what *this run* did, and
+    /// it did finish. Whether the run is still the one of record is a separate question, answered
+    /// by the guard inside `finish_task_attempt` and by `report_outcome` on the transition itself.
+    ///
+    /// A ledger write that fails is logged and dropped — telemetry must not fail a task.
+    async fn close_out_attempt(
+        &self,
+        task: &BackgroundTask,
+        current: Option<&BackgroundTask>,
+        status: TaskAttemptStatus,
+        error: Option<String>,
+    ) {
+        let outcome = TaskAttemptOutcome {
+            attempt: TaskAttemptRef::current(task),
+            status,
+            error,
+            // The run writes its usage into the payload, so it is only on the re-read row; the
+            // copy this worker claimed predates the run entirely.
+            tokens: current.and_then(BackgroundTask::token_usage),
         };
-        let suspended = matches!(
-            current.status,
-            crate::entities::task::TaskStatus::PendingApproval
-                | crate::entities::task::TaskStatus::WaitingForThirdPartyReply
+
+        report_outcome(
+            "Task attempt",
+            task.id,
+            "outcome",
+            self.task_persistence.finish_task_attempt(&outcome).await,
         );
-        if suspended {
-            info!(
-                "Background task {} suspended with status {}",
-                task_id,
-                current.status.as_str()
-            );
-        }
-        suspended
     }
 
     fn record_task_metric(
@@ -681,6 +722,20 @@ impl TaskWorker {
         &self,
         task: &crate::entities::task::BackgroundTask,
     ) -> Result<(), String> {
+        // Open the ledger row alongside the lease: both describe this one run, and both are wanted
+        // even if it never reaches a terminal state. A failure to open it is logged, not fatal —
+        // the run is the point, the bookkeeping is not.
+        if let Err(error) = self
+            .task_persistence
+            .begin_task_attempt(TaskAttemptRef::current(task))
+            .await
+        {
+            warn!(
+                "Could not open the attempt ledger for task {}: {error}",
+                task.id
+            );
+        }
+
         let lease = TaskLease::worker(self.worker_id);
         match while_leased(
             &*self.task_persistence,
@@ -1505,6 +1560,7 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            operator_emails: Vec::new(),
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
@@ -1623,6 +1679,7 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            operator_emails: Vec::new(),
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(

@@ -38,6 +38,7 @@ pub struct MailboxUser<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiSection {
     Mailbox,
+    Dashboard,
     Channels,
     Agents,
     Tasks,
@@ -51,6 +52,7 @@ impl UiSection {
     pub(crate) fn base_path(self) -> &'static str {
         match self {
             UiSection::Mailbox => "/ui",
+            UiSection::Dashboard => "/ui/dashboard",
             UiSection::Channels => "/ui/channels",
             UiSection::Agents => "/ui/agents",
             UiSection::Tasks => "/ui/tasks",
@@ -523,6 +525,7 @@ fn icon_rail(company_id: Uuid, section: UiSection) -> String {
             <a href="/ui/agents?company_id={company_id}" class="btn btn-square btn-lg {agents_style} text-2xl leading-none" title="Agents">🤖</a>
             <a href="/ui/tasks?company_id={company_id}" class="btn btn-square btn-lg {tasks_style} text-2xl leading-none" title="Tasks">⚙</a>
             <a href="/ui/outbox?company_id={company_id}" class="btn btn-square btn-lg {outbox_style} text-2xl leading-none" title="Outbox">📤</a>
+            <a href="/ui/dashboard?company_id={company_id}" class="btn btn-square btn-lg {dashboard_style} text-2xl leading-none" title="Dashboard">📊</a>
             <a href="/ui/companies?company_id={company_id}" class="btn btn-square btn-lg {companies_style} text-2xl leading-none" title="Companies">🏢</a>
             <a href="/ui/team?company_id={company_id}" class="btn btn-square btn-lg {team_style} text-2xl leading-none" title="Team">👥</a>
             <button type="button" class="btn btn-square btn-lg btn-ghost mt-auto text-2xl leading-none"
@@ -533,6 +536,7 @@ fn icon_rail(company_id: Uuid, section: UiSection) -> String {
         channels_style = style(section == UiSection::Channels),
         agents_style = style(section == UiSection::Agents),
         tasks_style = style(section == UiSection::Tasks),
+        dashboard_style = style(section == UiSection::Dashboard),
         outbox_style = style(section == UiSection::Outbox),
         companies_style = style(section == UiSection::Companies),
         team_style = style(section == UiSection::Team),

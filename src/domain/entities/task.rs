@@ -16,6 +16,17 @@ pub enum TaskStatus {
 }
 
 impl TaskStatus {
+    /// Is the task parked waiting on someone outside the queue?
+    ///
+    /// A suspended task is neither finished nor failed: it set its own status during the run and
+    /// keeps it, so the worker must not overwrite it on the way out.
+    pub fn is_suspended(self) -> bool {
+        matches!(
+            self,
+            TaskStatus::PendingApproval | TaskStatus::WaitingForThirdPartyReply
+        )
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             TaskStatus::Pending => "pending",
@@ -149,6 +160,58 @@ impl ThreadActivity {
             ThreadActivity::Failed => "Agent run failed",
         }
     }
+}
+
+/// Which numbered run at a task a ledger write is about.
+///
+/// The number is derived from `retry_count`, so a task re-claimed after its lease lapsed reuses the
+/// number of the run that never reported — which is the point: that run produced no result, so its
+/// record should be replaced rather than sat beside a duplicate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TaskAttemptRef {
+    pub task_id: Uuid,
+    pub attempt_number: i32,
+}
+
+impl TaskAttemptRef {
+    /// The attempt a task is about to make, given how many times it has already failed.
+    pub fn current(task: &BackgroundTask) -> Self {
+        Self {
+            task_id: task.id,
+            attempt_number: task.retry_count + 1,
+        }
+    }
+}
+
+/// How an attempt ended. Only terminal states — an attempt still running is written as
+/// `processing` when it begins and is never described by this type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskAttemptStatus {
+    Completed,
+    Failed,
+}
+
+impl TaskAttemptStatus {
+    /// The value stored in `task_attempts.status`, which a CHECK constraint restricts.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TaskAttemptStatus::Completed => "completed",
+            TaskAttemptStatus::Failed => "failed",
+        }
+    }
+}
+
+/// What one finished attempt cost and how it ended.
+///
+/// One value rather than five parameters: `error` and the two token counts are all optional, and
+/// positionally they would be trivially swappable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskAttemptOutcome {
+    pub attempt: TaskAttemptRef,
+    pub status: TaskAttemptStatus,
+    pub error: Option<String>,
+    /// `None` when the run never reached a model — a guard rejected it, or it failed first.
+    pub tokens: Option<TokenUsage>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]

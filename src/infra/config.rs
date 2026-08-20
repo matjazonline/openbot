@@ -2,6 +2,8 @@ use std::env;
 
 use time::Duration;
 
+use crate::entities::value_objects::EmailAddress;
+
 pub struct AppConfig {
     pub jwt_secret: String,
     pub access_token_ttl: Duration,
@@ -26,9 +28,22 @@ pub struct AppConfig {
     pub spam_scanner_type: String,
     pub spam_scanner_url: String,
     pub enable_llm_spam_guardrail: bool,
+    /// Addresses allowed to see the whole system rather than one company on `/ui/dashboard`.
+    ///
+    /// Deliberately deploy-controlled rather than a database role: `company_members.role` grants
+    /// `admin` *within one company*, which is not the same authority as reading every company's
+    /// traffic. Empty by default, so the global view does not exist until someone is named.
+    pub operator_emails: Vec<EmailAddress>,
 }
 
 impl AppConfig {
+    /// Is this the address of a system operator, and so entitled to the cross-company rollup?
+    pub fn is_operator(&self, email: &EmailAddress) -> bool {
+        self.operator_emails
+            .iter()
+            .any(|operator| operator.eq_ignore_case(email))
+    }
+
     pub fn from_env() -> Self {
         let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
@@ -50,6 +65,15 @@ impl AppConfig {
             .split(',')
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
+            .collect();
+
+        // No default: an unset variable means nobody holds the cross-company view.
+        let operator_emails = env::var("OPERATOR_EMAILS")
+            .unwrap_or_default()
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(EmailAddress::from)
             .collect();
 
         let smtp_host = env::var("SMTP_HOST").unwrap_or_else(|_| "localhost".to_string());
@@ -145,6 +169,7 @@ impl AppConfig {
             spam_scanner_type,
             spam_scanner_url,
             enable_llm_spam_guardrail,
+            operator_emails,
         }
     }
 

@@ -21,6 +21,9 @@ kill_timeout = "30s"
   ENABLE_LLM_SPAM_GUARDRAIL = "false"
   INCOMING_SMTP_DNSBL_ENABLED = "true"
   REFRESH_TOKEN_TTL_DAYS = "30"
+  # Comma-separated addresses that see /ui/dashboard across every company rather than
+  # scoped to one. Unset means nobody does; a company `admin` is not an operator.
+  OPERATOR_EMAILS = ""
 
 # axum API
 [http_service]

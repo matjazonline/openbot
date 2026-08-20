@@ -1339,6 +1339,7 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            operator_emails: Vec::new(),
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
@@ -1571,6 +1572,7 @@ regis";
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            operator_emails: Vec::new(),
         });
 
         let thread_use_cases = Arc::new(ThreadUseCases::new(
@@ -1692,6 +1694,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            operator_emails: Vec::new(),
         });
 
         let monitor = Arc::new(InMemoryMonitor::new());

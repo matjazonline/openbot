@@ -969,6 +969,7 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            operator_emails: Vec::new(),
         });
 
         let task_persistence = Arc::new(MockTaskPersistence {
@@ -1001,6 +1002,13 @@ mod tests {
                 .expect("valid lazy pool url"),
             config: config.clone(),
             monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+            // Same lazy pool: this test never renders a dashboard, so it never connects.
+            dashboard_persistence: Arc::new(
+                crate::adapters::persistence::PostgresPersistence::new(
+                    sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                        .expect("valid lazy pool url"),
+                ),
+            ),
             user_use_cases: Arc::new(crate::use_cases::user::UserUseCases::new(
                 Arc::new(crate::infra::argon2_password_hasher()),
                 Arc::new(MockUserPersistence {}),

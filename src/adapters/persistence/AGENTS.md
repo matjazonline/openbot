@@ -121,19 +121,36 @@ Fly.io build or, worse, keeps building the old query shape.
 The DB-backed tests in this directory open with:
 
 ```rust
-let database_url = match std::env::var("DATABASE_URL") { Ok(url) => url, Err(_) => return };
+let Some(pool) = test_pool().await else { return };
 ```
 
-They **silently pass when `DATABASE_URL` is unset**. A green `cargo test` is therefore no evidence
-that your SQL is correct — for the runtime-query files it is no evidence that the SQL is even
-parseable. Every model change must be run as:
+`test_pool` (`test_support.rs`) resolves `TEST_DATABASE_URL`, or else redirects `DATABASE_URL` onto
+its `_test` sibling, and applies the migrations once per test binary. **Never point these tests at
+the development database.** The queue operations they exercise are unscoped on purpose —
+`claim_pending_tasks` and `claim_outbox_emails` sweep every row, because that is what a worker does —
+so against your dev database a test run competes with any `cargo run` server polling the same queues
+twice a second, and `reap_expired_outbox_leases` can mark real deliveries failed.
+
+Create the database once:
+
+```sh
+createdb mail_agents_test
+```
+
+Then every model change must be run as:
 
 ```sh
 DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" cargo test --lib
 ```
 
-This runs parallel and should stay that way. Every fixture here shares one database, so a new
-DB-backed test has to be written to tolerate that:
+The command is unchanged; it now lands on `mail_agents_test`. With **no** `DATABASE_URL` at all the
+tests still skip, which is what lets CI run without a database — so a green `cargo test` alone is
+still no evidence that your SQL is correct, and for the runtime-query files no evidence that it is
+even parseable. A URL that is set but unreachable is now a panic rather than a skip, so a missing
+test database announces itself instead of reporting success.
+
+This runs parallel and should stay that way. Every fixture here still shares one database — the test
+one — so a new DB-backed test has to be written to tolerate that:
 
 - **Suffix every database-wide unique value** — company slugs, usernames, emails — with
   `Uuid::new_v4().simple()`. Channel slugs are unique per company, so those may stay fixed. A
@@ -143,6 +160,18 @@ DB-backed test has to be written to tolerate that:
   `background_tasks` queue with no company filter, because that is what a real worker does. Assert
   that *your* row was claimed exactly once (filter by id), not that the queue returned one row, and
   keep the claim limit small so the test steals as little as possible from whatever else is running.
+- **Do not assert that your row is still `pending`, or still unclaimed.** That asserts no unscoped
+  claim ran in between, which is not a property this code has. Either drop the status from the
+  assertion — `approval_lookup_is_scoped_and_token_is_consumed_once` counts its notification by
+  `idempotency_key` alone — or put the row out of reach first: `claim_outbox_emails` only takes rows
+  whose `available_at` has arrived, so pushing that forward excludes it from every claim set without
+  touching the columns under test.
+- **If you must call a real claim, make it deterministic and give back what is not yours.** Both
+  claims order by their due column, so backdating your own row sorts it ahead of every neighbour and
+  a `LIMIT 1` then takes precisely it. Where a claim can still catch a foreign row —
+  `only_one_worker_queues_an_outbound_send` runs two concurrent claims, so the second is guaranteed
+  to — release it back to `pending` with its worker and lease cleared. A test that leaves a
+  five-minute lease on someone else's row makes *their* test fail, several files away.
 
 If a test still cannot be isolated, run just that test rather than reaching for `--test-threads=1`
 for the whole suite — serialising everything hides the next isolation bug instead of surfacing it.

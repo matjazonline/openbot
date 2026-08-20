@@ -75,6 +75,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         agent_use_cases: Arc::new(agent_use_cases),
         thread_use_cases,
         approval_use_cases,
+        dashboard_persistence: postgres_arc.clone(),
         events: MailboxEvents::new(),
     })
 }

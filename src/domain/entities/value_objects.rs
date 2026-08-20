@@ -106,6 +106,18 @@ string_newtype!(ChannelSlug);
 // unrelated strings such as slugs or message IDs).
 string_newtype!(EmailAddress);
 
+impl EmailAddress {
+    /// Compare two addresses the way a mail system does: ignoring case.
+    ///
+    /// The derived `PartialEq` is case-*sensitive*, which is right for a `String` and wrong for an
+    /// address — `Ops@Example.com` and `ops@example.com` are one mailbox. The columns these are
+    /// matched against are `CITEXT`, so a `==` here would disagree with the same comparison made in
+    /// Postgres. Anything deciding *who someone is* must go through this rather than `==`.
+    pub fn eq_ignore_case(&self, other: &Self) -> bool {
+        self.0.trim().eq_ignore_ascii_case(other.0.trim())
+    }
+}
+
 // An RFC 5322 `Message-ID` (or `In-Reply-To` / one entry of `References`).
 string_newtype!(MessageId);
 

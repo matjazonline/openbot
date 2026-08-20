@@ -352,6 +352,7 @@ impl ChannelPersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::test_support::test_pool;
     use crate::use_cases::agent::AgentPersistence;
     use crate::use_cases::company::CompanyPersistence;
     use crate::use_cases::user::UserPersistence;
@@ -359,14 +360,8 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_channel_persistence_works() {
-        let database_url = match std::env::var("DATABASE_URL") {
-            Ok(url) => url,
-            Err(_) => return, // Skip test if DATABASE_URL is not set
-        };
-
-        let pool = match sqlx::PgPool::connect(&database_url).await {
-            Ok(p) => p,
-            Err(_) => return,
+        let Some(pool) = test_pool().await else {
+            return;
         };
 
         let persistence = PostgresPersistence::new(pool);
@@ -530,10 +525,7 @@ mod tests {
     /// Aliases and canonical slugs share one namespace per company, enforced by the database.
     #[tokio::test]
     async fn alias_slugs_are_unique_within_a_company_and_free_across_companies() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
-            return;
-        };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+        let Some(pool) = test_pool().await else {
             return;
         };
         let persistence = PostgresPersistence::new(pool);

@@ -493,6 +493,7 @@ impl ApprovalPersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::test_support::test_pool;
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
         company::CompanyPersistence,
@@ -502,10 +503,7 @@ mod tests {
 
     #[tokio::test]
     async fn approval_lookup_is_scoped_and_token_is_consumed_once() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
-            return;
-        };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+        let Some(pool) = test_pool().await else {
             return;
         };
         let persistence = PostgresPersistence::new(pool);
@@ -569,13 +567,17 @@ mod tests {
             .await
             .unwrap();
         assert!(created);
-        let queued_notifications: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM email_outbox WHERE idempotency_key = $1 AND status = 'pending'",
-        )
-        .bind(format!("approval:{}", approval.id))
-        .fetch_one(&persistence.pool)
-        .await
-        .unwrap();
+
+        // Counted by key alone, with no `status` filter. What is under test is that creating an
+        // approval queues exactly one notification; whether a poller has since claimed it is the
+        // poller's business, and asserting it is still 'pending' would be asserting that no
+        // unscoped claim ran in between — which is not a property this code has.
+        let queued_notifications: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM email_outbox WHERE idempotency_key = $1")
+                .bind(format!("approval:{}", approval.id))
+                .fetch_one(&persistence.pool)
+                .await
+                .unwrap();
         assert_eq!(queued_notifications, 1);
         assert_eq!(
             persistence
