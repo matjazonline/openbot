@@ -71,7 +71,7 @@ pub struct CompanyQuery {
     pub company_id: Uuid,
 }
 
-/// What the "✨ Generate with AI" box sends: the instructions, plus whichever model overrides the
+/// What the "Generate with AI" box sends: the instructions, plus whichever model overrides the
 /// form is currently showing.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PromptGeneratorForm {

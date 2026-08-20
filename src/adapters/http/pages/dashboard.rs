@@ -12,14 +12,18 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use super::{
+    PANELS_SKELETON,
+    chart::{self, ChartKind, Series, TimeChart, YUnit, thousands},
     company_switcher, escape_html_text,
+    icon::{BUTTON_ICON, Icon, icon},
     mailbox::{MailboxUser, UiSection, UiShell, ui_shell},
+    panels_placeholder,
 };
 use crate::entities::{
     company::Company,
     dashboard::{
-        AttemptStats, DashboardSnapshot, DashboardWindow, OUTSTANDING_LIMIT, OutboxHealth,
-        OutstandingTask, ProcessGauges, TaskQueueHealth, ThroughputBucket,
+        AttemptStats, DashboardSnapshot, DashboardWindow, LatencyBucket, OUTSTANDING_LIMIT,
+        OutboxHealth, OutstandingTask, ProcessGauges, TaskQueueHealth,
     },
     outbox::OutboxStatus,
     task::TaskStatus,
@@ -58,6 +62,21 @@ impl DashboardScopeView<'_> {
     }
 }
 
+/// The dashboard's chrome for one request: what the shell needs, and nothing that costs a query.
+///
+/// The panels are fetched on their own once the shell is on screen, so this page renders while the
+/// rollup's aggregates are still running rather than after them — which is the whole point of the
+/// placeholder [`dashboard_page`] leaves in their place.
+pub struct DashboardShell<'a> {
+    pub user: &'a MailboxUser<'a>,
+    pub scope: DashboardScopeView<'a>,
+    /// The caller's own companies — the switcher's options.
+    pub companies: &'a [Company],
+    /// The range the panels will be read over. The shell needs it before any query has run, because
+    /// it is what the panel fetch and the stream subscription are both parameterised by.
+    pub window: DashboardWindow,
+}
+
 pub struct DashboardPage<'a> {
     pub user: &'a MailboxUser<'a>,
     pub scope: DashboardScopeView<'a>,
@@ -84,14 +103,16 @@ impl DashboardPage<'_> {
     }
 }
 
-pub fn dashboard_page(page: &DashboardPage<'_>) -> String {
-    let sidebar = match page.scope {
+pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
+    let range = range_picker(shell.scope.company_id(), shell.window);
+    let sidebar = match shell.scope {
         DashboardScopeView::Company(company) => format!(
             r##"<aside class="flex w-72 shrink-0 flex-col border-r border-base-300 bg-base-200">
                 {switcher}
+                {range}
                 {legend}
             </aside>"##,
-            switcher = company_switcher(company, page.companies, UiSection::Dashboard),
+            switcher = company_switcher(company, shell.companies, UiSection::Dashboard),
             legend = scope_legend("This company"),
         ),
         DashboardScopeView::Global => format!(
@@ -101,6 +122,7 @@ pub fn dashboard_page(page: &DashboardPage<'_>) -> String {
                         <span class="text-sm font-semibold">Operator view</span>
                     </div>
                 </div>
+                {range}
                 {legend}
             </aside>"##,
             legend = scope_legend("All companies"),
@@ -109,27 +131,30 @@ pub fn dashboard_page(page: &DashboardPage<'_>) -> String {
 
     // `hx-ext="sse"` sits on the wrapper, not on the swapped element: a swap that replaced the
     // element carrying the connection would tear the stream down on its first tick.
+    //
+    // The panels themselves are fetched once the shell is on screen rather than rendered into it,
+    // so the workspace paints immediately and the rollup's aggregates run against a placeholder.
+    // The fetch is what fills it, not the stream: a reader whose SSE connection never establishes
+    // still gets their numbers, and the stream then keeps them current.
     let content = format!(
         r##"
         {sidebar}
         <section class="flex flex-1 flex-col overflow-y-auto bg-base-100" hx-ext="sse"
             sse-connect="/ui/dashboard/events{query}">
-            <div id="{panels_id}" sse-swap="{event}" hx-swap="innerHTML">{panels}</div>
+            <div id="{panels_id}"{PANELS_SKELETON} sse-swap="{event}" hx-swap="innerHTML"
+                hx-get="/ui/dashboard/panels{query}" hx-trigger="load">{placeholder}</div>
         </section>
         "##,
-        query = match page.scope.company_id() {
-            Some(company_id) => format!("?company_id={company_id}"),
-            None => String::new(),
-        },
+        query = dashboard_query(shell.scope.company_id(), shell.window),
         panels_id = DASHBOARD_PANELS_ID,
         event = DASHBOARD_EVENT,
-        panels = dashboard_panels(page),
+        placeholder = panels_placeholder(),
     );
 
     ui_shell(&UiShell {
-        title: &page.scope.title(),
-        user: page.user,
-        company_id: page.scope.company_id(),
+        title: &shell.scope.title(),
+        user: shell.user,
+        company_id: shell.scope.company_id(),
         section: UiSection::Dashboard,
         content: &content,
         script: "",
@@ -146,6 +171,7 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
     format!(
         r##"
         <div class="flex flex-col gap-6 p-6">
+            {chart_style}
             {alerts}
             <div>
                 <h2 class="mb-3 text-lg font-semibold">Queues right now</h2>
@@ -156,22 +182,27 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
                 </div>
             </div>
             <div>
-                <h2 class="mb-3 text-lg font-semibold">Last {minutes} minutes</h2>
+                <h2 class="mb-3 text-lg font-semibold">{window_label}</h2>
                 <div class="flex flex-col gap-3">
                     {attempts}
                     {throughput}
+                    {latency}
+                    {queue_depth}
                 </div>
             </div>
             {process}
         </div>
         "##,
+        chart_style = chart::STYLE,
         alerts = health_alerts(&page.snapshot.tasks, &page.snapshot.outbox),
         tasks = task_queue_panel(&page.snapshot.tasks, linked_company),
         outbox = outbox_panel(&page.snapshot.outbox, linked_company),
         outstanding = outstanding_panel(page),
-        minutes = page.window.minutes(),
+        window_label = page.window.label(),
         attempts = attempt_panel(&page.snapshot.attempts),
-        throughput = throughput_panel(page.snapshot),
+        throughput = throughput_panel(page.snapshot, page.window),
+        latency = latency_panel(page.snapshot, page.window),
+        queue_depth = queue_depth_panel(page.snapshot, page.window),
         process = process_panel(page.process),
     )
 }
@@ -186,7 +217,6 @@ fn health_alerts(tasks: &TaskQueueHealth, outbox: &OutboxHealth) -> String {
 
     if tasks.stalled > 0 {
         alerts.push_str(&alert_row(
-            "⚠",
             &format!(
                 "{} task{} claimed under a lapsed lease",
                 tasks.stalled,
@@ -198,7 +228,6 @@ fn health_alerts(tasks: &TaskQueueHealth, outbox: &OutboxHealth) -> String {
 
     if outbox.expired_leases > 0 {
         alerts.push_str(&alert_row(
-            "⚠",
             &format!(
                 "{} deliver{} past its lease",
                 outbox.expired_leases,
@@ -215,16 +244,18 @@ fn health_alerts(tasks: &TaskQueueHealth, outbox: &OutboxHealth) -> String {
     alerts
 }
 
-fn alert_row(icon: &str, headline: &str, detail: &str) -> String {
+/// Every alert here is the same kind of thing -- a lease nobody is renewing -- so they share one
+/// glyph rather than taking it as a parameter.
+fn alert_row(headline: &str, detail: &str) -> String {
     format!(
         r##"<div class="alert alert-warning">
-            <span class="text-xl leading-none">{icon}</span>
+            {glyph}
             <div>
                 <div class="font-semibold">{headline}</div>
                 <div class="text-sm opacity-80">{detail}</div>
             </div>
         </div>"##,
-        icon = escape_html_text(icon),
+        glyph = icon(Icon::Alert, "h-5 w-5"),
         headline = escape_html_text(headline),
         detail = escape_html_text(detail),
     )
@@ -342,7 +373,7 @@ fn outstanding_row(task: &OutstandingTask, show_company: bool, openable: bool) -
     };
 
     let body = format!(
-        r##"<span class="text-lg leading-none">{icon}</span>
+        r##"{glyph}
             <span class="min-w-0 flex-1">
                 <span class="flex items-baseline gap-2">
                     <span class="text-sm font-semibold {tone}">{state}</span>
@@ -352,7 +383,7 @@ fn outstanding_row(task: &OutstandingTask, show_company: bool, openable: bool) -
             </span>
             <span class="shrink-0 text-xs opacity-60">{since}{retries}</span>
             <span class="shrink-0 opacity-40">{chevron}</span>"##,
-        icon = outstanding_icon(task),
+        glyph = icon(outstanding_icon(task), BUTTON_ICON),
         tone = if task.needs_attention() {
             "text-error"
         } else {
@@ -362,7 +393,11 @@ fn outstanding_row(task: &OutstandingTask, show_company: bool, openable: bool) -
         where_ = escape_html_text(&where_),
         since = escape_html_text(&relative_time(task.since)),
         // The chevron is the affordance, so an unlinked row must not show one.
-        chevron = if destination.is_some() { "›" } else { "" },
+        chevron = if destination.is_some() {
+            icon(Icon::ChevronRight, "h-3 w-3")
+        } else {
+            String::new()
+        },
     );
 
     match destination {
@@ -396,15 +431,15 @@ fn outstanding_state(task: &OutstandingTask) -> &'static str {
 }
 
 /// The glyphs the thread column already uses for these states, so the two views agree.
-fn outstanding_icon(task: &OutstandingTask) -> &'static str {
+fn outstanding_icon(task: &OutstandingTask) -> Icon {
     if task.stalled {
-        return "⚠";
+        return Icon::Alert;
     }
     match task.status {
-        TaskStatus::DeadLetter => "⚠",
-        TaskStatus::PendingApproval => "⏳",
-        TaskStatus::WaitingForThirdPartyReply => "✉",
-        _ => "•",
+        TaskStatus::DeadLetter => Icon::Alert,
+        TaskStatus::PendingApproval => Icon::Hourglass,
+        TaskStatus::WaitingForThirdPartyReply => Icon::Mail,
+        _ => Icon::DotFill,
     }
 }
 
@@ -559,66 +594,176 @@ fn attempt_panel(attempts: &AttemptStats) -> String {
     )
 }
 
-/// Terminal outcomes per bucket, as bars scaled against the busiest bucket in the window.
+/// Terminal task outcomes per bucket, stacked so a column's height is everything that finished.
 ///
-/// Drawn with plain divs rather than a charting library: the artifact is two numbers per bucket, and
-/// a dependency that has to be loaded before the first paint would cost more than it renders.
-fn throughput_panel(snapshot: &DashboardSnapshot) -> String {
-    if snapshot.throughput.is_empty() {
+/// Completed and failed are the status colours doing status work, which is what they are reserved
+/// for — they are not two categories that happen to need telling apart.
+fn throughput_panel(snapshot: &DashboardSnapshot, window: DashboardWindow) -> String {
+    if snapshot.throughput_total() == 0 {
         return panel(
             "Throughput",
             r##"<div class="px-4 py-6 text-sm opacity-60">Nothing has finished in this window yet.</div>"##,
         );
     }
 
-    let peak = snapshot.throughput_peak().max(1);
-    let bars: String = snapshot
-        .throughput
-        .iter()
-        .map(|bucket| throughput_bar(bucket, peak))
-        .collect();
+    let series = [
+        Series {
+            label: "completed",
+            color: "var(--color-success)",
+            values: snapshot
+                .throughput
+                .iter()
+                .map(|bucket| Some(bucket.completed as f64))
+                .collect(),
+        },
+        Series {
+            label: "failed",
+            color: "var(--color-error)",
+            values: snapshot
+                .throughput
+                .iter()
+                .map(|bucket| Some(bucket.failed as f64))
+                .collect(),
+        },
+    ];
+
+    let buckets: Vec<_> = snapshot.throughput.iter().map(|slot| slot.bucket).collect();
 
     panel(
         "Throughput",
         &format!(
-            r##"
-            <div class="flex items-end gap-1 overflow-x-auto px-4 pb-2 pt-4" style="height: 8rem;">
-                {bars}
-            </div>
-            <div class="flex items-center gap-4 px-4 pb-3 text-xs opacity-70">
-                <span class="flex items-center gap-1">
-                    <span class="inline-block h-2 w-2 rounded-sm bg-success"></span>completed
-                </span>
-                <span class="flex items-center gap-1">
-                    <span class="inline-block h-2 w-2 rounded-sm bg-error"></span>failed
-                </span>
-                <span class="ml-auto">{total} finished, peak {peak} per bucket</span>
-            </div>
-            "##,
-            total = snapshot.throughput_total(),
+            "{chart}{footer}",
+            chart = chart::time_chart(&TimeChart {
+                buckets: &buckets,
+                series: &series,
+                kind: ChartKind::StackedColumn,
+                unit: YUnit::Count,
+                tick_format: window.tick_format(),
+            }),
+            footer = chart_footer(&format!(
+                "{total} finished, peak {peak} per bucket",
+                total = thousands(snapshot.throughput_total()),
+                peak = thousands(snapshot.throughput_peak()),
+            )),
         ),
     )
 }
 
-fn throughput_bar(bucket: &ThroughputBucket, peak: i64) -> String {
-    // Percentages of the tallest bucket, so the shape stays readable whether the window saw three
-    // tasks or three thousand.
-    let height = |count: i64| (count as f64 * 100.0 / peak as f64).round() as i64;
-    let label = format!(
-        "{} — {} completed, {} failed",
-        bucket.bucket.format("%H:%M"),
-        bucket.completed,
-        bucket.failed
-    );
+/// Attempt duration per bucket, at the median and at the tail.
+///
+/// Two quantiles of one measure, so they are two shades of one hue rather than two colours: a
+/// categorical pair would say these are different things being compared, when p95 is the same
+/// measurement asked a harder question.
+fn latency_panel(snapshot: &DashboardSnapshot, window: DashboardWindow) -> String {
+    let measured = snapshot
+        .latency
+        .iter()
+        .any(|bucket| bucket.p50_ms.is_some());
 
+    if !measured {
+        return panel(
+            "Attempt latency",
+            r##"<div class="px-4 py-6 text-sm opacity-60">No attempt has finished in this window yet.</div>"##,
+        );
+    }
+
+    let millis = |pick: fn(&LatencyBucket) -> Option<i64>| {
+        snapshot
+            .latency
+            .iter()
+            .map(|bucket| pick(bucket).map(|value| value as f64))
+            .collect::<Vec<_>>()
+    };
+
+    let series = [
+        Series {
+            label: "p95",
+            color: "var(--color-primary)",
+            values: millis(|bucket| bucket.p95_ms),
+        },
+        Series {
+            label: "p50",
+            // The same hue mixed toward the surface: still obviously the same measure, and clearly
+            // the lesser of the two without introducing a colour that means something else. The
+            // share is set against how dark `primary` itself now is -- mixed any further down it
+            // stops being a line and becomes a smudge on the panel.
+            color: "color-mix(in oklab, var(--color-primary) 60%, var(--color-base-100))",
+            values: millis(|bucket| bucket.p50_ms),
+        },
+    ];
+
+    let buckets: Vec<_> = snapshot.latency.iter().map(|slot| slot.bucket).collect();
+
+    panel(
+        "Attempt latency",
+        &format!(
+            "{chart}{footer}",
+            chart = chart::time_chart(&TimeChart {
+                buckets: &buckets,
+                series: &series,
+                kind: ChartKind::Line,
+                unit: YUnit::Millis,
+                tick_format: window.tick_format(),
+            }),
+            footer = chart_footer(
+                "Bucketed on when each attempt started; a gap is a bucket in which none finished",
+            ),
+        ),
+    )
+}
+
+/// How much work was outstanding at each point in the window.
+///
+/// One series, so no legend — the heading already names it. Read the query's own comment before
+/// trusting the shape too far: this is reconstructed from each task's last write rather than
+/// sampled, so it gets the open-to-closed boundary right and smooths the path in between.
+fn queue_depth_panel(snapshot: &DashboardSnapshot, window: DashboardWindow) -> String {
+    if snapshot.queue_depth.is_empty() {
+        return panel(
+            "Queue depth",
+            r##"<div class="px-4 py-6 text-sm opacity-60">No tasks have been queued yet.</div>"##,
+        );
+    }
+
+    let series = [Series {
+        label: "open tasks",
+        color: "var(--color-info)",
+        values: snapshot
+            .queue_depth
+            .iter()
+            .map(|bucket| Some(bucket.open as f64))
+            .collect(),
+    }];
+
+    let buckets: Vec<_> = snapshot
+        .queue_depth
+        .iter()
+        .map(|slot| slot.bucket)
+        .collect();
+
+    panel(
+        "Queue depth",
+        &format!(
+            "{chart}{footer}",
+            chart = chart::time_chart(&TimeChart {
+                buckets: &buckets,
+                series: &series,
+                kind: ChartKind::Area,
+                unit: YUnit::Count,
+                tick_format: window.tick_format(),
+            }),
+            footer = chart_footer(
+                "Tasks created but not yet finished, reconstructed from each task's last update",
+            ),
+        ),
+    )
+}
+
+/// The line under a chart: what it is measuring, or what it cannot quite claim to measure.
+fn chart_footer(note: &str) -> String {
     format!(
-        r##"<div class="flex h-full w-6 shrink-0 flex-col justify-end" title="{label}">
-            <div class="w-full rounded-t-sm bg-error" style="height: {failed}%"></div>
-            <div class="w-full bg-success" style="height: {completed}%"></div>
-        </div>"##,
-        label = escape_html_text(&label),
-        failed = height(bucket.failed),
-        completed = height(bucket.completed),
+        r##"<div class="px-4 pb-3 text-xs opacity-60">{note}</div>"##,
+        note = escape_html_text(note),
     )
 }
 
@@ -674,6 +819,49 @@ fn process_panel(process: &ProcessGauges) -> String {
                 )),
             ),
         ),
+    )
+}
+
+/// The query string that carries a dashboard's identity: which companies, and over what range.
+///
+/// One function because it is appended to three URLs that must agree — the page's own links, the
+/// panel fetch, and the SSE subscription. A range that reached the fetch but not the stream would
+/// show the right chart for five seconds and then the wrong one for as long as the tab stayed open.
+fn dashboard_query(company_id: Option<Uuid>, window: DashboardWindow) -> String {
+    match company_id {
+        Some(company_id) => format!("?company_id={company_id}&window={}", window.slug()),
+        None => format!("?window={}", window.slug()),
+    }
+}
+
+/// The trailing range every panel below is read over.
+///
+/// Plain links, and deliberately in the sidebar rather than above the panels: everything inside
+/// `#dashboard-panels` is thrown away and rebuilt on every tick, so a control living there would be
+/// re-created under the reader's pointer several times a minute. Navigating is also what
+/// re-establishes the SSE subscription against the new range — a control that only re-fetched the
+/// panels would leave the stream ticking on the old one and overwrite itself.
+fn range_picker(company_id: Option<Uuid>, window: DashboardWindow) -> String {
+    let options: String = DashboardWindow::PRESETS
+        .into_iter()
+        .map(|preset| {
+            let selected = preset == window;
+
+            format!(
+                r##"<a class="btn btn-xs join-item{active}" href="/ui/dashboard{query}"{current}>{label}</a>"##,
+                active = if selected { " btn-active" } else { "" },
+                query = dashboard_query(company_id, preset),
+                current = if selected { r#" aria-current="page""# } else { "" },
+                label = preset.slug(),
+            )
+        })
+        .collect();
+
+    format!(
+        r##"<div class="px-4 pb-4">
+            <div class="mb-1 text-xs font-semibold uppercase tracking-wide opacity-60">Range</div>
+            <div class="join">{options}</div>
+        </div>"##
     )
 }
 
@@ -802,25 +990,6 @@ fn plural(count: i64) -> &'static str {
     if count == 1 { "" } else { "s" }
 }
 
-/// Group digits so a six-figure token count can be read at a glance.
-fn thousands(value: i64) -> String {
-    let digits = value.abs().to_string();
-    let mut grouped = String::with_capacity(digits.len() + digits.len() / 3);
-
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            grouped.push(',');
-        }
-        grouped.push(digit);
-    }
-
-    if value < 0 {
-        format!("-{grouped}")
-    } else {
-        grouped
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -927,30 +1096,12 @@ mod tests {
         }
     }
 
-    fn page<'a>(
-        scope: DashboardScopeView<'a>,
-        companies: &'a [Company],
-        snapshot: &'a DashboardSnapshot,
-        user: &'a MailboxUser<'a>,
-        process: &'a ProcessGauges,
-    ) -> DashboardPage<'a> {
-        DashboardPage {
-            user,
-            scope,
-            companies,
-            snapshot,
-            window: DashboardWindow::last_hour(),
-            process,
-        }
-    }
-
     /// The live view is three attributes agreeing with each other. If the event name the page
     /// listens for ever drifts from the one the stream sends, the page still renders and simply
     /// never updates — a silent failure no other test would notice.
     #[test]
     fn the_page_subscribes_to_the_event_the_stream_sends() {
         let companies = [company()];
-        let snapshot = snapshot();
         let email = crate::entities::value_objects::EmailAddress::from("ops@example.test");
         let user = MailboxUser {
             id: Uuid::new_v4(),
@@ -958,14 +1109,12 @@ mod tests {
             email: &email,
             avatar_url: None,
         };
-        let process = ProcessGauges::default();
-        let html = dashboard_page(&page(
-            DashboardScopeView::Company(&companies[0]),
-            &companies,
-            &snapshot,
-            &user,
-            &process,
-        ));
+        let html = dashboard_page(&DashboardShell {
+            user: &user,
+            scope: DashboardScopeView::Company(&companies[0]),
+            companies: &companies,
+            window: DashboardWindow::last_hour(),
+        });
 
         assert!(
             html.contains(r#"hx-ext="sse""#),
@@ -985,7 +1134,6 @@ mod tests {
     /// The operator view has no company to scope to, and must not invent one.
     #[test]
     fn the_global_view_streams_unscoped_and_offers_no_switcher() {
-        let snapshot = snapshot();
         let email = crate::entities::value_objects::EmailAddress::from("ops@example.test");
         let user = MailboxUser {
             id: Uuid::new_v4(),
@@ -993,18 +1141,16 @@ mod tests {
             email: &email,
             avatar_url: None,
         };
-        let process = ProcessGauges::default();
-        let html = dashboard_page(&page(
-            DashboardScopeView::Global,
-            &[],
-            &snapshot,
-            &user,
-            &process,
-        ));
+        let html = dashboard_page(&DashboardShell {
+            user: &user,
+            scope: DashboardScopeView::Global,
+            companies: &[],
+            window: DashboardWindow::last_hour(),
+        });
 
         assert!(
-            html.contains(r#"sse-connect="/ui/dashboard/events""#),
-            "a global stream must carry no company_id"
+            html.contains(r#"sse-connect="/ui/dashboard/events?window=1h""#),
+            "a global stream carries the range but no company_id"
         );
         assert!(
             !html.contains("company_id="),
@@ -1137,7 +1283,7 @@ mod tests {
             "and it should say why: {html}"
         );
         assert!(
-            !html.contains("›"),
+            !html.contains(&icon(Icon::ChevronRight, "h-3 w-3")),
             "no chevron without somewhere to go: {html}"
         );
     }
@@ -1195,7 +1341,7 @@ mod tests {
 
     #[test]
     fn an_empty_window_says_so_instead_of_drawing_an_empty_chart() {
-        let panel = throughput_panel(&snapshot());
+        let panel = throughput_panel(&snapshot(), DashboardWindow::last_hour());
         assert!(panel.contains("Nothing has finished"), "{panel}");
     }
 }

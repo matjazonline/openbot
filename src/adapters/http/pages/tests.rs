@@ -346,6 +346,77 @@ fn top_bar_carries_a_theme_controller_that_survives_a_reload() {
     assert!(mailbox_no_company_page(&user).contains(r##"class="theme-controller""##));
 }
 
+/// daisyUI 5 dropped a set of class names that daisyUI 4 needed, and dropping them is silent:
+/// the markup keeps the class, the stylesheet has nothing to match, and the field just renders
+/// without whatever the class used to add. Nothing catches that at build time -- these pages are
+/// format strings, so a dead class is only ever a dead substring -- which is why this reads the
+/// page sources back rather than any rendered output.
+///
+/// `-bordered` is now the default on every field, and `label`
+/// styles its own text, so all of these were removed rather than replaced.
+#[test]
+fn no_page_reaches_for_a_class_daisyui_5_removed() {
+    const REMOVED_IN_V5: &[&str] = &[
+        "input-bordered",
+        "select-bordered",
+        "textarea-bordered",
+        "file-input-bordered",
+        "label-text",
+    ];
+
+    let pages = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/adapters/http/pages");
+    let mut checked = 0;
+
+    for entry in std::fs::read_dir(&pages).expect("the pages directory") {
+        let path = entry.expect("a directory entry").path();
+        if path.extension().is_none_or(|ext| ext != "rs") {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).expect("a page source");
+        // This file names them all, and is the one place that is allowed to.
+        if path.file_name().is_some_and(|name| name == "tests.rs") {
+            continue;
+        }
+        for dead in REMOVED_IN_V5 {
+            assert!(
+                !source.contains(dead),
+                "{} still uses `{dead}`, which daisyUI 5 does not define",
+                path.display(),
+            );
+        }
+        checked += 1;
+    }
+
+    // A path that silently reads nothing would pass every assertion above.
+    assert!(checked > 10, "only {checked} page sources were read");
+}
+
+#[test]
+fn dark_theme_recuts_the_blues_at_the_logos_hue() {
+    let email = EmailAddress::from("dana@example.com");
+    let user = MailboxUser {
+        id: Uuid::new_v4(),
+        username: "dana",
+        email: &email,
+        avatar_url: None,
+    };
+
+    let html = mailbox_no_company_page(&user);
+
+    // The override has to reach the browser after daisyUI's own themes, or it loses the cascade.
+    let head = &html[..html.find("<body").expect("a body")];
+    let themes = head.find("daisyui@5/themes.css").expect("daisyui themes");
+    let override_at = head.find("--color-primary:").expect("a primary override");
+    assert!(themes < override_at);
+
+    // Scoped to dark: the light theme shows these colours over white and never had the problem.
+    assert!(head.contains(r##"[data-theme="dark"] {"##));
+
+    // Hue 264 is `#0000ff` -- the wordmark's blue -- and 50% sits below daisyUI's stock 58%.
+    assert!(head.contains("--color-primary: oklch(50% 0.19 264.05);"));
+    assert!(head.contains("--color-info: oklch(66% 0.13 232.661);"));
+}
+
 #[test]
 fn top_bar_shows_the_logo_and_the_signed_in_account() {
     let company = mailbox_company();
@@ -373,7 +444,10 @@ fn top_bar_shows_the_logo_and_the_signed_in_account() {
         detail_html: &detail,
     });
 
-    assert!(html.contains("/assets/argo-inbox-logo.png"));
+    // Both inks ship on every page; CSS picks the one the current theme can be read against.
+    assert!(html.contains("/assets/busybots-logo-dark-hor.png"));
+    assert!(html.contains("/assets/busybots-logo-light.png"));
+    assert!(html.contains(r##"[data-theme="light"] .brand-logo-on-light { display: block; }"##));
     assert!(html.contains("dana&lt;script&gt;@example.com"));
     assert!(html.contains(">D</span>"));
     // Logging out goes through the confirmation dialog, not a bare post.
@@ -386,7 +460,7 @@ fn top_bar_shows_the_logo_and_the_signed_in_account() {
 
     // A user with no companies still gets the same bar, since it is their only way out.
     let no_company = mailbox_no_company_page(&user);
-    assert!(no_company.contains("/assets/argo-inbox-logo.png"));
+    assert!(no_company.contains("/assets/busybots-logo-dark-hor.png"));
     assert!(no_company.contains("Log out"));
 }
 
@@ -551,7 +625,7 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
         r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-lg btn-primary"##,
         company.id
     )));
-    assert!(channels.contains("/assets/argo-inbox-logo.png"));
+    assert!(channels.contains("/assets/busybots-logo-dark-hor.png"));
     assert!(channels.contains(&format!(
         r##"<li><a href="/ui/channels?company_id={}""##,
         company.id
@@ -801,7 +875,7 @@ fn prompt_generator_names_the_pane_it_answers_into() {
 
     // The box is namespaced by the agent it belongs to, and pulls the overrides along so an agent
     // pointed at its own model gets its prompt written by that model.
-    assert!(edit.contains("✨ Generate with AI"));
+    assert!(edit.contains("Generate with AI"));
     assert!(edit.contains(&format!(
         "hx-post=\"/ui/agents/generate-prompt?company_id={}\"",
         company.id
@@ -822,7 +896,7 @@ fn prompt_generator_names_the_pane_it_answers_into() {
     });
     assert!(create.contains("id=\"agent-generator-new\""));
     assert!(create.contains("id=\"agent-prompt-new\""));
-    assert!(!create.contains("hx-vals"));
+    assert!(!create.contains(r##"hx-vals='{"id_prefix""##));
 }
 
 #[test]
@@ -1561,7 +1635,7 @@ fn a_thread_row_carries_its_own_activity_slot() {
         working, idle,
         "a working thread must be distinguishable from an idle one"
     );
-    assert!(working.contains("•"));
+    assert!(working.contains(&icon(Icon::DotFill, BUTTON_ICON)));
     assert!(working.contains(r#"title="Agent replying…""#));
     assert!(working.contains("animate-pulse"));
 
@@ -1575,7 +1649,7 @@ fn a_thread_row_carries_its_own_activity_slot() {
         Some(ThreadActivity::Queued),
         None,
     );
-    assert!(queued.contains("•"));
+    assert!(queued.contains(&icon(Icon::DotFill, BUTTON_ICON)));
     assert!(queued.contains(r#"title="Queued""#));
     assert!(!queued.contains("animate-pulse"));
 
@@ -1588,7 +1662,7 @@ fn a_thread_row_carries_its_own_activity_slot() {
         Some(ThreadActivity::WaitingApproval),
         None,
     );
-    assert!(blocked.contains("⏳"));
+    assert!(blocked.contains(&icon(Icon::Hourglass, BUTTON_ICON)));
     assert!(blocked.contains(r#"title="Waiting for approval""#));
     assert!(!blocked.contains("animate-pulse"));
 }
@@ -1913,7 +1987,8 @@ fn task_monitor_list_targets_the_pane_and_swaps_out_of_band() {
     assert!(!inline.contains("hx-swap-oob"));
     // Paging keeps the filters it was made under, and stays on the list alone.
     assert!(inline.contains(&format!("/ui/tasks/list?company_id={}&page=3", company.id)));
-    assert!(inline.contains("← Newer"));
+    // Newest-first, so "back" is towards the newer end -- and the arrow leads the word.
+    assert!(inline.contains("</svg> Newer"));
 
     // After a stop or a resume the list rides along on the pane's response.
     let oob = task_monitor_list(&list, FragmentSwap::OutOfBand);
@@ -1928,7 +2003,7 @@ fn task_monitor_list_targets_the_pane_and_swaps_out_of_band() {
     };
     let empty_html = task_monitor_list(&empty, FragmentSwap::Inline);
     assert!(empty_html.contains("No tasks match these filters"));
-    assert!(!empty_html.contains("Older →"));
+    assert!(!empty_html.contains("Older <svg"));
 }
 
 #[test]
@@ -2051,7 +2126,7 @@ fn company_settings_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
         r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-lg btn-ghost"##,
         company.id
     )));
-    assert!(html.contains("/assets/argo-inbox-logo.png"));
+    assert!(html.contains("/assets/busybots-logo-dark-hor.png"));
     assert!(html.contains("id=\"company-pane\""));
     // The sidebar is the company list itself, so there is no switcher above it.
     assert!(!html.contains("dropdown-bottom"));
@@ -2428,6 +2503,94 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
 }
 
 #[test]
+fn the_avatar_picker_uploads_the_picked_file_and_carries_the_url_hidden() {
+    let stored = AvatarUrl::from("https://cdn.example.com/avatars/a.png");
+    let picked = avatar_picker(&AvatarPicker {
+        field_id: "member-avatar",
+        avatar_url: Some(&stored),
+        name: "Dana",
+        label: "Your Picture",
+        error: None,
+    });
+
+    // The field is its own swap target, so the route can answer with exactly this fragment.
+    assert!(picked.contains(r#"id="member-avatar""#));
+    assert!(picked.contains(r#"hx-post="/ui/uploads/avatar""#));
+    assert!(picked.contains(r#"hx-encoding="multipart/form-data""#));
+    assert!(picked.contains(r##"hx-target="#member-avatar""##));
+    // Only the picker's own fields go up with the file, not the form it happens to sit in.
+    assert!(picked.contains(r#"hx-params="avatar_file,avatar_url,avatar_field_id,avatar_name""#));
+    // What the surrounding form actually saves.
+    assert!(picked.contains(
+        r#"<input type="hidden" name="avatar_url" value="https://cdn.example.com/avatars/a.png">"#
+    ));
+    // Only a picture can be removed.
+    assert!(picked.contains(r#"hx-post="/ui/uploads/avatar/clear""#));
+
+    let empty = avatar_picker(&AvatarPicker {
+        field_id: "member-avatar",
+        avatar_url: None,
+        name: "Dana",
+        label: "Your Picture",
+        error: None,
+    });
+    assert!(empty.contains(r#"<input type="hidden" name="avatar_url" value="">"#));
+    assert!(!empty.contains("/ui/uploads/avatar/clear"));
+    // No picture yet, so the letter is what shows.
+    assert!(empty.contains(">D<"));
+}
+
+#[test]
+fn the_avatar_picker_escapes_what_it_sends_back_up() {
+    let picked = avatar_picker(&AvatarPicker {
+        field_id: "member-avatar",
+        avatar_url: None,
+        name: r#"Dana" onload="alert(1)"#,
+        label: "Your Picture",
+        error: Some(r#"<script>alert(1)</script>"#),
+    });
+
+    // The name travels in `hx-vals` as JSON inside an attribute, so it is escaped twice over.
+    assert!(!picked.contains(r#"onload="alert(1)"#));
+    assert!(picked.contains("&quot;"));
+    assert!(!picked.contains("<script>"));
+}
+
+#[test]
+fn each_agent_form_owns_its_own_picker() {
+    let company = mailbox_company();
+
+    // Both create forms are rendered at once -- one hidden behind a tab -- so their pickers must
+    // not swap each other when a file is picked.
+    let create = agent_create_pane(&AgentCreatePane {
+        company: &company,
+        draft: &AgentDraft::default(),
+        error: None,
+    });
+    assert!(create.contains(r#"id="agent-avatar-simple""#));
+    assert!(create.contains(r#"id="agent-avatar-new""#));
+    assert!(!create.contains(r#"type="url" name="avatar_url""#));
+
+    let agent = Agent {
+        avatar_url: Some(AvatarUrl::from("https://cdn.example.com/bot.png")),
+        ..settings_agent(company.id, "Triage", "triage")
+    };
+    let edit = agent_edit_pane(&AgentEditPane {
+        company: &company,
+        agent: &agent,
+        used_by: &[],
+        draft: None,
+        error: None,
+    });
+    assert!(edit.contains(&format!(r#"id="agent-avatar-{}""#, agent.id)));
+    assert!(edit.contains(
+        r#"<input type="hidden" name="avatar_url" value="https://cdn.example.com/bot.png">"#
+    ));
+    // The picked file is uploaded before the form is saved, so it never rides along with it.
+    assert!(edit.contains(r#"hx-params="not avatar_file""#));
+}
+
+#[test]
 fn only_your_own_member_pane_offers_the_avatar_field() {
     let company = mailbox_company();
     let dana = CompanyMember {
@@ -2447,7 +2610,13 @@ fn only_your_own_member_pane_offers_the_avatar_field() {
         r##"hx-put="/ui/team/members/{}/avatar?company_id={}""##,
         dana.user_id, company.id
     )));
-    assert!(own.contains(r#"value="https://example.com/dana.png""#));
+    // The picture is picked from disk; the URL it was stored at rides along hidden, so the save
+    // is still the same `avatar_url` field.
+    assert!(own.contains(r#"type="file" name="avatar_file""#));
+    assert!(!own.contains(r#"type="url" name="avatar_url""#));
+    assert!(own.contains(
+        r#"<input type="hidden" name="avatar_url" value="https://example.com/dana.png">"#
+    ));
     assert!(own.contains(r#"src="https://example.com/dana.png""#));
 
     // The owner looking at somebody else sees their picture but no way to change it.
@@ -2471,7 +2640,9 @@ fn only_your_own_member_pane_offers_the_avatar_field() {
         avatar_draft: Some("javascript:alert(1)"),
         error: Some("An avatar URL must start with http:// or https://."),
     });
-    assert!(rejected.contains(r#"value="javascript:alert(1)""#));
+    // ...but never as something a page would render: a draft that is not an `http` URL is shown
+    // as the reason it was refused, not put back into the field it came from.
+    assert!(!rejected.contains("javascript:alert(1)"));
     assert!(rejected.contains("must start with http://"));
 }
 
@@ -2764,7 +2935,7 @@ fn outbox_list_says_when_nothing_matches_and_pages_only_when_there_is_more() {
         FragmentSwap::Inline,
     );
     assert!(empty.contains("No queued email matches these filters."));
-    assert!(!empty.contains("Older →"));
+    assert!(!empty.contains("Older <svg"));
 
     let entry = queued_email(company.id, None, None);
     let paged = outbox_list(
@@ -2777,7 +2948,7 @@ fn outbox_list_says_when_nothing_matches_and_pages_only_when_there_is_more() {
         },
         FragmentSwap::OutOfBand,
     );
-    assert!(paged.contains("Older →"));
+    assert!(paged.contains("Older <svg"));
     assert!(paged.contains(r##"hx-swap-oob="outerHTML""##));
     assert!(paged.contains("page=2"));
 }
@@ -2817,4 +2988,93 @@ fn page_timestamps_render_as_utc_at_three_precisions() {
     assert_eq!(format_date(at), "Aug 19, 2026 UTC");
     assert_eq!(format_date_time(at), "Aug 19, 2026 14:48 UTC");
     assert_eq!(format_time(at), "Aug 19, 14:48:27 UTC");
+}
+
+/// A placeholder is two halves that have to meet: the attribute on the swap target, and the
+/// script in the shell that reads it. Either one alone renders a workspace that goes blank while
+/// it loads, which is what the placeholders exist to stop.
+#[test]
+fn the_ui_shell_carries_the_placeholder_machinery_for_its_swap_targets() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let detail = empty_detail_pane("Select a thread.", FragmentSwap::Inline);
+    let email = mailbox_account_email();
+
+    let html = mailbox_page(&MailboxPage {
+        user: &mailbox_user(&email),
+        company: &company,
+        companies: std::slice::from_ref(&company),
+        app_domain_name: "example.com",
+        channels: std::slice::from_ref(&channel),
+        selected_channel: Some(&channel),
+        threads: std::slice::from_ref(&thread),
+        next_cursor: Some("next_cursor"),
+        selected_thread_id: None,
+        activity: no_activity(),
+        detail_html: &detail,
+    });
+
+    assert!(html.contains(r##"id="detail-pane" data-skeleton="pane""##));
+    assert!(html.contains(r##"id="thread-column" data-skeleton="thread-column""##));
+    assert!(html.contains(r##"id="thread-list" data-skeleton="thread-rows""##));
+
+    assert!(html.contains("var UI_SKELETONS = {"));
+    assert!(html.contains("htmx:beforeRequest"));
+    assert!(html.contains("class=\\\"skeleton "));
+}
+
+/// The dashboard is the one workspace whose body is not rendered with the page, so the placeholder
+/// has to be backed by a request that actually replaces it.
+#[test]
+fn the_dashboard_shows_a_placeholder_and_fetches_the_panels_behind_it() {
+    let company = mailbox_company();
+    let email = mailbox_account_email();
+    let companies = [company];
+
+    use crate::entities::dashboard::DashboardWindow;
+
+    let html = dashboard_page(&DashboardShell {
+        user: &mailbox_user(&email),
+        scope: DashboardScopeView::Company(&companies[0]),
+        companies: &companies,
+        window: DashboardWindow::last_hour(),
+    });
+
+    assert!(html.contains(r##"data-skeleton="panels""##));
+    assert!(html.contains(r##"hx-get="/ui/dashboard/panels?company_id="##));
+    assert!(html.contains(r##"hx-trigger="load""##));
+    assert!(
+        html.contains(r##"class="skeleton h-28 w-full""##),
+        "the placeholder itself must be in the response, not only paintable later"
+    );
+}
+
+/// Each placeholder attribute is a constant interpolated into a `format!`. Put one in a plain
+/// string literal by mistake and it renders as the constant's own name, in the markup, where the
+/// reader can see it — and nothing in the compiler notices. Every pane that starts out empty is
+/// checked here, because those are the ones written as bare literals.
+#[test]
+fn no_pane_leaks_a_placeholder_constant_into_its_markup() {
+    let panes = [
+        empty_thread_column(),
+        empty_detail_pane("Select a thread.", FragmentSwap::Inline),
+        agent_settings_empty_pane("Select an agent.", FragmentSwap::Inline),
+        channel_settings_empty_pane("Select a channel.", FragmentSwap::Inline),
+        company_settings_empty_pane("Select a company.", FragmentSwap::Inline),
+        team_settings_empty_pane("Select a member.", FragmentSwap::Inline),
+        task_monitor_empty_pane("Select a task.", FragmentSwap::Inline),
+        outbox_empty_pane("Select an email.", FragmentSwap::Inline),
+    ];
+
+    for pane in panes {
+        assert!(
+            !pane.contains("_SKELETON"),
+            "a placeholder constant reached the markup: {pane}"
+        );
+        assert!(
+            pane.contains("data-skeleton="),
+            "the pane opted out of a placeholder: {pane}"
+        );
+    }
 }

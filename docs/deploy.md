@@ -106,9 +106,35 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 | `JWT_SECRET` | Session signing key |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | Outbound relay credentials |
 | `OPENAI_API_KEY` | Or `ANTHROPIC_API_KEY` / `GROQ_API_KEY` / `GEMINI_API_KEY`, per the agent's configured provider |
+| `GCS_SERVICE_ACCOUNT_JSON_BASE64` | The Cloud Storage service account key, base64-encoded — see [Picture uploads](#picture-uploads) |
 
 Non-secret settings live in the `[env]` block of `fly.toml`. `.env.example`
 documents the full set.
+
+### Picture uploads
+
+Avatars are picked from disk and stored in a Google Cloud Storage bucket, so two
+settings travel together — `GCS_BUCKET` (non-secret, `fly.toml`) and
+`GCS_SERVICE_ACCOUNT_JSON_BASE64` (a secret). Setting one without the other
+fails the boot rather than starting with uploads quietly disabled.
+
+```sh
+# A service account with Storage Object Creator on the bucket, nothing more.
+gcloud iam service-accounts keys create key.json \
+  --iam-account uploader@<project>.iam.gserviceaccount.com
+
+fly secrets set GCS_SERVICE_ACCOUNT_JSON_BASE64="$(base64 -i key.json | tr -d '\n')"
+rm key.json
+```
+
+The bucket has to be readable without credentials for a browser to load what it
+stores (`gcloud storage buckets add-iam-policy-binding gs://<bucket>
+--member=allUsers --role=roles/storage.objectViewer`). Objects are named by a
+fresh UUID and written with a one-year immutable `Cache-Control`, so a URL's
+bytes never change. Put a CDN in front by setting `GCS_PUBLIC_BASE_URL`.
+
+With no bucket configured the app runs normally and the picture pickers report
+that uploads are not configured; avatars already stored keep rendering.
 
 ### Do not use `sslmode=require`
 

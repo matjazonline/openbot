@@ -133,22 +133,6 @@ impl ThreadActivity {
         matches!(self, ThreadActivity::Working)
     }
 
-    /// A single character standing in for this state in the thread column, where there is room for
-    /// a mark but not for a sentence. The full wording rides along as the element's `title`.
-    ///
-    /// Every agent run goes through the worker, so `Queued` and `Working` now arrive *before* the
-    /// reply rather than after it, and a reader scanning the column has something real to learn
-    /// from them. They share a glyph on purpose: a queued task is picked up within a poll interval,
-    /// and swapping shapes that fast reads as a flicker rather than as progress.
-    pub fn mark(self) -> &'static str {
-        match self {
-            ThreadActivity::Queued | ThreadActivity::Working => "•",
-            ThreadActivity::WaitingApproval => "⏳",
-            ThreadActivity::WaitingReply => "✉",
-            ThreadActivity::Failed => "⚠",
-        }
-    }
-
     /// Wording for the mailbox, where the reader is waiting on a conversation rather than
     /// inspecting a task queue.
     pub fn label(self) -> &'static str {
@@ -430,9 +414,8 @@ mod tests {
                 ThreadActivity::from_task(activity.task_status(), Some(at(5)), now()),
                 Some(activity)
             );
-            assert!(!activity.label().is_empty());
             // Every state a thread can be in says something in the column.
-            assert!(!activity.mark().is_empty());
+            assert!(!activity.label().is_empty());
         }
     }
 }

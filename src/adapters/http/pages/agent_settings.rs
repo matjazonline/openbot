@@ -98,12 +98,13 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
                 <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
                     hx-get="/ui/agents/new?company_id={company_id}"
                     hx-target="#agent-pane" hx-swap="outerHTML"
-                    hx-push-url="/ui/agents?company_id={company_id}&new=1">＋ New Agent</button>
+                    hx-push-url="/ui/agents?company_id={company_id}&new=1">{plus_glyph} New Agent</button>
             </div>
         </aside>
         {pane_html}
         "##,
         company_switcher = company_switcher(company, page.companies, UiSection::Agents),
+        plus_glyph = icon(Icon::Plus, BUTTON_ICON),
         list_html = agent_settings_list(page.list, FragmentSwap::Inline),
         company_id = company.id,
         pane_html = page.pane_html,
@@ -190,7 +191,7 @@ fn agent_model_summary(agent: &Agent) -> String {
 pub fn agent_settings_empty_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="agent-pane" class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="agent-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -208,7 +209,7 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
 
     format!(
         r##"
-        <section id="agent-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="agent-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
                 <div class="flex min-w-0 items-center gap-3">
                     {avatar}
@@ -221,7 +222,8 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
             <div class="flex-1 overflow-y-auto px-6 py-4">
                 {error_html}
                 {used_by_html}
-                <form hx-put="/ui/agents/{agent_id}?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML" class="space-y-4">
+                <form hx-put="/ui/agents/{agent_id}?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
+                    hx-params="not avatar_file" class="space-y-4">
                     <input type="hidden" name="form_mode" value="advanced">
                     {fields}
                     <div class="flex items-center gap-3 border-t border-base-300 pt-4">
@@ -272,7 +274,7 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
 
     format!(
         r##"
-        <section id="agent-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="agent-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-6 py-4">
                 <h2 class="text-xl font-bold">New agent in {company_name}</h2>
                 <p class="text-xs opacity-70">An agent is a system prompt plus the model that answers with it. Channels run their agents in order.</p>
@@ -287,23 +289,19 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                 </div>
                 <form id="agent-tab-simple" class="{simple_hidden} space-y-4"
                     hx-post="/ui/agents?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
-                    hx-disabled-elt="find button[type='submit']">
+                    hx-params="not avatar_file" hx-disabled-elt="find button[type='submit']">
                     <input type="hidden" name="form_mode" value="simple">
                     <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Agent Name</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Agent Name</span></div>
                         <input type="text" name="name" required value="{name}" placeholder="Support Triage"
-                            class="input input-bordered w-full">
+                            class="input w-full">
                     </label>
+                    {avatar_field}
                     <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Avatar URL</span></div>
-                        <input type="url" name="avatar_url" value="{avatar_url}" placeholder="https://example.com/agent.png"
-                            class="input input-bordered w-full font-mono text-sm">
-                    </label>
-                    <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Agent Instructions</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Agent Instructions</span></div>
                         <textarea name="system_prompt" rows="6" required
                             placeholder="Describe the agent's role, responsibilities, rules and tone. A full system prompt is generated when the agent is created."
-                            class="textarea textarea-bordered w-full font-mono text-xs">{system_prompt}</textarea>
+                            class="textarea w-full font-mono text-xs">{system_prompt}</textarea>
                     </label>
                     <button type="submit" class="btn btn-primary">
                         <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
@@ -313,7 +311,7 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                 </form>
                 <form id="agent-tab-advanced" class="{advanced_hidden} space-y-4"
                     hx-post="/ui/agents?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
-                    hx-disabled-elt="find button[type='submit']">
+                    hx-params="not avatar_file" hx-disabled-elt="find button[type='submit']">
                     <input type="hidden" name="form_mode" value="advanced">
                     {fields}
                     <button type="submit" class="btn btn-primary">
@@ -331,7 +329,7 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
         simple_active = active(!pane.draft.advanced),
         advanced_active = active(pane.draft.advanced),
         name = escape_html_text(pane.draft.name),
-        avatar_url = escape_html_text(pane.draft.avatar_url),
+        avatar_field = agent_avatar_field("simple", pane.draft),
         system_prompt = escape_html_text(pane.draft.system_prompt),
         fields = agent_fields(&AgentFields {
             company_id: pane.company.id,
@@ -374,28 +372,23 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         r##"
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <label class="form-control w-full">
-                            <div class="label"><span class="label-text text-xs opacity-70">Agent Name</span></div>
+                            <div class="label"><span class="text-xs opacity-70">Agent Name</span></div>
                             <input type="text" name="name" required value="{name}" placeholder="Support Triage"
                                 oninput="this.form.slug.value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
-                                class="input input-bordered w-full">
+                                class="input w-full">
                         </label>
                         <label class="form-control w-full">
-                            <div class="label"><span class="label-text text-xs opacity-70">Handle</span></div>
+                            <div class="label"><span class="text-xs opacity-70">Handle</span></div>
                             <input type="text" name="slug" required value="{slug}" placeholder="support-triage"
-                                class="input input-bordered w-full font-mono">
+                                class="input w-full font-mono">
                         </label>
                     </div>
-                    <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Avatar URL</span></div>
-                        <input type="url" name="avatar_url" value="{avatar_url}" placeholder="https://example.com/agent.png"
-                            class="input input-bordered w-full font-mono text-sm">
-                        <div class="label"><span class="label-text-alt text-[11px] opacity-60">The picture shown beside this agent. Leave it empty for its initial.</span></div>
-                    </label>
+                    {avatar_field}
                     <div class="form-control w-full">
                         <div class="label justify-between">
-                            <span class="label-text text-xs opacity-70">System Prompt</span>
+                            <span class="text-xs opacity-70">System Prompt</span>
                             <button type="button" class="btn btn-ghost btn-xs"
-                                onclick="toggleAgentPromptGenerator('{id_prefix}')">✨ Generate with AI</button>
+                                onclick="toggleAgentPromptGenerator('{id_prefix}')">{sparkle} Generate with AI</button>
                         </div>
                         {generator}
                         {prompt_textarea}
@@ -405,29 +398,30 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                         <div class="collapse-content space-y-4">
                             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                                 <label class="form-control w-full">
-                                    <div class="label"><span class="label-text text-xs opacity-70">LLM Provider</span></div>
+                                    <div class="label"><span class="text-xs opacity-70">LLM Provider</span></div>
                                     <input type="text" id="agent-provider-{id_prefix}" name="provider" value="{provider}" placeholder="google, openai, anthropic"
-                                        class="input input-bordered w-full font-mono text-sm">
+                                        class="input w-full font-mono text-sm">
                                 </label>
                                 <label class="form-control w-full">
-                                    <div class="label"><span class="label-text text-xs opacity-70">LLM Model</span></div>
+                                    <div class="label"><span class="text-xs opacity-70">LLM Model</span></div>
                                     <input type="text" id="agent-model-{id_prefix}" name="model" value="{model}" placeholder="gemini-2.5-flash, gpt-4o"
-                                        class="input input-bordered w-full font-mono text-sm">
+                                        class="input w-full font-mono text-sm">
                                 </label>
                                 <label class="form-control w-full">
-                                    <div class="label"><span class="label-text text-xs opacity-70">LLM API Key</span></div>
+                                    <div class="label"><span class="text-xs opacity-70">LLM API Key</span></div>
                                     <input type="password" id="agent-api-key-{id_prefix}" name="api_key" value="{api_key}" placeholder="Overrides the company key"
-                                        class="input input-bordered w-full font-mono text-sm">
+                                        class="input w-full font-mono text-sm">
                                 </label>
                             </div>
                             <label class="form-control w-full">
-                                <div class="label"><span class="label-text text-xs opacity-70">Agent Config (JSON)</span></div>
+                                <div class="label"><span class="text-xs opacity-70">Agent Config (JSON)</span></div>
                                 <textarea name="config_json" rows="4" placeholder='{{ "temperature": 0.2 }}'
-                                    class="textarea textarea-bordered w-full font-mono text-xs">{config_json}</textarea>
+                                    class="textarea w-full font-mono text-xs">{config_json}</textarea>
                             </label>
                         </div>
                     </details>
         "##,
+        sparkle = icon(Icon::Sparkle, BUTTON_ICON),
         generator = prompt_generator(fields.company_id, fields.agent_id, &id_prefix),
         prompt_textarea =
             agent_prompt_textarea(&id_prefix, draft.system_prompt, FragmentSwap::Inline),
@@ -437,8 +431,24 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         model = escape_html_text(draft.model),
         api_key = escape_html_text(draft.api_key),
         config_json = escape_html_text(draft.config_json),
-        avatar_url = escape_html_text(draft.avatar_url),
+        avatar_field = agent_avatar_field(&id_prefix, draft),
     )
+}
+
+/// The agent's picture field.
+///
+/// `id_prefix` is what keeps the two forms on the create pane -- Simple and Advanced, both
+/// rendered, one hidden -- from swapping each other's field when a file is picked.
+fn agent_avatar_field(id_prefix: &str, draft: &AgentDraft<'_>) -> String {
+    let stored = AvatarUrl::parse(draft.avatar_url).ok().flatten();
+
+    avatar_picker(&AvatarPicker {
+        field_id: &format!("agent-avatar-{id_prefix}"),
+        avatar_url: stored.as_ref(),
+        name: draft.name,
+        label: "Agent Picture",
+        error: None,
+    })
 }
 
 /// The system prompt field itself.
@@ -450,14 +460,14 @@ pub fn agent_prompt_textarea(id_prefix: &str, system_prompt: &str, swap: Fragmen
     format!(
         r##"<textarea id="agent-prompt-{id_prefix}" name="system_prompt" rows="10"
                             placeholder="You are a support triage agent. Read the incoming mail, decide..."
-                            class="textarea textarea-bordered w-full font-mono text-xs"{oob}>{system_prompt}</textarea>"##,
+                            class="textarea w-full font-mono text-xs"{oob}>{system_prompt}</textarea>"##,
         id_prefix = escape_html_text(id_prefix),
         oob = swap.oob_attribute(),
         system_prompt = escape_html_text(system_prompt),
     )
 }
 
-/// The "✨ Generate with AI" box: instructions in, a written system prompt out.
+/// The "Generate with AI" box: instructions in, a written system prompt out.
 ///
 /// It cannot be a `<form>` — it sits inside the agent form already — so the button names what to
 /// send with `hx-include`, pulling the model overrides along so the generation runs on whichever
@@ -478,7 +488,7 @@ fn prompt_generator(company_id: Uuid, agent_id: Option<Uuid>, id_prefix: &str) -
                             <p class="text-xs opacity-70">Describe what this agent should do. The instructions are expanded into a full system prompt, replacing what is in the field below.</p>
                             <textarea id="agent-instructions-{id_prefix}" name="instructions" rows="3"
                                 placeholder="Answer billing questions politely, and escalate anything about refunds."
-                                class="textarea textarea-bordered w-full text-xs"></textarea>
+                                class="textarea w-full text-xs"></textarea>
                             <div class="flex items-center gap-3">
                                 <button type="button" class="btn btn-primary btn-outline btn-sm"
                                     hx-post="/ui/agents/generate-prompt?company_id={company_id}"
@@ -503,7 +513,8 @@ fn prompt_generator(company_id: Uuid, agent_id: Option<Uuid>, id_prefix: &str) -
 /// writes — `</script>` included — can escape the field it lands in.
 pub fn agent_prompt_generated(id_prefix: &str, system_prompt: &str) -> String {
     format!(
-        r##"<span class="text-success">✓ Prompt written into the field below.</span>{textarea}"##,
+        r##"<span class="inline-flex items-center gap-1.5 text-success">{glyph} Prompt written into the field below.</span>{textarea}"##,
+        glyph = icon(Icon::Check, BUTTON_ICON),
         textarea = agent_prompt_textarea(id_prefix, system_prompt, FragmentSwap::OutOfBand),
     )
 }

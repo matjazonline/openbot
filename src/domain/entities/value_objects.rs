@@ -155,6 +155,28 @@ impl AvatarUrl {
     }
 }
 
+// Where an uploaded file lives inside its bucket, e.g. `avatars/1f0c....png`. Distinct from the
+// URL it is served from: one is a key the storage API takes, the other is what a browser fetches.
+string_newtype!(ObjectKey);
+
+impl ObjectKey {
+    /// A fresh key under `folder`, named by a UUID rather than by anything the uploader sent.
+    ///
+    /// The name is generated, not derived from the client's file name, so `../` and a colliding
+    /// upload are both impossible by construction rather than by sanitizing a submitted string.
+    pub fn generated(folder: &str, extension: &str) -> Self {
+        Self(format!(
+            "{folder}/{name}.{extension}",
+            folder = folder.trim_matches('/'),
+            name = uuid::Uuid::new_v4(),
+        ))
+    }
+}
+
+// The public URL an uploaded object is served from. Becomes an [`AvatarUrl`] only by going through
+// [`AvatarUrl::parse`], so a misconfigured base URL cannot put a non-`http` scheme in an `<img>`.
+string_newtype!(ObjectUrl);
+
 fn starts_with_ignore_case(value: &str, prefix: &str) -> bool {
     value
         .get(..prefix.len())
@@ -194,5 +216,21 @@ mod tests {
         assert!(AvatarUrl::parse("example.com/me.png").is_err());
         // A scheme with nothing after it is not a URL either.
         assert!(AvatarUrl::parse("https://").is_err());
+    }
+
+    #[test]
+    fn a_generated_object_key_is_named_by_us_not_by_the_uploader() {
+        let key = ObjectKey::generated("avatars", "png");
+
+        assert!(key.starts_with("avatars/"), "{key}");
+        assert!(key.ends_with(".png"), "{key}");
+        // Nothing but the folder, a UUID and the extension, so no upload can walk out of the
+        // folder or land on another one's name.
+        assert_eq!(key.matches('/').count(), 1);
+        assert_eq!(key.len(), "avatars/".len() + 36 + ".png".len());
+        assert_ne!(ObjectKey::generated("avatars", "png"), key);
+
+        // A folder written with slashes around it still produces one clean join.
+        assert!(ObjectKey::generated("/pictures/", "jpg").starts_with("pictures/"));
     }
 }

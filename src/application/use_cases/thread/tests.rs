@@ -30,6 +30,7 @@ fn internal_test_config() -> Arc<AppConfig> {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     })
 }
@@ -824,6 +825,7 @@ async fn test_inter_channel_hop_limit_rejection() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -936,6 +938,7 @@ async fn test_spf_authentication_failure_rejection() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -1034,6 +1037,7 @@ async fn test_high_spam_score_rejection() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -1134,6 +1138,7 @@ async fn test_dmarc_authentication_failure_rejection() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -1234,6 +1239,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -1335,6 +1341,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -1434,6 +1441,7 @@ async fn test_channel_in_cc_resolves_properly() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -1552,6 +1560,7 @@ async fn test_multi_channel_to_and_cc_execution() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -1694,6 +1703,7 @@ async fn test_pipeline_address_chaining_execution() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -1819,6 +1829,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -1947,6 +1958,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -2132,6 +2144,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -2285,6 +2298,7 @@ async fn test_sender_verification_and_delegation_target_check() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -2868,6 +2882,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 
@@ -3081,6 +3096,7 @@ async fn test_context_only_quiet_mode_ingestion() {
         spam_scanner_type: "rspamd".to_string(),
         spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
         enable_llm_spam_guardrail: false,
+        gcs: None,
         operator_emails: Vec::new(),
     });
 

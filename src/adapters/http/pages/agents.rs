@@ -21,14 +21,14 @@ pub fn render_ai_prompt_generator(
             <button type="button"
                 onclick="let el = document.getElementById('{gen_box_id}'); if (el) {{ el.classList.toggle('hidden'); if (!el.classList.contains('hidden')) {{ const inp = document.getElementById('{gen_input_id}'); if (inp) inp.focus(); }} }} return false;"
                 class="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition cursor-pointer inline-flex items-center gap-1">
-                <span>✨ Generate with AI</span>
+                <span class="inline-flex items-center gap-1">{sparkle} Generate with AI</span>
             </button>
         </div>
 
         <div id="{gen_box_id}" class="hidden my-2 p-3 bg-slate-900/90 border border-indigo-500/40 rounded-xl space-y-2.5 shadow-inner">
             <div class="flex items-center justify-between text-xs font-semibold text-indigo-300">
                 <span class="flex items-center gap-1.5">
-                    <span>✨</span>
+                    {sparkle}
                     <span>Generate System Prompt with AI</span>
                 </span>
                 <button type="button" onclick="document.getElementById('{gen_box_id}').classList.add('hidden')" class="text-slate-400 hover:text-white transition cursor-pointer">&times;</button>
@@ -63,6 +63,7 @@ pub fn render_ai_prompt_generator(
             </div>
         </div>
         "#,
+        sparkle = icon(Icon::Sparkle, BUTTON_ICON),
         company_id = company_id,
         sys_prompt_id = sys_prompt_id,
         gen_box_id = gen_box_id,
@@ -72,6 +73,25 @@ pub fn render_ai_prompt_generator(
         hx_include = hx_include,
         hx_vals = hx_vals
     )
+}
+
+/// The picture field on the classic Agents page.
+///
+/// The same picker the `/ui` workspace uses, so a picture is chosen from disk in both places and
+/// there is one upload route behind them; `id_prefix` keeps the create form's field apart from
+/// every agent row's.
+fn legacy_agent_avatar_field(
+    id_prefix: &str,
+    name: &str,
+    avatar_url: Option<&AvatarUrl>,
+) -> String {
+    super::avatar_picker(&super::AvatarPicker {
+        field_id: &format!("legacy-agent-avatar-{id_prefix}"),
+        avatar_url,
+        name,
+        label: "Agent Picture",
+        error: None,
+    })
 }
 
 pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
@@ -113,6 +133,7 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                     <span class="text-emerald-400">+</span> Add New Agent
                 </h3>
                 <form hx-post="/companies/{company_id}/agents" hx-target="#agent-list" hx-swap="innerHTML" class="space-y-4"
+                      hx-params="not avatar_file"
                       hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('agent-form-card').classList.add('hidden'); document.getElementById('agent-form-toggle').setAttribute('aria-expanded', 'false'); }}"
                       onkeydown="if(event.key==='Enter' && event.target.tagName!=='TEXTAREA') event.preventDefault()">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -127,11 +148,7 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                             <input type="text" id="agent_slug" name="slug" required
                                 placeholder="triage-bot" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
                         </div>
-                        <div>
-                            <label for="agent_avatar_url" class="block text-xs font-medium text-slate-300 mb-1">Avatar URL</label>
-                            <input type="url" id="agent_avatar_url" name="avatar_url"
-                                placeholder="https://example.com/agent.png" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
-                        </div>
+                        {avatar_field}
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -181,6 +198,7 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
         "##,
         company_name = company_name,
         company_id = company_id,
+        avatar_field = legacy_agent_avatar_field("new", "", None),
         prompt_gen_html = prompt_gen_html,
         list_html = list_html
     );
@@ -278,11 +296,6 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
     let provider = agent.provider.as_deref().unwrap_or("");
     let model = agent.model.as_deref().unwrap_or("");
     let api_key = agent.api_key.as_deref().unwrap_or("");
-    let avatar_url = agent
-        .avatar_url
-        .as_ref()
-        .map(AvatarUrl::as_str)
-        .unwrap_or("");
     let system_prompt = agent.system_prompt.as_deref().unwrap_or("");
     let config_json_str = agent
         .config_json
@@ -303,7 +316,8 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
     format!(
         r##"
         <div id="agent-row-{agent_id}" class="bg-slate-800 border border-indigo-500/50 rounded-xl p-5 shadow-xl">
-            <form hx-put="/companies/{company_id}/agents/{agent_id}" hx-target="#agent-row-{agent_id}" hx-swap="outerHTML" class="space-y-4">
+            <form hx-put="/companies/{company_id}/agents/{agent_id}" hx-target="#agent-row-{agent_id}" hx-swap="outerHTML"
+                  hx-params="not avatar_file" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1">Agent Name</label>
@@ -313,10 +327,7 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
                         <label class="block text-xs font-medium text-slate-300 mb-1">Slug</label>
                         <input type="text" name="slug" value="{slug}" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Avatar URL</label>
-                        <input type="url" name="avatar_url" value="{avatar_url}" placeholder="https://example.com/agent.png" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
-                    </div>
+                    {avatar_field}
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -360,7 +371,8 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
         company_id = company_id,
         name = name,
         slug = slug,
-        avatar_url = avatar_url,
+        avatar_field =
+            legacy_agent_avatar_field(&agent_id.to_string(), name, agent.avatar_url.as_ref()),
         provider = provider,
         model = model,
         api_key = api_key,

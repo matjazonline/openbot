@@ -1592,7 +1592,7 @@ mod tests {
         };
         let sim_result_html =
             pages::channel_simulation_result_fragment(company.id, channel.id, &sim_result);
-        assert!(sim_result_html.contains("Webhook Triggered & Channel Resolved Successfully!"));
+        assert!(sim_result_html.contains("Webhook Triggered &amp; Channel Resolved Successfully!"));
 
         let test_message = crate::entities::message::Message {
             id: Uuid::new_v4(),

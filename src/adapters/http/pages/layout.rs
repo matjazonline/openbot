@@ -220,7 +220,10 @@ const APP_SCRIPT: &str = r##"        function getCachedCompanyId() {
                         btn.className = isSelected
                             ? 'px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-mono cursor-pointer hover:bg-emerald-500/30 transition flex items-center gap-1'
                             : 'px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 text-[11px] font-mono cursor-pointer hover:bg-slate-700 hover:text-white transition flex items-center gap-1';
-                        btn.innerHTML = (isSelected ? '✓ ' : '+ ') + member.email;
+                        // The glyph is markup, the email is not: it goes in as text so an
+                        // address containing angle brackets stays an address.
+                        btn.innerHTML = (isSelected ? CHIP_SELECTED_MARK : CHIP_ADD_MARK) + '<span></span>';
+                        btn.lastChild.textContent = member.email;
                         btn.title = (member.username ? member.username + ' (' + member.role + ')' : member.role);
                         btn.addEventListener('click', (e) => {
                             e.preventDefault();
@@ -340,8 +343,8 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
 <body class="h-full font-sans antialiased text-slate-100 flex flex-col items-center p-4 md:p-8">
     <div class="w-full max-w-4xl">
         <nav class="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
-            <a href="{home_href}" class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
-                <span class="text-indigo-500">❖</span> Mail Agents
+            <a href="{home_href}" class="flex items-center" title="BusyBots">
+                <img src="/assets/busybots-logo-light.png" alt="BusyBots" class="h-9 w-auto">
             </a>
             <div class="flex items-center gap-4 text-sm font-medium">
                 {navigation}
@@ -352,10 +355,14 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
         </div>
     </div>
     <script>
+        var CHIP_SELECTED_MARK = '{chip_selected_mark}';
+        var CHIP_ADD_MARK = '{chip_add_mark}';
 {APP_SCRIPT}
     </script>
 </body>
-</html>"##
+</html>"##,
+        chip_selected_mark = icon(Icon::Check, BUTTON_ICON),
+        chip_add_mark = icon(Icon::Plus, BUTTON_ICON),
     )
 }
 

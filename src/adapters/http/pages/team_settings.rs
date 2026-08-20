@@ -162,10 +162,11 @@ pub fn team_settings_page(page: &TeamSettingsPage<'_>) -> String {
                 <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
                     hx-get="/ui/team/new?company_id={company_id}"
                     hx-target="#team-pane" hx-swap="outerHTML"
-                    hx-push-url="/ui/team?company_id={company_id}&new=1">＋ Invite Person</button>
+                    hx-push-url="/ui/team?company_id={company_id}&new=1">{plus_glyph} Invite Person</button>
             </div>
             "##,
             company_id = company.id,
+            plus_glyph = icon(Icon::Plus, BUTTON_ICON),
         )
     } else {
         String::new()
@@ -337,7 +338,7 @@ fn member_name(member: &CompanyMember) -> &str {
 pub fn team_settings_empty_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="team-pane" class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="team-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -376,7 +377,7 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
 
     format!(
         r##"
-        <section id="team-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="team-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
                 <div class="flex min-w-0 items-center gap-3">
                     {avatar}
@@ -428,44 +429,46 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
     )
 }
 
-/// The avatar field, shown only in your own pane.
+/// The picture field, shown only in your own pane.
 ///
-/// A blank field is how a picture is removed, which is why the input is never `required` and the
-/// button says Save rather than Set.
+/// Picking a file uploads it and swaps the field around what was stored; the button is what
+/// attaches the result to the account, and "Remove" then Save is how a picture goes away.
 fn avatar_form(pane: &MemberPane<'_>) -> String {
     if !pane.is_self() {
         return String::new();
     }
 
-    let stored = pane
-        .member
-        .avatar_url
-        .as_ref()
-        .map(AvatarUrl::as_str)
-        .unwrap_or("");
+    // A rejected save re-renders with what was submitted rather than what is stored, so the pane
+    // does not appear to have kept a picture it refused.
+    let draft = pane
+        .avatar_draft
+        .and_then(|draft| AvatarUrl::parse(draft).ok().flatten());
+    let showing = draft.as_ref().or(pane.member.avatar_url.as_ref());
 
     format!(
         r##"
                 <form class="mb-6 rounded-box bg-base-200 px-4 py-3"
                     hx-put="/ui/team/members/{user_id}/avatar?company_id={company_id}"
                     hx-target="#team-pane" hx-swap="outerHTML"
+                    hx-params="avatar_url"
                     hx-disabled-elt="find button[type='submit']">
-                    <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Your Avatar URL</span></div>
-                        <input type="url" name="avatar_url" value="{avatar_url}" placeholder="https://example.com/me.png"
-                            class="input input-bordered w-full font-mono text-sm">
-                        <div class="label"><span class="label-text-alt text-[11px] opacity-60">Shown wherever you appear in the app. Leave it empty to go back to your initial.</span></div>
-                    </label>
+                    {picker}
                     <button type="submit" class="btn btn-primary btn-sm">
                         <span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>
-                        <span class="[.htmx-request_&]:hidden">Save Avatar</span>
+                        <span class="[.htmx-request_&]:hidden">Save Picture</span>
                         <span class="hidden [.htmx-request_&]:inline">Saving...</span>
                     </button>
                 </form>
         "##,
         user_id = pane.member.user_id,
         company_id = pane.company.id,
-        avatar_url = escape_html_text(pane.avatar_draft.unwrap_or(stored)),
+        picker = avatar_picker(&AvatarPicker {
+            field_id: "member-avatar",
+            avatar_url: showing,
+            name: member_name(pane.member),
+            label: "Your Picture",
+            error: None,
+        }),
     )
 }
 
@@ -482,10 +485,10 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
             r##"
                 <form hx-put="/ui/team/invites/{invite_id}?company_id={company_id}" hx-target="#team-pane" hx-swap="outerHTML" class="space-y-4">
                     <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Invited Email</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Invited Email</span></div>
                         <input type="email" name="email" required value="{email}" placeholder="colleague@example.com"
-                            class="input input-bordered w-full font-mono">
-                        <div class="label"><span class="label-text-alt text-[11px] opacity-60">They join the team by accepting this invite from their own account.</span></div>
+                            class="input w-full font-mono">
+                        <div class="label"><span class="text-[11px] opacity-60">They join the team by accepting this invite from their own account.</span></div>
                     </label>
                     <div class="flex items-center gap-3 border-t border-base-300 pt-4">
                         <button type="submit" class="btn btn-primary">
@@ -541,7 +544,7 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
 
     format!(
         r##"
-        <section id="team-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="team-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
                 <div class="min-w-0">
                     <h2 class="truncate font-mono text-xl font-bold">{stored_email}</h2>
@@ -566,7 +569,7 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
 pub fn invite_create_pane(pane: &InviteCreatePane<'_>) -> String {
     format!(
         r##"
-        <section id="team-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="team-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-6 py-4">
                 <h2 class="text-xl font-bold">Invite someone to {company_name}</h2>
                 <p class="text-xs opacity-70">They join by accepting the invite from their own account, and are then trusted by every channel with no participant list of its own.</p>
@@ -576,9 +579,9 @@ pub fn invite_create_pane(pane: &InviteCreatePane<'_>) -> String {
                 <form class="space-y-4" hx-post="/ui/team/invites?company_id={company_id}" hx-target="#team-pane" hx-swap="outerHTML"
                     hx-disabled-elt="find button[type='submit']">
                     <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Email Address</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Email Address</span></div>
                         <input type="email" name="email" required value="{email}" placeholder="colleague@example.com"
-                            class="input input-bordered w-full font-mono">
+                            class="input w-full font-mono">
                     </label>
                     <div class="flex items-center gap-3">
                         <button type="submit" class="btn btn-primary">

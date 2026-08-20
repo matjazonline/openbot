@@ -146,15 +146,15 @@ fn task_filter_form(company_id: Uuid, channels: &[Channel], filter: &TaskFilter)
                 hx-target="#task-list" hx-swap="outerHTML">
                 <input type="hidden" name="company_id" value="{company_id}">
                 <input type="hidden" name="limit" value="{limit}">
-                <select name="channel_id" class="select select-bordered select-sm w-full" aria-label="Filter by channel">
+                <select name="channel_id" class="select select-sm w-full" aria-label="Filter by channel">
                     <option value="">All channels</option>
                     {channel_options}
                 </select>
-                <select name="status" class="select select-bordered select-sm w-full" aria-label="Filter by status">
+                <select name="status" class="select select-sm w-full" aria-label="Filter by status">
                     <option value="">All statuses</option>
                     {status_options}
                 </select>
-                <select name="sort" class="select select-bordered select-sm w-full" aria-label="Sort by time">
+                <select name="sort" class="select select-sm w-full" aria-label="Sort by time">
                     <option value="desc"{newest_selected}>Newest first</option>
                     <option value="asc"{oldest_selected}>Oldest first</option>
                 </select>
@@ -185,11 +185,11 @@ pub fn task_monitor_list(list: &TaskMonitorList<'_>, swap: FragmentSwap) -> Stri
 
     format!(
         r##"
-            <div id="task-list" class="flex min-h-0 flex-1 flex-col"{oob}>
+            <div id="task-list"{LIST_SKELETON} class="flex min-h-0 flex-1 flex-col"{oob}>
                 <div class="flex items-center justify-between gap-2 px-3 py-2 text-[11px] opacity-60">
                     <span class="truncate">{summary}</span>
                     <button type="button" class="btn btn-ghost btn-xs" title="Reload this page of tasks"
-                        hx-get="{reload_url}" hx-target="#task-list" hx-swap="outerHTML">⟳</button>
+                        hx-get="{reload_url}" hx-target="#task-list" hx-swap="outerHTML">{reload_glyph}</button>
                 </div>
                 <ul id="task-menu" class="menu w-full flex-1 flex-nowrap gap-1 overflow-y-auto px-2">{menu_body}</ul>
                 {pager}
@@ -197,6 +197,7 @@ pub fn task_monitor_list(list: &TaskMonitorList<'_>, swap: FragmentSwap) -> Stri
         "##,
         oob = swap.oob_attribute(),
         summary = escape_html_text(&task_page_summary(list)),
+        reload_glyph = icon(Icon::Sync, BUTTON_ICON),
         reload_url = task_list_url(company_id, list.filter, list.selected_task_id),
         pager = task_pager(list),
     )
@@ -272,18 +273,22 @@ fn task_pager(list: &TaskMonitorList<'_>) -> String {
 
     // Which way "back" runs depends on the order the list is in, so the labels follow the sort
     // rather than claiming the newest tasks are always first.
+    let (back, forward) = (
+        icon(Icon::ArrowLeft, BUTTON_ICON),
+        icon(Icon::ArrowRight, BUTTON_ICON),
+    );
     let (previous_label, next_label) = if filter.sort_asc {
-        ("← Older", "Newer →")
+        (format!("{back} Older"), format!("Newer {forward}"))
     } else {
-        ("← Newer", "Older →")
+        (format!("{back} Newer"), format!("Older {forward}"))
     };
     let previous = if filter.page() > 1 {
-        button(filter.page() - 1, previous_label)
+        button(filter.page() - 1, &previous_label)
     } else {
         String::new()
     };
     let next = if list.has_next {
-        button(filter.page().saturating_add(1), next_label)
+        button(filter.page().saturating_add(1), &next_label)
     } else {
         String::new()
     };
@@ -304,7 +309,7 @@ fn task_pager(list: &TaskMonitorList<'_>) -> String {
 pub fn task_monitor_empty_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="task-pane" class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="task-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -319,7 +324,7 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
 
     format!(
         r##"
-        <section id="task-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="task-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
                 <div class="min-w-0">
                     <h2 class="flex items-center gap-2 truncate text-xl font-bold">
@@ -331,9 +336,9 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
                 <div class="flex shrink-0 items-center gap-2">
                     {thread_link}
                     {action_button}
-                    <button type="button" class="btn btn-ghost btn-sm btn-square text-xl leading-none" title="Reload this task"
+                    <button type="button" class="btn btn-ghost btn-sm btn-square" title="Reload this task"
                         hx-get="/ui/tasks/{task_id}?company_id={company_id}"
-                        hx-target="#task-pane" hx-swap="outerHTML">⟳</button>
+                        hx-target="#task-pane" hx-swap="outerHTML">{reload_glyph}</button>
                 </div>
             </div>
             <div class="flex-1 space-y-4 overflow-y-auto px-6 py-4">
@@ -350,6 +355,7 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
         status_label = task_status_label(task.status),
         task_type = escape_html_text(&task.task_type),
         task_id = task.id,
+        reload_glyph = icon(Icon::Sync, BUTTON_ICON),
         thread_link = task_thread_link(pane),
         action_button = task_action_button(company_id, task),
         error_html = form_error_banner(pane.error),

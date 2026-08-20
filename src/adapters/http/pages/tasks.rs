@@ -83,8 +83,8 @@ fn task_token_meter_card(totals: &TaskTokenTotals) -> String {
         <!-- Token Meter Summary Card -->
         <div class="bg-slate-900/80 border border-indigo-900/60 rounded-xl p-4 mb-6 flex flex-wrap items-center justify-between gap-4 shadow-sm">
             <div class="flex items-center gap-3">
-                <div class="p-2.5 bg-indigo-950/80 border border-indigo-700/50 rounded-lg text-indigo-400 text-lg">
-                    📊
+                <div class="p-2.5 bg-indigo-950/80 border border-indigo-700/50 rounded-lg text-indigo-400">
+                    {meter_glyph}
                 </div>
                 <div>
                     <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-300">Token Meter Summary</h4>
@@ -106,7 +106,8 @@ fn task_token_meter_card(totals: &TaskTokenTotals) -> String {
                 </div>
             </div>
         </div>
-"##
+"##,
+        meter_glyph = icon(Icon::Graph, "h-5 w-5"),
     )
 }
 
@@ -489,7 +490,10 @@ fn token_badge(payload: &serde_json::Value) -> Option<String> {
     );
     Some(badge(
         BADGE_TOKENS,
-        format!("📊 Token Meter: {total} tokens (Prompt: {prompt} | Completion: {completion})"),
+        format!(
+            "{glyph} Token Meter: {total} tokens (Prompt: {prompt} | Completion: {completion})",
+            glyph = icon(Icon::Graph, BUTTON_ICON),
+        ),
     ))
 }
 
@@ -555,7 +559,10 @@ fn finish_reason_badge(metadata: &serde_json::Value) -> String {
             format!("Finish Reason: {other}"),
         ),
     };
-    badge(style, format!("🏁 {label}"))
+    badge(
+        style,
+        format!("{glyph} {label}", glyph = icon(Icon::Goal, BUTTON_ICON)),
+    )
 }
 
 /// The collapsible "Task Execution Parameters" block shown under a message: summary chips over the
@@ -590,7 +597,7 @@ pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> Strin
         r##"
         <details class="mt-3 border-t border-slate-800/80 pt-3 group">
             <summary class="cursor-pointer text-xs font-semibold text-slate-400 hover:text-indigo-300 transition flex items-center gap-1.5 select-none">
-                <span class="text-indigo-400 font-mono text-[11px] group-open:rotate-90 transition-transform">►</span>
+                <span class="text-indigo-400 group-open:rotate-90 transition-transform">{disclosure}</span>
                 <span>Task Execution Parameters</span>
             </summary>
             <div class="mt-2.5">
@@ -598,37 +605,69 @@ pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> Strin
                 <pre class="bg-slate-950 p-3 rounded-lg text-emerald-300 font-mono text-[11px] border border-slate-800/80 overflow-x-auto whitespace-pre-wrap max-h-96">{payload_str}</pre>
             </div>
         </details>
-        "##
+        "##,
+        disclosure = icon(Icon::ChevronRight, "h-3 w-3"),
+    )
+}
+
+/// What state a task is in, as one pill.
+///
+/// `glyph` is `None` for the states that speak for themselves and `Some` for the two that are
+/// parked on somebody outside the queue -- those share an hourglass because they are the same kind
+/// of wait, differing only in who is being waited on.
+fn status_pill(tint: &str, label: &str, glyph: Option<Icon>) -> String {
+    format!(
+        r##"<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border {tint}">{glyph}{label}</span>"##,
+        glyph = match glyph {
+            Some(glyph) => icon(glyph, BUTTON_ICON),
+            None => String::new(),
+        },
     )
 }
 
 pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
     let created_at_str = super::format_time(task.created_at);
     let status_badge = match task.status {
-        TaskStatus::Pending => {
-            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-950 text-amber-300 border border-amber-700/50">Pending</span>"#
-        }
-        TaskStatus::Processing => {
-            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-950 text-indigo-300 border border-indigo-700/50 animate-pulse">Processing</span>"#
-        }
-        TaskStatus::PendingApproval => {
-            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-950 text-sky-300 border border-sky-700/50">⏳ Awaiting Approval</span>"#
-        }
-        TaskStatus::WaitingForThirdPartyReply => {
-            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-950 text-cyan-300 border border-cyan-700/50">⏳ Awaiting 3rd Party Reply</span>"#
-        }
-        TaskStatus::Completed => {
-            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700/50">Completed</span>"#
-        }
-        TaskStatus::Failed => {
-            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-950 text-rose-300 border border-rose-700/50">Failed</span>"#
-        }
-        TaskStatus::DeadLetter => {
-            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-950 text-purple-300 border border-purple-700/50">Dead Letter</span>"#
-        }
-        TaskStatus::Stopped => {
-            r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-600">Stopped</span>"#
-        }
+        TaskStatus::Pending => status_pill(
+            "bg-amber-950 text-amber-300 border-amber-700/50",
+            "Pending",
+            None,
+        ),
+        TaskStatus::Processing => status_pill(
+            "bg-indigo-950 text-indigo-300 border-indigo-700/50 animate-pulse",
+            "Processing",
+            None,
+        ),
+        TaskStatus::PendingApproval => status_pill(
+            "bg-sky-950 text-sky-300 border-sky-700/50",
+            "Awaiting Approval",
+            Some(Icon::Hourglass),
+        ),
+        TaskStatus::WaitingForThirdPartyReply => status_pill(
+            "bg-cyan-950 text-cyan-300 border-cyan-700/50",
+            "Awaiting 3rd Party Reply",
+            Some(Icon::Hourglass),
+        ),
+        TaskStatus::Completed => status_pill(
+            "bg-emerald-950 text-emerald-300 border-emerald-700/50",
+            "Completed",
+            None,
+        ),
+        TaskStatus::Failed => status_pill(
+            "bg-rose-950 text-rose-300 border-rose-700/50",
+            "Failed",
+            None,
+        ),
+        TaskStatus::DeadLetter => status_pill(
+            "bg-purple-950 text-purple-300 border-purple-700/50",
+            "Dead Letter",
+            None,
+        ),
+        TaskStatus::Stopped => status_pill(
+            "bg-slate-800 text-slate-400 border-slate-600",
+            "Stopped",
+            None,
+        ),
     };
 
     let action_button = match task.status {
@@ -684,11 +723,14 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
     let token_meter_badge = if let Some(tu) = task.token_usage() {
         format!(
             r##"<div class="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-950/80 border border-indigo-800/70 text-indigo-300 font-mono text-xs shadow-sm">
-                <span class="text-indigo-400 font-semibold">📊 Token Meter:</span>
-                <span class="text-white font-bold">{} total</span>
-                <span class="text-slate-400 text-[11px]">(Prompt: {} • Completion: {})</span>
+                <span class="inline-flex items-center gap-1.5 text-indigo-400 font-semibold">{glyph} Token Meter:</span>
+                <span class="text-white font-bold">{total} total</span>
+                <span class="text-slate-400 text-[11px]">(Prompt: {prompt} • Completion: {completion})</span>
             </div>"##,
-            tu.total_tokens, tu.prompt_tokens, tu.completion_tokens
+            glyph = icon(Icon::Graph, BUTTON_ICON),
+            total = tu.total_tokens,
+            prompt = tu.prompt_tokens,
+            completion = tu.completion_tokens,
         )
     } else {
         String::new()

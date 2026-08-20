@@ -133,11 +133,12 @@ pub fn company_settings_page(page: &CompanySettingsPage<'_>) -> String {
                 <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
                     hx-get="/ui/companies/new"
                     hx-target="#company-pane" hx-swap="outerHTML"
-                    hx-push-url="/ui/companies?new=1">＋ New Company</button>
+                    hx-push-url="/ui/companies?new=1">{plus_glyph} New Company</button>
             </div>
         </aside>
         {pane_html}
         "##,
+        plus_glyph = icon(Icon::Plus, BUTTON_ICON),
         list_html = company_settings_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
     );
@@ -204,7 +205,7 @@ fn company_settings_entry(company: &Company, selected: bool) -> String {
 pub fn company_settings_empty_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="company-pane" class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="company-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -220,7 +221,7 @@ pub fn company_edit_pane(pane: &CompanyEditPane<'_>) -> String {
 
     format!(
         r##"
-        <section id="company-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="company-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
                 <div class="min-w-0">
                     <h2 class="truncate text-xl font-bold">{name}</h2>
@@ -269,7 +270,7 @@ pub fn company_edit_pane(pane: &CompanyEditPane<'_>) -> String {
 pub fn company_create_pane(pane: &CompanyCreatePane<'_>) -> String {
     format!(
         r##"
-        <section id="company-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="company-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-6 py-4">
                 <h2 class="text-xl font-bold">New company</h2>
                 <p class="text-xs opacity-70">A company owns its channels, agents and threads, and its slug is the domain part their addresses are built on.</p>
@@ -316,17 +317,19 @@ fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
                         <span class="text-[11px] font-normal opacity-60">Agents</span>
                     </a>
                     <a href="/ui/tasks?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
-                        <span class="text-lg font-bold">⚙</span>
+                        <span class="text-lg font-bold">{tasks_glyph}</span>
                         <span class="text-[11px] font-normal opacity-60">Tasks</span>
                     </a>
                     <a href="/ui?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
-                        <span class="text-lg font-bold">✉</span>
+                        <span class="text-lg font-bold">{mailbox_glyph}</span>
                         <span class="text-[11px] font-normal opacity-60">Mailbox</span>
                     </a>
                 </div>
         "##,
         channels = counts.channels,
         agents = counts.agents,
+        tasks_glyph = icon(Icon::Gear, "h-5 w-5"),
+        mailbox_glyph = icon(Icon::Mail, "h-5 w-5"),
     )
 }
 
@@ -343,25 +346,25 @@ fn company_fields(draft: &CompanyDraft<'_>) -> String {
         r##"
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <label class="form-control w-full">
-                            <div class="label"><span class="label-text text-xs opacity-70">Company Name</span></div>
+                            <div class="label"><span class="text-xs opacity-70">Company Name</span></div>
                             <input type="text" name="name" required value="{name}" placeholder="Acme Corporation"
                                 oninput="this.form.slug.value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
-                                class="input input-bordered w-full">
+                                class="input w-full">
                         </label>
                         <label class="form-control w-full">
-                            <div class="label"><span class="label-text text-xs opacity-70">Slug (the address domain)</span></div>
+                            <div class="label"><span class="text-xs opacity-70">Slug (the address domain)</span></div>
                             <input type="text" name="slug" required value="{slug}" placeholder="acme-corporation"
-                                class="input input-bordered w-full font-mono">
+                                class="input w-full font-mono">
                         </label>
                     </div>
                     <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">LLM Spam Guardrail</span></div>
-                        <select name="enable_llm_spam_guardrail" class="select select-bordered w-full">
+                        <div class="label"><span class="text-xs opacity-70">LLM Spam Guardrail</span></div>
+                        <select name="enable_llm_spam_guardrail" class="select w-full">
                             <option value="" {default_selected}>Server default</option>
                             <option value="true" {enabled_selected}>Enabled for this company</option>
                             <option value="false" {disabled_selected}>Disabled for this company</option>
                         </select>
-                        <div class="label"><span class="label-text-alt text-[11px] opacity-60">An extra model pass over inbound mail before an agent ever sees it.</span></div>
+                        <div class="label"><span class="text-[11px] opacity-60">An extra model pass over inbound mail before an agent ever sees it.</span></div>
                     </label>
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
                         <summary class="collapse-title text-sm font-medium">Default model &amp; key</summary>
@@ -369,19 +372,19 @@ fn company_fields(draft: &CompanyDraft<'_>) -> String {
                             <p class="text-[11px] opacity-60">What every channel and agent in this company falls back to when it sets nothing of its own.</p>
                             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                                 <label class="form-control w-full">
-                                    <div class="label"><span class="label-text text-xs opacity-70">LLM Provider</span></div>
+                                    <div class="label"><span class="text-xs opacity-70">LLM Provider</span></div>
                                     <input type="text" name="provider" value="{provider}" placeholder="google, openai, anthropic"
-                                        class="input input-bordered w-full font-mono text-sm">
+                                        class="input w-full font-mono text-sm">
                                 </label>
                                 <label class="form-control w-full">
-                                    <div class="label"><span class="label-text text-xs opacity-70">LLM Model</span></div>
+                                    <div class="label"><span class="text-xs opacity-70">LLM Model</span></div>
                                     <input type="text" name="model" value="{model}" placeholder="gemini-2.5-flash, gpt-4o"
-                                        class="input input-bordered w-full font-mono text-sm">
+                                        class="input w-full font-mono text-sm">
                                 </label>
                                 <label class="form-control w-full">
-                                    <div class="label"><span class="label-text text-xs opacity-70">LLM API Key</span></div>
+                                    <div class="label"><span class="text-xs opacity-70">LLM API Key</span></div>
                                     <input type="password" name="api_key" value="{api_key}" placeholder="Overrides the server key"
-                                        class="input input-bordered w-full font-mono text-sm">
+                                        class="input w-full font-mono text-sm">
                                 </label>
                             </div>
                         </div>

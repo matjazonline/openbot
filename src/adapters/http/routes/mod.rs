@@ -16,6 +16,7 @@ pub mod ui_dashboard;
 pub mod ui_outbox;
 pub mod ui_tasks;
 pub mod ui_team;
+pub mod ui_uploads;
 pub mod user;
 pub mod webhooks;
 
@@ -56,6 +57,7 @@ pub fn router() -> Router<AppState> {
         .merge(ui_outbox::router())
         .merge(ui_tasks::router())
         .merge(ui_team::router())
+        .merge(ui_uploads::router())
         .route_layer(middleware::from_fn(auth::require_auth));
 
     Router::new()

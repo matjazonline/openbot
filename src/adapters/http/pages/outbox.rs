@@ -144,15 +144,15 @@ fn outbox_filter_form(company_id: Uuid, channels: &[Channel], filter: &OutboxFil
                 hx-target="#outbox-list" hx-swap="outerHTML">
                 <input type="hidden" name="company_id" value="{company_id}">
                 <input type="hidden" name="limit" value="{limit}">
-                <select name="channel_id" class="select select-bordered select-sm w-full" aria-label="Filter by channel">
+                <select name="channel_id" class="select select-sm w-full" aria-label="Filter by channel">
                     <option value="">All channels</option>
                     {channel_options}
                 </select>
-                <select name="status" class="select select-bordered select-sm w-full" aria-label="Filter by delivery status">
+                <select name="status" class="select select-sm w-full" aria-label="Filter by delivery status">
                     <option value="">All statuses</option>
                     {status_options}
                 </select>
-                <select name="sort" class="select select-bordered select-sm w-full" aria-label="Sort by time">
+                <select name="sort" class="select select-sm w-full" aria-label="Sort by time">
                     <option value="desc"{newest_selected}>Newest first</option>
                     <option value="asc"{oldest_selected}>Oldest first</option>
                 </select>
@@ -183,11 +183,11 @@ pub fn outbox_list(list: &OutboxList<'_>, swap: FragmentSwap) -> String {
 
     format!(
         r##"
-            <div id="outbox-list" class="flex min-h-0 flex-1 flex-col"{oob}>
+            <div id="outbox-list"{LIST_SKELETON} class="flex min-h-0 flex-1 flex-col"{oob}>
                 <div class="flex items-center justify-between gap-2 px-3 py-2 text-[11px] opacity-60">
                     <span class="truncate">{summary}</span>
                     <button type="button" class="btn btn-ghost btn-xs" title="Reload this page of the outbox"
-                        hx-get="{reload_url}" hx-target="#outbox-list" hx-swap="outerHTML">⟳</button>
+                        hx-get="{reload_url}" hx-target="#outbox-list" hx-swap="outerHTML">{reload_glyph}</button>
                 </div>
                 <ul id="outbox-menu" class="menu w-full flex-1 flex-nowrap gap-1 overflow-y-auto px-2">{menu_body}</ul>
                 {pager}
@@ -195,6 +195,7 @@ pub fn outbox_list(list: &OutboxList<'_>, swap: FragmentSwap) -> String {
         "##,
         oob = swap.oob_attribute(),
         summary = escape_html_text(&outbox_page_summary(list)),
+        reload_glyph = icon(Icon::Sync, BUTTON_ICON),
         reload_url = outbox_list_url(company_id, list.filter, list.selected_entry_id),
         pager = outbox_pager(list),
     )
@@ -270,18 +271,22 @@ fn outbox_pager(list: &OutboxList<'_>) -> String {
     };
 
     // Which way "back" runs depends on the order the list is in, so the labels follow the sort.
+    let (back, forward) = (
+        icon(Icon::ArrowLeft, BUTTON_ICON),
+        icon(Icon::ArrowRight, BUTTON_ICON),
+    );
     let (previous_label, next_label) = if filter.sort_asc {
-        ("← Older", "Newer →")
+        (format!("{back} Older"), format!("Newer {forward}"))
     } else {
-        ("← Newer", "Older →")
+        (format!("{back} Newer"), format!("Older {forward}"))
     };
     let previous = if filter.page() > 1 {
-        button(filter.page() - 1, previous_label)
+        button(filter.page() - 1, &previous_label)
     } else {
         String::new()
     };
     let next = if list.has_next {
-        button(filter.page().saturating_add(1), next_label)
+        button(filter.page().saturating_add(1), &next_label)
     } else {
         String::new()
     };
@@ -302,7 +307,7 @@ fn outbox_pager(list: &OutboxList<'_>) -> String {
 pub fn outbox_empty_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="outbox-pane" class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="outbox-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -317,7 +322,7 @@ pub fn outbox_detail_pane(pane: &OutboxDetailPane<'_>) -> String {
 
     format!(
         r##"
-        <section id="outbox-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="outbox-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
                 <div class="min-w-0">
                     <h2 class="flex items-center gap-2 truncate text-xl font-bold">
@@ -330,7 +335,7 @@ pub fn outbox_detail_pane(pane: &OutboxDetailPane<'_>) -> String {
                     {task_link}
                     <button type="button" class="btn btn-ghost btn-sm btn-square text-xl leading-none" title="Reload this email"
                         hx-get="/ui/outbox/{entry_id}?company_id={company_id}"
-                        hx-target="#outbox-pane" hx-swap="outerHTML">⟳</button>
+                        hx-target="#outbox-pane" hx-swap="outerHTML">{reload_glyph}</button>
                 </div>
             </div>
             <div class="flex-1 space-y-4 overflow-y-auto px-6 py-4">
@@ -346,6 +351,7 @@ pub fn outbox_detail_pane(pane: &OutboxDetailPane<'_>) -> String {
         status_label = entry.status.label(),
         subject = escape_html_text(entry.subject().unwrap_or("(no subject)")),
         entry_id = entry.id,
+        reload_glyph = icon(Icon::Sync, BUTTON_ICON),
         task_link = outbox_task_link(pane),
         delivery = outbox_delivery_state(entry),
         facts = outbox_facts(pane),

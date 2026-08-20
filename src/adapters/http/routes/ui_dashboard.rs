@@ -62,6 +62,22 @@ pub fn router() -> Router<AppState> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct DashboardQuery {
     pub company_id: Option<Uuid>,
+    /// Which trailing range to report over, as a [`DashboardWindow`] slug.
+    pub window: Option<String>,
+}
+
+impl DashboardQuery {
+    /// The range this request asked for, or the default.
+    ///
+    /// An unrecognised slug falls back rather than failing: a bookmark from before a preset was
+    /// renamed should still open the dashboard, and there is nothing a 400 would tell the reader
+    /// that the highlighted range in the sidebar does not already say.
+    fn window(&self) -> DashboardWindow {
+        self.window
+            .as_deref()
+            .and_then(DashboardWindow::from_slug)
+            .unwrap_or_default()
+    }
 }
 
 /// Everything a dashboard handler needs about its caller, resolved once.
@@ -208,16 +224,13 @@ async fn dashboard_page(
         return Ok(Html(pages::mailbox_no_company_page(&user)));
     }
 
-    let window = DashboardWindow::last_hour();
-    let reading = dashboard.read(scope.company_id(), window).await?;
-
-    Ok(Html(pages::dashboard_page(&pages::DashboardPage {
+    // No reading here: the shell carries a placeholder and asks for the panels itself, so the page
+    // is not held open for the rollup's aggregates.
+    Ok(Html(pages::dashboard_page(&pages::DashboardShell {
         user: &user,
         scope: scope.view(),
         companies: &scope.companies,
-        snapshot: &reading.snapshot,
-        window,
-        process: &reading.process,
+        window: query.window(),
     })))
 }
 
@@ -232,7 +245,7 @@ async fn dashboard_panels_fragment(
     let user = workspace_user(&account, &account_email);
 
     let scope = DashboardScope::resolve(&dashboard, &account_email, query.company_id).await?;
-    let window = DashboardWindow::last_hour();
+    let window = query.window();
     let reading = dashboard.read(scope.company_id(), window).await?;
 
     Ok(Html(render(&scope, &reading, &user, window)).into_response())
@@ -250,7 +263,7 @@ async fn dashboard_stream(
     let account_email = EmailAddress::from(account.email.as_str());
     let scope = DashboardScope::resolve(&dashboard, &account_email, query.company_id).await?;
     let company = scope.company_id();
-    let window = DashboardWindow::last_hour();
+    let window = query.window();
 
     let stream = async_stream::stream! {
         let user = workspace_user(&account, &account_email);

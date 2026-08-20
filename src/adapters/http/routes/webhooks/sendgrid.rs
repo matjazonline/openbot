@@ -978,6 +978,7 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            gcs: None,
             operator_emails: Vec::new(),
         });
 
@@ -1011,6 +1012,8 @@ mod tests {
                 .expect("valid lazy pool url"),
             config: config.clone(),
             monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+            // Inbound mail never uploads anything.
+            file_storage: None,
             // Same lazy pool: this test never renders a dashboard, so it never connects.
             dashboard_persistence: Arc::new(
                 crate::adapters::persistence::PostgresPersistence::new(

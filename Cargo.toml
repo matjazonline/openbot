@@ -37,6 +37,9 @@ regex = "1"
 reqwest = { version = "0.12", features = ["json"] }
 pulldown-cmark = "0.13"
 ammonia = "4"
+base64 = "0.22"
+# RS256 for the Google service-account assertion that buys a Cloud Storage access token.
+jsonwebtoken = "9"
 
 [dev-dependencies]
 # `#[tokio::test(start_paused = true)]`, so lease-heartbeat tests run in virtual time instead of

@@ -2,21 +2,49 @@
 
 use super::*;
 
-pub fn approval_result_page(title: &str, approval: &HumanApproval, message: &str) -> String {
-    let status_badge = match approval.status {
-        ApprovalStatus::Approved => {
-            r#"<span class="px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Approved</span>"#
-        }
-        ApprovalStatus::Rejected => {
-            r#"<span class="px-3 py-1 text-xs font-semibold rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">✗ Rejected</span>"#
-        }
-        ApprovalStatus::Expired => {
-            r#"<span class="px-3 py-1 text-xs font-semibold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">⏱ Expired</span>"#
-        }
-        ApprovalStatus::Pending => {
-            r#"<span class="px-3 py-1 text-xs font-semibold rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">⏳ Pending</span>"#
-        }
+/// The badge shape for the result page's headline verdict.
+const PILL_BADGE: &str = "px-3 py-1 text-xs font-semibold rounded-full";
+
+/// The badge shape for one approval in a list of them.
+const ROW_BADGE: &str = "px-2 py-0.5 text-xs rounded";
+
+/// What an approval currently says, as a coloured badge.
+///
+/// The result page and the per-channel list draw the same four verdicts at two sizes, so only the
+/// enclosing shape is a parameter -- the glyph, the tint and the wording of a verdict are fixed,
+/// and a status that read differently between the two views would be a bug.
+fn status_badge(status: &ApprovalStatus, shape: &str) -> String {
+    let (glyph, tint, label) = match status {
+        ApprovalStatus::Approved => (
+            Icon::Check,
+            "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30",
+            "Approved",
+        ),
+        ApprovalStatus::Rejected => (
+            Icon::X,
+            "bg-rose-500/20 text-rose-300 border border-rose-500/30",
+            "Rejected",
+        ),
+        ApprovalStatus::Expired => (
+            Icon::Stopwatch,
+            "bg-amber-500/20 text-amber-300 border border-amber-500/30",
+            "Expired",
+        ),
+        ApprovalStatus::Pending => (
+            Icon::Hourglass,
+            "bg-sky-500/20 text-sky-300 border border-sky-500/30",
+            "Pending",
+        ),
     };
+
+    format!(
+        r##"<span class="inline-flex items-center gap-1.5 {shape} {tint}">{glyph} {label}</span>"##,
+        glyph = icon(glyph, BUTTON_ICON),
+    )
+}
+
+pub fn approval_result_page(title: &str, approval: &HumanApproval, message: &str) -> String {
+    let status_badge = status_badge(&approval.status, PILL_BADGE);
 
     let content = format!(
         r##"
@@ -57,7 +85,7 @@ pub fn approval_details_page(approval: &HumanApproval) -> String {
         r##"
         <div class="max-w-xl mx-auto py-6">
             <div class="text-center mb-6">
-                <span class="px-3 py-1 text-xs font-semibold rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">⏳ Action Approval Required</span>
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">{pending_glyph} Action Approval Required</span>
                 <h1 class="text-2xl font-extrabold text-white mt-3">{action_title}</h1>
             </div>
 
@@ -70,15 +98,18 @@ pub fn approval_details_page(approval: &HumanApproval) -> String {
             </div>
 
             <div class="flex items-center justify-center gap-4">
-                <a href="{confirm_link}" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition shadow-lg shadow-emerald-900/20">
-                    ✓ Confirm & Execute
+                <a href="{confirm_link}" class="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition shadow-lg shadow-emerald-900/20">
+                    {confirm_glyph} Confirm &amp; Execute
                 </a>
-                <a href="{reject_link}" class="px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-xl transition shadow-lg shadow-rose-900/20">
-                    ✗ Reject
+                <a href="{reject_link}" class="inline-flex items-center gap-2 px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-xl transition shadow-lg shadow-rose-900/20">
+                    {reject_glyph} Reject
                 </a>
             </div>
         </div>
         "##,
+        pending_glyph = icon(Icon::Hourglass, BUTTON_ICON),
+        confirm_glyph = icon(Icon::Check, BUTTON_ICON),
+        reject_glyph = icon(Icon::X, BUTTON_ICON),
         action_title = approval.action_title,
         action_summary = approval.action_summary,
         approver_email = approval.approver_email,
@@ -99,12 +130,7 @@ pub fn channel_approvals_fragment(approvals: &[HumanApproval]) -> String {
     let rows: String = approvals
         .iter()
         .map(|a| {
-            let badge = match a.status {
-                ApprovalStatus::Approved => r#"<span class="px-2 py-0.5 text-xs rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Approved</span>"#,
-                ApprovalStatus::Rejected => r#"<span class="px-2 py-0.5 text-xs rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">✗ Rejected</span>"#,
-                ApprovalStatus::Expired => r#"<span class="px-2 py-0.5 text-xs rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">⏱ Expired</span>"#,
-                ApprovalStatus::Pending => r#"<span class="px-2 py-0.5 text-xs rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">⏳ Pending</span>"#,
-            };
+            let badge = status_badge(&a.status, ROW_BADGE);
 
             format!(
                 r##"

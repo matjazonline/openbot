@@ -16,7 +16,7 @@ fn simulation_loaded_thread_header(company_id: Uuid, channel_id: Uuid, tid: &str
                     </div>
                     <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
-                        <span>🔄 Simulate New Thread</span>
+                        <span class="inline-flex items-center gap-1.5">{sync_glyph} Simulate New Thread</span>
                     </a>
                 </div>
             </div>
@@ -24,6 +24,7 @@ fn simulation_loaded_thread_header(company_id: Uuid, channel_id: Uuid, tid: &str
         company_id = company_id,
         channel_id = channel_id,
         tid = tid,
+        sync_glyph = icon(Icon::Sync, BUTTON_ICON),
     )
 }
 
@@ -41,7 +42,7 @@ fn simulation_compose_form(
                 <div class="bg-slate-900/70 border border-slate-700/80 rounded-xl p-5 mb-6 shadow-md space-y-6">
                     <div>
                         <h3 class="text-md font-semibold text-white mb-4 flex items-center gap-2">
-                            <span class="text-indigo-400">⚡</span> Simulated Webhook Payload
+                            <span class="text-indigo-400">{payload_glyph}</span> Simulated Webhook Payload
                         </h3>
                         <form hx-post="/companies/{company_id}/channels/{channel_id}/simulate" hx-target="#simulation-result" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']" class="space-y-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -115,7 +116,7 @@ fn simulation_compose_form(
 
                     <div>
                         <h3 class="text-md font-semibold text-white mb-2 flex items-center gap-2">
-                            <span class="text-indigo-400">🔍</span> Open Existing Thread by ID
+                            <span class="text-indigo-400">{lookup_glyph}</span> Open Existing Thread by ID
                         </h3>
                         <p class="text-slate-400 text-xs mb-3">Inspect thread history and simulate follow-up reply messages for an existing thread.</p>
                         <form hx-get="/companies/{company_id}/channels/{channel_id}/simulate/thread" hx-target="#simulation-result" hx-swap="innerHTML" class="flex flex-col sm:flex-row gap-3">
@@ -135,6 +136,8 @@ fn simulation_compose_form(
         channel_id = channel_id,
         target_recipient = target_recipient,
         sender_email = sender_email,
+        payload_glyph = icon(Icon::Zap, BUTTON_ICON),
+        lookup_glyph = icon(Icon::Search, BUTTON_ICON),
     )
 }
 
@@ -159,7 +162,7 @@ pub fn channel_simulation_page(
         r##"
         <div class="flex items-center justify-between mb-6">
             <div>
-                <a href="/companies/{company_id}/channels" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1 inline-block">&larr; Back to Channels</a>
+                <a href="/companies/{company_id}/channels" class="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-medium mb-1">{back_glyph} Back to Channels</a>
                 <h2 class="text-2xl font-bold text-white">Simulate Webhook: {channel_name}</h2>
                 <p class="text-slate-400 text-sm mt-0.5">Test incoming email webhook resolution for <span class="font-mono text-emerald-300">{target_recipient}</span></p>
             </div>
@@ -169,6 +172,7 @@ pub fn channel_simulation_page(
 
         <div id="simulation-result">{initial_result_val}</div>
         "##,
+        back_glyph = icon(Icon::ArrowLeft, BUTTON_ICON),
         company_id = company.id,
         channel_name = channel.name,
         target_recipient = target_recipient,
@@ -301,12 +305,15 @@ fn configured_badge(source: &str) -> String {
 }
 
 fn missing_badge(env_vars: Option<&str>) -> String {
-    match env_vars {
-        Some(names) => {
-            format!("<span class=\"text-rose-400 font-bold\">Missing / Unset ⚠️ ({names})</span>")
-        }
-        None => "<span class=\"text-rose-400 font-bold\">Missing / Unset ⚠️</span>".to_string(),
-    }
+    let names = match env_vars {
+        Some(names) => format!(" ({names})"),
+        None => String::new(),
+    };
+
+    format!(
+        r##"<span class="inline-flex items-center gap-1.5 text-rose-400 font-bold">{glyph} Missing / Unset{names}</span>"##,
+        glyph = icon(Icon::Alert, BUTTON_ICON),
+    )
 }
 
 /// Environment variables that can supply a key for this provider, in the order they're reported.
@@ -361,13 +368,14 @@ pub fn channel_simulation_failure_fragment(
                 </div>
                 <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
-                    <span>🔄 Simulate New Thread</span>
+                    <span class="inline-flex items-center gap-1.5">{sync_glyph} Simulate New Thread</span>
                 </a>
             </div>
         </div>
         "##,
         company_id = company_id,
         channel_id = channel_id,
+        sync_glyph = icon(Icon::Sync, BUTTON_ICON),
     );
 
     format!(
@@ -375,7 +383,7 @@ pub fn channel_simulation_failure_fragment(
         {oob_form_swap}
         <div class="space-y-4">
             <div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
-                <span class="text-rose-400 text-lg">✕</span>
+                {error_glyph}
                 <span>Simulation Execution Error: {error_msg}</span>
             </div>
 
@@ -425,6 +433,7 @@ pub fn channel_simulation_failure_fragment(
         </div>
         "##,
         oob_form_swap = oob_form_swap,
+        error_glyph = icon(Icon::X, BUTTON_ICON),
         error_msg = error_msg,
         provider_str = provider_str,
         model_str = model_str,
@@ -449,13 +458,14 @@ fn simulation_completed_banner(company_id: Uuid, channel_id: Uuid) -> String {
                 </div>
                 <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
-                    <span>🔄 Simulate New Thread</span>
+                    <span class="inline-flex items-center gap-1.5">{sync_glyph} Simulate New Thread</span>
                 </a>
             </div>
         </div>
         "##,
         company_id = company_id,
         channel_id = channel_id,
+        sync_glyph = icon(Icon::Sync, BUTTON_ICON),
     )
 }
 
@@ -543,6 +553,21 @@ fn simulation_routing_report(
     )
 }
 
+/// The one-line verdict at the top of a simulation result: how the run went, in a tinted strip.
+///
+/// The three outcomes differ only in glyph, tint and sentence, so those are the parameters and the
+/// shape is not -- a verdict that was laid out differently from its siblings would read as a
+/// different kind of thing rather than as a different answer.
+fn status_banner(glyph: Icon, tint: &str, sentence: &str) -> String {
+    format!(
+        r##"<div class="p-4 rounded-xl border {tint} text-sm font-semibold flex items-center gap-2">
+            {glyph}
+            <span>{sentence}</span>
+        </div>"##,
+        glyph = icon(glyph, BUTTON_ICON),
+    )
+}
+
 pub fn channel_simulation_result_fragment(
     company_id: Uuid,
     channel_id: Uuid,
@@ -555,20 +580,23 @@ pub fn channel_simulation_result_fragment(
         (&llm.provider, &llm.model, &llm.api_key_status);
 
     let status_banner = if result.resolved {
-        r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-600/60 text-emerald-200 text-sm font-semibold flex items-center gap-2">
-            <span class="text-emerald-400 text-lg">✓</span>
-            <span>Webhook Triggered & Channel Resolved Successfully!</span>
-        </div>"#
+        status_banner(
+            Icon::Check,
+            "bg-emerald-950/80 border-emerald-600/60 text-emerald-200",
+            "Webhook Triggered &amp; Channel Resolved Successfully!",
+        )
     } else if !result.sender_authorized {
-        r#"<div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
-            <span class="text-rose-400 text-lg">✕</span>
-            <span>Unauthorized Sender: Email 'from' address is not listed in channel participant_emails.</span>
-        </div>"#
+        status_banner(
+            Icon::X,
+            "bg-rose-950/80 border-rose-600/60 text-rose-200",
+            "Unauthorized Sender: Email 'from' address is not listed in channel participant_emails.",
+        )
     } else {
-        r#"<div class="p-4 rounded-xl bg-amber-950/80 border border-amber-600/60 text-amber-200 text-sm font-semibold flex items-center gap-2">
-            <span class="text-amber-400 text-lg">⚠</span>
-            <span>Channel or Company Not Found for recipient address.</span>
-        </div>"#
+        status_banner(
+            Icon::Alert,
+            "bg-amber-950/80 border-amber-600/60 text-amber-200",
+            "Channel or Company Not Found for recipient address.",
+        )
     };
 
     let company_name = result
@@ -611,7 +639,7 @@ pub fn channel_simulation_result_fragment(
     };
 
     let body_fragment = simulation_routing_report(
-        status_banner,
+        &status_banner,
         provider_str,
         model_str,
         api_key_status,
@@ -645,11 +673,12 @@ pub(crate) fn simulation_active_banner(
                 </div>
                 <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
-                    <span>🔄 Simulate New Thread</span>
+                    <span class="inline-flex items-center gap-1.5">{sync_glyph} Simulate New Thread</span>
                 </a>
             </div>
         </div>
-        "##
+        "##,
+        sync_glyph = icon(Icon::Sync, BUTTON_ICON),
     )
 }
 
@@ -732,7 +761,7 @@ pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> Str
                     <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 space-y-2 shadow-sm">
                         <div class="flex items-center justify-between border-b border-indigo-500/20 pb-2 text-xs">
                             <div class="flex items-center gap-2 font-semibold text-indigo-300">
-                                <span>🤖</span>
+                                {author_glyph}
                                 <span>AI Agent Response</span>
                                 <span class="px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-200 text-[10px] uppercase font-mono">Outbound</span>
                             </div>
@@ -747,6 +776,7 @@ pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> Str
                         {params_html}
                     </div>
                     "##,
+            author_glyph = icon(Icon::Hubot, BUTTON_ICON),
             created_at = created_at,
             msg_id = msg.message_id,
             body = body,
@@ -759,7 +789,7 @@ pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> Str
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow-sm">
                         <div class="flex items-center justify-between border-b border-slate-800 pb-2 text-xs">
                             <div class="flex items-center gap-2 font-semibold text-slate-200">
-                                <span>👤</span>
+                                {author_glyph}
                                 <span>Inbound Email</span>
                                 <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] uppercase font-mono">Inbound</span>
                             </div>
@@ -778,6 +808,7 @@ pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> Str
                         {params_html}
                     </div>
                     "##,
+            author_glyph = icon(Icon::Person, BUTTON_ICON),
             created_at = created_at,
             sender = msg.sender,
             msg_id = msg.message_id,
@@ -815,7 +846,7 @@ pub(crate) fn thread_history_section(
             <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-5 space-y-4 shadow-lg{wrapper_extra_class}">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                     <h4 class="text-sm font-sans font-bold text-white flex items-center gap-2">
-                        <span>💬</span> Thread History ({msg_count} {label})
+                        {history_glyph} Thread History ({msg_count} {label})
                     </h4>
                     <span class="text-xs font-mono text-emerald-400">Thread ID: {thread_id_str}</span>
                 </div>
@@ -823,7 +854,8 @@ pub(crate) fn thread_history_section(
                     {msgs_html}
                 </div>
             </div>
-            "##
+            "##,
+        history_glyph = icon(Icon::CommentDiscussion, BUTTON_ICON),
     )
 }
 
@@ -863,7 +895,7 @@ pub(crate) fn simulate_reply_form(fields: &ReplyFormFields<'_>) -> String {
         <div class="bg-slate-900/90 border border-indigo-500/40 rounded-xl p-5 shadow-xl space-y-4">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                    <span class="text-indigo-400 text-base">↩️</span> Simulate Reply Webhook Call
+                    <span class="text-indigo-400">{reply_glyph}</span> Simulate Reply Webhook Call
                 </h3>
                 <span class="text-xs text-slate-400">Simulate next message in Thread <span class="font-mono text-indigo-300">{thread_id_str}</span></span>
             </div>
@@ -929,12 +961,14 @@ pub(crate) fn simulate_reply_form(fields: &ReplyFormFields<'_>) -> String {
                         </svg>
                         <span class="[.htmx-request_&]:hidden">Trigger Reply Webhook Simulation</span>
                         <span class="hidden [.htmx-request_&]:inline">Simulating...</span>
-                        <span class="[.htmx-request_&]:hidden">&rarr;</span>
+                        <span class="[.htmx-request_&]:hidden">{submit_glyph}</span>
                     </button>
                 </div>
             </form>
         </div>
-        "##
+        "##,
+        reply_glyph = icon(Icon::Reply, BUTTON_ICON),
+        submit_glyph = icon(Icon::ArrowRight, BUTTON_ICON),
     )
 }
 
@@ -1124,24 +1158,26 @@ pub fn channel_simulation_thread_error_fragment(
                 </div>
                 <a href="/companies/{company_id}/channels/{channel_id}/simulate"
                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer">
-                    <span>🔄 Simulate New Thread</span>
+                    <span class="inline-flex items-center gap-1.5">{sync_glyph} Simulate New Thread</span>
                 </a>
             </div>
         </div>
         "##,
         company_id = company_id,
         channel_id = channel_id,
+        sync_glyph = icon(Icon::Sync, BUTTON_ICON),
     );
 
     let error_body = format!(
         r##"
         <div class="space-y-4">
             <div class="p-4 rounded-xl bg-rose-950/80 border border-rose-600/60 text-rose-200 text-sm font-semibold flex items-center gap-2">
-                <span class="text-rose-400 text-lg">✕</span>
+                {error_glyph}
                 <span>Error Loading Thread ({thread_id_input}): {error_msg}</span>
             </div>
         </div>
         "##,
+        error_glyph = icon(Icon::X, BUTTON_ICON),
         thread_id_input = thread_id_input,
         error_msg = error_msg,
     );

@@ -3,6 +3,7 @@ use crate::{
         http::app_state::AppState,
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
         protocols::{EgressRegistry, email::EmailEgressAdapter},
+        storage::{FileStorage, gcs::GcsFileStorage},
     },
     domain::monitoring::MonitoringService,
     infra::{
@@ -25,6 +26,13 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         Arc::new(TracingMonitor::new()),
         Arc::new(InMemoryMonitor::new()),
     ]));
+
+    // Built before anything else that could fail slowly: a bucket named in the environment but
+    // unreachable through its key should stop the boot, not the first person to pick a picture.
+    let file_storage = match config.gcs.as_ref() {
+        Some(gcs) => Some(Arc::new(GcsFileStorage::from_config(gcs)?) as Arc<dyn FileStorage>),
+        None => None,
+    };
 
     let postgres_arc = Arc::new(postgres_persistence().await?);
     let argon_hasher = argon2_password_hasher();
@@ -76,6 +84,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         thread_use_cases,
         approval_use_cases,
         dashboard_persistence: postgres_arc.clone(),
+        file_storage,
         events: MailboxEvents::new(),
     })
 }

@@ -1339,6 +1339,7 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            gcs: None,
             operator_emails: Vec::new(),
         });
 
@@ -1572,6 +1573,7 @@ regis";
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            gcs: None,
             operator_emails: Vec::new(),
         });
 
@@ -1694,6 +1696,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            gcs: None,
             operator_emails: Vec::new(),
         });
 

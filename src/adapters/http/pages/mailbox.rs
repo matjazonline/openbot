@@ -250,7 +250,9 @@ const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox alre
             }
         }
 
-        // Mark threads whose agent answered while the reader was looking elsewhere.
+        // Mark threads whose agent answered while the reader was looking elsewhere. The glyph is
+        // an inline SVG rendered by the server into AGENT_REPLIED_MARK, so it matches the one a
+        // freshly loaded row is drawn with instead of being a second copy of it here.
         //
         // This is deliberately a client-side, in-session signal rather than a stored unread flag:
         // it means "this happened while you were watching", so a reload starting clean is correct
@@ -263,7 +265,7 @@ const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox alre
                 if (row.dataset.threadId === openThreadId) return;
                 var mark = row.querySelector('.thread-mark');
                 if (!mark) return;
-                mark.textContent = '✓';
+                mark.innerHTML = AGENT_REPLIED_MARK;
                 mark.title = 'Agent replied';
             });
         }
@@ -422,6 +424,8 @@ const THEME_INIT_SCRIPT: &str = r#"
 
 /// The HTML shell for every `/ui` response: daisyUI over the Tailwind browser build, plus htmx.
 fn ui_layout(title: &str, body: &str, script: &str) -> String {
+    let skeletons = skeleton_script();
+
     format!(
         r##"<!DOCTYPE html>
 <html lang="en" data-theme="dark" class="h-full">
@@ -431,6 +435,7 @@ fn ui_layout(title: &str, body: &str, script: &str) -> String {
     <title>{title} - Mail Agents</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <style>{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}</style>
     <script>{THEME_INIT_SCRIPT}</script>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
@@ -439,11 +444,14 @@ fn ui_layout(title: &str, body: &str, script: &str) -> String {
 <body class="h-full overflow-hidden bg-base-100 text-base-content">
 {body}
     <script>
+        var AGENT_REPLIED_MARK = '{agent_replied_mark}';
 {MAILBOX_SCRIPT}
+{skeletons}
 {script}
     </script>
 </body>
-</html>"##
+</html>"##,
+        agent_replied_mark = icon(Icon::Check, BUTTON_ICON),
     )
 }
 
@@ -502,6 +510,74 @@ pub fn mailbox_no_company_page(user: &MailboxUser<'_>) -> String {
     })
 }
 
+/// The wordmark, in both inks: the dark one for the light theme, the light one for the dark
+/// theme. Both are sent, and [`BRAND_LOGO_STYLES`] hides the one that does not belong -- swapping
+/// the `src` from script instead would leave the mark blank for a moment on every theme change.
+const BRAND_LOGO: &str = r##"
+                <img src="/assets/busybots-logo-dark-hor.png" alt="BusyBots"
+                    class="brand-logo brand-logo-on-light h-10 w-auto">
+                <img src="/assets/busybots-logo-light.png" alt="BusyBots"
+                    class="brand-logo brand-logo-on-dark h-10 w-auto">
+"##;
+
+/// Which of [`BRAND_LOGO`]'s two inks the current theme shows. Written against `data-theme` on
+/// `<html>`, which `THEME_INIT_SCRIPT` sets before the first paint and `applyTheme` keeps current.
+///
+/// Dark is the default here as it is everywhere else: an unset `data-theme` is the dark theme.
+const BRAND_LOGO_STYLES: &str = r##"
+        .brand-logo-on-light { display: none; }
+        [data-theme="light"] .brand-logo-on-dark { display: none; }
+        [data-theme="light"] .brand-logo-on-light { display: block; }
+"##;
+
+/// The two blues the dark theme paints with, pulled back from daisyUI's own.
+///
+/// Stock `dark` puts primary at `oklch(58% 0.233 277)` -- a light, electric indigo that glares
+/// against a `base-100` this dark, and is not the mark's colour either. Both are re-cut here at
+/// the wordmark's hue (`#0000ff` is `oklch(45% 0.313 264)`) and darker, so a `btn-primary` sits
+/// *in* the surface rather than on top of it, and so the light ink it carries gains contrast as
+/// the field loses it. `info` follows primary down by the same amount -- the dashboard draws the
+/// two side by side, and one of them staying at full brightness is what would read as a mistake.
+///
+/// Overriding the variables rather than the components keeps every `primary`/`info` utility --
+/// buttons, badges, toggles, chart strokes -- on one definition. Dark only: the light theme
+/// carries these colours over a white field, where they were never too loud to begin with.
+const DARK_THEME_BLUES: &str = r##"
+        [data-theme="dark"] {
+            --color-primary: oklch(50% 0.19 264.05);
+            --color-primary-content: oklch(96% 0.02 264.05);
+            --color-info: oklch(66% 0.13 232.661);
+        }
+"##;
+
+/// The one ring a focused field gets, and how round every field is.
+///
+/// daisyUI paints a focused field with both its own 1px border *and* a 2px outline held 2px
+/// away from it -- three concentric edges, which reads as a double border. Pulling the outline
+/// 1px inward lays it exactly over the border, so one 2px ring is all that shows. An outline is
+/// not part of layout, so nothing moves when a field takes focus.
+///
+/// `--radius-field` is the corner radius daisyUI gives every field-sized component, so setting
+/// it here rounds inputs, selects, textareas, buttons and tabs together rather than leaving each
+/// to pick its own. Both shipped themes set it to `.25rem`.
+///
+/// It needs `!important` where [`DARK_THEME_BLUES`] does not. daisyUI hangs the light theme off
+/// `:root:has(input.theme-controller[value=light]:checked)` as well as `[data-theme=light]`, and
+/// our theme switch is exactly that checkbox -- so in light the `:has` selector outweighs
+/// anything we could write at token level, and only in dark would the corners round. Overriding
+/// the priority beats matching daisyUI's selector shape, which is theirs to change.
+///
+/// Only the four text-entry fields are pulled in. A checkbox, toggle or range shares the offset
+/// outline but has no interior to hold a ring, so those keep their halo.
+const FIELD_STYLES: &str = r##"
+        :root, [data-theme] { --radius-field: .5rem !important; }
+
+        .input:focus, .input:focus-within,
+        .select:focus, .select:focus-within, .select:open,
+        .textarea:focus, .textarea:focus-within,
+        .file-input:focus, .file-input:focus-within { outline-offset: -1px; }
+"##;
+
 /// The light/dark switch in the top bar: daisyUI's `theme-controller` checkbox wrapped in a
 /// `swap`, so the box flips the theme in CSS on its own and the icon rotates with it.
 /// `applyTheme` in [`MAILBOX_SCRIPT`] only has to write the choice down and keep `data-theme`
@@ -526,8 +602,7 @@ const THEME_CONTROLLER: &str = r##"
 /// account on the right. It sits above all four columns, so it is the one piece of chrome that
 /// never moves when htmx swaps a column.
 ///
-/// The logo keeps a white plate behind it: half the wordmark is near-black navy, which all but
-/// disappears straight on the dark theme's bar.
+/// The brand mark comes in two inks, one per theme -- see [`BRAND_LOGO_STYLES`].
 fn top_bar(user: &MailboxUser<'_>, company_id: Option<Uuid>) -> String {
     // Profile lives in the Team workspace -- your own pane there is where the avatar is set -- so
     // the entry only appears once there is a company whose team you are on.
@@ -542,9 +617,8 @@ fn top_bar(user: &MailboxUser<'_>, company_id: Option<Uuid>) -> String {
     format!(
         r##"
         <header class="navbar h-16 min-h-16 shrink-0 justify-between gap-4 border-b border-base-300 bg-base-200 px-4">
-            <a href="/ui" class="flex items-center" title="ArgoInbox">
-                <img src="/assets/argo-inbox-logo.png" alt="ArgoInbox"
-                    class="h-11 w-auto rounded-lg bg-white px-2 py-1">
+            <a href="/ui" class="flex items-center" title="BusyBots">
+{BRAND_LOGO}
             </a>
             <div class="flex items-center gap-1">
 {THEME_CONTROLLER}
@@ -590,33 +664,61 @@ pub fn account_avatar_oob(username: &str, avatar_url: Option<&AvatarUrl>) -> Str
 /// The workspace the response belongs to is lit, so the rail says where you are as well as where
 /// you can go.
 fn icon_rail(company_id: Uuid, section: UiSection) -> String {
-    let style = |lit: bool| if lit { "btn-primary" } else { "btn-ghost" };
+    let destinations = [
+        (UiSection::Mailbox, "/ui", Icon::Mail, "Mailbox"),
+        (UiSection::Channels, "/ui/channels", Icon::Hash, "Channels"),
+        (UiSection::Agents, "/ui/agents", Icon::Hubot, "Agents"),
+        (UiSection::Tasks, "/ui/tasks", Icon::Gear, "Tasks"),
+        (
+            UiSection::Outbox,
+            "/ui/outbox",
+            Icon::PaperAirplane,
+            "Outbox",
+        ),
+        (
+            UiSection::Dashboard,
+            "/ui/dashboard",
+            Icon::Graph,
+            "Dashboard",
+        ),
+        (
+            UiSection::Companies,
+            "/ui/companies",
+            Icon::Organization,
+            "Companies",
+        ),
+        (UiSection::Team, "/ui/team", Icon::People, "Team"),
+    ];
+
+    let links: String = destinations
+        .iter()
+        .map(|(destination, path, glyph, title)| {
+            format!(
+                r##"<a href="{path}?company_id={company_id}" class="btn btn-square btn-lg {style}" title="{title}">{glyph}</a>"##,
+                style = if section == *destination {
+                    "btn-primary"
+                } else {
+                    "btn-ghost"
+                },
+                glyph = icon(*glyph, RAIL_ICON),
+            )
+        })
+        .collect();
 
     format!(
         r##"
         <nav class="flex w-16 shrink-0 flex-col items-center gap-2 border-r border-base-300 bg-base-300 py-3">
-            <a href="/ui?company_id={company_id}" class="btn btn-square btn-lg {mailbox_style} text-2xl leading-none" title="Mailbox">✉</a>
-            <a href="/ui/channels?company_id={company_id}" class="btn btn-square btn-lg {channels_style} text-2xl leading-none" title="Channels">#</a>
-            <a href="/ui/agents?company_id={company_id}" class="btn btn-square btn-lg {agents_style} text-2xl leading-none" title="Agents">🤖</a>
-            <a href="/ui/tasks?company_id={company_id}" class="btn btn-square btn-lg {tasks_style} text-2xl leading-none" title="Tasks">⚙</a>
-            <a href="/ui/outbox?company_id={company_id}" class="btn btn-square btn-lg {outbox_style} text-2xl leading-none" title="Outbox">📤</a>
-            <a href="/ui/dashboard?company_id={company_id}" class="btn btn-square btn-lg {dashboard_style} text-2xl leading-none" title="Dashboard">📊</a>
-            <a href="/ui/companies?company_id={company_id}" class="btn btn-square btn-lg {companies_style} text-2xl leading-none" title="Companies">🏢</a>
-            <a href="/ui/team?company_id={company_id}" class="btn btn-square btn-lg {team_style} text-2xl leading-none" title="Team">👥</a>
-            <button type="button" class="btn btn-square btn-lg btn-ghost mt-auto text-2xl leading-none"
-                title="Log out" onclick="confirmLogout()">⏻</button>
+            {links}
+            <button type="button" class="btn btn-square btn-lg btn-ghost mt-auto"
+                title="Log out" onclick="confirmLogout()">{sign_out}</button>
         </nav>
         "##,
-        mailbox_style = style(section == UiSection::Mailbox),
-        channels_style = style(section == UiSection::Channels),
-        agents_style = style(section == UiSection::Agents),
-        tasks_style = style(section == UiSection::Tasks),
-        dashboard_style = style(section == UiSection::Dashboard),
-        outbox_style = style(section == UiSection::Outbox),
-        companies_style = style(section == UiSection::Companies),
-        team_style = style(section == UiSection::Team),
+        sign_out = icon(Icon::SignOut, RAIL_ICON),
     )
 }
+
+/// The rail's buttons are square and large, so its glyphs are drawn a size up from body icons.
+const RAIL_ICON: &str = "h-6 w-6";
 
 /// The channel column: one menu entry per channel, channel actions at the bottom.
 fn channel_sidebar(page: &MailboxPage<'_>) -> String {
@@ -669,8 +771,9 @@ pub fn channel_actions(
     let edit_button = match selected_channel {
         Some(channel) => format!(
             r##"<a href="/ui/channels?company_id={company_id}&channel_id={channel_id}"
-                    class="btn btn-ghost btn-sm btn-block justify-start">✎ Edit Channel</a>"##,
+                    class="btn btn-ghost btn-sm btn-block justify-start">{pencil} Edit Channel</a>"##,
             channel_id = channel.id,
+            pencil = icon(Icon::Pencil, BUTTON_ICON),
         ),
         None => String::new(),
     };
@@ -678,11 +781,12 @@ pub fn channel_actions(
     format!(
         r##"
             <div id="channel-actions" class="space-y-1 border-t border-base-300 p-2"{oob}>
-                <a href="/ui/channels?company_id={company_id}&new=1" class="btn btn-ghost btn-sm btn-block justify-start">＋ New Channel</a>
+                <a href="/ui/channels?company_id={company_id}&new=1" class="btn btn-ghost btn-sm btn-block justify-start">{plus} New Channel</a>
                 {edit_button}
             </div>
         "##,
         oob = swap.oob_attribute(),
+        plus = icon(Icon::Plus, BUTTON_ICON),
     )
 }
 
@@ -715,7 +819,7 @@ pub(crate) fn company_switcher(
             <div class="dropdown dropdown-bottom w-full p-3">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-block justify-between">
                     <span class="truncate font-bold">{name}</span>
-                    <span class="opacity-60">▾</span>
+                    <span class="opacity-60">{caret}</span>
                 </div>
                 <ul tabindex="0" class="menu dropdown-content z-50 mt-1 w-56 rounded-box bg-base-300 p-2 shadow-xl">
                     {options}
@@ -723,6 +827,7 @@ pub(crate) fn company_switcher(
             </div>
         "##,
         name = escape_html_text(&company.name),
+        caret = icon(Icon::ChevronDown, BUTTON_ICON),
     )
 }
 
@@ -756,8 +861,9 @@ fn compose_button(company_id: Uuid, channel: &Channel) -> String {
         r##"<button id="compose-button" type="button" class="btn btn-primary btn-sm"
                     title="Start a new thread in this channel"
                     hx-get="/ui/compose?company_id={company_id}&channel_id={channel_id}"
-                    hx-target="#detail-pane" hx-swap="outerHTML">✎ New Thread</button>"##,
+                    hx-target="#detail-pane" hx-swap="outerHTML">{pencil} New Thread</button>"##,
         channel_id = channel.id,
+        pencil = icon(Icon::Pencil, BUTTON_ICON),
     )
 }
 
@@ -794,8 +900,9 @@ fn channel_menu_item(
 
 /// The thread column before any channel is picked.
 pub fn empty_thread_column() -> String {
-    r##"
-        <section id="thread-column" class="flex w-96 shrink-0 flex-col border-r border-base-300 bg-base-100">
+    format!(
+        r##"
+        <section id="thread-column"{THREAD_COLUMN_SKELETON} class="flex w-96 shrink-0 flex-col border-r border-base-300 bg-base-100">
             <div class="flex items-center justify-between border-b border-base-300 px-4 py-3">
                 <h2 class="text-lg font-bold">Threads</h2>
             </div>
@@ -804,7 +911,7 @@ pub fn empty_thread_column() -> String {
             </div>
         </section>
     "##
-    .to_string()
+    )
 }
 
 pub fn thread_column(column: &ThreadColumn<'_>) -> String {
@@ -818,7 +925,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
 
     format!(
         r##"
-        <section id="thread-column" class="flex w-96 shrink-0 flex-col border-r border-base-300 bg-base-100"
+        <section id="thread-column"{THREAD_COLUMN_SKELETON} class="flex w-96 shrink-0 flex-col border-r border-base-300 bg-base-100"
             hx-ext="sse"
             sse-connect="/ui/threads/events?company_id={company_id}&channel_id={channel_id}{after}">
             <div class="flex items-center justify-between gap-2 border-b border-base-300 px-4 py-3">
@@ -830,7 +937,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
                     {compose_button}
                     <button type="button" class="btn btn-ghost btn-sm btn-square text-xl leading-none" title="Reload threads"
                         hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
-                        hx-target="#thread-column" hx-swap="outerHTML">⟳</button>
+                        hx-target="#thread-column" hx-swap="outerHTML">{reload_glyph}</button>
                 </div>
             </div>
             {list_open}
@@ -838,6 +945,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
             </div>
         </section>
         "##,
+        reload_glyph = icon(Icon::Sync, BUTTON_ICON),
         channel_name = escape_html_text(&column.channel.name),
         company_id = column.company_id,
         channel_id = column.channel.id,
@@ -879,7 +987,7 @@ pub fn thread_activity_mark(activity: Option<ThreadActivity>) -> String {
     match activity {
         None => String::new(),
         Some(activity) => format!(
-            r##"<span class="shrink-0 text-sm leading-none {tint}{pulse}" title="{label}">{mark}</span>"##,
+            r##"<span class="shrink-0 leading-none {tint}{pulse}" title="{label}">{mark}</span>"##,
             tint = if activity == ThreadActivity::Failed {
                 "text-error"
             } else {
@@ -891,8 +999,22 @@ pub fn thread_activity_mark(activity: Option<ThreadActivity>) -> String {
                 ""
             },
             label = escape_html_text(activity.label()),
-            mark = activity.mark(),
+            mark = icon(activity_icon(activity), BUTTON_ICON),
         ),
+    }
+}
+
+/// The glyph standing in for a thread state where there is room for a mark but not for a sentence.
+///
+/// `Queued` and `Working` share one on purpose: a queued task is picked up within a poll interval,
+/// and swapping shapes that fast reads as a flicker rather than as progress. The full wording
+/// rides along as the element's `title`.
+fn activity_icon(activity: ThreadActivity) -> Icon {
+    match activity {
+        ThreadActivity::Queued | ThreadActivity::Working => Icon::DotFill,
+        ThreadActivity::WaitingApproval => Icon::Hourglass,
+        ThreadActivity::WaitingReply => Icon::Mail,
+        ThreadActivity::Failed => Icon::Alert,
     }
 }
 
@@ -1036,7 +1158,7 @@ fn thread_pagination(column: &ThreadColumn<'_>, swap: FragmentSwap) -> String {
 pub fn empty_detail_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="detail-pane" class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="detail-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -1074,7 +1196,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
 
     format!(
         r##"
-        <section id="detail-pane" data-thread-id="{thread_id}" class="flex flex-1 flex-col bg-base-100" hx-ext="sse"
+        <section id="detail-pane"{PANE_SKELETON} data-thread-id="{thread_id}" class="flex flex-1 flex-col bg-base-100" hx-ext="sse"
             sse-connect="/ui/events?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}{after}">
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
                 <div class="min-w-0">
@@ -1085,10 +1207,10 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                 <div class="flex shrink-0 items-center gap-2">
                     <button type="button" class="btn btn-primary btn-sm" title="Send another message in this thread"
                         hx-get="/ui/reply?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
-                        hx-target="#detail-pane" hx-swap="outerHTML">✎ New Message</button>
-                    <button type="button" class="btn btn-ghost btn-sm btn-square text-xl leading-none" title="Reload messages"
+                        hx-target="#detail-pane" hx-swap="outerHTML">{pencil} New Message</button>
+                    <button type="button" class="btn btn-ghost btn-sm btn-square" title="Reload messages"
                         hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
-                        hx-target="#detail-pane" hx-swap="outerHTML">⟳</button>
+                        hx-target="#detail-pane" hx-swap="outerHTML">{reload}</button>
                     <a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={thread_id}"
                         class="btn btn-outline btn-sm">Open in Simulator</a>
                 </div>
@@ -1101,6 +1223,8 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
             {composer}
         </section>
         "##,
+        pencil = icon(Icon::Pencil, BUTTON_ICON),
+        reload = icon(Icon::Sync, BUTTON_ICON),
         subject = escape_html_text(&pane.thread.subject),
         participants = participants,
         thread_id = pane.thread.id,
@@ -1127,10 +1251,12 @@ fn thread_composer(pane: &MessagePane<'_>) -> String {
                 <input type="hidden" name="channel_id" value="{channel_id}">
                 <input type="hidden" name="thread_id" value="{thread_id}">
                 <div class="flex items-end gap-2">
-                    <textarea id="thread-composer" name="text_body" rows="1" required
-                        placeholder="Write a message... (Enter to send, Shift+Enter for a new line)"
-                        class="textarea textarea-bordered max-h-40 min-h-12 flex-1 resize-none text-sm"
-                        onkeydown="composerKeydown(event)" oninput="autoGrowComposer(this)"></textarea>
+                    <div class="aura aura-holo flex-1 [--aura-radius:var(--radius-field)]">
+                        <textarea id="thread-composer" name="text_body" rows="1" required
+                            placeholder="Write a message... (Enter to send, Shift+Enter for a new line)"
+                            class="textarea block max-h-40 min-h-12 w-full resize-none text-sm"
+                            onkeydown="composerKeydown(event)" oninput="autoGrowComposer(this)"></textarea>
+                    </div>
                     <button type="submit" class="btn btn-primary" title="Send">
                         <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
                         <span class="[.htmx-request_&]:hidden">Send</span>
@@ -1138,7 +1264,7 @@ fn thread_composer(pane: &MessagePane<'_>) -> String {
                 </div>
                 <label class="label mt-1 cursor-pointer justify-start gap-2 p-0">
                     <input type="checkbox" name="deliver" value="true" class="toggle toggle-primary toggle-xs">
-                    <span class="label-text text-xs opacity-60">Deliver the agent reply by email (off keeps it in-app)</span>
+                    <span class="text-xs opacity-60">Deliver the agent reply by email (off keeps it in-app)</span>
                 </label>
             </form>
         "##,
@@ -1216,8 +1342,8 @@ pub(crate) fn form_error_banner(error: Option<&str>) -> String {
 fn readonly_field(label: &str, value: &str) -> String {
     format!(
         r##"<label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">{label}</span></div>
-                        <input type="text" class="input input-bordered w-full font-mono text-sm" value="{value}" readonly>
+                        <div class="label"><span class="text-xs opacity-70">{label}</span></div>
+                        <input type="text" class="input w-full font-mono text-sm" value="{value}" readonly>
                     </label>"##,
         label = escape_html_text(label),
         value = escape_html_text(value),
@@ -1231,7 +1357,7 @@ fn send_form_footer(deliver: bool, cancel_attributes: &str) -> String {
     format!(
         r##"<label class="label cursor-pointer justify-start gap-3">
                         <input type="checkbox" name="deliver" value="true" class="toggle toggle-primary toggle-sm" {deliver_checked}>
-                        <span class="label-text text-xs opacity-70">Deliver the agent reply by email (off keeps it in-app)</span>
+                        <span class="text-xs opacity-70">Deliver the agent reply by email (off keeps it in-app)</span>
                     </label>
                     <div class="flex items-center gap-3 pt-2">
                         <button type="submit" class="btn btn-primary">
@@ -1248,7 +1374,7 @@ fn send_form_footer(deliver: bool, cancel_attributes: &str) -> String {
 pub fn compose_pane(pane: &ComposePane<'_>) -> String {
     format!(
         r##"
-        <section id="detail-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="detail-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-6 py-4">
                 <h2 class="text-xl font-bold">New thread in {channel_name}</h2>
                 <p class="text-xs opacity-70">The message enters the channel as if it had been emailed in.</p>
@@ -1261,14 +1387,14 @@ pub fn compose_pane(pane: &ComposePane<'_>) -> String {
                     {to_field}
                     {from_field}
                     <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Subject</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Subject</span></div>
                         <input type="text" name="subject" required placeholder="Subject" value="{subject}"
-                            class="input input-bordered w-full">
+                            class="input w-full">
                     </label>
                     <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Message</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Message</span></div>
                         <textarea name="text_body" rows="10" required placeholder="Write the first message of the thread..."
-                            class="textarea textarea-bordered w-full">{text_body}</textarea>
+                            class="textarea w-full">{text_body}</textarea>
                     </label>
                     {footer}
                 </form>
@@ -1302,7 +1428,7 @@ pub fn compose_pane(pane: &ComposePane<'_>) -> String {
 pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
     format!(
         r##"
-        <section id="detail-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="detail-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-6 py-4">
                 <h2 class="text-xl font-bold">New message in {subject}</h2>
                 <p class="text-xs opacity-70">The message enters the channel as if it had been emailed in, continuing this thread.</p>
@@ -1317,9 +1443,9 @@ pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
                     {from_field}
                     {subject_field}
                     <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Message</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Message</span></div>
                         <textarea name="text_body" rows="10" required placeholder="Write your message..."
-                            class="textarea textarea-bordered w-full">{text_body}</textarea>
+                            class="textarea w-full">{text_body}</textarea>
                     </label>
                     {footer}
                 </form>
@@ -1357,7 +1483,7 @@ pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
 /// into it again until a full reload.
 fn thread_list_open_tag(swap: FragmentSwap) -> String {
     format!(
-        r##"<div id="thread-list" class="flex-1 overflow-y-auto" sse-swap="thread" hx-swap="afterbegin"{oob}>"##,
+        r##"<div id="thread-list"{THREAD_ROWS_SKELETON} class="flex-1 overflow-y-auto" sse-swap="thread" hx-swap="afterbegin"{oob}>"##,
         oob = swap.oob_attribute(),
     )
 }

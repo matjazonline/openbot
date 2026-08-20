@@ -710,7 +710,7 @@ pub async fn generate_agent_prompt_handler(
             let html = format!(
                 r#"
                 <div class="p-2 my-1 bg-emerald-500/10 border border-emerald-500/30 rounded text-emerald-300 text-xs flex items-center justify-between font-medium">
-                    <span>✓ System prompt generated successfully!</span>
+                    <span class="inline-flex items-center gap-1.5">{check} System prompt generated successfully!</span>
                 </div>
                 <script>
                     (function() {{
@@ -727,6 +727,7 @@ pub async fn generate_agent_prompt_handler(
                     }})();
                 </script>
                 "#,
+                check = pages::icon(pages::Icon::Check, pages::BUTTON_ICON),
                 target_id = target_id,
                 escaped_prompt = escaped_prompt,
                 gen_box_id = gen_box_id
@@ -884,7 +885,7 @@ mod tests {
             ", #test_provider",
         );
 
-        assert!(html.contains("✨ Generate with AI"));
+        assert!(html.contains("Generate with AI"));
         assert!(html.contains("Generate System Prompt with AI"));
         assert!(html.contains("hx-post="));
         assert!(html.contains(&format!("/companies/{company_id}/agents/generate-prompt")));

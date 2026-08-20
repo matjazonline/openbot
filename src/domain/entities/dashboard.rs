@@ -22,11 +22,30 @@ pub struct DashboardWindow {
 }
 
 impl DashboardWindow {
+    /// Every window a reader can pick, in the order the selector offers them.
+    pub const PRESETS: [Self; 3] = [Self::last_hour(), Self::last_six_hours(), Self::last_day()];
+
     /// The default view: the last hour, in five-minute buckets.
     pub const fn last_hour() -> Self {
         Self {
             minutes: 60,
             bucket_minutes: 5,
+        }
+    }
+
+    /// A morning's worth, in quarter-hours.
+    pub const fn last_six_hours() -> Self {
+        Self {
+            minutes: 360,
+            bucket_minutes: 15,
+        }
+    }
+
+    /// A full day, hour by hour.
+    pub const fn last_day() -> Self {
+        Self {
+            minutes: 1440,
+            bucket_minutes: 60,
         }
     }
 
@@ -37,6 +56,48 @@ impl DashboardWindow {
     /// Bucket width in *seconds*, which is the unit the epoch-flooring in the SQL works in.
     pub const fn bucket_seconds(&self) -> f64 {
         (self.bucket_minutes * 60) as f64
+    }
+
+    /// How many slices the window is cut into -- the row count every bucketed query must return
+    /// once it is gap-filled, and the number of points every chart draws.
+    pub const fn bucket_count(&self) -> i64 {
+        self.minutes / self.bucket_minutes
+    }
+
+    /// The window's name in a URL. Short enough to type, stable enough to bookmark.
+    pub const fn slug(&self) -> &'static str {
+        match self.minutes {
+            360 => "6h",
+            1440 => "24h",
+            _ => "1h",
+        }
+    }
+
+    /// The inverse of [`Self::slug`]. `None` for anything else, which callers read as "use the
+    /// default" rather than as an error -- a stale bookmark should show a dashboard, not a 400.
+    pub fn from_slug(slug: &str) -> Option<Self> {
+        Self::PRESETS
+            .into_iter()
+            .find(|window| window.slug() == slug)
+    }
+
+    /// How the heading says it. `minutes` alone would render the day as "Last 1440 minutes".
+    pub const fn label(&self) -> &'static str {
+        match self.minutes {
+            360 => "Last 6 hours",
+            1440 => "Last 24 hours",
+            _ => "Last hour",
+        }
+    }
+
+    /// How a bucket's timestamp is labelled on the x-axis: a day-long window crosses midnight, so
+    /// bare `%H:%M` would repeat itself and the reader could not tell which day a spike sat in.
+    pub const fn tick_format(&self) -> &'static str {
+        if self.minutes >= 1440 {
+            "%b %-d %H:%M"
+        } else {
+            "%H:%M"
+        }
     }
 }
 
@@ -121,6 +182,30 @@ impl ThroughputBucket {
     pub fn total(&self) -> i64 {
         self.completed + self.failed
     }
+}
+
+/// Attempt duration percentiles in one slice of the window.
+///
+/// Both percentiles are `None` for a bucket in which no attempt *finished*. That is deliberate and
+/// the charts rely on it: a quiet minute is not a zero-millisecond minute, so the line breaks there
+/// rather than diving to the floor and inventing a latency nobody measured.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LatencyBucket {
+    pub bucket: DateTime<Utc>,
+    pub p50_ms: Option<i64>,
+    pub p95_ms: Option<i64>,
+}
+
+/// How many tasks were still open at the end of one slice of the window.
+///
+/// Reconstructed from the task rows themselves rather than sampled: nothing records queue depth as
+/// it happens, but `background_tasks` is never pruned, so "created by then and not yet finished by
+/// then" is answerable after the fact. See the query for what that reconstruction does and does not
+/// preserve.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QueueDepthBucket {
+    pub bucket: DateTime<Utc>,
+    pub open: i64,
 }
 
 /// Per-attempt cost and duration over the window, from `task_attempts`.
@@ -252,6 +337,8 @@ pub struct DashboardSnapshot {
     pub tasks: TaskQueueHealth,
     pub outbox: OutboxHealth,
     pub throughput: Vec<ThroughputBucket>,
+    pub latency: Vec<LatencyBucket>,
+    pub queue_depth: Vec<QueueDepthBucket>,
     pub attempts: AttemptStats,
     /// Capped at [`OUTSTANDING_LIMIT`]; the page links to the task monitor for the rest.
     pub outstanding: Vec<OutstandingTask>,

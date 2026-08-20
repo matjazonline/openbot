@@ -171,12 +171,13 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
                 <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
                     hx-get="/ui/channels/new?company_id={company_id}"
                     hx-target="#channel-pane" hx-swap="outerHTML"
-                    hx-push-url="/ui/channels?company_id={company_id}&new=1">＋ New Channel</button>
+                    hx-push-url="/ui/channels?company_id={company_id}&new=1">{plus_glyph} New Channel</button>
             </div>
         </aside>
         {pane_html}
         "##,
         company_switcher = company_switcher(company, page.companies, UiSection::Channels),
+        plus_glyph = icon(Icon::Plus, BUTTON_ICON),
         list_html = channel_settings_list(page.list, FragmentSwap::Inline),
         company_id = company.id,
         pane_html = page.pane_html,
@@ -266,7 +267,7 @@ pub fn disabled_badge(channel: &Channel) -> &'static str {
 pub fn channel_settings_empty_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="channel-pane" class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="channel-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -286,7 +287,7 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
 
     format!(
         r##"
-        <section id="channel-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="channel-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
                 <div class="min-w-0">
                     <h2 class="truncate text-xl font-bold">{name}</h2>
@@ -350,7 +351,7 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
 
     format!(
         r##"
-        <section id="channel-pane" class="flex flex-1 flex-col bg-base-100">
+        <section id="channel-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-6 py-4">
                 <h2 class="text-xl font-bold">New channel in {company_name}</h2>
                 <p class="text-xs opacity-70">A channel is an inbound address at <span class="font-mono">@{company_slug}.{app_domain_name}</span> plus the agents that answer it.</p>
@@ -371,15 +372,15 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
                     <input type="hidden" name="enabled" value="true">
                     <input type="hidden" name="add_3rd_party" value="true">
                     <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Channel Name</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Channel Name</span></div>
                         <input type="text" name="name" required value="{name}" placeholder="Inbound Email Handler"
-                            class="input input-bordered w-full">
+                            class="input w-full">
                     </label>
                     <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Agent Instructions</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Agent Instructions</span></div>
                         <textarea name="system_prompt" rows="6" required
                             placeholder="Describe the agent's role, responsibilities, rules and tone. A full system prompt is generated when the channel is created."
-                            class="textarea textarea-bordered w-full font-mono text-xs">{system_prompt}</textarea>
+                            class="textarea w-full font-mono text-xs">{system_prompt}</textarea>
                     </label>
                     <div class="flex items-center gap-3">
                         <button type="submit" class="btn btn-primary">
@@ -460,60 +461,60 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
         r##"
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <label class="form-control w-full">
-                            <div class="label"><span class="label-text text-xs opacity-70">Channel Name</span></div>
+                            <div class="label"><span class="text-xs opacity-70">Channel Name</span></div>
                             <input type="text" name="name" required value="{name}" placeholder="Inbound Email Handler"
                                 oninput="this.form.slug.value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
-                                class="input input-bordered w-full">
+                                class="input w-full">
                         </label>
                         <label class="form-control w-full">
-                            <div class="label"><span class="label-text text-xs opacity-70">Address (@{company_slug}.{app_domain_name})</span></div>
+                            <div class="label"><span class="text-xs opacity-70">Address (@{company_slug}.{app_domain_name})</span></div>
                             <input type="text" name="slug" required value="{slug}" placeholder="inbound-email-handler"
-                                class="input input-bordered w-full font-mono">
+                                class="input w-full font-mono">
                         </label>
                     </div>
                     <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Alias Addresses (@{company_slug}.{app_domain_name})</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Alias Addresses (@{company_slug}.{app_domain_name})</span></div>
                         <input type="text" name="alias_slugs" value="{alias_slugs}" autocomplete="off"
                             placeholder="sales, help, contact"
-                            class="input input-bordered w-full font-mono">
-                        <div class="label"><span class="label-text-alt text-[11px] opacity-60">Comma-separated. Mail to any of these reaches this channel, and replies go back out from the address it arrived on.</span></div>
+                            class="input w-full font-mono">
+                        <div class="label"><span class="text-[11px] opacity-60">Comma-separated. Mail to any of these reaches this channel, and replies go back out from the address it arrived on.</span></div>
                     </label>
                     <div class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Agents</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Agents</span></div>
                         {agents_html}
                     </div>
                     <label class="form-control w-full">
-                        <div class="label"><span class="label-text text-xs opacity-70">Participant Emails</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Participant Emails</span></div>
                         <input type="text" name="participant_emails" value="{participant_emails}" autocomplete="off"
                             oninput="toggleChannelSpamConfirm(this)"
                             placeholder="Leave blank for the company team, @public for anyone, or comma-separated emails"
-                            class="input input-bordered w-full">
-                        <div class="label"><span class="label-text-alt text-[11px] opacity-60">Blank means the company team. Use <code class="font-mono">@public</code> to let anyone write in.</span></div>
+                            class="input w-full">
+                        <div class="label"><span class="text-[11px] opacity-60">Blank means the company team. Use <code class="font-mono">@public</code> to let anyone write in.</span></div>
                     </label>
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
                         <summary class="collapse-title text-sm font-medium">Custom model &amp; config</summary>
                         <div class="collapse-content space-y-4">
                             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                                 <label class="form-control w-full">
-                                    <div class="label"><span class="label-text text-xs opacity-70">LLM Provider</span></div>
+                                    <div class="label"><span class="text-xs opacity-70">LLM Provider</span></div>
                                     <input type="text" name="provider" value="{provider}" placeholder="google, openai, anthropic"
-                                        class="input input-bordered w-full font-mono text-sm">
+                                        class="input w-full font-mono text-sm">
                                 </label>
                                 <label class="form-control w-full">
-                                    <div class="label"><span class="label-text text-xs opacity-70">LLM Model</span></div>
+                                    <div class="label"><span class="text-xs opacity-70">LLM Model</span></div>
                                     <input type="text" name="model" value="{model}" placeholder="gemini-2.5-flash, gpt-4o"
-                                        class="input input-bordered w-full font-mono text-sm">
+                                        class="input w-full font-mono text-sm">
                                 </label>
                                 <label class="form-control w-full">
-                                    <div class="label"><span class="label-text text-xs opacity-70">LLM API Key</span></div>
+                                    <div class="label"><span class="text-xs opacity-70">LLM API Key</span></div>
                                     <input type="password" name="api_key" value="{api_key}" placeholder="Overrides the company key"
-                                        class="input input-bordered w-full font-mono text-sm">
+                                        class="input w-full font-mono text-sm">
                                 </label>
                             </div>
                             <label class="form-control w-full">
-                                <div class="label"><span class="label-text text-xs opacity-70">Channel Config (JSON)</span></div>
+                                <div class="label"><span class="text-xs opacity-70">Channel Config (JSON)</span></div>
                                 <textarea name="channel_config" rows="4" placeholder='{{ "trigger": "email", "action": "ai_reply" }}'
-                                    class="textarea textarea-bordered w-full font-mono text-xs">{channel_config}</textarea>
+                                    class="textarea w-full font-mono text-xs">{channel_config}</textarea>
                             </label>
                         </div>
                     </details>

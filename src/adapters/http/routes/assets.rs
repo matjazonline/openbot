@@ -12,22 +12,34 @@ use axum::{
 
 use crate::adapters::http::app_state::AppState;
 
-const LOGO_PNG: &[u8] = include_bytes!("../../../../assets/argo-inbox-logo.png");
+/// The dark-ink wordmark, for a light background.
+const LOGO_DARK_PNG: &[u8] = include_bytes!("../../../../assets/busybots-logo-dark-hor.png");
+
+/// The light-ink wordmark, for a dark background.
+const LOGO_LIGHT_PNG: &[u8] = include_bytes!("../../../../assets/busybots-logo-light.png");
 
 /// Immutable because the URL changes whenever the asset does — the file name is part of the build.
 const IMMUTABLE_CACHE: &str = "public, max-age=31536000, immutable";
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/assets/argo-inbox-logo.png", get(logo))
+    Router::new()
+        .route(
+            "/assets/busybots-logo-dark-hor.png",
+            get(|| png(LOGO_DARK_PNG)),
+        )
+        .route(
+            "/assets/busybots-logo-light.png",
+            get(|| png(LOGO_LIGHT_PNG)),
+        )
 }
 
-/// GET /assets/argo-inbox-logo.png - The wordmark shown in the mailbox top bar (Public).
-async fn logo() -> impl IntoResponse {
+/// One embedded PNG, served with the immutable cache headers every brand asset shares (Public).
+async fn png(bytes: &'static [u8]) -> impl IntoResponse {
     (
         [
             (CONTENT_TYPE, "image/png"),
             (CACHE_CONTROL, IMMUTABLE_CACHE),
         ],
-        LOGO_PNG,
+        bytes,
     )
 }

@@ -28,12 +28,89 @@ pub struct AppConfig {
     pub spam_scanner_type: String,
     pub spam_scanner_url: String,
     pub enable_llm_spam_guardrail: bool,
+    /// Where picked files are stored, when a bucket has been configured; `None` means this
+    /// deployment cannot accept uploads and the pages that offer one say so.
+    pub gcs: Option<GcsConfig>,
     /// Addresses allowed to see the whole system rather than one company on `/ui/dashboard`.
     ///
     /// Deliberately deploy-controlled rather than a database role: `company_members.role` grants
     /// `admin` *within one company*, which is not the same authority as reading every company's
     /// traffic. Empty by default, so the global view does not exist until someone is named.
     pub operator_emails: Vec<EmailAddress>,
+}
+
+/// The Google Cloud Storage bucket uploads are written to.
+///
+/// One value rather than three loose `Option<String>`s on [`AppConfig`], because a bucket without
+/// a key (or the reverse) is not a half-configured uploader — it is no uploader at all, and this
+/// makes that unrepresentable.
+#[derive(Debug, Clone)]
+pub struct GcsConfig {
+    pub bucket: String,
+    /// The service account key file, base64-encoded: JSON does not survive an environment variable
+    /// intact, and the key is multi-line PEM inside JSON.
+    pub service_account_json_base64: String,
+    /// A CDN or custom domain in front of the bucket; `None` serves straight from Google.
+    pub public_base_url_override: Option<String>,
+    /// The folder inside the bucket avatars are written to.
+    pub avatar_folder: String,
+}
+
+impl GcsConfig {
+    /// Storage configuration, or `None` when this deployment has no bucket.
+    ///
+    /// Both the bucket and the key are required together: a deployment naming one but not the
+    /// other has a mistake in it, and starting with uploads silently disabled would hide it until
+    /// somebody tried to change their picture.
+    fn from_env() -> Option<Self> {
+        let bucket = non_empty_var("GCS_BUCKET");
+        let service_account_json_base64 = non_empty_var("GCS_SERVICE_ACCOUNT_JSON_BASE64");
+
+        match (bucket, service_account_json_base64) {
+            (Some(bucket), Some(service_account_json_base64)) => Some(Self {
+                bucket,
+                service_account_json_base64,
+                public_base_url_override: non_empty_var("GCS_PUBLIC_BASE_URL"),
+                avatar_folder: non_empty_var("GCS_AVATAR_FOLDER")
+                    .unwrap_or_else(|| "avatars".to_string()),
+            }),
+            (None, None) => None,
+            (bucket, _) => panic!(
+                "{} is set but {} is not; both are needed to store uploads",
+                if bucket.is_some() {
+                    "GCS_BUCKET"
+                } else {
+                    "GCS_SERVICE_ACCOUNT_JSON_BASE64"
+                },
+                if bucket.is_some() {
+                    "GCS_SERVICE_ACCOUNT_JSON_BASE64"
+                } else {
+                    "GCS_BUCKET"
+                },
+            ),
+        }
+    }
+
+    /// What an uploaded object's URL is built from.
+    pub fn public_base_url(&self) -> String {
+        self.public_base_url_override.clone().unwrap_or_else(|| {
+            format!(
+                "https://storage.googleapis.com/{bucket}",
+                bucket = self.bucket
+            )
+        })
+    }
+}
+
+/// An environment variable that is set to something, treating blank as unset.
+///
+/// A deploy platform writes an empty string for a secret that was never filled in, and an empty
+/// bucket name is not a bucket.
+fn non_empty_var(name: &str) -> Option<String> {
+    env::var(name)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 impl AppConfig {
@@ -169,6 +246,7 @@ impl AppConfig {
             spam_scanner_type,
             spam_scanner_url,
             enable_llm_spam_guardrail,
+            gcs: GcsConfig::from_env(),
             operator_emails,
         }
     }

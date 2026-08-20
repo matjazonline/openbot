@@ -14,7 +14,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::Row;
-use std::str::FromStr;
+use std::{str::FromStr, sync::LazyLock};
 use uuid::Uuid;
 
 use crate::{
@@ -22,8 +22,9 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         dashboard::{
-            AttemptStats, DashboardSnapshot, DashboardWindow, OUTSTANDING_LIMIT, OutboxHealth,
-            OutboxStatusCount, OutstandingTask, TaskQueueHealth, TaskStatusCount, ThroughputBucket,
+            AttemptStats, DashboardSnapshot, DashboardWindow, LatencyBucket, OUTSTANDING_LIMIT,
+            OutboxHealth, OutboxStatusCount, OutstandingTask, QueueDepthBucket, TaskQueueHealth,
+            TaskStatusCount, ThroughputBucket,
         },
         outbox::OutboxStatus,
         task::TaskStatus,
@@ -87,7 +88,35 @@ const OUTBOX_PRESSURE_SQL: &str = r#"
       FROM email_outbox
      WHERE ($1::uuid IS NULL OR company_id = $1)"#;
 
-/// Terminal outcomes per time bucket across the window.
+/// Every bucket boundary in the window, whether or not anything happened in it.
+///
+/// Prepended to each bucketed query so they all return exactly `window.bucket_count()` rows in
+/// ascending order. Without it the aggregates are *sparse* — a quiet bucket produces no row at all —
+/// which the old bar strip got away with because it drew whatever it was given, but which a chart
+/// with a time axis cannot: the gap closes up and the axis then claims two adjacent columns were
+/// five minutes apart when they were an hour apart.
+///
+/// The slots are floored on the same epoch grid as the data (`floor(epoch / $2) * $2`), because the
+/// join is on equality: a boundary derived any other way would miss every bucket by a fraction of a
+/// second and every row would come back zero.
+///
+/// The span reads `$3 * 60 - $2` rather than a bucket count because it is the same statement: from
+/// the newest boundary, step back the whole window and forward one bucket, so the newest boundary is
+/// included and the count comes out at `minutes / bucket_minutes` exactly.
+///
+/// Shared as one string rather than copied into each query — three copies of this arithmetic is
+/// three chances for one chart's x-axis to silently disagree with the others'.
+const SLOTS_CTE: &str = r#"
+    WITH slots AS (
+        SELECT generate_series(
+                   to_timestamp(floor(extract(epoch FROM CURRENT_TIMESTAMP) / $2) * $2)
+                       - make_interval(secs => $3 * 60 - $2),
+                   to_timestamp(floor(extract(epoch FROM CURRENT_TIMESTAMP) / $2) * $2),
+                   make_interval(secs => $2)
+               ) AS bucket
+    )"#;
+
+/// Terminal outcomes per time bucket across the window, gap-filled by [`SLOTS_CTE`].
 ///
 /// Bucketing is epoch-flooring rather than `date_trunc`, because `date_trunc` only offers whole
 /// units and the window is sliced in fives. `updated_at` is when the row reached its current
@@ -95,16 +124,103 @@ const OUTBOX_PRESSURE_SQL: &str = r#"
 ///
 /// One row here is one *task*, not one attempt: a task that failed twice and then completed
 /// contributes a single `completed`. Attempt-level counts come from [`ATTEMPT_STATS_SQL`].
-const THROUGHPUT_SQL: &str = r#"
-    SELECT to_timestamp(floor(extract(epoch FROM updated_at) / $2) * $2) AS bucket,
-           COUNT(*) FILTER (WHERE status = 'completed')::bigint AS completed,
-           COUNT(*) FILTER (WHERE status IN ('failed', 'dead_letter'))::bigint AS failed
-      FROM background_tasks
-     WHERE ($1::uuid IS NULL OR company_id = $1)
-       AND status IN ('completed', 'failed', 'dead_letter')
-       AND updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $3)
-     GROUP BY bucket
-     ORDER BY bucket"#;
+const THROUGHPUT_BODY: &str = r#",
+    finished AS (
+        SELECT to_timestamp(floor(extract(epoch FROM updated_at) / $2) * $2) AS bucket,
+               COUNT(*) FILTER (WHERE status = 'completed')::bigint AS completed,
+               COUNT(*) FILTER (WHERE status IN ('failed', 'dead_letter'))::bigint AS failed
+          FROM background_tasks
+         WHERE ($1::uuid IS NULL OR company_id = $1)
+           AND status IN ('completed', 'failed', 'dead_letter')
+           AND updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $3)
+         GROUP BY bucket
+    )
+    SELECT slots.bucket,
+           COALESCE(finished.completed, 0)::bigint AS completed,
+           COALESCE(finished.failed, 0)::bigint AS failed
+      FROM slots
+      LEFT JOIN finished ON finished.bucket = slots.bucket
+     ORDER BY slots.bucket"#;
+
+/// Attempt duration percentiles per time bucket, gap-filled by [`SLOTS_CTE`].
+///
+/// The per-bucket twin of [`ATTEMPT_STATS_SQL`], and it inherits that query's `::double precision`
+/// cast for the same load-bearing reason — see its comment before touching this one.
+///
+/// A bucket in which nothing finished keeps its `NULL` percentiles rather than being coalesced to
+/// zero. The chart draws that as a break in the line: nobody measured a zero-millisecond attempt,
+/// and a floor-scraping line would read as "suddenly very fast" when it means "nothing ran".
+///
+/// Bucketed on `started_at`, so an attempt lands in the slice it began in even if it ran past the
+/// boundary — which keeps this consistent with `ATTEMPT_STATS_SQL`'s window filter.
+const LATENCY_BODY: &str = r#",
+    measured AS (
+        SELECT to_timestamp(floor(extract(epoch FROM attempt.started_at) / $2) * $2) AS bucket,
+               percentile_disc(0.5) WITHIN GROUP (
+                   ORDER BY (extract(epoch FROM (attempt.finished_at - attempt.started_at))
+                             * 1000)::double precision
+               ) AS p50_ms,
+               percentile_disc(0.95) WITHIN GROUP (
+                   ORDER BY (extract(epoch FROM (attempt.finished_at - attempt.started_at))
+                             * 1000)::double precision
+               ) AS p95_ms
+          FROM task_attempts attempt
+          JOIN background_tasks task ON task.id = attempt.task_id
+         WHERE ($1::uuid IS NULL OR task.company_id = $1)
+           AND attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $3)
+         GROUP BY bucket
+    )
+    SELECT slots.bucket,
+           measured.p50_ms,
+           measured.p95_ms
+      FROM slots
+      LEFT JOIN measured ON measured.bucket = slots.bucket
+     ORDER BY slots.bucket"#;
+
+/// How many tasks were still open at each bucket boundary, gap-filled by [`SLOTS_CTE`].
+///
+/// Nothing samples queue depth as it happens and there is no history table, so this reconstructs it
+/// from the task rows themselves — which is only possible because `background_tasks` is never
+/// pruned. A task counts as open at boundary `T` when it existed by then (`created_at <= T`) and had
+/// not finished by then: either it is still not finished now, or its last write landed after `T`.
+///
+/// What that does *not* preserve: a row carries only its *last* update, so a task that failed,
+/// backed off and was retried inside the window contributes one open-to-closed transition rather
+/// than its real sawtooth. The boundary between open and closed is right; the path between them is
+/// smoothed. A sampler writing real gauges is the only way to do better, and it would cost a table.
+///
+/// The `open_tasks` CTE narrows before the join on purpose. The join is buckets x tasks over a table
+/// with no retention, so without it the 24-hour window scans every task the system has ever run;
+/// with it the work is bounded by "unfinished, or finished recently", which is what the
+/// `(company_id, status, created_at DESC, id DESC)` index is for.
+const QUEUE_DEPTH_BODY: &str = r#",
+    open_tasks AS (
+        SELECT created_at, updated_at, status
+          FROM background_tasks
+         WHERE ($1::uuid IS NULL OR company_id = $1)
+           AND (status IN ('pending', 'processing', 'pending_approval',
+                           'waiting_for_third_party_reply')
+                OR updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $3))
+    )
+    SELECT slots.bucket,
+           COUNT(open_tasks.created_at)::bigint AS open_count
+      FROM slots
+      LEFT JOIN open_tasks
+             ON open_tasks.created_at <= slots.bucket
+            AND (open_tasks.status IN ('pending', 'processing', 'pending_approval',
+                                       'waiting_for_third_party_reply')
+                 OR open_tasks.updated_at > slots.bucket)
+     GROUP BY slots.bucket
+     ORDER BY slots.bucket"#;
+
+/// The three bucketed statements, each [`SLOTS_CTE`] followed by its own body.
+///
+/// Assembled once at first use rather than on every read: the dashboard re-reads on a five-second
+/// tick for every connected tab, and there is no reason for that to rebuild three strings each time.
+static THROUGHPUT_SQL: LazyLock<String> = LazyLock::new(|| format!("{SLOTS_CTE}{THROUGHPUT_BODY}"));
+static LATENCY_SQL: LazyLock<String> = LazyLock::new(|| format!("{SLOTS_CTE}{LATENCY_BODY}"));
+static QUEUE_DEPTH_SQL: LazyLock<String> =
+    LazyLock::new(|| format!("{SLOTS_CTE}{QUEUE_DEPTH_BODY}"));
 
 /// Duration percentiles and token spend over the window, from `task_attempts`.
 ///
@@ -184,12 +300,14 @@ impl DashboardPersistence for PostgresPersistence {
         company: Option<Uuid>,
         window: DashboardWindow,
     ) -> AppResult<DashboardSnapshot> {
-        // Sequential rather than joined: these are five unrelated aggregates over two tables, and a
+        // Sequential rather than joined: these are seven unrelated aggregates over two tables, and a
         // single query producing all of them would be a cross join nobody could read or index.
         Ok(DashboardSnapshot {
             tasks: self.task_queue_health(company).await?,
             outbox: self.outbox_health(company).await?,
             throughput: self.throughput(company, window).await?,
+            latency: self.latency(company, window).await?,
+            queue_depth: self.queue_depth(company, window).await?,
             attempts: self.attempt_stats(company, window).await?,
             outstanding: self.outstanding(company).await?,
         })
@@ -262,7 +380,7 @@ impl PostgresPersistence {
         company: Option<Uuid>,
         window: DashboardWindow,
     ) -> AppResult<Vec<ThroughputBucket>> {
-        let rows = sqlx::query(THROUGHPUT_SQL)
+        let rows = sqlx::query(&*THROUGHPUT_SQL)
             .bind(company)
             .bind(window.bucket_seconds())
             .bind(window.minutes() as i32)
@@ -278,6 +396,67 @@ impl PostgresPersistence {
                         .map_err(AppError::from)?,
                     completed: row.try_get("completed").map_err(AppError::from)?,
                     failed: row.try_get("failed").map_err(AppError::from)?,
+                })
+            })
+            .collect()
+    }
+
+    async fn latency(
+        &self,
+        company: Option<Uuid>,
+        window: DashboardWindow,
+    ) -> AppResult<Vec<LatencyBucket>> {
+        let rows = sqlx::query(&*LATENCY_SQL)
+            .bind(company)
+            .bind(window.bucket_seconds())
+            .bind(window.minutes() as i32)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+
+        rows.into_iter()
+            .map(|row| {
+                // `percentile_disc` hands back the type it ordered by, so these decode as `f64` and
+                // are rounded here rather than cast in SQL -- a millisecond is the smallest unit the
+                // page ever shows, and rounding once at the boundary keeps it that way.
+                let millis = |column| -> AppResult<Option<i64>> {
+                    Ok(row
+                        .try_get::<Option<f64>, _>(column)
+                        .map_err(AppError::from)?
+                        .map(|value| value.round() as i64))
+                };
+
+                Ok(LatencyBucket {
+                    bucket: row
+                        .try_get::<DateTime<Utc>, _>("bucket")
+                        .map_err(AppError::from)?,
+                    p50_ms: millis("p50_ms")?,
+                    p95_ms: millis("p95_ms")?,
+                })
+            })
+            .collect()
+    }
+
+    async fn queue_depth(
+        &self,
+        company: Option<Uuid>,
+        window: DashboardWindow,
+    ) -> AppResult<Vec<QueueDepthBucket>> {
+        let rows = sqlx::query(&*QUEUE_DEPTH_SQL)
+            .bind(company)
+            .bind(window.bucket_seconds())
+            .bind(window.minutes() as i32)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+
+        rows.into_iter()
+            .map(|row| {
+                Ok(QueueDepthBucket {
+                    bucket: row
+                        .try_get::<DateTime<Utc>, _>("bucket")
+                        .map_err(AppError::from)?,
+                    open: row.try_get("open_count").map_err(AppError::from)?,
                 })
             })
             .collect()

@@ -12,5 +12,6 @@ pub mod outbox;
 pub mod outreach;
 pub mod task;
 pub mod thread;
+pub mod upload;
 pub mod user;
 pub mod value_objects;
