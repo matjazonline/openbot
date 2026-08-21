@@ -768,6 +768,20 @@ mod tests {
         ) -> AppResult<Option<crate::entities::user::User>> {
             unimplemented!()
         }
+        async fn update_profile(
+            &self,
+            _id: Uuid,
+            _profile: crate::use_cases::user::ProfileUpdate<'_>,
+        ) -> AppResult<Option<crate::entities::user::User>> {
+            unimplemented!()
+        }
+        async fn update_password_hash(
+            &self,
+            _id: Uuid,
+            _password_hash: &str,
+        ) -> AppResult<Option<crate::entities::user::User>> {
+            unimplemented!()
+        }
     }
 
     struct MockCompanyInvitePersistence;

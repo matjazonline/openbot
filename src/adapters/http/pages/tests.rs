@@ -3251,15 +3251,17 @@ fn outbox_query_carries_only_what_was_chosen() {
 }
 
 #[test]
-fn page_timestamps_render_as_utc_at_three_precisions() {
-    // A fixed instant, so this pins the actual strings rather than just the presence of "UTC".
+fn page_timestamps_preserve_utc_instants_for_local_browser_rendering() {
     let at = chrono::DateTime::parse_from_rfc3339("2026-08-19T14:48:27.123456Z")
         .expect("a valid RFC 3339 instant")
         .with_timezone(&Utc);
 
-    assert_eq!(format_date(at), "Aug 19, 2026 UTC");
-    assert_eq!(format_date_time(at), "Aug 19, 2026 14:48 UTC");
-    assert_eq!(format_time(at), "Aug 19, 14:48:27 UTC");
+    assert_eq!(
+        format_date(at),
+        r#"<time datetime="2026-08-19T14:48:27.123456+00:00" data-local-time="date">Aug 19, 2026 UTC</time>"#
+    );
+    assert!(format_date_time(at).contains(r#"data-local-time="date-time""#));
+    assert!(format_time(at).contains(r#"data-local-time="time""#));
 }
 
 /// A placeholder is two halves that have to meet: the attribute on the swap target, and the
@@ -3504,4 +3506,150 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
     assert!(team_html.contains(
         r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Team</h2>"##
     ));
+}
+
+fn profile_account() -> User {
+    User {
+        id: Uuid::new_v4(),
+        username: "dana".to_string(),
+        email: "dana@example.com".to_string(),
+        password_hash: "irrelevant".to_string(),
+        avatar_url: Some(AvatarUrl::from("https://cdn.example.com/dana.png")),
+        created_at: Utc::now(),
+    }
+}
+
+#[test]
+fn the_profile_pane_offers_the_account_its_own_details_and_never_its_password() {
+    let account = profile_account();
+    let html = profile_pane(&ProfilePane {
+        user: &account,
+        draft: None,
+        outcome: ProfileOutcome::Untouched,
+    });
+
+    // Both forms write to the caller's own account, so neither carries a user id to point
+    // somewhere else.
+    assert!(html.contains(r##"hx-put="/ui/profile""##));
+    assert!(html.contains(r##"hx-put="/ui/profile/password""##));
+    assert!(!html.contains(&account.id.to_string()));
+
+    assert!(html.contains(r#"name="username" required value="dana""#));
+    assert!(html.contains(r#"name="email" required value="dana@example.com""#));
+
+    // The picture is picked from disk; the URL it was stored at rides along hidden.
+    assert!(html.contains(r#"type="file" name="avatar_file""#));
+    assert!(html.contains(
+        r#"<input type="hidden" name="avatar_url" value="https://cdn.example.com/dana.png">"#
+    ));
+
+    // A password field that came back holding what was typed would be a password sitting in the
+    // page's HTML.
+    assert!(html.contains(r#"name="current_password""#));
+    assert!(!html.contains("irrelevant"));
+    assert!(!html.contains(r#"name="current_password" value"#));
+}
+
+#[test]
+fn a_rejected_profile_shows_what_was_typed_rather_than_what_is_stored() {
+    let account = profile_account();
+    let html = profile_pane(&ProfilePane {
+        user: &account,
+        draft: Some(&ProfileDraft {
+            username: "<script>dana</script>",
+            email: "taken@example.com",
+            avatar_url: "javascript:alert(1)",
+        }),
+        outcome: ProfileOutcome::Rejected(
+            ProfileForm::Identity,
+            "An account already uses the address 'taken@example.com'.",
+        ),
+    });
+
+    assert!(html.contains("already uses the address"));
+    assert!(html.contains(r#"value="taken@example.com""#));
+    assert!(!html.contains("<script>dana</script>"));
+    assert!(html.contains("&lt;script&gt;dana&lt;/script&gt;"));
+    // A draft that is not an `http` URL never reaches the `<img src>` the bubble draws.
+    assert!(!html.contains("javascript:alert(1)"));
+}
+
+#[test]
+fn each_profile_banner_belongs_to_the_form_that_earned_it() {
+    let account = profile_account();
+
+    let saved = profile_pane(&ProfilePane {
+        user: &account,
+        draft: None,
+        outcome: ProfileOutcome::Saved(ProfileForm::Password, "Your password has been changed."),
+    });
+    let (details, password) = saved
+        .split_once("<h2 class=\"text-lg font-bold\">Password</h2>")
+        .expect("the pane renders both sections");
+    assert!(password.contains("Your password has been changed."));
+    assert!(!details.contains("Your password has been changed."));
+
+    let refused = profile_pane(&ProfilePane {
+        user: &account,
+        draft: None,
+        outcome: ProfileOutcome::Rejected(
+            ProfileForm::Password,
+            "That is not your current password.",
+        ),
+    });
+    assert!(refused.contains("That is not your current password."));
+    // A refusal is not a confirmation: the two banners must never render together.
+    assert!(!refused.contains("has been changed."));
+}
+
+#[test]
+fn the_account_chip_swaps_name_address_and_face_as_one() {
+    let email = mailbox_account_email();
+    let user = MailboxUser {
+        avatar_url: Some(&AvatarUrl::from("https://cdn.example.com/dana.png")),
+        ..mailbox_user(&email)
+    };
+
+    let oob = account_chip(&user, FragmentSwap::OutOfBand);
+    assert!(oob.contains(r#"id="account-chip""#));
+    assert!(oob.contains(r#"hx-swap-oob="outerHTML""#));
+    assert!(oob.contains("dana"));
+    assert!(oob.contains(email.as_str()));
+    assert!(oob.contains(r#"src="https://cdn.example.com/dana.png""#));
+
+    // In the bar itself the same fragment is rendered inline, or every page load would try to
+    // swap a chip that is not there yet.
+    assert!(!account_chip(&user, FragmentSwap::Inline).contains("hx-swap-oob"));
+}
+
+#[test]
+fn the_profile_page_renders_through_the_ui_shell_with_or_without_a_company() {
+    let account = profile_account();
+    let email = mailbox_account_email();
+    let user = mailbox_user(&email);
+    let pane = profile_pane(&ProfilePane {
+        user: &account,
+        draft: None,
+        outcome: ProfileOutcome::Untouched,
+    });
+
+    let company = mailbox_company();
+    let with_company = profile_page(&ProfilePage {
+        user: &user,
+        company: Some(&company),
+        pane_html: &pane,
+    });
+    assert!(with_company.contains("<title>Profile"));
+    assert!(with_company.contains(r##"<a href="/ui/profile">Profile</a>"##));
+    assert!(with_company.contains(&format!("/ui/channels?company_id={}", company.id)));
+
+    // An account with no company yet still reaches its own settings -- there is simply no rail
+    // for them to sit beside.
+    let without_company = profile_page(&ProfilePage {
+        user: &user,
+        company: None,
+        pane_html: &pane,
+    });
+    assert!(without_company.contains(r##"hx-put="/ui/profile""##));
+    assert!(!without_company.contains("company_id="));
 }

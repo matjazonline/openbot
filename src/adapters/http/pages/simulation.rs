@@ -751,8 +751,13 @@ pub(crate) fn message_task_payload(
 pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> String {
     let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
     let created_at = super::format_date_time(msg.created_at);
-    let params_html =
-        render_message_task_parameters_html(&message_task_payload(msg, is_agent, &created_at, ctx));
+    let created_at_utc = msg.created_at.to_rfc3339();
+    let params_html = render_message_task_parameters_html(&message_task_payload(
+        msg,
+        is_agent,
+        &created_at_utc,
+        ctx,
+    ));
 
     if is_agent {
         let body = render_markdown(&msg.clean_text_body);

@@ -402,6 +402,7 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
         var CHIP_SELECTED_MARK = '{chip_selected_mark}';
         var CHIP_ADD_MARK = '{chip_add_mark}';
 {APP_SCRIPT}
+{LOCAL_TIME_SCRIPT}
     </script>
 </body>
 </html>"##,

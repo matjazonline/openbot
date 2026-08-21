@@ -19,6 +19,7 @@ use crate::entities::{
     outbox::{OutboxEntry, OutboxFilter, OutboxStatus},
     task::{BackgroundTask, TaskFilter, TaskStatus, ThreadActivity},
     thread::Thread,
+    user::User,
     value_objects::{AvatarUrl, EmailAddress},
 };
 use crate::use_cases::channel::InboundEmailResult;
@@ -40,6 +41,7 @@ mod layout;
 mod mailbox;
 mod onboarding;
 mod outbox;
+mod profile;
 mod schedules;
 mod simulation;
 mod skeleton;
@@ -63,6 +65,7 @@ pub use layout::*;
 pub use mailbox::*;
 pub use onboarding::*;
 pub use outbox::*;
+pub use profile::*;
 pub use schedules::*;
 pub use simulation::*;
 pub(crate) use skeleton::{
@@ -73,24 +76,64 @@ pub use task_monitor::*;
 pub use tasks::*;
 pub use team_settings::*;
 
-/// Every timestamp the app stores is UTC, and a page has no idea what zone its reader is in. These
-/// three say so outright rather than rendering a bare wall clock the reader has to guess at, and
-/// they exist so a new page reaches for one instead of inventing a seventh format string.
+/// Every timestamp the app stores is UTC. These helpers preserve that instant in a semantic
+/// `datetime` attribute; the page shell replaces the UTC fallback text with the reader's local
+/// date/time once it reaches their browser.
 ///
 /// Pick by how much precision the reader actually needs: [`format_date`] for things that happened
 /// on a day (signups, invites), [`format_date_time`] for things you scan by recency (threads,
 /// messages), [`format_time`] for the queue views where seconds matter.
 pub(crate) fn format_date(at: DateTime<Utc>) -> String {
-    at.format("%b %d, %Y UTC").to_string()
+    local_time(at, "date", "%b %d, %Y UTC")
 }
 
 pub(crate) fn format_date_time(at: DateTime<Utc>) -> String {
-    at.format("%b %d, %Y %H:%M UTC").to_string()
+    local_time(at, "date-time", "%b %d, %Y %H:%M UTC")
 }
 
 pub(crate) fn format_time(at: DateTime<Utc>) -> String {
-    at.format("%b %d, %H:%M:%S UTC").to_string()
+    local_time(at, "time", "%b %d, %H:%M:%S UTC")
 }
+
+fn local_time(at: DateTime<Utc>, precision: &str, fallback_format: &str) -> String {
+    format!(
+        r#"<time datetime="{}" data-local-time="{}">{}</time>"#,
+        at.to_rfc3339(),
+        precision,
+        at.format(fallback_format)
+    )
+}
+
+/// Converts semantic UTC timestamps after the initial load and after partial HTMX responses.
+/// `Intl.DateTimeFormat` deliberately receives no `timeZone`, so it uses the browser's local one.
+pub(crate) const LOCAL_TIME_SCRIPT: &str = r##"
+        function localizeTimes(root) {
+            var scope = root && root.querySelectorAll ? root : document;
+            var times = Array.from(scope.querySelectorAll('time[data-local-time]:not([data-localized])'));
+            if (scope.matches && scope.matches('time[data-local-time]:not([data-localized])')) {
+                times.unshift(scope);
+            }
+            times.forEach(function (el) {
+                var at = new Date(el.dateTime);
+                if (Number.isNaN(at.getTime())) return;
+
+                var precision = el.dataset.localTime;
+                var options = precision === 'date'
+                    ? { year: 'numeric', month: 'short', day: 'numeric' }
+                    : precision === 'time'
+                        ? { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' }
+                        : { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' };
+
+                el.textContent = new Intl.DateTimeFormat(undefined, options).format(at);
+                el.title = at.toISOString();
+                el.dataset.localized = 'true';
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () { localizeTimes(document); });
+        document.addEventListener('htmx:afterSettle', function (event) { localizeTimes(event.target); });
+        localizeTimes(document);
+"##;
 
 #[cfg(test)]
 mod tests;

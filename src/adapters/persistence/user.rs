@@ -7,7 +7,9 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{user::User, value_objects::AvatarUrl},
-    use_cases::user::{PendingRegistration, RegistrationPersistence, UserPersistence},
+    use_cases::user::{
+        PendingRegistration, ProfileUpdate, RegistrationPersistence, UserPersistence,
+    },
 };
 
 // User struct as stored in the db.
@@ -176,5 +178,67 @@ impl UserPersistence for PostgresPersistence {
         .map_err(AppError::from)?;
 
         Ok(result.map(Into::into))
+    }
+
+    async fn update_profile(
+        &self,
+        id: Uuid,
+        profile: ProfileUpdate<'_>,
+    ) -> AppResult<Option<User>> {
+        let result = sqlx::query_as!(
+            UserDb,
+            r#"UPDATE users SET username = $2, email = $3, avatar_url = $4 WHERE id = $1
+               RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
+            id,
+            profile.username,
+            profile.email.as_str(),
+            profile.avatar_url.map(AvatarUrl::as_str)
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|err| taken_identity_error(err, &profile))?;
+
+        Ok(result.map(Into::into))
+    }
+
+    async fn update_password_hash(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>> {
+        let result = sqlx::query_as!(
+            UserDb,
+            r#"UPDATE users SET password_hash = $2 WHERE id = $1
+               RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
+            id,
+            password_hash
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(result.map(Into::into))
+    }
+}
+
+/// A username or address somebody else already holds is routine user input, not a database fault,
+/// so it surfaces as a bad request naming the field that clashed rather than a raw driver message.
+///
+/// Which of the two clashed comes from the constraint the row violated, because the statement
+/// writes both at once and the message has to point at the field the reader must change.
+fn taken_identity_error(err: sqlx::Error, profile: &ProfileUpdate<'_>) -> AppError {
+    let sqlx::Error::Database(ref db_err) = err else {
+        return AppError::from(err);
+    };
+    if db_err.code().as_deref() != Some("23505") {
+        return AppError::from(err);
+    }
+
+    match db_err.constraint() {
+        Some("users_username_key") => AppError::BadRequest(format!(
+            "The username '{}' is already taken.",
+            profile.username
+        )),
+        Some("users_email_key") => AppError::BadRequest(format!(
+            "An account already uses the address '{}'.",
+            profile.email
+        )),
+        _ => AppError::BadRequest("That username or email is already taken.".into()),
     }
 }

@@ -50,6 +50,9 @@ pub enum UiSection {
     Companies,
     Team,
     Invites,
+    /// The signed-in account's own details. Reached from the account menu rather than the rail --
+    /// it is the one `/ui` page that is about the reader instead of about a company.
+    Profile,
 }
 
 /// The confirmation asked for before a session ends: both logout triggers open this rather than
@@ -107,7 +110,7 @@ pub fn ui_shell(shell: &UiShell<'_>) -> String {
     </div>
     {LOGOUT_MODAL}
         "##,
-        top_bar = top_bar(shell.user, shell.company.map(|company| company.id)),
+        top_bar = top_bar(shell.user),
         content = shell.content,
     );
 
@@ -482,6 +485,7 @@ fn ui_layout(title: &str, body: &str, script: &str) -> String {
     <script>
         var AGENT_REPLIED_MARK = '{agent_replied_mark}';
 {MAILBOX_SCRIPT}
+{LOCAL_TIME_SCRIPT}
 {skeletons}
 {script}
     </script>
@@ -647,18 +651,10 @@ const THEME_CONTROLLER: &str = r##"
 /// account on the right. It sits above all four columns, so it is the one piece of chrome that
 /// never moves when htmx swaps a column.
 ///
-/// The brand mark comes in two inks, one per theme -- see [`BRAND_LOGO_STYLES`].
-fn top_bar(user: &MailboxUser<'_>, company_id: Option<Uuid>) -> String {
-    // Profile lives in the Team workspace -- your own pane there is where the avatar is set -- so
-    // the entry only appears once there is a company whose team you are on.
-    let profile_entry = match company_id {
-        Some(company_id) => format!(
-            r##"<li><a href="/ui/team?company_id={company_id}&member_id={user_id}">Profile</a></li>"##,
-            user_id = user.id,
-        ),
-        None => String::new(),
-    };
-
+/// The brand mark comes in two inks, one per theme -- see [`BRAND_LOGO_STYLES`]. Nothing in the
+/// account menu is scoped to a company, so unlike the rail the bar renders the same for a reader
+/// who has no company yet.
+fn top_bar(user: &MailboxUser<'_>) -> String {
     format!(
         r##"
         <header class="navbar h-16 min-h-16 shrink-0 justify-between gap-4 border-b border-base-300 bg-base-200 px-4">
@@ -669,15 +665,11 @@ fn top_bar(user: &MailboxUser<'_>, company_id: Option<Uuid>) -> String {
 {THEME_CONTROLLER}
                 <div class="dropdown dropdown-end">
                     <div tabindex="0" role="button" class="btn btn-ghost h-auto gap-3 px-2 py-1">
-                        <div class="hidden text-right leading-tight sm:block">
-                            <div class="text-sm font-semibold">{username}</div>
-                            <div class="text-[11px] font-normal opacity-60">{email}</div>
-                        </div>
-                        <div id="account-avatar">{avatar}</div>
+                        {chip}
                     </div>
                     <ul tabindex="0" class="menu menu-sm dropdown-content z-50 mt-3 w-60 rounded-box bg-base-300 p-2 shadow-xl">
                         <li class="menu-title truncate">{email}</li>
-                        {profile_entry}
+                        <li><a href="/ui/profile">Profile</a></li>
                         <li><a href="/ui/invites">My Invites</a></li>
                         <li><a href="/ui/companies">Companies</a></li>
                         <li>
@@ -688,21 +680,33 @@ fn top_bar(user: &MailboxUser<'_>, company_id: Option<Uuid>) -> String {
             </div>
         </header>
         "##,
-        username = escape_html_text(user.username),
         email = escape_html_text(user.email),
         sign_out = icon(Icon::SignOut, BUTTON_ICON),
-        avatar = avatar_bubble(user.avatar_url, user.username, AvatarSize::Bar),
+        chip = account_chip(user, FragmentSwap::Inline),
     )
 }
 
-/// The top bar's avatar on its own, swapped out of band after the account's picture changes.
+/// Who the top bar says you are: your name, your address and your face, as one fragment.
 ///
-/// The bar is the one piece of chrome an htmx swap never replaces, so without this the reader
-/// would keep seeing their old face until the next full page load.
-pub fn account_avatar_oob(username: &str, avatar_url: Option<&AvatarUrl>) -> String {
+/// The three are swapped together rather than separately because they are one claim -- a rename
+/// that reached the avatar but not the name beside it would leave the bar contradicting itself.
+///
+/// Rendered out of band after the account is saved, because the bar is the one piece of chrome an
+/// htmx swap never replaces: without it the reader keeps seeing their old name until the next full
+/// page load.
+pub fn account_chip(user: &MailboxUser<'_>, swap: FragmentSwap) -> String {
     format!(
-        r##"<div id="account-avatar" hx-swap-oob="outerHTML">{avatar}</div>"##,
-        avatar = avatar_bubble(avatar_url, username, AvatarSize::Bar),
+        r##"<div id="account-chip" class="flex items-center gap-3"{oob}>
+                            <div class="hidden text-right leading-tight sm:block">
+                                <div class="text-sm font-semibold">{username}</div>
+                                <div class="text-[11px] font-normal opacity-60">{email}</div>
+                            </div>
+                            {avatar}
+                        </div>"##,
+        oob = swap.oob_attribute(),
+        username = escape_html_text(user.username),
+        email = escape_html_text(user.email),
+        avatar = avatar_bubble(user.avatar_url, user.username, AvatarSize::Bar),
     )
 }
 

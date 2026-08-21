@@ -437,6 +437,22 @@ mod tests {
         ) -> AppResult<Option<crate::entities::user::User>> {
             Ok(None)
         }
+
+        async fn update_profile(
+            &self,
+            _: uuid::Uuid,
+            _: crate::use_cases::user::ProfileUpdate<'_>,
+        ) -> AppResult<Option<crate::entities::user::User>> {
+            Ok(None)
+        }
+
+        async fn update_password_hash(
+            &self,
+            _: uuid::Uuid,
+            _: &str,
+        ) -> AppResult<Option<crate::entities::user::User>> {
+            Ok(None)
+        }
     }
 
     struct StubHasher;

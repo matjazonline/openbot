@@ -283,10 +283,14 @@ async fn set_member_avatar(
     // Re-read the member so the pane and the sidebar both show what was just stored, and send the
     // top bar's own avatar along -- it is chrome no pane swap would otherwise touch.
     let member = view.member(user_id).await?;
+    let saved_email = EmailAddress::from(saved.email.as_str());
     let pane = format!(
         "{}{}",
         view.member_pane(&member, None),
-        pages::account_avatar_oob(&saved.username, saved.avatar_url.as_ref()),
+        pages::account_chip(
+            &workspace_user(&saved, &saved_email),
+            pages::FragmentSwap::OutOfBand,
+        ),
     );
 
     view.saved_response(TeamSelection::Member(user_id), pane)

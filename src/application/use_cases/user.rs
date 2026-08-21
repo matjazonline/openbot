@@ -19,6 +19,11 @@ use crate::{
 
 const CONFIRMATION_TTL_MINUTES: i64 = 15;
 
+/// The shortest password a *change* will store. Deliberately stricter than what registration
+/// grandfathered in: raising the floor for an account that is already signed in costs its owner
+/// one longer password, and refusing to lower it costs nobody anything.
+pub const MIN_PASSWORD_CHARS: usize = 8;
+
 pub struct PendingRegistration<'a> {
     pub username: &'a str,
     pub email: &'a EmailAddress,
@@ -42,6 +47,28 @@ pub enum RegistrationOutcome {
     ConfirmationSent,
 }
 
+/// The account fields their owner may edit, as one value rather than three parameters: two of
+/// them are strings, and a swapped pair would write an address into the name column silently.
+#[derive(Debug)]
+pub struct ProfileUpdate<'a> {
+    pub username: &'a str,
+    pub email: &'a EmailAddress,
+    /// The profile picture, or `None` for the letter bubble. Already parsed -- see
+    /// [`AvatarUrl::parse`], which runs where the form is read.
+    pub avatar_url: Option<&'a AvatarUrl>,
+}
+
+/// A password change as its form submits it: what the account currently has, and what it should
+/// have twice over.
+///
+/// The current password is what authorizes the change -- a session alone must not be enough, or a
+/// borrowed browser is a taken account.
+pub struct PasswordChange<'a> {
+    pub current: &'a SecretString,
+    pub new: &'a SecretString,
+    pub confirmation: &'a SecretString,
+}
+
 #[async_trait]
 pub trait UserPersistence: Send + Sync {
     /// Stores a new account and returns it, so a caller that has just registered somebody can
@@ -63,6 +90,15 @@ pub trait UserPersistence: Send + Sync {
         id: Uuid,
         avatar_url: Option<&AvatarUrl>,
     ) -> AppResult<Option<User>>;
+
+    /// Stores the identity fields the account owner may edit, all in one write so a rejected
+    /// address cannot leave a renamed account behind. `Ok(None)` means no such user.
+    async fn update_profile(&self, id: Uuid, profile: ProfileUpdate<'_>)
+    -> AppResult<Option<User>>;
+
+    /// Stores an already-hashed password. Takes the hash rather than the password so the plaintext
+    /// never reaches the adapter layer. `Ok(None)` means no such user.
+    async fn update_password_hash(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>>;
 }
 
 pub trait UserCredentialsHasher: Send + Sync {
@@ -215,6 +251,83 @@ impl UserUseCases {
         self.persistence.get_by_id(id).await
     }
 
+    /// Saves the account's own details: what it is called, where its mail goes, and its picture.
+    ///
+    /// Name and address are trimmed and checked here rather than at the form, so the API and the
+    /// page cannot disagree about what an acceptable account looks like. Whether the address is
+    /// already somebody else's is the database's call -- see the unique constraints on `users` --
+    /// because a check made here would be a check made before the row it guards.
+    #[instrument(skip(self))]
+    pub async fn update_profile(&self, id: Uuid, profile: ProfileUpdate<'_>) -> AppResult<User> {
+        let username = profile.username.trim();
+        let email = EmailAddress::from(profile.email.trim());
+
+        if username.is_empty() {
+            return Err(AppError::BadRequest("A username is required.".into()));
+        }
+        if !is_plausible_address(&email) {
+            return Err(AppError::BadRequest(
+                "Enter an email address of the form name@example.com.".into(),
+            ));
+        }
+
+        info!("Updating profile for user {id}...");
+
+        self.persistence
+            .update_profile(
+                id,
+                ProfileUpdate {
+                    username,
+                    email: &email,
+                    avatar_url: profile.avatar_url,
+                },
+            )
+            .await?
+            .ok_or_else(|| AppError::NotFound("User not found".into()))
+    }
+
+    /// Replaces the account's password, once the account has proved it knows the current one.
+    ///
+    /// Every rejection here propagates: an error reaching the hasher or the store must not be
+    /// mistaken for "the password did not match", nor for a change that went through.
+    #[instrument(skip(self, change))]
+    pub async fn change_password(&self, id: Uuid, change: PasswordChange<'_>) -> AppResult<()> {
+        let user = self
+            .persistence
+            .get_by_id(id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("User not found".into()))?;
+
+        if !self
+            .hasher
+            .verify_password(change.current.expose_secret(), &user.password_hash)?
+        {
+            return Err(AppError::InvalidCredentials);
+        }
+
+        let new_password = change.new.expose_secret();
+        if new_password.chars().count() < MIN_PASSWORD_CHARS {
+            return Err(AppError::BadRequest(format!(
+                "A new password needs at least {MIN_PASSWORD_CHARS} characters."
+            )));
+        }
+        if new_password != change.confirmation.expose_secret() {
+            return Err(AppError::BadRequest(
+                "The new password and its confirmation do not match.".into(),
+            ));
+        }
+
+        info!("Changing password for user {id}...");
+
+        let hash = self.hasher.hash_password(new_password)?;
+        self.persistence
+            .update_password_hash(id, &hash)
+            .await?
+            .ok_or_else(|| AppError::NotFound("User not found".into()))?;
+
+        Ok(())
+    }
+
     /// Points the account at a new profile picture, or back at its letter bubble with `None`.
     ///
     /// The URL arrives already parsed: [`AvatarUrl::parse`] is what rejects a scheme no `<img>`
@@ -228,6 +341,23 @@ impl UserUseCases {
             .await?
             .ok_or_else(|| AppError::NotFound("User not found".into()))
     }
+}
+
+/// Whether an address is shaped like one at all: exactly one `@`, with something either side and
+/// a dot in the domain. Deliverability is the mail server's answer, not ours -- this only catches
+/// the typo that would otherwise be stored as somebody's login.
+fn is_plausible_address(email: &EmailAddress) -> bool {
+    let mut parts = email.splitn(2, '@');
+    let (Some(local), Some(domain)) = (parts.next(), parts.next()) else {
+        return false;
+    };
+
+    !local.is_empty()
+        && !domain.contains('@')
+        && domain.contains('.')
+        && !domain.starts_with('.')
+        && !domain.ends_with('.')
+        && !email.contains(char::is_whitespace)
 }
 
 fn confirmation_number() -> u32 {
@@ -252,7 +382,29 @@ mod test {
 
     use super::*;
 
-    struct MockUserPersistence;
+    /// The stored account, so a write is observable by the read that follows it.
+    struct MockUserPersistence {
+        stored: std::sync::Mutex<User>,
+    }
+
+    impl MockUserPersistence {
+        fn new() -> Self {
+            Self {
+                stored: std::sync::Mutex::new(User {
+                    id: Uuid::new_v4(),
+                    username: "testuser".to_string(),
+                    email: "testuser@gmail.com".to_string(),
+                    password_hash: "secret_hash".to_string(),
+                    avatar_url: None,
+                    created_at: chrono::Utc::now(),
+                }),
+            }
+        }
+
+        fn id(&self) -> Uuid {
+            self.stored.lock().unwrap().id
+        }
+    }
 
     #[async_trait]
     impl UserPersistence for MockUserPersistence {
@@ -306,29 +458,39 @@ mod test {
         }
 
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<User>> {
-            Ok(Some(User {
-                id: Uuid::new_v4(),
-                username: "testuser".to_string(),
-                email: "testuser@gmail.com".to_string(),
-                password_hash: "secret_hash".to_string(),
-                avatar_url: None,
-                created_at: chrono::Utc::now(),
-            }))
+            Ok(Some(self.stored.lock().unwrap().clone()))
         }
 
         async fn update_avatar_url(
             &self,
-            id: Uuid,
+            _id: Uuid,
             avatar_url: Option<&AvatarUrl>,
         ) -> AppResult<Option<User>> {
-            Ok(Some(User {
-                id,
-                username: "testuser".to_string(),
-                email: "testuser@gmail.com".to_string(),
-                password_hash: "secret_hash".to_string(),
-                avatar_url: avatar_url.cloned(),
-                created_at: chrono::Utc::now(),
-            }))
+            let mut stored = self.stored.lock().unwrap();
+            stored.avatar_url = avatar_url.cloned();
+            Ok(Some(stored.clone()))
+        }
+
+        async fn update_profile(
+            &self,
+            _id: Uuid,
+            profile: ProfileUpdate<'_>,
+        ) -> AppResult<Option<User>> {
+            let mut stored = self.stored.lock().unwrap();
+            stored.username = profile.username.to_string();
+            stored.email = profile.email.to_string();
+            stored.avatar_url = profile.avatar_url.cloned();
+            Ok(Some(stored.clone()))
+        }
+
+        async fn update_password_hash(
+            &self,
+            _id: Uuid,
+            password_hash: &str,
+        ) -> AppResult<Option<User>> {
+            let mut stored = self.stored.lock().unwrap();
+            stored.password_hash = password_hash.to_string();
+            Ok(Some(stored.clone()))
         }
     }
 
@@ -349,7 +511,7 @@ mod test {
     async fn add_user_works() {
         let user_use_cases = UserUseCases::new(
             Arc::new(MockUserCredentialsHasher),
-            Arc::new(MockUserPersistence),
+            Arc::new(MockUserPersistence::new()),
         );
 
         let user = user_use_cases
@@ -361,11 +523,132 @@ mod test {
         assert_eq!(user.email, "testuser@gmail.com");
     }
 
+    fn use_cases(persistence: Arc<MockUserPersistence>) -> UserUseCases {
+        UserUseCases::new(Arc::new(MockUserCredentialsHasher), persistence)
+    }
+
+    #[tokio::test]
+    async fn updating_a_profile_trims_and_stores_every_field() {
+        let persistence = Arc::new(MockUserPersistence::new());
+        let id = persistence.id();
+
+        let saved = use_cases(persistence)
+            .update_profile(
+                id,
+                ProfileUpdate {
+                    username: "  renamed  ",
+                    email: &EmailAddress::from("  new@example.com  "),
+                    avatar_url: Some(&AvatarUrl::from("https://cdn.example.com/me.png")),
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(saved.username, "renamed");
+        assert_eq!(saved.email, "new@example.com");
+        assert_eq!(
+            saved.avatar_url.as_deref(),
+            Some("https://cdn.example.com/me.png")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_profile_needs_a_name_and_an_address_shaped_like_one() {
+        let persistence = Arc::new(MockUserPersistence::new());
+        let id = persistence.id();
+        let use_cases = use_cases(persistence);
+
+        for (username, email) in [("   ", "fine@example.com"), ("named", "not-an-address")] {
+            let rejected = use_cases
+                .update_profile(
+                    id,
+                    ProfileUpdate {
+                        username,
+                        email: &EmailAddress::from(email),
+                        avatar_url: None,
+                    },
+                )
+                .await;
+
+            assert!(
+                matches!(rejected, Err(AppError::BadRequest(_))),
+                "{username}/{email} should have been refused, got {rejected:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn changing_a_password_rehashes_it_only_for_whoever_knows_the_current_one() {
+        let persistence = Arc::new(MockUserPersistence::new());
+        let id = persistence.id();
+        let use_cases = use_cases(persistence.clone());
+
+        let wrong_current = use_cases
+            .change_password(
+                id,
+                PasswordChange {
+                    current: &"not-the-password".into(),
+                    new: &"a-longer-secret".into(),
+                    confirmation: &"a-longer-secret".into(),
+                },
+            )
+            .await;
+        assert!(matches!(wrong_current, Err(AppError::InvalidCredentials)));
+
+        use_cases
+            .change_password(
+                id,
+                PasswordChange {
+                    current: &"secret".into(),
+                    new: &"a-longer-secret".into(),
+                    confirmation: &"a-longer-secret".into(),
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            persistence.stored.lock().unwrap().password_hash,
+            "a-longer-secret_hash"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_new_password_must_be_long_enough_and_confirmed() {
+        let persistence = Arc::new(MockUserPersistence::new());
+        let id = persistence.id();
+        let use_cases = use_cases(persistence.clone());
+
+        for (new, confirmation) in [("short", "short"), ("a-longer-secret", "a-longer-secrat")] {
+            let rejected = use_cases
+                .change_password(
+                    id,
+                    PasswordChange {
+                        current: &"secret".into(),
+                        new: &new.into(),
+                        confirmation: &confirmation.into(),
+                    },
+                )
+                .await;
+
+            assert!(
+                matches!(rejected, Err(AppError::BadRequest(_))),
+                "{new}/{confirmation} should have been refused, got {rejected:?}"
+            );
+        }
+
+        assert_eq!(
+            persistence.stored.lock().unwrap().password_hash,
+            "secret_hash",
+            "a refused change must leave the stored password alone"
+        );
+    }
+
     #[tokio::test]
     async fn login_user_works() {
         let user_use_cases = UserUseCases::new(
             Arc::new(MockUserCredentialsHasher),
-            Arc::new(MockUserPersistence),
+            Arc::new(MockUserPersistence::new()),
         );
 
         let user = user_use_cases
