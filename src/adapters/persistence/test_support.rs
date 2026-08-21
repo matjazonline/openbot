@@ -23,10 +23,28 @@
 //! naming the fix, because that is a broken setup silently reporting success.
 
 use sqlx::PgPool;
-use tokio::sync::OnceCell;
+use tokio::sync::{Mutex, OnceCell};
 
 /// The suffix that separates the tests' database from the one you develop against.
 const TEST_DB_SUFFIX: &str = "_test";
+
+/// Serialises tests that exercise an *unscoped* queue claim.
+///
+/// A separate database keeps the tests away from a running server, but it does nothing about the
+/// tests themselves: they share one database and `cargo test` runs them in parallel. A claim like
+/// `claim_and_advance_due_schedules` sweeps every due row up to its batch size *and advances what
+/// it takes*, so two tests that each queue one row and assert their own comes back cannot overlap
+/// — whichever claims first carries off both rows, and the other fails on a row that was claimed,
+/// just not by it.
+///
+/// Nothing about the ordering or the batch size fixes that, which is what separates this from the
+/// crowding a test can fix on its own (`an_expired_delivery_lease_costs_an_attempt_and_reaches_the_cap`
+/// sorts its row to the front and claims with a limit of 1). Here the row is *consumed* by the
+/// other claim, so the two simply have to not run at the same time.
+///
+/// Hold it from before the row is queued until after the claim under test. It is a
+/// [`tokio::sync::Mutex`], so a panicking test releases it without poisoning it for the rest.
+pub static UNSCOPED_CLAIM: Mutex<()> = Mutex::const_new(());
 
 /// Migrations run once per test binary, not once per test.
 static MIGRATED: OnceCell<()> = OnceCell::const_new();
@@ -73,6 +91,42 @@ fn with_test_database_name(url: &str) -> String {
     }
 }
 
+/// Clear what earlier runs left behind, once per test binary.
+///
+/// Tests build their fixtures — a user, a company, a channel, some queue rows — and delete them on
+/// the way out, but a test that panics never reaches its cleanup. Companies at least cascade when
+/// a later run deletes them; `users` never does, because *nothing in this codebase deletes a user
+/// row at all*. So every panicking run leaked a handful of users permanently, and the table had
+/// grown to some 4,600 rows across roughly 200 runs before this existed.
+///
+/// That debris is not inert. These queue claims are unscoped, so leftover rows are exactly the
+/// neighbours that make a claim-and-assert test flaky — the failure this was written alongside.
+///
+/// `TRUNCATE ... CASCADE` over every table but the migration ledger, rather than a curated list of
+/// `DELETE`s in dependency order: it cannot go stale as tables are added, and it cannot silently
+/// half-clean because someone forgot that `companies.user_id` is `ON DELETE RESTRICT`.
+///
+/// It runs *before* the suite rather than after it, which is deliberate: the wreckage of a failed
+/// run stays on the database for you to inspect until the next run starts.
+async fn purge_fixtures(pool: &PgPool) {
+    sqlx::query(
+        r#"DO $$
+           DECLARE tables text;
+           BEGIN
+               SELECT string_agg(format('%I', tablename), ', ')
+                 INTO tables
+                 FROM pg_tables
+                WHERE schemaname = 'public' AND tablename <> '_sqlx_migrations';
+               IF tables IS NOT NULL THEN
+                   EXECUTE 'TRUNCATE TABLE ' || tables || ' CASCADE';
+               END IF;
+           END $$"#,
+    )
+    .execute(pool)
+    .await
+    .expect("the test database can be cleared between runs");
+}
+
 /// A pool against the test database, with migrations applied, or `None` when unconfigured.
 ///
 /// Panics if a database was configured but cannot be reached — see the module docs.
@@ -95,6 +149,7 @@ pub async fn test_pool() -> Option<PgPool> {
                 .run(&pool)
                 .await
                 .expect("the test database accepts this checkout's migrations");
+            purge_fixtures(&pool).await;
         })
         .await;
 

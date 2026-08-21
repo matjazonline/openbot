@@ -487,7 +487,7 @@ impl SchedulePersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::persistence::test_support::test_pool;
+    use crate::adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool};
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
         company::CompanyPersistence,
@@ -501,6 +501,9 @@ mod tests {
         let Some(pool) = test_pool().await else {
             return;
         };
+        // Held for the whole test: `claim_and_advance_due_schedules` is unscoped, and the sibling
+        // test below queues a due row of its own. See [`UNSCOPED_CLAIM`].
+        let _claim_guard = UNSCOPED_CLAIM.lock().await;
 
         let persistence = PostgresPersistence::new(pool.clone());
 
@@ -610,6 +613,9 @@ mod tests {
         let Some(pool) = test_pool().await else {
             return;
         };
+        // Held for the whole test: `claim_and_advance_due_schedules` is unscoped, and the sibling
+        // test above queues a due row of its own. See [`UNSCOPED_CLAIM`].
+        let _claim_guard = UNSCOPED_CLAIM.lock().await;
 
         let persistence = PostgresPersistence::new(pool);
 

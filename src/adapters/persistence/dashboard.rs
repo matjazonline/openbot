@@ -539,9 +539,71 @@ mod tests {
     use crate::entities::task::{
         TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus, TokenUsage,
     };
+    use crate::use_cases::{
+        channel::{ChannelPersistence, ChannelWrite},
+        company::CompanyPersistence,
+        user::UserPersistence,
+    };
 
     async fn test_persistence() -> Option<PostgresPersistence> {
         Some(PostgresPersistence::new(test_pool().await?))
+    }
+
+    /// A company and a task of this test's own, for the attempt-ledger tests below.
+    ///
+    /// `task_attempts.task_id` is a foreign key, so those tests need a task that exists. They used
+    /// to take whichever task happened to already be in the database and return early when there
+    /// was none — which meant they reported success while asserting nothing the moment the table
+    /// was empty, and the table is empty at the start of every run now. Owning the fixture keeps
+    /// them honest and scopes them to a company nothing else touches.
+    async fn task_fixture(persistence: &PostgresPersistence, label: &str) -> (Uuid, Uuid) {
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("{label}_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .expect("the fixture user is created");
+        let owner = UserPersistence::get_by_email(persistence, &email)
+            .await
+            .expect("the fixture user is readable")
+            .expect("the fixture user was just created");
+        let company = CompanyPersistence::create(
+            persistence,
+            owner.id,
+            "Dashboard Test",
+            &format!("{label}-{suffix}"),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("the fixture company is created");
+        let channel = ChannelPersistence::create(
+            persistence,
+            company.id,
+            ChannelWrite {
+                name: "Dashboard".into(),
+                slug: "dashboard".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .expect("the fixture channel is created");
+        let task = persistence
+            .enqueue_task(
+                company.id,
+                channel.id,
+                None,
+                "dashboard-probe",
+                serde_json::json!({}),
+            )
+            .await
+            .expect("the fixture task is queued");
+
+        (task.id, company.id)
     }
 
     #[tokio::test]
@@ -593,13 +655,7 @@ mod tests {
             return;
         };
 
-        let task_id: Option<Uuid> = sqlx::query_scalar("SELECT id FROM background_tasks LIMIT 1")
-            .fetch_optional(persistence.pool())
-            .await
-            .expect("background_tasks is readable");
-        let Some(task_id) = task_id else {
-            return;
-        };
+        let (task_id, company) = task_fixture(&persistence, "latency").await;
 
         let attempt = TaskAttemptRef {
             task_id,
@@ -619,13 +675,6 @@ mod tests {
             .await
             .expect("the ledger row closes");
 
-        let company: Uuid =
-            sqlx::query_scalar("SELECT company_id FROM background_tasks WHERE id = $1")
-                .bind(task_id)
-                .fetch_one(persistence.pool())
-                .await
-                .expect("the task's company is readable");
-
         // Scoped to this task's company so a neighbouring test cannot empty the window from under
         // it — the assertion needs at least one finished attempt to be there.
         let snapshot = persistence
@@ -639,12 +688,9 @@ mod tests {
             snapshot.attempts
         );
 
-        sqlx::query("DELETE FROM task_attempts WHERE task_id = $1 AND attempt_number = $2")
-            .bind(task_id)
-            .bind(9_998_i32)
-            .execute(persistence.pool())
+        CompanyPersistence::delete(&persistence, company)
             .await
-            .expect("the probe row is removed");
+            .expect("the fixture company is removed");
     }
 
     #[tokio::test]
@@ -653,15 +699,7 @@ mod tests {
             return;
         };
 
-        // Borrow a real task: `task_attempts.task_id` is a foreign key, so this needs one that
-        // exists. Without any task in the database there is nothing to assert against.
-        let task_id: Option<Uuid> = sqlx::query_scalar("SELECT id FROM background_tasks LIMIT 1")
-            .fetch_optional(persistence.pool())
-            .await
-            .expect("background_tasks is readable");
-        let Some(task_id) = task_id else {
-            return;
-        };
+        let (task_id, company) = task_fixture(&persistence, "ledger").await;
 
         // A number far above any real retry count, so this test cannot collide with live rows.
         let attempt = TaskAttemptRef {
@@ -720,11 +758,8 @@ mod tests {
             "the superseded run's token count must not be left behind on the new attempt"
         );
 
-        sqlx::query("DELETE FROM task_attempts WHERE task_id = $1 AND attempt_number = $2")
-            .bind(task_id)
-            .bind(9_999_i32)
-            .execute(persistence.pool())
+        CompanyPersistence::delete(&persistence, company)
             .await
-            .expect("the probe row is removed");
+            .expect("the fixture company is removed");
     }
 }
