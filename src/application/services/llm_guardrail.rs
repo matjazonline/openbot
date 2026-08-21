@@ -183,6 +183,7 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false, // Default false in env
+            secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
         };

@@ -8,7 +8,8 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         channel::{Channel, PUBLIC_PARTICIPANT},
-        company::Company,
+        company::{Company, CompanyAccess},
+        user::Viewer,
         value_objects::{ChannelSlug, CompanySlug},
     },
     infra::config::AppConfig,
@@ -209,6 +210,64 @@ impl ChannelUseCases {
             .await
     }
 
+    /// Every channel of `company_id` this viewer may read.
+    ///
+    /// The read counterpart of [`ChannelUseCases::list_company_channels`]: that one is for the
+    /// pages that *configure* channels and stays owner-only, this one is what the mailbox lists,
+    /// and a restricted channel simply is not in it for a colleague who is not a participant.
+    #[instrument(skip(self))]
+    pub async fn list_readable_channels(
+        &self,
+        viewer: &Viewer,
+        company_id: Uuid,
+    ) -> AppResult<Vec<Channel>> {
+        let Some(access) = self.viewer_access(viewer, company_id).await? else {
+            return Ok(Vec::new());
+        };
+
+        Ok(self
+            .channel_persistence
+            .list_by_company_id(company_id)
+            .await?
+            .into_iter()
+            .filter(|channel| channel.viewer_access(&viewer.email, access.membership))
+            .collect())
+    }
+
+    /// One channel, if this viewer may read it.
+    ///
+    /// Answers `None` for "no such channel", "not your company" and "not yours to read" alike:
+    /// telling them apart would let anyone probe ids to learn which channels a company runs.
+    #[instrument(skip(self))]
+    pub async fn get_readable_channel(
+        &self,
+        viewer: &Viewer,
+        company_id: Uuid,
+        channel_id: Uuid,
+    ) -> AppResult<Option<Channel>> {
+        let Some(access) = self.viewer_access(viewer, company_id).await? else {
+            return Ok(None);
+        };
+
+        let channel = self.channel_persistence.get_by_id(channel_id).await?;
+
+        Ok(channel.filter(|channel| {
+            channel.company_id == company_id
+                && channel.viewer_access(&viewer.email, access.membership)
+        }))
+    }
+
+    /// What the viewer is to a company, or `None` if they are nothing to it.
+    async fn viewer_access(
+        &self,
+        viewer: &Viewer,
+        company_id: Uuid,
+    ) -> AppResult<Option<CompanyAccess>> {
+        self.company_persistence
+            .company_access(viewer.user_id, company_id)
+            .await
+    }
+
     #[instrument(skip(self))]
     pub async fn get_company_channel(
         &self,
@@ -313,28 +372,18 @@ impl ChannelUseCases {
 
                 let sender_email = extract_email_address(&email.from);
 
-                let sender_authorized =
-                    if let (Some(comp), Some(ch)) = (company.as_ref(), channel.as_ref()) {
-                        match &ch.participant_emails {
-                            Some(allowed_emails) if !allowed_emails.is_empty() => {
-                                let is_public = allowed_emails
-                                    .iter()
-                                    .any(|e| e.trim().eq_ignore_ascii_case("@public"));
-                                let explicitly_listed = allowed_emails.iter().any(|e| {
-                                    !e.trim().eq_ignore_ascii_case("@public")
-                                        && e.eq_ignore_ascii_case(&sender_email)
-                                });
-                                is_public || explicitly_listed
-                            }
-                            _ => self
-                                .company_persistence
-                                .is_company_team_member(comp.id, &sender_email)
-                                .await
-                                .unwrap_or(false),
-                        }
-                    } else {
-                        false
-                    };
+                // The same verdict the real inbound path reaches, from the same method: a preview
+                // that re-implemented the participant rule would drift out of sync with it.
+                let sender_authorized = match (company.as_ref(), channel.as_ref()) {
+                    (Some(comp), Some(ch)) => {
+                        let membership = self
+                            .company_persistence
+                            .membership_for_email(comp.id, &sender_email)
+                            .await?;
+                        ch.participant_access(&sender_email, membership).authorized
+                    }
+                    _ => false,
+                };
 
                 let resolved = company.is_some() && channel.is_some() && sender_authorized;
 
@@ -630,6 +679,7 @@ pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<Ch
 mod tests {
     use super::*;
     use crate::entities::company::Company;
+    use crate::entities::company_member::CompanyMembership;
     use crate::entities::value_objects::EmailAddress;
     use chrono::Utc;
     use serde_json::json;
@@ -695,8 +745,12 @@ mod tests {
             unimplemented!()
         }
 
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
-            Ok(true)
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
         }
 
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
@@ -817,6 +871,7 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
         })

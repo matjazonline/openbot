@@ -11,6 +11,7 @@ pub mod schedule;
 pub mod task;
 pub mod ui;
 pub mod ui_agents;
+pub mod ui_attachments;
 pub mod ui_channels;
 pub mod ui_companies;
 pub mod ui_dashboard;
@@ -22,9 +23,11 @@ pub mod ui_uploads;
 pub mod user;
 pub mod webhooks;
 
+use std::sync::Arc;
+
 use axum::{Router, middleware};
 
-use crate::adapters::http::{app_state::AppState, auth};
+use crate::adapters::http::{app_state::AppState, auth, session::SessionAuthority};
 use crate::app_error::AppError;
 
 /// What an htmx fragment shows when the company behind a request cannot be loaded.
@@ -40,7 +43,12 @@ pub(super) fn company_load_error(error: &AppError) -> String {
     }
 }
 
-pub fn router() -> Router<AppState> {
+/// Every route in the app.
+///
+/// Takes the [`SessionAuthority`] rather than reaching for it through `AppState`, because the auth
+/// middleware is a layer rather than a handler: it is applied while the router is still stateless,
+/// so what it needs to verify a cookie has to be handed to it here.
+pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
     let protected = Router::new()
         .merge(user::protected_router())
         .merge(company::router())
@@ -54,6 +62,7 @@ pub fn router() -> Router<AppState> {
         .merge(onboarding::router())
         .merge(ui::router())
         .merge(ui_agents::router())
+        .merge(ui_attachments::router())
         .merge(ui_channels::router())
         .merge(ui_schedules::router())
         .merge(ui_companies::router())
@@ -62,7 +71,7 @@ pub fn router() -> Router<AppState> {
         .merge(ui_tasks::router())
         .merge(ui_team::router())
         .merge(ui_uploads::router())
-        .route_layer(middleware::from_fn(auth::require_auth));
+        .route_layer(middleware::from_fn_with_state(sessions, auth::require_auth));
 
     Router::new()
         .merge(health::router())

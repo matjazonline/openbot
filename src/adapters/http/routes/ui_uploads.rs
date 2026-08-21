@@ -207,10 +207,7 @@ async fn read_upload(mut multipart: Multipart) -> Result<(AvatarFieldForm, Vec<u
 mod tests {
     use axum::{body::Body, extract::FromRequest, http::Request};
 
-    use crate::{
-        app_error::{AppError, AppResult},
-        entities::value_objects::ObjectUrl,
-    };
+    use crate::adapters::storage::test_support::FakeStorage;
 
     use super::*;
 
@@ -258,43 +255,6 @@ mod tests {
             .expect("axum reads its own multipart")
     }
 
-    /// A bucket that remembers what it was asked to store.
-    struct FakeStorage {
-        answer: Result<ObjectUrl, AppError>,
-        stored: std::sync::Mutex<Vec<(ObjectKey, usize)>>,
-    }
-
-    impl FakeStorage {
-        fn returning(url: &str) -> Self {
-            Self {
-                answer: Ok(ObjectUrl::new(url)),
-                stored: std::sync::Mutex::new(Vec::new()),
-            }
-        }
-
-        fn failing() -> Self {
-            Self {
-                answer: Err(AppError::Internal("bucket on fire".into())),
-                stored: std::sync::Mutex::new(Vec::new()),
-            }
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl FileStorage for FakeStorage {
-        async fn upload_image(&self, key: &ObjectKey, image: &ImageUpload) -> AppResult<ObjectUrl> {
-            self.stored
-                .lock()
-                .expect("no test panics while holding this")
-                .push((key.clone(), image.bytes().len()));
-
-            self.answer
-                .as_ref()
-                .map(Clone::clone)
-                .map_err(|err| AppError::Internal(err.to_string()))
-        }
-    }
-
     #[tokio::test]
     async fn the_picked_file_and_the_fields_around_it_are_read_in_one_pass() {
         let multipart = multipart_body(&[
@@ -333,13 +293,16 @@ mod tests {
 
         // It went to a generated key in the configured folder, with the extension of what it
         // actually is rather than of what it was called.
-        let stored_keys = storage.stored.lock().expect("no panics");
-        let (key, size) = stored_keys.first().expect("one upload");
+        let stored = storage.objects();
+        let stored = stored.first().expect("one upload");
         assert!(
-            key.starts_with("avatars/") && key.ends_with(".png"),
-            "{key}"
+            stored.key.starts_with("avatars/") && stored.key.ends_with(".png"),
+            "{}",
+            stored.key
         );
-        assert_eq!(*size, png().len());
+        assert_eq!(stored.bytes.len(), png().len());
+        // An avatar is the one thing that belongs in the bucket anyone can read.
+        assert_eq!(stored.bucket, crate::adapters::storage::BucketKind::Public);
     }
 
     #[tokio::test]
@@ -351,7 +314,7 @@ mod tests {
             .expect_err("not a picture");
 
         assert!(refusal.contains("PNG, JPEG, GIF or WebP"), "{refusal}");
-        assert!(storage.stored.lock().expect("no panics").is_empty());
+        assert!(storage.objects().is_empty());
     }
 
     #[tokio::test]

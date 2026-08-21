@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::{agent::Agent, value_objects::AvatarUrl},
+    entities::{agent::Agent, user::Viewer, value_objects::AvatarUrl},
     use_cases::{
         channel::{SlugKind, validate_slug},
         company::{CompanyPersistence, owned_company},
@@ -160,6 +160,35 @@ impl AgentUseCases {
             }
         }
         Ok(agent)
+    }
+
+    /// One agent, if this viewer is on the company's team.
+    ///
+    /// The read counterpart of [`AgentUseCases::get_company_agent`]: that one is for the pages
+    /// that *configure* agents and stays owner-only, this one is what a rendered thread names as
+    /// its responder, and an invited member reads that just as the owner does. Which channels the
+    /// member may read at all is `Channel::viewer_access`'s question, asked before this one.
+    #[instrument(skip(self))]
+    pub async fn get_readable_agent(
+        &self,
+        viewer: &Viewer,
+        company_id: Uuid,
+        agent_id: Uuid,
+    ) -> AppResult<Option<Agent>> {
+        let is_team = self
+            .company_persistence
+            .company_access(viewer.user_id, company_id)
+            .await?
+            .is_some_and(|access| access.membership.is_team());
+        if !is_team {
+            return Ok(None);
+        }
+
+        Ok(self
+            .agent_persistence
+            .get_by_id(agent_id)
+            .await?
+            .filter(|agent| agent.company_id == company_id))
     }
 
     #[instrument(skip(self))]
@@ -442,13 +471,19 @@ fn environment_api_key(provider: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::company::Company;
+    use crate::entities::{
+        company::{Company, CompanyAccess},
+        company_member::CompanyMembership,
+        value_objects::EmailAddress,
+    };
     use chrono::Utc;
     use serde_json::json;
     use std::sync::Mutex;
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
+        /// Accounts that hold an accepted invite to a company, as `(user_id, company_id)`.
+        members: Mutex<Vec<(Uuid, Uuid)>>,
     }
 
     #[async_trait]
@@ -486,8 +521,39 @@ mod tests {
                 .cloned())
         }
 
-        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
-            unimplemented!()
+        async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
+            Ok(self
+                .companies
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|c| c.user_id == user_id)
+                .cloned()
+                .collect())
+        }
+
+        async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
+            let companies = self.companies.lock().unwrap();
+            let members = self.members.lock().unwrap();
+            Ok(companies
+                .iter()
+                .filter_map(|company| {
+                    let membership = if company.user_id == user_id {
+                        CompanyMembership::Owner
+                    } else if members
+                        .iter()
+                        .any(|(u, c)| *u == user_id && *c == company.id)
+                    {
+                        CompanyMembership::Member
+                    } else {
+                        return None;
+                    };
+                    Some(CompanyAccess {
+                        company: company.clone(),
+                        membership,
+                    })
+                })
+                .collect())
         }
 
         async fn update(
@@ -507,8 +573,12 @@ mod tests {
             unimplemented!()
         }
 
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
-            Ok(true)
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
         }
 
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
@@ -627,6 +697,7 @@ mod tests {
         let company_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence {
+            members: Mutex::new(Vec::new()),
             companies: Mutex::new(vec![Company {
                 id: company_id,
                 user_id: owner_id,
@@ -782,5 +853,117 @@ Guidelines:
         );
 
         assert!(ai_agents::AgentBuilder::from_yaml(&config_yaml).is_ok());
+    }
+
+    /// The read-scoped lookup exists so an invited member sees the agent answering the threads
+    /// they may read; it must still stop at the company's edge and stay read-only.
+    #[tokio::test]
+    async fn a_member_reads_the_agent_a_stranger_cannot() {
+        let owner_id = Uuid::new_v4();
+        let member_id = Uuid::new_v4();
+        let stranger_id = Uuid::new_v4();
+        let company_id = Uuid::new_v4();
+        let other_company_id = Uuid::new_v4();
+
+        let company = |id: Uuid, user_id: Uuid, slug: &str| Company {
+            id,
+            user_id,
+            name: "Acme Corp".to_string(),
+            slug: slug.into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            created_at: Utc::now(),
+        };
+
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![
+                company(company_id, owner_id, "acme"),
+                company(other_company_id, Uuid::new_v4(), "other"),
+            ]),
+            members: Mutex::new(vec![(member_id, company_id)]),
+        });
+        let agent_persistence = Arc::new(MockAgentPersistence {
+            agents: Mutex::new(Vec::new()),
+        });
+        let use_cases = AgentUseCases::new(company_persistence, agent_persistence);
+
+        let agent = use_cases
+            .create_agent(
+                owner_id,
+                company_id,
+                "Support Bot",
+                "support-bot",
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await
+            .expect("the owner creates the agent");
+
+        let viewer = |user_id: Uuid, email: &str| Viewer {
+            user_id,
+            email: EmailAddress::from(email),
+        };
+
+        // The member reads it, exactly as the owner does.
+        assert_eq!(
+            use_cases
+                .get_readable_agent(
+                    &viewer(member_id, "member@example.com"),
+                    company_id,
+                    agent.id
+                )
+                .await
+                .expect("a lookup")
+                .map(|found| found.id),
+            Some(agent.id)
+        );
+        assert_eq!(
+            use_cases
+                .get_readable_agent(&viewer(owner_id, "owner@example.com"), company_id, agent.id)
+                .await
+                .expect("a lookup")
+                .map(|found| found.id),
+            Some(agent.id)
+        );
+
+        // A stranger to the company does not.
+        assert!(
+            use_cases
+                .get_readable_agent(
+                    &viewer(stranger_id, "stranger@example.com"),
+                    company_id,
+                    agent.id
+                )
+                .await
+                .expect("a lookup")
+                .is_none()
+        );
+
+        // Nor does the member reach it through a company they are nothing to.
+        assert!(
+            use_cases
+                .get_readable_agent(
+                    &viewer(member_id, "member@example.com"),
+                    other_company_id,
+                    agent.id
+                )
+                .await
+                .expect("a lookup")
+                .is_none()
+        );
+
+        // Reading is all it grants: configuring the agent is still the owner's alone.
+        assert!(
+            use_cases
+                .list_company_agents(member_id, company_id)
+                .await
+                .is_err()
+        );
     }
 }

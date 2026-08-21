@@ -357,7 +357,16 @@ pub fn schedule_thread_pane(props: &ScheduleThreadPaneProps<'_>) -> String {
     let bubbles: String = props
         .messages
         .iter()
-        .map(|msg| message_bubble_chat(msg, props.agent))
+        .map(|msg| {
+            message_bubble_chat(
+                msg,
+                props.agent,
+                MessageScope {
+                    company_id: props.company_id,
+                    channel_id: props.channel.map(|channel| channel.id).unwrap_or_default(),
+                },
+            )
+        })
         .collect();
 
     let channel_name = props.channel.map(|c| c.name.as_str()).unwrap_or("Channel");

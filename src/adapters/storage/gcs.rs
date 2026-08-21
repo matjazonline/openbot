@@ -21,7 +21,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, instrument};
 
 use crate::{
-    adapters::storage::FileStorage,
+    adapters::storage::{BucketKind, FileStorage, StoredObject},
     app_error::{AppError, AppResult},
     entities::{
         upload::ImageUpload,
@@ -95,6 +95,8 @@ impl AccessToken {
 
 pub struct GcsFileStorage {
     bucket: String,
+    /// The bucket nothing public may read; `None` when the deployment stores no attachments.
+    private_bucket: Option<String>,
     /// What an object's URL is built from — the bucket's own public host, or a CDN in front of it.
     public_base_url: String,
     client_email: String,
@@ -123,6 +125,7 @@ impl GcsFileStorage {
         Ok(Self {
             public_base_url: config.public_base_url(),
             bucket: config.bucket.clone(),
+            private_bucket: config.attachments_bucket.clone(),
             client_email: key.client_email,
             token_uri: key.token_uri,
             signing_key,
@@ -200,33 +203,140 @@ impl GcsFileStorage {
     }
 }
 
-#[async_trait]
-impl FileStorage for GcsFileStorage {
-    #[instrument(skip(self, image), fields(bucket = %self.bucket, key = %key))]
-    async fn upload_image(&self, key: &ObjectKey, image: &ImageUpload) -> AppResult<ObjectUrl> {
+impl GcsFileStorage {
+    /// Which bucket a [`BucketKind`] names on this deployment.
+    ///
+    /// A private bucket that was never configured is an error rather than a fallback to the public
+    /// one: storing an attachment where anyone could read it is the one outcome worth refusing.
+    fn bucket_for(&self, kind: BucketKind) -> AppResult<&str> {
+        match kind {
+            BucketKind::Public => Ok(&self.bucket),
+            BucketKind::Private => self.private_bucket.as_deref().ok_or_else(|| {
+                AppError::Internal(
+                    "No private bucket is configured (GCS_ATTACHMENTS_BUCKET), so there is nowhere \
+                     to keep this that is not public"
+                        .to_string(),
+                )
+            }),
+        }
+    }
+
+    /// One media upload, whichever bucket it is going to.
+    async fn upload(
+        &self,
+        bucket: &str,
+        key: &ObjectKey,
+        content_type: &str,
+        bytes: Vec<u8>,
+    ) -> AppResult<()> {
         let token = self.access_token().await?;
 
         let response = self
             .http
             .post(format!(
-                "https://storage.googleapis.com/upload/storage/v1/b/{bucket}/o",
-                bucket = self.bucket,
+                "https://storage.googleapis.com/upload/storage/v1/b/{bucket}/o"
             ))
             // `query` percent-encodes the object name, which is the only part of this request that
             // is not a constant.
             .query(&[("uploadType", "media"), ("name", key.as_str())])
             .bearer_auth(token)
-            .header(reqwest::header::CONTENT_TYPE, image.format().mime())
+            .header(reqwest::header::CONTENT_TYPE, content_type)
             .header(reqwest::header::CACHE_CONTROL, OBJECT_CACHE_CONTROL)
-            .body(image.bytes().to_vec())
+            .body(bytes)
             .send()
             .await
             .map_err(|err| AppError::Internal(format!("GCS upload failed: {err}")))?;
 
         require_success(response, "GCS upload").await?;
 
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl FileStorage for GcsFileStorage {
+    #[instrument(skip(self, image), fields(bucket = %self.bucket, key = %key))]
+    async fn upload_image(&self, key: &ObjectKey, image: &ImageUpload) -> AppResult<ObjectUrl> {
+        self.upload(
+            &self.bucket,
+            key,
+            image.format().mime(),
+            image.bytes().to_vec(),
+        )
+        .await?;
+
         Ok(object_url(&self.public_base_url, key))
     }
+
+    #[instrument(skip(self, bytes), fields(bytes = bytes.len(), key = %key))]
+    async fn store_object(
+        &self,
+        bucket: BucketKind,
+        key: &ObjectKey,
+        content_type: &str,
+        bytes: Vec<u8>,
+    ) -> AppResult<()> {
+        self.upload(self.bucket_for(bucket)?, key, content_type, bytes)
+            .await
+    }
+
+    #[instrument(skip(self), fields(key = %key))]
+    async fn read_object(&self, bucket: BucketKind, key: &ObjectKey) -> AppResult<StoredObject> {
+        let token = self.access_token().await?;
+        let bucket = self.bucket_for(bucket)?;
+
+        let response = self
+            .http
+            .get(format!(
+                "https://storage.googleapis.com/storage/v1/b/{bucket}/o/{key}",
+                key = urlencoding(key.as_str()),
+            ))
+            .query(&[("alt", "media")])
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(|err| AppError::Internal(format!("GCS read failed: {err}")))?;
+
+        let response = require_success(response, "GCS read").await?;
+
+        // What the object was stored as, which is what the download route serves it as.
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or(DEFAULT_CONTENT_TYPE)
+            .to_string();
+
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|err| AppError::Internal(format!("GCS read was cut short: {err}")))?
+            .to_vec();
+
+        Ok(StoredObject {
+            content_type,
+            bytes,
+        })
+    }
+}
+
+/// What an object with no recorded type is served as: bytes to save, never something to run.
+const DEFAULT_CONTENT_TYPE: &str = "application/octet-stream";
+
+/// An object name as a *path segment* of the JSON API's read URL.
+///
+/// The slashes in a key are part of the name, not path structure, so they have to be encoded --
+/// `attachments/a.png` is one object, not a folder and a file, and Google answers 404 for the
+/// unencoded form.
+fn urlencoding(key: &str) -> String {
+    key.bytes()
+        .map(|byte| match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (byte as char).to_string()
+            }
+            other => format!("%{other:02X}"),
+        })
+        .collect()
 }
 
 /// The public URL an object is served from.
@@ -318,6 +428,17 @@ mod tests {
             object_url("https://cdn.example.com/", &key),
             ObjectUrl::new("https://cdn.example.com/avatars/abc.png")
         );
+    }
+
+    #[test]
+    fn an_object_name_is_encoded_whole_for_the_read_url() {
+        // The slash is part of the name, so it must not read as path structure.
+        assert_eq!(
+            urlencoding("attachments/9f2c.png"),
+            "attachments%2F9f2c.png"
+        );
+        assert_eq!(urlencoding("a b"), "a%20b");
+        assert_eq!(urlencoding("plain-name_1.0~"), "plain-name_1.0~");
     }
 
     #[test]

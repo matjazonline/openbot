@@ -4,7 +4,10 @@ use axum::extract::FromRef;
 use sqlx::PgPool;
 
 use crate::{
-    adapters::{persistence::dashboard::DashboardPersistence, storage::FileStorage},
+    adapters::{
+        http::session::SessionAuthority, persistence::dashboard::DashboardPersistence,
+        storage::FileStorage,
+    },
     domain::monitoring::MonitoringService,
     infra::{config::AppConfig, events::MailboxEvents},
     use_cases::{
@@ -29,6 +32,8 @@ pub struct AppState {
     pub approval_use_cases: Arc<ApprovalUseCases>,
     /// Read-only aggregates behind `/ui/dashboard`.
     pub dashboard_persistence: Arc<dyn DashboardPersistence>,
+    /// Issues and verifies sessions; the only thing that decides who a request is.
+    pub sessions: Arc<SessionAuthority>,
     /// Where a picked file is stored; `None` when no bucket is configured, which is what the
     /// avatar pickers report instead of failing at upload time.
     pub file_storage: Option<Arc<dyn FileStorage>>,
@@ -105,6 +110,12 @@ impl FromRef<AppState> for Arc<ApprovalUseCases> {
 impl FromRef<AppState> for Arc<dyn DashboardPersistence> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.dashboard_persistence.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<SessionAuthority> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.sessions.clone()
     }
 }
 

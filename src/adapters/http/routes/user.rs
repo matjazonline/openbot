@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
 
 use crate::{
-    adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
+    adapters::http::{
+        app_state::AppState, auth::AuthenticatedUser, pages, session::SessionAuthority,
+    },
     app_error::AppResult,
     use_cases::{company::CompanyUseCases, user::UserUseCases},
 };
@@ -44,12 +46,17 @@ async fn index(
     Redirect::temporary(destination)
 }
 
-async fn logout(_user: AuthenticatedUser, jar: CookieJar) -> impl IntoResponse {
-    let cookie = axum_extra::extract::cookie::Cookie::build(("user_id", ""))
-        .path("/")
-        .build();
+async fn logout(
+    _user: AuthenticatedUser,
+    State(sessions): State<Arc<SessionAuthority>>,
+    jar: CookieJar,
+) -> impl IntoResponse {
+    let jar = sessions
+        .cleared_cookies()
+        .into_iter()
+        .fold(jar, |jar, cookie| jar.remove(cookie));
 
-    (jar.remove(cookie), Redirect::to("/login"))
+    (jar, Redirect::to("/login"))
 }
 
 async fn login_page() -> impl IntoResponse {
@@ -125,9 +132,10 @@ async fn register_form(
 use axum_extra::extract::CookieJar;
 
 /// Handles HTMX form submission for user login.
-#[instrument(skip(user_use_cases, jar, form))]
+#[instrument(skip(user_use_cases, sessions, jar, form))]
 async fn login_form(
     State(user_use_cases): State<Arc<UserUseCases>>,
+    State(sessions): State<Arc<SessionAuthority>>,
     jar: CookieJar,
     Form(form): Form<LoginForm>,
 ) -> impl IntoResponse {
@@ -144,12 +152,7 @@ async fn login_form(
         .await
     {
         Ok(user) => {
-            let cookie =
-                axum_extra::extract::cookie::Cookie::build(("user_id", user.id.to_string()))
-                    .path("/")
-                    .http_only(true)
-                    .build();
-            let updated_jar = jar.add(cookie);
+            let updated_jar = jar.add(sessions.cookie(user.id));
 
             let alert = pages::success_alert(
                 &format!(
@@ -190,9 +193,10 @@ async fn register_json(
 }
 
 /// JSON endpoint for login (API compatibility).
-#[instrument(skip(user_use_cases, jar, payload))]
+#[instrument(skip(user_use_cases, sessions, jar, payload))]
 async fn login_json(
     State(user_use_cases): State<Arc<UserUseCases>>,
+    State(sessions): State<Arc<SessionAuthority>>,
     jar: CookieJar,
     Json(payload): Json<LoginForm>,
 ) -> AppResult<impl IntoResponse> {
@@ -201,11 +205,7 @@ async fn login_json(
         .login(&payload.email_or_username, &payload.password)
         .await?;
 
-    let cookie = axum_extra::extract::cookie::Cookie::build(("user_id", user.id.to_string()))
-        .path("/")
-        .http_only(true)
-        .build();
-    let updated_jar = jar.add(cookie);
+    let updated_jar = jar.add(sessions.cookie(user.id));
 
     Ok((
         updated_jar,
@@ -255,11 +255,23 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn logout_clears_cookie_and_redirects_to_login() {
+    async fn logout_clears_both_cookies_and_redirects_to_login() {
+        let sessions = Arc::new(SessionAuthority::new(
+            &crate::infra::config::AppConfig::for_test(),
+        ));
+
+        // A browser part-way through the change carries both: the session it signed in with, and
+        // the plaintext cookie left over from before.
         let mut headers = axum::http::HeaderMap::new();
         headers.insert(
             axum::http::header::COOKIE,
-            format!("user_id={}", uuid::Uuid::nil()).parse().unwrap(),
+            format!(
+                "session={}; user_id={}",
+                sessions.cookie(uuid::Uuid::nil()).value(),
+                uuid::Uuid::nil()
+            )
+            .parse()
+            .unwrap(),
         );
         let jar = CookieJar::from_headers(&headers);
 
@@ -267,6 +279,7 @@ mod tests {
             AuthenticatedUser {
                 id: uuid::Uuid::nil(),
             },
+            State(sessions),
             jar,
         )
         .await
@@ -274,14 +287,29 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
         assert_eq!(response.headers().get("location").unwrap(), "/login");
-        let set_cookie = response
+
+        let cleared: Vec<&str> = response
             .headers()
-            .get("set-cookie")
-            .unwrap()
-            .to_str()
-            .unwrap();
-        assert!(set_cookie.starts_with("user_id="));
-        assert!(set_cookie.contains("Max-Age=0"));
-        assert!(set_cookie.contains("Path=/"));
+            .get_all("set-cookie")
+            .iter()
+            .map(|value| value.to_str().expect("a printable cookie"))
+            .collect();
+
+        // The session goes, and so does the plaintext cookie it replaced -- a browser still
+        // holding one of those should stop offering it.
+        assert!(
+            cleared.iter().any(|cookie| cookie.starts_with("session=")),
+            "{cleared:?}"
+        );
+        assert!(
+            cleared.iter().any(|cookie| cookie.starts_with("user_id=")),
+            "{cleared:?}"
+        );
+        assert!(
+            cleared
+                .iter()
+                .all(|cookie| cookie.contains("Max-Age=0") && cookie.contains("Path=/")),
+            "{cleared:?}"
+        );
     }
 }

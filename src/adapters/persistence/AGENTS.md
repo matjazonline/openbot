@@ -9,8 +9,11 @@ them. Work the list in order; the two it cannot find are steps 2 and 7.
 
 # 1. Migration
 
-New timestamped file in `migrations/`, never an edit to an installed one. `20260819000000_channel_enabled.sql`
-is the minimal shape and `20260818000000_quorum_outreach.sql` the multi-statement one.
+New timestamped file in `migrations/`, never an edit to an installed one —
+`20260817000000_init_schema.sql` is the squashed baseline every database has already applied, so
+editing it changes a checksum sqlx will reject. The minimal shape is one `ALTER TABLE ... ADD
+COLUMN`; the multi-statement shape backfills in an `UPDATE` between the `ADD COLUMN` and the
+`SET NOT NULL`.
 
 A `NOT NULL` column needs a `DEFAULT` (or an `UPDATE` backfill before `SET NOT NULL`) — existing rows
 must come out valid, because production has rows and your dev database mostly doesn't. State the

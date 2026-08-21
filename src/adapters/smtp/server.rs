@@ -12,6 +12,7 @@ use crate::{
     application::use_cases::channel::parse_recipient_address,
     application::use_cases::thread::ThreadUseCases,
     domain::monitoring::{MonitoringService, SmtpConnectionMetrics, SmtpStatus},
+    entities::company_member::CompanyMembership,
     infra::config::AppConfig,
     services::email_parser::{RawAttachmentData, RawInboundPayload, extract_email},
 };
@@ -415,7 +416,12 @@ impl SmtpServer {
             self.apply_spam_score(session, &mut raw_payload).await;
         }
 
-        let norm_payload = EmailIngressAdapter::parse(raw_payload, &self.config);
+        let norm_payload = EmailIngressAdapter::parse_and_store(
+            raw_payload,
+            &self.config,
+            self.thread_use_cases.file_storage(),
+        )
+        .await;
         match self
             .thread_use_cases
             .ingest_normalized_message(norm_payload)
@@ -567,13 +573,21 @@ impl SmtpServer {
         };
 
         let sender = raw_payload.from.trim();
-        let is_team_member = self
+        let membership = match self
             .thread_use_cases
             .company_persistence()
-            .is_company_team_member(company.id, sender)
+            .membership_for_email(company.id, sender)
             .await
-            .unwrap_or(false);
-        !channel.participant_access(sender, is_team_member).trusted
+        {
+            Ok(membership) => membership,
+            Err(error) => {
+                // Every other bail-out here scans too: a directory lookup that failed must not be
+                // the reason a stranger is promoted to a trusted sender.
+                warn!(%error, "Membership lookup failed; scanning sender as a stranger");
+                CompanyMembership::None
+            }
+        };
+        !channel.participant_access(sender, membership).trusted
     }
 
     async fn apply_spam_score(&self, session: &SmtpSession, raw_payload: &mut RawInboundPayload) {
@@ -800,6 +814,7 @@ pub fn parse_raw_mime_to_payload(
                 filename,
                 content_type,
                 content,
+                stored_key: None,
             });
         }
 
@@ -904,8 +919,12 @@ mod tests {
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
         }
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
-            Ok(true)
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
         }
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
@@ -1339,6 +1358,7 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
         });
@@ -1573,6 +1593,7 @@ regis";
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
         });
@@ -1696,6 +1717,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
         });

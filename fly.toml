@@ -28,6 +28,9 @@ kill_timeout = "30s"
   # `fly secrets set GCS_SERVICE_ACCOUNT_JSON_BASE64=...`. Both or neither — naming one
   # without the other fails the boot. See docs/deploy.md.
   GCS_BUCKET = ""
+  # Mail attachments go in a bucket with no public access; served only through the app, to
+  # whoever the channel's participant rules allow. See docs/deploy.md.
+  GCS_ATTACHMENTS_BUCKET = ""
 
 # axum API
 [http_service]

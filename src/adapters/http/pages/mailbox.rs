@@ -1189,7 +1189,16 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
     } else {
         pane.messages
             .iter()
-            .map(|message| message_bubble_chat(message, pane.agent))
+            .map(|message| {
+                message_bubble_chat(
+                    message,
+                    pane.agent,
+                    MessageScope {
+                        company_id: pane.company_id,
+                        channel_id: pane.channel.id,
+                    },
+                )
+            })
             .collect()
     };
 
@@ -1293,7 +1302,11 @@ fn thread_composer(pane: &MessagePane<'_>) -> String {
 /// `agent` is the channel's agent when it runs exactly one, and is what the agent side is drawn as.
 /// A reply is stored with the *channel's* address as its sender rather than the agent that wrote
 /// it, so with a stack of agents there is no one face to show and the address stands in.
-pub fn message_bubble_chat(message: &Message, agent: Option<&Agent>) -> String {
+pub fn message_bubble_chat(
+    message: &Message,
+    agent: Option<&Agent>,
+    scope: MessageScope,
+) -> String {
     let is_agent =
         message.role == MessageRole::Agent || message.direction == MessageDirection::Outbound;
     let body = if is_agent {
@@ -1321,7 +1334,7 @@ pub fn message_bubble_chat(message: &Message, agent: Option<&Agent>) -> String {
                         {writer}
                         <time class="text-xs opacity-60">{created_at}</time>
                     </div>
-                    <div class="chat-bubble {bubble_class} max-w-2xl text-sm">{body}</div>
+                    <div class="chat-bubble {bubble_class} max-w-2xl text-sm">{body}{attachments}</div>
                     <div class="chat-footer font-mono text-[11px] opacity-40">{subject}</div>
                 </div>
         "##,
@@ -1332,7 +1345,80 @@ pub fn message_bubble_chat(message: &Message, agent: Option<&Agent>) -> String {
         created_at = super::format_date_time(message.created_at),
         subject = escape_html_text(&message.subject),
         body = body,
+        attachments = attachment_chips(message, scope),
     )
+}
+
+/// Where a message is being shown from.
+///
+/// An attachment link carries the company and channel because that is what the download route
+/// authorizes against -- the same scope the thread itself was opened with, so a file is never
+/// reachable from further away than the thread it hangs on.
+#[derive(Debug, Clone, Copy)]
+pub struct MessageScope {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+}
+
+/// What was attached to a message, under its body.
+///
+/// An attachment that was never stored -- mail that arrived before there was a bucket, or an
+/// upload that failed -- is still listed, as a chip that does not link anywhere. Saying nothing
+/// would misreport the mail.
+fn attachment_chips(message: &Message, scope: MessageScope) -> String {
+    let Some(attachments) = message.attachments.as_ref().filter(|a| !a.is_empty()) else {
+        return String::new();
+    };
+
+    let chips: String = attachments
+        .iter()
+        .map(|attachment| attachment_chip(message.thread_id, attachment, scope))
+        .collect();
+
+    format!(
+        r##"<div class="mt-2 flex flex-wrap gap-2 border-t border-current/20 pt-2">{chips}</div>"##
+    )
+}
+
+fn attachment_chip(
+    thread_id: Uuid,
+    attachment: &AttachmentMetadata,
+    scope: MessageScope,
+) -> String {
+    let label = format!(
+        r##"<span class="max-w-[16rem] truncate">{filename}</span>
+                            <span class="opacity-60">{size}</span>"##,
+        filename = escape_html_text(&attachment.filename),
+        size = escape_html_text(&file_size(attachment.size_bytes)),
+    );
+
+    match attachment.storage_key.is_some() {
+        true => format!(
+            r##"<a class="btn btn-xs btn-ghost gap-1 normal-case"
+                            href="/ui/threads/{thread_id}/attachments/{sha256}?company_id={company_id}&channel_id={channel_id}"
+                            download="{filename}" title="Download {filename}">📎 {label}</a>"##,
+            sha256 = escape_html_text(&attachment.sha256_hash),
+            company_id = scope.company_id,
+            channel_id = scope.channel_id,
+            filename = escape_html_text(&attachment.filename),
+        ),
+        false => format!(
+            r##"<span class="btn btn-xs btn-ghost btn-disabled gap-1 normal-case"
+                            title="This attachment was not stored, so there is nothing to download">📎 {label}</span>"##
+        ),
+    }
+}
+
+/// An attachment's size, as somebody deciding whether to download it would read it.
+fn file_size(bytes: usize) -> String {
+    const KB: usize = 1024;
+    const MB: usize = KB * 1024;
+
+    match bytes {
+        0..KB => format!("{bytes} B"),
+        KB..MB => format!("{:.0} KB", bytes as f64 / KB as f64),
+        _ => format!("{:.1} MB", bytes as f64 / MB as f64),
+    }
 }
 
 /// Why the last submit did not go through, above the form that will be retried.

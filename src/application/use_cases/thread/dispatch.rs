@@ -20,6 +20,7 @@ use crate::{
     entities::{
         agent::Agent,
         channel::{ChannelType, PUBLIC_PARTICIPANT, ParticipantIdentity},
+        company_member::CompanyMembership,
         message::{Message, MessageDirection, MessageRole},
         message_contract::NormalizedOutboundMessage,
         task::TokenUsage,
@@ -152,7 +153,7 @@ impl ThreadUseCases {
             primary_agent: None,
         };
         let mut agent_cache: HashMap<Uuid, Option<Agent>> = HashMap::new();
-        let mut membership_cache: HashMap<(Uuid, String), bool> = HashMap::new();
+        let mut membership_cache: HashMap<(Uuid, String), CompanyMembership> = HashMap::new();
 
         for (index, channel_match) in matches.iter().enumerate() {
             let history = self
@@ -174,20 +175,18 @@ impl ThreadUseCases {
 
             let sender = parsed.sender.trim();
             let member_key = (channel_match.company.id, sender.to_lowercase());
-            let is_team_member = match membership_cache.get(&member_key) {
+            let membership = match membership_cache.get(&member_key) {
                 Some(cached) => *cached,
                 None => {
                     let loaded = self
                         .company_persistence
-                        .is_company_team_member(channel_match.company.id, sender)
+                        .membership_for_email(channel_match.company.id, sender)
                         .await?;
                     membership_cache.insert(member_key, loaded);
                     loaded
                 }
             };
-            let access = channel_match
-                .channel
-                .participant_access(sender, is_team_member);
+            let access = channel_match.channel.participant_access(sender, membership);
 
             let upstream_context = self
                 .upstream_context_for(&run.outputs, ingest.task_id)

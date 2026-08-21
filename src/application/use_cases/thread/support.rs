@@ -13,6 +13,7 @@ use crate::{
     entities::{
         channel::Channel,
         company::Company,
+        company_member::CompanyMembership,
         message::{AttachmentMetadata, Message},
         message_contract::NormalizedInboundMessage,
         value_objects::{CompanySlug, MessageId, ThreadIndex},
@@ -33,7 +34,7 @@ pub(super) struct DirectoryCache<'a> {
     use_cases: &'a ThreadUseCases,
     companies: HashMap<String, Option<Company>>,
     channels: HashMap<Uuid, Vec<Channel>>,
-    memberships: HashMap<(Uuid, String), bool>,
+    memberships: HashMap<(Uuid, String), CompanyMembership>,
 }
 
 impl<'a> DirectoryCache<'a> {
@@ -69,13 +70,15 @@ impl<'a> DirectoryCache<'a> {
         Ok(loaded)
     }
 
-    /// Team membership feeds authorization decisions, so a persistence failure propagates rather
-    /// than silently degrading the sender to "not a member".
-    pub(super) async fn is_team_member(
+    /// What the sender is to the company, for `Channel::participant_access`.
+    ///
+    /// Membership feeds authorization decisions, so a persistence failure propagates rather than
+    /// silently degrading the sender to a stranger.
+    pub(super) async fn membership(
         &mut self,
         company_id: Uuid,
         sender: &str,
-    ) -> AppResult<bool> {
+    ) -> AppResult<CompanyMembership> {
         let key = (company_id, sender.trim().to_lowercase());
         if let Some(cached) = self.memberships.get(&key) {
             return Ok(*cached);
@@ -83,7 +86,7 @@ impl<'a> DirectoryCache<'a> {
         let loaded = self
             .use_cases
             .company_persistence
-            .is_company_team_member(company_id, sender.trim())
+            .membership_for_email(company_id, sender.trim())
             .await?;
         self.memberships.insert(key, loaded);
         Ok(loaded)

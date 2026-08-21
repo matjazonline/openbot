@@ -6,7 +6,10 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::company::Company,
+    entities::{
+        company::{Company, CompanyAccess},
+        company_member::CompanyMembership,
+    },
 };
 
 #[async_trait]
@@ -68,7 +71,46 @@ pub trait CompanyPersistence: Send + Sync {
             _ => Err(company_not_found()),
         }
     }
-    async fn is_company_team_member(&self, company_id: Uuid, email: &str) -> AppResult<bool>;
+    /// Every company the user may *read*: the ones they own, plus the ones they were invited to.
+    ///
+    /// Separate from [`CompanyPersistence::list_by_user_id`], which stays ownership-only because
+    /// it scopes the pages that administer a company. The default answers with owned companies
+    /// alone -- the conservative half of the truth -- so a persistence that has not implemented
+    /// this grants nobody anything they would not already have had.
+    async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
+        Ok(self
+            .list_by_user_id(user_id)
+            .await?
+            .into_iter()
+            .map(|company| CompanyAccess {
+                company,
+                membership: CompanyMembership::Owner,
+            })
+            .collect())
+    }
+    /// What the user is to one company, or `None` if they are nothing to it.
+    async fn company_access(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<Option<CompanyAccess>> {
+        Ok(self
+            .list_accessible_by_user_id(user_id)
+            .await?
+            .into_iter()
+            .find(|access| access.company.id == company_id))
+    }
+    /// What the account behind an *address* is to this company.
+    ///
+    /// The by-email counterpart of [`CompanyPersistence::company_access`], for the inbound path,
+    /// which knows a sender only by the address they wrote from. `Channel::participant_access`
+    /// asks it about every sender, and needs the owner told apart from the rest of the team --
+    /// a restricted channel takes its own owner's mail whether or not they are on its list.
+    async fn membership_for_email(
+        &self,
+        company_id: Uuid,
+        email: &str,
+    ) -> AppResult<CompanyMembership>;
     async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>>;
 }
 
@@ -162,6 +204,26 @@ impl CompanyUseCases {
     #[instrument(skip(self))]
     pub async fn list_user_companies(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         self.persistence.list_by_user_id(user_id).await
+    }
+
+    /// The companies a user may read, each with what they are to it.
+    ///
+    /// What the mailbox scopes by, where an invited member belongs; the administration pages keep
+    /// using [`CompanyUseCases::list_user_companies`], so being invited to a company does not
+    /// become permission to reconfigure it.
+    #[instrument(skip(self))]
+    pub async fn list_accessible_companies(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
+        self.persistence.list_accessible_by_user_id(user_id).await
+    }
+
+    /// What a user is to one company: its owner, an invited member, or nothing.
+    #[instrument(skip(self))]
+    pub async fn company_access(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<Option<CompanyAccess>> {
+        self.persistence.company_access(user_id, company_id).await
     }
 
     #[instrument(skip(self))]
@@ -354,8 +416,12 @@ mod tests {
             Ok(())
         }
 
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
-            Ok(true)
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
         }
 
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {

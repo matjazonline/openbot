@@ -34,7 +34,7 @@ pub fn create_app(app_state: AppState) -> Router {
         .allow_credentials(true);
 
     Router::new()
-        .merge(adapters::http::routes::router())
+        .merge(adapters::http::routes::router(app_state.sessions.clone()))
         .with_state(app_state)
         .layer(cors)
         .layer(

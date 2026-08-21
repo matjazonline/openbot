@@ -450,6 +450,7 @@ mod tests {
     use crate::entities::{
         channel::Channel,
         company::Company,
+        company_member::CompanyMembership,
         cursor::{MessageCursor, ThreadCursor},
         schedule::ScheduleTimezone,
         task::{BackgroundTask, TaskStatus},
@@ -728,8 +729,12 @@ mod tests {
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
         }
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
-            Ok(true)
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
         }
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec!["admin@example.com".into()])
@@ -1012,6 +1017,7 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
         })

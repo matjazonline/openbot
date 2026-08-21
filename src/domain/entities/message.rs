@@ -3,7 +3,7 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::entities::cursor::MessageCursor;
-use crate::entities::value_objects::{EmailAddress, MessageId, ThreadIndex};
+use crate::entities::value_objects::{EmailAddress, MessageId, ObjectKey, ThreadIndex};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -70,7 +70,13 @@ pub struct AttachmentMetadata {
     pub content_type: String,
     pub sha256_hash: String,
     pub size_bytes: usize,
-    pub storage_url: Option<String>,
+    /// Where the bytes are kept, as a key inside the private bucket -- never a URL.
+    ///
+    /// A URL here would be a URL somewhere, and what arrives in the mail is not for anyone
+    /// holding a link: it is served by the app, to whoever the channel's rules allow.
+    /// `None` is mail that arrived before there was anywhere to put it, or whose upload failed.
+    #[serde(default, alias = "storage_url")]
+    pub storage_key: Option<ObjectKey>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

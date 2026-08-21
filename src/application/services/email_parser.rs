@@ -3,7 +3,7 @@ use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::entities::message::AttachmentMetadata;
+use crate::entities::{message::AttachmentMetadata, value_objects::ObjectKey};
 
 use serde::{Deserialize, Serialize};
 
@@ -62,6 +62,9 @@ pub struct RawAttachmentData {
     pub filename: String,
     pub content_type: String,
     pub content: Vec<u8>,
+    /// Where the bytes were put, once they have been; see
+    /// [`crate::services::attachment_store::store_inbound_attachments`].
+    pub stored_key: Option<ObjectKey>,
 }
 
 pub struct EmailParser;
@@ -176,7 +179,7 @@ impl EmailParser {
                 content_type: att.content_type.clone(),
                 sha256_hash: hash_hex.clone(),
                 size_bytes: size,
-                storage_url: None,
+                storage_key: att.stored_key.clone(),
             };
 
             attachments.push(meta.clone());

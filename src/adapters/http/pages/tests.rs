@@ -1792,21 +1792,96 @@ fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
         sender: EmailAddress::from("support@acme.mailagents.com"),
         ..mailbox_message(thread.id, "The reply.")
     };
-    let html = message_bubble_chat(&reply, Some(&agent));
+    let html = message_bubble_chat(
+        &reply,
+        Some(&agent),
+        MessageScope {
+            company_id: Uuid::new_v4(),
+            channel_id: Uuid::new_v4(),
+        },
+    );
     assert!(html.contains("chat-image"));
     assert!(html.contains(r#"src="https://example.com/triage.png""#));
     assert!(html.contains("Triage"));
 
     // With no single agent behind the channel, the address it was sent from stands in.
-    let anonymous = message_bubble_chat(&reply, None);
+    let anonymous = message_bubble_chat(
+        &reply,
+        None,
+        MessageScope {
+            company_id: Uuid::new_v4(),
+            channel_id: Uuid::new_v4(),
+        },
+    );
     assert!(!anonymous.contains("<img"));
     assert!(anonymous.contains("support@acme.mailagents.com"));
 
     // An inbound message is its sender's, whichever agent answers the channel.
     let inbound = mailbox_message(thread.id, "The question.");
-    let inbound_html = message_bubble_chat(&inbound, Some(&agent));
+    let inbound_html = message_bubble_chat(
+        &inbound,
+        Some(&agent),
+        MessageScope {
+            company_id: Uuid::new_v4(),
+            channel_id: Uuid::new_v4(),
+        },
+    );
     assert!(!inbound_html.contains("<img"));
     assert!(inbound_html.contains(inbound.sender.as_str()));
+}
+
+#[test]
+fn an_attachment_is_offered_as_a_download_scoped_to_its_thread() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let mut message = mailbox_message(thread.id, "See attached.");
+    message.attachments = Some(vec![
+        AttachmentMetadata {
+            filename: "Q3 <report>.pdf".to_string(),
+            content_type: "application/pdf".to_string(),
+            sha256_hash: "abc123".to_string(),
+            size_bytes: 2048,
+            storage_key: Some(crate::entities::value_objects::ObjectKey::new(
+                "attachments/abc123.pdf",
+            )),
+        },
+        // Mail that arrived before there was anywhere to keep it.
+        AttachmentMetadata {
+            filename: "old.doc".to_string(),
+            content_type: "application/msword".to_string(),
+            sha256_hash: "def456".to_string(),
+            size_bytes: 10,
+            storage_key: None,
+        },
+    ]);
+
+    let html = message_bubble_chat(
+        &message,
+        None,
+        MessageScope {
+            company_id: company.id,
+            channel_id: channel.id,
+        },
+    );
+
+    // The link is the app's own, carrying the scope the download is authorized against -- never a
+    // storage URL.
+    assert!(html.contains(&format!(
+        r##"href="/ui/threads/{}/attachments/abc123?company_id={}&channel_id={}""##,
+        thread.id, company.id, channel.id
+    )));
+    assert!(!html.contains("storage.googleapis.com"));
+    assert!(!html.contains("attachments/abc123.pdf"));
+
+    // The name is shown as text, not as markup.
+    assert!(html.contains("Q3 &lt;report&gt;.pdf"));
+    assert!(html.contains("2 KB"));
+
+    // The one we do not have is listed, but leads nowhere.
+    assert!(html.contains("old.doc"));
+    assert!(!html.contains("attachments/def456"));
+    assert!(html.contains("btn-disabled"));
 }
 
 /// The stream sends bubbles rendered by `message_bubble_chat` while the page renders them inside
@@ -1828,7 +1903,13 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
         activity: None,
     });
 
-    assert!(pane.contains(message_bubble_chat(&message, None).trim()));
+    // Rendered with the scope the pane itself uses, so the comparison is of the markup rather
+    // than of two different attachment links.
+    let scope = MessageScope {
+        company_id: company.id,
+        channel_id: channel.id,
+    };
+    assert!(pane.contains(message_bubble_chat(&message, None, scope).trim()));
 }
 
 #[test]

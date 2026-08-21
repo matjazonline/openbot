@@ -163,7 +163,9 @@ impl ThreadUseCases {
         &self,
         raw_payload: RawInboundPayload,
     ) -> AppResult<InboundIngestResult> {
-        let norm = EmailIngressAdapter::parse(raw_payload, &self.config);
+        let norm =
+            EmailIngressAdapter::parse_and_store(raw_payload, &self.config, self.file_storage())
+                .await;
         self.ingest_normalized_message(norm).await
     }
 
@@ -182,7 +184,9 @@ impl ThreadUseCases {
         raw_payload: RawInboundPayload,
         delivery: ReplyDelivery,
     ) -> AppResult<InboundIngestResult> {
-        let norm = EmailIngressAdapter::parse(raw_payload, &self.config);
+        let norm =
+            EmailIngressAdapter::parse_and_store(raw_payload, &self.config, self.file_storage())
+                .await;
         self.ingest_normalized_message_with_source(norm, None, delivery)
             .await
     }
@@ -411,8 +415,8 @@ impl ThreadUseCases {
             }
         }
 
-        let is_team_member = directory.is_team_member(channel.company_id, sender).await?;
-        let access = channel.participant_access(sender, is_team_member);
+        let membership = directory.membership(channel.company_id, sender).await?;
+        let access = channel.participant_access(sender, membership);
 
         // Someone who isn't on the channel ACL may still be a party to an existing thread.
         let mut thread_authorized = false;
@@ -619,10 +623,8 @@ impl ThreadUseCases {
             return Ok(ControlFlow::Break(rejection));
         }
 
-        let is_team_member = directory
-            .is_team_member(channel.company_id, &sender)
-            .await?;
-        let access = channel.participant_access(&sender, is_team_member);
+        let membership = directory.membership(channel.company_id, &sender).await?;
+        let access = channel.participant_access(&sender, membership);
 
         // A third party joins the thread only when the sender is trusted *and* the channel
         // permits it: the flag can narrow who gets pulled in, never widen it.

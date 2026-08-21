@@ -1,6 +1,6 @@
 use crate::{
     adapters::{
-        http::app_state::AppState,
+        http::{app_state::AppState, session::SessionAuthority},
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
         protocols::{EgressRegistry, email::EmailEgressAdapter},
         storage::{FileStorage, gcs::GcsFileStorage},
@@ -21,6 +21,8 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 
 pub async fn init_app_state() -> anyhow::Result<AppState> {
     let config = Arc::new(AppConfig::from_env());
+
+    let sessions = Arc::new(SessionAuthority::new(&config));
 
     let monitoring: Arc<dyn MonitoringService> = Arc::new(CompositeMonitor::new(vec![
         Arc::new(TracingMonitor::new()),
@@ -69,7 +71,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         .with_egress_registry(egress_registry)
         .with_agent_persistence(postgres_arc.clone())
         .with_approval_use_cases(approval_use_cases.clone())
-        .with_monitoring(monitoring.clone()),
+        .with_monitoring(monitoring.clone())
+        .with_file_storage(file_storage.clone()),
     );
 
     let schedule_use_cases = Arc::new(ScheduleUseCases::new(
@@ -94,6 +97,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         thread_use_cases,
         approval_use_cases,
         dashboard_persistence: postgres_arc.clone(),
+        sessions,
         file_storage,
         events: MailboxEvents::new(),
     })

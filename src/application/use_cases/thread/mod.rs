@@ -16,6 +16,7 @@ use crate::{
         EgressRegistry,
         email::{EmailEgressAdapter, EmailIngressAdapter},
     },
+    adapters::storage::FileStorage,
     app_error::{AppError, AppResult},
     domain::monitoring::MonitoringService,
     entities::{
@@ -152,6 +153,8 @@ pub struct ThreadUseCases {
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
     egress_registry: Arc<EgressRegistry>,
+    /// Where inbound attachments are kept; `None` on a deployment with no private bucket.
+    file_storage: Option<Arc<dyn FileStorage>>,
     config: Arc<AppConfig>,
 }
 
@@ -176,6 +179,7 @@ impl ThreadUseCases {
             approval_use_cases: None,
             monitoring: None,
             egress_registry,
+            file_storage: None,
             config,
         }
     }
@@ -202,6 +206,18 @@ impl ThreadUseCases {
     pub fn with_monitoring(mut self, monitoring: Arc<dyn MonitoringService>) -> Self {
         self.monitoring = Some(monitoring);
         self
+    }
+
+    /// Where inbound attachments are kept. Without this, mail still arrives; its attachments are
+    /// recorded but not stored.
+    pub fn with_file_storage(mut self, file_storage: Option<Arc<dyn FileStorage>>) -> Self {
+        self.file_storage = file_storage;
+        self
+    }
+
+    /// The storage inbound attachments go to, for the adapters that parse on this use case's behalf.
+    pub fn file_storage(&self) -> Option<&dyn FileStorage> {
+        self.file_storage.as_deref()
     }
 
     pub fn channel_persistence(&self) -> &Arc<dyn ChannelPersistence> {

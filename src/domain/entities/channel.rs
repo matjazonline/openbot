@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::entities::company_member::CompanyMembership;
 use crate::entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -116,7 +117,16 @@ impl Channel {
     /// An empty or absent participant list means "company team members only". A list containing
     /// `@public` opens the channel to anyone, but only explicitly listed senders (or team members)
     /// are *trusted*.
-    pub fn participant_access(&self, sender: &str, is_team_member: bool) -> ParticipantAccess {
+    ///
+    /// `membership` is what the account behind `sender` is to the company, so the owner exemption
+    /// this shares with [`Channel::viewer_access`] can be applied here too: a restricted channel
+    /// never shuts its own company's owner out, whether they are reading it or writing to it.
+    /// Mail from an address that belongs to no account is simply [`CompanyMembership::None`].
+    pub fn participant_access(
+        &self,
+        sender: &str,
+        membership: CompanyMembership,
+    ) -> ParticipantAccess {
         match &self.participant_emails {
             Some(allowed) if !allowed.is_empty() => {
                 let is_public = allowed
@@ -127,14 +137,50 @@ impl Channel {
                         && e.eq_ignore_ascii_case(sender)
                 });
                 ParticipantAccess {
-                    authorized: is_public || explicitly_listed,
-                    trusted: explicitly_listed || is_team_member,
+                    authorized: is_public || explicitly_listed || membership.is_owner(),
+                    trusted: explicitly_listed || membership.is_team(),
                 }
             }
             _ => ParticipantAccess {
-                authorized: is_team_member,
-                trusted: is_team_member,
+                authorized: membership.is_team(),
+                trusted: membership.is_team(),
             },
+        }
+    }
+
+    /// The single definition of "may this signed-in account *read* this channel".
+    ///
+    /// The mirror of [`Channel::participant_access`], which answers the same question for mail
+    /// arriving from outside. The two differ in one deliberate way: `@public` decides what may
+    /// *enter* a channel and never grants a *read*, so an open channel's traffic is still only
+    /// visible to the company's own team. The owner exemption below is *not* one of the
+    /// differences -- it holds on both sides, so the owner of a restricted channel they are not
+    /// listed on can write to it as well as read it.
+    ///
+    /// | participant list | who may read it |
+    /// | --- | --- |
+    /// | absent or empty | the company team |
+    /// | contains `@public` | the company team -- never a stranger |
+    /// | specific addresses | those addresses, plus the company owner |
+    ///
+    /// A restricted channel is therefore *narrower* than the team: a colleague who is not a
+    /// participant does not see it. The owner is the one exception, so a company cannot lock
+    /// itself out of its own data.
+    pub fn viewer_access(&self, viewer: &EmailAddress, membership: CompanyMembership) -> bool {
+        if !membership.is_team() {
+            return false;
+        }
+
+        if membership.is_owner() {
+            return true;
+        }
+
+        match &self.participant_emails {
+            Some(allowed) if !allowed.is_empty() => allowed.iter().any(|participant| {
+                participant.trim().eq_ignore_ascii_case(PUBLIC_PARTICIPANT)
+                    || participant.eq_ignore_case(viewer)
+            }),
+            _ => true,
         }
     }
 
@@ -206,6 +252,146 @@ impl Channel {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A channel whose participant list is the only thing under test.
+    fn channel_for(participants: Option<&[&str]>) -> Channel {
+        Channel {
+            participant_emails: participants.map(|list| {
+                list.iter()
+                    .map(|email| EmailAddress::from(*email))
+                    .collect()
+            }),
+            ..channel_with_aliases(&[])
+        }
+    }
+
+    #[test]
+    fn an_unrestricted_channel_is_readable_by_the_team_and_nobody_else() {
+        let viewer = EmailAddress::from("dana@acme.test");
+
+        for channel in [channel_for(None), channel_for(Some(&[]))] {
+            assert!(channel.viewer_access(&viewer, CompanyMembership::Owner));
+            assert!(channel.viewer_access(&viewer, CompanyMembership::Member));
+            assert!(!channel.viewer_access(&viewer, CompanyMembership::None));
+        }
+    }
+
+    #[test]
+    fn a_restricted_channel_is_narrower_than_the_team() {
+        let channel = channel_for(Some(&["dana@acme.test", "ops@partner.test"]));
+
+        // A listed colleague sees it...
+        assert!(channel.viewer_access(
+            &EmailAddress::from("dana@acme.test"),
+            CompanyMembership::Member
+        ));
+        // ...and an unlisted one does not, even though they are on the team.
+        assert!(!channel.viewer_access(
+            &EmailAddress::from("sam@acme.test"),
+            CompanyMembership::Member
+        ));
+        // The owner is the one exception, so a company cannot lock itself out of its own data.
+        assert!(channel.viewer_access(
+            &EmailAddress::from("sam@acme.test"),
+            CompanyMembership::Owner
+        ));
+        // Being listed is not a way into a company you do not belong to.
+        assert!(!channel.viewer_access(
+            &EmailAddress::from("ops@partner.test"),
+            CompanyMembership::None
+        ));
+    }
+
+    #[test]
+    fn public_opens_a_channel_to_mail_not_to_readers() {
+        let channel = channel_for(Some(&[PUBLIC_PARTICIPANT, "dana@acme.test"]));
+        let stranger = EmailAddress::from("anyone@example.test");
+
+        // `@public` lets anyone write in, so the whole team may read what arrives...
+        assert!(channel.viewer_access(&stranger, CompanyMembership::Member));
+        assert!(channel.viewer_access(&stranger, CompanyMembership::Owner));
+        // ...but it never makes the traffic readable to the public that sent it.
+        assert!(!channel.viewer_access(&stranger, CompanyMembership::None));
+    }
+
+    #[test]
+    fn a_restricted_channel_still_takes_its_owner_s_mail() {
+        let channel = channel_for(Some(&["dana@acme.test", "ops@partner.test"]));
+
+        // The listed participant writes in, as they always could.
+        let listed = channel.participant_access("dana@acme.test", CompanyMembership::Member);
+        assert!(listed.authorized);
+        assert!(listed.trusted);
+
+        // The owner is not on the list, and still gets in -- the same exemption `viewer_access`
+        // makes, so the mailbox cannot show them a channel they may not answer in.
+        let owner = channel.participant_access("sam@acme.test", CompanyMembership::Owner);
+        assert!(owner.authorized);
+        assert!(owner.trusted);
+        assert!(channel.viewer_access(
+            &EmailAddress::from("sam@acme.test"),
+            CompanyMembership::Owner
+        ));
+
+        // An unlisted colleague is not the owner: a restricted channel is still narrower than the
+        // team, on the way in as on the way out.
+        let colleague = channel.participant_access("sam@acme.test", CompanyMembership::Member);
+        assert!(!colleague.authorized);
+        assert!(!channel.viewer_access(
+            &EmailAddress::from("sam@acme.test"),
+            CompanyMembership::Member
+        ));
+
+        // A stranger stays a stranger, whatever address they claim.
+        assert!(
+            !channel
+                .participant_access("anyone@example.test", CompanyMembership::None)
+                .authorized
+        );
+    }
+
+    #[test]
+    fn an_unrestricted_channel_takes_the_team_s_mail_and_no_one_else_s() {
+        for channel in [channel_for(None), channel_for(Some(&[]))] {
+            for membership in [CompanyMembership::Owner, CompanyMembership::Member] {
+                let access = channel.participant_access("dana@acme.test", membership);
+                assert!(access.authorized);
+                assert!(access.trusted);
+            }
+            let stranger =
+                channel.participant_access("anyone@example.test", CompanyMembership::None);
+            assert!(!stranger.authorized);
+            assert!(!stranger.trusted);
+        }
+    }
+
+    #[test]
+    fn public_lets_a_stranger_write_without_trusting_them() {
+        let channel = channel_for(Some(&[PUBLIC_PARTICIPANT, "dana@acme.test"]));
+
+        // Anyone may write in...
+        let stranger = channel.participant_access("anyone@example.test", CompanyMembership::None);
+        assert!(stranger.authorized);
+        // ...but `@public` alone never waives spam scoring or opens the thread to third parties.
+        assert!(!stranger.trusted);
+
+        // Being on the team is what earns that, listed or not.
+        assert!(
+            channel
+                .participant_access("sam@acme.test", CompanyMembership::Member)
+                .trusted
+        );
+    }
+
+    #[test]
+    fn a_participant_is_matched_the_way_a_mailbox_is() {
+        let channel = channel_for(Some(&["  Dana@Acme.test  "]));
+
+        assert!(channel.viewer_access(
+            &EmailAddress::from("dana@acme.test"),
+            CompanyMembership::Member
+        ));
+    }
 
     fn channel_with_aliases(aliases: &[&str]) -> Channel {
         Channel {

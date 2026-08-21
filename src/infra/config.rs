@@ -2,7 +2,7 @@ use std::env;
 
 use time::Duration;
 
-use crate::entities::value_objects::EmailAddress;
+use crate::{adapters::http::session::MIN_SECRET_BYTES, entities::value_objects::EmailAddress};
 
 pub struct AppConfig {
     pub jwt_secret: String,
@@ -28,6 +28,12 @@ pub struct AppConfig {
     pub spam_scanner_type: String,
     pub spam_scanner_url: String,
     pub enable_llm_spam_guardrail: bool,
+    /// Whether session cookies are marked `Secure`, so a browser never sends one over plain HTTP.
+    ///
+    /// Derived from [`AppConfig::app_domain_name`] rather than defaulted, because the two
+    /// deployments that exist -- localhost over HTTP and a real domain over HTTPS -- want opposite
+    /// answers, and a `Secure` cookie on localhost is a cookie that silently never arrives.
+    pub secure_cookies: bool,
     /// Where picked files are stored, when a bucket has been configured; `None` means this
     /// deployment cannot accept uploads and the pages that offer one say so.
     pub gcs: Option<GcsConfig>,
@@ -52,8 +58,14 @@ pub struct GcsConfig {
     pub service_account_json_base64: String,
     /// A CDN or custom domain in front of the bucket; `None` serves straight from Google.
     pub public_base_url_override: Option<String>,
-    /// The folder inside the bucket avatars are written to.
+    /// The folder inside the public bucket avatars are written to.
     pub avatar_folder: String,
+    /// The bucket mail attachments are written to, which must **not** be publicly readable: what
+    /// arrives on a channel is only ever served through the app, to somebody the channel's own
+    /// rules allow. `None` means attachments are not stored at all.
+    pub attachments_bucket: Option<String>,
+    /// The folder inside the private bucket attachments are written to.
+    pub attachments_folder: String,
 }
 
 impl GcsConfig {
@@ -73,6 +85,9 @@ impl GcsConfig {
                 public_base_url_override: non_empty_var("GCS_PUBLIC_BASE_URL"),
                 avatar_folder: non_empty_var("GCS_AVATAR_FOLDER")
                     .unwrap_or_else(|| "avatars".to_string()),
+                attachments_bucket: non_empty_var("GCS_ATTACHMENTS_BUCKET"),
+                attachments_folder: non_empty_var("GCS_ATTACHMENTS_FOLDER")
+                    .unwrap_or_else(|| "attachments".to_string()),
             }),
             (None, None) => None,
             (bucket, _) => panic!(
@@ -102,6 +117,14 @@ impl GcsConfig {
     }
 }
 
+/// Whether this is a developer's machine rather than a deployment, for the purpose of cookies.
+fn is_local_domain(domain: &str) -> bool {
+    let domain = domain.trim().to_ascii_lowercase();
+    let domain = domain.split(':').next().unwrap_or(&domain);
+
+    domain.is_empty() || domain == "localhost" || domain == "127.0.0.1" || domain == "[::1]"
+}
+
 /// An environment variable that is set to something, treating blank as unset.
 ///
 /// A deploy platform writes an empty string for a secret that was never filled in, and an empty
@@ -123,6 +146,11 @@ impl AppConfig {
 
     pub fn from_env() -> Self {
         let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+        assert!(
+            jwt_secret.len() >= MIN_SECRET_BYTES,
+            "JWT_SECRET must be at least {MIN_SECRET_BYTES} characters: it signs every session, \
+             so a guessable one is every account at once",
+        );
 
         let refresh_token_ttl_days: i64 = env::var("REFRESH_TOKEN_TTL_DAYS")
             .unwrap_or("30".to_string())
@@ -136,6 +164,12 @@ impl AppConfig {
 
         let app_domain_name =
             env::var("APP_DOMAIN_NAME").unwrap_or_else(|_| "localhost".to_string());
+
+        // Overridable for the deployment that terminates TLS somewhere this app cannot see.
+        let secure_cookies = match env::var("COOKIE_SECURE").ok().as_deref() {
+            Some(setting) => setting.trim().eq_ignore_ascii_case("true"),
+            None => !is_local_domain(&app_domain_name),
+        };
 
         let cors_allowed_origins = env::var("CORS_ALLOWED_ORIGINS")
             .unwrap_or_else(|_| "http://localhost:5173".to_string())
@@ -246,6 +280,7 @@ impl AppConfig {
             spam_scanner_type,
             spam_scanner_url,
             enable_llm_spam_guardrail,
+            secure_cookies,
             gcs: GcsConfig::from_env(),
             operator_emails,
         }
@@ -257,18 +292,72 @@ impl AppConfig {
 }
 
 #[cfg(test)]
+impl AppConfig {
+    /// A configuration with everything at its default, for tests that care about one field.
+    ///
+    /// Spelling out all of these at each test's call site is what made adding a field a
+    /// twenty-seven-file change; `..AppConfig::for_test()` keeps the next one to this function.
+    pub fn for_test() -> Self {
+        Self {
+            jwt_secret: "a-test-secret-long-enough-to-sign-with-01".to_string(),
+            access_token_ttl: Duration::days(1),
+            refresh_token_ttl: Duration::days(30),
+            app_domain_name: "localhost".to_string(),
+            cors_allowed_origins: Vec::new(),
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: String::new(),
+            smtp_password: String::new(),
+            smtp_from_address: "noreply@localhost".to_string(),
+            incoming_smtp_enabled: false,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: Vec::new(),
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: false,
+            enable_heuristic_scanner: false,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: String::new(),
+            enable_llm_spam_guardrail: false,
+            secure_cookies: false,
+            gcs: None,
+            operator_emails: Vec::new(),
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Long enough to pass the startup check, which is itself part of what is under test.
+    const TEST_SECRET: &str = "a-test-secret-long-enough-to-sign-with-01";
 
     #[test]
     fn test_app_config_from_env() {
         unsafe {
-            env::set_var("JWT_SECRET", "test_secret");
+            env::set_var("JWT_SECRET", TEST_SECRET);
             env::set_var("APP_DOMAIN_NAME", "example.com");
         }
 
         let config = AppConfig::from_env();
-        assert_eq!(config.jwt_secret, "test_secret");
+        assert_eq!(config.jwt_secret, TEST_SECRET);
         assert_eq!(config.app_domain_name, "example.com");
+        // A real domain is served over HTTPS, so its cookies say so.
+        assert!(config.secure_cookies);
+    }
+
+    #[test]
+    fn a_developer_machine_gets_cookies_it_can_send() {
+        assert!(is_local_domain("localhost"));
+        assert!(is_local_domain("LocalHost:3001"));
+        assert!(is_local_domain("127.0.0.1"));
+        assert!(is_local_domain(""));
+
+        assert!(!is_local_domain("example.com"));
+        assert!(!is_local_domain("mail.example.com"));
     }
 }

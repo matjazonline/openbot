@@ -1,14 +1,18 @@
+use std::sync::Arc;
+
 use axum::{
     body::Body,
-    extract::FromRequestParts,
+    extract::{FromRequestParts, State},
     http::{Request, StatusCode, request::Parts},
     middleware::Next,
     response::{IntoResponse, Redirect, Response},
 };
-use axum_extra::extract::CookieJar;
 use uuid::Uuid;
 
-use crate::adapters::http::app_state::AppState;
+use crate::{
+    adapters::http::{app_state::AppState, session::SessionAuthority},
+    entities::{user::Viewer, value_objects::EmailAddress},
+};
 
 #[derive(Debug, Clone)]
 pub struct AuthenticatedUser {
@@ -38,10 +42,17 @@ impl IntoResponse for AuthError {
     }
 }
 
-fn authenticated_user(headers: &axum::http::HeaderMap) -> Option<AuthenticatedUser> {
-    let jar = CookieJar::from_headers(headers);
-    let id = Uuid::parse_str(jar.get("user_id")?.value()).ok()?;
-    Some(AuthenticatedUser { id })
+/// Who a request is signed in as.
+///
+/// The answer comes from [`SessionAuthority`] and nowhere else: a cookie is believed because it
+/// carries a signature this deployment produced, never because it parses as a user id.
+fn authenticated_user(
+    sessions: &SessionAuthority,
+    headers: &axum::http::HeaderMap,
+) -> Option<AuthenticatedUser> {
+    sessions
+        .user_from_headers(headers)
+        .map(|id| AuthenticatedUser { id })
 }
 
 fn auth_error(path: &str, is_htmx: bool) -> AuthError {
@@ -54,8 +65,12 @@ fn auth_error(path: &str, is_htmx: bool) -> AuthError {
     }
 }
 
-pub async fn require_auth(request: Request<Body>, next: Next) -> Response {
-    if authenticated_user(request.headers()).is_some() {
+pub async fn require_auth(
+    State(sessions): State<Arc<SessionAuthority>>,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    if authenticated_user(&sessions, request.headers()).is_some() {
         return next.run(request).await;
     }
 
@@ -73,7 +88,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
 
     async fn from_request_parts(
         parts: &mut Parts,
-        _state: &AppState,
+        state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         let is_htmx = parts
             .headers
@@ -82,11 +97,40 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             .map(|v| v == "true")
             .unwrap_or(false);
 
-        if let Some(user) = authenticated_user(&parts.headers) {
+        if let Some(user) = authenticated_user(&state.sessions, &parts.headers) {
             return Ok(user);
         }
 
         Err(auth_error(parts.uri.path(), is_htmx))
+    }
+}
+
+/// The signed-in account together with its address, for the guards written in terms of who a
+/// channel's participants are.
+///
+/// An extractor rather than a lookup inside each handler, so a read guard cannot be reached with
+/// somebody else's address: the address comes from the session's own account, every time.
+impl FromRequestParts<AppState> for Viewer {
+    type Rejection = AuthError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let user = AuthenticatedUser::from_request_parts(parts, state).await?;
+
+        let account = state
+            .user_use_cases
+            .get_user_by_id(user.id)
+            .await
+            .ok()
+            .flatten()
+            .ok_or(AuthError::Unauthorized)?;
+
+        Ok(Viewer {
+            user_id: user.id,
+            email: EmailAddress::from(account.email.as_str()),
+        })
     }
 }
 
@@ -95,6 +139,12 @@ mod tests {
     use super::*;
     use axum::{Router, middleware, routing::get};
     use tower::ServiceExt;
+
+    use crate::infra::config::AppConfig;
+
+    fn sessions() -> Arc<SessionAuthority> {
+        Arc::new(SessionAuthority::new(&AppConfig::for_test()))
+    }
 
     #[tokio::test]
     async fn auth_error_redirects_to_login() {
@@ -139,7 +189,7 @@ mod tests {
         let app = Router::new()
             .route("/companies", get(|| async { StatusCode::OK }))
             .route("/api/companies", get(|| async { StatusCode::OK }))
-            .route_layer(middleware::from_fn(require_auth));
+            .route_layer(middleware::from_fn_with_state(sessions(), require_auth));
 
         let page_response = app
             .clone()
@@ -155,5 +205,43 @@ mod tests {
             .unwrap();
         assert_eq!(api_response.status(), StatusCode::UNAUTHORIZED);
         assert!(api_response.headers().get("location").is_none());
+    }
+
+    #[tokio::test]
+    async fn a_signed_session_gets_in_and_a_typed_user_id_does_not() {
+        let sessions = sessions();
+        let app = Router::new()
+            .route("/companies", get(|| async { StatusCode::OK }))
+            .route_layer(middleware::from_fn_with_state(
+                sessions.clone(),
+                require_auth,
+            ));
+
+        let signed_in = app
+            .clone()
+            .oneshot(
+                Request::get("/companies")
+                    .header(
+                        "cookie",
+                        format!("session={}", sessions.cookie(Uuid::new_v4()).value()),
+                    )
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(signed_in.status(), StatusCode::OK);
+
+        // What the old cookie looked like. It is now worth exactly nothing.
+        let forged = app
+            .oneshot(
+                Request::get("/companies")
+                    .header("cookie", format!("user_id={}", Uuid::new_v4()))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(forged.status(), StatusCode::SEE_OTHER);
     }
 }

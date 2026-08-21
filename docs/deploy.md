@@ -107,6 +107,7 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | Outbound relay credentials |
 | `OPENAI_API_KEY` | Or `ANTHROPIC_API_KEY` / `GROQ_API_KEY` / `GEMINI_API_KEY`, per the agent's configured provider |
 | `GCS_SERVICE_ACCOUNT_JSON_BASE64` | The Cloud Storage service account key, base64-encoded — see [Picture uploads](#picture-uploads) |
+| `JWT_SECRET` | Signs every session cookie. At least 32 characters; the app refuses to start with less |
 
 Non-secret settings live in the `[env]` block of `fly.toml`. `.env.example`
 documents the full set.
@@ -135,6 +136,38 @@ bytes never change. Put a CDN in front by setting `GCS_PUBLIC_BASE_URL`.
 
 With no bucket configured the app runs normally and the picture pickers report
 that uploads are not configured; avatars already stored keep rendering.
+
+### Mail attachments
+
+Attachments arriving on a channel are stored in a **second bucket with no public access**
+(`GCS_ATTACHMENTS_BUCKET`), never the avatar bucket. They are downloaded through the app
+(`/ui/threads/{thread}/attachments/{sha256}`), which authorizes each request the same way opening
+the thread is authorized, and serves the bytes with `Content-Disposition: attachment` and
+`X-Content-Type-Options: nosniff` so nothing emailed to us ever renders as a page on this origin.
+
+There is no signed or public URL anywhere in that path, so nothing is forwardable and access ends
+the moment someone leaves the channel. The same service account key covers both buckets; grant it
+Storage Object Creator **and** Storage Object Viewer on the private one.
+
+Objects are named by the SHA-256 of their contents, so the same file arriving twice is stored once.
+With no attachments bucket configured, mail still arrives and its attachments are recorded in
+`email_messages.attachments` — they simply show in the mailbox as files we do not have.
+
+### Who can read what
+
+Sessions are HS256 tokens signed with `JWT_SECRET` (cookie `session`, `HttpOnly`, `SameSite=Lax`,
+`Secure` off localhost). Deploying this invalidates every existing session once: the old cookie was
+an unsigned user id, and it is no longer believed.
+
+Reads are scoped by the channel a message arrived on, not by the company alone:
+
+| Channel's participant list | Who may read its threads and files |
+| --- | --- |
+| absent or empty | the company team (owner + `company_members`) |
+| contains `@public` | the company team — `@public` admits *mail*, never readers |
+| specific addresses | those addresses, plus the company owner |
+
+Administration (channels, agents, company settings) stays owner-only regardless.
 
 ### Do not use `sslmode=require`
 

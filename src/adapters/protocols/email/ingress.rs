@@ -1,16 +1,45 @@
 use crate::{
+    adapters::storage::FileStorage,
     entities::{
         channel::{ChannelType, ParticipantIdentity},
         message_contract::NormalizedInboundMessage,
         value_objects::{MessageId, ThreadIndex},
     },
     infra::config::AppConfig,
-    services::email_parser::{EmailParser, RawInboundPayload},
+    services::{
+        attachment_store::store_inbound_attachments,
+        email_parser::{EmailParser, RawInboundPayload},
+    },
 };
 
 pub struct EmailIngressAdapter;
 
 impl EmailIngressAdapter {
+    /// Parse, having first put any attachments somewhere they can be fetched from again.
+    ///
+    /// The storing happens here rather than inside [`EmailParser::parse`] because this is the last
+    /// point that holds the bytes *and* may await: everything past it carries metadata only.
+    /// With no storage configured this is exactly [`EmailIngressAdapter::parse`].
+    pub async fn parse_and_store(
+        mut payload: RawInboundPayload,
+        config: &AppConfig,
+        storage: Option<&dyn FileStorage>,
+    ) -> NormalizedInboundMessage {
+        if let (Some(storage), Some(gcs)) = (storage, config.gcs.as_ref())
+            && gcs.attachments_bucket.is_some()
+            && !payload.attachments_data.is_empty()
+        {
+            store_inbound_attachments(
+                storage,
+                &gcs.attachments_folder,
+                &mut payload.attachments_data,
+            )
+            .await;
+        }
+
+        Self::parse(payload, config)
+    }
+
     pub fn parse(payload: RawInboundPayload, config: &AppConfig) -> NormalizedInboundMessage {
         let parsed = EmailParser::parse(payload, &config.app_domain_name);
 

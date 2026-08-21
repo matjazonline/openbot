@@ -70,6 +70,7 @@ async fn sendgrid_inbound_webhook(
                             content_type: field_content_type
                                 .unwrap_or_else(|| "application/octet-stream".into()),
                             content: bytes.to_vec(),
+                            stored_key: None,
                         });
                     }
                 } else if let Ok(value) = field.text().await {
@@ -120,7 +121,12 @@ async fn sendgrid_inbound_webhook(
     }
 
     // Synchronous Ingestion: Parse MIME into normalized message, resolve thread, verify ACL, and save inbound message
-    let norm_payload = EmailIngressAdapter::parse(raw_payload, &thread_use_cases.config());
+    let norm_payload = EmailIngressAdapter::parse_and_store(
+        raw_payload,
+        &thread_use_cases.config(),
+        thread_use_cases.file_storage(),
+    )
+    .await;
     let ingest = thread_use_cases
         .ingest_normalized_message(norm_payload)
         .await
@@ -187,6 +193,7 @@ fn extract_from_payload(payload: SendGridPayload, raw: &mut RawInboundPayload) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::company_member::CompanyMembership;
     use async_trait::async_trait;
     use axum::body::Body;
     use axum::http::Request;
@@ -262,8 +269,12 @@ mod tests {
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
         }
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
-            Ok(true)
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
         }
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
@@ -1053,6 +1064,7 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
         });
@@ -1087,6 +1099,9 @@ mod tests {
                 .expect("valid lazy pool url"),
             config: config.clone(),
             monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+            sessions: Arc::new(crate::adapters::http::session::SessionAuthority::new(
+                &config,
+            )),
             // Inbound mail never uploads anything.
             file_storage: None,
             // Same lazy pool: this test never renders a dashboard, so it never connects.
