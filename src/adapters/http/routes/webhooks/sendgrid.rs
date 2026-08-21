@@ -761,7 +761,7 @@ mod tests {
             _username: &str,
             _email: &str,
             _password_hash: &str,
-        ) -> AppResult<()> {
+        ) -> AppResult<crate::entities::user::User> {
             unimplemented!()
         }
         async fn get_by_email(

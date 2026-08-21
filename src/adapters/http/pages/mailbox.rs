@@ -728,8 +728,23 @@ fn icon_rail(company_id: Uuid, section: UiSection) -> String {
 /// The rail's buttons are square and large, so its glyphs are drawn a size up from body icons.
 const RAIL_ICON: &str = "h-6 w-6";
 
+/// The header at the top of every `/ui` sidebar (first column): the workspace title and its one-line description.
+pub(crate) fn sidebar_header(title: &str, subtitle: &str) -> String {
+    format!(
+        r##"
+            <div class="border-b border-base-300 px-4 py-4">
+                <h2 class="text-sm font-bold uppercase tracking-wider opacity-70">{title}</h2>
+                <p class="text-[11px] opacity-60">{subtitle}</p>
+            </div>
+        "##,
+        title = escape_html_text(title),
+        subtitle = escape_html_text(subtitle),
+    )
+}
+
 /// The channel column: one menu entry per channel, channel actions at the bottom.
 fn channel_sidebar(page: &MailboxPage<'_>) -> String {
+    let header = sidebar_header("Mailbox", "Inbound channels and conversations.");
     let company_switcher = company_switcher(page.company, page.companies, UiSection::Mailbox);
     let items: String = page
         .channels
@@ -754,6 +769,7 @@ fn channel_sidebar(page: &MailboxPage<'_>) -> String {
     format!(
         r##"
         <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
+            {header}
             {company_switcher}
             <ul id="channel-menu" class="menu w-full flex-1 flex-nowrap gap-1 overflow-y-auto px-2">
                 {menu_body}
@@ -761,6 +777,8 @@ fn channel_sidebar(page: &MailboxPage<'_>) -> String {
             {footer}
         </aside>
         "##,
+        header = header,
+        company_switcher = company_switcher,
         footer = channel_actions(page.company.id, page.selected_channel, FragmentSwap::Inline),
     )
 }

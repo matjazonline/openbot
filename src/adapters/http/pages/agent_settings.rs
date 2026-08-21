@@ -94,6 +94,7 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
     let content = format!(
         r##"
         <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
+            {header}
             {company_switcher}
             {list_html}
             <div class="border-t border-base-300 p-2">
@@ -105,6 +106,7 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
         </aside>
         {pane_html}
         "##,
+        header = sidebar_header("Agents", "AI responders, system prompts and model overrides."),
         company_switcher = company_switcher(company, page.companies, UiSection::Agents),
         plus_glyph = icon(Icon::Plus, BUTTON_ICON),
         list_html = agent_settings_list(page.list, FragmentSwap::Inline),

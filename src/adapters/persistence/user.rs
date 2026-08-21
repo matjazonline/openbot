@@ -36,21 +36,24 @@ impl From<UserDb> for User {
 
 #[async_trait]
 impl UserPersistence for PostgresPersistence {
-    async fn create_user(&self, username: &str, email: &str, password_hash: &str) -> AppResult<()> {
+    async fn create_user(&self, username: &str, email: &str, password_hash: &str) -> AppResult<User> {
         let uuid = Uuid::new_v4();
 
-        sqlx::query!(
-            "INSERT INTO users (id, username, email, password_hash) VALUES ($1, $2, $3, $4)",
+        let db = sqlx::query_as!(
+            UserDb,
+            r#"INSERT INTO users (id, username, email, password_hash)
+               VALUES ($1, $2, $3, $4)
+               RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
             uuid,
             username,
             email,
             password_hash
         )
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        Ok(())
+        Ok(db.into())
     }
 
     async fn get_by_email(&self, email: &str) -> AppResult<Option<User>> {

@@ -98,12 +98,14 @@ pub fn task_monitor_page(page: &TaskMonitorPage<'_>) -> String {
     let content = format!(
         r##"
         <aside class="flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-200">
+            {header}
             {company_switcher}
             {filters}
             {list_html}
         </aside>
         {pane_html}
         "##,
+        header = sidebar_header("Tasks", "Background worker execution queue and states."),
         company_switcher = company_switcher(company, page.companies, UiSection::Tasks),
         filters = task_filter_form(company.id, page.channels, page.list.filter),
         list_html = task_monitor_list(page.list, FragmentSwap::Inline),

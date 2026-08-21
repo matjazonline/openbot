@@ -16,7 +16,7 @@ use super::{
     chart::{self, ChartKind, Series, TimeChart, YUnit, thousands},
     company_switcher, escape_html_text,
     icon::{BUTTON_ICON, Icon, icon},
-    mailbox::{MailboxUser, UiSection, UiShell, ui_shell},
+    mailbox::{MailboxUser, UiSection, UiShell, sidebar_header, ui_shell},
     panels_placeholder,
 };
 use crate::entities::{
@@ -104,19 +104,23 @@ impl DashboardPage<'_> {
 }
 
 pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
+    let header = sidebar_header("Dashboard", "System metrics, queue health and activity.");
     let range = range_picker(shell.scope.company_id(), shell.window);
     let sidebar = match shell.scope {
         DashboardScopeView::Company(company) => format!(
             r##"<aside class="flex w-72 shrink-0 flex-col border-r border-base-300 bg-base-200">
+                {header}
                 {switcher}
                 {range}
                 {legend}
             </aside>"##,
+            header = header,
             switcher = company_switcher(company, shell.companies, UiSection::Dashboard),
             legend = scope_legend("This company"),
         ),
         DashboardScopeView::Global => format!(
             r##"<aside class="flex w-72 shrink-0 flex-col border-r border-base-300 bg-base-200">
+                {header}
                 <div class="p-3">
                     <div class="alert alert-info py-2">
                         <span class="text-sm font-semibold">Operator view</span>
@@ -125,6 +129,7 @@ pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
                 {range}
                 {legend}
             </aside>"##,
+            header = header,
             legend = scope_legend("All companies"),
         ),
     };

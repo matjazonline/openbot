@@ -175,12 +175,14 @@ pub fn team_settings_page(page: &TeamSettingsPage<'_>) -> String {
     let content = format!(
         r##"
         <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
+            {header}
             {company_switcher}
             {list_html}
             {invite_button}
         </aside>
         {pane_html}
         "##,
+        header = sidebar_header("Team", "Company members and pending invitations."),
         company_switcher = company_switcher(company, page.companies, UiSection::Team),
         list_html = team_settings_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,

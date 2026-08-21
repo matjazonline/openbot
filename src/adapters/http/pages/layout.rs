@@ -22,7 +22,51 @@ pub fn base_layout(title: &str, content: &str) -> String {
 }
 
 pub(crate) fn public_layout(title: &str, content: &str) -> String {
-    layout(title, content, false)
+    format!(
+        r##"<!DOCTYPE html>
+<html lang="en" data-theme="dark" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title} - Mail Agents</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <style>
+        [data-theme="dark"] {{
+            --color-primary: oklch(50% 0.19 264.05);
+            --color-primary-content: oklch(96% 0.02 264.05);
+        }}
+        :root, [data-theme] {{ --radius-field: .5rem !important; }}
+        .input:focus, .input:focus-within {{ outline-offset: -1px; }}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body class="min-h-full bg-base-100 text-base-content">
+    <div class="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-6 sm:px-6 lg:px-8">
+        <nav class="navbar min-h-0 px-0">
+            <div class="flex-1">
+                <a href="/login" title="BusyBots">
+                    <img src="/assets/busybots-logo-light.png" alt="BusyBots" class="h-10 w-auto">
+                </a>
+            </div>
+            <div class="flex-none gap-2">
+                <a href="/login" class="btn btn-ghost btn-sm">Sign in</a>
+                <a href="/register" class="btn btn-primary btn-sm">Sign up</a>
+            </div>
+        </nav>
+
+        <main class="flex flex-1 items-center justify-center py-10">
+            <div class="card w-full max-w-md border border-base-300 bg-base-200 shadow-2xl">
+                <div class="card-body p-6 sm:p-8">
+                    {content}
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>"##
+    )
 }
 
 /// Navigation shown once a session exists: company-scoped shortcuts plus the account menu.

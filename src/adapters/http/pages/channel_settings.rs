@@ -187,6 +187,7 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
     let content = format!(
         r##"
         <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
+            {header}
             {company_switcher}
             {list_html}
             <div class="border-t border-base-300 p-2">
@@ -198,6 +199,7 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
         </aside>
         {pane_html}
         "##,
+        header = sidebar_header("Channels", "Inbound addresses and their routing rules."),
         company_switcher = company_switcher(company, page.companies, UiSection::Channels),
         plus_glyph = icon(Icon::Plus, BUTTON_ICON),
         list_html = channel_settings_list(page.list, FragmentSwap::Inline),

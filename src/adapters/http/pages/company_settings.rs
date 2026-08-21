@@ -124,10 +124,7 @@ pub fn company_settings_page(page: &CompanySettingsPage<'_>) -> String {
     let content = format!(
         r##"
         <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
-            <div class="border-b border-base-300 px-4 py-4">
-                <h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Companies</h2>
-                <p class="text-[11px] opacity-60">Every channel, agent and thread lives in one.</p>
-            </div>
+            {header}
             {list_html}
             <div class="border-t border-base-300 p-2">
                 <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
@@ -138,6 +135,7 @@ pub fn company_settings_page(page: &CompanySettingsPage<'_>) -> String {
         </aside>
         {pane_html}
         "##,
+        header = sidebar_header("Companies", "Every channel, agent and thread lives in one."),
         plus_glyph = icon(Icon::Plus, BUTTON_ICON),
         list_html = company_settings_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,

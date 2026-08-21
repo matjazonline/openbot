@@ -57,6 +57,7 @@ pub fn schedules_page(page: &SchedulesPage<'_>) -> String {
     let content = format!(
         r##"
         <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
+            {header}
             {company_switcher}
             {list_html}
             <div class="border-t border-base-300 p-2">
@@ -71,6 +72,7 @@ pub fn schedules_page(page: &SchedulesPage<'_>) -> String {
             {pane_html}
         </div>
         "##,
+        header = sidebar_header("Schedules", "Cron triggers and automated agent runs."),
         company_switcher = company_switcher(company, page.companies, UiSection::Schedules),
         list_html = list_html,
         plus_glyph = icon(Icon::Plus, BUTTON_ICON),
