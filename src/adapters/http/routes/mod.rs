@@ -1,4 +1,5 @@
 pub mod agent;
+pub mod agent_library;
 pub mod approval;
 pub mod assets;
 pub mod channel;
@@ -57,6 +58,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(channel::router())
         .merge(schedule::router())
         .merge(agent::router())
+        .merge(agent_library::router())
         .merge(approval::router())
         .merge(monitoring::router())
         .merge(onboarding::router())

@@ -6,7 +6,9 @@ use crate::entities::value_objects::AvatarUrl;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Agent {
     pub id: Uuid,
-    pub company_id: Uuid,
+    /// `None` identifies an operator-managed definition in the global agent library.
+    #[serde(default)]
+    pub company_id: Option<Uuid>,
     pub name: String,
     pub slug: String,
     pub provider: Option<String>,
@@ -24,6 +26,10 @@ pub struct Agent {
 }
 
 impl Agent {
+    pub fn is_library(&self) -> bool {
+        self.company_id.is_none()
+    }
+
     pub fn default_config() -> serde_json::Value {
         serde_json::json!({
             "system_prompt": "You are a helpful email agent."

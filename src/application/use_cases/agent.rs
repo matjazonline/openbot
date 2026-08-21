@@ -76,6 +76,12 @@ impl AgentWrite {
 pub trait AgentPersistence: Send + Sync {
     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent>;
 
+    async fn create_library(&self, _write: AgentWrite) -> AppResult<Agent> {
+        Err(AppError::Internal(
+            "Agent library persistence is unavailable.".into(),
+        ))
+    }
+
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>>;
 
     async fn get_by_company_slug_and_agent_slug(
@@ -86,9 +92,19 @@ pub trait AgentPersistence: Send + Sync {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>>;
 
+    async fn list_library(&self) -> AppResult<Vec<Agent>> {
+        Ok(Vec::new())
+    }
+
     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent>;
 
     async fn delete(&self, id: Uuid) -> AppResult<()>;
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SelectableAgents {
+    pub company_agents: Vec<Agent>,
+    pub library_agents: Vec<Agent>,
 }
 
 #[derive(Clone)]
@@ -141,6 +157,71 @@ impl AgentUseCases {
         self.agent_persistence.list_by_company_id(company_id).await
     }
 
+    /// Definitions a company owner may assign to a channel, grouped by ownership.
+    pub async fn list_selectable_agents(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<SelectableAgents> {
+        self.verify_company_owner(user_id, company_id).await?;
+        Ok(SelectableAgents {
+            company_agents: self
+                .agent_persistence
+                .list_by_company_id(company_id)
+                .await?,
+            library_agents: self.agent_persistence.list_library().await?,
+        })
+    }
+
+    pub async fn list_assignable_agents(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<Vec<Agent>> {
+        let selectable = self.list_selectable_agents(user_id, company_id).await?;
+        Ok(selectable
+            .library_agents
+            .into_iter()
+            .chain(selectable.company_agents)
+            .collect())
+    }
+
+    pub async fn list_library_agents(&self) -> AppResult<Vec<Agent>> {
+        self.agent_persistence.list_library().await
+    }
+
+    pub async fn get_library_agent(&self, agent_id: Uuid) -> AppResult<Option<Agent>> {
+        Ok(self
+            .agent_persistence
+            .get_by_id(agent_id)
+            .await?
+            .filter(Agent::is_library))
+    }
+
+    pub async fn create_library_agent(&self, mut write: AgentWrite) -> AppResult<Agent> {
+        write.normalize()?;
+        self.agent_persistence.create_library(write).await
+    }
+
+    pub async fn update_library_agent(
+        &self,
+        agent_id: Uuid,
+        mut write: AgentWrite,
+    ) -> AppResult<Agent> {
+        self.get_library_agent(agent_id)
+            .await?
+            .ok_or_else(agent_not_found)?;
+        write.normalize()?;
+        self.agent_persistence.update(agent_id, write).await
+    }
+
+    pub async fn delete_library_agent(&self, agent_id: Uuid) -> AppResult<()> {
+        self.get_library_agent(agent_id)
+            .await?
+            .ok_or_else(agent_not_found)?;
+        self.agent_persistence.delete(agent_id).await
+    }
+
     #[instrument(skip(self))]
     pub async fn get_company_agent(
         &self,
@@ -151,7 +232,7 @@ impl AgentUseCases {
         self.verify_company_owner(user_id, company_id).await?;
         let agent = self.agent_persistence.get_by_id(agent_id).await?;
         if let Some(ref ag) = agent {
-            if ag.company_id != company_id {
+            if ag.company_id != Some(company_id) {
                 return Ok(None);
             }
         }
@@ -184,7 +265,7 @@ impl AgentUseCases {
             .agent_persistence
             .get_by_id(agent_id)
             .await?
-            .filter(|agent| agent.company_id == company_id))
+            .filter(|agent| agent.company_id.is_none() || agent.company_id == Some(company_id)))
     }
 
     #[instrument(skip(self))]
@@ -203,7 +284,7 @@ impl AgentUseCases {
             .await?
             .ok_or_else(agent_not_found)?;
 
-        if agent.company_id != company_id {
+        if agent.company_id != Some(company_id) {
             return Err(agent_not_found());
         }
 
@@ -232,7 +313,7 @@ impl AgentUseCases {
             .await?
             .ok_or_else(agent_not_found)?;
 
-        if agent.company_id != company_id {
+        if agent.company_id != Some(company_id) {
             return Err(agent_not_found());
         }
 
@@ -267,25 +348,42 @@ impl AgentUseCases {
             api_key_override,
         )?;
 
-        let agent = llm.build_agent()?;
-        info!(
-            "Calling generate_system_prompt AI model | provider: '{}', model: '{}'",
-            llm.provider, llm.model
-        );
-        let response = agent
-            .chat(instructions)
-            .await
-            .map_err(|e| AppError::Internal(format!("AI generation call failed: {e}")))?;
-
-        // Models like to wrap the prompt in a code fence despite being told not to.
-        Ok(response
-            .content
-            .trim()
-            .trim_start_matches("```")
-            .trim_end_matches("```")
-            .trim()
-            .to_string())
+        generate_prompt_with(llm, instructions).await
     }
+
+    /// Generate a library prompt from explicit operator settings (falling back to environment
+    /// credentials), since a global definition has no company settings to inherit from.
+    pub async fn generate_library_system_prompt(
+        &self,
+        instructions: &str,
+        provider: Option<&str>,
+        model: Option<&str>,
+        api_key: Option<&str>,
+    ) -> AppResult<String> {
+        let llm = PromptGeneratorLlm::resolve_global(provider, model, api_key)?;
+        generate_prompt_with(llm, instructions).await
+    }
+}
+
+async fn generate_prompt_with(llm: PromptGeneratorLlm, instructions: &str) -> AppResult<String> {
+    let agent = llm.build_agent()?;
+    info!(
+        "Calling generate_system_prompt AI model | provider: '{}', model: '{}'",
+        llm.provider, llm.model
+    );
+    let response = agent
+        .chat(instructions)
+        .await
+        .map_err(|e| AppError::Internal(format!("AI generation call failed: {e}")))?;
+
+    // Models like to wrap the prompt in a code fence despite being told not to.
+    Ok(response
+        .content
+        .trim()
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim()
+        .to_string())
 }
 
 const PROMPT_GENERATOR_SYSTEM_PROMPT: &str = "\
@@ -307,6 +405,33 @@ struct PromptGeneratorLlm {
 }
 
 impl PromptGeneratorLlm {
+    fn resolve_global(
+        provider_override: Option<&str>,
+        model_override: Option<&str>,
+        api_key_override: Option<&str>,
+    ) -> AppResult<Self> {
+        let provider = non_empty(provider_override)
+            .map(str::to_lowercase)
+            .unwrap_or_else(provider_from_environment);
+        let model = non_empty(model_override)
+            .unwrap_or_else(|| default_model_for(&provider))
+            .to_string();
+        let environment_key = environment_api_key(&provider);
+        let api_key = non_empty(api_key_override)
+            .or_else(|| non_empty(environment_key.as_deref()))
+            .ok_or_else(|| {
+                AppError::BadRequest(format!(
+                    "An API key is required to generate a prompt with provider '{provider}'."
+                ))
+            })?
+            .to_string();
+        Ok(Self {
+            provider,
+            model,
+            api_key,
+        })
+    }
+
     fn resolve(
         company: &crate::entities::company::Company,
         provider_override: Option<&str>,
@@ -425,6 +550,7 @@ fn environment_api_key(provider: &str) -> Option<String> {
         "openai" => std::env::var("OPENAI_API_KEY").ok(),
         "anthropic" => std::env::var("ANTHROPIC_API_KEY").ok(),
         "groq" => std::env::var("GROQ_API_KEY").ok(),
+        "mistral" => std::env::var("MISTRAL_API_KEY").ok(),
         _ => std::env::var("LLM_API_KEY")
             .ok()
             .or_else(|| std::env::var("API_KEY").ok()),
@@ -558,7 +684,7 @@ mod tests {
         async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
             let agent = Agent {
                 id: Uuid::new_v4(),
-                company_id,
+                company_id: Some(company_id),
                 name: write.name,
                 slug: write.slug,
                 provider: write.provider,
@@ -604,7 +730,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .filter(|a| a.company_id == company_id)
+                .filter(|a| a.company_id == Some(company_id))
                 .cloned()
                 .collect())
         }

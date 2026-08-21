@@ -988,7 +988,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
 fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
     Agent {
         id: Uuid::new_v4(),
-        company_id,
+        company_id: Some(company_id),
         name: name.to_string(),
         slug: slug.to_string(),
         provider: None,
@@ -3191,7 +3191,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         activity: no_activity(),
         detail_html: "",
     });
-    assert!(mailbox_html.contains(r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Mailbox</h2>"##));
+    assert!(mailbox_html.contains(
+        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Mailbox</h2>"##
+    ));
 
     let channels_html = channel_settings_page(&ChannelSettingsPage {
         user: &user,
@@ -3204,7 +3206,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(channels_html.contains(r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Channels</h2>"##));
+    assert!(channels_html.contains(
+        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Channels</h2>"##
+    ));
 
     let agents_html = agent_settings_page(&AgentSettingsPage {
         user: &user,
@@ -3216,7 +3220,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(agents_html.contains(r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Agents</h2>"##));
+    assert!(agents_html.contains(
+        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Agents</h2>"##
+    ));
 
     let schedules_html = schedules_page(&SchedulesPage {
         user: &user,
@@ -3227,7 +3233,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         runs_html: "",
         pane_html: "",
     });
-    assert!(schedules_html.contains(r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Schedules</h2>"##));
+    assert!(schedules_html.contains(
+        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Schedules</h2>"##
+    ));
 
     let tasks_filter = TaskFilter::new(None, None, false, None, None);
     let tasks_html = task_monitor_page(&TaskMonitorPage {
@@ -3243,7 +3251,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(tasks_html.contains(r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Tasks</h2>"##));
+    assert!(tasks_html.contains(
+        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Tasks</h2>"##
+    ));
 
     let outbox_filter_val = outbox_filter();
     let outbox_html = outbox_page(&OutboxPage {
@@ -3259,7 +3269,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(outbox_html.contains(r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Outbox</h2>"##));
+    assert!(outbox_html.contains(
+        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Outbox</h2>"##
+    ));
 
     let dashboard_html = dashboard_page(&DashboardShell {
         user: &user,
@@ -3267,7 +3279,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         companies: &companies,
         window: crate::entities::dashboard::DashboardWindow::last_hour(),
     });
-    assert!(dashboard_html.contains(r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Dashboard</h2>"##));
+    assert!(dashboard_html.contains(
+        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Dashboard</h2>"##
+    ));
 
     let dashboard_global_html = dashboard_page(&DashboardShell {
         user: &user,
@@ -3275,7 +3289,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         companies: &companies,
         window: crate::entities::dashboard::DashboardWindow::last_hour(),
     });
-    assert!(dashboard_global_html.contains(r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Dashboard</h2>"##));
+    assert!(dashboard_global_html.contains(
+        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Dashboard</h2>"##
+    ));
 
     let companies_html = company_settings_page(&CompanySettingsPage {
         user: &user,
@@ -3286,7 +3302,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         rail_company_id: Some(company.id),
         pane_html: "",
     });
-    assert!(companies_html.contains(r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Companies</h2>"##));
+    assert!(companies_html.contains(
+        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Companies</h2>"##
+    ));
 
     let team_html = team_settings_page(&TeamSettingsPage {
         user: &user,
@@ -3300,5 +3318,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(team_html.contains(r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Team</h2>"##));
+    assert!(team_html.contains(
+        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Team</h2>"##
+    ));
 }

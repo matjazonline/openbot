@@ -125,6 +125,7 @@ pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
                     <div class="alert alert-info py-2">
                         <span class="text-sm font-semibold">Operator view</span>
                     </div>
+                    <a href="/ui/agent-library" class="btn btn-primary btn-sm mt-3 w-full">Manage agent library</a>
                 </div>
                 {range}
                 {legend}

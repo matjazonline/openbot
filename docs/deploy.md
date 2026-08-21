@@ -105,6 +105,7 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 | `DATABASE_URL` | Points at `mail-agents-db.internal` |
 | `JWT_SECRET` | Session signing key |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | Outbound relay credentials |
+| `SMTP_HOST` / `SMTP_FROM_ADDRESS` | Outbound relay and sender; when both are configured with a non-local host, new accounts must confirm a six-digit code sent by email. If outbound SMTP is not configured, registration skips confirmation. |
 | `OPENAI_API_KEY` | Or `ANTHROPIC_API_KEY` / `GROQ_API_KEY` / `GEMINI_API_KEY`, per the agent's configured provider |
 | `GCS_SERVICE_ACCOUNT_JSON_BASE64` | The Cloud Storage service account key, base64-encoded — see [Picture uploads](#picture-uploads) |
 | `JWT_SECRET` | Signs every session cookie. At least 32 characters; the app refuses to start with less |

@@ -81,3 +81,20 @@ pub fn register_page() -> String {
 
     public_layout("Register", content)
 }
+
+pub fn confirmation_form(email: &str) -> String {
+    let email = escape_html_text(email);
+    format!(
+        r##"<div class="rounded-lg border border-blue-200 bg-blue-50 p-4 text-blue-900">
+            <p class="mb-3">We sent a 6-digit confirmation code to <strong>{email}</strong>.</p>
+            <form hx-post="/api/user/register/confirm" hx-target="#response-message" hx-swap="innerHTML" class="space-y-3">
+                <input type="hidden" name="email" value="{email}">
+                <label for="confirmation_code" class="block text-sm font-medium">Confirmation code</label>
+                <input type="text" id="confirmation_code" name="code" required inputmode="numeric"
+                    autocomplete="one-time-code" pattern="[0-9]{{6}}" maxlength="6"
+                    class="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="000000">
+                <button type="submit" class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white">Confirm email</button>
+            </form>
+        </div>"##,
+    )
+}

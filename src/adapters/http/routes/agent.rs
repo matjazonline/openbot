@@ -145,7 +145,7 @@ pub struct AgentJsonPayload {
 
 impl AgentJsonPayload {
     /// The avatar this payload means, or why it cannot be stored.
-    fn avatar_url(&self) -> Result<Option<AvatarUrl>, String> {
+    pub(super) fn avatar_url(&self) -> Result<Option<AvatarUrl>, String> {
         AvatarUrl::parse(self.avatar_url.as_deref().unwrap_or_default())
     }
 }
@@ -813,7 +813,7 @@ mod tests {
 
         let agent = Agent {
             id: Uuid::new_v4(),
-            company_id: company.id,
+            company_id: Some(company.id),
             name: "Support Agent".to_string(),
             slug: "support-agent".to_string(),
             provider: Some("openai".to_string()),

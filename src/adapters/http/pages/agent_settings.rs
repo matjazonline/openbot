@@ -106,7 +106,10 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
         </aside>
         {pane_html}
         "##,
-        header = sidebar_header("Agents", "AI responders, system prompts and model overrides."),
+        header = sidebar_header(
+            "Agents",
+            "AI responders, system prompts and model overrides."
+        ),
         company_switcher = company_switcher(company, page.companies, UiSection::Agents),
         plus_glyph = icon(Icon::Plus, BUTTON_ICON),
         list_html = agent_settings_list(page.list, FragmentSwap::Inline),

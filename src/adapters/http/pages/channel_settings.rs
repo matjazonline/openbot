@@ -603,7 +603,8 @@ fn agent_radios(company_id: Uuid, agents: &[Agent], selected: &[Uuid], id_prefix
         );
     }
 
-    let options: String = agents
+    let render_options = |group: &[&Agent]| -> String {
+        group
         .iter()
         .map(|agent| {
             format!(
@@ -628,7 +629,32 @@ fn agent_radios(company_id: Uuid, agents: &[Agent], selected: &[Uuid], id_prefix
                 slug = escape_html_text(&agent.slug),
             )
         })
-        .collect();
+        .collect()
+    };
+    let library = agents
+        .iter()
+        .filter(|agent| agent.is_library())
+        .collect::<Vec<_>>();
+    let custom = agents
+        .iter()
+        .filter(|agent| !agent.is_library())
+        .collect::<Vec<_>>();
+    let library_options = if library.is_empty() {
+        r#"<p class="px-3 py-2 text-xs opacity-60">No library agents are available.</p>"#
+            .to_string()
+    } else {
+        render_options(&library)
+    };
+    let custom_options = if custom.is_empty() {
+        format!(
+            r#"<p class="px-3 py-2 text-xs opacity-60">No custom agents yet. <a class="link" href="/ui/agents?company_id={company_id}&amp;new=1">Create one</a>.</p>"#
+        )
+    } else {
+        render_options(&custom)
+    };
+    let options = format!(
+        r#"<div class="px-3 pt-2 text-[11px] font-bold uppercase opacity-60">Agent library</div>{library_options}<div class="mt-2 px-3 pt-2 text-[11px] font-bold uppercase opacity-60">Custom company agents</div>{custom_options}"#
+    );
 
     format!(
         r##"<div class="rounded-box border border-base-300 bg-base-200 p-1">

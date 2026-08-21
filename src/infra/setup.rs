@@ -39,7 +39,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     let postgres_arc = Arc::new(postgres_persistence().await?);
     let argon_hasher = argon2_password_hasher();
 
-    let user_use_cases = UserUseCases::new(Arc::new(argon_hasher), postgres_arc.clone());
+    let user_use_cases = UserUseCases::new(Arc::new(argon_hasher), postgres_arc.clone())
+        .with_email_confirmation(postgres_arc.clone(), config.clone());
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
     let company_invite_use_cases =
         CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());

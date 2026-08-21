@@ -308,7 +308,7 @@ async fn list_channels_page(
         .unwrap_or_default();
 
     let agents = agent_use_cases
-        .list_company_agents(user.id, company_id)
+        .list_assignable_agents(user.id, company_id)
         .await
         .unwrap_or_default();
 
@@ -424,7 +424,7 @@ impl ChannelListView<'_> {
         let company_id = self.company.id;
         let agents = self
             .agent_use_cases
-            .list_company_agents(self.user_id, company_id)
+            .list_assignable_agents(self.user_id, company_id)
             .await
             .unwrap_or_default();
         let channels = self
@@ -519,7 +519,7 @@ async fn edit_channel_form(
     };
 
     let agents = agent_use_cases
-        .list_company_agents(user.id, company_id)
+        .list_assignable_agents(user.id, company_id)
         .await
         .unwrap_or_default();
 
@@ -555,7 +555,7 @@ async fn cancel_channel_edit(
     };
 
     let agents = agent_use_cases
-        .list_company_agents(user.id, company_id)
+        .list_assignable_agents(user.id, company_id)
         .await
         .unwrap_or_default();
 
@@ -598,7 +598,7 @@ async fn update_channel_handler(
     };
 
     let agents = agent_use_cases
-        .list_company_agents(user.id, company_id)
+        .list_assignable_agents(user.id, company_id)
         .await
         .unwrap_or_default();
 

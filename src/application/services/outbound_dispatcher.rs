@@ -74,6 +74,45 @@ pub struct SentEmailResult {
 pub struct OutboundDispatcher;
 
 impl OutboundDispatcher {
+    pub async fn send_registration_confirmation(
+        config: &AppConfig,
+        recipient: &EmailAddress,
+        code: &str,
+    ) -> AppResult<()> {
+        let from = config
+            .smtp_from_address
+            .parse::<Mailbox>()
+            .map_err(|e| AppError::Internal(format!("Invalid SMTP_FROM_ADDRESS: {e}")))?;
+        let to = recipient
+            .parse::<Mailbox>()
+            .map_err(|e| AppError::BadRequest(format!("Invalid email address: {e}")))?;
+        let message = LettreMessage::builder()
+            .from(from)
+            .to(to)
+            .subject("Confirm your BusyBots email")
+            .header(ContentType::TEXT_PLAIN)
+            .body(format!(
+                "Your BusyBots confirmation code is {code}.\n\nThis code expires in 15 minutes."
+            ))
+            .map_err(|e| AppError::Internal(format!("Failed to build confirmation email: {e}")))?;
+
+        let mut transport = AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_host)
+            .map_err(|e| AppError::Internal(format!("Invalid SMTP host: {e}")))?
+            .port(config.smtp_port);
+        if !config.smtp_username.is_empty() {
+            transport = transport.credentials(Credentials::new(
+                config.smtp_username.clone(),
+                config.smtp_password.clone(),
+            ));
+        }
+        transport
+            .build()
+            .send(message)
+            .await
+            .map_err(|e| AppError::Internal(format!("SMTP dispatch failed: {e}")))?;
+        Ok(())
+    }
+
     pub fn prepare(config: &AppConfig, email: OutboundEmail) -> AppResult<SentEmailResult> {
         Self::prepare_with_message_id(config, email, None)
     }

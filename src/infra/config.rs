@@ -137,6 +137,15 @@ fn non_empty_var(name: &str) -> Option<String> {
 }
 
 impl AppConfig {
+    /// Whether registration must prove ownership of the supplied email address.
+    /// Local SMTP defaults deliberately do not turn this on.
+    pub fn email_confirmation_enabled(&self) -> bool {
+        !self.smtp_host.trim().is_empty()
+            && self.smtp_host != "localhost"
+            && !self.smtp_from_address.trim().is_empty()
+            && self.smtp_from_address != "noreply@localhost"
+    }
+
     /// Is this the address of a system operator, and so entitled to the cross-company rollup?
     pub fn is_operator(&self, email: &EmailAddress) -> bool {
         self.operator_emails

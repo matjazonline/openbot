@@ -7,7 +7,7 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{user::User, value_objects::AvatarUrl},
-    use_cases::user::UserPersistence,
+    use_cases::user::{PendingRegistration, RegistrationPersistence, UserPersistence},
 };
 
 // User struct as stored in the db.
@@ -19,6 +19,65 @@ pub struct UserDb {
     pub password_hash: String,
     pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
+}
+
+#[async_trait]
+impl RegistrationPersistence for PostgresPersistence {
+    async fn save_pending_registration(&self, pending: PendingRegistration<'_>) -> AppResult<()> {
+        sqlx::query(
+            r#"INSERT INTO pending_user_registrations
+                   (email, username, password_hash, confirmation_code_hash, expires_at)
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT (email) DO UPDATE SET
+                   username = EXCLUDED.username,
+                   password_hash = EXCLUDED.password_hash,
+                   confirmation_code_hash = EXCLUDED.confirmation_code_hash,
+                   expires_at = EXCLUDED.expires_at,
+                   created_at = CURRENT_TIMESTAMP"#,
+        )
+        .bind(pending.email.as_str())
+        .bind(pending.username)
+        .bind(pending.password_hash)
+        .bind(pending.confirmation_code_hash)
+        .bind(pending.expires_at)
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(())
+    }
+
+    async fn confirm_pending_registration(
+        &self,
+        email: &crate::entities::value_objects::EmailAddress,
+        confirmation_code_hash: &str,
+    ) -> AppResult<Option<User>> {
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        let user = sqlx::query_as::<_, UserDb>(
+            r#"INSERT INTO users (id, username, email, password_hash)
+               SELECT $3, pending.username, pending.email, pending.password_hash
+               FROM pending_user_registrations AS pending
+               WHERE pending.email = $1
+                 AND pending.confirmation_code_hash = $2
+                 AND pending.expires_at > CURRENT_TIMESTAMP
+               RETURNING id, username, email, password_hash, avatar_url, created_at"#,
+        )
+        .bind(email.as_str())
+        .bind(confirmation_code_hash)
+        .bind(Uuid::new_v4())
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+
+        if user.is_some() {
+            sqlx::query("DELETE FROM pending_user_registrations WHERE email = $1")
+                .bind(email.as_str())
+                .execute(&mut *transaction)
+                .await
+                .map_err(AppError::from)?;
+        }
+        transaction.commit().await.map_err(AppError::from)?;
+        Ok(user.map(Into::into))
+    }
 }
 
 impl From<UserDb> for User {
@@ -36,7 +95,12 @@ impl From<UserDb> for User {
 
 #[async_trait]
 impl UserPersistence for PostgresPersistence {
-    async fn create_user(&self, username: &str, email: &str, password_hash: &str) -> AppResult<User> {
+    async fn create_user(
+        &self,
+        username: &str,
+        email: &str,
+        password_hash: &str,
+    ) -> AppResult<User> {
         let uuid = Uuid::new_v4();
 
         let db = sqlx::query_as!(

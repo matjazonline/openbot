@@ -370,7 +370,7 @@ impl ChannelSettingsView<'_> {
 
     async fn agents(&self) -> AppResult<Vec<Agent>> {
         self.agent_use_cases
-            .list_company_agents(self.user_id, self.company.id)
+            .list_assignable_agents(self.user_id, self.company.id)
             .await
     }
 

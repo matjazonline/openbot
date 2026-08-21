@@ -1651,7 +1651,7 @@ mod tests {
 
         let agent = AgentEntity {
             id: Uuid::new_v4(),
-            company_id: company.id,
+            company_id: Some(company.id),
             name: "Tech Agent".to_string(),
             slug: "tech-agent".to_string(),
             provider: Some("anthropic".to_string()),
@@ -1825,7 +1825,7 @@ mod tests {
 
         let agent = AgentEntity {
             id: Uuid::new_v4(),
-            company_id: company.id,
+            company_id: Some(company.id),
             name: "Support Agent".to_string(),
             slug: "support-agent".to_string(),
             provider: None,

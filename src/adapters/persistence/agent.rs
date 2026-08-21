@@ -13,7 +13,7 @@ use crate::{
 #[derive(sqlx::FromRow, Debug, Serialize)]
 pub struct AgentDb {
     pub id: Uuid,
-    pub company_id: Uuid,
+    pub company_id: Option<Uuid>,
     pub name: String,
     pub slug: String,
     pub provider: Option<String>,
@@ -73,6 +73,29 @@ impl AgentPersistence for PostgresPersistence {
         Ok(db.into())
     }
 
+    async fn create_library(&self, write: AgentWrite) -> AppResult<Agent> {
+        let uuid = Uuid::new_v4();
+        let db = sqlx::query_as::<_, AgentDb>(
+            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url)
+               VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_at"#,
+        )
+        .bind(uuid)
+        .bind(&write.name)
+        .bind(&write.slug)
+        .bind(&write.provider)
+        .bind(&write.model)
+        .bind(&write.api_key)
+        .bind(&write.system_prompt)
+        .bind(&write.description)
+        .bind(&write.config_json)
+        .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(db.into())
+    }
+
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>> {
         let db = sqlx::query_as::<_, AgentDb>(
             r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_at
@@ -120,6 +143,18 @@ impl AgentPersistence for PostgresPersistence {
         Ok(db_list.into_iter().map(Into::into).collect())
     }
 
+    async fn list_library(&self) -> AppResult<Vec<Agent>> {
+        let rows = sqlx::query_as::<_, AgentDb>(
+            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_at
+               FROM agents WHERE company_id IS NULL
+               ORDER BY created_at DESC, id DESC LIMIT 200"#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
         let db = sqlx::query_as::<_, AgentDb>(
             r#"UPDATE agents
@@ -148,7 +183,20 @@ impl AgentPersistence for PostgresPersistence {
         sqlx::query!("DELETE FROM agents WHERE id = $1", id)
             .execute(&self.pool)
             .await
-            .map_err(AppError::from)?;
+            .map_err(|error| {
+                if error
+                    .as_database_error()
+                    .and_then(|db| db.code())
+                    .as_deref()
+                    == Some("23503")
+                {
+                    AppError::Conflict(
+                        "This library agent is assigned to one or more channels.".into(),
+                    )
+                } else {
+                    AppError::from(error)
+                }
+            })?;
 
         Ok(())
     }

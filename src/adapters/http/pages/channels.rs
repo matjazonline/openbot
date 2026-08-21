@@ -167,7 +167,8 @@ pub fn render_agents_selection_full(
         "text-slate-500",
         "Use channel fallback / custom agent",
     );
-    for agent in agents {
+    agent_cards.push_str(r#"<div class="sm:col-span-2 md:col-span-3 mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">Agent library</div>"#);
+    for agent in agents.iter().filter(|agent| agent.is_library()) {
         agent_cards.push_str(&agent_radio_card(
             &group_name,
             &agents_selection_id,
@@ -178,6 +179,27 @@ pub fn render_agents_selection_full(
             "text-slate-400",
             &format!("@{}", agent.slug),
         ));
+    }
+    if !agents.iter().any(Agent::is_library) {
+        agent_cards
+            .push_str(r#"<p class="text-xs text-slate-500">No library agents available.</p>"#);
+    }
+    agent_cards.push_str(r#"<div class="sm:col-span-2 md:col-span-3 mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">Custom company agents</div>"#);
+    for agent in agents.iter().filter(|agent| !agent.is_library()) {
+        agent_cards.push_str(&agent_radio_card(
+            &group_name,
+            &agents_selection_id,
+            &agent.id.to_string(),
+            selected_ids.is_some_and(|ids| ids.contains(&agent.id)),
+            "text-white",
+            &agent.name,
+            "text-slate-400",
+            &format!("@{}", agent.slug),
+        ));
+    }
+    if !agents.iter().any(|agent| !agent.is_library()) {
+        agent_cards
+            .push_str(r#"<p class="text-xs text-slate-500">No custom company agents yet.</p>"#);
     }
 
     let inline_form = inline_agent_form(
