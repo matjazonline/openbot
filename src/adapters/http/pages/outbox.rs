@@ -97,14 +97,12 @@ pub fn outbox_page(page: &OutboxPage<'_>) -> String {
         r##"
         <aside class="flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
-            {company_switcher}
             {filters}
             {list_html}
         </aside>
         {pane_html}
         "##,
         header = sidebar_header("Outbox", "Queued and delivered outbound messages."),
-        company_switcher = company_switcher(company, page.companies, UiSection::Outbox),
         filters = outbox_filter_form(company.id, page.channels, page.list.filter),
         list_html = outbox_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
@@ -113,7 +111,7 @@ pub fn outbox_page(page: &OutboxPage<'_>) -> String {
     ui_shell(&UiShell {
         title: &format!("{} Outbox", company.name),
         user: page.user,
-        company_id: Some(company.id),
+        company: Some(company),
         section: UiSection::Outbox,
         content: &content,
         script: "",

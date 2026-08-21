@@ -77,7 +77,7 @@ const AUTHENTICATED_NAV: &str = r##"
                     <summary class="list-none text-slate-300 hover:text-white transition cursor-pointer [&::-webkit-details-marker]:hidden">Account</summary>
                     <div class="absolute right-0 z-50 mt-2 w-36 overflow-hidden rounded-lg border border-slate-700 bg-slate-800 shadow-xl">
                         <a href="/companies" class="block px-4 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white transition">Companies</a>
-                        <a href="/invites" class="block px-4 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white transition">My Invites</a>
+                        <a href="/ui/invites" class="block px-4 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white transition">My Invites</a>
                         <form method="post" action="/logout" class="border-t border-slate-700">
                             <button type="submit" class="w-full px-4 py-2.5 text-left text-slate-300 hover:bg-slate-700 hover:text-white transition cursor-pointer">Log Out</button>
                         </form>

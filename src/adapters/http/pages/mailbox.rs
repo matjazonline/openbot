@@ -37,8 +37,7 @@ pub struct MailboxUser<'a> {
 
 /// Which `/ui` workspace a response belongs to, i.e. which rail icon is lit.
 ///
-/// Both workspaces render through [`ui_shell`], so this is also what the company switcher needs
-/// to keep a company change inside the workspace the user is already in.
+/// Every workspace renders through [`ui_shell`], which uses this to highlight its rail icon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiSection {
     Mailbox,
@@ -50,23 +49,7 @@ pub enum UiSection {
     Outbox,
     Companies,
     Team,
-}
-
-impl UiSection {
-    /// The `/ui` path this workspace is entered by, without any query string.
-    pub(crate) fn base_path(self) -> &'static str {
-        match self {
-            UiSection::Mailbox => "/ui",
-            UiSection::Dashboard => "/ui/dashboard",
-            UiSection::Channels => "/ui/channels",
-            UiSection::Agents => "/ui/agents",
-            UiSection::Schedules => "/ui/schedules",
-            UiSection::Tasks => "/ui/tasks",
-            UiSection::Outbox => "/ui/outbox",
-            UiSection::Companies => "/ui/companies",
-            UiSection::Team => "/ui/team",
-        }
-    }
+    Invites,
 }
 
 /// The confirmation asked for before a session ends: both logout triggers open this rather than
@@ -96,8 +79,9 @@ const LOGOUT_MODAL: &str = r##"
 pub struct UiShell<'a> {
     pub title: &'a str,
     pub user: &'a MailboxUser<'a>,
+    /// The company every workspace above the rail is scoped to, and whose face the rail ends on.
     /// `None` for a user with no company yet — there is nothing for the rail to point at.
-    pub company_id: Option<Uuid>,
+    pub company: Option<&'a Company>,
     pub section: UiSection,
     /// Everything to the right of the icon rail: the sidebar and its panes.
     pub content: &'a str,
@@ -107,8 +91,8 @@ pub struct UiShell<'a> {
 
 /// The full HTML document for one `/ui` response.
 pub fn ui_shell(shell: &UiShell<'_>) -> String {
-    let rail = match shell.company_id {
-        Some(company_id) => icon_rail(company_id, shell.section),
+    let rail = match shell.company {
+        Some(company) => icon_rail(company, shell.section),
         None => String::new(),
     };
 
@@ -123,7 +107,7 @@ pub fn ui_shell(shell: &UiShell<'_>) -> String {
     </div>
     {LOGOUT_MODAL}
         "##,
-        top_bar = top_bar(shell.user, shell.company_id),
+        top_bar = top_bar(shell.user, shell.company.map(|company| company.id)),
         content = shell.content,
     );
 
@@ -252,24 +236,57 @@ const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox alre
             }
         }
 
-        // Mark threads whose agent answered while the reader was looking elsewhere. The glyph is
-        // an inline SVG rendered by the server into AGENT_REPLIED_MARK, so it matches the one a
+        // Settle every thread whose agent has just answered: the row's activity mark goes quiet,
+        // and a thread the reader was not looking at gains the reply check. That glyph is an
+        // inline SVG rendered by the server into AGENT_REPLIED_MARK, so it matches the one a
         // freshly loaded row is drawn with instead of being a second copy of it here.
         //
-        // This is deliberately a client-side, in-session signal rather than a stored unread flag:
-        // it means "this happened while you were watching", so a reload starting clean is correct
-        // rather than a bug. The open thread never gets a mark -- the reply is already on screen.
+        // The check is deliberately a client-side, in-session signal rather than a stored unread
+        // flag: it means "this happened while you were watching", so a reload starting clean is
+        // correct rather than a bug. The open thread never gets one -- the reply is already on
+        // screen, and `quietRepliedRow` has settled that row from the message stream.
         function markLiveAgentReplies(list) {
             var pane = document.getElementById('detail-pane');
             var openThreadId = pane ? pane.dataset.threadId : null;
 
             list.querySelectorAll('.thread-row[data-last-role="agent"]').forEach(function (row) {
+                // The attribute is an arrival, not a standing fact about the thread, so it is spent
+                // here. Left on, every later insert of some *other* row would run this again over
+                // threads the reader has already dealt with.
+                row.removeAttribute('data-last-role');
+                // The agent has answered here, so this row's activity mark has said all it can --
+                // whether or not this is the thread on screen. The reply is the end of what the
+                // dot was promising, and the check beside it now carries the news.
+                row.classList.add('thread-replied');
                 if (row.dataset.threadId === openThreadId) return;
                 var mark = row.querySelector('.thread-mark');
                 if (!mark) return;
                 mark.innerHTML = AGENT_REPLIED_MARK;
                 mark.title = 'Agent replied';
             });
+        }
+
+        // The agent's reply landing in the open thread is the answer that thread's activity mark
+        // was promising, so the row goes quiet: the reader has the result in front of them and does
+        // not need a dot telling them a run they can see the end of is still being wound up.
+        //
+        // A class rather than emptying the slot, and one `dedupeThreadRow` carries: the bumped row
+        // arrives over the column's own connection with no ordering against this one, so a mark
+        // cleared here would be re-drawn a moment later by a row rendered before the task settled.
+        //
+        // It lasts until the column has something new to say about that thread -- a badge with a
+        // state on it -- rather than until the reader looks away. Reading a reply settles the row
+        // for good; opening another thread is not new information about this one.
+        function quietRepliedRow(bubble) {
+            if (!bubble || bubble.dataset.role !== 'agent') return;
+            var pane = document.getElementById('detail-pane');
+            var openThreadId = pane ? pane.dataset.threadId : null;
+            if (!openThreadId) return;
+            var row = document.querySelector(
+                '#thread-list .thread-row[data-thread-id="' + openThreadId + '"]');
+            if (row) {
+                row.classList.add('thread-replied');
+            }
         }
 
         // A thread reads newest-last, so opening one should land on its latest message.
@@ -337,6 +354,9 @@ const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox alre
                 if (row.classList.contains('bg-base-300')) {
                     seen[id].classList.add('bg-base-300');
                 }
+                if (row.classList.contains('thread-replied')) {
+                    seen[id].classList.add('thread-replied');
+                }
                 var staleMark = row.querySelector('.thread-mark');
                 var freshMark = seen[id].querySelector('.thread-mark');
                 if (staleMark && freshMark && staleMark.textContent && !freshMark.textContent) {
@@ -353,7 +373,17 @@ const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox alre
             var swapped = event.target;
 
             // A thread row's badge redraws in place; nothing about the messages changed.
+            //
+            // A badge arriving with something on it is a state the reader has not seen, so it also
+            // lifts the quiet an earlier reply put on that row. An empty one is the run ending,
+            // which is the reply's own news and leaves the row as the reply left it.
             if (swapped && swapped.classList && swapped.classList.contains('thread-activity')) {
+                if (swapped.firstElementChild) {
+                    var badgeRow = swapped.closest('.thread-row');
+                    if (badgeRow) {
+                        badgeRow.classList.remove('thread-replied');
+                    }
+                }
                 return;
             }
 
@@ -375,6 +405,10 @@ const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox alre
                     noThreads.remove();
                 }
                 return;
+            }
+
+            if (swapped && swapped.id === 'message-scroll') {
+                quietRepliedRow(swapped.lastElementChild);
             }
 
             // The thread is no longer empty, so its placeholder must go.
@@ -437,7 +471,7 @@ fn ui_layout(title: &str, body: &str, script: &str) -> String {
     <title>{title} - Mail Agents</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <style>{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}</style>
+    <style>{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}{THREAD_ROW_STYLES}</style>
     <script>{THEME_INIT_SCRIPT}</script>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
@@ -479,7 +513,7 @@ pub fn mailbox_page(page: &MailboxPage<'_>) -> String {
     ui_shell(&UiShell {
         title: &format!("{} Mailbox", page.company.name),
         user: page.user,
-        company_id: Some(page.company.id),
+        company: Some(page.company),
         section: UiSection::Mailbox,
         content: &content,
         script: "",
@@ -505,7 +539,7 @@ pub fn mailbox_no_company_page(user: &MailboxUser<'_>) -> String {
     ui_shell(&UiShell {
         title: "Mailbox",
         user,
-        company_id: None,
+        company: None,
         section: UiSection::Mailbox,
         content,
         script: "",
@@ -580,6 +614,15 @@ const FIELD_STYLES: &str = r##"
         .file-input:focus, .file-input:focus-within { outline-offset: -1px; }
 "##;
 
+/// The activity mark on a row whose reply the reader has just watched arrive: none.
+///
+/// Hiding rather than emptying the slot is what keeps the column honest afterwards. The badge for
+/// that thread keeps arriving and keeps being swapped into the hidden slot, so its mark is already
+/// current the moment `selectThreadRow` lifts the class and the row speaks again.
+const THREAD_ROW_STYLES: &str = r##"
+        .thread-row.thread-replied .thread-activity { display: none; }
+"##;
+
 /// The light/dark switch in the top bar: daisyUI's `theme-controller` checkbox wrapped in a
 /// `swap`, so the box flips the theme in CSS on its own and the icon rotates with it.
 /// `applyTheme` in [`MAILBOX_SCRIPT`] only has to write the choice down and keep `data-theme`
@@ -635,9 +678,10 @@ fn top_bar(user: &MailboxUser<'_>, company_id: Option<Uuid>) -> String {
                     <ul tabindex="0" class="menu menu-sm dropdown-content z-50 mt-3 w-60 rounded-box bg-base-300 p-2 shadow-xl">
                         <li class="menu-title truncate">{email}</li>
                         {profile_entry}
+                        <li><a href="/ui/invites">My Invites</a></li>
                         <li><a href="/ui/companies">Companies</a></li>
                         <li>
-                            <button type="button" class="w-full text-left" onclick="confirmLogout()">Log out</button>
+                            <button type="button" class="w-full text-left" onclick="confirmLogout()">{sign_out} Log out</button>
                         </li>
                     </ul>
                 </div>
@@ -646,6 +690,7 @@ fn top_bar(user: &MailboxUser<'_>, company_id: Option<Uuid>) -> String {
         "##,
         username = escape_html_text(user.username),
         email = escape_html_text(user.email),
+        sign_out = icon(Icon::SignOut, BUTTON_ICON),
         avatar = avatar_bubble(user.avatar_url, user.username, AvatarSize::Bar),
     )
 }
@@ -665,7 +710,8 @@ pub fn account_avatar_oob(username: &str, avatar_url: Option<&AvatarUrl>) -> Str
 ///
 /// The workspace the response belongs to is lit, so the rail says where you are as well as where
 /// you can go.
-fn icon_rail(company_id: Uuid, section: UiSection) -> String {
+fn icon_rail(company: &Company, section: UiSection) -> String {
+    let company_id = company.id;
     let destinations = [
         (UiSection::Mailbox, "/ui", Icon::Mail, "Mailbox"),
         (UiSection::Channels, "/ui/channels", Icon::Hash, "Channels"),
@@ -696,6 +742,7 @@ fn icon_rail(company_id: Uuid, section: UiSection) -> String {
             "Companies",
         ),
         (UiSection::Team, "/ui/team", Icon::People, "Team"),
+        (UiSection::Invites, "/ui/invites", Icon::Mail, "My Invites"),
     ];
 
     let links: String = destinations
@@ -717,11 +764,31 @@ fn icon_rail(company_id: Uuid, section: UiSection) -> String {
         r##"
         <nav class="flex w-16 shrink-0 flex-col items-center gap-2 border-r border-base-300 bg-base-300 py-3">
             {links}
-            <button type="button" class="btn btn-square btn-lg btn-ghost mt-auto"
-                title="Log out" onclick="confirmLogout()">{sign_out}</button>
+            {company_badge}
         </nav>
         "##,
-        sign_out = icon(Icon::SignOut, RAIL_ICON),
+        company_badge = rail_company_badge(company, FragmentSwap::Inline),
+    )
+}
+
+/// The foot of the rail: the company everything above it is scoped to, as its picture or its
+/// letter.
+///
+/// It stands where the sign-out button used to, because the rail's job is to say where you are:
+/// which company you are in is the one thing the icons above it do not show, and logging out
+/// already has an entry in the account menu -- where a deliberate click, rather than a stray one
+/// at the edge of the window, is what reaches it.
+///
+/// Rendered out of band after a company's settings are saved, so a new picture reaches the chrome
+/// that no pane swap would otherwise touch -- the rail's counterpart of [`account_avatar_oob`].
+pub fn rail_company_badge(company: &Company, swap: FragmentSwap) -> String {
+    format!(
+        r##"<a id="rail-company" href="/ui/companies?company_id={company_id}"
+                class="btn btn-square btn-lg btn-ghost mt-auto" title="{name}"{oob}>{avatar}</a>"##,
+        company_id = company.id,
+        name = escape_html_text(&company.name),
+        oob = swap.oob_attribute(),
+        avatar = avatar_bubble(company.avatar_url.as_ref(), &company.name, AvatarSize::Bar),
     )
 }
 
@@ -745,7 +812,6 @@ pub(crate) fn sidebar_header(title: &str, subtitle: &str) -> String {
 /// The channel column: one menu entry per channel, channel actions at the bottom.
 fn channel_sidebar(page: &MailboxPage<'_>) -> String {
     let header = sidebar_header("Mailbox", "Inbound channels and conversations.");
-    let company_switcher = company_switcher(page.company, page.companies, UiSection::Mailbox);
     let items: String = page
         .channels
         .iter()
@@ -770,7 +836,6 @@ fn channel_sidebar(page: &MailboxPage<'_>) -> String {
         r##"
         <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
-            {company_switcher}
             <ul id="channel-menu" class="menu w-full flex-1 flex-nowrap gap-1 overflow-y-auto px-2">
                 {menu_body}
             </ul>
@@ -778,7 +843,6 @@ fn channel_sidebar(page: &MailboxPage<'_>) -> String {
         </aside>
         "##,
         header = header,
-        company_switcher = company_switcher,
         footer = channel_actions(page.company.id, page.selected_channel, FragmentSwap::Inline),
     )
 }
@@ -813,47 +877,6 @@ pub fn channel_actions(
         "##,
         oob = swap.oob_attribute(),
         plus = icon(Icon::Plus, BUTTON_ICON),
-    )
-}
-
-/// The company picker at the top of both sidebars. Switching company stays in the workspace the
-/// user is already in, so `section` decides where the options point.
-pub(crate) fn company_switcher(
-    company: &Company,
-    companies: &[Company],
-    section: UiSection,
-) -> String {
-    let options: String = companies
-        .iter()
-        .map(|c| {
-            format!(
-                r##"<li><a href="{base_path}?company_id={id}" class="{active}">{name}</a></li>"##,
-                base_path = section.base_path(),
-                id = c.id,
-                active = if c.id == company.id {
-                    "menu-active"
-                } else {
-                    ""
-                },
-                name = escape_html_text(&c.name),
-            )
-        })
-        .collect();
-
-    format!(
-        r##"
-            <div class="dropdown dropdown-bottom w-full p-3">
-                <div tabindex="0" role="button" class="btn btn-ghost btn-block justify-between">
-                    <span class="truncate font-bold">{name}</span>
-                    <span class="opacity-60">{caret}</span>
-                </div>
-                <ul tabindex="0" class="menu dropdown-content z-50 mt-1 w-56 rounded-box bg-base-300 p-2 shadow-xl">
-                    {options}
-                </ul>
-            </div>
-        "##,
-        name = escape_html_text(&company.name),
-        caret = icon(Icon::ChevronDown, BUTTON_ICON),
     )
 }
 
@@ -1346,7 +1369,7 @@ pub fn message_bubble_chat(
 
     format!(
         r##"
-                <div class="chat {side}">
+                <div class="chat {side}" data-role="{role}">
                     <div class="chat-image">{avatar}</div>
                     <div class="chat-header gap-1 opacity-70">
                         {writer}
@@ -1357,6 +1380,9 @@ pub fn message_bubble_chat(
                 </div>
         "##,
         side = if is_agent { "chat-end" } else { "chat-start" },
+        // Read by the column when a bubble streams in: only the agent's own reply answers the
+        // question its row's activity mark was asking.
+        role = if is_agent { "agent" } else { "human" },
         bubble_class = if is_agent { "chat-bubble-primary" } else { "" },
         avatar = avatar_bubble(avatar_url, writer, AvatarSize::Row),
         writer = escape_html_text(writer),

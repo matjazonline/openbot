@@ -565,6 +565,7 @@ mod tests {
         company_member::CompanyMembership,
         value_objects::EmailAddress,
     };
+    use crate::use_cases::company::CompanyWrite;
     use chrono::Utc;
     use serde_json::json;
     use std::sync::Mutex;
@@ -577,16 +578,7 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(
-            &self,
-            _user_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -645,16 +637,7 @@ mod tests {
                 .collect())
         }
 
-        async fn update(
-            &self,
-            _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -776,6 +759,7 @@ mod tests {
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
+                avatar_url: None,
                 created_at: Utc::now(),
             }]),
         });
@@ -939,6 +923,7 @@ Guidelines:
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: Utc::now(),
         };
 

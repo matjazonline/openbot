@@ -14,7 +14,7 @@ use uuid::Uuid;
 use super::{
     PANELS_SKELETON,
     chart::{self, ChartKind, Series, TimeChart, YUnit, thousands},
-    company_switcher, escape_html_text,
+    escape_html_text,
     icon::{BUTTON_ICON, Icon, icon},
     mailbox::{MailboxUser, UiSection, UiShell, sidebar_header, ui_shell},
     panels_placeholder,
@@ -46,12 +46,17 @@ pub enum DashboardScopeView<'a> {
     Global,
 }
 
-impl DashboardScopeView<'_> {
-    fn company_id(&self) -> Option<Uuid> {
+impl<'a> DashboardScopeView<'a> {
+    /// The company on screen, for the chrome that draws it rather than just links to it.
+    fn company(&self) -> Option<&'a Company> {
         match self {
-            DashboardScopeView::Company(company) => Some(company.id),
+            DashboardScopeView::Company(company) => Some(company),
             DashboardScopeView::Global => None,
         }
+    }
+
+    fn company_id(&self) -> Option<Uuid> {
+        self.company().map(|company| company.id)
     }
 
     fn title(&self) -> String {
@@ -70,7 +75,7 @@ impl DashboardScopeView<'_> {
 pub struct DashboardShell<'a> {
     pub user: &'a MailboxUser<'a>,
     pub scope: DashboardScopeView<'a>,
-    /// The caller's own companies — the switcher's options.
+    /// The caller's own companies, used to resolve company-scoped navigation.
     pub companies: &'a [Company],
     /// The range the panels will be read over. The shell needs it before any query has run, because
     /// it is what the panel fetch and the stream subscription are both parameterised by.
@@ -80,8 +85,7 @@ pub struct DashboardShell<'a> {
 pub struct DashboardPage<'a> {
     pub user: &'a MailboxUser<'a>,
     pub scope: DashboardScopeView<'a>,
-    /// The caller's own companies — the switcher's options, and also the set of companies whose
-    /// `/ui` pages will actually resolve for them.
+    /// The caller's own companies — the set whose `/ui` pages will actually resolve for them.
     pub companies: &'a [Company],
     pub snapshot: &'a DashboardSnapshot,
     pub window: DashboardWindow,
@@ -107,15 +111,13 @@ pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
     let header = sidebar_header("Dashboard", "System metrics, queue health and activity.");
     let range = range_picker(shell.scope.company_id(), shell.window);
     let sidebar = match shell.scope {
-        DashboardScopeView::Company(company) => format!(
+        DashboardScopeView::Company(_) => format!(
             r##"<aside class="flex w-72 shrink-0 flex-col border-r border-base-300 bg-base-200">
                 {header}
-                {switcher}
                 {range}
                 {legend}
             </aside>"##,
             header = header,
-            switcher = company_switcher(company, shell.companies, UiSection::Dashboard),
             legend = scope_legend("This company"),
         ),
         DashboardScopeView::Global => format!(
@@ -160,7 +162,7 @@ pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
     ui_shell(&UiShell {
         title: &shell.scope.title(),
         user: shell.user,
-        company_id: shell.scope.company_id(),
+        company: shell.scope.company(),
         section: UiSection::Dashboard,
         content: &content,
         script: "",
@@ -1098,6 +1100,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         }
     }

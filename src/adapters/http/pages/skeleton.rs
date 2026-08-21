@@ -262,7 +262,17 @@ const SKELETON_BEHAVIOUR: &str = r##"
                     return;
                 }
 
-                painted.set(target, { html: target.innerHTML, className: target.className });
+                // The nodes themselves are kept, not their markup: the element that triggered
+                // the request is usually one of them, and htmx reads the root node of that
+                // element to find where an `hx-swap-oob` fragment belongs. Re-created from a
+                // string, the trigger is left detached for good and every out-of-band fragment
+                // in the response is silently dropped -- which is what kept a newly created
+                // company out of the sidebar beside it.
+                var kept = document.createDocumentFragment();
+                while (target.firstChild) {
+                    kept.appendChild(target.firstChild);
+                }
+                painted.set(target, { nodes: kept, className: target.className });
                 if (shape.className) {
                     target.className = shape.className;
                 }
@@ -279,7 +289,7 @@ const SKELETON_BEHAVIOUR: &str = r##"
                     return;
                 }
                 target.className = previous.className;
-                target.innerHTML = previous.html;
+                target.replaceChildren(previous.nodes);
             }
 
             document.body.addEventListener('htmx:beforeRequest', function (event) {

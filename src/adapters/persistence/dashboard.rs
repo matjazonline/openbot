@@ -541,7 +541,7 @@ mod tests {
     };
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
-        company::CompanyPersistence,
+        company::{CompanyPersistence, CompanyWrite},
         user::UserPersistence,
     };
 
@@ -571,12 +571,11 @@ mod tests {
         let company = CompanyPersistence::create(
             persistence,
             owner.id,
-            "Dashboard Test",
-            &format!("{label}-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Dashboard Test".to_string(),
+                slug: format!("{label}-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .expect("the fixture company is created");

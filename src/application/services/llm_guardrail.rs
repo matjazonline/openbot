@@ -198,6 +198,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: Some(true),
+            avatar_url: None,
             created_at: Utc::now(),
         };
 

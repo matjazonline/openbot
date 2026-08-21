@@ -27,10 +27,15 @@ use crate::{
         pages::{self, CompanyCounts, SpamGuardrail},
     },
     app_error::{AppError, AppResult},
-    entities::{company::Company, value_objects::EmailAddress},
+    entities::{
+        company::Company,
+        value_objects::{AvatarUrl, EmailAddress},
+    },
     infra::config::AppConfig,
     use_cases::{
-        agent::AgentUseCases, channel::ChannelUseCases, company::CompanyUseCases,
+        agent::AgentUseCases,
+        channel::ChannelUseCases,
+        company::{CompanyUseCases, CompanyWrite},
         user::UserUseCases,
     },
 };
@@ -72,9 +77,23 @@ pub struct CompanyForm {
     pub model: Option<String>,
     pub api_key: Option<String>,
     pub enable_llm_spam_guardrail: Option<String>,
+    /// What the pane's picker is holding: an uploaded picture's URL, or blank for the letter.
+    pub avatar_url: Option<String>,
 }
 
 const NO_SELECTION: &str = "Select a company to configure it, or create a new one.";
+
+/// Whether a write changed the company the rail at the far left is drawn for.
+///
+/// The rail ends on that company's picture, and no pane swap touches it, so a save that renames a
+/// company or gives it a new picture has to send the badge back out of band. Which company the
+/// rail is showing is not in the request, so it is read off the write instead: the sidebar's
+/// entries are ordinary links, so the pane and the rail always hold the same company on an edit,
+/// while a company that has only just been created is not yet the one the rail points at.
+enum RailRefresh {
+    SameCompany,
+    OtherCompany,
+}
 
 /// The use cases and the caller every Companies handler starts from.
 ///
@@ -159,25 +178,32 @@ impl Workspace {
         })
     }
 
-    /// The empty pane plus a sidebar with nothing selected — what cancelling a form and deleting
-    /// a company both leave behind.
-    async fn cleared_response(&self) -> AppResult<Response> {
+    /// The sidebar with nothing lit, out of band beside a pane that belongs to no company —
+    /// the placeholder, or the create form.
+    async fn deselected_list(&self) -> AppResult<String> {
         let companies = self.companies().await?;
-        let pane = pages::company_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline);
-        let list = pages::company_settings_list(
+
+        Ok(pages::company_settings_list(
             &pages::CompanySettingsList {
                 companies: &companies,
                 selected_company_id: None,
             },
             pages::FragmentSwap::OutOfBand,
-        );
+        ))
+    }
+
+    /// The empty pane plus a sidebar with nothing selected — what cancelling a form and deleting
+    /// a company both leave behind.
+    async fn cleared_response(&self) -> AppResult<Response> {
+        let pane = pages::company_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline);
+        let list = self.deselected_list().await?;
 
         Ok(Html(format!("{pane}{list}")).into_response())
     }
 
     /// What every successful write returns: the saved company's pane, with the sidebar list
     /// refreshed beside it so a create or a rename shows up immediately.
-    async fn saved_response(&self, company: &Company) -> AppResult<Response> {
+    async fn saved_response(&self, company: &Company, rail: RailRefresh) -> AppResult<Response> {
         let counts = self.counts(company.id).await?;
         let pane = self.edit_pane(company, counts, None, None);
         let companies = self.companies().await?;
@@ -188,13 +214,19 @@ impl Workspace {
             },
             pages::FragmentSwap::OutOfBand,
         );
+        let rail_html = match rail {
+            RailRefresh::SameCompany => {
+                pages::rail_company_badge(company, pages::FragmentSwap::OutOfBand)
+            }
+            RailRefresh::OtherCompany => String::new(),
+        };
 
         Ok((
             [(
                 "HX-Push-Url",
                 format!("/ui/companies?company_id={}", company.id),
             )],
-            Html(format!("{pane}{list}")),
+            Html(format!("{pane}{list}{rail_html}")),
         )
             .into_response())
     }
@@ -241,19 +273,25 @@ async fn companies_page(
             },
             // The create form deselects the list, but the rail keeps pointing at the company the
             // request was scoped to, so the other workspaces stay one click away.
-            rail_company_id: company.as_ref().map(|company| company.id),
+            rail_company: company.as_ref(),
             pane_html: &pane_html,
         },
     )))
 }
 
 /// GET /ui/companies/new - The create-company form for the pane (Protected).
-#[instrument(skip(_workspace))]
-async fn create_pane(_workspace: Workspace) -> Html<String> {
-    Html(pages::company_create_pane(&pages::CompanyCreatePane {
+///
+/// The sidebar comes with it, deselected: the form belongs to no company, so leaving the entry
+/// that was open before it lit would say the pane is showing a company it is not.
+#[instrument(skip(workspace))]
+async fn create_pane(workspace: Workspace) -> AppResult<Response> {
+    let pane = pages::company_create_pane(&pages::CompanyCreatePane {
         draft: &pages::CompanyDraft::default(),
         error: None,
-    }))
+    });
+    let list = workspace.deselected_list().await?;
+
+    Ok(Html(format!("{pane}{list}")).into_response())
 }
 
 /// GET /ui/companies/close - Dismiss whichever form the pane holds (Protected).
@@ -280,21 +318,21 @@ async fn edit_pane(workspace: Workspace, Path(company_id): Path<Uuid>) -> AppRes
 async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> Response {
     let submitted = SubmittedCompany::new(form);
 
-    let created = workspace
-        .company_use_cases
-        .create_company(
-            workspace.user_id,
-            &submitted.form.name,
-            &submitted.slug,
-            submitted.form.api_key.as_deref(),
-            submitted.form.provider.as_deref(),
-            submitted.form.model.as_deref(),
-            submitted.spam_guardrail.stored(),
-        )
-        .await;
+    let created = match submitted.write() {
+        Ok(write) => {
+            workspace
+                .company_use_cases
+                .create_company(workspace.user_id, write)
+                .await
+        }
+        Err(refusal) => Err(AppError::BadRequest(refusal)),
+    };
 
     match created {
-        Ok(company) => match workspace.saved_response(&company).await {
+        Ok(company) => match workspace
+            .saved_response(&company, RailRefresh::OtherCompany)
+            .await
+        {
             Ok(response) => response,
             Err(err) => err.into_response(),
         },
@@ -317,22 +355,22 @@ async fn update_company(
     let counts = workspace.counts(company_id).await?;
     let submitted = SubmittedCompany::new(form);
 
-    let saved = workspace
-        .company_use_cases
-        .update_company_for_user(
-            workspace.user_id,
-            company_id,
-            &submitted.form.name,
-            &submitted.slug,
-            submitted.form.api_key.as_deref(),
-            submitted.form.provider.as_deref(),
-            submitted.form.model.as_deref(),
-            submitted.spam_guardrail.stored(),
-        )
-        .await;
+    let saved = match submitted.write() {
+        Ok(write) => {
+            workspace
+                .company_use_cases
+                .update_company_for_user(workspace.user_id, company_id, write)
+                .await
+        }
+        Err(refusal) => Err(AppError::BadRequest(refusal)),
+    };
 
     match saved {
-        Ok(company) => workspace.saved_response(&company).await,
+        Ok(company) => {
+            workspace
+                .saved_response(&company, RailRefresh::SameCompany)
+                .await
+        }
         Err(err) => Ok(Html(workspace.edit_pane(
             &stored,
             counts,
@@ -390,6 +428,21 @@ impl SubmittedCompany {
             model: self.form.model.as_deref().unwrap_or(""),
             api_key: self.form.api_key.as_deref().unwrap_or(""),
             spam_guardrail: self.spam_guardrail,
+            avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
         }
+    }
+
+    /// The submitted company as a write. The picture is parsed rather than taken as typed: it
+    /// ends up in an `<img src>` on the rail of every page this company scopes.
+    fn write(&self) -> Result<CompanyWrite, String> {
+        Ok(CompanyWrite {
+            name: self.form.name.clone(),
+            slug: self.slug.clone(),
+            api_key: self.form.api_key.clone(),
+            provider: self.form.provider.clone(),
+            model: self.form.model.clone(),
+            enable_llm_spam_guardrail: self.spam_guardrail.stored(),
+            avatar_url: AvatarUrl::parse(self.form.avatar_url.as_deref().unwrap_or(""))?,
+        })
     }
 }

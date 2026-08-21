@@ -539,6 +539,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -580,6 +581,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 

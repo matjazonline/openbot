@@ -1153,7 +1153,10 @@ mod tests {
             task::{BackgroundTask, TaskStatus},
             thread::Thread,
         },
-        use_cases::{company::CompanyPersistence, thread::ThreadPersistence},
+        use_cases::{
+            company::{CompanyPersistence, CompanyWrite},
+            thread::ThreadPersistence,
+        },
     };
 
     struct MockCompanyPersistence {
@@ -1161,16 +1164,7 @@ mod tests {
     }
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(
-            &self,
-            _user_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
         }
         async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
@@ -1182,16 +1176,7 @@ mod tests {
         async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
             unimplemented!()
         }
-        async fn update(
-            &self,
-            _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
@@ -1957,6 +1942,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -2124,6 +2110,7 @@ mod tests {
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -2254,6 +2241,7 @@ mod tests {
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 

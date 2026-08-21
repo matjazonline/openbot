@@ -9,59 +9,69 @@ use crate::{
     entities::{
         company::{Company, CompanyAccess},
         company_member::CompanyMembership,
+        value_objects::AvatarUrl,
     },
 };
 
+/// Everything one company write sets, so create and update cannot drift apart and so a caller
+/// cannot transpose two same-typed arguments in a seven-parameter list.
+///
+/// Values reach persistence already normalized — see [`CompanyWrite::normalize`]. Mirrors
+/// [`crate::use_cases::agent::AgentWrite`].
+#[derive(Debug, Clone, Default)]
+pub struct CompanyWrite {
+    pub name: String,
+    pub slug: String,
+    pub api_key: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub enable_llm_spam_guardrail: Option<bool>,
+    /// The company's picture, already parsed as a URL a page may render.
+    pub avatar_url: Option<AvatarUrl>,
+}
+
+impl CompanyWrite {
+    /// Trim the fields that have canonical forms and drop the blanks. Runs once, in the use case,
+    /// so create and update store the same shape.
+    fn normalize(&mut self) -> AppResult<()> {
+        self.name = self.name.trim().to_string();
+        self.slug = self.slug.trim().to_lowercase().replace(' ', "-");
+
+        if self.name.is_empty() || self.slug.is_empty() {
+            return Err(AppError::Internal(
+                "Company name and slug cannot be empty.".into(),
+            ));
+        }
+
+        for field in [&mut self.api_key, &mut self.provider, &mut self.model] {
+            if let Some(value) = field.as_mut() {
+                *value = value.trim().to_string();
+                if value.is_empty() {
+                    *field = None;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[async_trait]
 pub trait CompanyPersistence: Send + Sync {
-    async fn create(
-        &self,
-        user_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        enable_llm_spam_guardrail: Option<bool>,
-    ) -> AppResult<Company>;
+    async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company>;
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>>;
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>>;
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>>;
-    async fn update(
-        &self,
-        id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        enable_llm_spam_guardrail: Option<bool>,
-    ) -> AppResult<Company>;
+    async fn update(&self, id: Uuid, write: CompanyWrite) -> AppResult<Company>;
     async fn delete(&self, id: Uuid) -> AppResult<()>;
     async fn update_for_user(
         &self,
         user_id: Uuid,
         id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        enable_llm_spam_guardrail: Option<bool>,
+        write: CompanyWrite,
     ) -> AppResult<Company> {
         match self.get_by_id(id).await? {
-            Some(company) if company.user_id == user_id => {
-                self.update(
-                    id,
-                    name,
-                    slug,
-                    api_key,
-                    provider,
-                    model,
-                    enable_llm_spam_guardrail,
-                )
-                .await
-            }
+            Some(company) if company.user_id == user_id => self.update(id, write).await,
             _ => Err(company_not_found()),
         }
     }
@@ -165,40 +175,15 @@ impl CompanyUseCases {
     pub async fn create_company(
         &self,
         user_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        enable_llm_spam_guardrail: Option<bool>,
+        mut write: CompanyWrite,
     ) -> AppResult<Company> {
-        let name_trimmed = name.trim();
-        let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
-        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
-
-        if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::Internal(
-                "Company name and slug cannot be empty.".into(),
-            ));
-        }
+        write.normalize()?;
 
         info!(
             "Creating company: {} ({}) for user {}",
-            name_trimmed, slug_clean, user_id
+            write.name, write.slug, user_id
         );
-        self.persistence
-            .create(
-                user_id,
-                name_trimmed,
-                &slug_clean,
-                api_key_clean,
-                provider_clean,
-                model_clean,
-                enable_llm_spam_guardrail,
-            )
-            .await
+        self.persistence.create(user_id, write).await
     }
 
     #[instrument(skip(self))]
@@ -237,40 +222,11 @@ impl CompanyUseCases {
     }
 
     #[instrument(skip(self))]
-    pub async fn update_company(
-        &self,
-        id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        enable_llm_spam_guardrail: Option<bool>,
-    ) -> AppResult<Company> {
-        let name_trimmed = name.trim();
-        let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
-        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
+    pub async fn update_company(&self, id: Uuid, mut write: CompanyWrite) -> AppResult<Company> {
+        write.normalize()?;
 
-        if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::Internal(
-                "Company name and slug cannot be empty.".into(),
-            ));
-        }
-
-        info!("Updating company {}: {} ({})", id, name_trimmed, slug_clean);
-        self.persistence
-            .update(
-                id,
-                name_trimmed,
-                &slug_clean,
-                api_key_clean,
-                provider_clean,
-                model_clean,
-                enable_llm_spam_guardrail,
-            )
-            .await
+        info!("Updating company {}: {} ({})", id, write.name, write.slug);
+        self.persistence.update(id, write).await
     }
 
     #[instrument(skip(self))]
@@ -283,32 +239,10 @@ impl CompanyUseCases {
         &self,
         user_id: Uuid,
         id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        enable_llm_spam_guardrail: Option<bool>,
+        mut write: CompanyWrite,
     ) -> AppResult<Company> {
-        let name = name.trim();
-        let slug = slug.trim().to_lowercase().replace(' ', "-");
-        if name.is_empty() || slug.is_empty() {
-            return Err(AppError::Internal(
-                "Company name and slug cannot be empty.".into(),
-            ));
-        }
-        self.persistence
-            .update_for_user(
-                user_id,
-                id,
-                name,
-                &slug,
-                api_key.map(str::trim).filter(|value| !value.is_empty()),
-                provider.map(str::trim).filter(|value| !value.is_empty()),
-                model.map(str::trim).filter(|value| !value.is_empty()),
-                enable_llm_spam_guardrail,
-            )
-            .await
+        write.normalize()?;
+        self.persistence.update_for_user(user_id, id, write).await
     }
 
     pub async fn delete_company_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
@@ -330,25 +264,17 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(
-            &self,
-            user_id: Uuid,
-            name: &str,
-            slug: &str,
-            api_key: Option<&str>,
-            provider: Option<&str>,
-            model: Option<&str>,
-            enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company> {
             let company = Company {
                 id: Uuid::new_v4(),
                 user_id,
-                name: name.to_string(),
-                slug: slug.into(),
-                api_key: api_key.map(|s| s.to_string()),
-                provider: provider.map(|s| s.to_string()),
-                model: model.map(|s| s.to_string()),
-                enable_llm_spam_guardrail,
+                name: write.name,
+                slug: write.slug.into(),
+                api_key: write.api_key,
+                provider: write.provider,
+                model: write.model,
+                enable_llm_spam_guardrail: write.enable_llm_spam_guardrail,
+                avatar_url: write.avatar_url,
                 created_at: Utc::now(),
             };
             self.companies.lock().unwrap().push(company.clone());
@@ -386,28 +312,20 @@ mod tests {
                 .collect())
         }
 
-        async fn update(
-            &self,
-            id: Uuid,
-            name: &str,
-            slug: &str,
-            api_key: Option<&str>,
-            provider: Option<&str>,
-            model: Option<&str>,
-            enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn update(&self, id: Uuid, write: CompanyWrite) -> AppResult<Company> {
             let mut list = self.companies.lock().unwrap();
             let company = list
                 .iter_mut()
                 .find(|c| c.id == id)
                 .ok_or_else(|| AppError::Internal("Not found".into()))?;
 
-            company.name = name.to_string();
-            company.slug = slug.into();
-            company.api_key = api_key.map(|s| s.to_string());
-            company.provider = provider.map(|s| s.to_string());
-            company.model = model.map(|s| s.to_string());
-            company.enable_llm_spam_guardrail = enable_llm_spam_guardrail;
+            company.name = write.name;
+            company.slug = write.slug.into();
+            company.api_key = write.api_key;
+            company.provider = write.provider;
+            company.model = write.model;
+            company.enable_llm_spam_guardrail = write.enable_llm_spam_guardrail;
+            company.avatar_url = write.avatar_url;
             Ok(company.clone())
         }
 
@@ -441,12 +359,15 @@ mod tests {
         let company = use_cases
             .create_company(
                 user_id,
-                "Acme Corp",
-                "acme-corp",
-                Some("key123"),
-                Some("google"),
-                Some("gemini-2.5-flash"),
-                Some(true),
+                CompanyWrite {
+                    name: "Acme Corp".to_string(),
+                    slug: "acme-corp".to_string(),
+                    api_key: Some("key123".to_string()),
+                    provider: Some("google".to_string()),
+                    model: Some("gemini-2.5-flash".to_string()),
+                    enable_llm_spam_guardrail: Some(true),
+                    avatar_url: Some(AvatarUrl::from("https://cdn.example.com/acme.png")),
+                },
             )
             .await
             .unwrap();
@@ -456,6 +377,10 @@ mod tests {
         assert_eq!(company.provider.as_deref(), Some("google"));
         assert_eq!(company.model.as_deref(), Some("gemini-2.5-flash"));
         assert_eq!(company.enable_llm_spam_guardrail, Some(true));
+        assert_eq!(
+            company.avatar_url,
+            Some(AvatarUrl::from("https://cdn.example.com/acme.png"))
+        );
 
         // List
         let list = use_cases.list_user_companies(user_id).await.unwrap();
@@ -465,17 +390,19 @@ mod tests {
         let updated = use_cases
             .update_company(
                 company.id,
-                "Acme Inc",
-                "acme-inc",
-                None,
-                None,
-                None,
-                Some(false),
+                CompanyWrite {
+                    name: "Acme Inc".to_string(),
+                    slug: "acme-inc".to_string(),
+                    enable_llm_spam_guardrail: Some(false),
+                    ..CompanyWrite::default()
+                },
             )
             .await
             .unwrap();
         assert_eq!(updated.name, "Acme Inc");
         assert_eq!(updated.enable_llm_spam_guardrail, Some(false));
+        // A write sets every column, so a save that carries no picture is a save that clears it.
+        assert_eq!(updated.avatar_url, None);
 
         // Delete
         use_cases.delete_company(company.id).await.unwrap();
@@ -498,6 +425,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: Utc::now(),
         };
         let persistence = MockCompanyPersistence {

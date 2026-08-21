@@ -19,6 +19,7 @@ use crate::{
     app_error::AppResult,
     use_cases::{
         company::CompanyUseCases,
+        company_invite::CompanyInviteUseCases,
         user::{RegistrationOutcome, UserUseCases},
     },
 };
@@ -54,13 +55,27 @@ pub fn protected_router() -> Router<AppState> {
 
 async fn index(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
+    State(user_use_cases): State<Arc<UserUseCases>>,
     user: AuthenticatedUser,
-) -> impl IntoResponse {
+) -> AppResult<Redirect> {
+    let account = user_use_cases
+        .get_user_by_id(user.id)
+        .await?
+        .ok_or_else(|| crate::app_error::AppError::NotFound("User not found".into()))?;
+
+    if invite_use_cases
+        .has_pending_user_invites(&account.email)
+        .await?
+    {
+        return Ok(Redirect::temporary("/ui/invites"));
+    }
+
     let destination = match company_use_cases.list_user_companies(user.id).await {
         Ok(companies) if companies.is_empty() => "/onboarding",
         _ => "/companies",
     };
-    Redirect::temporary(destination)
+    Ok(Redirect::temporary(destination))
 }
 
 async fn logout(

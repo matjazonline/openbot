@@ -37,8 +37,9 @@ use super::{
     InternalChannelSource, MAX_THREAD_MESSAGES_PER_HOUR, RecipientRole, ThreadUseCases,
     durable_ingest_payload,
     support::{
-        DirectoryCache, build_prompt_text, check_inbound_guards, parsed_email_from_normalized,
-        reference_ids, strip_quoted_history, thread_index_of, thread_lookup_ids,
+        DirectoryCache, body_mentions_email, body_mentions_slug, build_prompt_text,
+        check_inbound_guards, parsed_email_from_normalized, reference_ids, strip_quoted_history,
+        thread_index_of, thread_lookup_ids,
     },
 };
 
@@ -70,6 +71,8 @@ struct CandidateMatch {
     channel: Channel,
     /// The slug the envelope actually named — an alias, or the channel's canonical slug.
     matched_slug: ChannelSlug,
+    /// The complete To/Cc address that produced this match. Pipeline steps share this address.
+    delivery_address: EmailAddress,
     role: RecipientRole,
     step_index: usize,
     total_steps: usize,
@@ -154,6 +157,7 @@ enum ThreadAccess {
 
 struct MaterializedMatch {
     channel_match: ChannelMatch,
+    executes_agent: bool,
     /// Replies that close an outreach are recorded but must not trigger a fresh agent run.
     marks_context_only: bool,
 }
@@ -228,6 +232,7 @@ impl ThreadUseCases {
 
         let mut context_only = resolved.address_context_only;
         let mut channel_matches = Vec::with_capacity(resolved.matches.len());
+        let mut executable_matches = Vec::new();
         for candidate in std::mem::take(&mut resolved.matches) {
             match self
                 .materialize_channel_match(
@@ -242,13 +247,23 @@ impl ThreadUseCases {
                 ControlFlow::Break(rejection) => return Ok(rejection),
                 ControlFlow::Continue(materialized) => {
                     context_only |= materialized.marks_context_only;
+                    if materialized.executes_agent {
+                        executable_matches.push(materialized.channel_match.clone());
+                    }
                     channel_matches.push(materialized.channel_match);
                 }
             }
         }
 
-        self.finalize_ingest(parsed, norm, channel_matches, context_only, delivery)
-            .await
+        self.finalize_ingest(
+            parsed,
+            norm,
+            channel_matches,
+            executable_matches,
+            context_only,
+            delivery,
+        )
+        .await
     }
 
     /// Phase 2: walk every `To` then `Cc` address, expanding channel pipelines into authorized
@@ -348,6 +363,7 @@ impl ThreadUseCases {
                             company: company.clone(),
                             channel,
                             matched_slug: channel_slug,
+                            delivery_address: EmailAddress::from(address.clone()),
                             role,
                             step_index,
                             total_steps,
@@ -593,6 +609,7 @@ impl ThreadUseCases {
             company,
             channel,
             matched_slug,
+            delivery_address,
             role,
             step_index,
             total_steps,
@@ -688,6 +705,18 @@ impl ThreadUseCases {
             parsed.prompt_text = build_prompt_text(&clean_text_body, &parsed.attachments);
         }
 
+        let executes_agent = role == RecipientRole::To
+            || self
+                .cc_match_is_mentioned(
+                    &channel,
+                    &company,
+                    &matched_slug,
+                    &delivery_address,
+                    &clean_text_body,
+                    directory,
+                )
+                .await?;
+
         let inbound_message = self
             .thread_persistence
             .create_message(&build_inbound_message(
@@ -720,8 +749,45 @@ impl ThreadUseCases {
                 step_index,
                 total_steps,
             },
+            executes_agent,
             marks_context_only,
         }))
+    }
+
+    async fn cc_match_is_mentioned(
+        &self,
+        channel: &Channel,
+        company: &Company,
+        matched_slug: &ChannelSlug,
+        delivery_address: &EmailAddress,
+        body: &str,
+        directory: &mut DirectoryCache<'_>,
+    ) -> AppResult<bool> {
+        if body_mentions_email(body, delivery_address) {
+            return Ok(true);
+        }
+
+        let canonical_address =
+            channel.inbound_address(&company.slug, &self.config.app_domain_name);
+        if body_mentions_email(body, &canonical_address)
+            || body_mentions_slug(body, matched_slug)
+            || body_mentions_slug(body, &channel.slug)
+            || channel
+                .alias_slugs
+                .iter()
+                .any(|slug| body_mentions_slug(body, slug))
+        {
+            return Ok(true);
+        }
+
+        for agent_id in channel.agent_ids.iter().flatten() {
+            if let Some(agent) = directory.agent(*agent_id).await?
+                && body_mentions_slug(body, &agent.slug)
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// Refuse a sender who is neither on the thread nor answering one of its outreaches, and tell
@@ -890,11 +956,15 @@ impl ThreadUseCases {
         mut parsed: ParsedEmail,
         norm: NormalizedInboundMessage,
         channel_matches: Vec<ChannelMatch>,
+        executable_matches: Vec<ChannelMatch>,
         context_only: bool,
         delivery: ReplyDelivery,
     ) -> AppResult<InboundIngestResult> {
         let first = channel_matches[0].clone();
-        let context_only = context_only || parsed.is_context_only || norm.is_context_only;
+        let context_only = context_only
+            || parsed.is_context_only
+            || norm.is_context_only
+            || executable_matches.is_empty();
         parsed.is_context_only = context_only;
 
         let mut norm = norm;
@@ -923,15 +993,25 @@ impl ThreadUseCases {
             return Ok(result);
         }
 
+        // Passive CC matches have already been written to their histories. Keep them out of the
+        // durable task so neither the worker nor the task activity fan-out treats them as active.
+        let primary = executable_matches[0].clone();
+        let mut durable_result = result.clone();
+        durable_result.company = Some(primary.company.clone());
+        durable_result.channel = Some(primary.channel.clone());
+        durable_result.thread = Some(primary.thread.clone());
+        durable_result.inbound_message = Some(primary.inbound_message.clone());
+        durable_result.channel_matches = executable_matches;
+
         // Durable task: survives a crash between ingest and agent execution.
         let task = self
             .task_persistence
             .enqueue_task(
-                first.company.id,
-                first.channel.id,
-                Some(first.thread.id),
+                primary.company.id,
+                primary.channel.id,
+                Some(primary.thread.id),
                 AGENT_DISPATCH_TASK,
-                durable_ingest_payload(&result),
+                durable_ingest_payload(&durable_result),
             )
             .await?;
         result.task_id = Some(task.id);

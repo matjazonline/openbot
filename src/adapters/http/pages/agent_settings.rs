@@ -10,7 +10,7 @@ use super::*;
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
 ///
 /// Kept out of the `format!` blocks below so its braces need no escaping.
-const AGENT_SETTINGS_SCRIPT: &str = r##"        function showAgentTab(advanced) {
+pub const AGENT_SETTINGS_SCRIPT: &str = r##"        function showAgentTab(advanced) {
             var simple = document.getElementById('agent-tab-simple');
             var advancedForm = document.getElementById('agent-tab-advanced');
             var simpleBtn = document.getElementById('agent-tab-simple-btn');
@@ -95,7 +95,6 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
         r##"
         <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
-            {company_switcher}
             {list_html}
             <div class="border-t border-base-300 p-2">
                 <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
@@ -110,7 +109,6 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
             "Agents",
             "AI responders, system prompts and model overrides."
         ),
-        company_switcher = company_switcher(company, page.companies, UiSection::Agents),
         plus_glyph = icon(Icon::Plus, BUTTON_ICON),
         list_html = agent_settings_list(page.list, FragmentSwap::Inline),
         company_id = company.id,
@@ -120,7 +118,7 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
     ui_shell(&UiShell {
         title: &format!("{} Agents", company.name),
         user: page.user,
-        company_id: Some(company.id),
+        company: Some(company),
         section: UiSection::Agents,
         content: &content,
         script: AGENT_SETTINGS_SCRIPT,
@@ -264,7 +262,7 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
         used_by_html = used_by_channels(company_id, pane.used_by),
         delete_warning = delete_warning(pane.used_by),
         fields = agent_fields(&AgentFields {
-            company_id,
+            scope: AgentFormScope::Company(company_id),
             agent_id: Some(agent_id),
             draft,
         }),
@@ -339,7 +337,7 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
         avatar_field = agent_avatar_field("simple", pane.draft),
         system_prompt = escape_html_text(pane.draft.system_prompt),
         fields = agent_fields(&AgentFields {
-            company_id: pane.company.id,
+            scope: AgentFormScope::Company(pane.company.id),
             agent_id: None,
             draft: pane.draft,
         }),
@@ -348,11 +346,25 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
 
 /// Everything about an agent except which URL its form submits to.
 struct AgentFields<'a> {
-    company_id: Uuid,
+    scope: AgentFormScope,
     /// The agent this form edits, `None` in the create pane. It namespaces every element id, so
     /// the create pane's two forms do not collide.
     agent_id: Option<Uuid>,
     draft: &'a AgentDraft<'a>,
+}
+
+#[derive(Clone, Copy)]
+enum AgentFormScope {
+    Company(Uuid),
+    Library,
+}
+
+pub fn library_agent_fields(draft: &AgentDraft<'_>, agent_id: Option<Uuid>) -> String {
+    agent_fields(&AgentFields {
+        scope: AgentFormScope::Library,
+        agent_id,
+        draft,
+    })
 }
 
 /// The element-id namespace one form's fields share.
@@ -373,6 +385,16 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         ""
     } else {
         " open"
+    };
+    let (api_key_placeholder, description_help) = match fields.scope {
+        AgentFormScope::Company(_) => (
+            "Overrides the company key",
+            "Shown to other agents in this company",
+        ),
+        AgentFormScope::Library => (
+            "Used by this library agent",
+            "Shown to agents in companies that select it",
+        ),
     };
 
     format!(
@@ -416,14 +438,14 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                                 </label>
                                 <label class="form-control w-full">
                                     <div class="label"><span class="text-xs opacity-70">LLM API Key</span></div>
-                                    <input type="password" id="agent-api-key-{id_prefix}" name="api_key" value="{api_key}" placeholder="Overrides the company key"
+                                    <input type="password" id="agent-api-key-{id_prefix}" name="api_key" value="{api_key}" placeholder="{api_key_placeholder}"
                                         class="input w-full font-mono text-sm">
                                 </label>
                             </div>
                             <label class="form-control w-full">
                                 <div class="label">
                                     <span class="text-xs opacity-70">Description</span>
-                                    <span class="text-xs opacity-50">Shown to other agents in this company</span>
+                                    <span class="text-xs opacity-50">{description_help}</span>
                                 </div>
                                 <input type="text" id="agent-description-{id_prefix}" name="description" value="{description}" placeholder="Answers supplier capacity and delivery-date questions"
                                     class="input w-full text-sm">
@@ -437,7 +459,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                     </details>
         "##,
         sparkle = icon(Icon::Sparkle, BUTTON_ICON),
-        generator = prompt_generator(fields.company_id, fields.agent_id, &id_prefix),
+        generator = prompt_generator(fields.scope, fields.agent_id, &id_prefix),
         prompt_textarea =
             agent_prompt_textarea(&id_prefix, draft.system_prompt, FragmentSwap::Inline),
         name = escape_html_text(draft.name),
@@ -445,6 +467,8 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         provider = escape_html_text(draft.provider),
         model = escape_html_text(draft.model),
         api_key = escape_html_text(draft.api_key),
+        api_key_placeholder = api_key_placeholder,
+        description_help = description_help,
         description = escape_html_text(draft.description),
         config_json = escape_html_text(draft.config_json),
         avatar_field = agent_avatar_field(&id_prefix, draft),
@@ -488,7 +512,7 @@ pub fn agent_prompt_textarea(id_prefix: &str, system_prompt: &str, swap: Fragmen
 /// It cannot be a `<form>` — it sits inside the agent form already — so the button names what to
 /// send with `hx-include`, pulling the model overrides along so the generation runs on whichever
 /// model this agent is being pointed at.
-fn prompt_generator(company_id: Uuid, agent_id: Option<Uuid>, id_prefix: &str) -> String {
+fn prompt_generator(scope: AgentFormScope, agent_id: Option<Uuid>, id_prefix: &str) -> String {
     // The create pane has no agent to name, and says so by staying silent: the handler reads an
     // absent id as "answer into the new-agent form".
     let vals = match agent_id {
@@ -496,6 +520,13 @@ fn prompt_generator(company_id: Uuid, agent_id: Option<Uuid>, id_prefix: &str) -
             format!(r##" hx-vals='{{"id_prefix": "{agent_id}"}}'"##)
         }
         None => String::new(),
+    };
+
+    let url = match scope {
+        AgentFormScope::Company(company_id) => {
+            format!("/ui/agents/generate-prompt?company_id={company_id}")
+        }
+        AgentFormScope::Library => "/ui/agent-library/generate-prompt".to_string(),
     };
 
     format!(
@@ -507,7 +538,7 @@ fn prompt_generator(company_id: Uuid, agent_id: Option<Uuid>, id_prefix: &str) -
                                 class="textarea w-full text-xs"></textarea>
                             <div class="flex items-center gap-3">
                                 <button type="button" class="btn btn-primary btn-outline btn-sm"
-                                    hx-post="/ui/agents/generate-prompt?company_id={company_id}"
+                                    hx-post="{url}"
                                     hx-include="#agent-instructions-{id_prefix}, #agent-provider-{id_prefix}, #agent-model-{id_prefix}, #agent-api-key-{id_prefix}"{vals}
                                     hx-target="#agent-generator-status-{id_prefix}" hx-swap="innerHTML"
                                     hx-disabled-elt="this">

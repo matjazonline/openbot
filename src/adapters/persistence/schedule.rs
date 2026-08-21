@@ -490,7 +490,7 @@ mod tests {
     use crate::adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool};
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
-        company::CompanyPersistence,
+        company::{CompanyPersistence, CompanyWrite},
         user::UserPersistence,
     };
 
@@ -521,12 +521,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Anchor Corp",
-            &format!("anchor-corp-{}", Uuid::new_v4().simple()),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Anchor Corp".to_string(),
+                slug: format!("anchor-corp-{}", Uuid::new_v4().simple()),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -634,12 +633,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Schedule Corp",
-            &company_slug,
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Schedule Corp".to_string(),
+                slug: company_slug.to_string(),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();

@@ -18,7 +18,7 @@ use crate::entities::task::TaskStatus;
 use crate::services::outbound_dispatcher::OutboundEmail;
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
-use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
 use crate::use_cases::user::UserPersistence;
 use chrono::Utc;
 
@@ -118,12 +118,11 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
     let company = CompanyPersistence::create(
         persistence.as_ref(),
         owner.id,
-        "Loop Test",
-        &format!("loop-{suffix}"),
-        None,
-        None,
-        None,
-        None,
+        CompanyWrite {
+            name: "Loop Test".to_string(),
+            slug: format!("loop-{suffix}"),
+            ..CompanyWrite::default()
+        },
     )
     .await
     .expect("the company is created");

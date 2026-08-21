@@ -28,7 +28,7 @@ fn agent_radio_card(
         r#"
         <label class="flex items-center gap-2 p-2 bg-slate-800/80 border border-slate-700/80 rounded-lg cursor-pointer hover:bg-slate-700/60 transition">
             <input type="radio" name="{group_name}" value="{value}" {checked}
-                onchange="let parent = this.closest('#{agents_selection_id}'); if (parent) {{ let target = parent.querySelector('input[name=agent_ids]'); if (target) target.value = this.value; }}"
+                onchange="let parent = this.closest('#{agents_selection_id}'); if (parent) {{ let library = parent.querySelector('.library-agent-select'); if (library) library.value = ''; let target = parent.querySelector('input[name=agent_ids]'); if (target) target.value = this.value; }}"
                 class="border-slate-700 text-indigo-600 focus:ring-indigo-500">
             <div class="text-xs flex flex-col">
                 <span class="font-medium {title_class}">{title}</span>
@@ -168,21 +168,28 @@ pub fn render_agents_selection_full(
         "Use channel fallback / custom agent",
     );
     agent_cards.push_str(r#"<div class="sm:col-span-2 md:col-span-3 mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">Agent library</div>"#);
-    for agent in agents.iter().filter(|agent| agent.is_library()) {
-        agent_cards.push_str(&agent_radio_card(
-            &group_name,
-            &agents_selection_id,
-            &agent.id.to_string(),
-            selected_ids.is_some_and(|ids| ids.contains(&agent.id)),
-            "text-white",
-            &agent.name,
-            "text-slate-400",
-            &format!("@{}", agent.slug),
-        ));
-    }
-    if !agents.iter().any(Agent::is_library) {
+    let library_options = agents
+        .iter()
+        .filter(|agent| agent.is_library())
+        .map(|agent| {
+            format!(
+                r#"<option value="{id}"{selected}>{name} (@{slug})</option>"#,
+                id = agent.id,
+                selected = if selected_ids.is_some_and(|ids| ids.contains(&agent.id)) {
+                    " selected"
+                } else {
+                    ""
+                },
+                name = escape_html_text(&agent.name),
+                slug = escape_html_text(&agent.slug),
+            )
+        })
+        .collect::<String>();
+    if library_options.is_empty() {
         agent_cards
             .push_str(r#"<p class="text-xs text-slate-500">No library agents available.</p>"#);
+    } else {
+        agent_cards.push_str(&format!(r#"<select class="library-agent-select sm:col-span-2 md:col-span-3 bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm" onchange="let parent=this.closest('#{agents_selection_id}'); parent.querySelectorAll('input[type=radio]').forEach((radio)=>radio.checked=false); parent.querySelector('input[name=agent_ids]').value=this.value"><option value="">Choose a library agent…</option>{library_options}</select>"#));
     }
     agent_cards.push_str(r#"<div class="sm:col-span-2 md:col-span-3 mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">Custom company agents</div>"#);
     for agent in agents.iter().filter(|agent| !agent.is_library()) {

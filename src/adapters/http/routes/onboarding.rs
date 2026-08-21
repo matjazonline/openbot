@@ -16,7 +16,7 @@ use crate::{
     use_cases::{
         agent::AgentUseCases,
         channel::{ChannelUseCases, ChannelWrite},
-        company::CompanyUseCases,
+        company::{CompanyUseCases, CompanyWrite},
     },
 };
 
@@ -83,12 +83,14 @@ async fn create_company(
     match company_use_cases
         .create_company(
             user.id,
-            &form.name,
-            &form.slug,
-            form.api_key.as_deref(),
-            form.provider.as_deref(),
-            form.model.as_deref(),
-            None,
+            CompanyWrite {
+                name: form.name.clone(),
+                slug: form.slug.clone(),
+                api_key: form.api_key.clone(),
+                provider: form.provider.clone(),
+                model: form.model.clone(),
+                ..CompanyWrite::default()
+            },
         )
         .await
     {
@@ -241,6 +243,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: Utc::now(),
         }
     }

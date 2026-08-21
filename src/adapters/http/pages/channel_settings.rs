@@ -63,22 +63,21 @@ const CHANNEL_SETTINGS_SCRIPT: &str = r##"        function showChannelTab(advanc
         // A channel can run several agents in order, but a urlencoded form keeps only the last
         // value of a repeated name — so the options feed one hidden comma-separated field.
         //
-        // The options are radios with no `name`: naming them would group them for the browser but
-        // also add a field to the submitted body, and the server still reads only `agent_ids`.
-        // Clearing the siblings here is what makes the group behave like one.
+        // Library definitions use one dropdown; custom company definitions remain compact radios.
+        // Both feed the same hidden field consumed by the server.
         function syncChannelAgents(el) {
             var form = el.closest('form');
             if (!form) return;
             var options = form.querySelectorAll('.channel-agent-option');
             Array.prototype.forEach.call(options, function (option) {
-                if (option !== el) option.checked = false;
+                if (el.tagName === 'SELECT' || option !== el) option.checked = false;
             });
+            var library = form.querySelector('.channel-library-agent-select');
+            if (library && library !== el) library.value = '';
             var target = form.querySelector('input[name="agent_ids"]');
             if (!target) return;
-            var checked = form.querySelectorAll('.channel-agent-option:checked');
-            target.value = Array.prototype.map.call(checked, function (box) {
-                return box.value;
-            }).join(',');
+            var checked = form.querySelector('.channel-agent-option:checked');
+            target.value = el.tagName === 'SELECT' ? el.value : (checked ? checked.value : '');
         }"##;
 
 /// The channel list in the sidebar — the only part of the workspace a write has to refresh.
@@ -188,7 +187,6 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
         r##"
         <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
-            {company_switcher}
             {list_html}
             <div class="border-t border-base-300 p-2">
                 <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
@@ -200,7 +198,6 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
         {pane_html}
         "##,
         header = sidebar_header("Channels", "Inbound addresses and their routing rules."),
-        company_switcher = company_switcher(company, page.companies, UiSection::Channels),
         plus_glyph = icon(Icon::Plus, BUTTON_ICON),
         list_html = channel_settings_list(page.list, FragmentSwap::Inline),
         company_id = company.id,
@@ -210,7 +207,7 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
     ui_shell(&UiShell {
         title: &format!("{} Channels", company.name),
         user: page.user,
-        company_id: Some(company.id),
+        company: Some(company),
         section: UiSection::Channels,
         content: &content,
         script: CHANNEL_SETTINGS_SCRIPT,
@@ -643,7 +640,25 @@ fn agent_radios(company_id: Uuid, agents: &[Agent], selected: &[Uuid], id_prefix
         r#"<p class="px-3 py-2 text-xs opacity-60">No library agents are available.</p>"#
             .to_string()
     } else {
-        render_options(&library)
+        let options = library
+            .iter()
+            .map(|agent| {
+                format!(
+                    r#"<option value="{id}"{selected}>{name} (@{slug})</option>"#,
+                    id = agent.id,
+                    selected = if selected.contains(&agent.id) {
+                        " selected"
+                    } else {
+                        ""
+                    },
+                    name = escape_html_text(&agent.name),
+                    slug = escape_html_text(&agent.slug),
+                )
+            })
+            .collect::<String>();
+        format!(
+            r#"<select class="select channel-library-agent-select mx-3 my-2 w-[calc(100%-1.5rem)]" onchange="syncChannelAgents(this)"><option value="">Choose a library agent…</option>{options}</select>"#
+        )
     };
     let custom_options = if custom.is_empty() {
         format!(

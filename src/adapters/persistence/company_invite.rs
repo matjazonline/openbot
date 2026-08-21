@@ -275,7 +275,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
 mod tests {
     use super::*;
     use crate::adapters::persistence::test_support::test_pool;
-    use crate::use_cases::company::CompanyPersistence;
+    use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
     use crate::use_cases::user::UserPersistence;
 
     #[tokio::test]
@@ -311,7 +311,14 @@ mod tests {
 
         // Create company
         let company = persistence
-            .create(owner.id, "Test Corp", "test-corp", None, None, None, None)
+            .create(
+                owner.id,
+                CompanyWrite {
+                    name: "Test Corp".to_string(),
+                    slug: "test-corp".to_string(),
+                    ..CompanyWrite::default()
+                },
+            )
             .await
             .unwrap();
 

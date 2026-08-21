@@ -57,11 +57,11 @@ pub struct CompanySettingsList<'a> {
 pub struct CompanySettingsPage<'a> {
     pub user: &'a MailboxUser<'a>,
     pub list: &'a CompanySettingsList<'a>,
-    /// Which company the rail's other workspaces point at.
+    /// Which company the rail's other workspaces point at, and whose face it ends on.
     ///
     /// Not the same as the list's selection: opening the create form deselects the list but must
     /// not empty the rail, and a user with no company yet has nothing for it to point at.
-    pub rail_company_id: Option<Uuid>,
+    pub rail_company: Option<&'a Company>,
     /// Pre-rendered right-hand pane: a company's settings, the create form, or a placeholder.
     pub pane_html: &'a str,
 }
@@ -78,6 +78,10 @@ pub struct CompanyDraft<'a> {
     pub model: &'a str,
     pub api_key: &'a str,
     pub spam_guardrail: SpamGuardrail,
+    /// The picture as the picker is holding it, blank for the letter bubble. Kept as the
+    /// submitted text so a rejected save comes back showing what was picked -- see
+    /// [`company_fields`], which is where it becomes an [`AvatarUrl`] again.
+    pub avatar_url: &'a str,
 }
 
 impl Default for CompanyDraft<'_> {
@@ -89,6 +93,7 @@ impl Default for CompanyDraft<'_> {
             model: "",
             api_key: "",
             spam_guardrail: SpamGuardrail::ServerDefault,
+            avatar_url: "",
         }
     }
 }
@@ -144,7 +149,7 @@ pub fn company_settings_page(page: &CompanySettingsPage<'_>) -> String {
     ui_shell(&UiShell {
         title: "Companies",
         user: page.user,
-        company_id: page.rail_company_id,
+        company: page.rail_company,
         section: UiSection::Companies,
         content: &content,
         script: "",
@@ -182,11 +187,8 @@ fn company_settings_entry(company: &Company, selected: bool) -> String {
     format!(
         r##"
                 <li>
-                    <a class="flex flex-col items-start gap-0.5 {active}"
-                        hx-get="/ui/companies/{company_id}"
-                        hx-target="#company-pane" hx-swap="outerHTML"
-                        hx-push-url="/ui/companies?company_id={company_id}"
-                        onclick="selectSidebarItem(this)">
+                    <a href="/ui/companies?company_id={company_id}"
+                        class="flex flex-col items-start gap-0.5 {active}">
                         <span class="w-full truncate">{name}</span>
                         <span class="w-full truncate font-mono text-[11px] opacity-60">/{slug}</span>
                     </a>
@@ -340,8 +342,13 @@ fn company_fields(draft: &CompanyDraft<'_>) -> String {
             " open"
         };
 
+    // Taken as text and parsed here rather than carried as a URL, so a tampered hidden field
+    // cannot reach the `<img src>` the bubble draws.
+    let picture = AvatarUrl::parse(draft.avatar_url).ok().flatten();
+
     format!(
         r##"
+                    {picture_field}
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <label class="form-control w-full">
                             <div class="label"><span class="text-xs opacity-70">Company Name</span></div>
@@ -388,6 +395,13 @@ fn company_fields(draft: &CompanyDraft<'_>) -> String {
                         </div>
                     </details>
         "##,
+        picture_field = avatar_picker(&AvatarPicker {
+            field_id: "company-avatar",
+            avatar_url: picture.as_ref(),
+            name: draft.name,
+            label: "Company Picture",
+            error: None,
+        }),
         name = escape_html_text(draft.name),
         slug = escape_html_text(draft.slug),
         default_selected = selected_attr(draft.spam_guardrail, SpamGuardrail::ServerDefault),
@@ -412,5 +426,6 @@ fn stored_draft(company: &Company) -> CompanyDraft<'_> {
         model: company.model.as_deref().unwrap_or(""),
         api_key: company.api_key.as_deref().unwrap_or(""),
         spam_guardrail: SpamGuardrail::from_stored(company.enable_llm_spam_guardrail),
+        avatar_url: company.avatar_url.as_deref().unwrap_or(""),
     }
 }

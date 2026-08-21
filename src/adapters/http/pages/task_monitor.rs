@@ -99,14 +99,12 @@ pub fn task_monitor_page(page: &TaskMonitorPage<'_>) -> String {
         r##"
         <aside class="flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
-            {company_switcher}
             {filters}
             {list_html}
         </aside>
         {pane_html}
         "##,
         header = sidebar_header("Tasks", "Background worker execution queue and states."),
-        company_switcher = company_switcher(company, page.companies, UiSection::Tasks),
         filters = task_filter_form(company.id, page.channels, page.list.filter),
         list_html = task_monitor_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
@@ -115,7 +113,7 @@ pub fn task_monitor_page(page: &TaskMonitorPage<'_>) -> String {
     ui_shell(&UiShell {
         title: &format!("{} Tasks", company.name),
         user: page.user,
-        company_id: Some(company.id),
+        company: Some(company),
         section: UiSection::Tasks,
         content: &content,
         script: "",

@@ -623,7 +623,7 @@ mod tests {
     use crate::entities::message::{MessageDirection, MessageRole};
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
-        company::CompanyPersistence,
+        company::{CompanyPersistence, CompanyWrite},
         user::UserPersistence,
     };
 
@@ -648,12 +648,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Thread Test",
-            &format!("thread-test-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Thread Test".to_string(),
+                slug: format!("thread-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -814,12 +813,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Outbox Reply Test",
-            &format!("outbox-reply-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Outbox Reply Test".to_string(),
+                slug: format!("outbox-reply-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -974,13 +972,12 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Stream Test",
-            // Slugs are hyphen-only; the label reads as a Rust identifier.
-            &format!("{}-{suffix}", label.replace('_', "-")),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Stream Test".to_string(),
+                // Slugs are hyphen-only; the label reads as a Rust identifier.
+                slug: format!("{}-{suffix}", label.replace('_', "-")),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();

@@ -496,7 +496,7 @@ mod tests {
     use crate::adapters::persistence::test_support::test_pool;
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
-        company::CompanyPersistence,
+        company::{CompanyPersistence, CompanyWrite},
         thread::ThreadPersistence,
         user::UserPersistence,
     };
@@ -521,12 +521,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Approval Test",
-            &format!("approval-test-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Approval Test".to_string(),
+                slug: format!("approval-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();

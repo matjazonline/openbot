@@ -1383,6 +1383,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
         let result = ResolvedAgentParams::new(Some(&company), None, None);
@@ -1403,6 +1404,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
         let result = ResolvedAgentParams::new(Some(&company), None, None);
@@ -1457,6 +1459,7 @@ mod tests {
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
         let params = ResolvedAgentParams::new(Some(&company), None, None)?;
@@ -1476,6 +1479,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("invalid-custom-model-xyz".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
         let params = ResolvedAgentParams::new(Some(&company), None, None)?;
@@ -1532,6 +1536,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -1569,6 +1574,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -1625,6 +1631,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -1708,6 +1715,7 @@ mod tests {
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -1749,6 +1757,7 @@ mod tests {
             provider: Some("unsupported_provider".to_string()),
             model: Some("some-model".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -1777,6 +1786,7 @@ mod tests {
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -1820,6 +1830,7 @@ mod tests {
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -1857,6 +1868,7 @@ mod tests {
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: chrono::Utc::now(),
         };
 

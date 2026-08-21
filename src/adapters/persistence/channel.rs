@@ -355,7 +355,7 @@ mod tests {
     use crate::adapters::persistence::test_support::test_pool;
     use crate::use_cases::agent::AgentPersistence;
     use crate::use_cases::agent::AgentWrite;
-    use crate::use_cases::company::CompanyPersistence;
+    use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
     use crate::use_cases::user::UserPersistence;
     use serde_json::json;
 
@@ -384,12 +384,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Channel Corp",
-            &format!("ch-corp-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Channel Corp".to_string(),
+                slug: format!("ch-corp-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -542,12 +541,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Alias Corp",
-            &company_slug,
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Alias Corp".to_string(),
+                slug: company_slug.to_string(),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -556,12 +554,11 @@ mod tests {
         let other_company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Other Corp",
-            &other_slug,
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Other Corp".to_string(),
+                slug: other_slug.to_string(),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();

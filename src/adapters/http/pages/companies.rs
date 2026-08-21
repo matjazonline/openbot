@@ -155,6 +155,9 @@ pub fn company_edit_fragment(company: &Company) -> String {
         r##"
         <form id="company-{id}" hx-put="/companies/{id}" hx-target="#company-{id}" hx-swap="outerHTML"
             class="bg-slate-900 border border-indigo-500/60 rounded-xl p-4 md:p-5 space-y-4 shadow-lg">
+            <!-- A save sets every column, so the picture -- which is picked in `/ui`, not here --
+                 rides along rather than being cleared by a rename. -->
+            <input type="hidden" name="avatar_url" value="{avatar_url}">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Company Name</label>
@@ -206,6 +209,7 @@ pub fn company_edit_fragment(company: &Company) -> String {
         api_key = api_key_val,
         provider = provider_val,
         model = model_val,
+        avatar_url = escape_html_text(company.avatar_url.as_deref().unwrap_or("")),
     )
 }
 

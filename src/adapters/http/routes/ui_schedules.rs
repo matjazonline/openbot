@@ -773,6 +773,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: Utc::now(),
         }
     }
@@ -1038,5 +1039,94 @@ mod tests {
         assert!(html.contains("0 errors found")); // Markdown rendered
         assert!(html.contains("hx-post=\"/ui/schedules/thread/"));
         assert!(html.contains("Reply</button>"));
+    }
+
+    /// The browser's Create Schedule submission, field for field, must reach the handler.
+    /// The pane posts every control in the form — including the ones its show/hide boxes have
+    /// hidden — so the empty `scheduled_at` and `recipient_emails` are part of a normal interval
+    /// create, and the numeric cadence arrives as a string like every urlencoded value.
+    #[tokio::test]
+    async fn create_schedule_form_deserializes_browser_submission() {
+        use axum::body::Body;
+        use axum::extract::FromRequest;
+        use axum::http::{Request, header};
+
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+        let body = format!(
+            "company_id={company_id}&name=Daily+Operations+Report&channel_id={channel_id}\
+             &schedule_type=interval&interval_seconds=3600&scheduled_at=\
+             &subject_template=%5BDaily%5D+Report&prompt_template=Summarise+the+day\
+             &timezone=UTC&delivery_mode=mailbox_only&recipient_emails="
+        )
+        .replace(['\n', ' '], "");
+
+        let req = Request::builder()
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+
+        let form = Form::<CreateScheduleForm>::from_request(req, &())
+            .await
+            .expect("the Create Schedule form must deserialize, not 422")
+            .0;
+
+        assert_eq!(form.channel_id, channel_id);
+        assert_eq!(form.schedule.company_id, company_id);
+        assert_eq!(form.schedule.name, "Daily Operations Report");
+        assert_eq!(form.schedule.interval_seconds, Some(3600));
+
+        let write = form
+            .schedule
+            .into_write()
+            .expect("form must map to a write");
+        assert_eq!(write.schedule_type, ScheduleType::Interval);
+        assert_eq!(write.delivery_mode, ScheduleDeliveryMode::MailboxOnly);
+        assert_eq!(write.scheduled_at, None);
+        assert!(write.recipient_emails.is_empty());
+    }
+
+    /// The one-off half of the same pane: the cadence select is hidden but still submits, and the
+    /// datetime lands as the browser's `datetime-local` value rather than RFC3339.
+    #[tokio::test]
+    async fn create_schedule_form_deserializes_one_off_submission() {
+        use axum::body::Body;
+        use axum::extract::FromRequest;
+        use axum::http::{Request, header};
+
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+        let body = format!(
+            "company_id={company_id}&name=Quarter+Close&channel_id={channel_id}\
+             &schedule_type=one_off&interval_seconds=&scheduled_at=2026-08-25T14%3A30\
+             &subject_template=Close&prompt_template=Close+the+quarter\
+             &timezone=UTC&delivery_mode=email_custom&recipient_emails=a%40x.com%2C+b%40x.com"
+        )
+        .replace(['\n', ' '], "");
+
+        let req = Request::builder()
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+
+        let form = Form::<CreateScheduleForm>::from_request(req, &())
+            .await
+            .expect("the one-off Create Schedule form must deserialize, not 422")
+            .0;
+
+        assert_eq!(form.schedule.interval_seconds, None);
+
+        let write = form
+            .schedule
+            .into_write()
+            .expect("form must map to a write");
+        assert_eq!(write.schedule_type, ScheduleType::OneOff);
+        assert_eq!(
+            write.scheduled_at.map(|at| at.to_rfc3339()),
+            Some("2026-08-25T14:30:00+00:00".to_string())
+        );
+        assert_eq!(write.recipient_emails.len(), 2);
     }
 }

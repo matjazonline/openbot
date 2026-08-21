@@ -178,6 +178,16 @@ impl CompanyInviteUseCases {
             .await
     }
 
+    /// Whether an account has an invitation that still needs an answer.
+    #[instrument(skip(self))]
+    pub async fn has_pending_user_invites(&self, user_email: &str) -> AppResult<bool> {
+        Ok(self
+            .list_user_invites(user_email)
+            .await?
+            .iter()
+            .any(|invite| invite.status == "pending"))
+    }
+
     #[instrument(skip(self, user))]
     pub async fn accept_invite(&self, user: &User, invite_id: Uuid) -> AppResult<CompanyInvite> {
         info!("User {} accepting invite {}", user.id, invite_id);
@@ -298,6 +308,7 @@ mod tests {
     use super::*;
     use crate::entities::company::Company;
     use crate::entities::company_member::CompanyMembership;
+    use crate::use_cases::company::CompanyWrite;
     use chrono::Utc;
     use std::sync::Mutex;
 
@@ -307,16 +318,7 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(
-            &self,
-            _user_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -344,16 +346,7 @@ mod tests {
             unimplemented!()
         }
 
-        async fn update(
-            &self,
-            _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -535,6 +528,7 @@ mod tests {
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
+                avatar_url: None,
                 created_at: Utc::now(),
             }]),
         });
@@ -607,6 +601,7 @@ mod tests {
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
+                avatar_url: None,
                 created_at: Utc::now(),
             }]),
         });
@@ -644,6 +639,12 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(user_invites.len(), 1);
+        assert!(
+            use_cases
+                .has_pending_user_invites("newuser@example.com")
+                .await
+                .unwrap()
+        );
 
         // User accepts invite
         let user = User {
@@ -657,6 +658,12 @@ mod tests {
 
         let accepted = use_cases.accept_invite(&user, invite.id).await.unwrap();
         assert_eq!(accepted.status, "accepted");
+        assert!(
+            !use_cases
+                .has_pending_user_invites("newuser@example.com")
+                .await
+                .unwrap()
+        );
         assert_eq!(
             use_cases
                 .accept_invite(&user, invite.id)

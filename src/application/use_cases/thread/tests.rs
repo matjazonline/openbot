@@ -1,8 +1,11 @@
 use super::*;
+use crate::entities::agent::Agent;
 use crate::entities::channel::Channel;
 use crate::entities::company_member::CompanyMembership;
 use crate::services::email_parser::MAX_CHANNEL_HOPS;
+use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
+use crate::use_cases::company::CompanyWrite;
 use chrono::Utc;
 use std::sync::Mutex;
 
@@ -60,16 +63,7 @@ impl MockCompanyPersistence {
 
 #[async_trait]
 impl CompanyPersistence for MockCompanyPersistence {
-    async fn create(
-        &self,
-        _user_id: Uuid,
-        _name: &str,
-        _slug: &str,
-        _api_key: Option<&str>,
-        _provider: Option<&str>,
-        _model: Option<&str>,
-        _enable_llm_spam_guardrail: Option<bool>,
-    ) -> AppResult<Company> {
+    async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
         unimplemented!()
     }
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
@@ -93,16 +87,7 @@ impl CompanyPersistence for MockCompanyPersistence {
     async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
         unimplemented!()
     }
-    async fn update(
-        &self,
-        _id: Uuid,
-        _name: &str,
-        _slug: &str,
-        _api_key: Option<&str>,
-        _provider: Option<&str>,
-        _model: Option<&str>,
-        _enable_llm_spam_guardrail: Option<bool>,
-    ) -> AppResult<Company> {
+    async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
         unimplemented!()
     }
     async fn delete(&self, _id: Uuid) -> AppResult<()> {
@@ -408,6 +393,41 @@ impl ThreadPersistence for MockThreadPersistence {
 
 struct MockTaskPersistence {
     tasks: Mutex<Vec<crate::entities::task::BackgroundTask>>,
+}
+
+struct MockAgentPersistence {
+    agents: Vec<Agent>,
+}
+
+#[async_trait]
+impl AgentPersistence for MockAgentPersistence {
+    async fn create(&self, _company_id: Uuid, _write: AgentWrite) -> AppResult<Agent> {
+        unimplemented!()
+    }
+
+    async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>> {
+        Ok(self.agents.iter().find(|agent| agent.id == id).cloned())
+    }
+
+    async fn get_by_company_slug_and_agent_slug(
+        &self,
+        _company_slug: &str,
+        _agent_slug: &str,
+    ) -> AppResult<Option<Agent>> {
+        unimplemented!()
+    }
+
+    async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Agent>> {
+        unimplemented!()
+    }
+
+    async fn update(&self, _id: Uuid, _write: AgentWrite) -> AppResult<Agent> {
+        unimplemented!()
+    }
+
+    async fn delete(&self, _id: Uuid) -> AppResult<()> {
+        unimplemented!()
+    }
 }
 
 #[async_trait]
@@ -767,6 +787,7 @@ async fn test_inter_channel_hop_limit_rejection() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
 
@@ -899,6 +920,7 @@ async fn test_spf_authentication_failure_rejection() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
 
@@ -999,6 +1021,7 @@ async fn test_high_spam_score_rejection() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
 
@@ -1101,6 +1124,7 @@ async fn test_dmarc_authentication_failure_rejection() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
 
@@ -1203,6 +1227,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
 
@@ -1306,6 +1331,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
 
@@ -1407,6 +1433,7 @@ async fn test_channel_in_cc_resolves_properly() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
 
@@ -1468,10 +1495,10 @@ async fn test_channel_in_cc_resolves_properly() {
     });
 
     let thread_use_cases = ThreadUseCases::new(
-        thread_persistence,
+        thread_persistence.clone(),
         channel_persistence,
         company_persistence,
-        task_persistence,
+        task_persistence.clone(),
         config,
     );
 
@@ -1490,8 +1517,12 @@ async fn test_channel_in_cc_resolves_properly() {
         .unwrap();
 
     assert!(result.accepted);
+    assert!(result.task_id.is_none());
+    assert!(result.parsed_email.as_ref().unwrap().is_context_only);
     assert_eq!(result.channel_matches.len(), 1);
     assert_eq!(result.channel_matches[0].recipient_role, RecipientRole::Cc);
+    assert_eq!(thread_persistence.messages.lock().unwrap().len(), 1);
+    assert!(task_persistence.tasks.lock().unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -1509,6 +1540,7 @@ async fn test_multi_channel_to_and_cc_execution() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
 
@@ -1591,7 +1623,7 @@ async fn test_multi_channel_to_and_cc_execution() {
         thread_persistence.clone(),
         channel_persistence,
         company_persistence,
-        task_persistence,
+        task_persistence.clone(),
         config,
     );
 
@@ -1619,6 +1651,13 @@ async fn test_multi_channel_to_and_cc_execution() {
     // Verify thread creation for both channels
     let threads = thread_persistence.threads.lock().unwrap();
     assert_eq!(threads.len(), 2);
+    drop(threads);
+
+    let tasks = task_persistence.tasks.lock().unwrap();
+    assert_eq!(tasks.len(), 1);
+    let task_matches = tasks[0].payload["channel_matches"].as_array().unwrap();
+    assert_eq!(task_matches.len(), 1);
+    assert_eq!(task_matches[0]["channel"]["slug"], "support");
 }
 
 #[tokio::test]
@@ -1637,6 +1676,7 @@ async fn test_pipeline_address_chaining_execution() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
 
@@ -1780,6 +1820,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
 
@@ -1928,6 +1969,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
 
@@ -2075,6 +2117,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: Utc::now(),
         }],
         vec![(company_id, "team_member@acme.com".to_string())],
@@ -2270,6 +2313,7 @@ async fn test_sender_verification_and_delegation_target_check() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
 
@@ -2456,6 +2500,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -2650,6 +2695,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -2751,6 +2797,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }]));
     let channel_persistence = Arc::new(MockChannelPersistence {
@@ -2853,6 +2900,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: Utc::now(),
         }],
         vec![(company_id, "team@acme.com".to_string())],
@@ -3068,6 +3116,7 @@ async fn test_context_only_quiet_mode_ingestion() {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: Utc::now(),
         }],
         vec![(company_id, "team@acme.com".to_string())],
@@ -3187,6 +3236,7 @@ struct TestChannel {
     add_3rd_party: bool,
     alias_slugs: Vec<ChannelSlug>,
     participant_emails: Option<Vec<EmailAddress>>,
+    agent_ids: Option<Vec<Uuid>>,
 }
 
 impl Default for TestChannel {
@@ -3198,6 +3248,7 @@ impl Default for TestChannel {
             add_3rd_party: true,
             alias_slugs: Vec::new(),
             participant_emails: None,
+            agent_ids: None,
         }
     }
 }
@@ -3223,6 +3274,7 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
         add_3rd_party,
         alias_slugs,
         participant_emails,
+        agent_ids,
     } = spec;
     let company_id = Uuid::new_v4();
     let channel_id = Uuid::new_v4();
@@ -3237,6 +3289,7 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: Utc::now(),
         }],
         vec![(company_id, "team@acme.com".to_string())],
@@ -3255,7 +3308,7 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
             provider: None,
             model: None,
             participant_emails,
-            agent_ids: None,
+            agent_ids,
             channel_config: None,
             created_at: Utc::now(),
         }]),
@@ -3299,6 +3352,153 @@ fn participants_of(result: &InboundIngestResult) -> Vec<String> {
         .iter()
         .map(ToString::to_string)
         .collect()
+}
+
+fn cc_message(message_id: &str, body: &str, cc: &str) -> RawInboundPayload {
+    RawInboundPayload {
+        headers: Some(format!("Message-ID: <{message_id}@acme.com>\n")),
+        to: "person@example.com".to_string(),
+        cc: Some(cc.to_string()),
+        from: "team@acme.com".to_string(),
+        subject: Some("FYI".to_string()),
+        text: Some(body.to_string()),
+        ..Default::default()
+    }
+}
+
+#[tokio::test]
+async fn a_cc_d_channel_runs_when_its_email_is_mentioned() {
+    let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(cc_message(
+            "cc-email-mention",
+            "Please ask SUPPORT@ACME.MAILAGENTS.COM to help.",
+            "support@acme.mailagents.com",
+        ))
+        .await
+        .unwrap();
+
+    assert!(result.accepted);
+    assert!(result.task_id.is_some());
+    assert!(!result.parsed_email.as_ref().unwrap().is_context_only);
+}
+
+#[tokio::test]
+async fn a_cc_d_channel_runs_for_a_plain_channel_or_alias_mention() {
+    for (message_id, body) in [
+        ("cc-channel-mention", "Please ask @support."),
+        ("cc-alias-mention", "Please ask @helpdesk."),
+    ] {
+        let (thread_use_cases, _) = use_cases_with_channel_aliases(vec!["helpdesk".into()]);
+        let result = thread_use_cases
+            .ingest_and_save_inbound_message(cc_message(
+                message_id,
+                body,
+                "helpdesk@acme.mailagents.com",
+            ))
+            .await
+            .unwrap();
+
+        assert!(result.accepted);
+        assert!(result.task_id.is_some(), "body did not activate CC: {body}");
+    }
+}
+
+#[tokio::test]
+async fn a_cc_d_channel_runs_for_its_assigned_agent_slug() {
+    let agent_id = Uuid::new_v4();
+    let (thread_use_cases, _) = use_cases_with_channel(TestChannel {
+        agent_ids: Some(vec![agent_id]),
+        ..TestChannel::default()
+    });
+    let thread_use_cases =
+        thread_use_cases.with_agent_persistence(Arc::new(MockAgentPersistence {
+            agents: vec![Agent {
+                id: agent_id,
+                company_id: None,
+                name: "Triage Bot".to_string(),
+                slug: "triage-bot".to_string(),
+                provider: None,
+                model: None,
+                api_key: None,
+                system_prompt: None,
+                description: None,
+                config_json: None,
+                avatar_url: None,
+                created_at: Utc::now(),
+            }],
+        }));
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(cc_message(
+            "cc-agent-mention",
+            "Please ask @triage-bot.",
+            "support@acme.mailagents.com",
+        ))
+        .await
+        .unwrap();
+
+    assert!(result.accepted);
+    assert!(result.task_id.is_some());
+}
+
+#[tokio::test]
+async fn a_mention_only_in_quoted_history_does_not_activate_a_cc_d_channel() {
+    let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
+    let first = thread_use_cases
+        .ingest_and_save_inbound_message(RawInboundPayload {
+            headers: Some("Message-ID: <quoted-mention-root@acme.com>\n".to_string()),
+            to: "support@acme.mailagents.com".to_string(),
+            from: "team@acme.com".to_string(),
+            subject: Some("Mention history".to_string()),
+            text: Some("Please ask @support.".to_string()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert!(first.task_id.is_some());
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(RawInboundPayload {
+            headers: Some(
+                "Message-ID: <quoted-mention-reply@acme.com>\nIn-Reply-To: <quoted-mention-root@acme.com>\n"
+                    .to_string(),
+            ),
+            to: "person@example.com".to_string(),
+            cc: Some("support@acme.mailagents.com".to_string()),
+            from: "team@acme.com".to_string(),
+            subject: Some("Re: Mention history".to_string()),
+            text: Some(
+                "Just keeping this for context.\n\nOn Fri, someone wrote:\n> Please ask @support."
+                    .to_string(),
+            ),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    assert!(result.accepted);
+    assert!(result.task_id.is_none());
+    assert!(result.parsed_email.as_ref().unwrap().is_context_only);
+}
+
+#[tokio::test]
+async fn an_explicit_quiet_trigger_wins_over_a_cc_mention() {
+    let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
+
+    let result = thread_use_cases
+        .ingest_and_save_inbound_message(cc_message(
+            "quiet-cc-mention",
+            "[quiet] Please ask @support.",
+            "support@acme.mailagents.com",
+        ))
+        .await
+        .unwrap();
+
+    assert!(result.accepted);
+    assert!(result.task_id.is_none());
+    assert!(result.parsed_email.as_ref().unwrap().is_context_only);
 }
 
 /// The flag off makes the channel internal: the CC'd outsider is not recorded on the thread, and

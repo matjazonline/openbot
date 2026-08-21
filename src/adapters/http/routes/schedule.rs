@@ -109,11 +109,39 @@ impl ScheduleRequest {
     }
 }
 
+/// A urlencoded body carries every value as a string, and a `#[serde(flatten)]` around this form
+/// (see `CreateScheduleForm`) hands those strings to the field types untouched — so a plain
+/// `Option<i64>` rejects `interval_seconds=3600` as "invalid type: string", and the whole submit
+/// 422s before the handler runs. Parse the cadence from the string the browser actually sends.
+fn deserialize_interval_seconds<'de, D>(deserializer: D) -> Result<Option<i64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum IntervalSeconds {
+        Number(i64),
+        Text(String),
+    }
+
+    match Option::<IntervalSeconds>::deserialize(deserializer)? {
+        None => Ok(None),
+        Some(IntervalSeconds::Number(seconds)) => Ok(Some(seconds)),
+        Some(IntervalSeconds::Text(text)) if text.trim().is_empty() => Ok(None),
+        Some(IntervalSeconds::Text(text)) => text
+            .trim()
+            .parse::<i64>()
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct UiScheduleForm {
     pub company_id: Uuid,
     pub name: String,
     pub schedule_type: String,
+    #[serde(default, deserialize_with = "deserialize_interval_seconds")]
     pub interval_seconds: Option<i64>,
     pub scheduled_at: Option<String>,
     pub subject_template: String,

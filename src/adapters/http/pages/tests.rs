@@ -16,6 +16,24 @@ fn test_render_markdown_formats_content_and_removes_unsafe_html() {
 }
 
 #[test]
+fn library_agent_fields_reuse_the_advanced_editor_and_avatar_picker() {
+    let html = library_agent_fields(
+        &AgentDraft {
+            name: "Global helper",
+            advanced: true,
+            ..AgentDraft::default()
+        },
+        None,
+    );
+
+    assert!(html.contains("Agent Picture"));
+    assert!(html.contains("/ui/uploads/avatar"));
+    assert!(html.contains("/ui/agent-library/generate-prompt"));
+    assert!(html.contains("Used by this library agent"));
+    assert!(!html.contains("Overrides the company key"));
+}
+
+#[test]
 fn test_find_task_for_message_multi_task_matching() {
     let thread_id = Uuid::new_v4();
     let company_id = Uuid::new_v4();
@@ -218,6 +236,7 @@ fn mailbox_company() -> Company {
         provider: None,
         model: None,
         enable_llm_spam_guardrail: None,
+        avatar_url: None,
         created_at: Utc::now(),
     }
 }
@@ -578,6 +597,66 @@ fn channel_actions_swap_out_of_band_so_picking_a_channel_reveals_edit_channel() 
 }
 
 #[test]
+fn the_rail_ends_on_the_company_it_is_scoped_to_rather_than_on_a_way_out() {
+    let mut company = mailbox_company();
+    company.name = "Acme <script>".to_string();
+    let channel = mailbox_channel(company.id);
+    let detail = empty_detail_pane("Select a thread.", FragmentSwap::Inline);
+    let email = mailbox_account_email();
+    let page = |company: &Company| {
+        mailbox_page(&MailboxPage {
+            user: &mailbox_user(&email),
+            company,
+            companies: std::slice::from_ref(company),
+            app_domain_name: "example.com",
+            channels: std::slice::from_ref(&channel),
+            selected_channel: Some(&channel),
+            threads: &[],
+            next_cursor: None,
+            selected_thread_id: None,
+            activity: no_activity(),
+            detail_html: &detail,
+        })
+    };
+
+    let letter = page(&company);
+
+    // The foot of the rail says which company you are in, and opens its settings.
+    assert!(letter.contains(&format!(
+        r##"<a id="rail-company" href="/ui/companies?company_id={}""##,
+        company.id
+    )));
+    assert!(letter.contains(r##"title="Acme &lt;script&gt;""##));
+    // No picture yet, so the letter shows -- and no `<img>` is left to break.
+    assert!(letter.contains(">A</span>"));
+    assert!(!letter.contains("cdn.example.com"));
+
+    // Signing out is not what the bottom of the rail does any more; the account menu owns it.
+    assert!(!letter.contains(r##"title="Log out""##));
+    assert!(letter.contains(r##"onclick="confirmLogout()""##));
+
+    company.avatar_url = Some(AvatarUrl::from("https://cdn.example.com/acme.png"));
+    let pictured = page(&company);
+    assert!(pictured.contains(r##"src="https://cdn.example.com/acme.png""##));
+    // The letter stays underneath, so a picture that fails to load leaves the bubble filled.
+    assert!(pictured.contains(">A</span>"));
+}
+
+#[test]
+fn the_rail_badge_can_be_sent_back_out_of_band_after_a_company_is_saved() {
+    let mut company = mailbox_company();
+    company.avatar_url = Some(AvatarUrl::from("https://cdn.example.com/acme.png"));
+
+    let inline = rail_company_badge(&company, FragmentSwap::Inline);
+    assert!(!inline.contains("hx-swap-oob"));
+
+    // The rail is chrome no pane swap touches, so a saved picture has to ride back on its own.
+    let oob = rail_company_badge(&company, FragmentSwap::OutOfBand);
+    assert!(oob.contains(r##"id="rail-company""##));
+    assert!(oob.contains(r##"hx-swap-oob="outerHTML""##));
+}
+
+#[test]
 fn icon_rail_lights_the_workspace_the_response_belongs_to() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
@@ -620,16 +699,13 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
         pane_html: &pane,
     });
 
-    // Same chrome, other icon lit — and the company switcher stays in this workspace.
+    // Same chrome, other icon lit. Company selection lives in the Companies workspace.
     assert!(channels.contains(&format!(
         r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-lg btn-primary"##,
         company.id
     )));
     assert!(channels.contains("/assets/busybots-logo-dark-hor.png"));
-    assert!(channels.contains(&format!(
-        r##"<li><a href="/ui/channels?company_id={}""##,
-        company.id
-    )));
+    assert!(!channels.contains("dropdown-bottom w-full p-3"));
     assert!(channels.contains("id=\"channel-pane\""));
 
     let agent = settings_agent(company.id, "Triage", "triage");
@@ -646,15 +722,12 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
         pane_html: &agent_pane,
     });
 
-    // The third workspace, same chrome again: its own icon lit, its own switcher targets.
+    // The third workspace, same chrome again: its own icon lit.
     assert!(agents.contains(&format!(
         r##"<a href="/ui/agents?company_id={}" class="btn btn-square btn-lg btn-primary"##,
         company.id
     )));
-    assert!(agents.contains(&format!(
-        r##"<li><a href="/ui/agents?company_id={}""##,
-        company.id
-    )));
+    assert!(!agents.contains("dropdown-bottom w-full p-3"));
     assert!(agents.contains("id=\"agent-pane\""));
     // The rail is shared, so the other two workspaces stay one click away and unlit.
     assert!(agents.contains(&format!(
@@ -1830,6 +1903,54 @@ fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
     );
     assert!(!inbound_html.contains("<img"));
     assert!(inbound_html.contains(inbound.sender.as_str()));
+
+    // Who wrote it is on the bubble, because only the agent's reply quiets the thread's row.
+    assert!(html.contains(r#"data-role="agent""#));
+    assert!(inbound_html.contains(r#"data-role="human""#));
+}
+
+/// An agent's reply is the answer its row's dot was promising, so the row stops repeating it --
+/// on the open thread and on one the reader was not watching alike, and until the column has a new
+/// state to report for that thread.
+#[test]
+fn a_reply_in_the_open_thread_quiets_that_thread_s_activity_mark() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+
+    let detail = empty_detail_pane("Select a thread.", FragmentSwap::Inline);
+    let email = mailbox_account_email();
+
+    let page = mailbox_page(&MailboxPage {
+        user: &mailbox_user(&email),
+        company: &company,
+        companies: std::slice::from_ref(&company),
+        app_domain_name: "example.com",
+        channels: std::slice::from_ref(&channel),
+        selected_channel: Some(&channel),
+        threads: std::slice::from_ref(&thread),
+        next_cursor: None,
+        selected_thread_id: None,
+        activity: no_activity(),
+        detail_html: &detail,
+    });
+
+    // The rule that hides it, and the reply that puts the row under it.
+    assert!(page.contains(".thread-row.thread-replied .thread-activity { display: none; }"));
+    assert!(page.contains("function quietRepliedRow(bubble)"));
+    assert!(page.contains("quietRepliedRow(swapped.lastElementChild)"));
+    // Only the agent's own bubble counts as the reply.
+    assert!(page.contains("bubble.dataset.role !== 'agent'"));
+
+    // A reply on a row the reader was not watching quiets it too, and each arrival is spent once
+    // so a later insert cannot re-settle a thread that has since started working again.
+    assert!(page.contains("row.classList.add('thread-replied')"));
+    assert!(page.contains("row.removeAttribute('data-last-role')"));
+
+    // Quiet ends on a badge that carries a state, not on the reader opening something else.
+    assert!(page.contains("badgeRow.classList.remove('thread-replied')"));
+    assert!(page.contains("if (swapped.firstElementChild)"));
+    assert!(!page.contains("row.classList.remove('thread-replied')"));
 }
 
 #[test]
@@ -2037,11 +2158,7 @@ fn task_monitor_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
         r##"<a href="/ui/agents?company_id={}" class="btn btn-square btn-lg btn-ghost"##,
         company.id
     )));
-    // The company switcher stays in this workspace.
-    assert!(html.contains(&format!(
-        r##"<li><a href="/ui/tasks?company_id={}""##,
-        company.id
-    )));
+    assert!(!html.contains("dropdown-bottom w-full p-3"));
     assert!(html.contains("id=\"task-pane\""));
     // The filter form keeps what the request was made with, and it sits outside the swapped list.
     assert!(html.contains(&format!(
@@ -2202,7 +2319,7 @@ fn company_settings_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
     let html = company_settings_page(&CompanySettingsPage {
         user: &mailbox_user(&email),
         list: &list,
-        rail_company_id: Some(company.id),
+        rail_company: Some(&company),
         pane_html: &pane,
     });
 
@@ -2236,7 +2353,7 @@ fn company_settings_page_without_a_company_still_offers_the_create_form() {
     let html = company_settings_page(&CompanySettingsPage {
         user: &mailbox_user(&email),
         list: &list,
-        rail_company_id: None,
+        rail_company: None,
         pane_html: &pane,
     });
 
@@ -2248,7 +2365,7 @@ fn company_settings_page_without_a_company_still_offers_the_create_form() {
 }
 
 #[test]
-fn company_settings_list_targets_the_pane_and_swaps_out_of_band() {
+fn company_settings_list_saves_selection_in_the_url_and_swaps_out_of_band() {
     let company = settings_company("Acme", "acme");
     let other = settings_company("Globex", "globex");
     let list = CompanySettingsList {
@@ -2257,8 +2374,11 @@ fn company_settings_list_targets_the_pane_and_swaps_out_of_band() {
     };
 
     let inline = company_settings_list(&list, FragmentSwap::Inline);
-    assert!(inline.contains(&format!(r##"hx-get="/ui/companies/{}""##, company.id)));
-    assert!(inline.contains("hx-target=\"#company-pane\""));
+    assert!(inline.contains(&format!(
+        r##"href="/ui/companies?company_id={}""##,
+        company.id
+    )));
+    assert!(!inline.contains("hx-target=\"#company-pane\""));
     assert!(inline.contains("/globex"));
     assert!(inline.contains("menu-active"));
     assert!(!inline.contains("hx-swap-oob"));
@@ -2316,6 +2436,72 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
 }
 
 #[test]
+fn the_company_form_picks_a_picture_and_saves_it_with_the_rest_of_the_settings() {
+    let mut company = settings_company("Acme", "acme");
+    company.avatar_url = Some(AvatarUrl::from("https://cdn.example.com/acme.png"));
+
+    let html = company_edit_pane(&CompanyEditPane {
+        company: &company,
+        app_domain_name: "example.com",
+        counts: CompanyCounts::default(),
+        draft: None,
+        error: None,
+    });
+
+    // The picker is the same control every other picture is set with, in this form's own field.
+    assert!(html.contains(r#"id="company-avatar""#));
+    assert!(html.contains(r#"hx-post="/ui/uploads/avatar""#));
+    // The stored picture is what the form is holding, so saving the form keeps it.
+    assert!(html.contains(
+        r#"<input type="hidden" name="avatar_url" value="https://cdn.example.com/acme.png">"#
+    ));
+    assert!(html.contains(&format!(r##"hx-put="/ui/companies/{}""##, company.id)));
+
+    // A company with no picture yet offers the same field, showing its letter.
+    let create = company_create_pane(&CompanyCreatePane {
+        draft: &CompanyDraft::default(),
+        error: None,
+    });
+    assert!(create.contains(r#"id="company-avatar""#));
+    assert!(create.contains(r#"<input type="hidden" name="avatar_url" value="">"#));
+}
+
+#[test]
+fn a_rejected_company_save_keeps_the_picture_that_was_picked() {
+    let company = settings_company("Acme", "acme");
+    let draft = CompanyDraft {
+        name: "Acme Renamed",
+        slug: "acme-renamed",
+        avatar_url: "https://cdn.example.com/picked.png",
+        ..CompanyDraft::default()
+    };
+
+    let html = company_edit_pane(&CompanyEditPane {
+        company: &company,
+        app_domain_name: "example.com",
+        counts: CompanyCounts::default(),
+        draft: Some(&draft),
+        error: Some("Slug is taken"),
+    });
+
+    assert!(html.contains(
+        r#"<input type="hidden" name="avatar_url" value="https://cdn.example.com/picked.png">"#
+    ));
+
+    // A submitted URL is text until it is parsed, and what cannot be rendered never reaches the
+    // `<img src>` the bubble draws.
+    let tampered = CompanyDraft {
+        avatar_url: "javascript:alert(1)",
+        ..CompanyDraft::default()
+    };
+    let refused = company_create_pane(&CompanyCreatePane {
+        draft: &tampered,
+        error: None,
+    });
+    assert!(!refused.contains("<img src=\"javascript:"));
+}
+
+#[test]
 fn company_edit_pane_keeps_a_rejected_save_in_the_form() {
     let company = settings_company("Acme", "acme");
     let draft = CompanyDraft {
@@ -2325,6 +2511,7 @@ fn company_edit_pane_keeps_a_rejected_save_in_the_form() {
         model: "",
         api_key: "",
         spam_guardrail: SpamGuardrail::Disabled,
+        avatar_url: "",
     };
 
     let html = company_edit_pane(&CompanyEditPane {
@@ -2391,7 +2578,7 @@ fn the_create_form_deselects_the_list_without_emptying_the_rail() {
     let html = company_settings_page(&CompanySettingsPage {
         user: &mailbox_user(&email),
         list: &list,
-        rail_company_id: Some(company.id),
+        rail_company: Some(&company),
         pane_html: &pane,
     });
 
@@ -2465,11 +2652,7 @@ fn team_settings_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
         "the team icon belongs below the companies icon"
     );
     assert!(html.contains("id=\"team-pane\""));
-    // The company switcher stays in this workspace.
-    assert!(html.contains(&format!(
-        r##"<li><a href="/ui/team?company_id={}""##,
-        company.id
-    )));
+    assert!(!html.contains("dropdown-bottom w-full p-3"));
     assert!(html.contains(r##"hx-get="/ui/team/new?company_id="##));
 }
 
@@ -3299,7 +3482,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
             companies: &companies,
             selected_company_id: Some(company.id),
         },
-        rail_company_id: Some(company.id),
+        rail_company: Some(&company),
         pane_html: "",
     });
     assert!(companies_html.contains(

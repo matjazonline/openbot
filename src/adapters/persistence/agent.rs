@@ -207,7 +207,7 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::test_support::test_pool;
     use crate::use_cases::agent::AgentWrite;
-    use crate::use_cases::company::CompanyPersistence;
+    use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
     use crate::use_cases::user::UserPersistence;
     use serde_json::json;
 
@@ -233,12 +233,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Agent Corp",
-            "agent-corp",
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Agent Corp".to_string(),
+                slug: "agent-corp".to_string(),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();

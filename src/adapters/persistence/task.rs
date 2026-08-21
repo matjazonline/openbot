@@ -614,17 +614,26 @@ impl TaskPersistence for PostgresPersistence {
             return Ok(HashMap::new());
         }
 
-        // `DISTINCT ON` keeps only each thread's most recently touched unfinished task, so a
-        // thread that has been through several runs reports the current one rather than a stale
-        // dead letter. Terminal statuses are excluded here rather than mapped to `None` later, to
-        // keep the index scan on `background_tasks_thread_idx` narrow.
+        // `DISTINCT ON` keeps one task per thread: the run still going if there is one, and
+        // otherwise whichever of the thread's finished runs ended last.
+        //
+        // `completed` earns its place in that second group even though it draws no badge. A
+        // dead letter is the thread's last word only until a later run answers the question, and
+        // asking again is exactly what a reader does with a failure: without the successful run
+        // in the comparison, the alert would come back the moment the retry finished and the
+        // thread would look broken for good. Ordering by the clock alone cannot express that,
+        // hence the boolean: unfinished work outranks any finished run however old it is.
+        //
+        // `stopped` and `failed` stay out. Neither is an answer, so neither should bury one.
         let rows = sqlx::query_as::<_, ThreadActivityDb>(
             r#"SELECT DISTINCT ON (thread_id) thread_id, status, lock_expires_at
                FROM background_tasks
                WHERE thread_id = ANY($1)
                  AND status IN ('pending', 'processing', 'pending_approval',
-                                'waiting_for_third_party_reply', 'dead_letter')
-               ORDER BY thread_id, updated_at DESC, id DESC"#,
+                                'waiting_for_third_party_reply', 'dead_letter', 'completed')
+               ORDER BY thread_id,
+                        status IN ('dead_letter', 'completed'),
+                        updated_at DESC, id DESC"#,
         )
         .bind(thread_ids)
         .fetch_all(&self.pool)
@@ -641,8 +650,10 @@ impl TaskPersistence for PostgresPersistence {
                     ThreadActivity::from_task(status, row.lock_expires_at, now),
                 ))
             })
-            // A status the filter admitted always maps to some activity, but flattening here means
-            // a future status added to the query cannot show up as a badge nobody chose.
+            // `completed` is queried for its position in that ordering, not for a badge: reaching
+            // here it means the thread's last word was a run that worked, which is nothing to
+            // show. Dropping every `None` also keeps a status added to the query later from
+            // turning into a badge nobody chose.
             .filter_map(|entry: AppResult<_>| match entry {
                 Ok((thread_id, Some(activity))) => Some(Ok((thread_id, activity))),
                 Ok((_, None)) => None,
@@ -1920,7 +1931,7 @@ mod tests {
     use crate::services::outbound_dispatcher::OutboundEmail;
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
-        company::CompanyPersistence,
+        company::{CompanyPersistence, CompanyWrite},
         thread::ThreadPersistence,
         user::UserPersistence,
     };
@@ -1955,12 +1966,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Activity Test",
-            &format!("activity-test-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Activity Test".to_string(),
+                slug: format!("activity-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -2056,6 +2066,26 @@ mod tests {
             "the newest task wins over an older dead letter on the same thread"
         );
 
+        // Asking again after a failure and getting an answer settles the thread: the run that
+        // worked is its last word, and the dead letter behind it is history rather than a badge.
+        set_status(current.id, "completed", None).await;
+        let activity = persistence.list_thread_activity(&ids).await.unwrap();
+        assert_eq!(
+            activity.get(&threads[3].id),
+            None,
+            "a successful run buries the dead letter it was asked to make up for"
+        );
+
+        // The failure still stands on its own while nothing has answered it.
+        set_status(current.id, "stopped", None).await;
+        let activity = persistence.list_thread_activity(&ids).await.unwrap();
+        assert_eq!(
+            activity.get(&threads[3].id),
+            Some(&ThreadActivity::Failed),
+            "a run that was stopped rather than answered leaves the failure showing"
+        );
+        set_status(current.id, "completed", None).await;
+
         // An abandoned worker leaves `processing` behind; that is queued work, not a live agent.
         set_status(
             running.id,
@@ -2100,12 +2130,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Queue Test",
-            &format!("queue-test-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Queue Test".to_string(),
+                slug: format!("queue-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -2214,12 +2243,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Enqueue Test",
-            &format!("enqueue-test-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Enqueue Test".to_string(),
+                slug: format!("enqueue-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -2316,12 +2344,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Outbox Channel Test",
-            &format!("outbox-channel-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Outbox Channel Test".to_string(),
+                slug: format!("outbox-channel-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -2413,12 +2440,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Reap Test",
-            &format!("reap-test-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Reap Test".to_string(),
+                slug: format!("reap-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -2581,12 +2607,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Dead Letter Test",
-            &format!("dead-letter-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Dead Letter Test".to_string(),
+                slug: format!("dead-letter-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -2683,12 +2708,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Delivery Test",
-            &format!("delivery-test-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Delivery Test".to_string(),
+                slug: format!("delivery-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -2795,12 +2819,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Outreach Test",
-            &format!("outreach-test-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Outreach Test".to_string(),
+                slug: format!("outreach-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();

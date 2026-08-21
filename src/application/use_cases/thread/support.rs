@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::{
     app_error::AppResult,
     entities::{
+        agent::Agent,
         channel::Channel,
         company::Company,
         company_member::CompanyMembership,
@@ -35,6 +36,7 @@ pub(super) struct DirectoryCache<'a> {
     companies: HashMap<String, Option<Company>>,
     channels: HashMap<Uuid, Vec<Channel>>,
     memberships: HashMap<(Uuid, String), CompanyMembership>,
+    agents: HashMap<Uuid, Option<Agent>>,
 }
 
 impl<'a> DirectoryCache<'a> {
@@ -44,6 +46,7 @@ impl<'a> DirectoryCache<'a> {
             companies: HashMap::new(),
             channels: HashMap::new(),
             memberships: HashMap::new(),
+            agents: HashMap::new(),
         }
     }
 
@@ -89,6 +92,20 @@ impl<'a> DirectoryCache<'a> {
             .membership_for_email(company_id, sender.trim())
             .await?;
         self.memberships.insert(key, loaded);
+        Ok(loaded)
+    }
+
+    /// One configured agent, cached because several channel matches may reference the same
+    /// library definition.
+    pub(super) async fn agent(&mut self, id: Uuid) -> AppResult<Option<Agent>> {
+        if let Some(cached) = self.agents.get(&id) {
+            return Ok(cached.clone());
+        }
+        let Some(persistence) = self.use_cases.agent_persistence() else {
+            return Ok(None);
+        };
+        let loaded = persistence.get_by_id(id).await?;
+        self.agents.insert(id, loaded.clone());
         Ok(loaded)
     }
 }
@@ -262,5 +279,88 @@ pub(super) fn build_prompt_text(clean_body: &str, attachments: &[AttachmentMetad
         clean_body.to_string()
     } else {
         format!("{}\n\n{}", clean_body, attachment_prompts.join("\n"))
+    }
+}
+
+/// Whether a body contains an email address as a complete address-like token.
+pub(super) fn body_mentions_email(body: &str, address: &str) -> bool {
+    let body = body.to_lowercase();
+    let address = address.trim().to_lowercase();
+    if address.is_empty() {
+        return false;
+    }
+
+    body.match_indices(&address).any(|(start, matched)| {
+        let before = body[..start].chars().next_back();
+        let end = start + matched.len();
+        let mut after = body[end..].chars();
+        let next = after.next();
+        let left_bounded = before.is_none_or(|ch| !is_email_token_char(ch));
+        let right_bounded = match next {
+            Some('.') => after.next().is_none_or(|ch| !ch.is_ascii_alphanumeric()),
+            Some(ch) => !is_email_token_char(ch),
+            None => true,
+        };
+        left_bounded && right_bounded
+    })
+}
+
+/// Whether a body contains a plain `@slug` mention as a complete mention token.
+pub(super) fn body_mentions_slug(body: &str, slug: &str) -> bool {
+    let slug = slug.trim();
+    if slug.is_empty() {
+        return false;
+    }
+    contains_bounded_case_insensitive(body, &format!("@{slug}"), is_slug_token_char)
+}
+
+fn contains_bounded_case_insensitive(
+    haystack: &str,
+    needle: &str,
+    is_token_char: fn(char) -> bool,
+) -> bool {
+    let haystack = haystack.to_lowercase();
+    let needle = needle.to_lowercase();
+    if needle.is_empty() {
+        return false;
+    }
+
+    haystack.match_indices(&needle).any(|(start, matched)| {
+        let before = haystack[..start].chars().next_back();
+        let end = start + matched.len();
+        let after = haystack[end..].chars().next();
+        before.is_none_or(|ch| !is_token_char(ch)) && after.is_none_or(|ch| !is_token_char(ch))
+    })
+}
+
+fn is_email_token_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '%' | '+' | '-' | '@')
+}
+
+fn is_slug_token_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-')
+}
+
+#[cfg(test)]
+mod mention_tests {
+    use super::{body_mentions_email, body_mentions_slug};
+
+    #[test]
+    fn email_mentions_are_case_insensitive_and_bounded() {
+        assert!(body_mentions_email(
+            "Please ask SUPPORT@ACME.MAILAGENTS.COM.",
+            "support@acme.mailagents.com"
+        ));
+        assert!(!body_mentions_email(
+            "xsupport@acme.mailagents.com",
+            "support@acme.mailagents.com"
+        ));
+    }
+
+    #[test]
+    fn slug_mentions_do_not_match_longer_slugs_or_bracket_syntax() {
+        assert!(body_mentions_slug("Please ask @Support.", "support"));
+        assert!(!body_mentions_slug("Please ask @supporting.", "support"));
+        assert!(!body_mentions_slug("Please ask @[support].", "support"));
     }
 }

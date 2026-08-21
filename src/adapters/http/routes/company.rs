@@ -13,9 +13,9 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
-    app_error::AppResult,
-    entities::company::Company,
-    use_cases::company::CompanyUseCases,
+    app_error::{AppError, AppResult},
+    entities::{company::Company, value_objects::AvatarUrl},
+    use_cases::company::{CompanyUseCases, CompanyWrite},
 };
 
 pub fn router() -> Router<AppState> {
@@ -45,6 +45,33 @@ pub struct CompanyForm {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub enable_llm_spam_guardrail: Option<bool>,
+    /// The company's picture. A save carries what it was sent, so the edit form keeps the stored
+    /// URL in a hidden field rather than dropping the picture on every rename.
+    pub avatar_url: Option<String>,
+}
+
+impl CompanyForm {
+    /// The submitted company as a write, with the avatar parsed rather than taken as typed --
+    /// it ends up in an `<img src>` on every page that shows the company.
+    fn write(&self) -> AppResult<CompanyWrite> {
+        Ok(CompanyWrite {
+            name: self.name.clone(),
+            slug: self.slug.clone(),
+            api_key: self.api_key.clone(),
+            provider: self.provider.clone(),
+            model: self.model.clone(),
+            enable_llm_spam_guardrail: self.enable_llm_spam_guardrail,
+            avatar_url: parsed_avatar(self.avatar_url.as_deref())?,
+        })
+    }
+}
+
+/// A submitted avatar field, refused rather than stored when it is not a URL a page may render.
+fn parsed_avatar(submitted: Option<&str>) -> AppResult<Option<AvatarUrl>> {
+    match submitted {
+        Some(value) => AvatarUrl::parse(value).map_err(AppError::BadRequest),
+        None => Ok(None),
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -74,18 +101,12 @@ async fn create_company(
     user: AuthenticatedUser,
     Form(form): Form<CompanyForm>,
 ) -> impl IntoResponse {
-    match company_use_cases
-        .create_company(
-            user.id,
-            &form.name,
-            &form.slug,
-            form.api_key.as_deref(),
-            form.provider.as_deref(),
-            form.model.as_deref(),
-            form.enable_llm_spam_guardrail,
-        )
-        .await
-    {
+    let created = match form.write() {
+        Ok(write) => company_use_cases.create_company(user.id, write).await,
+        Err(err) => Err(err),
+    };
+
+    match created {
         Ok(_) => {
             let companies = company_use_cases
                 .list_user_companies(user.id)
@@ -148,19 +169,16 @@ async fn update_company(
     Path(id): Path<Uuid>,
     Form(form): Form<CompanyForm>,
 ) -> impl IntoResponse {
-    match company_use_cases
-        .update_company_for_user(
-            _user.id,
-            id,
-            &form.name,
-            &form.slug,
-            form.api_key.as_deref(),
-            form.provider.as_deref(),
-            form.model.as_deref(),
-            form.enable_llm_spam_guardrail,
-        )
-        .await
-    {
+    let saved = match form.write() {
+        Ok(write) => {
+            company_use_cases
+                .update_company_for_user(_user.id, id, write)
+                .await
+        }
+        Err(err) => Err(err),
+    };
+
+    match saved {
         Ok(company) => Html(pages::company_row_fragment(&company)),
         Err(err) => Html(pages::error_alert(&format!("Update failed: {err}"))),
     }
@@ -195,15 +213,7 @@ async fn create_company_json(
     Json(payload): Json<CompanyForm>,
 ) -> AppResult<impl IntoResponse> {
     let company = company_use_cases
-        .create_company(
-            user.id,
-            &payload.name,
-            &payload.slug,
-            payload.api_key.as_deref(),
-            payload.provider.as_deref(),
-            payload.model.as_deref(),
-            payload.enable_llm_spam_guardrail,
-        )
+        .create_company(user.id, payload.write()?)
         .await?;
     Ok((
         StatusCode::CREATED,
@@ -222,16 +232,7 @@ async fn update_company_json(
     Json(payload): Json<CompanyForm>,
 ) -> AppResult<impl IntoResponse> {
     let company = company_use_cases
-        .update_company_for_user(
-            _user.id,
-            id,
-            &payload.name,
-            &payload.slug,
-            payload.api_key.as_deref(),
-            payload.provider.as_deref(),
-            payload.model.as_deref(),
-            payload.enable_llm_spam_guardrail,
-        )
+        .update_company_for_user(_user.id, id, payload.write()?)
         .await?;
     Ok((
         StatusCode::OK,
@@ -271,6 +272,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: Utc::now(),
         };
 
@@ -297,6 +299,51 @@ mod tests {
     }
 
     #[test]
+    fn a_classic_save_carries_the_picture_it_was_sent_and_refuses_one_no_page_could_render() {
+        let form = |avatar_url: Option<&str>| CompanyForm {
+            name: "Test Corp".to_string(),
+            slug: "test-corp".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            avatar_url: avatar_url.map(str::to_string),
+        };
+
+        let kept = form(Some("https://cdn.example.com/acme.png"))
+            .write()
+            .expect("an http URL is a picture a page may show");
+        assert_eq!(
+            kept.avatar_url,
+            Some(AvatarUrl::from("https://cdn.example.com/acme.png"))
+        );
+
+        // The page this form lives on has no picker, so it sends the stored URL in a hidden
+        // field -- and a company saved from a form that carries none has no picture.
+        assert_eq!(form(None).write().expect("no picture").avatar_url, None);
+        assert_eq!(form(Some("")).write().expect("no picture").avatar_url, None);
+
+        // A tampered field is refused rather than stored: it ends up in an `<img src>`.
+        assert!(form(Some("javascript:alert(1)")).write().is_err());
+
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Test Corp".to_string(),
+            slug: "test-corp".into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            avatar_url: Some(AvatarUrl::from("https://cdn.example.com/acme.png")),
+            created_at: Utc::now(),
+        };
+        assert!(pages::company_edit_fragment(&company).contains(
+            r#"<input type="hidden" name="avatar_url" value="https://cdn.example.com/acme.png">"#
+        ));
+    }
+
+    #[test]
     fn cached_company_client_nav_and_row_rendering() {
         let cid = Uuid::new_v4();
         let company = Company {
@@ -308,6 +355,7 @@ mod tests {
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
+            avatar_url: None,
             created_at: Utc::now(),
         };
 
