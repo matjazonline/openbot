@@ -59,6 +59,8 @@ pub struct AgentDraft<'a> {
     pub slug: &'a str,
     /// The written system prompt in Advanced mode; the instructions to expand in Simple mode.
     pub system_prompt: &'a str,
+    /// One line on what this agent is for, shown to sibling agents by the directory tool.
+    pub description: &'a str,
     pub provider: &'a str,
     pub model: &'a str,
     pub api_key: &'a str,
@@ -414,6 +416,14 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                                 </label>
                             </div>
                             <label class="form-control w-full">
+                                <div class="label">
+                                    <span class="text-xs opacity-70">Description</span>
+                                    <span class="text-xs opacity-50">Shown to other agents in this company</span>
+                                </div>
+                                <input type="text" id="agent-description-{id_prefix}" name="description" value="{description}" placeholder="Answers supplier capacity and delivery-date questions"
+                                    class="input w-full text-sm">
+                            </label>
+                            <label class="form-control w-full">
                                 <div class="label"><span class="text-xs opacity-70">Agent Config (JSON)</span></div>
                                 <textarea name="config_json" rows="4" placeholder='{{ "temperature": 0.2 }}'
                                     class="textarea w-full font-mono text-xs">{config_json}</textarea>
@@ -430,6 +440,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         provider = escape_html_text(draft.provider),
         model = escape_html_text(draft.model),
         api_key = escape_html_text(draft.api_key),
+        description = escape_html_text(draft.description),
         config_json = escape_html_text(draft.config_json),
         avatar_field = agent_avatar_field(&id_prefix, draft),
     )
@@ -572,6 +583,7 @@ fn stored_draft<'a>(agent: &'a Agent, config_json: &'a str) -> AgentDraft<'a> {
         name: &agent.name,
         slug: &agent.slug,
         system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+        description: agent.description.as_deref().unwrap_or(""),
         provider: agent.provider.as_deref().unwrap_or(""),
         model: agent.model.as_deref().unwrap_or(""),
         api_key: agent.api_key.as_deref().unwrap_or(""),

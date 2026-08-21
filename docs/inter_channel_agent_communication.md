@@ -46,16 +46,19 @@ A outreach target
 
 ## Agent Configuration
 
-Agent A uses the existing `outreach_and_await_quorum` tool with a same-company-only target policy. A single target and a 100 percent threshold represent one channel call.
+Agent A uses the existing `outreach_and_await_quorum` tool with a same-company-only target policy. A single target and a 100 percent threshold represent one channel call, and both are the defaults, so the model need only supply the address, subject and body.
+
+Grant `list_company_agents` alongside it so Agent A can discover Agent B's address instead of carrying it in its prompt.
 
 ```yaml
 tools:
+  - name: list_company_agents
   - name: outreach_and_await_quorum
 
 hitl:
   tools:
     outreach_and_await_quorum:
-      require_approval: false
+      require_approval: true
 
 tool_security:
   tools:
@@ -65,8 +68,12 @@ tool_security:
       config:
         allowed_target_scope: same_company_channels
         max_targets: 1
+        default_timeout_hours: 96
         max_timeout_hours: 168
+        internal_requires_approval: false
 ```
+
+`require_approval: true` with `internal_requires_approval: false` is the combination that lets one agent mail strangers under approval while delegating to colleagues freely. Approval is keyed by tool ID, so the tool alone cannot tell the two apart; the server resolves every recipient against the channel directory before the approval gate and lets the call through only when all of them are callable same-company channels. A single external or unresolvable recipient pulls the whole call back under approval, and a persistence failure does the same.
 
 Agent B should normally retain the external-only policy and approval requirements for third-party email:
 
@@ -96,6 +103,10 @@ Supported target scopes are:
 | `same_company_channels` | Direct agent-channel addresses in the current company only |
 | `any` | External addresses and valid same-company agent channels |
 
+| Setting | Default | Effect |
+|---|---|---|
+| `internal_requires_approval` | `true` | When `false`, a call whose recipients are all callable same-company channels skips human approval. Any value other than an explicit `false` means `true`. |
+
 Use `same_company_channels` for coordinator agents that must not contact third parties directly.
 
 ## Tool Call
@@ -105,12 +116,30 @@ Agent A calls Agent B through its channel address:
 ```json
 {
   "target_emails": ["agent-b@acme.mailagents.example"],
-  "completion_threshold_percent": 100,
-  "timeout_hours": 96,
   "subject": "Acquire supplier capacity data",
   "body": "Contact the supplier and return available quantity and earliest delivery date."
 }
 ```
+
+`completion_threshold_percent` defaults to 100 and `timeout_hours` to `default_timeout_hours`, so a delegated request omits both. Spelling them out explicitly produces an identical idempotency key.
+
+Agent A finds that address by calling `list_company_agents` first, which returns one entry per callable sibling channel:
+
+```json
+{
+  "agents": [
+    {
+      "address": "agent-b@acme.mailagents.example",
+      "channel_name": "Supplier Desk",
+      "agent_name": "VendorResearchAgent",
+      "description": "Answers supplier capacity and delivery-date questions."
+    }
+  ],
+  "count": 1
+}
+```
+
+`description` comes from the agent's Description field on its settings page. The directory applies exactly the same eligibility rules as the send path, so it can never advertise a channel the tool would then refuse.
 
 An internal target must satisfy all of these conditions:
 

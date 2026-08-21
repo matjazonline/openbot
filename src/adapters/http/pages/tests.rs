@@ -718,6 +718,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         model: Some("gpt-4o".to_string()),
         api_key: Some("sk-test".to_string()),
         system_prompt: Some("Answer <billing> questions.".to_string()),
+        description: None,
         config_json: Some(serde_json::json!({ "temperature": 0.2 })),
         ..settings_agent(company.id, "Triage <bot>", "triage")
     };
@@ -994,6 +995,7 @@ fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
         model: None,
         api_key: None,
         system_prompt: None,
+        description: None,
         config_json: None,
         avatar_url: None,
         created_at: Utc::now(),

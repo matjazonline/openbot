@@ -5,7 +5,7 @@ use crate::{
         value_objects::{ChannelSlug, CompanySlug, MessageId},
     },
     services::outbound_dispatcher::OutboundEmail,
-    use_cases::channel::{ChannelPersistence, parse_recipient_address_pipeline},
+    use_cases::channel::{ChannelPersistence, InternalTargetOutcome, resolve_internal_target},
 };
 use ai_agents::{
     Tool, ToolResult,
@@ -47,12 +47,17 @@ pub struct OutreachToolContext {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct OutreachInput {
-    /// External email addresses to contact. Each recipient receives a separate email.
+    /// Email addresses to contact. Each recipient receives a separate email. A same-company agent
+    /// channel address delegates to that agent, when tool policy permits it.
     target_emails: Vec<String>,
-    /// Percentage of distinct recipients that must reply before the task resumes.
-    completion_threshold_percent: f64,
-    /// Maximum hours to wait before requesting a human timeout decision.
-    timeout_hours: u32,
+    /// Percentage of distinct recipients that must reply before the task resumes. Omit for 100,
+    /// which is what a single delegated request wants.
+    #[serde(default)]
+    completion_threshold_percent: Option<f64>,
+    /// Maximum hours to wait before requesting a human timeout decision. Omit for the configured
+    /// default.
+    #[serde(default)]
+    timeout_hours: Option<u32>,
     /// Subject for the outreach emails.
     subject: String,
     /// Plain-text body for the outreach emails.
@@ -106,7 +111,10 @@ impl Tool for OutreachAndAwaitQuorumTool {
     }
 
     fn description(&self) -> &str {
-        "Send a message to each permitted recipient and pause this task until the configured percentage of distinct recipients replies or the timeout requires a human decision. Same-company agent channels can be permitted by tool policy. Use one recipient with a 100% threshold for single-party delegation."
+        "Contact one or more recipients and pause this task until enough of them reply, or until the timeout requires a human decision. \
+         Recipients may be third parties, or — when tool policy permits — other agents in this company, addressed by their channel address. \
+         To delegate one request to one agent or person, pass a single address and omit completion_threshold_percent and timeout_hours. \
+         Use list_company_agents to discover which agents in this company you can address."
     }
 
     fn input_schema(&self) -> Value {
@@ -139,7 +147,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
         };
 
         let max_targets = config_usize(&ctx.custom_config, "max_targets", 50);
-        let max_timeout_hours = config_u32(&ctx.custom_config, "max_timeout_hours", 720);
+        let limits = OutreachLimits::from_config(&ctx.custom_config);
         let target_emails = match normalize_targets(
             input.target_emails.clone(),
             max_targets,
@@ -154,7 +162,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
             Ok(targets) => targets,
             Err(error) => return ToolResult::error(error),
         };
-        let request = match ValidatedOutreach::from_input(&input, max_timeout_hours) {
+        let request = match ValidatedOutreach::from_input(&input, limits) {
             Ok(request) => request,
             Err(error) => return ToolResult::error(error),
         };
@@ -220,17 +228,38 @@ struct ValidatedOutreach<'a> {
     body: &'a str,
 }
 
+/// The two hour bounds from tool policy, named so they cannot be swapped at the call site.
+#[derive(Debug, Clone, Copy)]
+struct OutreachLimits {
+    /// Applied when the model omits `timeout_hours`.
+    default_timeout_hours: u32,
+    max_timeout_hours: u32,
+}
+
+impl OutreachLimits {
+    fn from_config(config: &Value) -> Self {
+        Self {
+            default_timeout_hours: config_u32(config, "default_timeout_hours", 96),
+            max_timeout_hours: config_u32(config, "max_timeout_hours", 720),
+        }
+    }
+}
+
 impl<'a> ValidatedOutreach<'a> {
-    fn from_input(input: &'a OutreachInput, max_timeout_hours: u32) -> Result<Self, String> {
-        if !input.completion_threshold_percent.is_finite()
-            || input.completion_threshold_percent <= 0.0
-            || input.completion_threshold_percent > 100.0
-        {
+    /// Resolve omitted numbers *here*, before [`ValidatedOutreach::idempotency_key`] runs, so the
+    /// short and long forms of the same request hash alike and a retry re-attaches instead of
+    /// mailing everyone a second time.
+    fn from_input(input: &'a OutreachInput, limits: OutreachLimits) -> Result<Self, String> {
+        let max_timeout_hours = limits.max_timeout_hours;
+        let threshold = input.completion_threshold_percent.unwrap_or(100.0);
+        let timeout_hours = input.timeout_hours.unwrap_or(limits.default_timeout_hours);
+
+        if !threshold.is_finite() || threshold <= 0.0 || threshold > 100.0 {
             return Err(
                 "completion_threshold_percent must be greater than 0 and at most 100".into(),
             );
         }
-        if input.timeout_hours == 0 || input.timeout_hours > max_timeout_hours {
+        if timeout_hours == 0 || timeout_hours > max_timeout_hours {
             return Err(format!(
                 "timeout_hours must be between 1 and {max_timeout_hours}"
             ));
@@ -245,8 +274,8 @@ impl<'a> ValidatedOutreach<'a> {
         }
 
         Ok(Self {
-            threshold_percent: input.completion_threshold_percent,
-            timeout_hours: input.timeout_hours,
+            threshold_percent: threshold,
+            timeout_hours,
             subject,
             body,
         })
@@ -340,7 +369,6 @@ async fn normalize_targets(
         ));
     }
     let scope = configured_target_scope(config)?;
-    let app_domain_lower = app_domain_name.trim().to_lowercase();
     let mut targets = Vec::with_capacity(values.len());
     for value in values {
         let mailbox: Mailbox = value
@@ -348,51 +376,33 @@ async fn normalize_targets(
             .parse()
             .map_err(|_| format!("Invalid target email address: {value}"))?;
         let email = mailbox.email.to_string().to_lowercase();
-        let domain = email
-            .rsplit_once('@')
-            .map(|(_, domain)| domain)
-            .unwrap_or("");
-        let is_platform_address = domain.eq_ignore_ascii_case(&app_domain_lower)
-            || domain.ends_with(&format!(".{app_domain_lower}"));
 
-        if is_platform_address {
-            if scope == AllowedTargetScope::ExternalOnly {
+        let outcome = resolve_internal_target(
+            &email,
+            app_domain_name,
+            company_id,
+            source_channel_id,
+            channel_persistence,
+        )
+        .await
+        .map_err(|error| format!("Failed to resolve platform channel {email}: {error}"))?;
+
+        match outcome {
+            InternalTargetOutcome::External if scope == AllowedTargetScope::SameCompanyChannels => {
+                return Err(format!(
+                    "Only same-company platform channels are permitted by this tool policy: {email}"
+                ));
+            }
+            InternalTargetOutcome::External => {}
+            _ if scope == AllowedTargetScope::ExternalOnly => {
                 return Err(format!(
                     "Platform address cannot be an external outreach target: {email}"
                 ));
             }
-            let (company_slug, channel_slugs, is_context_only) =
-                parse_recipient_address_pipeline(&email, app_domain_name)
-                    .ok_or_else(|| format!("Invalid platform channel address: {email}"))?;
-            if is_context_only || channel_slugs.len() != 1 {
-                return Err(format!(
-                    "Internal outreach requires one direct channel address without pipeline or context-only suffix: {email}"
-                ));
-            }
-            let channel = channel_persistence
-                .get_by_company_slug_and_channel_slug(&company_slug, &channel_slugs[0])
-                .await
-                .map_err(|error| format!("Failed to resolve platform channel {email}: {error}"))?
-                .ok_or_else(|| format!("Platform channel does not exist: {email}"))?;
-            if channel.company_id != company_id {
-                return Err(format!(
-                    "Cross-company channel calls are not allowed: {email}"
-                ));
-            }
-            if channel.id == source_channel_id {
-                return Err(format!("A channel cannot call itself: {email}"));
-            }
-            if !channel.enabled {
-                return Err(format!("Target channel is disabled: {email}"));
-            }
-            if channel.agent_ids.as_ref().is_none_or(Vec::is_empty) {
-                return Err(format!("Target channel has no configured agent: {email}"));
-            }
-        } else if scope == AllowedTargetScope::SameCompanyChannels {
-            return Err(format!(
-                "Only same-company platform channels are permitted by this tool policy: {email}"
-            ));
+            InternalTargetOutcome::Callable(_) => {}
+            InternalTargetOutcome::Rejected(reason) => return Err(reason),
         }
+
         if !targets.contains(&email) {
             targets.push(email);
         }
@@ -652,5 +662,74 @@ mod tests {
         .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("one direct channel address"));
+    }
+
+    fn input(threshold: Option<f64>, timeout: Option<u32>) -> OutreachInput {
+        OutreachInput {
+            target_emails: vec!["b@acme.example".into()],
+            completion_threshold_percent: threshold,
+            timeout_hours: timeout,
+            subject: "Capacity".into(),
+            body: "Please confirm available capacity.".into(),
+        }
+    }
+
+    fn limits() -> OutreachLimits {
+        OutreachLimits {
+            default_timeout_hours: 96,
+            max_timeout_hours: 720,
+        }
+    }
+
+    /// The short delegation form and the fully-spelled-out form are the same request, so a retry
+    /// that switches between them must re-attach to the existing outreach rather than send twice.
+    #[test]
+    fn omitted_numbers_hash_like_their_explicit_defaults() {
+        let task_id = Uuid::new_v4();
+        let targets = vec!["b@acme.example".to_string()];
+
+        let short = input(None, None);
+        let long = input(Some(100.0), Some(96));
+
+        let short_key = ValidatedOutreach::from_input(&short, limits())
+            .ok()
+            .expect("short form is valid")
+            .idempotency_key(task_id, &targets);
+        let long_key = ValidatedOutreach::from_input(&long, limits())
+            .ok()
+            .expect("long form is valid")
+            .idempotency_key(task_id, &targets);
+
+        assert_eq!(short_key, long_key);
+    }
+
+    #[test]
+    fn omitted_timeout_takes_the_configured_default() {
+        let short = input(None, None);
+        let resolved = ValidatedOutreach::from_input(&short, limits())
+            .ok()
+            .expect("defaults are valid");
+        assert_eq!(resolved.timeout_hours, 96);
+        assert_eq!(resolved.threshold_percent, 100.0);
+    }
+
+    #[test]
+    fn an_explicit_timeout_over_the_maximum_is_still_rejected() {
+        let over = input(None, Some(1_000));
+        let Err(message) = ValidatedOutreach::from_input(&over, limits()) else {
+            panic!("a timeout above the maximum must be rejected");
+        };
+        assert!(message.contains("between 1 and 720"));
+    }
+
+    /// A default larger than the maximum is a misconfiguration, not a licence to exceed the cap.
+    #[test]
+    fn a_default_over_the_maximum_is_rejected_rather_than_silently_clamped() {
+        let bad = OutreachLimits {
+            default_timeout_hours: 900,
+            max_timeout_hours: 720,
+        };
+        let short = input(None, None);
+        assert!(ValidatedOutreach::from_input(&short, bad).is_err());
     }
 }

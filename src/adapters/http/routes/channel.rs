@@ -1,3 +1,4 @@
+use crate::use_cases::agent::AgentWrite;
 use std::{convert::Infallible, sync::Arc};
 
 use axum::{
@@ -483,14 +484,15 @@ pub(super) async fn resolve_channel_agents(
             .create_agent(
                 user_id,
                 company_id,
-                &form.name,
-                slug,
-                form.provider.as_deref(),
-                form.model.as_deref(),
-                form.api_key.as_deref(),
-                Some(instructions),
-                None,
-                None,
+                AgentWrite {
+                    name: form.name.clone(),
+                    slug: slug.to_string(),
+                    provider: form.provider.clone(),
+                    model: form.model.clone(),
+                    api_key: form.api_key.clone(),
+                    system_prompt: Some(instructions.to_string()),
+                    ..AgentWrite::default()
+                },
             )
             .await
             .map_err(|err| format!("Failed to create agent for channel: {err}"))?
@@ -1299,14 +1301,15 @@ async fn create_channel_json(
                 .create_agent(
                     user.id,
                     company_id,
-                    &payload.name,
-                    &slug,
-                    payload.provider.as_deref(),
-                    payload.model.as_deref(),
-                    payload.api_key.as_deref(),
-                    Some(prompt_trimmed),
-                    None,
-                    None,
+                    AgentWrite {
+                        name: payload.name.clone(),
+                        slug: slug.clone(),
+                        provider: payload.provider.clone(),
+                        model: payload.model.clone(),
+                        api_key: payload.api_key.clone(),
+                        system_prompt: Some(prompt_trimmed.to_string()),
+                        ..AgentWrite::default()
+                    },
                 )
                 .await?;
             let mut ids = agent_ids.unwrap_or_default();

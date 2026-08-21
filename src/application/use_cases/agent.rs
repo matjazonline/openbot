@@ -20,20 +20,61 @@ pub fn agent_not_found() -> AppError {
     AppError::NotFound("Agent not found in this company.".into())
 }
 
+/// Everything one agent write sets, so create and update cannot drift apart and so a caller
+/// cannot transpose two same-typed arguments in a nine-parameter list.
+///
+/// Values reach persistence already normalized — see [`AgentWrite::normalize`]. Mirrors
+/// [`crate::use_cases::channel::ChannelWrite`].
+#[derive(Debug, Clone, Default)]
+pub struct AgentWrite {
+    pub name: String,
+    pub slug: String,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub api_key: Option<String>,
+    pub system_prompt: Option<String>,
+    /// Short statement of what the agent is for, read by the agent directory tool.
+    pub description: Option<String>,
+    pub config_json: Option<serde_json::Value>,
+    pub avatar_url: Option<AvatarUrl>,
+}
+
+impl AgentWrite {
+    /// Trim the fields that have canonical forms and drop the blanks. Runs once, in the use case,
+    /// so create and update store the same shape.
+    fn normalize(&mut self) -> AppResult<()> {
+        self.name = self.name.trim().to_string();
+        self.slug = self.slug.trim().to_lowercase().replace(' ', "-");
+
+        if self.name.is_empty() || self.slug.is_empty() {
+            return Err(AppError::BadRequest(
+                "The agent name and slug cannot be empty.".into(),
+            ));
+        }
+        validate_slug(&self.slug, SlugKind::AgentSlug)?;
+
+        for field in [
+            &mut self.provider,
+            &mut self.model,
+            &mut self.api_key,
+            &mut self.system_prompt,
+            &mut self.description,
+        ] {
+            if let Some(value) = field.as_mut() {
+                *value = value.trim().to_string();
+                if value.is_empty() {
+                    *field = None;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[async_trait]
 pub trait AgentPersistence: Send + Sync {
-    async fn create(
-        &self,
-        company_id: Uuid,
-        name: &str,
-        slug: &str,
-        provider: Option<&str>,
-        model: Option<&str>,
-        api_key: Option<&str>,
-        system_prompt: Option<&str>,
-        config_json: Option<serde_json::Value>,
-        avatar_url: Option<&AvatarUrl>,
-    ) -> AppResult<Agent>;
+    async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent>;
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>>;
 
@@ -45,18 +86,7 @@ pub trait AgentPersistence: Send + Sync {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>>;
 
-    async fn update(
-        &self,
-        id: Uuid,
-        name: &str,
-        slug: &str,
-        provider: Option<&str>,
-        model: Option<&str>,
-        api_key: Option<&str>,
-        system_prompt: Option<&str>,
-        config_json: Option<serde_json::Value>,
-        avatar_url: Option<&AvatarUrl>,
-    ) -> AppResult<Agent>;
+    async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent>;
 
     async fn delete(&self, id: Uuid) -> AppResult<()>;
 }
@@ -88,51 +118,17 @@ impl AgentUseCases {
         &self,
         user_id: Uuid,
         company_id: Uuid,
-        name: &str,
-        slug: &str,
-        provider: Option<&str>,
-        model: Option<&str>,
-        api_key: Option<&str>,
-        system_prompt: Option<&str>,
-        config_json: Option<serde_json::Value>,
-        avatar_url: Option<&AvatarUrl>,
+        mut write: AgentWrite,
     ) -> AppResult<Agent> {
         self.verify_company_owner(user_id, company_id).await?;
-
-        let name_trimmed = name.trim();
-        let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
-
-        if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::BadRequest(
-                "The agent name and slug cannot be empty.".into(),
-            ));
-        }
-
-        validate_slug(&slug_clean, SlugKind::AgentSlug)?;
-
-        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let system_prompt_clean = system_prompt.map(|s| s.trim()).filter(|s| !s.is_empty());
+        write.normalize()?;
 
         info!(
             "Creating agent '{}' ({}) for company {}",
-            name_trimmed, slug_clean, company_id
+            write.name, write.slug, company_id
         );
 
-        self.agent_persistence
-            .create(
-                company_id,
-                name_trimmed,
-                &slug_clean,
-                provider_clean,
-                model_clean,
-                api_key_clean,
-                system_prompt_clean,
-                config_json,
-                avatar_url,
-            )
-            .await
+        self.agent_persistence.create(company_id, write).await
     }
 
     #[instrument(skip(self))]
@@ -197,14 +193,7 @@ impl AgentUseCases {
         user_id: Uuid,
         company_id: Uuid,
         agent_id: Uuid,
-        name: &str,
-        slug: &str,
-        provider: Option<&str>,
-        model: Option<&str>,
-        api_key: Option<&str>,
-        system_prompt: Option<&str>,
-        config_json: Option<serde_json::Value>,
-        avatar_url: Option<&AvatarUrl>,
+        mut write: AgentWrite,
     ) -> AppResult<Agent> {
         self.verify_company_owner(user_id, company_id).await?;
 
@@ -218,40 +207,14 @@ impl AgentUseCases {
             return Err(agent_not_found());
         }
 
-        let name_trimmed = name.trim();
-        let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
-
-        if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::BadRequest(
-                "The agent name and slug cannot be empty.".into(),
-            ));
-        }
-
-        validate_slug(&slug_clean, SlugKind::AgentSlug)?;
-
-        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let system_prompt_clean = system_prompt.map(|s| s.trim()).filter(|s| !s.is_empty());
+        write.normalize()?;
 
         info!(
             "Updating agent {} for company {}: {} ({})",
-            agent_id, company_id, name_trimmed, slug_clean
+            agent_id, company_id, write.name, write.slug
         );
 
-        self.agent_persistence
-            .update(
-                agent_id,
-                name_trimmed,
-                &slug_clean,
-                provider_clean,
-                model_clean,
-                api_key_clean,
-                system_prompt_clean,
-                config_json,
-                avatar_url,
-            )
-            .await
+        self.agent_persistence.update(agent_id, write).await
     }
 
     #[instrument(skip(self))]
@@ -592,29 +555,19 @@ mod tests {
 
     #[async_trait]
     impl AgentPersistence for MockAgentPersistence {
-        async fn create(
-            &self,
-            company_id: Uuid,
-            name: &str,
-            slug: &str,
-            provider: Option<&str>,
-            model: Option<&str>,
-            api_key: Option<&str>,
-            system_prompt: Option<&str>,
-            config_json: Option<serde_json::Value>,
-            avatar_url: Option<&AvatarUrl>,
-        ) -> AppResult<Agent> {
+        async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
             let agent = Agent {
                 id: Uuid::new_v4(),
                 company_id,
-                name: name.to_string(),
-                slug: slug.to_string(),
-                provider: provider.map(|s| s.to_string()),
-                model: model.map(|s| s.to_string()),
-                api_key: api_key.map(|s| s.to_string()),
-                system_prompt: system_prompt.map(|s| s.to_string()),
-                config_json,
-                avatar_url: avatar_url.cloned(),
+                name: write.name,
+                slug: write.slug,
+                provider: write.provider,
+                model: write.model,
+                api_key: write.api_key,
+                system_prompt: write.system_prompt,
+                description: write.description,
+                config_json: write.config_json,
+                avatar_url: write.avatar_url,
                 created_at: Utc::now(),
             };
             self.agents.lock().unwrap().push(agent.clone());
@@ -656,32 +609,22 @@ mod tests {
                 .collect())
         }
 
-        async fn update(
-            &self,
-            id: Uuid,
-            name: &str,
-            slug: &str,
-            provider: Option<&str>,
-            model: Option<&str>,
-            api_key: Option<&str>,
-            system_prompt: Option<&str>,
-            config_json: Option<serde_json::Value>,
-            avatar_url: Option<&AvatarUrl>,
-        ) -> AppResult<Agent> {
+        async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
             let mut list = self.agents.lock().unwrap();
             let agent = list
                 .iter_mut()
                 .find(|a| a.id == id)
                 .ok_or_else(|| AppError::Internal("Not found".into()))?;
 
-            agent.name = name.to_string();
-            agent.slug = slug.to_string();
-            agent.provider = provider.map(|s| s.to_string());
-            agent.model = model.map(|s| s.to_string());
-            agent.api_key = api_key.map(|s| s.to_string());
-            agent.system_prompt = system_prompt.map(|s| s.to_string());
-            agent.config_json = config_json;
-            agent.avatar_url = avatar_url.cloned();
+            agent.name = write.name;
+            agent.slug = write.slug;
+            agent.provider = write.provider;
+            agent.model = write.model;
+            agent.api_key = write.api_key;
+            agent.system_prompt = write.system_prompt;
+            agent.description = write.description;
+            agent.config_json = write.config_json;
+            agent.avatar_url = write.avatar_url;
             Ok(agent.clone())
         }
 
@@ -722,14 +665,11 @@ mod tests {
             .create_agent(
                 owner_id,
                 company_id,
-                "Quiet Bot",
-                "quiet",
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
+                AgentWrite {
+                    name: "Quiet Bot".to_string(),
+                    slug: "quiet".to_string(),
+                    ..AgentWrite::default()
+                },
             )
             .await;
         assert!(invalid_res.is_err());
@@ -741,14 +681,16 @@ mod tests {
             .create_agent(
                 owner_id,
                 company_id,
-                "Support Bot",
-                "support-bot",
-                Some("openai"),
-                Some("gpt-4o"),
-                Some("key_123"),
-                Some("Prompt"),
-                Some(config.clone()),
-                None,
+                AgentWrite {
+                    name: "Support Bot".to_string(),
+                    slug: "support-bot".to_string(),
+                    provider: Some("openai".to_string()),
+                    model: Some("gpt-4o".to_string()),
+                    api_key: Some("key_123".to_string()),
+                    system_prompt: Some("Prompt".to_string()),
+                    config_json: Some(config.clone()),
+                    ..AgentWrite::default()
+                },
             )
             .await
             .unwrap();
@@ -767,14 +709,11 @@ mod tests {
             .create_agent(
                 non_owner_id,
                 company_id,
-                "Hacker Bot",
-                "hacker-bot",
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
+                AgentWrite {
+                    name: "Hacker Bot".to_string(),
+                    slug: "hacker-bot".to_string(),
+                    ..AgentWrite::default()
+                },
             )
             .await;
         assert!(err.is_err());
@@ -793,14 +732,14 @@ mod tests {
                 owner_id,
                 company_id,
                 agent.id,
-                "Updated Bot",
-                "updated-bot",
-                Some("anthropic"),
-                Some("claude-3-5-sonnet"),
-                None,
-                None,
-                Some(updated_config.clone()),
-                None,
+                AgentWrite {
+                    name: "Updated Bot".to_string(),
+                    slug: "updated-bot".to_string(),
+                    provider: Some("anthropic".to_string()),
+                    model: Some("claude-3-5-sonnet".to_string()),
+                    config_json: Some(updated_config.clone()),
+                    ..AgentWrite::default()
+                },
             )
             .await
             .unwrap();
@@ -893,14 +832,11 @@ Guidelines:
             .create_agent(
                 owner_id,
                 company_id,
-                "Support Bot",
-                "support-bot",
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
+                AgentWrite {
+                    name: "Support Bot".to_string(),
+                    slug: "support-bot".to_string(),
+                    ..AgentWrite::default()
+                },
             )
             .await
             .expect("the owner creates the agent");

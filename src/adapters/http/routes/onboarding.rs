@@ -1,3 +1,4 @@
+use crate::use_cases::agent::AgentWrite;
 use std::sync::Arc;
 
 use axum::{
@@ -146,14 +147,12 @@ async fn create_channel(
         .create_agent(
             user.id,
             company_id,
-            &form.name,
-            &slug,
-            None,
-            None,
-            None,
-            Some(&system_prompt),
-            None,
-            None,
+            AgentWrite {
+                name: form.name.clone(),
+                slug: slug.clone(),
+                system_prompt: Some(system_prompt.clone()),
+                ..AgentWrite::default()
+            },
         )
         .await
     {

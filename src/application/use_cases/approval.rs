@@ -927,6 +927,7 @@ mod tests {
             approval_use_cases: server1_approval_use_cases,
             context: ctx1,
             suspended: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            delegation: None,
         };
 
         // Tool trigger attempt on Server 1
@@ -984,6 +985,7 @@ mod tests {
             approval_use_cases: server2_approval_use_cases,
             context: ctx2,
             suspended: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            delegation: None,
         };
 
         let req2 = ApprovalRequest::new(

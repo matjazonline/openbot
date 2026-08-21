@@ -8,6 +8,8 @@
 
 use std::sync::Arc;
 
+use crate::use_cases::agent::AgentWrite;
+
 use axum::{
     Form, Router,
     extract::{FromRequestParts, Path, Query},
@@ -305,14 +307,17 @@ async fn create_agent(
             .create_agent(
                 workspace.user_id,
                 company.id,
-                &submitted.form.name,
-                &submitted.slug,
-                submitted.form.provider.as_deref(),
-                submitted.form.model.as_deref(),
-                submitted.form.api_key.as_deref(),
-                submitted.form.system_prompt.as_deref(),
-                config_json,
-                avatar_url.as_ref(),
+                AgentWrite {
+                    name: submitted.form.name.clone(),
+                    slug: submitted.slug.clone(),
+                    provider: submitted.form.provider.clone(),
+                    model: submitted.form.model.clone(),
+                    api_key: submitted.form.api_key.clone(),
+                    system_prompt: submitted.form.system_prompt.clone(),
+                    description: submitted.form.description.clone(),
+                    config_json,
+                    avatar_url,
+                },
             )
             .await
             .map_err(|err| format!("Failed to create agent: {err}"))
@@ -357,14 +362,17 @@ async fn update_agent(
             workspace.user_id,
             company.id,
             agent_id,
-            &submitted.form.name,
-            &submitted.slug,
-            submitted.form.provider.as_deref(),
-            submitted.form.model.as_deref(),
-            submitted.form.api_key.as_deref(),
-            submitted.form.system_prompt.as_deref(),
-            config_json,
-            avatar_url.as_ref(),
+            AgentWrite {
+                name: submitted.form.name.clone(),
+                slug: submitted.slug.clone(),
+                provider: submitted.form.provider.clone(),
+                model: submitted.form.model.clone(),
+                api_key: submitted.form.api_key.clone(),
+                system_prompt: submitted.form.system_prompt.clone(),
+                description: submitted.form.description.clone(),
+                config_json,
+                avatar_url,
+            },
         )
         .await;
 
@@ -548,6 +556,7 @@ impl SubmittedAgent {
             name: &self.form.name,
             slug: &self.slug,
             system_prompt: self.form.system_prompt.as_deref().unwrap_or(""),
+            description: self.form.description.as_deref().unwrap_or(""),
             provider: self.form.provider.as_deref().unwrap_or(""),
             model: self.form.model.as_deref().unwrap_or(""),
             api_key: self.form.api_key.as_deref().unwrap_or(""),

@@ -14,6 +14,9 @@ pub struct Agent {
     #[serde(skip_serializing)]
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
+    /// A short statement of what this agent is for, shown to other agents in the same company by
+    /// the agent directory tool. Not part of the prompt.
+    pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
     /// The picture shown next to the agent's name; `None` renders as a letter bubble.
     pub avatar_url: Option<AvatarUrl>,

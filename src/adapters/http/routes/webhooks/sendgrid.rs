@@ -317,6 +317,8 @@ mod tests {
         }
     }
 
+    use crate::use_cases::agent::AgentWrite;
+
     struct MockAgentPersistence;
 
     #[async_trait]
@@ -324,14 +326,7 @@ mod tests {
         async fn create(
             &self,
             _company_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _api_key: Option<&str>,
-            _system_prompt: Option<&str>,
-            _config_json: Option<serde_json::Value>,
-            _avatar_url: Option<&crate::entities::value_objects::AvatarUrl>,
+            _write: AgentWrite,
         ) -> AppResult<crate::entities::agent::Agent> {
             unimplemented!()
         }
@@ -354,14 +349,7 @@ mod tests {
         async fn update(
             &self,
             _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _api_key: Option<&str>,
-            _system_prompt: Option<&str>,
-            _config_json: Option<serde_json::Value>,
-            _avatar_url: Option<&crate::entities::value_objects::AvatarUrl>,
+            _write: AgentWrite,
         ) -> AppResult<crate::entities::agent::Agent> {
             unimplemented!()
         }

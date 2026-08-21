@@ -1,3 +1,4 @@
+use crate::use_cases::agent::AgentWrite;
 use std::sync::Arc;
 
 use axum::{
@@ -71,6 +72,8 @@ pub struct AgentForm {
     pub model: Option<String>,
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
+    /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
+    pub description: Option<String>,
     pub config_json: Option<String>,
     pub avatar_url: Option<String>,
     /// `"simple"` means `system_prompt` holds instructions to expand, not the prompt itself.
@@ -134,6 +137,8 @@ pub struct AgentJsonPayload {
     pub model: Option<String>,
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
+    /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
+    pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
     pub avatar_url: Option<String>,
 }
@@ -188,14 +193,16 @@ pub(super) async fn create_agent_from_instructions(
         .create_agent(
             user_id,
             company_id,
-            name,
-            slug,
-            overrides.provider,
-            overrides.model,
-            overrides.api_key,
-            Some(&system_prompt),
-            None,
-            avatar_url,
+            AgentWrite {
+                name: name.to_string(),
+                slug: slug.to_string(),
+                provider: overrides.provider.map(str::to_string),
+                model: overrides.model.map(str::to_string),
+                api_key: overrides.api_key.map(str::to_string),
+                system_prompt: Some(system_prompt),
+                avatar_url: avatar_url.cloned(),
+                ..AgentWrite::default()
+            },
         )
         .await
         .map_err(|err| format!("Failed to create agent: {err}"))
@@ -259,14 +266,17 @@ async fn create_agent_handler(
         .create_agent(
             user.id,
             company_id,
-            &form.name,
-            &form.slug(),
-            form.provider.as_deref(),
-            form.model.as_deref(),
-            form.api_key.as_deref(),
-            form.system_prompt.as_deref(),
-            config_json,
-            avatar_url.as_ref(),
+            AgentWrite {
+                name: form.name.clone(),
+                slug: form.slug(),
+                provider: form.provider.clone(),
+                model: form.model.clone(),
+                api_key: form.api_key.clone(),
+                system_prompt: form.system_prompt.clone(),
+                description: form.description.clone(),
+                config_json,
+                avatar_url,
+            },
         )
         .await
     {
@@ -377,14 +387,16 @@ async fn create_agent_inline_handler(
         .create_agent(
             user.id,
             company_id,
-            &name,
-            &slug,
-            provider.as_deref(),
-            model.as_deref(),
-            api_key.as_deref(),
-            system_prompt.as_deref(),
-            config_json,
-            None,
+            AgentWrite {
+                name: name.clone(),
+                slug: slug.clone(),
+                provider: provider.clone(),
+                model: model.clone(),
+                api_key: api_key.clone(),
+                system_prompt: system_prompt.clone(),
+                config_json,
+                ..AgentWrite::default()
+            },
         )
         .await
     {
@@ -489,14 +501,17 @@ async fn update_agent_handler(
             user.id,
             company_id,
             agent_id,
-            &form.name,
-            &form.slug(),
-            form.provider.as_deref(),
-            form.model.as_deref(),
-            form.api_key.as_deref(),
-            form.system_prompt.as_deref(),
-            config_json,
-            avatar_url.as_ref(),
+            AgentWrite {
+                name: form.name.clone(),
+                slug: form.slug(),
+                provider: form.provider.clone(),
+                model: form.model.clone(),
+                api_key: form.api_key.clone(),
+                system_prompt: form.system_prompt.clone(),
+                description: form.description.clone(),
+                config_json,
+                avatar_url,
+            },
         )
         .await
     {
@@ -543,14 +558,17 @@ async fn create_agent_json(
         .create_agent(
             user.id,
             company_id,
-            &payload.name,
-            &payload.slug,
-            payload.provider.as_deref(),
-            payload.model.as_deref(),
-            payload.api_key.as_deref(),
-            payload.system_prompt.as_deref(),
-            payload.config_json.clone(),
-            avatar_url.as_ref(),
+            AgentWrite {
+                name: payload.name.clone(),
+                slug: payload.slug.clone(),
+                provider: payload.provider.clone(),
+                model: payload.model.clone(),
+                api_key: payload.api_key.clone(),
+                system_prompt: payload.system_prompt.clone(),
+                description: payload.description.clone(),
+                config_json: payload.config_json.clone(),
+                avatar_url,
+            },
         )
         .await?;
 
@@ -591,14 +609,17 @@ async fn update_agent_json(
             user.id,
             company_id,
             agent_id,
-            &payload.name,
-            &payload.slug,
-            payload.provider.as_deref(),
-            payload.model.as_deref(),
-            payload.api_key.as_deref(),
-            payload.system_prompt.as_deref(),
-            payload.config_json.clone(),
-            avatar_url.as_ref(),
+            AgentWrite {
+                name: payload.name.clone(),
+                slug: payload.slug.clone(),
+                provider: payload.provider.clone(),
+                model: payload.model.clone(),
+                api_key: payload.api_key.clone(),
+                system_prompt: payload.system_prompt.clone(),
+                description: payload.description.clone(),
+                config_json: payload.config_json.clone(),
+                avatar_url,
+            },
         )
         .await?;
 
@@ -799,6 +820,7 @@ mod tests {
             model: Some("gpt-4o".to_string()),
             api_key: Some("sk-test123".to_string()),
             system_prompt: Some("You are a helpful agent.".to_string()),
+            description: None,
             config_json: Some(json!({ "temperature": 0.5 })),
             avatar_url: None,
             created_at: Utc::now(),

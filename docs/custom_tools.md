@@ -1,12 +1,15 @@
 # Custom Agent Tools
 
-`mail-agents-server` provides one application-owned custom tool:
+`mail-agents-server` provides two application-owned custom tools:
 
 ```text
 outreach_and_await_quorum
+list_company_agents
 ```
 
-The tool sends an individual message to each permitted recipient, pauses the current background task, and resumes it after the configured percentage of distinct recipients replies. Targets are external by default. A same-company channel policy enables durable inter-channel agent calls; see [Inter-Channel Agent Communication](inter_channel_agent_communication.md).
+`outreach_and_await_quorum` sends an individual message to each permitted recipient, pauses the current background task, and resumes it after the configured percentage of distinct recipients replies. It covers both third-party outreach and delegation to another agent in the same company — one tool, because both are "contact someone and wait." Targets are external by default; a same-company channel policy enables durable inter-channel agent calls, see [Inter-Channel Agent Communication](inter_channel_agent_communication.md).
+
+`list_company_agents` is the read-only address book that makes delegation usable: it returns the sibling agent channels this agent may call, with each one's description. Without it, callable addresses have to be hardcoded into a system prompt and go stale silently when a channel is renamed or disabled.
 
 ## Agent YAML
 
@@ -75,8 +78,8 @@ The model calls the tool with:
 | Field | Type | Requirements |
 |---|---|---|
 | `target_emails` | string array | 1 to `max_targets` addresses permitted by `allowed_target_scope`; duplicates are normalized and removed |
-| `completion_threshold_percent` | number | Greater than 0 and at most 100 |
-| `timeout_hours` | integer | 1 to `max_timeout_hours` |
+| `completion_threshold_percent` | number, optional | Greater than 0 and at most 100. Omitted means 100 |
+| `timeout_hours` | integer, optional | 1 to `max_timeout_hours`. Omitted means `default_timeout_hours` |
 | `subject` | string | 1 to 300 characters after trimming |
 | `body` | string | 1 to 20,000 characters after trimming |
 
@@ -111,7 +114,19 @@ The quorum tool also covers single-recipient delegation. Use one target and a 10
 }
 ```
 
-There is no separate `delegate_to_third_party` tool.
+Both optional fields may be omitted, which is the short form a delegated request should use:
+
+```json
+{
+  "target_emails": ["billing@acme.mailagents.example"],
+  "subject": "Invoice clarification",
+  "body": "Please confirm the tax amount on invoice INV-1042."
+}
+```
+
+Defaults are resolved before the idempotency key is computed, so the short form and the fully-spelled-out form of the same request hash alike — a retry that switches between them re-attaches to the existing outreach instead of sending twice.
+
+There is no separate `delegate_to_third_party` or `delegate_to_agent` tool. Delegation is a target-scope and approval question, not a different action.
 
 ## Execution Lifecycle
 
@@ -163,6 +178,9 @@ A valid reply arriving while timeout approval is pending still counts. If it rea
 - Omitting the tool from `tools:` means the model has no access to it.
 - Tool-specific values under `tool_security.tools.outreach_and_await_quorum.config` are available to the Rust tool through `ToolExecutionContext.custom_config`.
 - `allowed_target_scope` accepts `external_only` (default), `same_company_channels`, or `any`.
+- `default_timeout_hours` (default 96) fills in an omitted `timeout_hours`. A default above `max_timeout_hours` is rejected, not clamped.
+- `internal_requires_approval` (default `true`) governs whether a call whose recipients are *all* same-company agent channels may skip human approval. Anything other than an explicit `false` — absent, malformed, or the wrong type — means `true`.
+- `list_company_agents` reads only `max_results` (default 50) from its own `tool_security` config block, and never requires approval.
 - `timeout_ms` limits creation of the durable outreach, not the human response window. `timeout_hours` controls the response deadline.
 - At least one channel participant or company team member must be available as the approver when HITL is enabled.
 - Do not place secrets in tool arguments, YAML custom configuration, or tool output.

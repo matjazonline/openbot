@@ -7,9 +7,16 @@ use crate::entities::company::Company;
 use crate::entities::message::{Message, MessageRole};
 use crate::entities::task::TokenUsage;
 use crate::entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress};
-use crate::services::outreach_tool::{OutreachAndAwaitQuorumTool, OutreachToolContext};
+use crate::services::agent_directory_tool::{AgentDirectoryContext, ListCompanyAgentsTool};
+use crate::services::outreach_tool::{
+    OUTREACH_TOOL_ID, OutreachAndAwaitQuorumTool, OutreachToolContext,
+};
 use crate::use_cases::approval::ApprovalUseCases;
-use crate::use_cases::{channel::ChannelPersistence, thread::RecipientRole};
+use crate::use_cases::{
+    agent::AgentPersistence,
+    channel::{ChannelPersistence, InternalTargetOutcome, resolve_internal_target},
+    thread::RecipientRole,
+};
 use ai_agents::{Agent, AgentBuilder};
 use regex::Regex;
 use sha2::{Digest, Sha256};
@@ -17,7 +24,7 @@ use std::sync::{
     Arc, LazyLock,
     atomic::{AtomicBool, Ordering},
 };
-use tracing::info;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 static URL_KEY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
@@ -184,8 +191,17 @@ fn base_agent_config_with_observability(observability_enabled: bool) -> serde_js
                     "max_output_chars": 4000,
                     "config": {
                         "max_targets": 50,
+                        "default_timeout_hours": 96,
                         "max_timeout_hours": 720,
-                        "allowed_target_scope": "external_only"
+                        "allowed_target_scope": "external_only",
+                        "internal_requires_approval": true
+                    }
+                },
+                "list_company_agents": {
+                    "timeout_ms": 5000,
+                    "max_output_chars": 4000,
+                    "config": {
+                        "max_results": 50
                     }
                 }
             }
@@ -557,10 +573,97 @@ pub struct ApprovalContext {
     pub approver_email: EmailAddress,
 }
 
+/// Everything needed to decide whether one outreach call is purely internal, and whether that
+/// earns it a pass on human approval.
+///
+/// Approval is keyed by tool ID, so the outreach tool alone cannot distinguish "ask a colleague"
+/// from "mail a stranger". This carries the resolved answer instead: the recipients are classified
+/// against the channel directory, not taken on the model's word.
+#[derive(Clone)]
+pub struct InternalDelegationPolicy {
+    pub channel_persistence: Arc<dyn ChannelPersistence>,
+    pub app_domain_name: String,
+    pub company_id: Uuid,
+    pub source_channel_id: Uuid,
+    /// When false, a call whose recipients are *all* same-company agent channels skips the human.
+    /// Defaults to true, so behaviour is unchanged until an operator opts in.
+    pub requires_approval: bool,
+}
+
+/// Read `tool_security.tools.outreach_and_await_quorum.config.internal_requires_approval`.
+///
+/// Absent, malformed, or non-boolean all mean `true`: this gates outbound mail, so anything other
+/// than an explicit `false` fails closed.
+fn internal_requires_approval(config: &serde_json::Value) -> bool {
+    config
+        .get("tool_security")
+        .and_then(|v| v.get("tools"))
+        .and_then(|v| v.get(OUTREACH_TOOL_ID))
+        .and_then(|v| v.get("config"))
+        .and_then(|v| v.get("internal_requires_approval"))
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(true)
+}
+
 pub struct AgentApprovalHandler {
     pub approval_use_cases: Arc<ApprovalUseCases>,
     pub context: ApprovalContext,
     pub suspended: Arc<AtomicBool>,
+    /// `None` when the run has no outreach tool, so nothing can be auto-approved.
+    pub delegation: Option<InternalDelegationPolicy>,
+}
+
+impl InternalDelegationPolicy {
+    /// Whether this trigger is an outreach call whose every recipient is a callable same-company
+    /// agent channel, and policy lets such a call skip the human.
+    ///
+    /// Every uncertain case answers `false`. An unresolvable recipient, a lookup failure, or a
+    /// recipient that is not a channel all fall through to the human rather than past the gate.
+    async fn approves_without_human(&self, trigger: &ai_agents::hitl::ApprovalTrigger) -> bool {
+        if self.requires_approval {
+            return false;
+        }
+        let ai_agents::hitl::ApprovalTrigger::Tool { name, args } = trigger else {
+            return false;
+        };
+        if name != OUTREACH_TOOL_ID {
+            return false;
+        }
+        let Some(targets) = args.get("target_emails").and_then(|v| v.as_array()) else {
+            return false;
+        };
+        // An empty list is not "all internal"; it is a malformed call.
+        if targets.is_empty() {
+            return false;
+        }
+
+        for target in targets {
+            let Some(email) = target.as_str() else {
+                return false;
+            };
+            let outcome = resolve_internal_target(
+                &email.trim().to_lowercase(),
+                &self.app_domain_name,
+                self.company_id,
+                self.source_channel_id,
+                self.channel_persistence.as_ref(),
+            )
+            .await;
+            match outcome {
+                Ok(InternalTargetOutcome::Callable(_)) => {}
+                Ok(_) => return false,
+                Err(error) => {
+                    warn!(
+                        "Could not classify outreach recipient while deciding approval, \
+                         falling back to human approval: {}",
+                        error
+                    );
+                    return false;
+                }
+            }
+        }
+        true
+    }
 }
 
 #[async_trait::async_trait]
@@ -569,6 +672,15 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
         &self,
         req: ai_agents::hitl::ApprovalRequest,
     ) -> ai_agents::hitl::ApprovalResult {
+        // Ahead of the approver check on purpose: delegating to a colleague needs no approver, and
+        // a coordinator channel with no configured participant must still be able to do it.
+        if let Some(policy) = self.delegation.as_ref()
+            && policy.approves_without_human(&req.trigger).await
+        {
+            info!("Outreach targets only same-company agent channels; approval not required");
+            return ai_agents::hitl::ApprovalResult::Approved;
+        }
+
         if self.context.approver_email.trim().is_empty() {
             return ai_agents::hitl::ApprovalResult::rejected_with_reason(
                 "No channel participant or company team member is configured to approve this action.",
@@ -701,6 +813,7 @@ pub struct AgentRunner<'a> {
     upstream_pipeline_context: Option<String>,
     task_persistence: Option<Arc<dyn TaskPersistence>>,
     channel_persistence: Option<Arc<dyn ChannelPersistence>>,
+    agent_persistence: Option<Arc<dyn AgentPersistence>>,
     outreach_context: Option<OutreachToolContext>,
 }
 
@@ -723,6 +836,7 @@ impl<'a> AgentRunner<'a> {
             upstream_pipeline_context: None,
             task_persistence: None,
             channel_persistence: None,
+            agent_persistence: None,
             outreach_context: None,
         }
     }
@@ -801,6 +915,15 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
+    /// Let the agent discover which sibling channels it may call.
+    ///
+    /// Separate from [`AgentRunner::outreach_tool`] because the directory is a read, not a send:
+    /// an agent can be given the address book without being given the ability to write to it.
+    pub fn agent_directory(mut self, agent_persistence: Arc<dyn AgentPersistence>) -> Self {
+        self.agent_persistence = Some(agent_persistence);
+        self
+    }
+
     pub async fn execute(self) -> anyhow::Result<AgentExecutionOutput> {
         let start_time = std::time::Instant::now();
         let history_message_count = self.history.len();
@@ -868,9 +991,11 @@ impl<'a> AgentRunner<'a> {
                 .zip(self.channel_persistence.clone())
                 .zip(self.outreach_context.clone())
                 .map(|((tasks, channels), context)| (tasks, channels, context)),
+            agent_persistence: self.agent_persistence.clone(),
             recipient_role: self.recipient_role,
             full_prompt,
             history_message_count,
+            internal_requires_approval: internal_requires_approval(&config),
             suspended: Arc::new(AtomicBool::new(false)),
         };
 
@@ -997,9 +1122,13 @@ struct AgentTask {
         Arc<dyn ChannelPersistence>,
         OutreachToolContext,
     )>,
+    /// Present when the run may list its sibling agent channels.
+    agent_persistence: Option<Arc<dyn AgentPersistence>>,
     recipient_role: Option<RecipientRole>,
     full_prompt: String,
     history_message_count: usize,
+    /// Tool policy for internal delegation, read from the merged agent config.
+    internal_requires_approval: bool,
     /// Set by the approval handler or outreach tool when the run parks awaiting a human/other agent.
     suspended: Arc<AtomicBool>,
 }
@@ -1078,10 +1207,21 @@ impl AgentTask {
         let mut builder = AgentBuilder::from_yaml(&self.config_yaml)?;
 
         if let Some((use_cases, context)) = self.approval.clone() {
+            let delegation =
+                self.outreach
+                    .as_ref()
+                    .map(|(_, channels, outreach)| InternalDelegationPolicy {
+                        channel_persistence: channels.clone(),
+                        app_domain_name: outreach.app_domain_name.clone(),
+                        company_id: outreach.company_id,
+                        source_channel_id: outreach.channel_id,
+                        requires_approval: self.internal_requires_approval,
+                    });
             builder = builder.approval_handler(Arc::new(AgentApprovalHandler {
                 approval_use_cases: use_cases,
                 context,
                 suspended: self.suspended.clone(),
+                delegation,
             }));
         }
 
@@ -1109,6 +1249,18 @@ impl AgentTask {
             .auto_configure_spawner()
             .await?;
         if let Some((task_persistence, channel_persistence, context)) = self.outreach.clone() {
+            if let Some(agent_persistence) = self.agent_persistence.clone() {
+                builder = builder.tool(Arc::new(ListCompanyAgentsTool::new(
+                    channel_persistence.clone(),
+                    agent_persistence,
+                    AgentDirectoryContext {
+                        company_id: context.company_id,
+                        company_slug: context.company_slug.clone(),
+                        source_channel_id: context.channel_id,
+                        app_domain_name: context.app_domain_name.clone(),
+                    },
+                )));
+            }
             builder = builder.tool(Arc::new(OutreachAndAwaitQuorumTool::new(
                 task_persistence,
                 channel_persistence,
@@ -1506,6 +1658,7 @@ mod tests {
             model: Some("claude-3-5-sonnet".to_string()),
             api_key: Some("agent-api-key".to_string()),
             system_prompt: None,
+            description: None,
             config_json: Some(serde_json::json!({
                 "system_prompt": "Agent prompt",
                 "temperature": 0.7
@@ -1679,6 +1832,7 @@ mod tests {
             model: None,
             api_key: None,
             system_prompt: Some("You are a helpful triage assistant.".to_string()),
+            description: None,
             config_json: None,
             avatar_url: None,
             created_at: chrono::Utc::now(),
@@ -1955,5 +2109,203 @@ system_prompt: Hello
             assert_eq!(is_to, expected_to);
             assert_eq!(is_cc, expected_cc);
         }
+    }
+
+    // --- internal delegation approval policy -------------------------------------------------
+
+    struct DirectoryStub {
+        channels: Vec<Channel>,
+    }
+
+    #[async_trait::async_trait]
+    impl ChannelPersistence for DirectoryStub {
+        async fn create(
+            &self,
+            _company_id: Uuid,
+            _write: crate::use_cases::channel::ChannelWrite,
+        ) -> crate::app_error::AppResult<Channel> {
+            unimplemented!()
+        }
+        async fn get_by_id(&self, _id: Uuid) -> crate::app_error::AppResult<Option<Channel>> {
+            unimplemented!()
+        }
+        async fn get_by_company_slug_and_channel_slug(
+            &self,
+            _company_slug: &CompanySlug,
+            channel_slug: &ChannelSlug,
+        ) -> crate::app_error::AppResult<Option<Channel>> {
+            Ok(self
+                .channels
+                .iter()
+                .find(|c| &c.slug == channel_slug)
+                .cloned())
+        }
+        async fn list_by_company_id(
+            &self,
+            _company_id: Uuid,
+        ) -> crate::app_error::AppResult<Vec<Channel>> {
+            Ok(self.channels.clone())
+        }
+        async fn update(
+            &self,
+            _id: Uuid,
+            _write: crate::use_cases::channel::ChannelWrite,
+        ) -> crate::app_error::AppResult<Channel> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> crate::app_error::AppResult<()> {
+            unimplemented!()
+        }
+    }
+
+    fn agent_channel(company_id: Uuid, slug: &str) -> Channel {
+        Channel {
+            id: Uuid::new_v4(),
+            company_id,
+            name: slug.to_string(),
+            slug: slug.into(),
+            alias_slugs: Vec::new(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: Some(vec![Uuid::new_v4()]),
+            channel_config: None,
+            enabled: true,
+            add_3rd_party: true,
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    fn policy(
+        channels: Vec<Channel>,
+        company_id: Uuid,
+        requires_approval: bool,
+    ) -> InternalDelegationPolicy {
+        InternalDelegationPolicy {
+            channel_persistence: Arc::new(DirectoryStub { channels }),
+            app_domain_name: "mailagents.example".to_string(),
+            company_id,
+            source_channel_id: Uuid::new_v4(),
+            requires_approval,
+        }
+    }
+
+    fn outreach_trigger(targets: &[&str]) -> ai_agents::hitl::ApprovalTrigger {
+        ai_agents::hitl::ApprovalTrigger::Tool {
+            name: OUTREACH_TOOL_ID.to_string(),
+            args: serde_json::json!({ "target_emails": targets }),
+        }
+    }
+
+    #[tokio::test]
+    async fn an_all_internal_call_skips_the_human_when_policy_allows() {
+        let company_id = Uuid::new_v4();
+        let policy = policy(
+            vec![agent_channel(company_id, "billing")],
+            company_id,
+            false,
+        );
+        assert!(
+            policy
+                .approves_without_human(&outreach_trigger(&["billing@acme.mailagents.example"]))
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn an_external_recipient_still_requires_the_human() {
+        let company_id = Uuid::new_v4();
+        let policy = policy(
+            vec![agent_channel(company_id, "billing")],
+            company_id,
+            false,
+        );
+        assert!(
+            !policy
+                .approves_without_human(&outreach_trigger(&["stranger@supplier.example"]))
+                .await
+        );
+    }
+
+    /// The case that justifies deciding per call instead of per tool: one stranger in the list
+    /// must pull the whole call back under approval.
+    #[tokio::test]
+    async fn a_mixed_call_requires_the_human() {
+        let company_id = Uuid::new_v4();
+        let policy = policy(
+            vec![agent_channel(company_id, "billing")],
+            company_id,
+            false,
+        );
+        assert!(
+            !policy
+                .approves_without_human(&outreach_trigger(&[
+                    "billing@acme.mailagents.example",
+                    "stranger@supplier.example",
+                ]))
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn a_platform_address_with_no_such_channel_requires_the_human() {
+        let company_id = Uuid::new_v4();
+        let policy = policy(
+            vec![agent_channel(company_id, "billing")],
+            company_id,
+            false,
+        );
+        assert!(
+            !policy
+                .approves_without_human(&outreach_trigger(&["ghost@acme.mailagents.example"]))
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn the_default_policy_never_skips_the_human() {
+        let company_id = Uuid::new_v4();
+        let policy = policy(vec![agent_channel(company_id, "billing")], company_id, true);
+        assert!(
+            !policy
+                .approves_without_human(&outreach_trigger(&["billing@acme.mailagents.example"]))
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn an_empty_or_malformed_target_list_requires_the_human() {
+        let company_id = Uuid::new_v4();
+        let policy = policy(
+            vec![agent_channel(company_id, "billing")],
+            company_id,
+            false,
+        );
+        assert!(!policy.approves_without_human(&outreach_trigger(&[])).await);
+        assert!(
+            !policy
+                .approves_without_human(&ai_agents::hitl::ApprovalTrigger::Tool {
+                    name: OUTREACH_TOOL_ID.to_string(),
+                    args: serde_json::json!({}),
+                })
+                .await
+        );
+    }
+
+    #[test]
+    fn the_approval_flag_fails_closed_unless_explicitly_false() {
+        let explicit = serde_json::json!({
+            "tool_security": { "tools": { OUTREACH_TOOL_ID: {
+                "config": { "internal_requires_approval": false } } } }
+        });
+        assert!(!internal_requires_approval(&explicit));
+
+        assert!(internal_requires_approval(&serde_json::json!({})));
+        let wrong_type = serde_json::json!({
+            "tool_security": { "tools": { OUTREACH_TOOL_ID: {
+                "config": { "internal_requires_approval": "false" } } } }
+        });
+        assert!(internal_requires_approval(&wrong_type));
     }
 }

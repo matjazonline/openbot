@@ -222,6 +222,10 @@ impl ThreadUseCases {
                                 claim.worker_id,
                             ),
                         );
+                        // The address book only makes sense alongside the tool that uses it.
+                        if let Some(agent_persistence) = self.agent_persistence() {
+                            runner = runner.agent_directory(agent_persistence.clone());
+                        }
                     }
                     runner.execute().await
                 }

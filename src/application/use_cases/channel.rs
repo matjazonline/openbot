@@ -628,6 +628,127 @@ pub fn parse_recipient_address(
         .map(|(company, channels, _)| (company, channels[0].clone()))
 }
 
+/// Why a same-company channel cannot be called by another channel's agent.
+///
+/// Every variant is a rule the internal transport enforces anyway; naming them lets the caller
+/// explain the refusal instead of returning a bare `false`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InternalTargetRejection {
+    CrossCompany,
+    SelfCall,
+    Disabled,
+    NoAgent,
+}
+
+impl InternalTargetRejection {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::CrossCompany => "Cross-company channel calls are not allowed",
+            Self::SelfCall => "A channel cannot call itself",
+            Self::Disabled => "Target channel is disabled",
+            Self::NoAgent => "Target channel has no configured agent",
+        }
+    }
+}
+
+impl std::fmt::Display for InternalTargetRejection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// Whether `target` may receive an internal channel call from the caller's channel.
+///
+/// One decision, one place: the outreach tool's send path and the agent directory both consult
+/// this, so the directory can never advertise a channel the send path would refuse.
+///
+/// Address-shape rules (direct address, no `+` pipeline, no context-only suffix) are *not* checked
+/// here — those belong to the address parser, and a resolved [`Channel`] no longer carries them.
+pub fn check_internal_target(
+    target: &Channel,
+    caller_company_id: Uuid,
+    caller_channel_id: Uuid,
+) -> Result<(), InternalTargetRejection> {
+    if target.company_id != caller_company_id {
+        return Err(InternalTargetRejection::CrossCompany);
+    }
+    if target.id == caller_channel_id {
+        return Err(InternalTargetRejection::SelfCall);
+    }
+    if !target.enabled {
+        return Err(InternalTargetRejection::Disabled);
+    }
+    if target.agent_ids.as_ref().is_none_or(Vec::is_empty) {
+        return Err(InternalTargetRejection::NoAgent);
+    }
+    Ok(())
+}
+
+/// What one outreach recipient turns out to be.
+#[derive(Debug, Clone)]
+pub enum InternalTargetOutcome {
+    /// Not an address under the application domain — an ordinary third-party recipient.
+    External,
+    /// A same-company channel the caller is allowed to call.
+    Callable(Box<Channel>),
+    /// An address under the application domain that cannot be called, and why.
+    Rejected(String),
+}
+
+/// Classify one recipient address as external, callable internal channel, or refused.
+///
+/// Shared by the outreach send path and the approval policy so that "is this a colleague or a
+/// stranger?" is answered the same way in both. Persistence errors propagate rather than
+/// degrading into `External` — misclassifying a channel as a stranger would mail the outside
+/// world under a policy meant for internal traffic.
+pub async fn resolve_internal_target(
+    email: &str,
+    app_domain_name: &str,
+    caller_company_id: Uuid,
+    caller_channel_id: Uuid,
+    channel_persistence: &dyn ChannelPersistence,
+) -> AppResult<InternalTargetOutcome> {
+    let domain = match email.rsplit_once('@') {
+        Some((_, domain)) => domain,
+        None => return Ok(InternalTargetOutcome::External),
+    };
+    let app_domain_lower = app_domain_name.trim().to_lowercase();
+    let is_platform_address = domain.eq_ignore_ascii_case(&app_domain_lower)
+        || domain.ends_with(&format!(".{app_domain_lower}"));
+    if !is_platform_address {
+        return Ok(InternalTargetOutcome::External);
+    }
+
+    let Some((company_slug, channel_slugs, is_context_only)) =
+        parse_recipient_address_pipeline(email, app_domain_name)
+    else {
+        return Ok(InternalTargetOutcome::Rejected(format!(
+            "Invalid platform channel address: {email}"
+        )));
+    };
+    if is_context_only || channel_slugs.len() != 1 {
+        return Ok(InternalTargetOutcome::Rejected(format!(
+            "Internal outreach requires one direct channel address without pipeline or context-only suffix: {email}"
+        )));
+    }
+
+    let Some(channel) = channel_persistence
+        .get_by_company_slug_and_channel_slug(&company_slug, &channel_slugs[0])
+        .await?
+    else {
+        return Ok(InternalTargetOutcome::Rejected(format!(
+            "Platform channel does not exist: {email}"
+        )));
+    };
+
+    match check_internal_target(&channel, caller_company_id, caller_channel_id) {
+        Ok(()) => Ok(InternalTargetOutcome::Callable(Box::new(channel))),
+        Err(rejection) => Ok(InternalTargetOutcome::Rejected(format!(
+            "{rejection}: {email}"
+        ))),
+    }
+}
+
 pub fn levenshtein_distance(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();

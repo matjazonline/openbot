@@ -1,3 +1,4 @@
+pub mod agent_directory_tool;
 pub mod agent_runner;
 pub mod attachment_store;
 pub mod email_parser;

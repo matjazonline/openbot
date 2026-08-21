@@ -50,6 +50,10 @@ mod support;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+#[path = "inter_channel_tests.rs"]
+mod inter_channel_tests;
+
 pub const MAX_THREAD_MESSAGES_PER_HOUR: usize = 60;
 
 #[derive(Clone, Copy)]

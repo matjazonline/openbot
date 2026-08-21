@@ -354,6 +354,7 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::test_support::test_pool;
     use crate::use_cases::agent::AgentPersistence;
+    use crate::use_cases::agent::AgentWrite;
     use crate::use_cases::company::CompanyPersistence;
     use crate::use_cases::user::UserPersistence;
     use serde_json::json;
@@ -400,28 +401,22 @@ mod tests {
         let agent1 = AgentPersistence::create(
             &persistence,
             company.id,
-            "Primary Agent",
-            "primary-agent",
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            AgentWrite {
+                name: "Primary Agent".to_string(),
+                slug: "primary-agent".to_string(),
+                ..AgentWrite::default()
+            },
         )
         .await
         .unwrap();
         let agent2 = AgentPersistence::create(
             &persistence,
             company.id,
-            "Secondary Agent",
-            "secondary-agent",
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            AgentWrite {
+                name: "Secondary Agent".to_string(),
+                slug: "secondary-agent".to_string(),
+                ..AgentWrite::default()
+            },
         )
         .await
         .unwrap();
