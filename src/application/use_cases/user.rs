@@ -13,7 +13,10 @@ use crate::{
 
 #[async_trait]
 pub trait UserPersistence: Send + Sync {
-    async fn create_user(&self, username: &str, email: &str, password_hash: &str) -> AppResult<()>;
+    /// Stores a new account and returns it, so a caller that has just registered somebody can
+    /// act as them (sign them in) without a second lookup by a name it would have to trust.
+    async fn create_user(&self, username: &str, email: &str, password_hash: &str)
+    -> AppResult<User>;
     async fn get_by_email(&self, email: &str) -> AppResult<Option<User>>;
     async fn get_by_username(&self, username: &str) -> AppResult<Option<User>>;
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<User>>;
@@ -50,15 +53,15 @@ impl UserUseCases {
     }
 
     #[instrument(skip(self, password))]
-    pub async fn add(&self, username: &str, email: &str, password: &SecretString) -> AppResult<()> {
+    pub async fn add(&self, username: &str, email: &str, password: &SecretString) -> AppResult<User> {
         info!("Adding user...");
 
         let hash = self.hasher.hash_password(password.expose_secret())?;
-        self.persistence.create_user(username, email, &hash).await?;
+        let user = self.persistence.create_user(username, email, &hash).await?;
 
         info!("Adding user finished.");
 
-        Ok(())
+        Ok(user)
     }
 
     #[instrument(skip(self, password))]
@@ -120,12 +123,19 @@ mod test {
             &self,
             username: &str,
             email: &str,
-            _password_hash: &str,
-        ) -> AppResult<()> {
+            password_hash: &str,
+        ) -> AppResult<User> {
             assert_eq!(username, "testuser");
             assert_eq!(email, "testuser@gmail.com");
 
-            Ok(())
+            Ok(User {
+                id: Uuid::new_v4(),
+                username: username.to_string(),
+                email: email.to_string(),
+                password_hash: password_hash.to_string(),
+                avatar_url: None,
+                created_at: chrono::Utc::now(),
+            })
         }
 
         async fn get_by_email(&self, email: &str) -> AppResult<Option<User>> {
@@ -205,11 +215,13 @@ mod test {
             Arc::new(MockUserPersistence),
         );
 
-        let result = user_use_cases
+        let user = user_use_cases
             .add("testuser", "testuser@gmail.com", &"testuser_pw".into())
-            .await;
+            .await
+            .unwrap();
 
-        assert!(result.is_ok());
+        assert_eq!(user.username, "testuser");
+        assert_eq!(user.email, "testuser@gmail.com");
     }
 
     #[tokio::test]

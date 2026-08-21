@@ -12,7 +12,6 @@
 use super::*;
 use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::test_support::test_pool;
-use chrono::Utc;
 use crate::entities::message_contract::NormalizedInboundMessage;
 use crate::entities::outreach::{CreateOutreachRequest, OutreachTargetRequest};
 use crate::entities::task::TaskStatus;
@@ -21,6 +20,7 @@ use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::CompanyPersistence;
 use crate::use_cases::user::UserPersistence;
+use chrono::Utc;
 
 const APP_DOMAIN: &str = "mailagents.test";
 
@@ -226,6 +226,7 @@ async fn deliver_internally(
     email: OutboundEmail,
     idempotency_key: &str,
 ) -> InboundIngestResult {
+    let worker_id = Uuid::new_v4();
     let prepared = fixture
         .threads
         .prepare_internal_channel_delivery(email, Some(idempotency_key))
@@ -233,26 +234,38 @@ async fn deliver_internally(
         .expect("the internal destination resolves")
         .expect("a same-company channel is delivered internally, not over SMTP");
 
-    eprintln!("PROBE prepared: msg={} in_reply_to={} src_channel={:?} to={:?}",
-        prepared.outbound_message_id, prepared.in_reply_to, prepared.source_channel_id, prepared.recipients_to);
     fixture
         .threads
         .record_outreach_outbound_message(outbox_id, &prepared)
         .await
         .expect("the outbound message is recorded in the sender's thread");
-    let rows: Vec<(Uuid, Uuid, String)> = sqlx::query_as(
-        "SELECT tm.thread_id, tm.channel_id, tm.direction FROM thread_messages tm
-         JOIN email_messages em ON em.id = tm.email_message_id WHERE em.message_id = $1")
-        .bind(prepared.outbound_message_id.as_str())
-        .fetch_all(&fixture.pool).await.unwrap();
-    eprintln!("PROBE existing rows for this message-id: {rows:?}");
-    eprintln!("PROBE channel_a={} channel_b={}", fixture.channel_a.id, fixture.channel_b.id);
 
-    fixture
+    let ingested = fixture
         .threads
         .ingest_prepared_internal_message(&prepared)
         .await
-        .expect("the trusted internal message is ingested")
+        .expect("the trusted internal message is ingested");
+
+    // The worker marks the row sent with the Message-ID it went out under. Reply correlation
+    // matches on exactly that value, and without it a return hop reads as an unexplained cycle.
+    TaskPersistence::claim_outbox_emails(
+        fixture.persistence.as_ref(),
+        worker_id,
+        Utc::now() + chrono::Duration::minutes(5),
+        10,
+    )
+    .await
+    .expect("the outbox row is claimable");
+    TaskPersistence::mark_outbox_email_sent(
+        fixture.persistence.as_ref(),
+        outbox_id,
+        worker_id,
+        prepared.outbound_message_id.as_str(),
+    )
+    .await
+    .expect("the outbox row is marked sent");
+
+    ingested
 }
 
 #[tokio::test]

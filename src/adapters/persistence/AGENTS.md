@@ -146,11 +146,25 @@ Then every model change must be run as:
 DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" cargo test --lib
 ```
 
-The command is unchanged; it now lands on `mail_agents_test`. With **no** `DATABASE_URL` at all the
-tests still skip, which is what lets CI run without a database — so a green `cargo test` alone is
-still no evidence that your SQL is correct, and for the runtime-query files no evidence that it is
-even parseable. A URL that is set but unreachable is now a panic rather than a skip, so a missing
-test database announces itself instead of reporting success.
+The command is unchanged; it now lands on `mail_agents_test`. **Run it with the variable set.**
+`cargo test` does not read `.env` — only `main.rs` does, at runtime — so an unexported `DATABASE_URL`
+is the normal accident, not an exotic one.
+
+Both ways of getting it wrong now fail loudly rather than skipping:
+
+| `DATABASE_URL` | Result |
+|---|---|
+| set, reachable | the DB-backed tests run |
+| set, unreachable | panic naming the fix |
+| unset | panic naming the fix |
+| unset, with `ALLOW_MISSING_DATABASE_URL=1` | skip, deliberately |
+
+The skip used to be the default, on the reasoning that it let CI run without a database. There is no
+CI here, and the silence cost real bugs: the three `thread.rs` tests below that named columns no
+migration creates, plus a content-hash mismatch that broke every internal delegation hop and a
+`WHERE id = $9` placeholder collision, all sitting behind a green suite. A skipped test is *counted
+as passing* and the suite reports the same total either way, so nothing about the output reveals it.
+Use `ALLOW_MISSING_DATABASE_URL=1` when you genuinely want the non-DB tests only.
 
 This runs parallel and should stay that way. Every fixture here still shares one database — the test
 one — so a new DB-backed test has to be written to tolerate that:

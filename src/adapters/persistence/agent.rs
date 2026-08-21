@@ -124,7 +124,7 @@ impl AgentPersistence for PostgresPersistence {
         let db = sqlx::query_as::<_, AgentDb>(
             r#"UPDATE agents
                SET name = $1, slug = $2, provider = $3, model = $4, api_key = $5, system_prompt = $6, description = $7, config_json = $8, avatar_url = $9
-               WHERE id = $9
+               WHERE id = $10
                RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_at"#,
         )
         .bind(&write.name)

@@ -79,6 +79,9 @@ CREATE TABLE agents (
     model TEXT,
     api_key TEXT,
     system_prompt TEXT,
+    -- What this agent is for, in one line. Read by the `list_company_agents` tool so a sibling
+    -- agent can pick the right colleague without its address book living in a system prompt.
+    description TEXT,
     config_json JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     avatar_url TEXT,

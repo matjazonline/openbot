@@ -12,15 +12,24 @@
 //! The command `src/adapters/persistence/AGENTS.md` tells you to run is unchanged; it just lands
 //! somewhere it cannot do damage.
 //!
-//! # Absent configuration skips, broken configuration shouts
+//! # Missing configuration shouts too, unless silence is asked for
 //!
-//! With no `DATABASE_URL` at all these tests skip, which is what lets the suite run in CI without a
-//! database. That silence has a cost the same AGENTS.md records: three tests in `thread.rs` named
-//! columns no migration creates and went unnoticed because CI never set the variable.
+//! These tests used to skip when `DATABASE_URL` was unset, so the suite could run without a
+//! database. The cost is recorded in `src/adapters/persistence/AGENTS.md`: three tests in
+//! `thread.rs` named columns no migration creates and went unnoticed, because nothing ever set the
+//! variable. Two more slipped through the same gap later — a content-hash mismatch that broke every
+//! internal delegation hop, and a `WHERE id = $9` placeholder collision — each hidden behind a
+//! green run of a suite that had silently skipped every Postgres test.
 //!
-//! So the two cases are separated. *No* configuration is a skip, as before. Configuration that is
-//! present but unusable — the test database was never created, the server is down — is a panic
-//! naming the fix, because that is a broken setup silently reporting success.
+//! The failure mode is what makes it dangerous: a skipped test is *counted as passing*, the suite
+//! reports the same total either way, and whole-suite wall time is too noisy to notice. So the
+//! default is now loud. Unset is a panic naming the fix, exactly like a database that cannot be
+//! reached.
+//!
+//! Silence is still available, but it has to be asked for: set `ALLOW_MISSING_DATABASE_URL=1` and
+//! the tests skip as before. That is the switch for a CI job that deliberately runs without
+//! Postgres — this repository has no CI at all today, which is why the old default was protecting
+//! nothing.
 
 use sqlx::PgPool;
 use tokio::sync::{Mutex, OnceCell};
@@ -49,10 +58,31 @@ pub static UNSCOPED_CLAIM: Mutex<()> = Mutex::const_new(());
 /// Migrations run once per test binary, not once per test.
 static MIGRATED: OnceCell<()> = OnceCell::const_new();
 
-/// Where the tests should connect, or `None` when nothing is configured.
+/// The environment variable that buys back the old skip-when-unset behaviour.
+const ALLOW_MISSING_URL_VAR: &str = "ALLOW_MISSING_DATABASE_URL";
+
+/// Whether the caller has explicitly asked for DB-backed tests to be skipped.
+///
+/// Any non-empty value counts. The point is that skipping is a deliberate act with a name on it,
+/// not the accident of an unexported variable.
+fn skipping_is_permitted() -> bool {
+    permits_skipping(std::env::var(ALLOW_MISSING_URL_VAR).ok().as_deref())
+}
+
+/// The decision itself, separated from the environment so it can be tested without `set_var` —
+/// which is `unsafe` in edition 2024 and process-global besides, so a test using it would race
+/// every other test in the binary.
+fn permits_skipping(value: Option<&str>) -> bool {
+    value.is_some_and(|value| !value.trim().is_empty())
+}
+
+/// Where the tests should connect, or `None` when skipping has been explicitly permitted.
 ///
 /// `TEST_DATABASE_URL` wins outright, for a database that is not named after the development one.
 /// Otherwise `DATABASE_URL` is redirected onto its `_test` sibling.
+///
+/// Panics when neither is set and [`ALLOW_MISSING_URL_VAR`] is absent — see the module docs for
+/// why an unset variable is a failure rather than a skip.
 fn test_database_url() -> Option<String> {
     let explicit = std::env::var("TEST_DATABASE_URL")
         .ok()
@@ -61,8 +91,21 @@ fn test_database_url() -> Option<String> {
         return Some(explicit);
     }
 
-    let configured = std::env::var("DATABASE_URL").ok()?;
-    Some(with_test_database_name(&configured))
+    let configured = std::env::var("DATABASE_URL")
+        .ok()
+        .filter(|url| !url.trim().is_empty());
+    match configured {
+        Some(configured) => Some(with_test_database_name(&configured)),
+        None if skipping_is_permitted() => None,
+        None => panic!(
+            "DATABASE_URL is not set, so this test would silently skip and be counted as passing.\n\n\
+             Run the suite with a database:\n\n    \
+             DATABASE_URL=\"postgres://$(whoami)@localhost:5432/mail_agents\" cargo test\n\n\
+             (Tests never use that database directly — they are redirected onto its `_test` \
+             sibling. Create it once with `createdb mail_agents_test`.)\n\n\
+             To skip them on purpose, set {ALLOW_MISSING_URL_VAR}=1."
+        ),
+    }
 }
 
 /// Redirect a connection URL onto its `_test` sibling, leaving everything else about it alone.
@@ -159,6 +202,17 @@ pub async fn test_pool() -> Option<PgPool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn skipping_needs_a_real_value_not_just_a_present_variable() {
+        assert!(permits_skipping(Some("1")));
+        assert!(permits_skipping(Some("true")));
+        // An exported-but-empty variable is the classic `export FOO=` accident. It must not buy
+        // silence, or the failure this whole mechanism exists to prevent comes back.
+        assert!(!permits_skipping(Some("")));
+        assert!(!permits_skipping(Some("   ")));
+        assert!(!permits_skipping(None));
+    }
 
     #[test]
     fn a_development_url_is_redirected_to_its_test_sibling() {

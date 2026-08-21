@@ -450,7 +450,12 @@ impl ThreadUseCases {
                     .collect(),
                 subject: sent.subject.clone(),
                 clean_text_body: sent.body_text.clone(),
-                raw_text_body: None,
+                // Must match what `ingest_prepared_internal_message` stores for the very same
+                // mail. Both sides write one canonical `email_messages` row keyed by Message-ID,
+                // and its upsert only returns a row when the content hashes agree — leaving this
+                // `None` while the receiving side wrote `Some(body)` made every internal
+                // delegation hop fail its outbox delivery and retry forever.
+                raw_text_body: Some(sent.body_text.clone()),
                 raw_html_body: None,
                 attachments: None,
                 direction: MessageDirection::Outbound,
