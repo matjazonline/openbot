@@ -11,8 +11,8 @@ use crate::{
     },
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
-        company::CompanyUseCases, company_invite::CompanyInviteUseCases, thread::ThreadUseCases,
-        user::UserUseCases,
+        company::CompanyUseCases, company_invite::CompanyInviteUseCases,
+        schedule::ScheduleUseCases, thread::ThreadUseCases, user::UserUseCases,
     },
 };
 use std::fs::File;
@@ -72,6 +72,15 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         .with_monitoring(monitoring.clone()),
     );
 
+    let schedule_use_cases = Arc::new(ScheduleUseCases::new(
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        config.clone(),
+    ));
+
     Ok(AppState {
         db: postgres_arc.pool().clone(),
         config,
@@ -80,6 +89,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         company_use_cases: Arc::new(company_use_cases),
         company_invite_use_cases: Arc::new(company_invite_use_cases),
         channel_use_cases,
+        schedule_use_cases,
         agent_use_cases: Arc::new(agent_use_cases),
         thread_use_cases,
         approval_use_cases,

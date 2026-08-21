@@ -7,19 +7,29 @@ use uuid::Uuid;
 
 use crate::{
     adapters::persistence::task::{
-        Leased, OutboxEmail, TASK_LEASE_SECONDS, TaskLease, TaskPersistence, report_outcome,
-        while_leased,
+        Leased, OutboundSend, OutboxEmail, TASK_LEASE_SECONDS, TaskLease, TaskPersistence,
+        report_outcome, while_leased,
     },
     domain::monitoring::{MonitoringService, TaskExecutionMetrics, TaskStatusMetric},
     entities::{
-        channel::Channel,
+        agent::Agent,
+        channel::{Channel, PUBLIC_PARTICIPANT},
+        company::Company,
+        message::{Message, MessageDirection, MessageRole},
         outreach::DueOutreach,
+        schedule::ScheduledRunPayload,
         task::{BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus},
         value_objects::{EmailAddress, MessageId},
     },
     infra::config::AppConfig,
-    services::outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
-    use_cases::thread::{InboundIngestResult, ThreadUseCases},
+    services::{
+        agent_runner::{AgentRunner, ResolvedAgentParams},
+        outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
+    },
+    use_cases::{
+        schedule::{SCHEDULED_AGENT_RUN_TASK, ScheduleUseCases},
+        thread::{InboundIngestResult, ThreadUseCases},
+    },
 };
 
 /// How long the task loop waits before looking for work again. This is the whole delay between a
@@ -31,6 +41,9 @@ const TASK_POLL_INTERVAL: Duration = Duration::from_millis(500);
 /// How long the outbox loop waits. It runs on its own cadence rather than behind an agent run, so a
 /// queued reply goes out within half a second instead of whenever the current task happens to end.
 const OUTBOX_POLL_INTERVAL: Duration = Duration::from_millis(500);
+
+/// How often the schedule loop checks for due recurring or one-off runs.
+const SCHEDULE_POLL_INTERVAL: Duration = Duration::from_secs(2);
 
 /// How often the slow lane runs. Quorum timeouts and expired delivery leases are measured in
 /// minutes; checking them at queue cadence scans a hundred outreaches to find nothing.
@@ -105,6 +118,29 @@ async fn poll_until_shutdown<State, Work>(
     }
 }
 
+/// What a scheduled run needs loaded before the agent can answer: the company and channel it runs
+/// as, and the agent configured on that channel, if any.
+struct ScheduledRunContext {
+    company: Company,
+    channel: Channel,
+    agent: Option<Agent>,
+}
+
+/// The Message-ID of a scheduled run's reply, derived from the task so a retry reuses it and the
+/// saved message and the emailed copy always agree.
+fn scheduled_reply_message_id(task_id: Uuid, domain: &str) -> MessageId {
+    MessageId::new(format!("<schedule-reply-{task_id}@{domain}>"))
+}
+
+/// `Re:` a subject without stacking a second prefix.
+fn reply_subject(subject: &str) -> String {
+    if subject.trim_start().to_lowercase().starts_with("re:") {
+        subject.to_string()
+    } else {
+        format!("Re: {subject}")
+    }
+}
+
 /// Why one outbox delivery did not happen, and therefore whether trying again could help.
 enum DeliveryFailure {
     /// Transport or database trouble: costs an attempt, comes back after a backoff.
@@ -122,6 +158,7 @@ impl DeliveryFailure {
 pub struct TaskWorker {
     task_persistence: Arc<dyn TaskPersistence>,
     thread_use_cases: Arc<ThreadUseCases>,
+    schedule_use_cases: Option<Arc<ScheduleUseCases>>,
     config: Arc<AppConfig>,
     monitoring: Option<Arc<dyn MonitoringService>>,
     worker_id: uuid::Uuid,
@@ -136,6 +173,7 @@ impl TaskWorker {
         Self {
             task_persistence,
             thread_use_cases,
+            schedule_use_cases: None,
             config,
             monitoring: None,
             worker_id: uuid::Uuid::new_v4(),
@@ -147,7 +185,12 @@ impl TaskWorker {
         self
     }
 
-    /// Run the worker's three poll loops until shutdown.
+    pub fn with_schedules(mut self, schedule_use_cases: Arc<ScheduleUseCases>) -> Self {
+        self.schedule_use_cases = Some(schedule_use_cases);
+        self
+    }
+
+    /// Run the worker's poll loops until shutdown.
     ///
     /// They are separate on purpose. A task run holds its loop for as long as the agent takes --
     /// seconds, sometimes minutes — and while the outbox shared that tick, no reply went out for
@@ -158,8 +201,8 @@ impl TaskWorker {
         shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     ) {
         info!(
-            "Starting Background Task Worker (tasks every {:?}, outbox every {:?}, maintenance every {:?})...",
-            TASK_POLL_INTERVAL, OUTBOX_POLL_INTERVAL, MAINTENANCE_INTERVAL
+            "Starting Background Task Worker (tasks every {:?}, outbox every {:?}, schedules every {:?}, maintenance every {:?})...",
+            TASK_POLL_INTERVAL, OUTBOX_POLL_INTERVAL, SCHEDULE_POLL_INTERVAL, MAINTENANCE_INTERVAL
         );
 
         let tasks = tokio::spawn(poll_until_shutdown(
@@ -176,6 +219,17 @@ impl TaskWorker {
             Arc::clone(&self),
             |worker| async move { worker.process_outbox_emails().await },
         ));
+        let schedules = if self.schedule_use_cases.is_some() {
+            tokio::spawn(poll_until_shutdown(
+                "schedule",
+                SCHEDULE_POLL_INTERVAL,
+                shutdown_rx.resubscribe(),
+                Arc::clone(&self),
+                |worker| async move { worker.process_due_schedules().await },
+            ))
+        } else {
+            tokio::spawn(async {})
+        };
         let maintenance = tokio::spawn(poll_until_shutdown(
             "maintenance",
             MAINTENANCE_INTERVAL,
@@ -184,7 +238,19 @@ impl TaskWorker {
             |worker| async move { worker.run_maintenance().await },
         ));
 
-        let _ = tokio::join!(tasks, outbox, maintenance);
+        let _ = tokio::join!(tasks, outbox, schedules, maintenance);
+    }
+
+    /// Claim and advance any due recurring or one-off channel schedules.
+    async fn process_due_schedules(&self) -> Result<Polled, String> {
+        let Some(ref schedules) = self.schedule_use_cases else {
+            return Ok(Polled::Idle);
+        };
+        let count = schedules
+            .process_due_schedules(10)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(polled(count, 10))
     }
 
     /// Claim and run the next due task.
@@ -631,6 +697,10 @@ impl TaskWorker {
         &self,
         task: &crate::entities::task::BackgroundTask,
     ) -> Result<(), String> {
+        if task.task_type == SCHEDULED_AGENT_RUN_TASK {
+            return self.execute_scheduled_task(task).await;
+        }
+
         // Parse payload
         let mut ingest: InboundIngestResult = serde_json::from_value(task.payload.clone())
             .map_err(|e| format!("Invalid task payload JSON: {}", e))?;
@@ -716,6 +786,249 @@ impl TaskWorker {
             .map_err(|e| e.to_string())?;
 
         Ok(())
+    }
+
+    /// Run one `scheduled_agent_run` task: answer the schedule's prompt in its thread, and email
+    /// the answer on if the schedule asked for that.
+    ///
+    /// Split from the inbound path because a scheduled run has no inbound message to ingest, but
+    /// it shares the guard that matters — a retry must not run the agent, or reply, twice.
+    async fn execute_scheduled_task(&self, task: &BackgroundTask) -> Result<(), String> {
+        let payload: ScheduledRunPayload = serde_json::from_value(task.payload.clone())
+            .map_err(|e| format!("Invalid scheduled task payload: {e}"))?;
+        let context = self.load_scheduled_run_context(&payload).await?;
+
+        // The reply hangs off the schedule's own prompt message, so finding one already saved
+        // means a previous attempt got past the agent. Re-running would bill a second call and
+        // append a second answer to the thread; delivery is still reached, because what failed
+        // last time may have been the send.
+        let answer = match self
+            .thread_use_cases
+            .find_outbound_reply(payload.thread_id, &payload.trigger_message_id)
+            .await
+            .map_err(|e| e.to_string())?
+        {
+            Some(existing) => {
+                info!(
+                    "Idempotency Guard: schedule '{}' already answered in thread {}, skipping the agent",
+                    payload.schedule_name, payload.thread_id
+                );
+                existing.clean_text_body
+            }
+            None => {
+                let answer = self.run_scheduled_agent(&payload, &context).await?;
+                self.save_scheduled_reply(task, &payload, &context, &answer)
+                    .await?;
+                answer
+            }
+        };
+
+        self.deliver_scheduled_reply(task, &payload, &context, &answer)
+            .await
+    }
+
+    /// Everything a scheduled run needs loaded before the agent can be built.
+    async fn load_scheduled_run_context(
+        &self,
+        payload: &ScheduledRunPayload,
+    ) -> Result<ScheduledRunContext, String> {
+        let company = self
+            .thread_use_cases
+            .company_persistence()
+            .get_by_id(payload.company_id)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("Company {} not found", payload.company_id))?;
+
+        let channel = self
+            .thread_use_cases
+            .channel_persistence()
+            .get_by_id(payload.channel_id)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("Channel {} not found", payload.channel_id))?;
+
+        let first_agent_id = channel
+            .agent_ids
+            .as_ref()
+            .and_then(|ids| ids.first().copied());
+        let agent = match (self.thread_use_cases.agent_persistence(), first_agent_id) {
+            (Some(agents), Some(id)) => agents.get_by_id(id).await.map_err(|e| e.to_string())?,
+            _ => None,
+        };
+
+        Ok(ScheduledRunContext {
+            company,
+            channel,
+            agent,
+        })
+    }
+
+    /// The agent's answer to the schedule's prompt, with the thread so far as context.
+    async fn run_scheduled_agent(
+        &self,
+        payload: &ScheduledRunPayload,
+        context: &ScheduledRunContext,
+    ) -> Result<String, String> {
+        let history = self
+            .thread_use_cases
+            .thread_persistence()
+            .list_messages_by_thread_id(payload.thread_id)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let params = ResolvedAgentParams::new(
+            Some(&context.company),
+            Some(&context.channel),
+            context.agent.as_ref(),
+        )
+        .map_err(|e| format!("Failed to resolve agent parameters: {e}"))?;
+
+        let output = AgentRunner::new(&payload.prompt, &params)
+            .history(&history)
+            .monitoring(self.monitoring.clone())
+            .config(Some(self.config.clone()))
+            .company(Some(context.company.clone()))
+            .ids(
+                Some(context.company.id),
+                Some(context.channel.id),
+                context.agent.as_ref().map(|agent| agent.id),
+            )
+            .execute()
+            .await
+            .map_err(|e| format!("Agent execution failed: {e}"))?;
+
+        Ok(output.content)
+    }
+
+    /// Record the answer in the schedule's thread, threaded onto the prompt that asked for it.
+    async fn save_scheduled_reply(
+        &self,
+        task: &BackgroundTask,
+        payload: &ScheduledRunPayload,
+        context: &ScheduledRunContext,
+        answer: &str,
+    ) -> Result<(), String> {
+        let sender = context
+            .channel
+            .inbound_address(&context.company.slug, &self.config.app_domain_name);
+
+        let message = Message {
+            id: Uuid::new_v4(),
+            thread_id: payload.thread_id,
+            message_id: scheduled_reply_message_id(task.id, &self.config.app_domain_name),
+            in_reply_to: Some(payload.trigger_message_id.clone()),
+            references_list: vec![payload.trigger_message_id.clone()],
+            sender: sender.clone(),
+            recipients_to: vec![sender],
+            recipients_cc: vec![],
+            subject: reply_subject(&payload.subject),
+            clean_text_body: answer.to_string(),
+            raw_text_body: Some(answer.to_string()),
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Outbound,
+            role: MessageRole::Agent,
+            thread_index: None,
+            created_at: chrono::Utc::now(),
+        };
+
+        self.thread_use_cases
+            .save_message(&message)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
+
+    /// Queue the answer for email, when the schedule delivers anywhere beyond its mailbox. The
+    /// idempotency key makes this safe to reach on a retry that skipped the agent.
+    async fn deliver_scheduled_reply(
+        &self,
+        task: &BackgroundTask,
+        payload: &ScheduledRunPayload,
+        context: &ScheduledRunContext,
+        answer: &str,
+    ) -> Result<(), String> {
+        if !payload.wants_email() {
+            return Ok(());
+        }
+
+        let ScheduledRunContext {
+            company, channel, ..
+        } = context;
+
+        let recipients = self.scheduled_recipients(payload, channel).await;
+        let Some((primary_to, cc_list)) = recipients.split_first() else {
+            warn!(
+                "Schedule '{}' asked for email delivery but resolved no recipients",
+                payload.schedule_name
+            );
+            return Ok(());
+        };
+
+        let reply_message_id = scheduled_reply_message_id(task.id, &self.config.app_domain_name);
+        let outbound_email = OutboundEmail {
+            channel_id: channel.id,
+            channel_name: channel.name.clone(),
+            channel_slug: channel.slug.clone(),
+            company_slug: company.slug.clone(),
+            trigger_message_id: payload.trigger_message_id.clone(),
+            thread_references: vec![reply_message_id],
+            recipient_to: primary_to.clone(),
+            recipients_cc: cc_list.to_vec(),
+            subject: reply_subject(&payload.subject),
+            body_text: answer.to_string(),
+            hop_count: 0,
+            trace_channels: vec![channel.id],
+        };
+
+        self.task_persistence
+            .enqueue_outbound_send(OutboundSend {
+                company_id: company.id,
+                channel_id: channel.id,
+                task_id: Some(task.id),
+                idempotency_key: format!("task:{}:scheduled-email", task.id),
+                payload: serde_json::to_value(&outbound_email)
+                    .map_err(|e| format!("Serialization error: {e}"))?,
+            })
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
+
+    /// Who the answer is emailed to: the schedule's own list, or the channel's participants with
+    /// the company team as the fallback when the channel names none.
+    async fn scheduled_recipients(
+        &self,
+        payload: &ScheduledRunPayload,
+        channel: &Channel,
+    ) -> Vec<EmailAddress> {
+        if let Some(custom) = payload.custom_recipients() {
+            return custom.to_vec();
+        }
+
+        let participants: Vec<EmailAddress> = channel
+            .participant_emails
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|email| !email.eq_ignore_ascii_case(PUBLIC_PARTICIPANT))
+            .collect();
+
+        if !participants.is_empty() {
+            return participants;
+        }
+
+        self.thread_use_cases
+            .company_persistence()
+            .list_company_team_emails(payload.company_id)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(EmailAddress::from)
+            .collect()
     }
 
     async fn execute_single_task_with_lease(
@@ -1063,10 +1376,19 @@ mod tests {
         renewals: Mutex<usize>,
         /// How many renewals to grant before reporting the lease gone. `None` grants every one.
         renewals_before_loss: Option<usize>,
+        /// Emails queued for delivery. The trait's default discards them, which would let a test
+        /// claiming a send happened pass without one.
+        outbound_sends: Mutex<Vec<OutboundSend>>,
     }
 
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        async fn enqueue_outbound_send(&self, send: OutboundSend) -> AppResult<Option<Uuid>> {
+            let id = Uuid::new_v4();
+            self.outbound_sends.lock().unwrap().push(send);
+            Ok(Some(id))
+        }
+
         async fn renew_task_lease(
             &self,
             _id: Uuid,
@@ -1776,6 +2098,318 @@ mod tests {
                 .last_error
                 .unwrap()
                 .contains("API key is missing")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_scheduled_run_without_an_api_key_fails_the_task_for_retry() {
+        let task_persistence = Arc::new(MockTaskPersistence::default());
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+        let thread_id = Uuid::new_v4();
+
+        let company = Company {
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Test Company".to_string(),
+            slug: "test-co".into(),
+            api_key: None,
+            provider: Some("openai".to_string()),
+            model: Some("gpt-4o".to_string()),
+            enable_llm_spam_guardrail: None,
+            created_at: chrono::Utc::now(),
+        };
+
+        let channel = Channel {
+            enabled: true,
+            add_3rd_party: true,
+            id: channel_id,
+            company_id,
+            name: "Audit Channel".to_string(),
+            slug: "audit".into(),
+            alias_slugs: Vec::new(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: None,
+            channel_config: None,
+            created_at: chrono::Utc::now(),
+        };
+
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            messages: Mutex::new(vec![]),
+            threads: Mutex::new(vec![]),
+        });
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            cors_allowed_origins: vec![],
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+            gcs: None,
+            operator_emails: Vec::new(),
+        });
+
+        let thread_use_cases = Arc::new(ThreadUseCases::new(
+            thread_persistence.clone(),
+            Arc::new(MockChannelPersistence {
+                channel: Some(channel.clone()),
+            }),
+            Arc::new(MockCompanyPersistence {
+                company: Some(company.clone()),
+            }),
+            task_persistence.clone(),
+            config.clone(),
+        ));
+
+        let worker = Arc::new(TaskWorker::new(
+            task_persistence.clone(),
+            thread_use_cases,
+            config,
+        ));
+
+        let scheduled_payload = serde_json::json!({
+            "schedule_id": Uuid::new_v4(),
+            "schedule_name": "Nightly Audit",
+            "channel_id": channel_id,
+            "company_id": company_id,
+            "thread_id": thread_id,
+            "subject": "Audit Report",
+            "prompt": "Run audit",
+            "delivery_mode": "mailbox_only",
+            "recipient_emails": [],
+            "trigger_message_id": "<TRIGGER123@domain.com>",
+        });
+
+        let task = task_persistence
+            .enqueue_task(
+                company_id,
+                channel_id,
+                Some(thread_id),
+                "scheduled_agent_run",
+                scheduled_payload,
+            )
+            .await
+            .unwrap();
+
+        worker.process_next_task_batch().await.unwrap();
+
+        let processed = task_persistence
+            .get_task_by_id(task.id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        // Reached `execute_scheduled_task` -- and failed there for a reason the payload parse
+        // would have pre-empted, so this also proves the typed payload accepted a real one.
+        assert_eq!(processed.status, TaskStatus::Pending);
+        assert_eq!(processed.retry_count, 1);
+        assert!(processed.last_error.unwrap().contains("API key is missing"));
+    }
+
+    /// A retry must not run the agent again. The guard finds the answer a previous attempt saved
+    /// and goes straight to delivery -- which is what may have failed the first time.
+    #[tokio::test]
+    async fn a_retried_scheduled_run_reuses_its_answer_instead_of_calling_the_agent_twice() {
+        let task_persistence = Arc::new(MockTaskPersistence::default());
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+        let thread_id = Uuid::new_v4();
+        let trigger = MessageId::new("<TRIGGER123@domain.com>");
+
+        let company = Company {
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Test Company".to_string(),
+            slug: "test-co".into(),
+            api_key: None,
+            provider: Some("openai".to_string()),
+            model: Some("gpt-4o".to_string()),
+            enable_llm_spam_guardrail: None,
+            created_at: chrono::Utc::now(),
+        };
+
+        let channel = Channel {
+            enabled: true,
+            add_3rd_party: true,
+            id: channel_id,
+            company_id,
+            name: "Audit Channel".to_string(),
+            slug: "audit".into(),
+            alias_slugs: Vec::new(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: None,
+            channel_config: None,
+            created_at: chrono::Utc::now(),
+        };
+
+        // The answer a previous attempt already saved, threaded onto the schedule's prompt.
+        let existing_reply = Message {
+            id: Uuid::new_v4(),
+            thread_id,
+            message_id: MessageId::new("<already-answered@domain.com>"),
+            in_reply_to: Some(trigger.clone()),
+            references_list: vec![trigger.clone()],
+            sender: EmailAddress::from("audit@test-co.mailagents.com"),
+            recipients_to: vec![],
+            recipients_cc: vec![],
+            subject: "Re: Audit Report".into(),
+            clean_text_body: "Audit complete: nothing to report.".into(),
+            raw_text_body: None,
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Outbound,
+            role: MessageRole::Agent,
+            thread_index: None,
+            created_at: chrono::Utc::now(),
+        };
+
+        let thread_persistence = Arc::new(MockThreadPersistence {
+            messages: Mutex::new(vec![existing_reply]),
+            threads: Mutex::new(vec![]),
+        });
+
+        let config = Arc::new(AppConfig {
+            jwt_secret: "secret".to_string(),
+            access_token_ttl: time::Duration::days(1),
+            refresh_token_ttl: time::Duration::days(30),
+            app_domain_name: "mailagents.com".to_string(),
+            cors_allowed_origins: vec![],
+            smtp_host: "localhost".to_string(),
+            smtp_port: 1025,
+            smtp_username: "".to_string(),
+            smtp_password: "".to_string(),
+            smtp_from_address: "noreply@mailagents.com".to_string(),
+            incoming_smtp_enabled: true,
+            incoming_smtp_host: "0.0.0.0".to_string(),
+            incoming_smtp_port: 2525,
+            max_spam_score: 5.0,
+            dnsbl_enabled: false,
+            dnsbl_servers: vec![],
+            smtp_rate_limit_conns_per_ip: 30,
+            reject_self_domain_helo: true,
+            enable_heuristic_scanner: true,
+            enable_spam_scanner: false,
+            spam_scanner_type: "rspamd".to_string(),
+            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
+            enable_llm_spam_guardrail: false,
+            gcs: None,
+            operator_emails: Vec::new(),
+        });
+
+        let thread_use_cases = Arc::new(ThreadUseCases::new(
+            thread_persistence.clone(),
+            Arc::new(MockChannelPersistence {
+                channel: Some(channel.clone()),
+            }),
+            Arc::new(MockCompanyPersistence {
+                company: Some(company.clone()),
+            }),
+            task_persistence.clone(),
+            config.clone(),
+        ));
+
+        let worker = Arc::new(TaskWorker::new(
+            task_persistence.clone(),
+            thread_use_cases,
+            config,
+        ));
+
+        let task = task_persistence
+            .enqueue_task(
+                company_id,
+                channel_id,
+                Some(thread_id),
+                SCHEDULED_AGENT_RUN_TASK,
+                serde_json::json!({
+                    "schedule_id": Uuid::new_v4(),
+                    "schedule_name": "Nightly Audit",
+                    "channel_id": channel_id,
+                    "company_id": company_id,
+                    "thread_id": thread_id,
+                    "subject": "Audit Report",
+                    "prompt": "Run audit",
+                    "delivery_mode": "email_custom",
+                    "recipient_emails": ["ops@example.com", "cc@example.com"],
+                    "trigger_message_id": trigger.to_string(),
+                }),
+            )
+            .await
+            .unwrap();
+
+        worker.process_next_task_batch().await.unwrap();
+
+        let processed = task_persistence
+            .get_task_by_id(task.id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        // No API-key failure: the agent was never reached, even though this company has no key.
+        assert_eq!(
+            processed.status,
+            TaskStatus::Completed,
+            "last_error: {:?}",
+            processed.last_error
+        );
+
+        // Exactly one reply in the thread -- the retry appended nothing.
+        assert_eq!(
+            thread_persistence.messages.lock().unwrap().len(),
+            1,
+            "a retry must not append a second answer"
+        );
+
+        // Delivery still ran, addressed from the schedule's own recipient list.
+        let sends = task_persistence.outbound_sends.lock().unwrap();
+        assert_eq!(sends.len(), 1);
+        let email: OutboundEmail = serde_json::from_value(sends[0].payload.clone()).unwrap();
+        assert_eq!(email.recipient_to, EmailAddress::from("ops@example.com"));
+        assert_eq!(
+            email.recipients_cc,
+            vec![EmailAddress::from("cc@example.com")]
+        );
+        assert_eq!(email.body_text, "Audit complete: nothing to report.");
+        assert_eq!(email.subject, "Re: Audit Report");
+    }
+
+    #[test]
+    fn a_reply_subject_does_not_stack_prefixes() {
+        assert_eq!(reply_subject("Audit Report"), "Re: Audit Report");
+        assert_eq!(reply_subject("Re: Audit Report"), "Re: Audit Report");
+        assert_eq!(reply_subject("RE: Audit Report"), "RE: Audit Report");
+    }
+
+    #[test]
+    fn a_scheduled_reply_message_id_is_stable_across_retries() {
+        let task_id = Uuid::new_v4();
+        assert_eq!(
+            scheduled_reply_message_id(task_id, "mailagents.com"),
+            scheduled_reply_message_id(task_id, "mailagents.com"),
+            "the saved reply and the emailed copy must agree, on every attempt"
         );
     }
 }

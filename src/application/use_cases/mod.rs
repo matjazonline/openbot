@@ -3,5 +3,6 @@ pub mod approval;
 pub mod channel;
 pub mod company;
 pub mod company_invite;
+pub mod schedule;
 pub mod thread;
 pub mod user;

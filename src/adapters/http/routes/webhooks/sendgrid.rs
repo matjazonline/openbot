@@ -913,6 +913,81 @@ mod tests {
         }
     }
 
+    struct MockSchedulePersistence;
+    #[async_trait]
+    impl crate::adapters::persistence::schedule::SchedulePersistence for MockSchedulePersistence {
+        async fn create(
+            &self,
+            _company_id: Uuid,
+            _channel_id: Uuid,
+            _write: crate::entities::schedule::ScheduleWrite,
+        ) -> AppResult<crate::entities::schedule::ChannelSchedule> {
+            unimplemented!()
+        }
+        async fn get_by_id(
+            &self,
+            _id: Uuid,
+        ) -> AppResult<Option<crate::entities::schedule::ChannelSchedule>> {
+            Ok(None)
+        }
+        async fn list_by_channel_id(
+            &self,
+            _company_id: Uuid,
+            _channel_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::schedule::ChannelSchedule>> {
+            Ok(vec![])
+        }
+        async fn list_by_company_id(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::schedule::ChannelSchedule>> {
+            Ok(vec![])
+        }
+        async fn update(
+            &self,
+            _existing: &crate::entities::schedule::ChannelSchedule,
+            _write: crate::entities::schedule::ScheduleWrite,
+        ) -> AppResult<crate::entities::schedule::ChannelSchedule> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            Ok(())
+        }
+        async fn set_enabled(&self, _id: Uuid, _enabled: bool) -> AppResult<bool> {
+            Ok(true)
+        }
+        async fn claim_and_advance_due_schedules(
+            &self,
+            _limit: i64,
+        ) -> AppResult<Vec<crate::entities::schedule::ChannelSchedule>> {
+            Ok(vec![])
+        }
+        async fn record_manual_run(
+            &self,
+            _id: Uuid,
+        ) -> AppResult<Option<crate::entities::schedule::ChannelSchedule>> {
+            Ok(None)
+        }
+        async fn release_failed_claim(
+            &self,
+            _schedule: &crate::entities::schedule::ChannelSchedule,
+            _error: &str,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn clear_last_error(&self, _id: Uuid) -> AppResult<()> {
+            Ok(())
+        }
+        async fn list_schedule_runs(
+            &self,
+            _schedule_id: Uuid,
+            _offset: i64,
+            _limit: i64,
+        ) -> AppResult<Vec<crate::entities::schedule::ScheduleRun>> {
+            Ok(vec![])
+        }
+    }
+
     #[tokio::test]
     async fn sendgrid_webhook_processes_email_creates_thread_and_dispatches() {
         let company_id = Uuid::new_v4();
@@ -1003,7 +1078,7 @@ mod tests {
 
         let channel_use_cases = Arc::new(ChannelUseCases::new(
             company_persistence.clone(),
-            channel_persistence,
+            channel_persistence.clone(),
             config.clone(),
         ));
         let app_state = AppState {
@@ -1038,7 +1113,15 @@ mod tests {
                     Arc::new(MockCompanyInvitePersistence {}),
                 ),
             ),
-            channel_use_cases,
+            channel_use_cases: channel_use_cases.clone(),
+            schedule_use_cases: Arc::new(crate::use_cases::schedule::ScheduleUseCases::new(
+                Arc::new(MockSchedulePersistence),
+                company_persistence.clone(),
+                channel_persistence.clone(),
+                thread_persistence.clone(),
+                task_persistence.clone(),
+                config.clone(),
+            )),
             agent_use_cases: Arc::new(crate::use_cases::agent::AgentUseCases::new(
                 company_persistence,
                 Arc::new(MockAgentPersistence),

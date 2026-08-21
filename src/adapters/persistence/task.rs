@@ -2459,13 +2459,19 @@ mod tests {
         };
         // Claiming is the subject here, so this calls the real query rather than leasing the row
         // by hand — but the query is unscoped by design and would take whatever else is queued.
-        // `claim_outbox_emails` orders by `(available_at, id)`, so backdating this row sorts it
-        // ahead of every neighbour and a LIMIT of 1 then claims precisely it. The release below
-        // covers the rest: once the backoff pushes this row into the future it stops sorting first,
-        // and the claim would otherwise carry off whichever row did.
+        // `claim_outbox_emails` orders by `(available_at, id)`, so this row has to sort ahead of
+        // every neighbour for a LIMIT of 1 to claim precisely it. Backdating by a fixed hour does
+        // not achieve that: the test database accumulates `pending` rows from earlier runs, and one
+        // left behind yesterday is older than any constant offset from now. So the offset is taken
+        // from the queue's own minimum, which puts this row strictly first whatever is already
+        // there. The release below covers the rest: once the backoff pushes this row into the
+        // future it stops sorting first, and the claim would otherwise carry off whichever row did.
         sqlx::query(
-            "UPDATE email_outbox SET available_at = CURRENT_TIMESTAMP - interval '1 hour'
-             WHERE id = $1",
+            "UPDATE email_outbox
+                SET available_at =
+                    (SELECT LEAST(MIN(available_at), CURRENT_TIMESTAMP) FROM email_outbox)
+                    - interval '1 hour'
+              WHERE id = $1",
         )
         .bind(outbox_id)
         .execute(&pool)

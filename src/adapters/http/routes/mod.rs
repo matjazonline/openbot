@@ -7,6 +7,7 @@ pub mod company_invite;
 pub mod health;
 pub mod monitoring;
 pub mod onboarding;
+pub mod schedule;
 pub mod task;
 pub mod ui;
 pub mod ui_agents;
@@ -14,6 +15,7 @@ pub mod ui_channels;
 pub mod ui_companies;
 pub mod ui_dashboard;
 pub mod ui_outbox;
+pub mod ui_schedules;
 pub mod ui_tasks;
 pub mod ui_team;
 pub mod ui_uploads;
@@ -45,6 +47,7 @@ pub fn router() -> Router<AppState> {
         .merge(company_invite::router())
         .merge(task::router())
         .merge(channel::router())
+        .merge(schedule::router())
         .merge(agent::router())
         .merge(approval::router())
         .merge(monitoring::router())
@@ -52,6 +55,7 @@ pub fn router() -> Router<AppState> {
         .merge(ui::router())
         .merge(ui_agents::router())
         .merge(ui_channels::router())
+        .merge(ui_schedules::router())
         .merge(ui_companies::router())
         .merge(ui_dashboard::router())
         .merge(ui_outbox::router())

@@ -212,6 +212,18 @@ impl ThreadUseCases {
         &self.company_persistence
     }
 
+    pub fn thread_persistence(&self) -> &Arc<dyn ThreadPersistence> {
+        &self.thread_persistence
+    }
+
+    pub fn task_persistence(&self) -> &Arc<dyn TaskPersistence> {
+        &self.task_persistence
+    }
+
+    pub fn agent_persistence(&self) -> Option<&Arc<dyn AgentPersistence>> {
+        self.agent_persistence.as_ref()
+    }
+
     pub fn config(&self) -> &Arc<AppConfig> {
         &self.config
     }

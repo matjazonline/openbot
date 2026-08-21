@@ -40,6 +40,7 @@ ammonia = "4"
 base64 = "0.22"
 # RS256 for the Google service-account assertion that buys a Cloud Storage access token.
 jsonwebtoken = "9"
+chrono-tz = "0.10.4"
 
 [dev-dependencies]
 # `#[tokio::test(start_paused = true)]`, so lease-heartbeat tests run in virtual time instead of

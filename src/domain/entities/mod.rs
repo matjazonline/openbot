@@ -10,6 +10,7 @@ pub mod message;
 pub mod message_contract;
 pub mod outbox;
 pub mod outreach;
+pub mod schedule;
 pub mod task;
 pub mod thread;
 pub mod upload;

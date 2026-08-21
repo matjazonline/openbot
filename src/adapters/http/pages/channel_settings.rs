@@ -6,7 +6,10 @@
 //! sends the sidebar list along out of band, so a rename or a delete shows up immediately.
 
 use super::*;
-use crate::entities::channel::PUBLIC_PARTICIPANT;
+use crate::entities::{
+    channel::PUBLIC_PARTICIPANT,
+    schedule::{ChannelSchedule, ScheduleDeliveryMode},
+};
 
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
 ///
@@ -20,6 +23,24 @@ const CHANNEL_SETTINGS_SCRIPT: &str = r##"        function showChannelTab(advanc
             if (advancedForm) advancedForm.classList.toggle('hidden', !advanced);
             if (simpleBtn) simpleBtn.classList.toggle('tab-active', !advanced);
             if (advancedBtn) advancedBtn.classList.toggle('tab-active', advanced);
+        }
+
+        function toggleScheduleType(select) {
+            var form = select.closest('form');
+            if (!form) return;
+            var isInterval = select.value === 'interval';
+            var intervalBox = form.querySelector('.schedule-interval-box');
+            var oneoffBox = form.querySelector('.schedule-oneoff-box');
+            if (intervalBox) intervalBox.classList.toggle('hidden', !isInterval);
+            if (oneoffBox) oneoffBox.classList.toggle('hidden', isInterval);
+        }
+
+        function toggleScheduleDelivery(select) {
+            var form = select.closest('form');
+            if (!form) return;
+            var isCustom = select.value === 'email_custom';
+            var customBox = form.querySelector('.schedule-custom-recipients-box');
+            if (customBox) customBox.classList.toggle('hidden', !isCustom);
         }
 
         // The spam interlock only applies to a channel anyone can write to, so the confirmation
@@ -144,6 +165,7 @@ pub struct ChannelEditPane<'a> {
     pub app_domain_name: &'a str,
     pub channel: &'a Channel,
     pub agents: &'a [Agent],
+    pub schedules: &'a [ChannelSchedule],
     pub spam_scan_enabled: bool,
     /// What the user last typed, when a save was rejected; `None` shows the stored channel.
     pub draft: Option<&'a ChannelDraft<'a>>,
@@ -298,7 +320,7 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
                     <a href="/companies/{company_id}/channels/{channel_id}/simulate" class="btn btn-outline btn-sm">Simulator</a>
                 </div>
             </div>
-            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="flex-1 overflow-y-auto px-6 py-4 space-y-6">
                 {error_html}
                 <form hx-put="/ui/channels/{channel_id}?company_id={company_id}" hx-target="#channel-pane" hx-swap="outerHTML" class="space-y-4">
                     <input type="hidden" name="form_mode" value="advanced">
@@ -320,6 +342,8 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
                             hx-push-url="/ui/channels?company_id={company_id}">Delete Channel</button>
                     </div>
                 </form>
+
+                {schedules_html}
             </div>
         </section>
         "##,
@@ -338,6 +362,7 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
             draft,
             spam_scan_enabled: pane.spam_scan_enabled,
         }),
+        schedules_html = channel_schedules_card(company_id, channel_id, pane.schedules),
     )
 }
 
@@ -712,4 +737,202 @@ pub fn stored_config(channel: &Channel) -> String {
         Some(config) => serde_json::to_string_pretty(config).unwrap_or_else(|_| config.to_string()),
         None => String::new(),
     }
+}
+
+pub fn channel_schedules_card(
+    company_id: Uuid,
+    channel_id: Uuid,
+    schedules: &[ChannelSchedule],
+) -> String {
+    let rows_html: String = if schedules.is_empty() {
+        r#"<div class="rounded-lg border border-dashed border-base-300 p-4 text-center text-xs opacity-60">No automated schedules configured for this channel yet.</div>"#.to_string()
+    } else {
+        schedules
+            .iter()
+            .map(|s| {
+                let status_badge = if s.enabled {
+                    r#"<span class="badge badge-success badge-sm">Active</span>"#
+                } else {
+                    r#"<span class="badge badge-ghost badge-sm opacity-60">Paused</span>"#
+                };
+                let delivery_badge = match s.delivery_mode {
+                    ScheduleDeliveryMode::MailboxOnly => {
+                        r#"<span class="badge badge-neutral badge-sm">Mailbox Only</span>"#
+                    }
+                    ScheduleDeliveryMode::EmailParticipants => {
+                        r#"<span class="badge badge-info badge-sm">Email: Participants</span>"#
+                    }
+                    ScheduleDeliveryMode::EmailCustom => {
+                        r#"<span class="badge badge-primary badge-sm">Email: Custom</span>"#
+                    }
+                };
+                let next_run_info = match s.next_run_at {
+                    Some(next) => format!("Next run: {}", s.in_zone(next, "%b %d, %H:%M %Z")),
+                    None => "Completed".to_string(),
+                };
+                let toggle_label = if s.enabled { "Pause" } else { "Resume" };
+                let toggle_value = if s.enabled { "false" } else { "true" };
+
+                format!(
+                    r##"
+                    <div class="flex flex-col gap-2 rounded-lg border border-base-300 bg-base-100 p-3">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-semibold text-sm truncate">{name}</span>
+                                    {status_badge}
+                                    {delivery_badge}
+                                </div>
+                                <div class="mt-1 flex flex-wrap items-center gap-2 text-xs opacity-70">
+                                    <span class="font-medium text-primary">{cadence}</span>
+                                    <span>•</span>
+                                    <span>{next_run_info}</span>
+                                </div>
+                            </div>
+                            <div class="flex shrink-0 items-center gap-1">
+                                <form hx-post="/ui/channels/{channel_id}/schedules/{schedule_id}/run-now"
+                                    hx-target="#channel-schedules-card" hx-swap="outerHTML" class="inline">
+                                    <input type="hidden" name="company_id" value="{company_id}">
+                                    <button type="submit" class="btn btn-outline btn-xs" title="Trigger this schedule immediately">
+                                        Run Now
+                                    </button>
+                                </form>
+                                <form hx-post="/ui/channels/{channel_id}/schedules/{schedule_id}/toggle"
+                                    hx-target="#channel-schedules-card" hx-swap="outerHTML" class="inline">
+                                    <input type="hidden" name="company_id" value="{company_id}">
+                                    <input type="hidden" name="enabled" value="{toggle_value}">
+                                    <button type="submit" class="btn btn-ghost btn-xs">
+                                        {toggle_label}
+                                    </button>
+                                </form>
+                                <form hx-post="/ui/channels/{channel_id}/schedules/{schedule_id}/delete"
+                                    hx-target="#channel-schedules-card" hx-swap="outerHTML"
+                                    hx-confirm="Delete schedule '{name}'?" class="inline">
+                                    <input type="hidden" name="company_id" value="{company_id}">
+                                    <button type="submit" class="btn btn-ghost btn-xs text-error">
+                                        ✕
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="rounded bg-base-200 p-2 text-xs font-mono opacity-80 truncate" title="{subject}">
+                            <span class="font-semibold text-base-content/70">Subject:</span> {subject}
+                        </div>
+                        <div class="rounded bg-base-200 p-2 text-xs font-mono opacity-80 line-clamp-2" title="{prompt}">
+                            <span class="font-semibold text-base-content/70">Prompt:</span> {prompt}
+                        </div>
+                    </div>
+                    "##,
+                    name = escape_html_text(&s.name),
+                    cadence = escape_html_text(&s.cadence_label()),
+                    subject = escape_html_text(&s.subject_template),
+                    prompt = escape_html_text(&s.prompt_template),
+                    schedule_id = s.id,
+                    channel_id = channel_id,
+                    company_id = company_id,
+                    status_badge = status_badge,
+                    delivery_badge = delivery_badge,
+                    next_run_info = next_run_info,
+                    toggle_label = toggle_label,
+                    toggle_value = toggle_value,
+                )
+            })
+            .collect()
+    };
+
+    format!(
+        r##"
+        <div id="channel-schedules-card" class="rounded-box border border-base-300 bg-base-200 p-4 space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-bold">Automated Schedules &amp; Triggers</h3>
+                    <p class="text-xs opacity-60">Run this channel's agents on a recurring interval or as a one-off scheduled report.</p>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                {rows_html}
+            </div>
+
+            <details class="collapse collapse-arrow border border-base-300 bg-base-100 rounded-lg">
+                <summary class="collapse-title text-xs font-semibold">+ New Schedule</summary>
+                <div class="collapse-content">
+                    <form hx-post="/ui/channels/{channel_id}/schedules" hx-target="#channel-schedules-card" hx-swap="outerHTML" class="space-y-3 pt-2">
+                        <input type="hidden" name="company_id" value="{company_id}">
+                        
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <label class="form-control w-full">
+                                <div class="label py-1"><span class="text-xs opacity-70">Schedule Name</span></div>
+                                <input type="text" name="name" required placeholder="Daily Operations Report" class="input input-sm w-full">
+                            </label>
+                            <label class="form-control w-full">
+                                <div class="label py-1"><span class="text-xs opacity-70">Schedule Type</span></div>
+                                <select name="schedule_type" class="select select-sm w-full" onchange="toggleScheduleType(this)">
+                                    <option value="interval" selected>Recurring Interval</option>
+                                    <option value="one_off">One-Off Scheduled Run</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <div class="schedule-interval-box">
+                            <label class="form-control w-full">
+                                <div class="label py-1"><span class="text-xs opacity-70">Repeat Cadence</span></div>
+                                <select name="interval_seconds" class="select select-sm w-full">
+                                    <option value="900">Every 15 minutes</option>
+                                    <option value="1800">Every 30 minutes</option>
+                                    <option value="3600" selected>Every hour</option>
+                                    <option value="21600">Every 6 hours</option>
+                                    <option value="43200">Every 12 hours</option>
+                                    <option value="86400">Every day (24h)</option>
+                                    <option value="604800">Every week (7d)</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <div class="schedule-oneoff-box hidden">
+                            <label class="form-control w-full">
+                                <div class="label py-1"><span class="text-xs opacity-70">Run At (Date &amp; Time)</span></div>
+                                <input type="datetime-local" name="scheduled_at" class="input input-sm w-full">
+                            </label>
+                        </div>
+
+                        <label class="form-control w-full">
+                            <div class="label py-1"><span class="text-xs opacity-70">Thread Subject (supports <code class="font-mono">{{date}}</code>, <code class="font-mono">{{time}}</code>)</span></div>
+                            <input type="text" name="subject_template" required value="[Scheduled Report] {{date}}" class="input input-sm w-full font-mono text-xs">
+                        </label>
+
+                        <label class="form-control w-full">
+                            <div class="label py-1"><span class="text-xs opacity-70">Agent Prompt / Task Instructions</span></div>
+                            <textarea name="prompt_template" required rows="3" placeholder="Describe what the agent should analyze or generate for this scheduled run..." class="textarea textarea-sm w-full font-mono text-xs"></textarea>
+                        </label>
+
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <label class="form-control w-full">
+                                <div class="label py-1"><span class="text-xs opacity-70">Output Delivery Mode</span></div>
+                                <select name="delivery_mode" class="select select-sm w-full" onchange="toggleScheduleDelivery(this)">
+                                    <option value="mailbox_only" selected>Mailbox Only (In-App Review)</option>
+                                    <option value="email_participants">Post to Mailbox &amp; Email Participants</option>
+                                    <option value="email_custom">Post to Mailbox &amp; Email Custom List</option>
+                                </select>
+                            </label>
+                            <div class="schedule-custom-recipients-box hidden">
+                                <label class="form-control w-full">
+                                    <div class="label py-1"><span class="text-xs opacity-70">Recipient Emails (comma-separated)</span></div>
+                                    <input type="text" name="recipient_emails" placeholder="team@company.com, client@example.com" class="input input-sm w-full">
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 pt-2">
+                            <button type="submit" class="btn btn-primary btn-sm">Create Schedule</button>
+                        </div>
+                    </form>
+                </div>
+            </details>
+        </div>
+        "##,
+        rows_html = rows_html,
+        channel_id = channel_id,
+        company_id = company_id,
+    )
 }

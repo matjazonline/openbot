@@ -32,6 +32,7 @@ async fn main() -> anyhow::Result<()> {
             app_state.thread_use_cases.clone(),
             app_state.config.clone(),
         )
+        .with_schedules(app_state.schedule_use_cases.clone())
         .with_monitoring(app_state.monitoring.clone()),
     );
 

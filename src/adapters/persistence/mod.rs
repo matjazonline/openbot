@@ -8,6 +8,7 @@ pub mod channel;
 pub mod company;
 pub mod company_invite;
 pub mod dashboard;
+pub mod schedule;
 pub mod task;
 #[cfg(test)]
 pub mod test_support;

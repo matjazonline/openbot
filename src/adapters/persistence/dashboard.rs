@@ -575,7 +575,10 @@ mod tests {
         assert_eq!(snapshot.tasks.total(), 0, "{:?}", snapshot.tasks);
         assert_eq!(snapshot.tasks.stalled, 0);
         assert_eq!(snapshot.outbox.total(), 0, "{:?}", snapshot.outbox);
-        assert!(snapshot.throughput.is_empty(), "{:?}", snapshot.throughput);
+        // Gap-filled, so "owns nothing" reads as a full series of zeroes rather than no series at
+        // all: `SLOTS_CTE` generates one bucket per slice of the window from `CURRENT_TIMESTAMP`
+        // alone, and never sees `$1`. An emptiness check here would assert the chart has no x-axis.
+        assert_eq!(snapshot.throughput_total(), 0, "{:?}", snapshot.throughput);
         assert_eq!(snapshot.attempts, AttemptStats::default());
     }
 

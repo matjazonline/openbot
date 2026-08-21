@@ -39,6 +39,7 @@ mod layout;
 mod mailbox;
 mod onboarding;
 mod outbox;
+mod schedules;
 mod simulation;
 mod skeleton;
 mod task_monitor;
@@ -60,6 +61,7 @@ pub use layout::*;
 pub use mailbox::*;
 pub use onboarding::*;
 pub use outbox::*;
+pub use schedules::*;
 pub use simulation::*;
 pub(crate) use skeleton::{
     LIST_SKELETON, PANE_SKELETON, PANELS_SKELETON, THREAD_COLUMN_SKELETON, THREAD_ROWS_SKELETON,

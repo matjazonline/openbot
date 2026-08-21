@@ -45,6 +45,7 @@ pub enum UiSection {
     Dashboard,
     Channels,
     Agents,
+    Schedules,
     Tasks,
     Outbox,
     Companies,
@@ -59,6 +60,7 @@ impl UiSection {
             UiSection::Dashboard => "/ui/dashboard",
             UiSection::Channels => "/ui/channels",
             UiSection::Agents => "/ui/agents",
+            UiSection::Schedules => "/ui/schedules",
             UiSection::Tasks => "/ui/tasks",
             UiSection::Outbox => "/ui/outbox",
             UiSection::Companies => "/ui/companies",
@@ -668,6 +670,12 @@ fn icon_rail(company_id: Uuid, section: UiSection) -> String {
         (UiSection::Mailbox, "/ui", Icon::Mail, "Mailbox"),
         (UiSection::Channels, "/ui/channels", Icon::Hash, "Channels"),
         (UiSection::Agents, "/ui/agents", Icon::Hubot, "Agents"),
+        (
+            UiSection::Schedules,
+            "/ui/schedules",
+            Icon::Stopwatch,
+            "Schedules",
+        ),
         (UiSection::Tasks, "/ui/tasks", Icon::Gear, "Tasks"),
         (
             UiSection::Outbox,

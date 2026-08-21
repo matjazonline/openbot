@@ -26,12 +26,16 @@ use crate::{
         pages,
     },
     app_error::{AppError, AppResult},
-    entities::{agent::Agent, channel::Channel, company::Company, value_objects::EmailAddress},
+    entities::{
+        agent::Agent, channel::Channel, company::Company, schedule::ChannelSchedule,
+        value_objects::EmailAddress,
+    },
     infra::config::AppConfig,
     use_cases::{
         agent::AgentUseCases,
         channel::{ChannelUseCases, ChannelWrite},
         company::CompanyUseCases,
+        schedule::ScheduleUseCases,
         user::UserUseCases,
     },
 };
@@ -80,6 +84,7 @@ const NO_SELECTION: &str = "Select a channel to configure it, or create a new on
 struct Workspace {
     company_use_cases: Arc<CompanyUseCases>,
     channel_use_cases: Arc<ChannelUseCases>,
+    schedule_use_cases: Arc<ScheduleUseCases>,
     agent_use_cases: Arc<AgentUseCases>,
     user_use_cases: Arc<UserUseCases>,
     config: Arc<AppConfig>,
@@ -98,6 +103,7 @@ impl FromRequestParts<AppState> for Workspace {
         Ok(Self {
             company_use_cases: state.company_use_cases.clone(),
             channel_use_cases: state.channel_use_cases.clone(),
+            schedule_use_cases: state.schedule_use_cases.clone(),
             agent_use_cases: state.agent_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             config: state.config.clone(),
@@ -118,6 +124,7 @@ impl Workspace {
     fn view<'a>(&'a self, company: &'a Company) -> ChannelSettingsView<'a> {
         ChannelSettingsView {
             channel_use_cases: &self.channel_use_cases,
+            schedule_use_cases: &self.schedule_use_cases,
             agent_use_cases: &self.agent_use_cases,
             config: &self.config,
             user_id: self.user_id,
@@ -153,10 +160,15 @@ async fn channels_page(
         .channel_id
         .and_then(|id| channels.iter().find(|channel| channel.id == id));
 
+    let selected_schedules = match selected {
+        Some(channel) => view.schedules(channel.id).await?,
+        None => vec![],
+    };
+
     let creating = matches!(query.new.as_deref(), Some("1") | Some("true"));
     let pane_html = match (creating, selected) {
         (true, _) => view.create_pane(&agents, &pages::ChannelDraft::default(), None),
-        (false, Some(channel)) => view.edit_pane(channel, &agents, None, None),
+        (false, Some(channel)) => view.edit_pane(channel, &agents, &selected_schedules, None, None),
         (false, None) => {
             pages::channel_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline)
         }
@@ -215,8 +227,11 @@ async fn edit_pane(
     let view = workspace.view(&company);
     let channel = view.channel(channel_id).await?;
     let agents = view.agents().await?;
+    let schedules = view.schedules(channel.id).await?;
 
-    Ok(Html(view.edit_pane(&channel, &agents, None, None)))
+    Ok(Html(
+        view.edit_pane(&channel, &agents, &schedules, None, None),
+    ))
 }
 
 /// POST /ui/channels - Create a channel from the pane's Simple or Advanced form (Protected).
@@ -284,13 +299,18 @@ async fn update_channel(
     let view = workspace.view(&company);
     let stored = view.channel(channel_id).await?;
     let agents = view.agents().await?;
+    let schedules = view.schedules(channel_id).await?;
     let submitted = SubmittedChannel::new(form);
 
     let rejected = |message: String| {
-        Ok(
-            Html(view.edit_pane(&stored, &agents, Some(&submitted.draft()), Some(&message)))
-                .into_response(),
-        )
+        Ok(Html(view.edit_pane(
+            &stored,
+            &agents,
+            &schedules,
+            Some(&submitted.draft()),
+            Some(&message),
+        ))
+        .into_response())
     };
 
     let channel_config = match parse_config_form(submitted.form.channel_config.clone()) {
@@ -334,6 +354,7 @@ async fn delete_channel(
 /// Everything the workspace renders from, so each handler names its data once.
 struct ChannelSettingsView<'a> {
     channel_use_cases: &'a ChannelUseCases,
+    schedule_use_cases: &'a ScheduleUseCases,
     agent_use_cases: &'a AgentUseCases,
     config: &'a AppConfig,
     user_id: Uuid,
@@ -350,6 +371,12 @@ impl ChannelSettingsView<'_> {
     async fn agents(&self) -> AppResult<Vec<Agent>> {
         self.agent_use_cases
             .list_company_agents(self.user_id, self.company.id)
+            .await
+    }
+
+    async fn schedules(&self, channel_id: Uuid) -> AppResult<Vec<ChannelSchedule>> {
+        self.schedule_use_cases
+            .list_channel_schedules(self.user_id, self.company.id, channel_id)
             .await
     }
 
@@ -393,6 +420,7 @@ impl ChannelSettingsView<'_> {
         &self,
         channel: &Channel,
         agents: &[Agent],
+        schedules: &[ChannelSchedule],
         draft: Option<&pages::ChannelDraft<'_>>,
         error: Option<&str>,
     ) -> String {
@@ -401,6 +429,7 @@ impl ChannelSettingsView<'_> {
             app_domain_name: &self.config.app_domain_name,
             channel,
             agents,
+            schedules,
             spam_scan_enabled: self.config.is_spam_scan_enabled(),
             draft,
             error,
@@ -423,7 +452,8 @@ impl ChannelSettingsView<'_> {
     /// What every successful write returns: the saved channel's pane, with the sidebar list
     /// refreshed beside it so a create, rename or slug change shows up immediately.
     async fn saved_response(&self, channel: &Channel, agents: &[Agent]) -> AppResult<Response> {
-        let pane = self.edit_pane(channel, agents, None, None);
+        let schedules = self.schedules(channel.id).await?;
+        let pane = self.edit_pane(channel, agents, &schedules, None, None);
         let channels = self.channels().await?;
         let list = pages::channel_settings_list(
             &self.list(&channels, Some(channel.id)),
