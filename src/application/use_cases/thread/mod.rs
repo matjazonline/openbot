@@ -45,7 +45,7 @@ use crate::{
 
 mod dispatch;
 mod ingest;
-pub use ingest::ReplyDelivery;
+pub use ingest::{ReplyDelivery, SYSTEM_ADDRESS_ANSWERED};
 mod support;
 
 #[cfg(test)]
@@ -909,6 +909,62 @@ fn push_channel_directory(body: &mut String, entries: &[ChannelDirectoryEntry]) 
         }
     }
     body.push('\n');
+}
+
+/// The reply `_help@{company}.{app_domain}` sends back.
+///
+/// `entries` is whatever [`ThreadUseCases::writable_channel_directory`] allowed this sender, so the
+/// team-only rule is decided there rather than restated here; an empty list still gets the syntax
+/// section, which discloses nothing about the company.
+///
+/// Every example below is checked against the real parsers: the `+` split in
+/// `parse_recipient_address_pipeline`, the separators in `strip_context_suffix_from_slug`, and the
+/// bracket forms in `EmailParser::check_body_context_trigger`.
+pub fn format_help_email_body(
+    entries: &[ChannelDirectoryEntry],
+    company_slug: &CompanySlug,
+    app_domain: &str,
+) -> String {
+    let domain_part = format!("{company_slug}.{app_domain}");
+    let example = entries
+        .first()
+        .map(|entry| {
+            entry
+                .address
+                .split('@')
+                .next()
+                .unwrap_or("support")
+                .to_string()
+        })
+        .unwrap_or_else(|| "support".to_string());
+
+    let mut body = String::from("Mail Agents Help\n\n");
+    push_channel_directory(&mut body, entries);
+    if entries.is_empty() {
+        body.push_str(
+            "You are not currently a participant of any channel in this company, so there is \
+             nothing to list. Ask a colleague to add you.\n\n",
+        );
+    }
+
+    body.push_str("Addressing tricks:\n");
+    body.push_str(&format!(
+        "  {example}+billing@{domain_part}\n      Send to both channels, in that order.\n"
+    ));
+    body.push_str(&format!(
+        "  {example}+quiet@{domain_part}\n      File it on the thread without running the agent.\n"
+    ));
+    body.push_str(
+        "  [[quiet]]\n      As the first thing in the body, does the same as +quiet.\n\n",
+    );
+    body.push_str(&format!(
+        "  {} all mean \"file it, don't answer\", and attach to a\n  channel name with '+', '.', \
+         '-' or '_'.\n\n",
+        crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES.join(", ")
+    ));
+
+    body.push_str("Reply to this address at any time to see this again.\n");
+    body
 }
 
 /// The one sentence that says why a bounce happened, for both bounce renderers.

@@ -58,6 +58,20 @@ pub struct OutboundEmail {
     pub trace_channels: Vec<Uuid>,
 }
 
+/// One server-generated message: a bounce, or a reply from a reserved `_` address.
+///
+/// A struct rather than positional arguments because `from_name`, `subject` and `body` are three
+/// adjacent strings, and a transposed pair would compile and mail the wrong thing.
+struct SystemMail<'a> {
+    message_id: MessageId,
+    from: EmailAddress,
+    from_name: &'a str,
+    to: &'a EmailAddress,
+    subject: String,
+    body: &'a str,
+    in_reply_to: Option<MessageId>,
+}
+
 #[derive(Debug, Clone)]
 pub struct SentEmailResult {
     pub outbound_message_id: MessageId,
@@ -422,39 +436,112 @@ impl OutboundDispatcher {
         subject: &str,
         bounce_body: &str,
     ) -> AppResult<SentEmailResult> {
-        let outbound_uuid = Uuid::new_v4();
-        let outbound_message_id: MessageId =
-            format!("<bounce-{}@{}>", outbound_uuid, config.app_domain_name).into();
-
-        let from_email: EmailAddress = format!("mailer-daemon@{}", config.app_domain_name).into();
-        let from_header_value = format!("\"Mail Agents Server\" <{}>", from_email);
-
         let formatted_subject = if subject.to_lowercase().starts_with("[undeliverable]") {
             subject.to_string()
         } else {
             format!("[Undeliverable] {}", subject)
         };
 
+        Self::send_system_mail(
+            config,
+            SystemMail {
+                message_id: format!("<bounce-{}@{}>", Uuid::new_v4(), config.app_domain_name)
+                    .into(),
+                from: format!("mailer-daemon@{}", config.app_domain_name).into(),
+                from_name: "Mail Agents Server",
+                to: recipient_to,
+                subject: formatted_subject,
+                body: bounce_body,
+                in_reply_to: None,
+            },
+        )
+        .await
+    }
+
+    /// The answer a reserved `_`-prefixed address sends back.
+    ///
+    /// Unlike a channel reply this carries no `X-MailAgents-*` headers and never joins the
+    /// inter-channel trace: it comes from the server, not from an agent.
+    pub async fn send_system_reply(
+        config: &AppConfig,
+        company_slug: &CompanySlug,
+        system_local_part: &str,
+        recipient_to: &EmailAddress,
+        subject: &str,
+        in_reply_to: Option<MessageId>,
+        body: &str,
+    ) -> AppResult<SentEmailResult> {
+        let trimmed = subject.trim();
+        let formatted_subject = if trimmed.is_empty() {
+            "Mail Agents Help".to_string()
+        } else if trimmed.to_lowercase().starts_with("re:") {
+            trimmed.to_string()
+        } else {
+            format!("Re: {trimmed}")
+        };
+
+        let from: EmailAddress = format!(
+            "{system_local_part}@{company_slug}.{}",
+            config.app_domain_name
+        )
+        .into();
+
+        Self::send_system_mail(
+            config,
+            SystemMail {
+                message_id: format!("<system-{}@{}>", Uuid::new_v4(), config.app_domain_name)
+                    .into(),
+                from,
+                from_name: "Mail Agents",
+                to: recipient_to,
+                subject: formatted_subject,
+                body,
+                in_reply_to,
+            },
+        )
+        .await
+    }
+
+    /// Build and post one server-generated message.
+    ///
+    /// Shared by the bounce and the system reply so the headers that make an auto-message safe --
+    /// `Auto-Submitted: auto-replied`, which `check_inbound_guards` refuses on the way back in --
+    /// are set in exactly one place.
+    async fn send_system_mail(
+        config: &AppConfig,
+        mail: SystemMail<'_>,
+    ) -> AppResult<SentEmailResult> {
+        let from_header_value = format!("\"{}\" <{}>", mail.from_name, mail.from);
         let from_mailbox = from_header_value
             .parse::<Mailbox>()
             .map_err(|e| AppError::Internal(format!("Invalid From address mailbox: {}", e)))?;
 
-        let to_mailbox = recipient_to
+        let to_mailbox = mail
+            .to
             .parse::<Mailbox>()
             .map_err(|e| AppError::Internal(format!("Invalid To address mailbox: {}", e)))?;
 
-        let builder = LettreMessage::builder()
+        let mut builder = LettreMessage::builder()
             .from(from_mailbox)
             .to(to_mailbox)
-            .subject(&formatted_subject)
+            .subject(&mail.subject)
             .header(ContentType::TEXT_PLAIN)
             .header(CustomHeader {
                 name: HeaderName::new_from_ascii_str("Auto-Submitted"),
                 value: "auto-replied".to_string(),
             });
 
-        let email_msg = builder.body(bounce_body.to_string()).map_err(|e| {
-            AppError::Internal(format!("Failed to build bounce email message: {}", e))
+        if let Some(ref parent) = mail.in_reply_to
+            && !parent.is_empty()
+        {
+            builder = builder.header(CustomHeader {
+                name: HeaderName::new_from_ascii_str("In-Reply-To"),
+                value: parent.to_string(),
+            });
+        }
+
+        let email_msg = builder.body(mail.body.to_string()).map_err(|e| {
+            AppError::Internal(format!("Failed to build system email message: {}", e))
         })?;
 
         if !config.smtp_host.is_empty() {
@@ -471,20 +558,20 @@ impl OutboundDispatcher {
 
             let mailer = mailer_builder.build();
             if let Err(err) = mailer.send(email_msg).await {
-                warn!("Failed to dispatch bounce email via SMTP: {err}");
+                warn!("Failed to dispatch system email via SMTP: {err}");
             }
         }
 
         Ok(SentEmailResult {
-            outbound_message_id,
-            in_reply_to: MessageId::default(),
+            outbound_message_id: mail.message_id,
+            in_reply_to: mail.in_reply_to.unwrap_or_default(),
             references: vec![],
-            from_address: from_email,
-            from_name: Some("Mail Agents Server".to_string()),
-            recipients_to: vec![recipient_to.clone()],
+            from_address: mail.from,
+            from_name: Some(mail.from_name.to_string()),
+            recipients_to: vec![mail.to.clone()],
             recipients_cc: vec![],
-            subject: formatted_subject,
-            body_text: bounce_body.to_string(),
+            subject: mail.subject,
+            body_text: mail.body.to_string(),
             source_channel_id: None,
             hop_count: 0,
             trace_channels: Vec::new(),

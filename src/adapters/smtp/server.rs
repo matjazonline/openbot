@@ -689,6 +689,14 @@ fn ingest_status(ingest: &crate::use_cases::thread::InboundIngestResult) -> Smtp
         return SmtpStatus::Accepted;
     }
     match ingest.reason.as_deref() {
+        // The server answered a reserved `_` address itself. Nothing was routed, but nothing went
+        // wrong either, so this must not be counted as an SMTP error.
+        //
+        // Matching on the reason *string* is the coupling `src/AGENTS.md` warns about, and several
+        // arms below already miscategorize ("Company or Channel not found" lands on `Error`).
+        // Turning `InboundIngestResult::reason` into an enum is the real fix, and is not this
+        // change's job.
+        Some(crate::use_cases::thread::SYSTEM_ADDRESS_ANSWERED) => SmtpStatus::Accepted,
         Some("SPF authentication failed") => SmtpStatus::RejectedSpf,
         Some("DKIM authentication failed") => SmtpStatus::RejectedDkim,
         Some("DMARC authentication failed") => SmtpStatus::RejectedDmarc,

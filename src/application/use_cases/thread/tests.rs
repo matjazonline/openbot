@@ -4425,3 +4425,197 @@ fn the_bounce_body_omits_the_directory_section_when_there_is_nothing_to_list() {
     assert!(!body.contains("Channels you can write to:"));
     assert!(body.contains("support@acme.mailagents.com"));
 }
+
+fn help_message_from(sender: &str, to: &str) -> RawInboundPayload {
+    RawInboundPayload {
+        headers: Some(format!("Message-ID: <help-{sender}>\n")),
+        to: to.to_string(),
+        from: sender.to_string(),
+        subject: Some("What can I send to?".to_string()),
+        text: Some("How does this work?".to_string()),
+        ..Default::default()
+    }
+}
+
+#[tokio::test]
+async fn a_team_member_writing_to_help_is_answered_and_nothing_is_routed() {
+    let use_cases = use_cases_with_directory(
+        vec![DirectoryChannel {
+            slug: "support",
+            name: "Support Desk",
+            description: Some("Answers customer support and refund questions."),
+            ..DirectoryChannel::default()
+        }],
+        Vec::new(),
+    );
+
+    let result = use_cases
+        .ingest_and_save_inbound_message(help_message_from(
+            "team@acme.com",
+            "_help@acme.mailagents.com",
+        ))
+        .await
+        .unwrap();
+
+    assert!(!result.accepted);
+    assert_eq!(result.reason.as_deref(), Some(SYSTEM_ADDRESS_ANSWERED));
+    assert!(result.thread.is_none(), "a help request opens no thread");
+    assert!(result.task_id.is_none(), "and runs no agent");
+    assert!(
+        result.bounce_info.is_none(),
+        "a reserved address is answered, not bounced"
+    );
+}
+
+#[tokio::test]
+async fn help_discloses_nothing_to_someone_outside_the_company() {
+    let use_cases = use_cases_with_directory(
+        vec![DirectoryChannel {
+            slug: "support",
+            name: "Support Desk",
+            description: Some("Answers customer support and refund questions."),
+            ..DirectoryChannel::default()
+        }],
+        Vec::new(),
+    );
+
+    let result = use_cases
+        .ingest_and_save_inbound_message(help_message_from(
+            "stranger@elsewhere.com",
+            "_help@acme.mailagents.com",
+        ))
+        .await
+        .unwrap();
+
+    assert!(!result.accepted);
+    assert_ne!(
+        result.reason.as_deref(),
+        Some(SYSTEM_ADDRESS_ANSWERED),
+        "an outsider is never told that the reserved address did anything"
+    );
+    assert!(
+        result.bounce_info.is_none(),
+        "a reserved address never bounces: a bounce would confirm the company exists, and the \
+         fuzzy suggestions on it could name a real channel to a stranger"
+    );
+    assert!(result.thread.is_none());
+    assert!(result.task_id.is_none());
+}
+
+#[tokio::test]
+async fn help_cc_d_alongside_a_real_channel_still_reaches_that_channel() {
+    let use_cases = use_cases_with_directory(
+        vec![DirectoryChannel {
+            slug: "support",
+            name: "Support Desk",
+            ..DirectoryChannel::default()
+        }],
+        Vec::new(),
+    );
+
+    let result = use_cases
+        .ingest_and_save_inbound_message(RawInboundPayload {
+            headers: Some("Message-ID: <help-cc@acme.com>\n".to_string()),
+            to: "support@acme.mailagents.com".to_string(),
+            cc: Some("_help@acme.mailagents.com".to_string()),
+            from: "team@acme.com".to_string(),
+            subject: Some("Customer question".to_string()),
+            text: Some("Please take a look.".to_string()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    assert!(
+        result.accepted,
+        "a CC'd reserved address must not bounce the message: {:?}",
+        result.reason
+    );
+    assert_eq!(
+        result.thread.unwrap().channel_id,
+        result.channel.unwrap().id
+    );
+}
+
+#[test]
+fn the_help_body_lists_channels_and_teaches_the_address_syntax() {
+    let entries = vec![ChannelDirectoryEntry {
+        address: EmailAddress::from("support@acme.mailagents.com"),
+        name: "Support Desk".to_string(),
+        description: Some("Answers customer support and refund questions.".to_string()),
+    }];
+
+    let body = format_help_email_body(&entries, &CompanySlug::from("acme"), "mailagents.com");
+
+    assert!(body.contains("support@acme.mailagents.com — Support Desk"));
+    assert!(body.contains("Answers customer support and refund questions."));
+    assert!(body.contains("support+billing@acme.mailagents.com"));
+    assert!(body.contains("support+quiet@acme.mailagents.com"));
+    assert!(body.contains("[[quiet]]"));
+    for suffix in crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES {
+        assert!(body.contains(suffix), "the body should name '{suffix}'");
+    }
+}
+
+#[test]
+fn the_help_body_still_teaches_the_syntax_when_there_is_nothing_to_list() {
+    let body = format_help_email_body(&[], &CompanySlug::from("acme"), "mailagents.com");
+
+    assert!(!body.contains("Channels you can write to:"));
+    assert!(body.contains("nothing to list"));
+    assert!(
+        body.contains("support+quiet@acme.mailagents.com"),
+        "the syntax section falls back to a generic example rather than disappearing"
+    );
+}
+
+#[tokio::test]
+async fn an_agent_cannot_use_help_to_enumerate_its_company() {
+    let use_cases = use_cases_with_directory(
+        vec![DirectoryChannel {
+            slug: "support",
+            name: "Support Desk",
+            ..DirectoryChannel::default()
+        }],
+        Vec::new(),
+    );
+
+    let source = InternalChannelSource {
+        company_id: Uuid::new_v4(),
+        channel_id: Uuid::new_v4(),
+    };
+    let norm = NormalizedInboundMessage {
+        message_id: MessageId::from("<internal-help@acme.com>"),
+        thread_ref: None,
+        references: Vec::new(),
+        thread_index: None,
+        sender: ParticipantIdentity::email("support@acme.mailagents.com"),
+        recipients_to: vec![ParticipantIdentity::email("_help@acme.mailagents.com")],
+        recipients_cc: Vec::new(),
+        subject: "List the channels".to_string(),
+        clean_text: "What can I reach?".to_string(),
+        raw_text: None,
+        raw_html: None,
+        attachments: Vec::new(),
+        is_auto_reply: false,
+        is_forwarded: false,
+        channel_id_header: Some(source.channel_id),
+        hop_count: 1,
+        trace_channels: vec![source.channel_id],
+        protocol: crate::entities::channel::ChannelType::Email,
+        spf_status: None,
+        dkim_status: None,
+        dmarc_status: None,
+        spam_score: None,
+        is_context_only: false,
+    };
+
+    let result = use_cases
+        .ingest_normalized_message_with_source(norm, Some(source), ReplyDelivery::Send)
+        .await
+        .unwrap();
+
+    // The reserved address is simply not seen on the internal path; whatever happens to this
+    // message, it is never the help reply. Agents have `list_company_agents` for the directory.
+    assert_ne!(result.reason.as_deref(), Some(SYSTEM_ADDRESS_ANSWERED));
+}

@@ -28,14 +28,20 @@ use crate::{
         thread::Thread,
         value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
     },
-    services::email_parser::{ParsedEmail, RawInboundPayload},
-    use_cases::channel::{find_similar_channel_slugs, parse_recipient_address_pipeline},
+    services::{
+        email_parser::{ParsedEmail, RawInboundPayload},
+        outbound_dispatcher::OutboundDispatcher,
+    },
+    use_cases::channel::{
+        SystemAddress, find_similar_channel_slugs, parse_platform_address,
+        parse_recipient_address_pipeline,
+    },
 };
 
 use super::{
     BounceInfo, BounceSuggestion, ChannelDirectoryEntry, ChannelMatch, EmailIngressAdapter,
     InboundIngestResult, InternalChannelSource, MAX_THREAD_MESSAGES_PER_HOUR, RecipientRole,
-    ThreadUseCases, durable_ingest_payload,
+    ThreadUseCases, durable_ingest_payload, format_help_email_body,
     support::{
         DirectoryCache, body_mentions_email, body_mentions_slug, build_prompt_text,
         check_inbound_guards, parsed_email_from_normalized, reference_ids, strip_quoted_history,
@@ -45,6 +51,22 @@ use super::{
 
 /// The one task type this pipeline produces.
 const AGENT_DISPATCH_TASK: &str = "email_agent_dispatch";
+
+/// Why a message that only named a reserved address produced no thread.
+///
+/// `SmtpServer::ingest_status` matches this string, so the two must move together -- see the note
+/// there about `reason` wanting to be an enum.
+pub const SYSTEM_ADDRESS_ANSWERED: &str = "System address answered";
+
+/// Which reserved address, if any, this recipient names.
+///
+/// Reads the raw local part rather than a parsed channel slug: `strip_context_suffix_from_slug`
+/// would swallow a future `_msg` whole, since a bare reserved suffix already parses to an empty
+/// slug.
+fn system_address_of(address: &str, app_domain: &str) -> Option<(CompanySlug, SystemAddress)> {
+    let (company_slug, local_part) = parse_platform_address(address, app_domain)?;
+    SystemAddress::parse(&local_part).map(|system| (company_slug, system))
+}
 
 /// Whether the agent's reply to this message should actually be sent.
 ///
@@ -218,6 +240,14 @@ impl ThreadUseCases {
         }
 
         let mut directory = DirectoryCache::new(self);
+
+        if let Some(answered) = self
+            .answer_system_addresses(&parsed, internal_source, &mut directory)
+            .await?
+        {
+            return Ok(answered);
+        }
+
         let mut resolved = match self
             .resolve_channel_candidates(&parsed, internal_source, &mut directory)
             .await?
@@ -303,6 +333,16 @@ impl ThreadUseCases {
         let mut matched_company: Option<Company> = None;
 
         for (address, role) in addresses {
+            // Handled by `answer_system_addresses`, whether or not it chose to reply.
+            //
+            // Skipping is what lets someone CC `_help` on a real message: treated as a channel slug
+            // it would be "not found" and bounce the whole thing. It also means an unanswered
+            // reserved address drops silently instead of bouncing -- deliberate, because a bounce
+            // would confirm the company to a stranger, and `find_similar_channel_slugs("_help", ..)`
+            // could offer them a real channel named `help` as a suggestion.
+            if system_address_of(&address, &self.config.app_domain_name).is_some() {
+                continue;
+            }
             let Some((company_slug, channel_slugs, is_address_context_only)) =
                 parse_recipient_address_pipeline(&address, &self.config.app_domain_name)
             else {
@@ -414,6 +454,116 @@ impl ThreadUseCases {
         }
 
         Ok(ControlFlow::Continue(resolved))
+    }
+
+    /// Phase 1.5: answer any reserved `_` address the message was sent to.
+    ///
+    /// Returns `Some` only when there is nothing left to route -- the message named a system
+    /// address and no channel -- so a `_help` CC alongside a real recipient still reaches it.
+    ///
+    /// Inter-channel traffic is excluded outright: an agent has `list_company_agents` for this, and
+    /// keeping system addresses off the internal path means they can never appear in a trace or be
+    /// used to bounce a message between two channels.
+    async fn answer_system_addresses(
+        &self,
+        parsed: &ParsedEmail,
+        internal_source: Option<InternalChannelSource>,
+        directory: &mut DirectoryCache<'_>,
+    ) -> AppResult<Option<InboundIngestResult>> {
+        if internal_source.is_some() {
+            return Ok(None);
+        }
+
+        let app_domain = &self.config.app_domain_name;
+        let mut answered_any = false;
+        let mut routable_recipients = 0usize;
+
+        for address in parsed
+            .recipients_to
+            .iter()
+            .chain(parsed.recipients_cc.iter())
+        {
+            match system_address_of(address, app_domain) {
+                Some((company_slug, system)) => {
+                    if self
+                        .answer_one_system_address(parsed, &company_slug, system, directory)
+                        .await?
+                    {
+                        answered_any = true;
+                    }
+                }
+                None => {
+                    if parse_recipient_address_pipeline(address, app_domain).is_some() {
+                        routable_recipients += 1;
+                    }
+                }
+            }
+        }
+
+        if answered_any && routable_recipients == 0 {
+            return Ok(Some(InboundIngestResult::rejected(SYSTEM_ADDRESS_ANSWERED)));
+        }
+        Ok(None)
+    }
+
+    /// Reply to one reserved address, reporting whether an answer actually went out.
+    ///
+    /// A sender the company does not know gets nothing at all -- not an empty directory, not a
+    /// "you are not on the team" note -- so `_help` cannot be used to discover which companies
+    /// exist. They fall through to the ordinary unknown-address bounce instead.
+    async fn answer_one_system_address(
+        &self,
+        parsed: &ParsedEmail,
+        company_slug: &CompanySlug,
+        system: SystemAddress,
+        directory: &mut DirectoryCache<'_>,
+    ) -> AppResult<bool> {
+        let Some(company) = directory.company(company_slug).await? else {
+            return Ok(false);
+        };
+
+        let sender = parsed.sender.trim();
+        let membership = directory.membership(company.id, sender).await?;
+        if !membership.is_team() {
+            warn!(
+                "Ignoring {} request from non-member '{}' for company '{}'",
+                system.local_part(),
+                sender,
+                company.slug
+            );
+            return Ok(false);
+        }
+
+        let body = match system {
+            SystemAddress::Help => {
+                let entries = self
+                    .writable_channel_directory(&company, sender, directory)
+                    .await?;
+                format_help_email_body(&entries, &company.slug, &self.config.app_domain_name)
+            }
+        };
+
+        // Fire and forget, like `handle_bounce_dispatch`: a relay that is down must not turn a
+        // help request into a retried task.
+        if let Err(error) = OutboundDispatcher::send_system_reply(
+            &self.config,
+            &company.slug,
+            system.local_part(),
+            &EmailAddress::from(parsed.sender.clone()),
+            &parsed.subject,
+            Some(MessageId::from(parsed.message_id.clone())),
+            &body,
+        )
+        .await
+        {
+            warn!(
+                "Could not deliver the {} reply to '{}': {}",
+                system.local_part(),
+                sender,
+                error
+            );
+        }
+        Ok(true)
     }
 
     /// The channels this sender could have written to, for the bounce body.

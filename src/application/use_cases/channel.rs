@@ -616,10 +616,31 @@ pub fn strip_context_suffix_from_slug(raw_slug: &str) -> (String, bool) {
     (raw_slug.trim().to_lowercase(), false)
 }
 
-pub fn parse_recipient_address_pipeline(
+/// Whether a bare domain belongs to this platform at all — the application domain itself, or any
+/// company subdomain of it.
+///
+/// Deliberately broader than [`parse_platform_address`]: `resolve_internal_target` has to treat
+/// `someone@{app_domain}` as *ours but malformed* rather than as a stranger, because classifying a
+/// platform address as external would mail the outside world under a policy meant for colleagues.
+pub fn is_platform_domain(domain: &str, app_domain_name: &str) -> bool {
+    let domain = domain.trim();
+    let app_domain_lower = app_domain_name.trim().to_lowercase();
+    domain.eq_ignore_ascii_case(&app_domain_lower)
+        || domain
+            .to_lowercase()
+            .ends_with(&format!(".{app_domain_lower}"))
+}
+
+/// Split `{local}@{company}.{app_domain}` into its company and its raw local part.
+///
+/// The local part comes back lowercased but otherwise **untouched** — no pipeline split, no
+/// context-suffix stripping — because callers disagree about what it means. Channel routing expands
+/// it; [`SystemAddress::parse`] must see it whole, before `strip_context_suffix_from_slug` could
+/// eat a name like `_msg`.
+pub fn parse_platform_address(
     to_str: &str,
     app_domain_name: &str,
-) -> Option<(CompanySlug, Vec<ChannelSlug>, bool)> {
+) -> Option<(CompanySlug, String)> {
     let email_addr = if let (Some(start), Some(end)) = (to_str.find('<'), to_str.rfind('>')) {
         if start < end {
             &to_str[start + 1..end]
@@ -636,25 +657,60 @@ pub fn parse_recipient_address_pipeline(
         return None;
     }
 
-    let channel_part = parts[0].trim();
+    let local_part = parts[0].trim();
     let domain_part = parts[1].trim();
 
-    if channel_part.is_empty() || domain_part.is_empty() {
+    if local_part.is_empty() || domain_part.is_empty() {
         return None;
     }
 
-    let domain_lower = app_domain_name.trim().to_lowercase();
-    let expected_suffix = format!(".{}", domain_lower);
-
-    let company_slug = if domain_part.ends_with(&expected_suffix) {
-        &domain_part[..domain_part.len() - expected_suffix.len()]
-    } else {
-        return None;
-    };
-
+    let expected_suffix = format!(".{}", app_domain_name.trim().to_lowercase());
+    let company_slug = domain_part.strip_suffix(&expected_suffix)?;
     if company_slug.is_empty() {
         return None;
     }
+
+    Some((CompanySlug::new(company_slug), local_part.to_string()))
+}
+
+/// A local part the server answers itself instead of routing to a channel.
+///
+/// The leading underscore is what makes this namespace safe to reserve: `channel_slugs_format` and
+/// `companies_slug_format` both constrain slugs to `^[a-z0-9]...`, so no customer can create a
+/// channel or company that shadows one of these names. Adding a variant needs no blocklist and no
+/// migration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SystemAddress {
+    /// `_help@{company}.{app_domain}` — replies with the sender's channels and the address syntax.
+    Help,
+}
+
+impl SystemAddress {
+    /// Every reserved local part, so tests can assert the whole set at once.
+    pub const ALL: &'static [SystemAddress] = &[SystemAddress::Help];
+
+    pub fn local_part(self) -> &'static str {
+        match self {
+            SystemAddress::Help => "_help",
+        }
+    }
+
+    /// Match a raw local part, exactly. Must be given the address *before* any pipeline or
+    /// context-suffix handling; see [`parse_platform_address`].
+    pub fn parse(local_part: &str) -> Option<Self> {
+        let candidate = local_part.trim().to_lowercase();
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|system| system.local_part() == candidate)
+    }
+}
+
+pub fn parse_recipient_address_pipeline(
+    to_str: &str,
+    app_domain_name: &str,
+) -> Option<(CompanySlug, Vec<ChannelSlug>, bool)> {
+    let (company_slug, channel_part) = parse_platform_address(to_str, app_domain_name)?;
 
     let mut is_context_only = false;
     let mut channel_slugs: Vec<String> = Vec::new();
@@ -674,7 +730,7 @@ pub fn parse_recipient_address_pipeline(
     }
 
     Some((
-        CompanySlug::new(company_slug),
+        company_slug,
         channel_slugs.into_iter().map(ChannelSlug::new).collect(),
         is_context_only,
     ))
@@ -772,10 +828,7 @@ pub async fn resolve_internal_target(
         Some((_, domain)) => domain,
         None => return Ok(InternalTargetOutcome::External),
     };
-    let app_domain_lower = app_domain_name.trim().to_lowercase();
-    let is_platform_address = domain.eq_ignore_ascii_case(&app_domain_lower)
-        || domain.ends_with(&format!(".{app_domain_lower}"));
-    if !is_platform_address {
+    if !is_platform_domain(domain, app_domain_name) {
         return Ok(InternalTargetOutcome::External);
     }
 
@@ -1704,5 +1757,81 @@ mod tests {
             )
             .await;
         assert!(res_participants.is_ok());
+    }
+
+    #[test]
+    fn a_platform_address_splits_into_its_company_and_untouched_local_part() {
+        let domain = "mailagents.com";
+
+        let (company, local) =
+            parse_platform_address("_help@acme.mailagents.com", domain).expect("ours");
+        assert_eq!(company, "acme");
+        assert_eq!(
+            local, "_help",
+            "the local part must survive whole -- no pipeline split, no suffix stripping"
+        );
+
+        let (_, piped) =
+            parse_platform_address("Support Desk <SUPPORT+Billing@acme.mailagents.com>", domain)
+                .expect("ours");
+        assert_eq!(
+            piped, "support+billing",
+            "a display name is stripped and the address lowercased, but nothing is expanded"
+        );
+
+        assert!(parse_platform_address("someone@elsewhere.com", domain).is_none());
+        assert!(
+            parse_platform_address("someone@mailagents.com", domain).is_none(),
+            "the bare application domain names no company"
+        );
+        assert!(parse_platform_address("not-an-address", domain).is_none());
+    }
+
+    #[test]
+    fn the_platform_domain_test_is_wider_than_the_address_parser() {
+        // `resolve_internal_target` relies on this gap: `someone@mailagents.com` is ours but
+        // malformed, and must not be classified as an external stranger.
+        assert!(is_platform_domain("mailagents.com", "mailagents.com"));
+        assert!(is_platform_domain("acme.mailagents.com", "mailagents.com"));
+        assert!(!is_platform_domain("elsewhere.com", "mailagents.com"));
+        assert!(!is_platform_domain("notmailagents.com", "mailagents.com"));
+    }
+
+    #[test]
+    fn only_an_exact_underscore_prefixed_name_is_a_system_address() {
+        assert_eq!(SystemAddress::parse("_help"), Some(SystemAddress::Help));
+        assert_eq!(SystemAddress::parse("_HELP"), Some(SystemAddress::Help));
+        assert_eq!(
+            SystemAddress::parse("help"),
+            None,
+            "without the underscore it is a slug a customer may own"
+        );
+        assert_eq!(SystemAddress::parse("_helpdesk"), None);
+        assert_eq!(SystemAddress::parse("support"), None);
+    }
+
+    #[test]
+    fn no_system_address_can_be_shadowed_by_a_channel_or_a_context_suffix() {
+        for system in SystemAddress::ALL {
+            let local = system.local_part();
+
+            assert!(
+                local.starts_with('_'),
+                "'{local}' is only safe to reserve because channel_slugs_format forbids a leading \
+                 underscore"
+            );
+            assert!(
+                validate_slug(local, SlugKind::ChannelAddress).is_ok(),
+                "if validate_slug ever rejects '{local}', the reason must not be a reserved \
+                 context suffix -- see the assertion below"
+            );
+
+            let (stripped, is_context) = strip_context_suffix_from_slug(local);
+            assert!(
+                !is_context && stripped == local,
+                "'{local}' collides with a reserved context suffix: it parses to ({stripped:?}, \
+                 {is_context}) and would be eaten before SystemAddress::parse ever saw it"
+            );
+        }
     }
 }
