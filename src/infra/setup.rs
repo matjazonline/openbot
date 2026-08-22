@@ -9,10 +9,16 @@ use crate::{
     infra::{
         argon2_password_hasher, config::AppConfig, events::MailboxEvents, postgres_persistence,
     },
+    services::outbound_dispatcher::SmtpConfirmationSender,
     use_cases::{
-        agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
-        company::CompanyUseCases, company_invite::CompanyInviteUseCases,
-        schedule::ScheduleUseCases, thread::ThreadUseCases, user::UserUseCases,
+        agent::AgentUseCases,
+        approval::ApprovalUseCases,
+        channel::ChannelUseCases,
+        company::CompanyUseCases,
+        company_invite::CompanyInviteUseCases,
+        schedule::ScheduleUseCases,
+        thread::ThreadUseCases,
+        user::{EmailConfirmation, UserUseCases},
     },
 };
 use std::fs::File;
@@ -40,7 +46,12 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     let argon_hasher = argon2_password_hasher();
 
     let user_use_cases = UserUseCases::new(Arc::new(argon_hasher), postgres_arc.clone())
-        .with_email_confirmation(postgres_arc.clone(), config.clone());
+        .with_email_confirmation(EmailConfirmation {
+            registrations: postgres_arc.clone(),
+            account_changes: postgres_arc.clone(),
+            codes: Arc::new(SmtpConfirmationSender::new(config.clone())),
+            config: config.clone(),
+        });
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
     let company_invite_use_cases =
         CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());

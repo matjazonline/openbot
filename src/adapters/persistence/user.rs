@@ -6,9 +6,14 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::{user::User, value_objects::AvatarUrl},
+    entities::{
+        user::User,
+        value_objects::{AvatarUrl, EmailAddress},
+    },
     use_cases::user::{
-        PendingRegistration, ProfileUpdate, RegistrationPersistence, UserPersistence,
+        AccountChange, AccountChangeKind, AccountChangePersistence, PendingAccountChange,
+        PendingChange, PendingRegistration, ProfileUpdate, RegistrationPersistence,
+        UserPersistence,
     },
 };
 
@@ -223,12 +228,12 @@ impl UserPersistence for PostgresPersistence {
 /// Which of the two clashed comes from the constraint the row violated, because the statement
 /// writes both at once and the message has to point at the field the reader must change.
 fn taken_identity_error(err: sqlx::Error, profile: &ProfileUpdate<'_>) -> AppError {
+    if !is_unique_violation(&err) {
+        return AppError::from(err);
+    }
     let sqlx::Error::Database(ref db_err) = err else {
         return AppError::from(err);
     };
-    if db_err.code().as_deref() != Some("23505") {
-        return AppError::from(err);
-    }
 
     match db_err.constraint() {
         Some("users_username_key") => AppError::BadRequest(format!(
@@ -240,5 +245,436 @@ fn taken_identity_error(err: sqlx::Error, profile: &ProfileUpdate<'_>) -> AppErr
             profile.email
         )),
         _ => AppError::BadRequest("That username or email is already taken.".into()),
+    }
+}
+
+/// Whether the driver is reporting a duplicate key rather than a fault. Both places that turn one
+/// into a readable refusal ask this, so the code lives in one place.
+fn is_unique_violation(err: &sqlx::Error) -> bool {
+    matches!(err, sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("23505"))
+}
+
+/// One row of `pending_account_changes`, before its `kind` and payload are folded into the
+/// [`PendingChange`] the domain speaks in.
+#[derive(sqlx::FromRow, Debug)]
+struct PendingAccountChangeDb {
+    kind: String,
+    new_email: Option<String>,
+    expires_at: DateTime<Utc>,
+}
+
+impl PendingAccountChangeDb {
+    /// The row as the domain reads it. `None` for a row whose `kind` is not one this build knows
+    /// -- the schema's CHECK should make that unreachable, and a row from the future is better
+    /// skipped than guessed at.
+    fn into_pending(self) -> Option<PendingChange> {
+        match AccountChangeKind::parse(&self.kind)? {
+            AccountChangeKind::Email => Some(PendingChange::Email {
+                new_email: EmailAddress::from(self.new_email?),
+                expires_at: self.expires_at,
+            }),
+            AccountChangeKind::Password => Some(PendingChange::Password {
+                expires_at: self.expires_at,
+            }),
+        }
+    }
+}
+
+#[async_trait]
+impl AccountChangePersistence for PostgresPersistence {
+    async fn save_pending_account_change(
+        &self,
+        pending: PendingAccountChange<'_>,
+    ) -> AppResult<()> {
+        // Split here rather than in the SQL: the columns a kind may fill are the one thing the
+        // table's CHECK constraint enforces, and the enum is what makes filling the wrong one
+        // impossible to write in the first place.
+        let (new_email, new_password_hash) = match &pending.change {
+            AccountChange::Email(email) => (Some(email.as_str()), None),
+            AccountChange::Password(hash) => (None, Some(*hash)),
+        };
+
+        sqlx::query!(
+            r#"INSERT INTO pending_account_changes
+                   (user_id, kind, new_email, new_password_hash, confirmation_code_hash, expires_at)
+               VALUES ($1, $2, $3, $4, $5, $6)
+               ON CONFLICT (user_id, kind) DO UPDATE SET
+                   new_email = EXCLUDED.new_email,
+                   new_password_hash = EXCLUDED.new_password_hash,
+                   confirmation_code_hash = EXCLUDED.confirmation_code_hash,
+                   expires_at = EXCLUDED.expires_at,
+                   created_at = CURRENT_TIMESTAMP"#,
+            pending.user_id,
+            pending.change.kind().as_str(),
+            new_email,
+            new_password_hash,
+            pending.confirmation_code_hash,
+            pending.expires_at,
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(())
+    }
+
+    async fn confirm_pending_account_change(
+        &self,
+        user_id: Uuid,
+        kind: AccountChangeKind,
+        confirmation_code_hash: &str,
+    ) -> AppResult<Option<User>> {
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+
+        // Deleting is what claims the request, and it happens in the same transaction as the
+        // write: two browsers racing the same code cannot both find a row to spend.
+        let claimed = sqlx::query!(
+            r#"DELETE FROM pending_account_changes
+               WHERE user_id = $1
+                 AND kind = $2
+                 AND confirmation_code_hash = $3
+                 AND expires_at > CURRENT_TIMESTAMP
+               RETURNING new_email, new_password_hash"#,
+            user_id,
+            kind.as_str(),
+            confirmation_code_hash,
+        )
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+
+        let Some(claimed) = claimed else {
+            transaction.rollback().await.map_err(AppError::from)?;
+            return Ok(None);
+        };
+
+        let updated = match kind {
+            AccountChangeKind::Email => {
+                sqlx::query_as!(
+                    UserDb,
+                    r#"UPDATE users SET email = $2 WHERE id = $1
+                       RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
+                    user_id,
+                    claimed.new_email,
+                )
+                .fetch_optional(&mut *transaction)
+                .await
+                .map_err(|err| taken_address_error(err, claimed.new_email.as_deref()))?
+            }
+            AccountChangeKind::Password => {
+                sqlx::query_as!(
+                    UserDb,
+                    r#"UPDATE users SET password_hash = $2 WHERE id = $1
+                       RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
+                    user_id,
+                    claimed.new_password_hash,
+                )
+                .fetch_optional(&mut *transaction)
+                .await
+                .map_err(AppError::from)?
+            }
+        };
+
+        transaction.commit().await.map_err(AppError::from)?;
+        Ok(updated.map(Into::into))
+    }
+
+    async fn list_pending_account_changes(&self, user_id: Uuid) -> AppResult<Vec<PendingChange>> {
+        let rows = sqlx::query_as!(
+            PendingAccountChangeDb,
+            r#"SELECT kind, new_email as "new_email: String", expires_at
+               FROM pending_account_changes
+               WHERE user_id = $1 AND expires_at > CURRENT_TIMESTAMP
+               ORDER BY kind"#,
+            user_id,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(rows
+            .into_iter()
+            .filter_map(PendingAccountChangeDb::into_pending)
+            .collect())
+    }
+
+    async fn discard_pending_account_change(
+        &self,
+        user_id: Uuid,
+        kind: AccountChangeKind,
+    ) -> AppResult<()> {
+        sqlx::query!(
+            "DELETE FROM pending_account_changes WHERE user_id = $1 AND kind = $2",
+            user_id,
+            kind.as_str(),
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(())
+    }
+}
+
+/// The address having been taken in the fifteen minutes since the code went out is the one thing
+/// that can still refuse a confirmation, and the reader is the only one who can resolve it.
+fn taken_address_error(err: sqlx::Error, address: Option<&str>) -> AppError {
+    if is_unique_violation(&err) {
+        return AppError::BadRequest(format!(
+            "An account already uses the address '{}'.",
+            address.unwrap_or_default()
+        ));
+    }
+    AppError::from(err)
+}
+
+#[cfg(test)]
+mod tests {
+    //! What a pending account change does is decided by SQL — the CHECK constraint that keeps a
+    //! row's payload matching its kind, the `DELETE ... RETURNING` that makes spending a code
+    //! atomic, and the `expires_at` comparison — so none of it can be shown anywhere but against a
+    //! real database.
+
+    use super::*;
+    use crate::adapters::persistence::test_support::test_pool;
+    use crate::use_cases::user::AccountChangePersistence;
+
+    async fn account(persistence: &PostgresPersistence) -> User {
+        let username = format!("pending_{}", Uuid::new_v4().simple());
+        persistence
+            .create_user(&username, &format!("{username}@example.com"), "hash")
+            .await
+            .expect("an account")
+    }
+
+    fn in_fifteen_minutes() -> DateTime<Utc> {
+        Utc::now() + chrono::Duration::minutes(15)
+    }
+
+    #[tokio::test]
+    async fn a_confirmed_code_moves_the_address_and_cannot_be_spent_twice() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let user = account(&persistence).await;
+        let moved_to = EmailAddress::from(format!("moved_{}@example.com", Uuid::new_v4().simple()));
+
+        persistence
+            .save_pending_account_change(PendingAccountChange {
+                user_id: user.id,
+                change: AccountChange::Email(&moved_to),
+                confirmation_code_hash: "hash-of-123456",
+                expires_at: in_fifteen_minutes(),
+            })
+            .await
+            .expect("a stored request");
+
+        // Until it is confirmed the account still has the address it signed up with.
+        let stored = persistence
+            .get_by_id(user.id)
+            .await
+            .expect("a lookup")
+            .expect("the account");
+        assert_eq!(stored.email, user.email);
+
+        let pending = persistence
+            .list_pending_account_changes(user.id)
+            .await
+            .expect("the pending list");
+        assert!(
+            matches!(pending.as_slice(), [PendingChange::Email { new_email, .. }] if new_email == &moved_to),
+            "the request reads back as the address it will move to: {pending:?}"
+        );
+
+        let confirmed = persistence
+            .confirm_pending_account_change(user.id, AccountChangeKind::Email, "hash-of-123456")
+            .await
+            .expect("a confirmation")
+            .expect("the updated account");
+        assert_eq!(confirmed.email, moved_to.as_str());
+
+        // The delete is what claims the request, so the same code cannot be replayed.
+        assert!(
+            persistence
+                .confirm_pending_account_change(user.id, AccountChangeKind::Email, "hash-of-123456")
+                .await
+                .expect("a second attempt")
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_wrong_or_expired_code_changes_nothing() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let user = account(&persistence).await;
+
+        persistence
+            .save_pending_account_change(PendingAccountChange {
+                user_id: user.id,
+                change: AccountChange::Password("new-hash"),
+                confirmation_code_hash: "hash-of-123456",
+                expires_at: in_fifteen_minutes(),
+            })
+            .await
+            .expect("a stored request");
+
+        assert!(
+            persistence
+                .confirm_pending_account_change(
+                    user.id,
+                    AccountChangeKind::Password,
+                    "hash-of-000000"
+                )
+                .await
+                .expect("a wrong code")
+                .is_none()
+        );
+
+        // A code that missed its window is refused, and does not show up as something to confirm.
+        persistence
+            .save_pending_account_change(PendingAccountChange {
+                user_id: user.id,
+                change: AccountChange::Password("new-hash"),
+                confirmation_code_hash: "hash-of-123456",
+                expires_at: Utc::now() - chrono::Duration::minutes(1),
+            })
+            .await
+            .expect("an expired request");
+
+        assert!(
+            persistence
+                .confirm_pending_account_change(
+                    user.id,
+                    AccountChangeKind::Password,
+                    "hash-of-123456"
+                )
+                .await
+                .expect("an expired code")
+                .is_none()
+        );
+        assert!(
+            persistence
+                .list_pending_account_changes(user.id)
+                .await
+                .expect("the pending list")
+                .is_empty()
+        );
+        assert_eq!(
+            persistence
+                .get_by_id(user.id)
+                .await
+                .expect("a lookup")
+                .expect("the account")
+                .password_hash,
+            "hash",
+            "neither refusal may write the new password"
+        );
+    }
+
+    #[tokio::test]
+    async fn each_kind_gets_one_request_and_a_second_ask_replaces_it() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let user = account(&persistence).await;
+        let first = EmailAddress::from(format!("first_{}@example.com", Uuid::new_v4().simple()));
+        let second = EmailAddress::from(format!("second_{}@example.com", Uuid::new_v4().simple()));
+
+        for (address, code) in [(&first, "hash-of-111111"), (&second, "hash-of-222222")] {
+            persistence
+                .save_pending_account_change(PendingAccountChange {
+                    user_id: user.id,
+                    change: AccountChange::Email(address),
+                    confirmation_code_hash: code,
+                    expires_at: in_fifteen_minutes(),
+                })
+                .await
+                .expect("a stored request");
+        }
+        persistence
+            .save_pending_account_change(PendingAccountChange {
+                user_id: user.id,
+                change: AccountChange::Password("new-hash"),
+                confirmation_code_hash: "hash-of-333333",
+                expires_at: in_fifteen_minutes(),
+            })
+            .await
+            .expect("a stored request");
+
+        // One per kind: asking twice for an address change leaves the second ask, not both.
+        let pending = persistence
+            .list_pending_account_changes(user.id)
+            .await
+            .expect("the pending list");
+        assert_eq!(pending.len(), 2);
+        assert!(matches!(
+            pending.iter().find(|p| p.kind() == AccountChangeKind::Email),
+            Some(PendingChange::Email { new_email, .. }) if new_email == &second
+        ));
+
+        // ...and the code the first ask mailed out is dead.
+        assert!(
+            persistence
+                .confirm_pending_account_change(user.id, AccountChangeKind::Email, "hash-of-111111")
+                .await
+                .expect("the superseded code")
+                .is_none()
+        );
+
+        // Discarding one kind leaves the other alone.
+        persistence
+            .discard_pending_account_change(user.id, AccountChangeKind::Email)
+            .await
+            .expect("a discard");
+        let pending = persistence
+            .list_pending_account_changes(user.id)
+            .await
+            .expect("the pending list");
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].kind(), AccountChangeKind::Password);
+    }
+
+    #[tokio::test]
+    async fn an_address_taken_since_the_code_was_mailed_refuses_the_confirmation() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let mover = account(&persistence).await;
+        let squatter = account(&persistence).await;
+
+        persistence
+            .save_pending_account_change(PendingAccountChange {
+                user_id: mover.id,
+                change: AccountChange::Email(&EmailAddress::from(squatter.email.as_str())),
+                confirmation_code_hash: "hash-of-123456",
+                expires_at: in_fifteen_minutes(),
+            })
+            .await
+            .expect("a stored request");
+
+        let refused = persistence
+            .confirm_pending_account_change(mover.id, AccountChangeKind::Email, "hash-of-123456")
+            .await;
+        assert!(
+            matches!(refused, Err(AppError::BadRequest(ref message)) if message.contains(&squatter.email)),
+            "a taken address must be named, not reported as a driver fault: {refused:?}"
+        );
+
+        // The transaction rolled back, so the request is still there to retry with another address.
+        assert_eq!(
+            persistence
+                .get_by_id(mover.id)
+                .await
+                .expect("a lookup")
+                .expect("the account")
+                .email,
+            mover.email
+        );
     }
 }

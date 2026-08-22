@@ -3525,6 +3525,7 @@ fn the_profile_pane_offers_the_account_its_own_details_and_never_its_password() 
     let html = profile_pane(&ProfilePane {
         user: &account,
         draft: None,
+        pending: &[],
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -3560,6 +3561,7 @@ fn a_rejected_profile_shows_what_was_typed_rather_than_what_is_stored() {
             email: "taken@example.com",
             avatar_url: "javascript:alert(1)",
         }),
+        pending: &[],
         outcome: ProfileOutcome::Rejected(
             ProfileForm::Identity,
             "An account already uses the address 'taken@example.com'.",
@@ -3581,6 +3583,7 @@ fn each_profile_banner_belongs_to_the_form_that_earned_it() {
     let saved = profile_pane(&ProfilePane {
         user: &account,
         draft: None,
+        pending: &[],
         outcome: ProfileOutcome::Saved(ProfileForm::Password, "Your password has been changed."),
     });
     let (details, password) = saved
@@ -3592,6 +3595,7 @@ fn each_profile_banner_belongs_to_the_form_that_earned_it() {
     let refused = profile_pane(&ProfilePane {
         user: &account,
         draft: None,
+        pending: &[],
         outcome: ProfileOutcome::Rejected(
             ProfileForm::Password,
             "That is not your current password.",
@@ -3630,6 +3634,7 @@ fn the_profile_page_renders_through_the_ui_shell_with_or_without_a_company() {
     let pane = profile_pane(&ProfilePane {
         user: &account,
         draft: None,
+        pending: &[],
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -3652,4 +3657,81 @@ fn the_profile_page_renders_through_the_ui_shell_with_or_without_a_company() {
     });
     assert!(without_company.contains(r##"hx-put="/ui/profile""##));
     assert!(!without_company.contains("company_id="));
+}
+
+fn in_fifteen_minutes() -> chrono::DateTime<Utc> {
+    Utc::now() + chrono::Duration::minutes(15)
+}
+
+#[test]
+fn a_section_waiting_on_a_code_asks_for_it_instead_of_offering_its_form_again() {
+    let account = profile_account();
+    let moving_to = EmailAddress::from("new@example.com");
+
+    let html = profile_pane(&ProfilePane {
+        user: &account,
+        draft: None,
+        pending: &[PendingChange::Email {
+            new_email: moving_to.clone(),
+            expires_at: in_fifteen_minutes(),
+        }],
+        outcome: ProfileOutcome::Untouched,
+    });
+
+    // The address field is gone while its code is outstanding -- asking again would silently void
+    // the code already sitting in somebody's inbox.
+    assert!(!html.contains(r#"name="email""#));
+    assert!(html.contains(r##"hx-post="/ui/profile/changes/email""##));
+    assert!(html.contains(r##"hx-delete="/ui/profile/changes/email""##));
+    assert!(html.contains(r#"name="code""#));
+    // Which inbox to open is the one thing the panel has to say.
+    assert!(html.contains("new@example.com"));
+
+    // The other section is untouched: one pending change does not lock the whole pane.
+    assert!(html.contains(r#"name="current_password""#));
+    assert!(!html.contains(r##"hx-post="/ui/profile/changes/password""##));
+}
+
+#[test]
+fn a_pending_password_change_leaves_the_account_details_form_alone() {
+    let account = profile_account();
+
+    let html = profile_pane(&ProfilePane {
+        user: &account,
+        draft: None,
+        pending: &[PendingChange::Password {
+            expires_at: in_fifteen_minutes(),
+        }],
+        outcome: ProfileOutcome::Untouched,
+    });
+
+    assert!(html.contains(r##"hx-post="/ui/profile/changes/password""##));
+    assert!(!html.contains(r#"name="current_password""#));
+    // This code goes to the address the account already has, not to anything on a form.
+    assert!(html.contains("dana@example.com"));
+
+    assert!(html.contains(r#"name="email" required value="dana@example.com""#));
+    assert!(!html.contains(r##"hx-post="/ui/profile/changes/email""##));
+}
+
+#[test]
+fn a_pending_address_is_never_shown_as_the_account_s_own() {
+    let account = profile_account();
+    let html = profile_pane(&ProfilePane {
+        user: &account,
+        draft: None,
+        pending: &[PendingChange::Email {
+            new_email: EmailAddress::from("<script>x</script>@example.com"),
+            expires_at: in_fifteen_minutes(),
+        }],
+        outcome: ProfileOutcome::Saved(
+            ProfileForm::Identity,
+            "Your name and picture are saved. Check the new address for the code.",
+        ),
+    });
+
+    // The header still reads the stored address: nothing about an unconfirmed one is the account's.
+    assert!(html.contains("dana@example.com"));
+    assert!(!html.contains("<script>x</script>"));
+    assert!(html.contains("&lt;script&gt;x&lt;/script&gt;@example.com"));
 }

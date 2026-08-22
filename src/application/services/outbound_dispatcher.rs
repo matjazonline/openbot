@@ -13,10 +13,13 @@ use sha2::{Digest, Sha256};
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use std::sync::Arc;
+
 use crate::{
     app_error::{AppError, AppResult},
     entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId},
     infra::config::AppConfig,
+    use_cases::user::ConfirmationCodeSender,
 };
 
 #[derive(Clone, Debug)]
@@ -71,13 +74,93 @@ pub struct SentEmailResult {
     pub trace_channels: Vec<Uuid>,
 }
 
+/// Mails confirmation codes over this deployment's SMTP relay.
+///
+/// It exists so [`crate::use_cases::user::UserUseCases`] depends on the *act* of sending a code
+/// rather than on SMTP: a test can then hand it a sender that keeps the code, which is the only
+/// way to exercise a confirmation flow end to end without a mailbox.
+pub struct SmtpConfirmationSender {
+    config: Arc<AppConfig>,
+}
+
+impl SmtpConfirmationSender {
+    pub fn new(config: Arc<AppConfig>) -> Self {
+        Self { config }
+    }
+}
+
+#[async_trait::async_trait]
+impl ConfirmationCodeSender for SmtpConfirmationSender {
+    async fn send_code(
+        &self,
+        recipient: &EmailAddress,
+        code: &str,
+        purpose: ConfirmationPurpose,
+    ) -> AppResult<()> {
+        OutboundDispatcher::send_confirmation_code(&self.config, recipient, code, purpose).await
+    }
+}
+
+/// What a mailed confirmation code proves, and so what its mail should say.
+///
+/// It changes the wording and nothing else. The distinction that matters is *where* each code is
+/// sent, and that is the caller's -- see `EmailConfirmation::request`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfirmationPurpose {
+    Registration,
+    EmailChange,
+    PasswordChange,
+}
+
+impl ConfirmationPurpose {
+    fn subject(self) -> &'static str {
+        match self {
+            ConfirmationPurpose::Registration => "Confirm your BusyBots email",
+            ConfirmationPurpose::EmailChange => "Confirm your new BusyBots email",
+            ConfirmationPurpose::PasswordChange => "Confirm your BusyBots password change",
+        }
+    }
+
+    fn lead(self) -> &'static str {
+        match self {
+            ConfirmationPurpose::Registration => "Your BusyBots confirmation code is",
+            ConfirmationPurpose::EmailChange => {
+                "To use this address for your BusyBots account, enter the code"
+            }
+            ConfirmationPurpose::PasswordChange => {
+                "To finish changing your BusyBots password, enter the code"
+            }
+        }
+    }
+
+    /// What to do if the code was not asked for. A registration code reaching a stranger is a
+    /// typo; a code about an account that already exists may be somebody else at its controls, so
+    /// those two say to change the password rather than to ignore it.
+    fn footer(self) -> &'static str {
+        match self {
+            ConfirmationPurpose::Registration => {
+                "If you did not sign up for BusyBots, you can ignore this email."
+            }
+            ConfirmationPurpose::EmailChange | ConfirmationPurpose::PasswordChange => {
+                "If you did not ask for this, change your BusyBots password -- somebody else may be signed in to your account."
+            }
+        }
+    }
+}
+
 pub struct OutboundDispatcher;
 
 impl OutboundDispatcher {
-    pub async fn send_registration_confirmation(
+    /// Mails one confirmation code.
+    ///
+    /// Every code this app sends goes out through here, so the subject and the sentence above the
+    /// code are the only thing [`ConfirmationPurpose`] changes -- what a code *proves* differs,
+    /// how it is delivered does not.
+    async fn send_confirmation_code(
         config: &AppConfig,
         recipient: &EmailAddress,
         code: &str,
+        purpose: ConfirmationPurpose,
     ) -> AppResult<()> {
         let from = config
             .smtp_from_address
@@ -89,10 +172,12 @@ impl OutboundDispatcher {
         let message = LettreMessage::builder()
             .from(from)
             .to(to)
-            .subject("Confirm your BusyBots email")
+            .subject(purpose.subject())
             .header(ContentType::TEXT_PLAIN)
             .body(format!(
-                "Your BusyBots confirmation code is {code}.\n\nThis code expires in 15 minutes."
+                "{lead} {code}.\n\nThis code expires in 15 minutes.\n\n{footer}",
+                lead = purpose.lead(),
+                footer = purpose.footer(),
             ))
             .map_err(|e| AppError::Internal(format!("Failed to build confirmation email: {e}")))?;
 

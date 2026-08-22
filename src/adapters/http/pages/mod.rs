@@ -22,7 +22,10 @@ use crate::entities::{
     user::User,
     value_objects::{AvatarUrl, EmailAddress},
 };
-use crate::use_cases::channel::InboundEmailResult;
+use crate::use_cases::{
+    channel::InboundEmailResult,
+    user::{AccountChangeKind, PendingChange},
+};
 
 mod agent_settings;
 mod agents;

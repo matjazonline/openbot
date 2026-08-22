@@ -1,9 +1,13 @@
 //! `/ui/profile` — the signed-in account's own details, in the shared `/ui` shell.
 //!
-//! Two forms, because they are two different decisions: the identity form saves who the account
+//! Two sections, because they are two different decisions: the identity form saves who the account
 //! is (its picture, its name, its address), and the password form re-authenticates before it
-//! changes anything. They swap the same `#profile-pane`, so whichever one answers leaves the
-//! whole pane showing what is now stored.
+//! changes anything. They swap the same `#profile-pane`, so whichever one answers leaves the whole
+//! pane showing what is now stored.
+//!
+//! Either can be waiting on a code rather than offering its form: a new address and a new password
+//! are both mailed one before they take effect, and a section with a request outstanding shows
+//! [`code_panel`] in place of its form until the code comes back or the request is cancelled.
 
 use super::*;
 
@@ -66,13 +70,22 @@ impl ProfileOutcome<'_> {
     }
 }
 
-/// The pane for one request: the stored account, plus whatever the last submit left behind.
+/// The pane for one request: the stored account, whatever is waiting on a mailed code, and
+/// whatever the last submit left behind.
 pub struct ProfilePane<'a> {
     pub user: &'a User,
     /// What was last typed into the identity form, when a save was rejected; `None` shows the
     /// stored account.
     pub draft: Option<&'a ProfileDraft<'a>>,
+    /// Changes this account has asked for and not yet proved. A section with one waiting asks for
+    /// the code instead of offering its form again -- see [`code_panel`].
+    pub pending: &'a [PendingChange],
     pub outcome: ProfileOutcome<'a>,
+}
+
+/// What is waiting on a code for `kind`, if anything.
+fn pending_of(pending: &[PendingChange], kind: AccountChangeKind) -> Option<&PendingChange> {
+    pending.iter().find(|change| change.kind() == kind)
 }
 
 pub fn profile_page(page: &ProfilePage<'_>) -> String {
@@ -119,16 +132,29 @@ pub fn profile_pane(pane: &ProfilePane<'_>) -> String {
         username = escape_html_text(&user.username),
         email = escape_html_text(&user.email),
         joined = super::format_date(user.created_at),
-        identity = identity_form(draft, &pane.outcome),
-        password = password_form(&pane.outcome),
+        identity = identity_section(draft, pane.pending, &pane.outcome),
+        password = password_section(pane.user, pane.pending, &pane.outcome),
     )
 }
 
-/// The picture, the name and the address: what other people see this account as.
-fn identity_form(draft: &ProfileDraft<'_>, outcome: &ProfileOutcome<'_>) -> String {
-    // Taken as text and parsed here rather than carried as a URL, so a tampered hidden field
-    // cannot reach the `<img src>` the bubble draws.
-    let picture = AvatarUrl::parse(draft.avatar_url).ok().flatten();
+/// The account's own details, or the code that has to come back before its new address is real.
+fn identity_section(
+    draft: &ProfileDraft<'_>,
+    pending: &[PendingChange],
+    outcome: &ProfileOutcome<'_>,
+) -> String {
+    let body = match pending_of(pending, AccountChangeKind::Email) {
+        Some(PendingChange::Email {
+            new_email,
+            expires_at,
+        }) => code_panel(&CodePanel {
+            sent_to: new_email,
+            explanation: "Enter it to move your account to that address. Until you do, your account keeps the address it has.",
+            kind: AccountChangeKind::Email,
+            expires_at: *expires_at,
+        }),
+        _ => identity_form(draft),
+    };
 
     format!(
         r##"
@@ -136,6 +162,21 @@ fn identity_form(draft: &ProfileDraft<'_>, outcome: &ProfileOutcome<'_>) -> Stri
                 <h2 class="text-lg font-bold">Account details</h2>
                 <p class="mb-4 text-xs opacity-60">Your name and picture are what your team and your threads show you as; your address is what channels recognise you by.</p>
                 {banner}
+                {body}
+            </section>
+        "##,
+        banner = outcome.banner(ProfileForm::Identity),
+    )
+}
+
+/// The picture, the name and the address: what other people see this account as.
+fn identity_form(draft: &ProfileDraft<'_>) -> String {
+    // Taken as text and parsed here rather than carried as a URL, so a tampered hidden field
+    // cannot reach the `<img src>` the bubble draws.
+    let picture = AvatarUrl::parse(draft.avatar_url).ok().flatten();
+
+    format!(
+        r##"
                 <form class="space-y-4" hx-put="/ui/profile" hx-target="#profile-pane" hx-swap="outerHTML"
                     hx-disabled-elt="find button[type='submit']">
                     {picture_field}
@@ -151,7 +192,7 @@ fn identity_form(draft: &ProfileDraft<'_>, outcome: &ProfileOutcome<'_>) -> Stri
                                 class="input w-full font-mono">
                         </label>
                     </div>
-                    <p class="text-[11px] opacity-60">Changing your address changes which channels treat you as a participant, and where mail addressed to you arrives. You stay signed in.</p>
+                    <p class="text-[11px] opacity-60">A new address is mailed a code before it becomes yours, so it is not your account's until you confirm it. Changing it changes which channels treat you as a participant, and where mail addressed to you arrives. You stay signed in.</p>
                     <div class="border-t border-base-300 pt-4">
                         <button type="submit" class="btn btn-primary">
                             <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
@@ -160,9 +201,7 @@ fn identity_form(draft: &ProfileDraft<'_>, outcome: &ProfileOutcome<'_>) -> Stri
                         </button>
                     </div>
                 </form>
-            </section>
         "##,
-        banner = outcome.banner(ProfileForm::Identity),
         picture_field = avatar_picker(&AvatarPicker {
             field_id: "profile-avatar",
             avatar_url: picture.as_ref(),
@@ -175,15 +214,41 @@ fn identity_form(draft: &ProfileDraft<'_>, outcome: &ProfileOutcome<'_>) -> Stri
     )
 }
 
-/// Its own form, and never pre-filled: a password field that comes back holding what was typed is
-/// a password sitting in the page's HTML.
-fn password_form(outcome: &ProfileOutcome<'_>) -> String {
+/// The password form, or the code that has to come back before a new password takes effect.
+fn password_section(
+    user: &User,
+    pending: &[PendingChange],
+    outcome: &ProfileOutcome<'_>,
+) -> String {
+    let account_email = EmailAddress::from(user.email.as_str());
+    let body = match pending_of(pending, AccountChangeKind::Password) {
+        Some(PendingChange::Password { expires_at }) => code_panel(&CodePanel {
+            sent_to: &account_email,
+            explanation: "Enter it to finish the change. Until you do, your current password still works.",
+            kind: AccountChangeKind::Password,
+            expires_at: *expires_at,
+        }),
+        _ => password_form(),
+    };
+
     format!(
         r##"
             <section class="rounded-box border border-base-300 bg-base-200 p-6">
                 <h2 class="text-lg font-bold">Password</h2>
                 <p class="mb-4 text-xs opacity-60">Changing it does not sign your other browsers out.</p>
                 {banner}
+                {body}
+            </section>
+        "##,
+        banner = outcome.banner(ProfileForm::Password),
+    )
+}
+
+/// Never pre-filled: a password field that comes back holding what was typed is a password sitting
+/// in the page's HTML.
+fn password_form() -> String {
+    format!(
+        r##"
                 <form class="space-y-4" hx-put="/ui/profile/password" hx-target="#profile-pane" hx-swap="outerHTML"
                     hx-disabled-elt="find button[type='submit']">
                     <label class="form-control w-full">
@@ -211,10 +276,59 @@ fn password_form(outcome: &ProfileOutcome<'_>) -> String {
                         </button>
                     </div>
                 </form>
-            </section>
         "##,
-        banner = outcome.banner(ProfileForm::Password),
         minimum = crate::use_cases::user::MIN_PASSWORD_CHARS,
+    )
+}
+
+/// A change that has been asked for and is waiting on the code mailed out for it.
+pub struct CodePanel<'a> {
+    /// Where the code went -- the *new* address for an address change, the account's own for a
+    /// password one. Named because it is the only thing that tells the reader which inbox to open.
+    pub sent_to: &'a EmailAddress,
+    /// What confirming the code will do, and what holds until it is confirmed.
+    pub explanation: &'a str,
+    pub kind: AccountChangeKind,
+    pub expires_at: DateTime<Utc>,
+}
+
+/// The one control that turns a mailed code into a change, wherever a change is confirmed.
+///
+/// It replaces its section's form rather than sitting beside it: the account is in one state or
+/// the other, and offering both invites a second request that silently voids the code already in
+/// somebody's inbox. Cancel is how you get the form back.
+fn code_panel(panel: &CodePanel<'_>) -> String {
+    format!(
+        r##"
+                <form class="space-y-4" hx-post="/ui/profile/changes/{kind}" hx-target="#profile-pane" hx-swap="outerHTML"
+                    hx-disabled-elt="find button[type='submit']">
+                    <div class="rounded-box bg-base-300 px-4 py-3 text-sm">
+                        <p>We sent a 6-digit code to <span class="font-mono font-semibold">{sent_to}</span>.</p>
+                        <p class="mt-1 text-xs opacity-70">{explanation}</p>
+                        <p class="mt-1 text-xs opacity-60">The code expires at {expires_at}.</p>
+                    </div>
+                    <label class="form-control w-full max-w-xs">
+                        <div class="label"><span class="text-xs opacity-70">Confirmation Code</span></div>
+                        <input type="text" name="code" required inputmode="numeric" autocomplete="one-time-code"
+                            pattern="[0-9]{{6}}" maxlength="6" placeholder="000000"
+                            class="input w-full font-mono tracking-[0.4em]">
+                    </label>
+                    <div class="flex items-center gap-3 border-t border-base-300 pt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                            <span class="[.htmx-request_&]:hidden">Confirm</span>
+                            <span class="hidden [.htmx-request_&]:inline">Confirming...</span>
+                        </button>
+                        <button type="button" class="btn btn-ghost"
+                            hx-delete="/ui/profile/changes/{kind}"
+                            hx-target="#profile-pane" hx-swap="outerHTML">Cancel</button>
+                    </div>
+                </form>
+        "##,
+        kind = panel.kind.as_str(),
+        sent_to = escape_html_text(panel.sent_to),
+        explanation = escape_html_text(panel.explanation),
+        expires_at = super::format_date_time(panel.expires_at),
     )
 }
 

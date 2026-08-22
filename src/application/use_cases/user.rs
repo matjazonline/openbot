@@ -14,7 +14,7 @@ use crate::{
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
-    services::outbound_dispatcher::OutboundDispatcher,
+    services::outbound_dispatcher::ConfirmationPurpose,
 };
 
 const CONFIRMATION_TTL_MINUTES: i64 = 15;
@@ -101,16 +101,224 @@ pub trait UserPersistence: Send + Sync {
     async fn update_password_hash(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>>;
 }
 
+/// Which account field a pending change will write when its code arrives.
+///
+/// Parsed from the stored `kind` column once, at the adapter boundary, so every place that acts on
+/// a pending change matches exhaustively and a third kind is a compile error rather than a silently
+/// ignored row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AccountChangeKind {
+    Email,
+    Password,
+}
+
+impl AccountChangeKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AccountChangeKind::Email => "email",
+            AccountChangeKind::Password => "password",
+        }
+    }
+
+    /// What the stored column means. `None` for anything else, which is a row the schema's own
+    /// CHECK constraint should already have refused.
+    pub fn parse(stored: &str) -> Option<Self> {
+        match stored {
+            "email" => Some(AccountChangeKind::Email),
+            "password" => Some(AccountChangeKind::Password),
+            _ => None,
+        }
+    }
+}
+
+/// The value a confirmed change will write, carried as one enum so a row cannot claim to be an
+/// email change while holding a password hash.
+#[derive(Debug)]
+pub enum AccountChange<'a> {
+    Email(&'a EmailAddress),
+    /// Already hashed. The plaintext is not the adapter layer's to hold, not even briefly.
+    Password(&'a str),
+}
+
+impl AccountChange<'_> {
+    pub fn kind(&self) -> AccountChangeKind {
+        match self {
+            AccountChange::Email(_) => AccountChangeKind::Email,
+            AccountChange::Password(_) => AccountChangeKind::Password,
+        }
+    }
+}
+
+/// A change waiting on the code that was mailed out for it.
+pub struct PendingAccountChange<'a> {
+    pub user_id: Uuid,
+    pub change: AccountChange<'a>,
+    pub confirmation_code_hash: &'a str,
+    pub expires_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// A change this account has asked for and not yet confirmed, as the page needs to show it.
+///
+/// The address a code went to is part of the email variant because that is the *new* one -- the
+/// whole point of confirming an address change is that the code goes somewhere the account cannot
+/// yet receive mail as.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PendingChange {
+    Email {
+        new_email: EmailAddress,
+        expires_at: chrono::DateTime<chrono::Utc>,
+    },
+    Password {
+        expires_at: chrono::DateTime<chrono::Utc>,
+    },
+}
+
+impl PendingChange {
+    pub fn kind(&self) -> AccountChangeKind {
+        match self {
+            PendingChange::Email { .. } => AccountChangeKind::Email,
+            PendingChange::Password { .. } => AccountChangeKind::Password,
+        }
+    }
+}
+
+/// Delivers a confirmation code to an address.
+///
+/// A port rather than a direct call into the SMTP dispatcher, because a code that only exists in
+/// somebody's inbox cannot be asserted on: this is the seam a test hands a recorder to, so the
+/// confirm half of every flow below is exercised rather than assumed.
+#[async_trait]
+pub trait ConfirmationCodeSender: Send + Sync {
+    async fn send_code(
+        &self,
+        recipient: &EmailAddress,
+        code: &str,
+        purpose: ConfirmationPurpose,
+    ) -> AppResult<()>;
+}
+
+#[async_trait]
+pub trait AccountChangePersistence: Send + Sync {
+    /// Records a change against its code, replacing any earlier request of the same kind so an
+    /// abandoned code cannot still be confirmed after a second one has been sent.
+    async fn save_pending_account_change(&self, pending: PendingAccountChange<'_>)
+    -> AppResult<()>;
+
+    /// Writes the pending change of `kind` if the code matches and has not expired, and clears the
+    /// request. `Ok(None)` means there was no such pending change to confirm -- a wrong code, an
+    /// expired one, or one already used.
+    async fn confirm_pending_account_change(
+        &self,
+        user_id: Uuid,
+        kind: AccountChangeKind,
+        confirmation_code_hash: &str,
+    ) -> AppResult<Option<User>>;
+
+    /// What this account is waiting on, so a reloaded page asks for the code again rather than
+    /// silently forgetting a change was requested. Expired requests are not returned.
+    async fn list_pending_account_changes(&self, user_id: Uuid) -> AppResult<Vec<PendingChange>>;
+
+    /// Abandons a request, so its owner can go back to the form and ask for something else.
+    async fn discard_pending_account_change(
+        &self,
+        user_id: Uuid,
+        kind: AccountChangeKind,
+    ) -> AppResult<()>;
+}
+
 pub trait UserCredentialsHasher: Send + Sync {
     fn hash_password(&self, password: &str) -> AppResult<String>;
     fn verify_password(&self, password: &str, hash: &str) -> AppResult<bool>;
+}
+
+/// What proving ownership of an address needs, present only on a deployment that can actually
+/// send mail -- see [`AppConfig::email_confirmation_enabled`].
+///
+/// A struct rather than the four positional `Arc`s it would otherwise be: `registrations` and
+/// `account_changes` are the same value on every real deployment, and positionally they would be
+/// indistinguishable.
+#[derive(Clone)]
+pub struct EmailConfirmation {
+    pub registrations: Arc<dyn RegistrationPersistence>,
+    pub account_changes: Arc<dyn AccountChangePersistence>,
+    pub codes: Arc<dyn ConfirmationCodeSender>,
+    pub config: Arc<AppConfig>,
+}
+
+impl EmailConfirmation {
+    /// Mails a fresh code for `change` and records what it will write, returning the request as
+    /// the page has to show it.
+    ///
+    /// The mail is sent *after* the request is stored, so a code that reaches somebody's inbox is
+    /// always one this deployment can still honour.
+    async fn request(
+        &self,
+        user_id: Uuid,
+        change: AccountChange<'_>,
+        send_to: &EmailAddress,
+    ) -> AppResult<PendingChange> {
+        let kind = change.kind();
+        let code = format!("{:06}", confirmation_number());
+        let expires_at = chrono::Utc::now() + chrono::Duration::minutes(CONFIRMATION_TTL_MINUTES);
+
+        self.account_changes
+            .save_pending_account_change(PendingAccountChange {
+                user_id,
+                change,
+                confirmation_code_hash: &account_change_code_hash(
+                    &self.config,
+                    user_id,
+                    kind,
+                    &code,
+                ),
+                expires_at,
+            })
+            .await?;
+
+        self.codes
+            .send_code(
+                send_to,
+                &code,
+                match kind {
+                    AccountChangeKind::Email => ConfirmationPurpose::EmailChange,
+                    AccountChangeKind::Password => ConfirmationPurpose::PasswordChange,
+                },
+            )
+            .await?;
+
+        Ok(match kind {
+            AccountChangeKind::Email => PendingChange::Email {
+                new_email: send_to.clone(),
+                expires_at,
+            },
+            AccountChangeKind::Password => PendingChange::Password { expires_at },
+        })
+    }
+}
+
+/// What saving the account's details did.
+///
+/// The two halves are separate because they happen on different terms: the name and the picture
+/// are stored, while a new address is only *requested* until its code comes back.
+#[derive(Debug)]
+pub struct Saved {
+    pub user: User,
+    /// Set when the submitted address differed from the stored one.
+    pub pending: Option<PendingChange>,
+}
+
+/// What changing the password did: written, or mailed a code that has to come back first.
+#[derive(Debug)]
+pub enum PasswordOutcome {
+    Changed,
+    ConfirmationSent(PendingChange),
 }
 
 #[derive(Clone)]
 pub struct UserUseCases {
     hasher: Arc<dyn UserCredentialsHasher>,
     persistence: Arc<dyn UserPersistence>,
-    confirmation: Option<(Arc<dyn RegistrationPersistence>, Arc<AppConfig>)>,
+    confirmation: Option<EmailConfirmation>,
 }
 
 impl UserUseCases {
@@ -125,13 +333,19 @@ impl UserUseCases {
         }
     }
 
-    pub fn with_email_confirmation(
-        mut self,
-        persistence: Arc<dyn RegistrationPersistence>,
-        config: Arc<AppConfig>,
-    ) -> Self {
-        self.confirmation = Some((persistence, config));
+    pub fn with_email_confirmation(mut self, confirmation: EmailConfirmation) -> Self {
+        self.confirmation = Some(confirmation);
         self
+    }
+
+    /// The confirmation machinery, but only when this deployment really mails codes out.
+    ///
+    /// `None` is the local default and means every change applies as soon as it is asked for --
+    /// there would be nowhere for a code to go.
+    fn confirming(&self) -> Option<&EmailConfirmation> {
+        self.confirmation
+            .as_ref()
+            .filter(|confirmation| confirmation.config.email_confirmation_enabled())
     }
 
     pub async fn register(
@@ -140,18 +354,13 @@ impl UserUseCases {
         email: &str,
         password: &SecretString,
     ) -> AppResult<RegistrationOutcome> {
-        let Some((confirmation, config)) = &self.confirmation else {
+        let Some(confirmation) = self.confirming() else {
             return self
                 .add(username, email, password)
                 .await
                 .map(RegistrationOutcome::Created);
         };
-        if !config.email_confirmation_enabled() {
-            return self
-                .add(username, email, password)
-                .await
-                .map(RegistrationOutcome::Created);
-        }
+        let config = &confirmation.config;
 
         let email = EmailAddress::from(email.trim());
         if self.persistence.get_by_email(&email).await?.is_some()
@@ -169,6 +378,7 @@ impl UserUseCases {
         let code = format!("{:06}", confirmation_number());
         let code_hash = confirmation_code_hash(config, &email, &code);
         confirmation
+            .registrations
             .save_pending_registration(PendingRegistration {
                 username: username.trim(),
                 email: &email,
@@ -178,29 +388,31 @@ impl UserUseCases {
                     + chrono::Duration::minutes(CONFIRMATION_TTL_MINUTES),
             })
             .await?;
-        OutboundDispatcher::send_registration_confirmation(config, &email, &code).await?;
+        confirmation
+            .codes
+            .send_code(&email, &code, ConfirmationPurpose::Registration)
+            .await?;
         Ok(RegistrationOutcome::ConfirmationSent)
     }
 
     pub async fn confirm_registration(&self, email: &str, code: &str) -> AppResult<User> {
-        if code.len() != 6 || !code.bytes().all(|byte| byte.is_ascii_digit()) {
+        if !is_confirmation_code(code) {
             return Err(AppError::BadRequest(
                 "Invalid or expired confirmation code".into(),
             ));
         }
-        let Some((confirmation, config)) = &self.confirmation else {
+        let Some(confirmation) = self.confirming() else {
             return Err(AppError::BadRequest(
                 "Email confirmation is not enabled".into(),
             ));
         };
-        if !config.email_confirmation_enabled() {
-            return Err(AppError::BadRequest(
-                "Email confirmation is not enabled".into(),
-            ));
-        }
         let email = EmailAddress::from(email.trim());
         confirmation
-            .confirm_pending_registration(&email, &confirmation_code_hash(config, &email, code))
+            .registrations
+            .confirm_pending_registration(
+                &email,
+                &confirmation_code_hash(&confirmation.config, &email, code),
+            )
             .await?
             .ok_or_else(|| AppError::BadRequest("Invalid or expired confirmation code".into()))
     }
@@ -253,12 +465,14 @@ impl UserUseCases {
 
     /// Saves the account's own details: what it is called, where its mail goes, and its picture.
     ///
+    /// Name and picture are written straight away. A *different* address is not: it is mailed a
+    /// code first, and only becomes the account's when that code comes back -- an address written
+    /// on nothing but a signed-in session is one a borrowed browser could point at itself.
+    ///
     /// Name and address are trimmed and checked here rather than at the form, so the API and the
-    /// page cannot disagree about what an acceptable account looks like. Whether the address is
-    /// already somebody else's is the database's call -- see the unique constraints on `users` --
-    /// because a check made here would be a check made before the row it guards.
+    /// page cannot disagree about what an acceptable account looks like.
     #[instrument(skip(self))]
-    pub async fn update_profile(&self, id: Uuid, profile: ProfileUpdate<'_>) -> AppResult<User> {
+    pub async fn update_profile(&self, id: Uuid, profile: ProfileUpdate<'_>) -> AppResult<Saved> {
         let username = profile.username.trim();
         let email = EmailAddress::from(profile.email.trim());
 
@@ -271,32 +485,72 @@ impl UserUseCases {
             ));
         }
 
+        let account = self.account(id).await?;
+        let stored_email = EmailAddress::from(account.email.as_str());
+        let address_changed = !stored_email.eq_ignore_case(&email);
+
         info!("Updating profile for user {id}...");
 
-        self.persistence
+        // The address stays as it is until it is proved; everything else on the form is written
+        // now, so a rejected or abandoned code does not also lose a rename.
+        let confirming = self.confirming().filter(|_| address_changed);
+        let user = self
+            .persistence
             .update_profile(
                 id,
                 ProfileUpdate {
                     username,
-                    email: &email,
+                    email: if confirming.is_some() {
+                        &stored_email
+                    } else {
+                        &email
+                    },
                     avatar_url: profile.avatar_url,
                 },
             )
             .await?
-            .ok_or_else(|| AppError::NotFound("User not found".into()))
+            .ok_or_else(|| AppError::NotFound("User not found".into()))?;
+
+        let Some(confirmation) = confirming else {
+            return Ok(Saved {
+                user,
+                pending: None,
+            });
+        };
+
+        // Whether the address is free is asked here so the reader hears about it now rather than
+        // after a round trip through their inbox. It is asked again by the unique constraint the
+        // confirmation writes through, which is what actually decides a race.
+        if self.persistence.get_by_email(&email).await?.is_some() {
+            return Err(AppError::BadRequest(format!(
+                "An account already uses the address '{email}'."
+            )));
+        }
+
+        let pending = confirmation
+            .request(id, AccountChange::Email(&email), &email)
+            .await?;
+
+        Ok(Saved {
+            user,
+            pending: Some(pending),
+        })
     }
 
-    /// Replaces the account's password, once the account has proved it knows the current one.
+    /// Replaces the account's password, once the account has proved it knows the current one --
+    /// and, where codes are mailed at all, that it can read the address the account is registered
+    /// at. Knowing the old password and holding the mailbox are two different proofs, and a
+    /// password is worth both.
     ///
     /// Every rejection here propagates: an error reaching the hasher or the store must not be
     /// mistaken for "the password did not match", nor for a change that went through.
     #[instrument(skip(self, change))]
-    pub async fn change_password(&self, id: Uuid, change: PasswordChange<'_>) -> AppResult<()> {
-        let user = self
-            .persistence
-            .get_by_id(id)
-            .await?
-            .ok_or_else(|| AppError::NotFound("User not found".into()))?;
+    pub async fn change_password(
+        &self,
+        id: Uuid,
+        change: PasswordChange<'_>,
+    ) -> AppResult<PasswordOutcome> {
+        let user = self.account(id).await?;
 
         if !self
             .hasher
@@ -318,14 +572,96 @@ impl UserUseCases {
         }
 
         info!("Changing password for user {id}...");
-
         let hash = self.hasher.hash_password(new_password)?;
-        self.persistence
-            .update_password_hash(id, &hash)
-            .await?
-            .ok_or_else(|| AppError::NotFound("User not found".into()))?;
 
-        Ok(())
+        let Some(confirmation) = self.confirming() else {
+            self.persistence
+                .update_password_hash(id, &hash)
+                .await?
+                .ok_or_else(|| AppError::NotFound("User not found".into()))?;
+            return Ok(PasswordOutcome::Changed);
+        };
+
+        // The code goes to the address the account already has, not to anything on the form: this
+        // proves the mailbox, and the mailbox is the one thing an attacker holding the session
+        // does not have.
+        let account_email = EmailAddress::from(user.email.as_str());
+        let pending = confirmation
+            .request(id, AccountChange::Password(&hash), &account_email)
+            .await?;
+
+        Ok(PasswordOutcome::ConfirmationSent(pending))
+    }
+
+    /// Writes a change its owner has now proved, and clears the request.
+    ///
+    /// A wrong code, an expired one and one already spent are deliberately one answer: telling
+    /// them apart tells somebody guessing which of their guesses was closest.
+    #[instrument(skip(self, code))]
+    pub async fn confirm_account_change(
+        &self,
+        id: Uuid,
+        kind: AccountChangeKind,
+        code: &str,
+    ) -> AppResult<User> {
+        let Some(confirmation) = self.confirming() else {
+            return Err(AppError::BadRequest(
+                "Email confirmation is not enabled".into(),
+            ));
+        };
+        if !is_confirmation_code(code) {
+            return Err(AppError::BadRequest(
+                "Invalid or expired confirmation code".into(),
+            ));
+        }
+
+        info!("Confirming {} change for user {id}...", kind.as_str());
+
+        confirmation
+            .account_changes
+            .confirm_pending_account_change(
+                id,
+                kind,
+                &account_change_code_hash(&confirmation.config, id, kind, code),
+            )
+            .await?
+            .ok_or_else(|| AppError::BadRequest("Invalid or expired confirmation code".into()))
+    }
+
+    /// Abandons a requested change, so its owner can go back to the form and ask for something
+    /// else rather than waiting the code out.
+    #[instrument(skip(self))]
+    pub async fn discard_account_change(&self, id: Uuid, kind: AccountChangeKind) -> AppResult<()> {
+        let Some(confirmation) = self.confirming() else {
+            return Ok(());
+        };
+
+        confirmation
+            .account_changes
+            .discard_pending_account_change(id, kind)
+            .await
+    }
+
+    /// What this account has asked for and not yet proved, so a reloaded page keeps asking for the
+    /// code instead of quietly forgetting the request.
+    #[instrument(skip(self))]
+    pub async fn pending_account_changes(&self, id: Uuid) -> AppResult<Vec<PendingChange>> {
+        let Some(confirmation) = self.confirming() else {
+            return Ok(Vec::new());
+        };
+
+        confirmation
+            .account_changes
+            .list_pending_account_changes(id)
+            .await
+    }
+
+    /// The stored account, or the `NotFound` a stale session deserves.
+    async fn account(&self, id: Uuid) -> AppResult<User> {
+        self.persistence
+            .get_by_id(id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("User not found".into()))
     }
 
     /// Points the account at a new profile picture, or back at its letter bubble with `None`.
@@ -363,6 +699,33 @@ fn is_plausible_address(email: &EmailAddress) -> bool {
 fn confirmation_number() -> u32 {
     let bytes = *Uuid::new_v4().as_bytes();
     u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) % 1_000_000
+}
+
+/// The six digits a mailed code is, as a shape check rather than a lookup -- a code that cannot
+/// be one is refused without touching the store.
+fn is_confirmation_code(code: &str) -> bool {
+    code.len() == 6 && code.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+/// A change's code, bound to the account *and* the field it changes.
+///
+/// Both are in the digest on purpose: without the kind, a code mailed for a password change would
+/// also confirm a pending address change, and the two are mailed to different places.
+fn account_change_code_hash(
+    config: &AppConfig,
+    user_id: Uuid,
+    kind: AccountChangeKind,
+    code: &str,
+) -> String {
+    let mut digest = Sha256::new();
+    digest.update(&config.jwt_secret);
+    digest.update(":");
+    digest.update(user_id.as_bytes());
+    digest.update(":");
+    digest.update(kind.as_str());
+    digest.update(":");
+    digest.update(code);
+    format!("{:x}", digest.finalize())
 }
 
 fn confirmation_code_hash(config: &AppConfig, email: &EmailAddress, code: &str) -> String {
@@ -527,6 +890,353 @@ mod test {
         UserUseCases::new(Arc::new(MockUserCredentialsHasher), persistence)
     }
 
+    /// The pending changes an account has asked for, in memory, plus the codes that were mailed.
+    ///
+    /// It records the *hash* rather than the code, exactly as Postgres does, so the tests below
+    /// confirm the same way a browser does: by presenting a code that has to hash to what was
+    /// stored.
+    #[derive(Default)]
+    struct MockAccountChanges {
+        stored: std::sync::Mutex<Vec<(Uuid, AccountChangeKind, String, String, bool)>>,
+    }
+
+    #[async_trait]
+    impl AccountChangePersistence for MockAccountChanges {
+        async fn save_pending_account_change(
+            &self,
+            pending: PendingAccountChange<'_>,
+        ) -> AppResult<()> {
+            let kind = pending.change.kind();
+            let payload = match pending.change {
+                AccountChange::Email(email) => email.to_string(),
+                AccountChange::Password(hash) => hash.to_string(),
+            };
+            let mut stored = self.stored.lock().unwrap();
+            stored.retain(|(id, existing, ..)| !(*id == pending.user_id && *existing == kind));
+            stored.push((
+                pending.user_id,
+                kind,
+                payload,
+                pending.confirmation_code_hash.to_string(),
+                pending.expires_at > chrono::Utc::now(),
+            ));
+            Ok(())
+        }
+
+        async fn confirm_pending_account_change(
+            &self,
+            user_id: Uuid,
+            kind: AccountChangeKind,
+            confirmation_code_hash: &str,
+        ) -> AppResult<Option<User>> {
+            let mut stored = self.stored.lock().unwrap();
+            let found = stored.iter().position(|(id, existing, _, hash, live)| {
+                *id == user_id && *existing == kind && hash == confirmation_code_hash && *live
+            });
+            let Some(found) = found else { return Ok(None) };
+            let (_, _, payload, ..) = stored.remove(found);
+
+            Ok(Some(User {
+                id: user_id,
+                username: "testuser".to_string(),
+                email: match kind {
+                    AccountChangeKind::Email => payload.clone(),
+                    AccountChangeKind::Password => "testuser@gmail.com".to_string(),
+                },
+                password_hash: match kind {
+                    AccountChangeKind::Email => "secret_hash".to_string(),
+                    AccountChangeKind::Password => payload,
+                },
+                avatar_url: None,
+                created_at: chrono::Utc::now(),
+            }))
+        }
+
+        async fn list_pending_account_changes(
+            &self,
+            user_id: Uuid,
+        ) -> AppResult<Vec<PendingChange>> {
+            Ok(self
+                .stored
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(id, _, _, _, live)| *id == user_id && *live)
+                .map(|(_, kind, payload, ..)| match kind {
+                    AccountChangeKind::Email => PendingChange::Email {
+                        new_email: EmailAddress::from(payload.as_str()),
+                        expires_at: chrono::Utc::now() + chrono::Duration::minutes(15),
+                    },
+                    AccountChangeKind::Password => PendingChange::Password {
+                        expires_at: chrono::Utc::now() + chrono::Duration::minutes(15),
+                    },
+                })
+                .collect())
+        }
+
+        async fn discard_pending_account_change(
+            &self,
+            user_id: Uuid,
+            kind: AccountChangeKind,
+        ) -> AppResult<()> {
+            self.stored
+                .lock()
+                .unwrap()
+                .retain(|(id, existing, ..)| !(*id == user_id && *existing == kind));
+            Ok(())
+        }
+    }
+
+    /// Keeps every code instead of mailing it, so a test can present one back.
+    #[derive(Default)]
+    struct RecordingSender {
+        sent: std::sync::Mutex<Vec<(EmailAddress, String, ConfirmationPurpose)>>,
+    }
+
+    impl RecordingSender {
+        /// The code from the most recent mail, and where it went.
+        fn last(&self) -> (EmailAddress, String, ConfirmationPurpose) {
+            self.sent
+                .lock()
+                .unwrap()
+                .last()
+                .cloned()
+                .expect("a code was mailed")
+        }
+    }
+
+    #[async_trait]
+    impl ConfirmationCodeSender for RecordingSender {
+        async fn send_code(
+            &self,
+            recipient: &EmailAddress,
+            code: &str,
+            purpose: ConfirmationPurpose,
+        ) -> AppResult<()> {
+            self.sent
+                .lock()
+                .unwrap()
+                .push((recipient.clone(), code.to_string(), purpose));
+            Ok(())
+        }
+    }
+
+    struct MockRegistrations;
+
+    #[async_trait]
+    impl RegistrationPersistence for MockRegistrations {
+        async fn save_pending_registration(&self, _: PendingRegistration<'_>) -> AppResult<()> {
+            unimplemented!()
+        }
+        async fn confirm_pending_registration(
+            &self,
+            _: &EmailAddress,
+            _: &str,
+        ) -> AppResult<Option<User>> {
+            unimplemented!()
+        }
+    }
+
+    /// Use cases wired the way a real deployment is: codes are mailed and have to come back.
+    ///
+    /// `smtp_host` is what [`AppConfig::email_confirmation_enabled`] keys off, and the test default
+    /// is `localhost` -- which deliberately means "do not confirm".
+    fn confirming_use_cases(
+        persistence: Arc<MockUserPersistence>,
+    ) -> (UserUseCases, Arc<MockAccountChanges>, Arc<RecordingSender>) {
+        let changes = Arc::new(MockAccountChanges::default());
+        let sender = Arc::new(RecordingSender::default());
+        let use_cases = UserUseCases::new(Arc::new(MockUserCredentialsHasher), persistence)
+            .with_email_confirmation(EmailConfirmation {
+                registrations: Arc::new(MockRegistrations),
+                account_changes: changes.clone(),
+                codes: sender.clone(),
+                config: Arc::new(AppConfig {
+                    smtp_host: "smtp.example.com".to_string(),
+                    smtp_from_address: "noreply@example.com".to_string(),
+                    ..AppConfig::for_test()
+                }),
+            });
+
+        (use_cases, changes, sender)
+    }
+
+    #[tokio::test]
+    async fn a_new_address_is_mailed_a_code_and_is_not_the_account_s_until_it_comes_back() {
+        let persistence = Arc::new(MockUserPersistence::new());
+        let id = persistence.id();
+        let (use_cases, _, sender) = confirming_use_cases(persistence.clone());
+
+        let saved = use_cases
+            .update_profile(
+                id,
+                ProfileUpdate {
+                    username: "renamed",
+                    email: &EmailAddress::from("new@example.com"),
+                    avatar_url: None,
+                },
+            )
+            .await
+            .unwrap();
+
+        // The rename lands now; the address does not.
+        assert_eq!(saved.user.username, "renamed");
+        assert_eq!(
+            persistence.stored.lock().unwrap().email,
+            "testuser@gmail.com"
+        );
+
+        // The code goes to the *new* address -- proving it is reachable is the whole point.
+        let (sent_to, code, purpose) = sender.last();
+        assert_eq!(sent_to.as_str(), "new@example.com");
+        assert_eq!(purpose, ConfirmationPurpose::EmailChange);
+        assert!(matches!(saved.pending, Some(PendingChange::Email { .. })));
+
+        let confirmed = use_cases
+            .confirm_account_change(id, AccountChangeKind::Email, &code)
+            .await
+            .unwrap();
+        assert_eq!(confirmed.email, "new@example.com");
+        assert!(
+            use_cases
+                .pending_account_changes(id)
+                .await
+                .unwrap()
+                .is_empty(),
+            "a spent code leaves nothing to confirm again"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_new_password_is_mailed_a_code_and_the_old_one_stands_until_it_comes_back() {
+        let persistence = Arc::new(MockUserPersistence::new());
+        let id = persistence.id();
+        let (use_cases, _, sender) = confirming_use_cases(persistence.clone());
+
+        let outcome = use_cases
+            .change_password(
+                id,
+                PasswordChange {
+                    current: &"secret".into(),
+                    new: &"a-longer-secret".into(),
+                    confirmation: &"a-longer-secret".into(),
+                },
+            )
+            .await
+            .unwrap();
+
+        assert!(matches!(outcome, PasswordOutcome::ConfirmationSent(_)));
+        assert_eq!(
+            persistence.stored.lock().unwrap().password_hash,
+            "secret_hash",
+            "the stored password must still be the old one"
+        );
+
+        // This code goes to the address the account already has: the mailbox is what a stolen
+        // session does not have.
+        let (sent_to, code, purpose) = sender.last();
+        assert_eq!(sent_to.as_str(), "testuser@gmail.com");
+        assert_eq!(purpose, ConfirmationPurpose::PasswordChange);
+
+        let confirmed = use_cases
+            .confirm_account_change(id, AccountChangeKind::Password, &code)
+            .await
+            .unwrap();
+        assert_eq!(confirmed.password_hash, "a-longer-secret_hash");
+    }
+
+    #[tokio::test]
+    async fn a_code_confirms_only_the_change_it_was_mailed_for() {
+        let persistence = Arc::new(MockUserPersistence::new());
+        let id = persistence.id();
+        let (use_cases, _, sender) = confirming_use_cases(persistence.clone());
+
+        use_cases
+            .update_profile(
+                id,
+                ProfileUpdate {
+                    username: "testuser",
+                    email: &EmailAddress::from("new@example.com"),
+                    avatar_url: None,
+                },
+            )
+            .await
+            .unwrap();
+        let (_, email_code, _) = sender.last();
+
+        use_cases
+            .change_password(
+                id,
+                PasswordChange {
+                    current: &"secret".into(),
+                    new: &"a-longer-secret".into(),
+                    confirmation: &"a-longer-secret".into(),
+                },
+            )
+            .await
+            .unwrap();
+
+        // Both are outstanding at once, and the address code must not spend the password request.
+        assert_eq!(
+            use_cases.pending_account_changes(id).await.unwrap().len(),
+            2
+        );
+        let crossed = use_cases
+            .confirm_account_change(id, AccountChangeKind::Password, &email_code)
+            .await;
+        assert!(matches!(crossed, Err(AppError::BadRequest(_))));
+
+        for wrong in ["000000", "12345", "abcdef"] {
+            assert!(
+                use_cases
+                    .confirm_account_change(id, AccountChangeKind::Email, wrong)
+                    .await
+                    .is_err(),
+                "{wrong} should not confirm anything"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_cancelled_request_gives_the_form_back_and_voids_its_code() {
+        let persistence = Arc::new(MockUserPersistence::new());
+        let id = persistence.id();
+        let (use_cases, _, sender) = confirming_use_cases(persistence);
+
+        use_cases
+            .update_profile(
+                id,
+                ProfileUpdate {
+                    username: "testuser",
+                    email: &EmailAddress::from("new@example.com"),
+                    avatar_url: None,
+                },
+            )
+            .await
+            .unwrap();
+        let (_, code, _) = sender.last();
+
+        use_cases
+            .discard_account_change(id, AccountChangeKind::Email)
+            .await
+            .unwrap();
+
+        assert!(
+            use_cases
+                .pending_account_changes(id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            use_cases
+                .confirm_account_change(id, AccountChangeKind::Email, &code)
+                .await
+                .is_err(),
+            "a cancelled request's code must not still work"
+        );
+    }
+
     #[tokio::test]
     async fn updating_a_profile_trims_and_stores_every_field() {
         let persistence = Arc::new(MockUserPersistence::new());
@@ -544,12 +1254,14 @@ mod test {
             .await
             .unwrap();
 
-        assert_eq!(saved.username, "renamed");
-        assert_eq!(saved.email, "new@example.com");
+        assert_eq!(saved.user.username, "renamed");
+        assert_eq!(saved.user.email, "new@example.com");
         assert_eq!(
-            saved.avatar_url.as_deref(),
+            saved.user.avatar_url.as_deref(),
             Some("https://cdn.example.com/me.png")
         );
+        // Nothing to confirm: with no confirmation configured, the address is simply written.
+        assert!(saved.pending.is_none());
     }
 
     #[tokio::test]
