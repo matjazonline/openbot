@@ -681,7 +681,7 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
     assert!(mailbox.contains(&format!("/ui/channels?company_id={}", company.id)));
     assert!(!mailbox.contains(&format!("href=\"/companies/{}/channels\"", company.id)));
     assert!(mailbox.contains(&format!(
-        r##"<a href="/ui?company_id={}" class="btn btn-square btn-lg btn-primary"##,
+        r##"<a href="/ui?company_id={}" class="btn btn-square btn-md btn-primary"##,
         company.id
     )));
 
@@ -701,7 +701,7 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
 
     // Same chrome, other icon lit. Company selection lives in the Companies workspace.
     assert!(channels.contains(&format!(
-        r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-lg btn-primary"##,
+        r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-md btn-primary"##,
         company.id
     )));
     assert!(channels.contains("/assets/busybots-logo-dark-hor.png"));
@@ -724,14 +724,14 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
 
     // The third workspace, same chrome again: its own icon lit.
     assert!(agents.contains(&format!(
-        r##"<a href="/ui/agents?company_id={}" class="btn btn-square btn-lg btn-primary"##,
+        r##"<a href="/ui/agents?company_id={}" class="btn btn-square btn-md btn-primary"##,
         company.id
     )));
     assert!(!agents.contains("dropdown-bottom w-full p-3"));
     assert!(agents.contains("id=\"agent-pane\""));
     // The rail is shared, so the other two workspaces stay one click away and unlit.
     assert!(agents.contains(&format!(
-        r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-lg btn-ghost"##,
+        r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-md btn-ghost"##,
         company.id
     )));
 }
@@ -2151,11 +2151,11 @@ fn task_monitor_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
 
     // Same chrome as the other workspaces: its own rail icon lit, the others one click away.
     assert!(html.contains(&format!(
-        r##"<a href="/ui/tasks?company_id={}" class="btn btn-square btn-lg btn-primary"##,
+        r##"<a href="/ui/tasks?company_id={}" class="btn btn-square btn-md btn-primary"##,
         company.id
     )));
     assert!(html.contains(&format!(
-        r##"<a href="/ui/agents?company_id={}" class="btn btn-square btn-lg btn-ghost"##,
+        r##"<a href="/ui/agents?company_id={}" class="btn btn-square btn-md btn-ghost"##,
         company.id
     )));
     assert!(!html.contains("dropdown-bottom w-full p-3"));
@@ -2325,11 +2325,11 @@ fn company_settings_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
 
     // Same chrome as the other workspaces: its own rail icon lit, the others one click away.
     assert!(html.contains(&format!(
-        r##"<a href="/ui/companies?company_id={}" class="btn btn-square btn-lg btn-primary"##,
+        r##"<a href="/ui/companies?company_id={}" class="btn btn-square btn-md btn-primary"##,
         company.id
     )));
     assert!(html.contains(&format!(
-        r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-lg btn-ghost"##,
+        r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-md btn-ghost"##,
         company.id
     )));
     assert!(html.contains("/assets/busybots-logo-dark-hor.png"));
@@ -2585,7 +2585,7 @@ fn the_create_form_deselects_the_list_without_emptying_the_rail() {
     // Nothing in the sidebar is lit, but the other workspaces are still one click away.
     assert!(!company_settings_list(&list, FragmentSwap::Inline).contains("menu-active"));
     assert!(html.contains(&format!(
-        r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-lg btn-ghost"##,
+        r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-md btn-ghost"##,
         company.id
     )));
     assert!(html.contains(r##"hx-post="/ui/companies""##));
@@ -2639,11 +2639,11 @@ fn team_settings_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
 
     // Same chrome as the other workspaces: its own rail icon lit, the others one click away.
     assert!(html.contains(&format!(
-        r##"<a href="/ui/team?company_id={}" class="btn btn-square btn-lg btn-primary"##,
+        r##"<a href="/ui/team?company_id={}" class="btn btn-square btn-md btn-primary"##,
         company.id
     )));
     assert!(html.contains(&format!(
-        r##"<a href="/ui/companies?company_id={}" class="btn btn-square btn-lg btn-ghost"##,
+        r##"<a href="/ui/companies?company_id={}" class="btn btn-square btn-md btn-ghost"##,
         company.id
     )));
     // The team icon sits directly below the companies one.
@@ -3376,9 +3376,10 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         activity: no_activity(),
         detail_html: "",
     });
-    assert!(mailbox_html.contains(
-        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Mailbox</h2>"##
-    ));
+    assert!(
+        mailbox_html
+            .contains(r##"<h2 class="text-base font-semibold leading-tight">Mailbox</h2>"##)
+    );
 
     let channels_html = channel_settings_page(&ChannelSettingsPage {
         user: &user,
@@ -3391,9 +3392,10 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(channels_html.contains(
-        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Channels</h2>"##
-    ));
+    assert!(
+        channels_html
+            .contains(r##"<h2 class="text-base font-semibold leading-tight">Channels</h2>"##)
+    );
 
     let agents_html = agent_settings_page(&AgentSettingsPage {
         user: &user,
@@ -3405,9 +3407,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(agents_html.contains(
-        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Agents</h2>"##
-    ));
+    assert!(
+        agents_html.contains(r##"<h2 class="text-base font-semibold leading-tight">Agents</h2>"##)
+    );
 
     let schedules_html = schedules_page(&SchedulesPage {
         user: &user,
@@ -3418,9 +3420,10 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         runs_html: "",
         pane_html: "",
     });
-    assert!(schedules_html.contains(
-        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Schedules</h2>"##
-    ));
+    assert!(
+        schedules_html
+            .contains(r##"<h2 class="text-base font-semibold leading-tight">Schedules</h2>"##)
+    );
 
     let tasks_filter = TaskFilter::new(None, None, false, None, None);
     let tasks_html = task_monitor_page(&TaskMonitorPage {
@@ -3436,9 +3439,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(tasks_html.contains(
-        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Tasks</h2>"##
-    ));
+    assert!(
+        tasks_html.contains(r##"<h2 class="text-base font-semibold leading-tight">Tasks</h2>"##)
+    );
 
     let outbox_filter_val = outbox_filter();
     let outbox_html = outbox_page(&OutboxPage {
@@ -3454,9 +3457,9 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(outbox_html.contains(
-        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Outbox</h2>"##
-    ));
+    assert!(
+        outbox_html.contains(r##"<h2 class="text-base font-semibold leading-tight">Outbox</h2>"##)
+    );
 
     let dashboard_html = dashboard_page(&DashboardShell {
         user: &user,
@@ -3464,9 +3467,10 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         companies: &companies,
         window: crate::entities::dashboard::DashboardWindow::last_hour(),
     });
-    assert!(dashboard_html.contains(
-        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Dashboard</h2>"##
-    ));
+    assert!(
+        dashboard_html
+            .contains(r##"<h2 class="text-base font-semibold leading-tight">Dashboard</h2>"##)
+    );
 
     let dashboard_global_html = dashboard_page(&DashboardShell {
         user: &user,
@@ -3474,9 +3478,10 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         companies: &companies,
         window: crate::entities::dashboard::DashboardWindow::last_hour(),
     });
-    assert!(dashboard_global_html.contains(
-        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Dashboard</h2>"##
-    ));
+    assert!(
+        dashboard_global_html
+            .contains(r##"<h2 class="text-base font-semibold leading-tight">Dashboard</h2>"##)
+    );
 
     let companies_html = company_settings_page(&CompanySettingsPage {
         user: &user,
@@ -3487,9 +3492,10 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         rail_company: Some(&company),
         pane_html: "",
     });
-    assert!(companies_html.contains(
-        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Companies</h2>"##
-    ));
+    assert!(
+        companies_html
+            .contains(r##"<h2 class="text-base font-semibold leading-tight">Companies</h2>"##)
+    );
 
     let team_html = team_settings_page(&TeamSettingsPage {
         user: &user,
@@ -3503,9 +3509,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         },
         pane_html: "",
     });
-    assert!(team_html.contains(
-        r##"<h2 class="text-sm font-bold uppercase tracking-wider opacity-70">Team</h2>"##
-    ));
+    assert!(team_html.contains(r##"<h2 class="text-base font-semibold leading-tight">Team</h2>"##));
 }
 
 fn profile_account() -> User {

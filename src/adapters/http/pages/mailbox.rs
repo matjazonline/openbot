@@ -474,7 +474,7 @@ fn ui_layout(title: &str, body: &str, script: &str) -> String {
     <title>{title} - Mail Agents</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <style>{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}{THREAD_ROW_STYLES}</style>
+    <style>{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}{APP_SHELL_STYLES}{THREAD_ROW_STYLES}</style>
     <script>{THEME_INIT_SCRIPT}</script>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
@@ -618,6 +618,107 @@ const FIELD_STYLES: &str = r##"
         .file-input:focus, .file-input:focus-within { outline-offset: -1px; }
 "##;
 
+/// Shared visual language for every authenticated workspace.
+///
+/// The pages deliberately keep their layout utilities close to their markup, while the shell
+/// owns the product-wide qualities that should never drift between workspaces: typography,
+/// surface depth, navigation states, motion, scrollbars and accessible keyboard focus.
+const APP_SHELL_STYLES: &str = r##"
+        :root {
+            color-scheme: light dark;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+                "Segoe UI", sans-serif;
+            font-synthesis: none;
+            text-rendering: optimizeLegibility;
+        }
+
+        body {
+            background-image:
+                radial-gradient(circle at 18% -10%, color-mix(in oklab, var(--color-primary) 9%, transparent), transparent 28rem),
+                linear-gradient(135deg, color-mix(in oklab, var(--color-base-200) 35%, transparent), transparent 42%);
+        }
+
+        ::selection {
+            background: color-mix(in oklab, var(--color-primary) 28%, transparent);
+        }
+
+        :where(a, button, input, select, textarea):focus-visible {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 2px;
+        }
+
+        .app-topbar {
+            background: color-mix(in oklab, var(--color-base-100) 88%, transparent);
+            box-shadow: 0 1px 0 color-mix(in oklab, var(--color-base-content) 7%, transparent);
+            backdrop-filter: blur(18px) saturate(140%);
+        }
+
+        .app-rail {
+            scrollbar-width: none;
+            background: color-mix(in oklab, var(--color-base-200) 86%, var(--color-base-300));
+        }
+        .app-rail::-webkit-scrollbar { display: none; }
+        .app-rail .btn {
+            position: relative;
+            min-height: 2.75rem;
+            transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+        }
+        .app-rail .btn:hover { transform: translateY(-1px); }
+        .app-rail .btn-primary::before {
+            position: absolute;
+            left: -.55rem;
+            width: 3px;
+            height: 1.5rem;
+            border-radius: 999px;
+            background: currentColor;
+            content: "";
+        }
+
+        aside.bg-base-200 {
+            background: color-mix(in oklab, var(--color-base-200) 90%, transparent);
+        }
+
+        .workspace-heading h2 {
+            letter-spacing: -.025em;
+        }
+
+        .menu :where(li > a, li > button) {
+            border-radius: .625rem;
+            transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+        }
+        .menu :where(li > a, li > button):hover { transform: translateX(1px); }
+        .menu .menu-active {
+            box-shadow: inset 3px 0 0 var(--color-primary);
+            font-weight: 650;
+        }
+
+        .card, .modal-box, section.rounded-box {
+            border-color: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+            box-shadow: 0 1px 2px color-mix(in oklab, #000 10%, transparent),
+                0 12px 32px color-mix(in oklab, #000 5%, transparent);
+        }
+
+        .btn { font-weight: 650; letter-spacing: -.01em; }
+        .badge { font-weight: 650; }
+        .table :where(th) {
+            font-size: .6875rem;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            opacity: .65;
+        }
+
+        * { scrollbar-color: color-mix(in oklab, var(--color-base-content) 18%, transparent) transparent; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                scroll-behavior: auto !important;
+                transition-duration: .01ms !important;
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+            }
+        }
+"##;
+
 /// The activity mark on a row whose reply the reader has just watched arrive: none.
 ///
 /// Hiding rather than emptying the slot is what keeps the column honest afterwards. The badge for
@@ -657,7 +758,7 @@ const THEME_CONTROLLER: &str = r##"
 fn top_bar(user: &MailboxUser<'_>) -> String {
     format!(
         r##"
-        <header class="navbar h-16 min-h-16 shrink-0 justify-between gap-4 border-b border-base-300 bg-base-200 px-4">
+        <header class="app-topbar navbar z-40 h-16 min-h-16 shrink-0 justify-between gap-4 border-b border-base-300 px-4 lg:px-5">
             <a href="/ui" class="flex items-center" title="BusyBots">
 {BRAND_LOGO}
             </a>
@@ -667,7 +768,7 @@ fn top_bar(user: &MailboxUser<'_>) -> String {
                     <div tabindex="0" role="button" class="btn btn-ghost h-auto gap-3 px-2 py-1">
                         {chip}
                     </div>
-                    <ul tabindex="0" class="menu menu-sm dropdown-content z-50 mt-3 w-60 rounded-box bg-base-300 p-2 shadow-xl">
+                    <ul tabindex="0" class="menu menu-sm dropdown-content z-50 mt-3 w-64 rounded-box border border-base-300 bg-base-100 p-2 shadow-2xl">
                         <li class="menu-title truncate">{email}</li>
                         <li><a href="/ui/profile">Profile</a></li>
                         <li><a href="/ui/invites">My Invites</a></li>
@@ -753,12 +854,13 @@ fn icon_rail(company: &Company, section: UiSection) -> String {
         .iter()
         .map(|(destination, path, glyph, title)| {
             format!(
-                r##"<a href="{path}?company_id={company_id}" class="btn btn-square btn-lg {style}" title="{title}">{glyph}</a>"##,
+                r##"<a href="{path}?company_id={company_id}" class="btn btn-square btn-md {style}" title="{title}" aria-label="{title}"{current}>{glyph}</a>"##,
                 style = if section == *destination {
                     "btn-primary"
                 } else {
                     "btn-ghost"
                 },
+                current = if section == *destination { r##" aria-current="page""## } else { "" },
                 glyph = icon(*glyph, RAIL_ICON),
             )
         })
@@ -766,7 +868,7 @@ fn icon_rail(company: &Company, section: UiSection) -> String {
 
     format!(
         r##"
-        <nav class="flex w-16 shrink-0 flex-col items-center gap-2 border-r border-base-300 bg-base-300 py-3">
+        <nav class="app-rail flex w-16 shrink-0 flex-col items-center gap-1.5 overflow-y-auto border-r border-base-300 px-2 py-3" aria-label="Primary navigation">
             {links}
             {company_badge}
         </nav>
@@ -788,7 +890,7 @@ fn icon_rail(company: &Company, section: UiSection) -> String {
 pub fn rail_company_badge(company: &Company, swap: FragmentSwap) -> String {
     format!(
         r##"<a id="rail-company" href="/ui/companies?company_id={company_id}"
-                class="btn btn-square btn-lg btn-ghost mt-auto" title="{name}"{oob}>{avatar}</a>"##,
+                class="btn btn-square btn-md btn-ghost mt-auto" title="{name}" aria-label="Company: {name}"{oob}>{avatar}</a>"##,
         company_id = company.id,
         name = escape_html_text(&company.name),
         oob = swap.oob_attribute(),
@@ -803,9 +905,9 @@ const RAIL_ICON: &str = "h-6 w-6";
 pub(crate) fn sidebar_header(title: &str, subtitle: &str) -> String {
     format!(
         r##"
-            <div class="border-b border-base-300 px-4 py-4">
-                <h2 class="text-sm font-bold uppercase tracking-wider opacity-70">{title}</h2>
-                <p class="text-[11px] opacity-60">{subtitle}</p>
+            <div class="workspace-heading border-b border-base-300 px-4 py-5">
+                <h2 class="text-base font-semibold leading-tight">{title}</h2>
+                <p class="mt-1 text-xs leading-relaxed opacity-60">{subtitle}</p>
             </div>
         "##,
         title = escape_html_text(title),
