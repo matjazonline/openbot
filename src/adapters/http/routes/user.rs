@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{
     Form, Json, Router,
     extract::{Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect},
     routing::{get, post},
 };
@@ -20,11 +20,11 @@ use crate::{
     },
     app_error::{AppError, AppResult},
     entities::value_objects::EmailAddress,
-    infra::config::{AppConfig, GoogleOAuthConfig},
+    infra::config::{AppConfig, AppleOAuthConfig, GoogleOAuthConfig},
     use_cases::{
         company::CompanyUseCases,
         company_invite::CompanyInviteUseCases,
-        user::{GoogleIdentity, RegistrationOutcome, UserUseCases},
+        user::{ExternalIdentity, LoginMethod, RegistrationOutcome, UserUseCases},
     },
 };
 
@@ -58,6 +58,7 @@ pub fn public_router() -> Router<AppState> {
 pub fn protected_router() -> Router<AppState> {
     Router::new()
         .route("/", get(index))
+        .route("/auth/google/connect", get(start_google_connection))
         .route("/logout", post(logout))
 }
 
@@ -100,12 +101,16 @@ async fn logout(
 }
 
 async fn login_page() -> impl IntoResponse {
-    Html(pages::login_page(GoogleOAuthConfig::from_env().is_some()))
+    Html(pages::login_page(
+        GoogleOAuthConfig::from_env().is_some(),
+        AppleOAuthConfig::from_env().is_some(),
+    ))
 }
 
 async fn register_page() -> impl IntoResponse {
     Html(pages::register_page(
         GoogleOAuthConfig::from_env().is_some(),
+        AppleOAuthConfig::from_env().is_some(),
     ))
 }
 
@@ -113,6 +118,7 @@ async fn register_page() -> impl IntoResponse {
 enum GoogleFlow {
     Register,
     Login,
+    Connect,
 }
 
 impl GoogleFlow {
@@ -120,6 +126,7 @@ impl GoogleFlow {
         match self {
             Self::Register => "register",
             Self::Login => "login",
+            Self::Connect => "connect",
         }
     }
 
@@ -127,6 +134,7 @@ impl GoogleFlow {
         match value {
             "register" => Some(Self::Register),
             "login" => Some(Self::Login),
+            "connect" => Some(Self::Connect),
             _ => None,
         }
     }
@@ -134,22 +142,35 @@ impl GoogleFlow {
 
 async fn start_google_registration(
     State(config): State<Arc<AppConfig>>,
+    State(sessions): State<Arc<SessionAuthority>>,
     jar: CookieJar,
 ) -> impl IntoResponse {
-    start_google_flow(&config, jar, GoogleFlow::Register)
+    start_google_flow(&config, &sessions, jar, GoogleFlow::Register, None)
 }
 
 async fn start_google_login(
     State(config): State<Arc<AppConfig>>,
+    State(sessions): State<Arc<SessionAuthority>>,
     jar: CookieJar,
 ) -> impl IntoResponse {
-    start_google_flow(&config, jar, GoogleFlow::Login)
+    start_google_flow(&config, &sessions, jar, GoogleFlow::Login, None)
+}
+
+async fn start_google_connection(
+    State(config): State<Arc<AppConfig>>,
+    State(sessions): State<Arc<SessionAuthority>>,
+    user: AuthenticatedUser,
+    jar: CookieJar,
+) -> impl IntoResponse {
+    start_google_flow(&config, &sessions, jar, GoogleFlow::Connect, Some(user.id))
 }
 
 fn start_google_flow(
     config: &AppConfig,
+    sessions: &SessionAuthority,
     jar: CookieJar,
     flow: GoogleFlow,
+    user_id: Option<Uuid>,
 ) -> axum::response::Response {
     let Some(google) = GoogleOAuthConfig::from_env() else {
         return (
@@ -160,9 +181,14 @@ fn start_google_flow(
         )
             .into_response();
     };
-    let state = Uuid::new_v4().simple().to_string();
-    let flow_value = format!("{}:{state}", flow.as_str());
-    let cookie = Cookie::build((GOOGLE_FLOW_COOKIE, flow_value))
+    let state = sessions.issue_oauth_state(
+        "google",
+        flow.as_str(),
+        user_id,
+        Uuid::new_v4().simple().to_string(),
+    );
+    let encoded_state = sessions.encode_oauth_state(&state);
+    let cookie = Cookie::build((GOOGLE_FLOW_COOKIE, state.transaction))
         .path("/auth/google")
         .http_only(true)
         .same_site(SameSite::Lax)
@@ -175,7 +201,7 @@ fn start_google_flow(
         .append_pair("redirect_uri", &redirect_uri)
         .append_pair("response_type", "code")
         .append_pair("scope", "openid email profile")
-        .append_pair("state", &state)
+        .append_pair("state", &encoded_state)
         .finish();
     (
         jar.add(cookie),
@@ -211,17 +237,32 @@ async fn google_callback(
     State(config): State<Arc<AppConfig>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(sessions): State<Arc<SessionAuthority>>,
+    headers: HeaderMap,
     jar: CookieJar,
     Query(query): Query<GoogleCallbackQuery>,
 ) -> impl IntoResponse {
-    let result = complete_google_flow(&config, &user_use_cases, &jar, query).await;
+    let signed_in_user = sessions.user_from_headers(&headers);
+    let result = complete_google_flow(
+        &config,
+        &user_use_cases,
+        &sessions,
+        &jar,
+        signed_in_user,
+        query,
+    )
+    .await;
     let cleared = jar.remove(
         Cookie::build(GOOGLE_FLOW_COOKIE)
             .path("/auth/google")
             .build(),
     );
     match result {
-        Ok(user) => (
+        Ok((user, GoogleFlow::Connect)) => (
+            cleared.add(sessions.cookie(user.id)),
+            Redirect::temporary("/ui/profile?connected=google"),
+        )
+            .into_response(),
+        Ok((user, _)) => (
             cleared.add(sessions.cookie(user.id)),
             Redirect::temporary(SIGNED_IN_LANDING),
         )
@@ -240,28 +281,34 @@ async fn google_callback(
 async fn complete_google_flow(
     config: &AppConfig,
     user_use_cases: &UserUseCases,
+    sessions: &SessionAuthority,
     jar: &CookieJar,
+    signed_in_user: Option<Uuid>,
     query: GoogleCallbackQuery,
-) -> AppResult<crate::entities::user::User> {
+) -> AppResult<(crate::entities::user::User, GoogleFlow)> {
     if query.error.is_some() {
         return Err(AppError::BadRequest(
             "Google authentication was cancelled.".into(),
         ));
     }
-    let stored = jar.get(GOOGLE_FLOW_COOKIE).ok_or_else(|| {
+    let stored_transaction = jar.get(GOOGLE_FLOW_COOKIE).ok_or_else(|| {
         AppError::BadRequest("Google authentication expired. Please try again.".into())
     })?;
-    let (flow, expected_state) = stored
-        .value()
-        .split_once(':')
+    let encoded_state = query
+        .state
+        .as_deref()
         .ok_or_else(|| AppError::BadRequest("Invalid Google authentication state.".into()))?;
-    let flow = GoogleFlow::parse(flow)
-        .ok_or_else(|| AppError::BadRequest("Invalid Google authentication flow.".into()))?;
-    if query.state.as_deref() != Some(expected_state) {
+    let state = sessions
+        .verify_oauth_state(encoded_state)
+        .filter(|state| state.provider == "google")
+        .ok_or_else(|| AppError::BadRequest("Invalid Google authentication state.".into()))?;
+    if stored_transaction.value() != state.transaction {
         return Err(AppError::BadRequest(
             "Invalid Google authentication state.".into(),
         ));
     }
+    let flow = GoogleFlow::parse(&state.flow)
+        .ok_or_else(|| AppError::BadRequest("Invalid Google authentication flow.".into()))?;
     let google = GoogleOAuthConfig::from_env()
         .ok_or_else(|| AppError::BadRequest("Google authentication is not configured.".into()))?;
     let code = query.code.ok_or_else(|| {
@@ -273,19 +320,47 @@ async fn complete_google_flow(
             "Google has not verified this email address.".into(),
         ));
     }
-    match flow {
+    let user = match flow {
         GoogleFlow::Register => {
             let email = EmailAddress::from(profile.email.as_str());
             user_use_cases
-                .register_google(GoogleIdentity {
+                .register_external(ExternalIdentity {
+                    provider: LoginMethod::Google,
                     subject: &profile.sub,
                     email: &email,
                     display_name: profile.name.as_deref(),
                 })
                 .await
         }
-        GoogleFlow::Login => user_use_cases.login_google(&profile.sub).await,
-    }
+        GoogleFlow::Login => {
+            user_use_cases
+                .login_external(LoginMethod::Google, &profile.sub)
+                .await
+        }
+        GoogleFlow::Connect => {
+            let initiating_user = state
+                .user_id
+                .ok_or_else(|| AppError::BadRequest("Invalid Google connection account.".into()))?;
+            if signed_in_user != Some(initiating_user) {
+                return Err(AppError::BadRequest(
+                    "Google connection expired. Please sign in and try again.".into(),
+                ));
+            }
+            let email = EmailAddress::from(profile.email.as_str());
+            user_use_cases
+                .link_external(
+                    initiating_user,
+                    ExternalIdentity {
+                        provider: LoginMethod::Google,
+                        subject: &profile.sub,
+                        email: &email,
+                        display_name: profile.name.as_deref(),
+                    },
+                )
+                .await
+        }
+    }?;
+    Ok((user, flow))
 }
 
 async fn fetch_google_profile(
@@ -606,7 +681,7 @@ mod tests {
 
     #[tokio::test]
     async fn login_page_contains_htmx_attributes() {
-        let html = pages::login_page(false);
+        let html = pages::login_page(false, false);
         assert!(html.contains("htmx.org"));
         assert!(html.contains("hx-post=\"/api/user/login\""));
         assert!(html.contains("hx-target=\"#response-message\""));
@@ -616,7 +691,7 @@ mod tests {
 
     #[tokio::test]
     async fn register_page_contains_htmx_attributes() {
-        let html = pages::register_page(false);
+        let html = pages::register_page(false, false);
         assert!(html.contains("htmx.org"));
         assert!(html.contains("hx-post=\"/api/user/register\""));
         assert!(html.contains("hx-target=\"#response-message\""));
@@ -626,10 +701,12 @@ mod tests {
 
     #[test]
     fn google_buttons_are_only_rendered_when_google_is_configured() {
-        assert!(!pages::login_page(false).contains("/auth/google/login"));
-        assert!(!pages::register_page(false).contains("/auth/google/register"));
-        assert!(pages::login_page(true).contains("/auth/google/login"));
-        assert!(pages::register_page(true).contains("/auth/google/register"));
+        assert!(!pages::login_page(false, false).contains("/auth/google/login"));
+        assert!(!pages::register_page(false, false).contains("/auth/google/register"));
+        assert!(pages::login_page(true, false).contains("/auth/google/login"));
+        assert!(pages::register_page(true, false).contains("/auth/google/register"));
+        assert!(pages::login_page(false, true).contains("/auth/apple/login"));
+        assert!(pages::register_page(false, true).contains("/auth/apple/register"));
     }
 
     #[test]

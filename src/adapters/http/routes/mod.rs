@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod agent_library;
+pub mod apple_auth;
 pub mod approval;
 pub mod assets;
 pub mod channel;
@@ -54,6 +55,7 @@ pub(super) fn company_load_error(error: &AppError) -> String {
 pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
     let protected = Router::new()
         .merge(user::protected_router())
+        .merge(apple_auth::protected_router())
         .merge(company::router())
         .merge(company_invite::router())
         .merge(task::router())
@@ -83,6 +85,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(health::router())
         .merge(assets::router())
         .merge(user::public_router())
+        .merge(apple_auth::public_router())
         .merge(webhooks::router())
         .merge(protected)
 }

@@ -51,6 +51,39 @@ pub struct GoogleOAuthConfig {
     pub client_secret: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct AppleOAuthConfig {
+    pub client_id: String,
+    pub team_id: String,
+    pub key_id: String,
+    pub private_key_base64: String,
+}
+
+impl AppleOAuthConfig {
+    pub fn from_env() -> Option<Self> {
+        let values = (
+            non_empty_var("APPLE_OAUTH_CLIENT_ID"),
+            non_empty_var("APPLE_OAUTH_TEAM_ID"),
+            non_empty_var("APPLE_OAUTH_KEY_ID"),
+            non_empty_var("APPLE_OAUTH_PRIVATE_KEY_BASE64"),
+        );
+        match values {
+            (Some(client_id), Some(team_id), Some(key_id), Some(private_key_base64)) => {
+                Some(Self {
+                    client_id,
+                    team_id,
+                    key_id,
+                    private_key_base64,
+                })
+            }
+            (None, None, None, None) => None,
+            _ => panic!(
+                "APPLE_OAUTH_CLIENT_ID, APPLE_OAUTH_TEAM_ID, APPLE_OAUTH_KEY_ID and APPLE_OAUTH_PRIVATE_KEY_BASE64 must either all be set or all be absent"
+            ),
+        }
+    }
+}
+
 impl GoogleOAuthConfig {
     /// Loads Google sign-in when both credentials are present. A half-configured deployment is a
     /// startup/configuration error rather than a button that fails after it is clicked.
@@ -183,6 +216,7 @@ impl AppConfig {
         // Validate the optional pair at startup even though the OAuth routes load it only when a
         // flow begins (credentials are deliberately not copied into the broad application config).
         let _ = GoogleOAuthConfig::from_env();
+        let _ = AppleOAuthConfig::from_env();
         let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
         assert!(
             jwt_secret.len() >= MIN_SECRET_BYTES,

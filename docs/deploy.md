@@ -107,6 +107,7 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | Outbound relay credentials |
 | `SMTP_HOST` / `SMTP_FROM_ADDRESS` | Outbound relay and sender; when both are configured with a non-local host, new accounts must confirm a six-digit code sent by email. If outbound SMTP is not configured, registration skips confirmation. |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Optional Google registration/login. Set both and register `https://<APP_DOMAIN_NAME>/auth/google/callback` as an authorized redirect URI in Google Cloud. |
+| `APPLE_OAUTH_CLIENT_ID` / `APPLE_OAUTH_TEAM_ID` / `APPLE_OAUTH_KEY_ID` / `APPLE_OAUTH_PRIVATE_KEY_BASE64` | Optional Sign in with Apple. Set all four, use the Services ID as the client ID, base64-encode the `.p8` private key, and register `https://<APP_DOMAIN_NAME>/auth/apple/callback` as the return URL. Apple requires a real HTTPS domain and does not accept localhost. Register the outbound mail domain and sender with Apple's private email relay so confirmation codes reach relay addresses. |
 | `OPENAI_API_KEY` | Or `ANTHROPIC_API_KEY` / `GROQ_API_KEY` / `GEMINI_API_KEY`, per the agent's configured provider |
 | `GCS_SERVICE_ACCOUNT_JSON_BASE64` | The Cloud Storage service account key, base64-encoded — see [Picture uploads](#picture-uploads) |
 | `JWT_SECRET` | Signs every session cookie. At least 32 characters; the app refuses to start with less |

@@ -11,7 +11,7 @@ use crate::{
         value_objects::{AvatarUrl, EmailAddress},
     },
     use_cases::user::{
-        AccountChange, AccountChangeKind, AccountChangePersistence, GoogleIdentity, LoginMethod,
+        AccountChange, AccountChangeKind, AccountChangePersistence, ExternalIdentity, LoginMethod,
         PendingAccountChange, PendingChange, PendingRegistration, ProfileUpdate,
         RegistrationPersistence, UserPersistence,
     },
@@ -235,6 +235,30 @@ impl UserPersistence for PostgresPersistence {
         Ok(result.map(Into::into))
     }
 
+    async fn activate_password(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>> {
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        let result = sqlx::query_as::<_, UserDb>(
+            r#"UPDATE users SET password_hash = $2 WHERE id = $1
+               RETURNING id, username, email, password_hash, avatar_url, created_at"#,
+        )
+        .bind(id)
+        .bind(password_hash)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        if result.is_some() {
+            sqlx::query(
+                "INSERT INTO user_login_methods (user_id, provider) VALUES ($1, 'password') ON CONFLICT (user_id, provider) DO NOTHING",
+            )
+            .bind(id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(AppError::from)?;
+        }
+        transaction.commit().await.map_err(AppError::from)?;
+        Ok(result.map(Into::into))
+    }
+
     async fn has_login_method(&self, id: Uuid, method: LoginMethod) -> AppResult<bool> {
         sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS(SELECT 1 FROM user_login_methods WHERE user_id = $1 AND provider = $2)",
@@ -246,12 +270,17 @@ impl UserPersistence for PostgresPersistence {
         .map_err(AppError::from)
     }
 
-    async fn create_google_user(&self, identity: GoogleIdentity<'_>) -> AppResult<User> {
+    async fn create_external_user(&self, identity: ExternalIdentity<'_>) -> AppResult<User> {
+        if identity.provider == LoginMethod::Password {
+            return Err(AppError::BadRequest(
+                "Password registration is not an external-provider flow.".into(),
+            ));
+        }
         let id = Uuid::new_v4();
-        let base = google_username(identity.display_name, identity.email.as_str());
+        let base = external_username(identity.display_name, identity.email.as_str());
         let username = format!("{}-{}", base, &id.simple().to_string()[..8]);
         // Not an Argon2 hash, and password authentication checks the method table before parsing.
-        let password_hash = format!("google-only:{id}");
+        let password_hash = format!("{}-only:{id}", identity.provider.as_str());
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         let user = sqlx::query_as::<_, UserDb>(
             r#"INSERT INTO users (id, username, email, password_hash)
@@ -264,36 +293,59 @@ impl UserPersistence for PostgresPersistence {
         .bind(password_hash)
         .fetch_one(&mut *transaction)
         .await
-        .map_err(AppError::from)?;
+        .map_err(external_account_conflict)?;
         sqlx::query(
-            "INSERT INTO user_login_methods (user_id, provider, provider_subject) VALUES ($1, 'google', $2)",
+            "INSERT INTO user_login_methods (user_id, provider, provider_subject) VALUES ($1, $2, $3)",
         )
         .bind(id)
+        .bind(identity.provider.as_str())
         .bind(identity.subject)
         .execute(&mut *transaction)
         .await
-        .map_err(AppError::from)?;
+        .map_err(external_identity_conflict)?;
         transaction.commit().await.map_err(AppError::from)?;
         Ok(user.into())
     }
 
-    async fn get_by_google_subject(&self, subject: &str) -> AppResult<Option<User>> {
+    async fn get_by_external_subject(
+        &self,
+        provider: LoginMethod,
+        subject: &str,
+    ) -> AppResult<Option<User>> {
         sqlx::query_as::<_, UserDb>(
             r#"SELECT users.id, users.username, users.email, users.password_hash,
                       users.avatar_url, users.created_at
                FROM users
                JOIN user_login_methods methods ON methods.user_id = users.id
-               WHERE methods.provider = 'google' AND methods.provider_subject = $1"#,
+               WHERE methods.provider = $1 AND methods.provider_subject = $2"#,
         )
+        .bind(provider.as_str())
         .bind(subject)
         .fetch_optional(&self.pool)
         .await
         .map(|user| user.map(Into::into))
         .map_err(AppError::from)
     }
+
+    async fn link_external_identity(
+        &self,
+        user_id: Uuid,
+        identity: ExternalIdentity<'_>,
+    ) -> AppResult<()> {
+        sqlx::query(
+            "INSERT INTO user_login_methods (user_id, provider, provider_subject) VALUES ($1, $2, $3)",
+        )
+        .bind(user_id)
+        .bind(identity.provider.as_str())
+        .bind(identity.subject)
+        .execute(&self.pool)
+        .await
+        .map_err(external_identity_conflict)?;
+        Ok(())
+    }
 }
 
-fn google_username(display_name: Option<&str>, email: &str) -> String {
+fn external_username(display_name: Option<&str>, email: &str) -> String {
     let source = display_name
         .filter(|name| !name.trim().is_empty())
         .unwrap_or_else(|| email.split('@').next().unwrap_or("user"));
@@ -315,6 +367,22 @@ fn google_username(display_name: Option<&str>, email: &str) -> String {
         "user".to_string()
     } else {
         name.to_string()
+    }
+}
+
+fn external_identity_conflict(err: sqlx::Error) -> AppError {
+    if is_unique_violation(&err) {
+        AppError::Conflict("That login method is already connected.".into())
+    } else {
+        AppError::from(err)
+    }
+}
+
+fn external_account_conflict(err: sqlx::Error) -> AppError {
+    if is_unique_violation(&err) {
+        AppError::BadRequest("An account with that email already exists.".into())
+    } else {
+        AppError::from(err)
     }
 }
 
@@ -458,7 +526,7 @@ impl AccountChangePersistence for PostgresPersistence {
                 .map_err(|err| taken_address_error(err, claimed.new_email.as_deref()))?
             }
             AccountChangeKind::Password => {
-                sqlx::query_as!(
+                let updated = sqlx::query_as!(
                     UserDb,
                     r#"UPDATE users SET password_hash = $2 WHERE id = $1
                        RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
@@ -467,7 +535,17 @@ impl AccountChangePersistence for PostgresPersistence {
                 )
                 .fetch_optional(&mut *transaction)
                 .await
-                .map_err(AppError::from)?
+                .map_err(AppError::from)?;
+                if updated.is_some() {
+                    sqlx::query(
+                        "INSERT INTO user_login_methods (user_id, provider) VALUES ($1, 'password') ON CONFLICT (user_id, provider) DO NOTHING",
+                    )
+                    .bind(user_id)
+                    .execute(&mut *transaction)
+                    .await
+                    .map_err(AppError::from)?;
+                }
+                updated
             }
         };
 
@@ -533,7 +611,7 @@ mod tests {
 
     use super::*;
     use crate::adapters::persistence::test_support::test_pool;
-    use crate::use_cases::user::AccountChangePersistence;
+    use crate::use_cases::user::{AccountChangePersistence, UserCredentialsHasher};
 
     async fn account(persistence: &PostgresPersistence) -> User {
         let username = format!("pending_{}", Uuid::new_v4().simple());
@@ -805,7 +883,8 @@ mod tests {
         let google_email = EmailAddress::from(format!("google-{suffix}@example.com"));
         let google_subject = format!("google-subject-{suffix}");
         let google_user = persistence
-            .create_google_user(GoogleIdentity {
+            .create_external_user(ExternalIdentity {
+                provider: LoginMethod::Google,
                 subject: &google_subject,
                 email: &google_email,
                 display_name: Some("Google Person"),
@@ -826,7 +905,7 @@ mod tests {
         );
         assert_eq!(
             persistence
-                .get_by_google_subject(&google_subject)
+                .get_by_external_subject(LoginMethod::Google, &google_subject)
                 .await
                 .expect("Google lookup")
                 .expect("registered identity")
@@ -835,7 +914,7 @@ mod tests {
         );
         assert!(
             persistence
-                .get_by_google_subject("some-other-google-subject")
+                .get_by_external_subject(LoginMethod::Google, "some-other-google-subject")
                 .await
                 .expect("Google lookup")
                 .is_none()
@@ -855,16 +934,91 @@ mod tests {
             Err(AppError::InvalidCredentials)
         ));
         assert!(matches!(
-            use_cases.login_google("some-other-google-subject").await,
+            use_cases
+                .login_external(LoginMethod::Google, "some-other-google-subject")
+                .await,
             Err(AppError::InvalidCredentials)
         ));
         assert_eq!(
             use_cases
-                .login_google(&google_subject)
+                .login_external(LoginMethod::Google, &google_subject)
                 .await
                 .expect("registered Google login")
                 .id,
             google_user.id
+        );
+
+        let password = "new-password-login";
+        let password_hash = crate::infra::argon2_password_hasher()
+            .hash_password(password)
+            .expect("password hash");
+        persistence
+            .activate_password(google_user.id, &password_hash)
+            .await
+            .expect("activate password")
+            .expect("Google user still exists");
+        assert!(
+            persistence
+                .has_login_method(google_user.id, LoginMethod::Password)
+                .await
+                .expect("password method lookup")
+        );
+        assert_eq!(
+            use_cases
+                .login(&google_user.email, &secrecy::SecretString::from(password))
+                .await
+                .expect("added password login")
+                .id,
+            google_user.id
+        );
+
+        let linked_subject = format!("linked-google-{suffix}");
+        let password_email = EmailAddress::from(password_user.email.as_str());
+        use_cases
+            .link_external(
+                password_user.id,
+                ExternalIdentity {
+                    provider: LoginMethod::Google,
+                    subject: &linked_subject,
+                    email: &password_email,
+                    display_name: None,
+                },
+            )
+            .await
+            .expect("link Google to password account");
+        assert_eq!(
+            use_cases
+                .login_external(LoginMethod::Google, &linked_subject)
+                .await
+                .expect("linked Google login")
+                .id,
+            password_user.id
+        );
+
+        let apple_email = EmailAddress::from(format!("apple-{suffix}@example.com"));
+        let apple_subject = format!("apple-subject-{suffix}");
+        let apple_user = persistence
+            .create_external_user(ExternalIdentity {
+                provider: LoginMethod::Apple,
+                subject: &apple_subject,
+                email: &apple_email,
+                display_name: Some("Apple Person"),
+            })
+            .await
+            .expect("Apple registration");
+        assert!(
+            persistence
+                .has_login_method(apple_user.id, LoginMethod::Apple)
+                .await
+                .expect("Apple method lookup")
+        );
+        assert_eq!(
+            use_cases
+                .login_external(LoginMethod::Apple, &apple_subject)
+                .await
+                .expect("Apple login")
+                .id,
+            apple_user.id
         );
     }
 }

@@ -1,4 +1,5 @@
 use super::*;
+use crate::use_cases::user::LoginMethods;
 use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
@@ -3711,6 +3712,13 @@ fn the_profile_pane_offers_the_account_its_own_details_and_never_its_password() 
         user: &account,
         draft: None,
         pending: &[],
+        methods: &LoginMethods {
+            password: true,
+            google: false,
+            apple: false,
+        },
+        google_enabled: false,
+        apple_enabled: false,
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -3737,6 +3745,31 @@ fn the_profile_pane_offers_the_account_its_own_details_and_never_its_password() 
 }
 
 #[test]
+fn an_oauth_only_profile_can_add_password_and_connect_available_providers() {
+    let account = profile_account();
+    let html = profile_pane(&ProfilePane {
+        user: &account,
+        draft: None,
+        pending: &[],
+        methods: &LoginMethods {
+            password: false,
+            google: true,
+            apple: false,
+        },
+        google_enabled: true,
+        apple_enabled: true,
+        outcome: ProfileOutcome::Untouched,
+    });
+
+    assert!(html.contains(r##"hx-put="/ui/profile/password/setup""##));
+    assert!(!html.contains(r#"name="current_password""#));
+    assert!(html.contains("Google"));
+    assert!(html.contains("Connected"));
+    assert!(html.contains(r##"href="/auth/apple/connect""##));
+    assert!(!html.contains(r##"href="/auth/google/connect""##));
+}
+
+#[test]
 fn a_rejected_profile_shows_what_was_typed_rather_than_what_is_stored() {
     let account = profile_account();
     let html = profile_pane(&ProfilePane {
@@ -3747,6 +3780,13 @@ fn a_rejected_profile_shows_what_was_typed_rather_than_what_is_stored() {
             avatar_url: "javascript:alert(1)",
         }),
         pending: &[],
+        methods: &LoginMethods {
+            password: true,
+            google: false,
+            apple: false,
+        },
+        google_enabled: false,
+        apple_enabled: false,
         outcome: ProfileOutcome::Rejected(
             ProfileForm::Identity,
             "An account already uses the address 'taken@example.com'.",
@@ -3769,6 +3809,13 @@ fn each_profile_banner_belongs_to_the_form_that_earned_it() {
         user: &account,
         draft: None,
         pending: &[],
+        methods: &LoginMethods {
+            password: true,
+            google: false,
+            apple: false,
+        },
+        google_enabled: false,
+        apple_enabled: false,
         outcome: ProfileOutcome::Saved(ProfileForm::Password, "Your password has been changed."),
     });
     let (details, password) = saved
@@ -3781,6 +3828,13 @@ fn each_profile_banner_belongs_to_the_form_that_earned_it() {
         user: &account,
         draft: None,
         pending: &[],
+        methods: &LoginMethods {
+            password: true,
+            google: false,
+            apple: false,
+        },
+        google_enabled: false,
+        apple_enabled: false,
         outcome: ProfileOutcome::Rejected(
             ProfileForm::Password,
             "That is not your current password.",
@@ -3820,6 +3874,13 @@ fn the_profile_page_renders_through_the_ui_shell_with_or_without_a_company() {
         user: &account,
         draft: None,
         pending: &[],
+        methods: &LoginMethods {
+            password: true,
+            google: false,
+            apple: false,
+        },
+        google_enabled: false,
+        apple_enabled: false,
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -3899,6 +3960,13 @@ fn a_section_waiting_on_a_code_asks_for_it_instead_of_offering_its_form_again() 
             new_email: moving_to.clone(),
             expires_at: in_fifteen_minutes(),
         }],
+        methods: &LoginMethods {
+            password: true,
+            google: false,
+            apple: false,
+        },
+        google_enabled: false,
+        apple_enabled: false,
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -3926,6 +3994,13 @@ fn a_pending_password_change_leaves_the_account_details_form_alone() {
         pending: &[PendingChange::Password {
             expires_at: in_fifteen_minutes(),
         }],
+        methods: &LoginMethods {
+            password: true,
+            google: false,
+            apple: false,
+        },
+        google_enabled: false,
+        apple_enabled: false,
         outcome: ProfileOutcome::Untouched,
     });
 
@@ -3948,6 +4023,13 @@ fn a_pending_address_is_never_shown_as_the_account_s_own() {
             new_email: EmailAddress::from("<script>x</script>@example.com"),
             expires_at: in_fifteen_minutes(),
         }],
+        methods: &LoginMethods {
+            password: true,
+            google: false,
+            apple: false,
+        },
+        google_enabled: false,
+        apple_enabled: false,
         outcome: ProfileOutcome::Saved(
             ProfileForm::Identity,
             "Your name and picture are saved. Check the new address for the code.",

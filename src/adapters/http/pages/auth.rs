@@ -2,8 +2,8 @@
 
 use super::*;
 
-pub fn login_page(google_enabled: bool) -> String {
-    let google = google_button("login", "Sign in with Google", google_enabled);
+pub fn login_page(google_enabled: bool, apple_enabled: bool) -> String {
+    let providers = provider_buttons("login", "Sign in", google_enabled, apple_enabled);
     let content = format!(
         r##"
         <div class="mb-6 text-center">
@@ -13,7 +13,7 @@ pub fn login_page(google_enabled: bool) -> String {
 
         <div id="response-message"></div>
 
-        {google}
+        {providers}
 
         <form hx-post="/api/user/login" hx-target="#response-message" hx-swap="innerHTML" class="space-y-5">
             <fieldset class="fieldset">
@@ -41,8 +41,8 @@ pub fn login_page(google_enabled: bool) -> String {
     public_layout("Login", &content)
 }
 
-pub fn register_page(google_enabled: bool) -> String {
-    let google = google_button("register", "Register with Google", google_enabled);
+pub fn register_page(google_enabled: bool, apple_enabled: bool) -> String {
+    let providers = provider_buttons("register", "Register", google_enabled, apple_enabled);
     let content = format!(
         r##"
         <div class="mb-6 text-center">
@@ -52,7 +52,7 @@ pub fn register_page(google_enabled: bool) -> String {
 
         <div id="response-message"></div>
 
-        {google}
+        {providers}
 
         <form hx-post="/api/user/register" hx-target="#response-message" hx-swap="innerHTML" class="space-y-4">
             <fieldset class="fieldset">
@@ -92,12 +92,18 @@ pub fn register_page(google_enabled: bool) -> String {
     public_layout("Register", &content)
 }
 
-fn google_button(action: &str, label: &str, enabled: bool) -> String {
-    if !enabled {
+fn provider_buttons(action: &str, verb: &str, google_enabled: bool, apple_enabled: bool) -> String {
+    if !google_enabled && !apple_enabled {
         return String::new();
     }
+    let google = google_enabled
+        .then(|| format!(r##"<a href="/auth/google/{action}" class="btn btn-outline w-full">{verb} with Google</a>"##))
+        .unwrap_or_default();
+    let apple = apple_enabled
+        .then(|| format!(r##"<a href="/auth/apple/{action}" class="btn btn-neutral w-full">{verb} with Apple</a>"##))
+        .unwrap_or_default();
     format!(
-        r##"<a href="/auth/google/{action}" class="btn btn-outline w-full">{label}</a>
+        r##"<div class="space-y-2">{google}{apple}</div>
         <div class="divider text-xs text-base-content/50">OR</div>"##
     )
 }

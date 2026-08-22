@@ -28,6 +28,7 @@ pub const MIN_PASSWORD_CHARS: usize = 8;
 pub enum LoginMethod {
     Password,
     Google,
+    Apple,
 }
 
 impl LoginMethod {
@@ -35,14 +36,22 @@ impl LoginMethod {
         match self {
             Self::Password => "password",
             Self::Google => "google",
+            Self::Apple => "apple",
         }
     }
 }
 
-pub struct GoogleIdentity<'a> {
+pub struct ExternalIdentity<'a> {
+    pub provider: LoginMethod,
     pub subject: &'a str,
     pub email: &'a EmailAddress,
     pub display_name: Option<&'a str>,
+}
+
+pub struct LoginMethods {
+    pub password: bool,
+    pub google: bool,
+    pub apple: bool,
 }
 
 pub struct PendingRegistration<'a> {
@@ -90,6 +99,11 @@ pub struct PasswordChange<'a> {
     pub confirmation: &'a SecretString,
 }
 
+pub struct PasswordSetup<'a> {
+    pub new: &'a SecretString,
+    pub confirmation: &'a SecretString,
+}
+
 #[async_trait]
 pub trait UserPersistence: Send + Sync {
     /// Stores a new account and returns it, so a caller that has just registered somebody can
@@ -121,20 +135,38 @@ pub trait UserPersistence: Send + Sync {
     /// never reaches the adapter layer. `Ok(None)` means no such user.
     async fn update_password_hash(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>>;
 
+    async fn activate_password(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>> {
+        self.update_password_hash(id, password_hash).await
+    }
+
     async fn has_login_method(&self, _id: Uuid, method: LoginMethod) -> AppResult<bool> {
         // Keeps lightweight persistence doubles focused on the behavior they test. Production
         // persistence overrides this and treats the table as authoritative.
         Ok(method == LoginMethod::Password)
     }
 
-    async fn create_google_user(&self, _identity: GoogleIdentity<'_>) -> AppResult<User> {
+    async fn create_external_user(&self, _identity: ExternalIdentity<'_>) -> AppResult<User> {
         Err(AppError::Internal(
-            "Google registration is not supported by this persistence".into(),
+            "External-provider registration is not supported by this persistence".into(),
         ))
     }
 
-    async fn get_by_google_subject(&self, _subject: &str) -> AppResult<Option<User>> {
+    async fn get_by_external_subject(
+        &self,
+        _provider: LoginMethod,
+        _subject: &str,
+    ) -> AppResult<Option<User>> {
         Ok(None)
+    }
+
+    async fn link_external_identity(
+        &self,
+        _user_id: Uuid,
+        _identity: ExternalIdentity<'_>,
+    ) -> AppResult<()> {
+        Err(AppError::Internal(
+            "External-provider linking is not supported by this persistence".into(),
+        ))
     }
 }
 
@@ -503,7 +535,12 @@ impl UserUseCases {
         Ok(user)
     }
 
-    pub async fn register_google(&self, identity: GoogleIdentity<'_>) -> AppResult<User> {
+    pub async fn register_external(&self, identity: ExternalIdentity<'_>) -> AppResult<User> {
+        if identity.provider == LoginMethod::Password {
+            return Err(AppError::BadRequest(
+                "Password registration is not an external-provider flow.".into(),
+            ));
+        }
         if self
             .persistence
             .get_by_email(&identity.email)
@@ -511,22 +548,90 @@ impl UserUseCases {
             .is_some()
             || self
                 .persistence
-                .get_by_google_subject(identity.subject)
+                .get_by_external_subject(identity.provider, identity.subject)
                 .await?
                 .is_some()
         {
             return Err(AppError::BadRequest(
-                "An account with that Google identity or email already exists. Sign in using the method you registered.".into(),
+                "An account with that identity or email already exists. Sign in using a connected method.".into(),
             ));
         }
-        self.persistence.create_google_user(identity).await
+        self.persistence.create_external_user(identity).await
     }
 
-    pub async fn login_google(&self, subject: &str) -> AppResult<User> {
+    pub async fn login_external(&self, provider: LoginMethod, subject: &str) -> AppResult<User> {
+        if provider == LoginMethod::Password {
+            return Err(AppError::InvalidCredentials);
+        }
         self.persistence
-            .get_by_google_subject(subject)
+            .get_by_external_subject(provider, subject)
             .await?
             .ok_or(AppError::InvalidCredentials)
+    }
+
+    pub async fn link_external(
+        &self,
+        user_id: Uuid,
+        identity: ExternalIdentity<'_>,
+    ) -> AppResult<User> {
+        if identity.provider == LoginMethod::Password {
+            return Err(AppError::BadRequest(
+                "A password cannot be linked through OAuth.".into(),
+            ));
+        }
+        let user = self.account(user_id).await?;
+        let account_email = EmailAddress::from(user.email.as_str());
+        if !account_email.eq_ignore_case(identity.email) {
+            return Err(AppError::BadRequest(format!(
+                "The verified {} email must match your account email.",
+                identity.provider.as_str()
+            )));
+        }
+        if let Some(owner) = self
+            .persistence
+            .get_by_external_subject(identity.provider, identity.subject)
+            .await?
+        {
+            return if owner.id == user_id {
+                Ok(user)
+            } else {
+                Err(AppError::Conflict(
+                    "That login identity is already connected to another account.".into(),
+                ))
+            };
+        }
+        if self
+            .persistence
+            .has_login_method(user_id, identity.provider)
+            .await?
+        {
+            return Err(AppError::Conflict(format!(
+                "This account already has a {} login.",
+                identity.provider.as_str()
+            )));
+        }
+        self.persistence
+            .link_external_identity(user_id, identity)
+            .await?;
+        Ok(user)
+    }
+
+    pub async fn login_methods(&self, id: Uuid) -> AppResult<LoginMethods> {
+        self.account(id).await?;
+        Ok(LoginMethods {
+            password: self
+                .persistence
+                .has_login_method(id, LoginMethod::Password)
+                .await?,
+            google: self
+                .persistence
+                .has_login_method(id, LoginMethod::Google)
+                .await?,
+            apple: self
+                .persistence
+                .has_login_method(id, LoginMethod::Apple)
+                .await?,
+        })
     }
 
     #[instrument(skip(self))]
@@ -671,6 +776,51 @@ impl UserUseCases {
             .request(id, AccountChange::Password(&hash), &account_email)
             .await?;
 
+        Ok(PasswordOutcome::ConfirmationSent(pending))
+    }
+
+    /// Adds password authentication to an OAuth-only account. The mailbox confirmation is the
+    /// re-authentication proof because there is deliberately no current password to ask for.
+    #[instrument(skip(self, setup))]
+    pub async fn set_password(
+        &self,
+        id: Uuid,
+        setup: PasswordSetup<'_>,
+    ) -> AppResult<PasswordOutcome> {
+        let user = self.account(id).await?;
+        if self
+            .persistence
+            .has_login_method(id, LoginMethod::Password)
+            .await?
+        {
+            return Err(AppError::Conflict(
+                "This account already has a password. Change it instead.".into(),
+            ));
+        }
+
+        let new_password = setup.new.expose_secret();
+        if new_password.chars().count() < MIN_PASSWORD_CHARS {
+            return Err(AppError::BadRequest(format!(
+                "A new password needs at least {MIN_PASSWORD_CHARS} characters."
+            )));
+        }
+        if new_password != setup.confirmation.expose_secret() {
+            return Err(AppError::BadRequest(
+                "The new password and its confirmation do not match.".into(),
+            ));
+        }
+        let hash = self.hasher.hash_password(new_password)?;
+        let Some(confirmation) = self.confirming() else {
+            self.persistence
+                .activate_password(id, &hash)
+                .await?
+                .ok_or_else(|| AppError::NotFound("User not found".into()))?;
+            return Ok(PasswordOutcome::Changed);
+        };
+        let account_email = EmailAddress::from(user.email.as_str());
+        let pending = confirmation
+            .request(id, AccountChange::Password(&hash), &account_email)
+            .await?;
         Ok(PasswordOutcome::ConfirmationSent(pending))
     }
 
@@ -829,6 +979,7 @@ mod test {
     /// The stored account, so a write is observable by the read that follows it.
     struct MockUserPersistence {
         stored: std::sync::Mutex<User>,
+        password_enabled: std::sync::atomic::AtomicBool,
     }
 
     impl MockUserPersistence {
@@ -842,6 +993,7 @@ mod test {
                     avatar_url: None,
                     created_at: chrono::Utc::now(),
                 }),
+                password_enabled: std::sync::atomic::AtomicBool::new(true),
             }
         }
 
@@ -935,6 +1087,26 @@ mod test {
             let mut stored = self.stored.lock().unwrap();
             stored.password_hash = password_hash.to_string();
             Ok(Some(stored.clone()))
+        }
+
+        async fn activate_password(
+            &self,
+            id: Uuid,
+            password_hash: &str,
+        ) -> AppResult<Option<User>> {
+            let updated = self.update_password_hash(id, password_hash).await?;
+            self.password_enabled
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(updated)
+        }
+
+        async fn has_login_method(&self, _id: Uuid, method: LoginMethod) -> AppResult<bool> {
+            Ok(match method {
+                LoginMethod::Password => self
+                    .password_enabled
+                    .load(std::sync::atomic::Ordering::SeqCst),
+                LoginMethod::Google | LoginMethod::Apple => false,
+            })
         }
     }
 
@@ -1450,5 +1622,62 @@ mod test {
             .unwrap();
 
         assert_eq!(user.username, "testuser");
+    }
+
+    #[tokio::test]
+    async fn linking_an_external_provider_requires_the_accounts_email() {
+        let persistence = Arc::new(MockUserPersistence::new());
+        let id = persistence.id();
+        let user_use_cases = use_cases(persistence);
+        let other_email = EmailAddress::from("someone-else@example.com");
+
+        let result = user_use_cases
+            .link_external(
+                id,
+                ExternalIdentity {
+                    provider: LoginMethod::Apple,
+                    subject: "apple-subject",
+                    email: &other_email,
+                    display_name: None,
+                },
+            )
+            .await;
+
+        assert!(
+            matches!(result, Err(AppError::BadRequest(message)) if message.contains("must match"))
+        );
+    }
+
+    #[tokio::test]
+    async fn an_oauth_only_account_can_add_password_login() {
+        let persistence = Arc::new(MockUserPersistence::new());
+        persistence
+            .password_enabled
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        let id = persistence.id();
+        let user_use_cases = use_cases(persistence.clone());
+
+        let result = user_use_cases
+            .set_password(
+                id,
+                PasswordSetup {
+                    new: &"a-new-password".into(),
+                    confirmation: &"a-new-password".into(),
+                },
+            )
+            .await
+            .expect("set password");
+
+        assert!(matches!(result, PasswordOutcome::Changed));
+        assert!(
+            persistence
+                .has_login_method(id, LoginMethod::Password)
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            persistence.stored.lock().unwrap().password_hash,
+            "a-new-password_hash"
+        );
     }
 }

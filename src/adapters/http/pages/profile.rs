@@ -10,6 +10,7 @@
 //! [`code_panel`] in place of its form until the code comes back or the request is cancelled.
 
 use super::*;
+use crate::use_cases::user::LoginMethods;
 
 /// The Profile workspace for one request.
 pub struct ProfilePage<'a> {
@@ -80,6 +81,9 @@ pub struct ProfilePane<'a> {
     /// Changes this account has asked for and not yet proved. A section with one waiting asks for
     /// the code instead of offering its form again -- see [`code_panel`].
     pub pending: &'a [PendingChange],
+    pub methods: &'a LoginMethods,
+    pub google_enabled: bool,
+    pub apple_enabled: bool,
     pub outcome: ProfileOutcome<'a>,
 }
 
@@ -125,6 +129,7 @@ pub fn profile_pane(pane: &ProfilePane<'_>) -> String {
                 </div>
             </div>
             {identity}
+            {login_methods}
             {password}
         </div>
         "##,
@@ -133,7 +138,46 @@ pub fn profile_pane(pane: &ProfilePane<'_>) -> String {
         email = escape_html_text(&user.email),
         joined = super::format_date(user.created_at),
         identity = identity_section(draft, pane.pending, &pane.outcome),
-        password = password_section(pane.user, pane.pending, &pane.outcome),
+        login_methods = login_methods_section(pane),
+        password = password_section(pane.user, pane.pending, pane.methods, &pane.outcome),
+    )
+}
+
+fn login_methods_section(pane: &ProfilePane<'_>) -> String {
+    let google = provider_row(
+        "Google",
+        pane.methods.google,
+        pane.google_enabled,
+        "/auth/google/connect",
+    );
+    let apple = provider_row(
+        "Apple",
+        pane.methods.apple,
+        pane.apple_enabled,
+        "/auth/apple/connect",
+    );
+    format!(
+        r##"
+            <section class="mb-6 rounded-box border border-base-300 bg-base-200 p-6">
+                <h2 class="text-lg font-bold">Login methods</h2>
+                <p class="mb-4 text-xs opacity-60">Connected methods sign in to this same account. Provider emails must match your account email.</p>
+                <div class="space-y-3">{google}{apple}</div>
+            </section>
+        "##
+    )
+}
+
+fn provider_row(name: &str, connected: bool, enabled: bool, connect_url: &str) -> String {
+    let action = if connected {
+        r#"<span class="badge badge-success badge-outline">Connected</span>"#.to_string()
+    } else if enabled {
+        format!(r##"<a class="btn btn-sm btn-outline" href="{connect_url}">Connect</a>"##)
+    } else {
+        r#"<span class="text-xs opacity-50">Unavailable</span>"#.to_string()
+    };
+    format!(
+        r#"<div class="flex items-center justify-between rounded-box border border-base-300 bg-base-100 px-4 py-3"><span class="font-medium">{name}</span>{action}</div>"#,
+        name = escape_html_text(name),
     )
 }
 
@@ -218,29 +262,65 @@ fn identity_form(draft: &ProfileDraft<'_>) -> String {
 fn password_section(
     user: &User,
     pending: &[PendingChange],
+    methods: &LoginMethods,
     outcome: &ProfileOutcome<'_>,
 ) -> String {
     let account_email = EmailAddress::from(user.email.as_str());
     let body = match pending_of(pending, AccountChangeKind::Password) {
         Some(PendingChange::Password { expires_at }) => code_panel(&CodePanel {
             sent_to: &account_email,
-            explanation: "Enter it to finish the change. Until you do, your current password still works.",
+            explanation: if methods.password {
+                "Enter it to finish the change. Until you do, your current password still works."
+            } else {
+                "Enter it to activate password login. Until you do, use your connected provider."
+            },
             kind: AccountChangeKind::Password,
             expires_at: *expires_at,
         }),
-        _ => password_form(),
+        _ if methods.password => password_form(),
+        _ => password_setup_form(),
     };
 
     format!(
         r##"
             <section class="rounded-box border border-base-300 bg-base-200 p-6">
                 <h2 class="text-lg font-bold">Password</h2>
-                <p class="mb-4 text-xs opacity-60">Changing it does not sign your other browsers out.</p>
+                <p class="mb-4 text-xs opacity-60">{description}</p>
                 {banner}
                 {body}
             </section>
         "##,
         banner = outcome.banner(ProfileForm::Password),
+        description = if methods.password {
+            "Changing it does not sign your other browsers out."
+        } else {
+            "Add email or username and password as another way to sign in."
+        },
+    )
+}
+
+fn password_setup_form() -> String {
+    format!(
+        r##"
+                <p class="mb-4 text-xs opacity-60">Add a password so you can also sign in with your email or username.</p>
+                <form class="space-y-4" hx-put="/ui/profile/password/setup" hx-target="#profile-pane" hx-swap="outerHTML"
+                    hx-disabled-elt="find button[type='submit']">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">New Password</span></div>
+                            <input type="password" name="new_password" required minlength="{MIN_PASSWORD_CHARS}"
+                                autocomplete="new-password" class="input w-full">
+                        </label>
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Confirm Password</span></div>
+                            <input type="password" name="confirm_password" required minlength="{MIN_PASSWORD_CHARS}"
+                                autocomplete="new-password" class="input w-full">
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Password</button>
+                </form>
+        "##,
+        MIN_PASSWORD_CHARS = crate::use_cases::user::MIN_PASSWORD_CHARS,
     )
 }
 

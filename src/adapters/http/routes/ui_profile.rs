@@ -28,12 +28,12 @@ use crate::{
         user::User,
         value_objects::{AvatarUrl, EmailAddress},
     },
-    infra::config::AppConfig,
+    infra::config::{AppConfig, AppleOAuthConfig, GoogleOAuthConfig},
     use_cases::{
         company::CompanyUseCases,
         user::{
-            AccountChangeKind, PasswordChange, PasswordOutcome, PendingChange, ProfileUpdate,
-            UserUseCases,
+            AccountChangeKind, LoginMethods, PasswordChange, PasswordOutcome, PasswordSetup,
+            PendingChange, ProfileUpdate, UserUseCases,
         },
     },
 };
@@ -44,6 +44,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/ui/profile", get(profile_page).put(update_profile))
         .route("/ui/profile/password", put(change_password))
+        .route("/ui/profile/password/setup", put(set_password))
         .route(
             "/ui/profile/changes/{kind}",
             post(confirm_change).delete(cancel_change),
@@ -74,6 +75,12 @@ pub struct PasswordForm {
     pub confirm_password: SecretString,
 }
 
+#[derive(Deserialize)]
+pub struct PasswordSetupForm {
+    pub new_password: SecretString,
+    pub confirm_password: SecretString,
+}
+
 /// The six digits mailed out for a pending change.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CodeForm {
@@ -87,6 +94,7 @@ pub struct CodeForm {
 struct Account {
     user: User,
     pending: Vec<PendingChange>,
+    methods: LoginMethods,
 }
 
 impl Account {
@@ -94,6 +102,7 @@ impl Account {
         Ok(Self {
             user: load_account(user_use_cases, user_id).await?,
             pending: user_use_cases.pending_account_changes(user_id).await?,
+            methods: user_use_cases.login_methods(user_id).await?,
         })
     }
 
@@ -106,6 +115,9 @@ impl Account {
             user: &self.user,
             draft,
             pending: &self.pending,
+            methods: &self.methods,
+            google_enabled: GoogleOAuthConfig::from_env().is_some(),
+            apple_enabled: AppleOAuthConfig::from_env().is_some(),
             outcome,
         })
     }
@@ -272,6 +284,46 @@ async fn change_password(
         }
     };
 
+    let account = Account::load(&user_use_cases, user.id).await?;
+    Ok(Html(account.pane(
+        None,
+        pages::ProfileOutcome::Saved(pages::ProfileForm::Password, &message),
+    )))
+}
+
+/// PUT /ui/profile/password/setup - Add password login to an OAuth-only account (Protected).
+#[instrument(skip(user_use_cases, user, form))]
+async fn set_password(
+    State(user_use_cases): State<Arc<UserUseCases>>,
+    user: AuthenticatedUser,
+    Form(form): Form<PasswordSetupForm>,
+) -> AppResult<Html<String>> {
+    let outcome = user_use_cases
+        .set_password(
+            user.id,
+            PasswordSetup {
+                new: &form.new_password,
+                confirmation: &form.confirm_password,
+            },
+        )
+        .await;
+    let message = match outcome {
+        Ok(PasswordOutcome::Changed) => "Password login has been added.".to_string(),
+        Ok(PasswordOutcome::ConfirmationSent(_)) => format!(
+            "Check {} for the code that activates password login.",
+            load_account(&user_use_cases, user.id).await?.email
+        ),
+        Err(err) => {
+            return rejected(
+                &user_use_cases,
+                user.id,
+                pages::ProfileForm::Password,
+                None,
+                &write_error(&err, "add password login"),
+            )
+            .await;
+        }
+    };
     let account = Account::load(&user_use_cases, user.id).await?;
     Ok(Html(account.pane(
         None,

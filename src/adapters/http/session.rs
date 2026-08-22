@@ -45,6 +45,17 @@ struct SessionClaims {
     exp: i64,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OAuthState {
+    pub transaction: String,
+    pub provider: String,
+    pub flow: String,
+    pub user_id: Option<Uuid>,
+    pub nonce: String,
+    iat: i64,
+    exp: i64,
+}
+
 /// Issues sessions and decides whether one is genuine.
 pub struct SessionAuthority {
     encoding: EncodingKey,
@@ -118,6 +129,35 @@ impl SessionAuthority {
         decode::<SessionClaims>(token, &self.decoding, &self.validation)
             .ok()
             .map(|token| token.claims.sub)
+    }
+
+    pub fn issue_oauth_state(
+        &self,
+        provider: &str,
+        flow: &str,
+        user_id: Option<Uuid>,
+        nonce: String,
+    ) -> OAuthState {
+        let issued_at = time::OffsetDateTime::now_utc();
+        OAuthState {
+            transaction: Uuid::new_v4().simple().to_string(),
+            provider: provider.to_string(),
+            flow: flow.to_string(),
+            user_id,
+            nonce,
+            iat: issued_at.unix_timestamp(),
+            exp: (issued_at + Duration::minutes(10)).unix_timestamp(),
+        }
+    }
+
+    pub fn encode_oauth_state(&self, state: &OAuthState) -> String {
+        encode(&Header::new(Algorithm::HS256), state, &self.encoding).unwrap_or_default()
+    }
+
+    pub fn verify_oauth_state(&self, token: &str) -> Option<OAuthState> {
+        decode::<OAuthState>(token, &self.decoding, &self.validation)
+            .ok()
+            .map(|token| token.claims)
     }
 
     /// Who a request is signed in as, from the cookies it carries.
@@ -270,5 +310,33 @@ mod tests {
                 .expect("a cookie header"),
         );
         assert_eq!(sessions.user_from_headers(&legacy), None);
+    }
+
+    #[test]
+    fn oauth_state_is_signed_and_carries_the_connecting_account() {
+        let sessions = signing(SECRET);
+        let user_id = Uuid::new_v4();
+        let state = sessions.issue_oauth_state(
+            "apple",
+            "connect",
+            Some(user_id),
+            "one-use-nonce".to_string(),
+        );
+        let encoded = sessions.encode_oauth_state(&state);
+        let decoded = sessions.verify_oauth_state(&encoded).expect("signed state");
+
+        assert_eq!(decoded.provider, "apple");
+        assert_eq!(decoded.flow, "connect");
+        assert_eq!(decoded.user_id, Some(user_id));
+        assert_eq!(decoded.nonce, "one-use-nonce");
+
+        let mut tampered = encoded.into_bytes();
+        let last = tampered.last_mut().expect("token byte");
+        *last = if *last == b'a' { b'b' } else { b'a' };
+        assert!(
+            sessions
+                .verify_oauth_state(std::str::from_utf8(&tampered).unwrap())
+                .is_none()
+        );
     }
 }
