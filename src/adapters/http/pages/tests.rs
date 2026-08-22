@@ -249,6 +249,7 @@ fn mailbox_channel(company_id: Uuid) -> Channel {
         id: Uuid::new_v4(),
         company_id,
         name: "Inbox".to_string(),
+        description: None,
         slug: "inbox".into(),
         alias_slugs: Vec::new(),
         api_key: None,
@@ -3957,4 +3958,31 @@ fn a_pending_address_is_never_shown_as_the_account_s_own() {
     assert!(html.contains("dana@example.com"));
     assert!(!html.contains("<script>x</script>"));
     assert!(html.contains("&lt;script&gt;x&lt;/script&gt;@example.com"));
+}
+
+#[test]
+fn the_channel_form_offers_a_description_and_escapes_what_was_typed_into_it() {
+    let company = mailbox_company();
+    let draft = ChannelDraft {
+        name: "Supplier Desk",
+        description: "Answers <supplier> capacity questions.",
+        ..ChannelDraft::default()
+    };
+
+    let html = channel_create_pane(&ChannelCreatePane {
+        company: &company,
+        app_domain_name: "mailagents.com",
+        agents: &[],
+        spam_scan_enabled: true,
+        draft: &draft,
+        error: None,
+    });
+
+    assert_eq!(
+        html.matches(r#"name="description""#).count(),
+        2,
+        "both the simple and the advanced tab collect a description"
+    );
+    assert!(html.contains("Answers &lt;supplier&gt; capacity questions."));
+    assert!(!html.contains("<supplier>"));
 }

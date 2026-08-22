@@ -481,6 +481,7 @@ mod tests {
             id,
             company_id,
             name: slug.to_string(),
+            description: None,
             slug: slug.into(),
             alias_slugs: Vec::new(),
             api_key: None,

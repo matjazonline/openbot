@@ -550,6 +550,7 @@ mod tests {
             id: channel_id,
             company_id,
             name: "Test WF".to_string(),
+            description: None,
             slug: "test-wf".into(),
             alias_slugs: Vec::new(),
             provider: None,

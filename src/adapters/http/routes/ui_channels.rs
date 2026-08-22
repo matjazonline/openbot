@@ -43,7 +43,7 @@ use crate::{
 use super::{
     channel::{
         ChannelForm, parse_agent_ids_form, parse_config_form, parse_emails_form, parse_list_form,
-        resolve_channel_agents, slugify,
+        parse_text_form, resolve_channel_agents, slugify,
     },
     ui::{load_account, load_scoped_company, workspace_user},
 };
@@ -505,6 +505,7 @@ impl SubmittedChannel {
     fn draft(&self) -> pages::ChannelDraft<'_> {
         pages::ChannelDraft {
             name: &self.form.name,
+            description: self.form.description.as_deref().unwrap_or(""),
             slug: &self.slug,
             alias_slugs: self.form.alias_slugs.as_deref().unwrap_or(""),
             system_prompt: self.form.system_prompt.as_deref().unwrap_or(""),
@@ -529,6 +530,7 @@ impl SubmittedChannel {
     ) -> ChannelWrite {
         ChannelWrite {
             name: self.form.name.clone(),
+            description: parse_text_form(self.form.description.clone()),
             slug: self.slug.clone(),
             alias_slugs: parse_list_form(self.form.alias_slugs.clone()),
             api_key: self.form.api_key.clone(),

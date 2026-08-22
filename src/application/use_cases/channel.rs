@@ -26,6 +26,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone)]
 pub struct ChannelWrite {
     pub name: String,
+    /// What the channel is for, in one line. `None` and a blank string mean the same thing, so
+    /// every form boundary normalizes blank to `None` before building the write.
+    pub description: Option<String>,
     pub slug: String,
     /// Extra local parts the channel also answers on. Replaced wholesale by every write.
     pub alias_slugs: Vec<String>,
@@ -53,6 +56,7 @@ impl Default for ChannelWrite {
     fn default() -> Self {
         Self {
             name: String::new(),
+            description: None,
             slug: String::new(),
             alias_slugs: Vec::new(),
             api_key: None,
@@ -990,6 +994,7 @@ mod tests {
             id,
             company_id,
             name: write.name,
+            description: None,
             slug: write.slug.into(),
             alias_slugs: Vec::new(),
             api_key: write.api_key,
@@ -1442,6 +1447,7 @@ mod tests {
                 id: uuid::Uuid::new_v4(),
                 company_id,
                 name: "Support".to_string(),
+                description: None,
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -1467,6 +1473,7 @@ mod tests {
                 id: uuid::Uuid::new_v4(),
                 company_id,
                 name: "Billing".to_string(),
+                description: None,
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,

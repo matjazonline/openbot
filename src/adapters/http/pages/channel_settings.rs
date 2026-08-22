@@ -131,6 +131,8 @@ pub struct ChannelSettingsPage<'a> {
 #[derive(Debug)]
 pub struct ChannelDraft<'a> {
     pub name: &'a str,
+    /// What the channel is for, in one line. Shown to teammates whose mail bounced.
+    pub description: &'a str,
     pub slug: &'a str,
     /// Extra addresses the channel answers on, as the comma-separated list the form submits.
     pub alias_slugs: &'a str,
@@ -155,6 +157,7 @@ impl Default for ChannelDraft<'_> {
     fn default() -> Self {
         Self {
             name: "",
+            description: "",
             slug: "",
             alias_slugs: "",
             system_prompt: "",
@@ -429,6 +432,13 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
                             class="input w-full">
                     </label>
                     <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Description</span></div>
+                        <input type="text" name="description" value="{description}" autocomplete="off"
+                            placeholder="Answers supplier capacity and delivery-date questions."
+                            class="input w-full">
+                        <div class="label"><span class="text-[11px] opacity-60">One line, shown to teammates who mail an address that does not exist.</span></div>
+                    </label>
+                    <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Agent Instructions</span></div>
                         <textarea name="system_prompt" rows="6" required
                             placeholder="Describe the agent's role, responsibilities, rules and tone. A full system prompt is generated when the channel is created."
@@ -474,6 +484,7 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
         simple_active = active(!pane.draft.advanced),
         advanced_active = active(pane.draft.advanced),
         name = escape_html_text(pane.draft.name),
+        description = escape_html_text(pane.draft.description),
         system_prompt = escape_html_text(pane.draft.system_prompt),
         fields = channel_fields(&ChannelFields {
             company: pane.company,
@@ -524,6 +535,13 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                                 class="input w-full font-mono">
                         </label>
                     </div>
+                    <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Description</span></div>
+                        <input type="text" name="description" value="{description}" autocomplete="off"
+                            placeholder="Answers supplier capacity and delivery-date questions."
+                            class="input w-full">
+                        <div class="label"><span class="text-[11px] opacity-60">What this channel is for, in one line. Shown to teammates who mail an address that does not exist, so they can find the channel they meant.</span></div>
+                    </label>
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Alias Addresses (@{company_slug}.{app_domain_name})</span></div>
                         <input type="text" name="alias_slugs" value="{alias_slugs}" autocomplete="off"
@@ -591,6 +609,7 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                     {spam_html}
         "##,
         name = escape_html_text(draft.name),
+        description = escape_html_text(draft.description),
         company_slug = escape_html_text(&fields.company.slug),
         app_domain_name = escape_html_text(fields.app_domain_name),
         slug = escape_html_text(draft.slug),
@@ -824,6 +843,7 @@ fn stored_draft<'a>(
 ) -> ChannelDraft<'a> {
     ChannelDraft {
         name: &channel.name,
+        description: channel.description.as_deref().unwrap_or(""),
         slug: &channel.slug,
         alias_slugs,
         system_prompt: "",

@@ -22,6 +22,7 @@ pub struct ChannelDb {
     pub id: Uuid,
     pub company_id: Uuid,
     pub name: String,
+    pub description: Option<String>,
     pub slug: String,
     pub alias_slugs: Vec<String>,
     pub api_key: Option<String>,
@@ -50,6 +51,7 @@ impl From<ChannelDb> for Channel {
             id: db.id,
             company_id: db.company_id,
             name: db.name,
+            description: db.description,
             slug: ChannelSlug::from(db.slug),
             alias_slugs: db.alias_slugs.into_iter().map(ChannelSlug::from).collect(),
             api_key: db.api_key,
@@ -82,7 +84,7 @@ impl From<ChannelDb> for Channel {
 }
 
 const CHANNEL_SELECT: &str = r#"
-    SELECT ch.id, ch.company_id, ch.name,
+    SELECT ch.id, ch.company_id, ch.name, ch.description,
            (SELECT cs.slug::text FROM channel_slugs cs
             WHERE cs.channel_id = ch.id AND cs.is_primary) AS slug,
            COALESCE(
@@ -202,17 +204,18 @@ impl ChannelPersistence for PostgresPersistence {
 
         sqlx::query(
             r#"INSERT INTO channels (
-                    id, company_id, name, access_mode, api_key, provider, model,
+                    id, company_id, name, description, access_mode, api_key, provider, model,
                     channel_config, enabled, add_3rd_party, created_by,
                     retrieve_company_memory, retrieve_agent_memory, retrieve_user_memory,
                     persist_company_memory, persist_agent_memory, persist_user_memory,
                     memory_recall_mode, memory_max_results
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-                         $12, $13, $14, $15, $16, $17, $18, $19)"#,
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                         $13, $14, $15, $16, $17, $18, $19, $20)"#,
         )
         .bind(uuid)
         .bind(company_id)
         .bind(write.name)
+        .bind(write.description)
         .bind(access_mode)
         .bind(write.api_key)
         .bind(write.provider)
@@ -309,16 +312,17 @@ impl ChannelPersistence for PostgresPersistence {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let result = sqlx::query(
             r#"UPDATE channels
-               SET name = $1, access_mode = $2, api_key = $3,
-                   provider = $4, model = $5, channel_config = $6, enabled = $7,
-                   add_3rd_party = $8, retrieve_company_memory = $9,
-                   retrieve_agent_memory = $10, retrieve_user_memory = $11,
-                   persist_company_memory = $12, persist_agent_memory = $13,
-                   persist_user_memory = $14, memory_recall_mode = $15,
-                   memory_max_results = $16
-               WHERE id = $17"#,
+               SET name = $1, description = $2, access_mode = $3, api_key = $4,
+                   provider = $5, model = $6, channel_config = $7, enabled = $8,
+                   add_3rd_party = $9, retrieve_company_memory = $10,
+                   retrieve_agent_memory = $11, retrieve_user_memory = $12,
+                   persist_company_memory = $13, persist_agent_memory = $14,
+                   persist_user_memory = $15, memory_recall_mode = $16,
+                   memory_max_results = $17
+               WHERE id = $18"#,
         )
         .bind(write.name)
+        .bind(write.description)
         .bind(access_mode)
         .bind(write.api_key)
         .bind(write.provider)
@@ -482,6 +486,7 @@ mod tests {
             company.id,
             ChannelWrite {
                 name: "Inbound Email".into(),
+                description: Some("Takes support mail from the website form.".into()),
                 slug: "inbound-email".into(),
                 alias_slugs: Vec::new(),
                 api_key: Some("ch_key_123".into()),
@@ -509,6 +514,10 @@ mod tests {
         .unwrap();
 
         assert_eq!(channel.name, "Inbound Email");
+        assert_eq!(
+            channel.description.as_deref(),
+            Some("Takes support mail from the website form.")
+        );
         assert_eq!(channel.slug, "inbound-email");
         assert_eq!(channel.api_key.as_deref(), Some("ch_key_123"));
         assert_eq!(channel.provider.as_deref(), Some("openai"));
@@ -546,6 +555,7 @@ mod tests {
             channel.id,
             ChannelWrite {
                 name: "Inbound Email V2".into(),
+                description: Some("Now also handles refund requests.".into()),
                 slug: "inbound-email-v2".into(),
                 enabled: false,
                 add_3rd_party: true,
@@ -564,6 +574,11 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(updated.name, "Inbound Email V2");
+        assert_eq!(
+            updated.description.as_deref(),
+            Some("Now also handles refund requests."),
+            "an edited description must survive a round trip"
+        );
         assert_eq!(updated.api_key, None);
         assert_eq!(updated.participant_emails, None);
         assert!(!updated.enabled, "the off switch must survive a round trip");
@@ -578,6 +593,10 @@ mod tests {
             .unwrap();
         assert!(!reread.enabled);
         assert!(reread.add_3rd_party);
+        assert_eq!(
+            reread.description.as_deref(),
+            Some("Now also handles refund requests.")
+        );
 
         // 5. Delete
         ChannelPersistence::delete(&persistence, channel.id)

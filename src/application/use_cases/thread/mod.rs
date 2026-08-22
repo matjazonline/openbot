@@ -813,6 +813,14 @@ pub struct BounceSuggestion {
     pub suggestions: Vec<ChannelSlug>,
 }
 
+/// One channel the bouncing sender could have written to instead.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ChannelDirectoryEntry {
+    pub address: EmailAddress,
+    pub name: String,
+    pub description: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BounceInfo {
     pub recipient_to: EmailAddress,
@@ -823,6 +831,13 @@ pub struct BounceInfo {
     #[serde(default)]
     pub disabled_slugs: Vec<ChannelSlug>,
     pub suggestions: Vec<BounceSuggestion>,
+    /// The channels this sender may write to, listed only when they are on the company's team.
+    ///
+    /// Empty for everyone else, so a stranger who guesses at an address never learns the company's
+    /// channel directory from the bounce it earns. Defaulted on deserialize for the same reason as
+    /// `disabled_slugs`.
+    #[serde(default)]
+    pub available_channels: Vec<ChannelDirectoryEntry>,
     pub original_subject: String,
 }
 
@@ -868,8 +883,32 @@ pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String
         ));
     }
 
+    push_channel_directory(&mut body, &bounce.available_channels);
+
     body.push_str("Please check the channel address and try sending your email again.\n");
     body
+}
+
+/// The "here is what you could have written to" section, appended only for a sender the platform
+/// recognizes as one of the company's own people.
+///
+/// Nothing at all is rendered for an empty list, so a stranger's bounce is byte-for-byte what it
+/// was before this section existed.
+fn push_channel_directory(body: &mut String, entries: &[ChannelDirectoryEntry]) {
+    if entries.is_empty() {
+        return;
+    }
+
+    body.push_str("Channels you can write to:\n");
+    for entry in entries {
+        body.push_str(&format!("  - {} \u{2014} {}\n", entry.address, entry.name));
+        if let Some(description) = entry.description.as_deref().map(str::trim)
+            && !description.is_empty()
+        {
+            body.push_str(&format!("      {description}\n"));
+        }
+    }
+    body.push('\n');
 }
 
 /// The one sentence that says why a bounce happened, for both bounce renderers.

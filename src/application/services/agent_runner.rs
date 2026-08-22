@@ -1455,6 +1455,7 @@ mod tests {
             }
         });
         let channel = Channel {
+            description: None,
             enabled: true,
             add_3rd_party: true,
             retrieve_company_memory: false,
@@ -1621,6 +1622,7 @@ mod tests {
         };
 
         let channel = Channel {
+            description: None,
             enabled: true,
             add_3rd_party: true,
             retrieve_company_memory: false,
@@ -1688,6 +1690,7 @@ mod tests {
         };
 
         let channel = Channel {
+            description: None,
             enabled: true,
             add_3rd_party: true,
             retrieve_company_memory: false,
@@ -1783,6 +1786,7 @@ mod tests {
         };
 
         let channel = Channel {
+            description: None,
             enabled: true,
             add_3rd_party: true,
             retrieve_company_memory: false,
@@ -1865,6 +1869,7 @@ mod tests {
         };
 
         let channel = Channel {
+            description: None,
             enabled: true,
             add_3rd_party: true,
             retrieve_company_memory: false,
@@ -2261,6 +2266,7 @@ system_prompt: Hello
             id: Uuid::new_v4(),
             company_id,
             name: slug.to_string(),
+            description: None,
             slug: slug.into(),
             alias_slugs: Vec::new(),
             api_key: None,

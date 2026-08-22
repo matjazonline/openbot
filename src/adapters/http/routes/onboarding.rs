@@ -258,6 +258,7 @@ mod tests {
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Customer Support".to_string(),
+            description: None,
             slug: "customer-support".into(),
             alias_slugs: Vec::new(),
             api_key: None,

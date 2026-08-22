@@ -7,7 +7,7 @@ use crate::{
     entities::{channel::ChannelType, message_contract::NormalizedOutboundMessage},
     infra::config::AppConfig,
     services::outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
-    use_cases::thread::{BounceInfo, bounce_cause},
+    use_cases::thread::{BounceInfo, format_bounce_email_body},
 };
 
 pub struct EmailEgressAdapter {
@@ -61,43 +61,11 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
     }
 
     async fn dispatch_bounce(&self, bounce_info: &BounceInfo) -> AppResult<()> {
-        let mut bounce_body = format!(
-            "Your email to company '{}' could not be delivered because {}:\n",
-            bounce_info.company_slug.as_deref().unwrap_or("unknown"),
-            bounce_cause(bounce_info)
-        );
-
-        for invalid in &bounce_info.invalid_slugs {
-            bounce_body.push_str(&format!(" - Invalid: {}\n", invalid));
-        }
-
-        for disabled in &bounce_info.disabled_slugs {
-            bounce_body.push_str(&format!(
-                " - Disabled (address is correct, but the channel is switched off): {}\n",
-                disabled
-            ));
-        }
-
-        if !bounce_info.suggestions.is_empty() {
-            bounce_body.push_str("\nDid you mean one of the following valid channel addresses?\n");
-            for sug in &bounce_info.suggestions {
-                if !sug.suggestions.is_empty() {
-                    bounce_body.push_str(&format!(
-                        " - For '{}', suggested: {}\n",
-                        sug.invalid_slug,
-                        sug.suggestions.join(", ")
-                    ));
-                }
-            }
-        }
-
-        bounce_body.push_str("\nPlease check the recipient address and try again.");
-
         OutboundDispatcher::send_bounce(
             &self.config,
             &bounce_info.recipient_to,
             &bounce_info.original_subject,
-            &bounce_body,
+            &format_bounce_email_body(bounce_info, &self.config.app_domain_name),
         )
         .await?;
 

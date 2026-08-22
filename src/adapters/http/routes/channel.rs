@@ -91,6 +91,7 @@ pub fn router() -> Router<AppState> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChannelForm {
     pub name: String,
+    pub description: Option<String>,
     pub slug: Option<String>,
     pub alias_slugs: Option<String>,
     pub system_prompt: Option<String>,
@@ -170,6 +171,7 @@ pub(super) fn parse_agent_ids_form(input: Option<String>) -> Option<Vec<Uuid>> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChannelJsonPayload {
     pub name: String,
+    pub description: Option<String>,
     pub slug: Option<String>,
     /// A PUT replaces the alias set wholesale, like every other field here.
     pub alias_slugs: Option<Vec<String>>,
@@ -252,6 +254,16 @@ pub(crate) async fn load_thread_page(
 pub(super) fn parse_emails_form(input: Option<String>) -> Option<Vec<String>> {
     let list = parse_list_form(input);
     if list.is_empty() { None } else { Some(list) }
+}
+
+/// Trim one free-text field, treating a blank one as absent.
+///
+/// A form always posts every field, so an untouched textarea arrives as `Some("")`. Storing that
+/// would make "no description" two distinct values in the database.
+pub(super) fn parse_text_form(input: Option<String>) -> Option<String> {
+    input
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
 }
 
 /// Split one comma/newline/semicolon-separated textarea into its non-blank entries.
@@ -386,6 +398,7 @@ async fn create_channel_handler(
         enabled,
         add_3rd_party,
         name: form.name,
+        description: parse_text_form(form.description),
         slug,
         alias_slugs: parse_list_form(form.alias_slugs),
         api_key: form.api_key,
@@ -632,6 +645,7 @@ async fn update_channel_handler(
 
     let write = ChannelWrite {
         name: form.name,
+        description: parse_text_form(form.description),
         slug,
         alias_slugs: parse_list_form(form.alias_slugs),
         api_key: form.api_key,
@@ -1338,6 +1352,7 @@ async fn create_channel_json(
 
     let write = ChannelWrite {
         name: payload.name,
+        description: parse_text_form(payload.description),
         slug,
         alias_slugs: payload.alias_slugs.unwrap_or_default(),
         api_key: payload.api_key,
@@ -1404,6 +1419,7 @@ async fn update_channel_json(
 
     let write = ChannelWrite {
         name: payload.name,
+        description: parse_text_form(payload.description),
         slug,
         alias_slugs: payload.alias_slugs.unwrap_or_default(),
         api_key: payload.api_key,
@@ -1506,6 +1522,7 @@ mod tests {
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Auto Dispatcher".to_string(),
+            description: None,
             slug: "auto-dispatcher".into(),
             alias_slugs: Vec::new(),
             api_key: None,

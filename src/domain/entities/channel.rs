@@ -65,6 +65,14 @@ pub struct Channel {
     pub id: Uuid,
     pub company_id: Uuid,
     pub name: String,
+    /// What this channel is for, in one line, as its owner wrote it.
+    ///
+    /// Shown to a teammate whose mail bounced off an address that does not exist, so the list of
+    /// channels they *could* have written to explains itself. Defaulted on deserialize for the
+    /// same reason as `enabled`: durable `background_tasks` payloads written before this field
+    /// existed must still re-hydrate.
+    #[serde(default)]
+    pub description: Option<String>,
     pub slug: ChannelSlug,
     /// Extra local parts this channel also answers on, canonical [`Channel::slug`] excluded.
     ///
@@ -419,6 +427,7 @@ mod tests {
             id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
             name: "Support".to_string(),
+            description: None,
             slug: "support".into(),
             alias_slugs: aliases.iter().map(|a| ChannelSlug::from(*a)).collect(),
             api_key: None,

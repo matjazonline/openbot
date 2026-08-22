@@ -800,6 +800,7 @@ async fn test_inter_channel_hop_limit_rejection() {
                 id: channel_id,
                 company_id,
                 name: "Inbound Flow".to_string(),
+                description: None,
                 slug: "inbound".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -825,6 +826,7 @@ async fn test_inter_channel_hop_limit_rejection() {
                 id: source_channel_id,
                 company_id,
                 name: "Source Flow".to_string(),
+                description: None,
                 slug: "source".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -951,6 +953,7 @@ async fn test_spf_authentication_failure_rejection() {
             id: channel_id,
             company_id,
             name: "Inbound Flow".to_string(),
+            description: None,
             slug: "inbound".into(),
             alias_slugs: Vec::new(),
             api_key: None,
@@ -1062,6 +1065,7 @@ async fn test_high_spam_score_rejection() {
             id: channel_id,
             company_id,
             name: "Inbound Flow".to_string(),
+            description: None,
             slug: "inbound".into(),
             alias_slugs: Vec::new(),
             api_key: None,
@@ -1175,6 +1179,7 @@ async fn test_dmarc_authentication_failure_rejection() {
             id: channel_id,
             company_id,
             name: "Inbound Flow".to_string(),
+            description: None,
             slug: "inbound".into(),
             alias_slugs: Vec::new(),
             api_key: None,
@@ -1288,6 +1293,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
             id: channel_id,
             company_id,
             name: "Restricted Flow".to_string(),
+            description: None,
             slug: "restricted".into(),
             alias_slugs: Vec::new(),
             api_key: None,
@@ -1402,6 +1408,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
             id: channel_id,
             company_id,
             name: "Restricted Flow".to_string(),
+            description: None,
             slug: "restricted".into(),
             alias_slugs: Vec::new(),
             api_key: None,
@@ -1514,6 +1521,7 @@ async fn test_channel_in_cc_resolves_properly() {
             id: channel_id,
             company_id,
             name: "Support Flow".to_string(),
+            description: None,
             slug: "support".into(),
             alias_slugs: Vec::new(),
             api_key: None,
@@ -1632,6 +1640,7 @@ async fn test_multi_channel_to_and_cc_execution() {
                 id: wf1_id,
                 company_id,
                 name: "Support".to_string(),
+                description: None,
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -1657,6 +1666,7 @@ async fn test_multi_channel_to_and_cc_execution() {
                 id: wf2_id,
                 company_id,
                 name: "Billing".to_string(),
+                description: None,
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -1787,6 +1797,7 @@ async fn test_pipeline_address_chaining_execution() {
                 id: wf1_id,
                 company_id,
                 name: "Support".to_string(),
+                description: None,
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -1812,6 +1823,7 @@ async fn test_pipeline_address_chaining_execution() {
                 id: wf2_id,
                 company_id,
                 name: "Billing".to_string(),
+                description: None,
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -1837,6 +1849,7 @@ async fn test_pipeline_address_chaining_execution() {
                 id: wf3_id,
                 company_id,
                 name: "Legal".to_string(),
+                description: None,
                 slug: "legal".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -1959,6 +1972,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Support".to_string(),
+                description: None,
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -1984,6 +1998,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Billing".to_string(),
+                description: None,
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -2126,6 +2141,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
             id: channel_id,
             company_id,
             name: "Support".to_string(),
+            description: None,
             slug: "support".into(),
             alias_slugs: Vec::new(),
             api_key: None,
@@ -2291,6 +2307,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 id: flow_team_only,
                 company_id,
                 name: "Team Only".to_string(),
+                description: None,
                 slug: "team-only".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -2316,6 +2333,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 id: flow_public,
                 company_id,
                 name: "Public Flow".to_string(),
+                description: None,
                 slug: "public-flow".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -2341,6 +2359,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 id: flow_explicit,
                 company_id,
                 name: "Explicit Flow".to_string(),
+                description: None,
                 slug: "explicit-flow".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -2508,6 +2527,7 @@ async fn test_sender_verification_and_delegation_target_check() {
             id: channel_id,
             company_id,
             name: "Support".to_string(),
+            description: None,
             slug: "support".into(),
             alias_slugs: Vec::new(),
             api_key: None,
@@ -2705,6 +2725,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
                 id: channel_a_id,
                 company_id,
                 name: "Agent A".to_string(),
+                description: None,
                 slug: "agent-a".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -2730,6 +2751,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
                 id: channel_b_id,
                 company_id,
                 name: "Agent B".to_string(),
+                description: None,
                 slug: "agent-b".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -2919,6 +2941,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 id: channel_a_id,
                 company_id,
                 name: "Agent A".to_string(),
+                description: None,
                 slug: "agent-a".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -2944,6 +2967,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 id: channel_b_id,
                 company_id,
                 name: "Agent B".to_string(),
+                description: None,
                 slug: "agent-b".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -3040,6 +3064,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 id: channel_a_id,
                 company_id,
                 name: "Agent A".to_string(),
+                description: None,
                 slug: "agent-a".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -3065,6 +3090,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 id: channel_b_id,
                 company_id,
                 name: "Agent B".to_string(),
+                description: None,
                 slug: "agent-b".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
@@ -3164,6 +3190,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
             id: channel_id,
             company_id,
             name: "Support Channel".to_string(),
+            description: None,
             slug: "support".into(),
             alias_slugs: Vec::new(),
             api_key: None,
@@ -3390,6 +3417,7 @@ async fn test_context_only_quiet_mode_ingestion() {
             id: channel_id,
             company_id,
             name: "Support Channel".to_string(),
+            description: None,
             slug: "support".into(),
             alias_slugs: Vec::new(),
             api_key: None,
@@ -3573,6 +3601,7 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
             id: channel_id,
             company_id,
             name: "Support Channel".to_string(),
+            description: None,
             slug: "support".into(),
             alias_slugs,
             api_key: None,
@@ -4089,4 +4118,310 @@ async fn unknown_slug_is_still_a_bounce_when_the_channel_has_aliases() {
         "aliases are offered as did-you-mean suggestions: {:?}",
         bounce.suggestions
     );
+}
+
+/// One channel in the [`use_cases_with_directory`] fixture.
+///
+/// Named fields rather than positional arguments: `slug`, `name` and `description` are all
+/// strings, and a transposed pair would silently build a different channel.
+struct DirectoryChannel {
+    slug: &'static str,
+    name: &'static str,
+    description: Option<&'static str>,
+    enabled: bool,
+    participant_emails: Option<Vec<EmailAddress>>,
+    agent_ids: Option<Vec<Uuid>>,
+}
+
+impl Default for DirectoryChannel {
+    fn default() -> Self {
+        Self {
+            slug: "support",
+            name: "Support",
+            description: None,
+            enabled: true,
+            participant_emails: None,
+            agent_ids: None,
+        }
+    }
+}
+
+/// A company whose channel list the bounce directory has to filter, with `team@acme.com` on the
+/// team and nobody else.
+fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) -> ThreadUseCases {
+    let company_id = Uuid::new_v4();
+
+    let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
+        vec![Company {
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: Utc::now(),
+        }],
+        vec![(company_id, "team@acme.com".to_string())],
+    ));
+
+    let channels = specs
+        .into_iter()
+        .map(|spec| Channel {
+            id: Uuid::new_v4(),
+            company_id,
+            name: spec.name.to_string(),
+            description: spec.description.map(str::to_string),
+            slug: spec.slug.into(),
+            alias_slugs: Vec::new(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: spec.participant_emails,
+            agent_ids: spec.agent_ids,
+            channel_config: None,
+            enabled: spec.enabled,
+            add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: Utc::now(),
+        })
+        .collect();
+
+    ThreadUseCases::new(
+        Arc::new(MockThreadPersistence {
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        }),
+        Arc::new(MockChannelPersistence {
+            channels: Mutex::new(channels),
+        }),
+        company_persistence,
+        Arc::new(MockTaskPersistence {
+            tasks: Mutex::new(Vec::new()),
+        }),
+        internal_test_config(),
+    )
+    .with_agent_persistence(Arc::new(MockAgentPersistence { agents }))
+}
+
+fn misspelled_message_from(sender: &str) -> RawInboundPayload {
+    RawInboundPayload {
+        headers: Some(format!("Message-ID: <typo-{sender}>\n")),
+        to: "suport@acme.mailagents.com".to_string(),
+        from: sender.to_string(),
+        subject: Some("Quick question".to_string()),
+        text: Some("Can you take a look?".to_string()),
+        ..Default::default()
+    }
+}
+
+async fn bounce_for(use_cases: &ThreadUseCases, sender: &str) -> BounceInfo {
+    let result = use_cases
+        .ingest_and_save_inbound_message(misspelled_message_from(sender))
+        .await
+        .unwrap();
+
+    assert!(!result.accepted, "reason: {:?}", result.reason);
+    assert_eq!(
+        result.reason.as_deref(),
+        Some("Channel address not found or misspelled")
+    );
+    result
+        .bounce_info
+        .expect("an unknown channel slug bounces rather than dropping the message")
+}
+
+fn listed_addresses(bounce: &BounceInfo) -> Vec<String> {
+    bounce
+        .available_channels
+        .iter()
+        .map(|entry| entry.address.to_string())
+        .collect()
+}
+
+#[tokio::test]
+async fn a_team_member_who_mistypes_a_channel_is_told_which_ones_they_can_use() {
+    let use_cases = use_cases_with_directory(
+        vec![
+            DirectoryChannel {
+                slug: "support",
+                name: "Support Desk",
+                description: Some("Answers customer support and refund questions."),
+                ..DirectoryChannel::default()
+            },
+            DirectoryChannel {
+                slug: "billing",
+                name: "Billing",
+                ..DirectoryChannel::default()
+            },
+        ],
+        Vec::new(),
+    );
+
+    let bounce = bounce_for(&use_cases, "team@acme.com").await;
+
+    assert_eq!(
+        listed_addresses(&bounce),
+        vec![
+            "billing@acme.mailagents.com".to_string(),
+            "support@acme.mailagents.com".to_string(),
+        ],
+        "every channel the sender may write to is listed, in address order"
+    );
+    assert_eq!(
+        bounce.available_channels[1].description.as_deref(),
+        Some("Answers customer support and refund questions.")
+    );
+    assert_eq!(bounce.available_channels[0].description, None);
+
+    let body = format_bounce_email_body(&bounce, "mailagents.com");
+    assert!(body.contains("Channels you can write to:"));
+    assert!(body.contains("support@acme.mailagents.com — Support Desk"));
+    assert!(body.contains("Answers customer support and refund questions."));
+    assert!(body.contains("billing@acme.mailagents.com — Billing"));
+}
+
+#[tokio::test]
+async fn an_outsider_s_bounce_never_discloses_the_channel_directory() {
+    let use_cases = use_cases_with_directory(
+        vec![DirectoryChannel {
+            slug: "support",
+            name: "Support Desk",
+            description: Some("Answers customer support and refund questions."),
+            ..DirectoryChannel::default()
+        }],
+        Vec::new(),
+    );
+
+    let bounce = bounce_for(&use_cases, "stranger@elsewhere.com").await;
+
+    assert!(
+        bounce.available_channels.is_empty(),
+        "a guessed address must not enumerate the company's channels"
+    );
+
+    let body = format_bounce_email_body(&bounce, "mailagents.com");
+    assert!(!body.contains("Channels you can write to:"));
+    assert!(!body.contains("Support Desk"));
+    assert!(
+        body.contains("Did you mean:"),
+        "the spelling hint an outsider already got is unchanged"
+    );
+}
+
+#[tokio::test]
+async fn the_directory_lists_only_what_this_sender_could_actually_reach() {
+    let use_cases = use_cases_with_directory(
+        vec![
+            DirectoryChannel {
+                slug: "support",
+                name: "Support Desk",
+                ..DirectoryChannel::default()
+            },
+            DirectoryChannel {
+                slug: "legal",
+                name: "Legal",
+                participant_emails: Some(vec![EmailAddress::from("counsel@acme.com")]),
+                ..DirectoryChannel::default()
+            },
+            DirectoryChannel {
+                slug: "archive",
+                name: "Archive",
+                enabled: false,
+                ..DirectoryChannel::default()
+            },
+        ],
+        Vec::new(),
+    );
+
+    let bounce = bounce_for(&use_cases, "team@acme.com").await;
+
+    assert_eq!(
+        listed_addresses(&bounce),
+        vec!["support@acme.mailagents.com".to_string()],
+        "a restricted channel the sender is not a participant of, and a disabled one, stay hidden"
+    );
+}
+
+#[tokio::test]
+async fn a_channel_without_its_own_description_borrows_its_agent_s() {
+    let agent_id = Uuid::new_v4();
+    let use_cases = use_cases_with_directory(
+        vec![
+            DirectoryChannel {
+                slug: "vendors",
+                name: "Supplier Desk",
+                agent_ids: Some(vec![agent_id]),
+                ..DirectoryChannel::default()
+            },
+            DirectoryChannel {
+                slug: "support",
+                name: "Support Desk",
+                ..DirectoryChannel::default()
+            },
+        ],
+        vec![Agent {
+            id: agent_id,
+            company_id: None,
+            name: "VendorResearchAgent".to_string(),
+            slug: "vendor-research".to_string(),
+            provider: None,
+            model: None,
+            api_key: None,
+            system_prompt: None,
+            description: Some("Answers supplier capacity and delivery-date questions.".to_string()),
+            config_json: None,
+            avatar_url: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: Utc::now(),
+        }],
+    );
+
+    let bounce = bounce_for(&use_cases, "team@acme.com").await;
+
+    assert_eq!(
+        bounce.available_channels[1].description.as_deref(),
+        Some("Answers supplier capacity and delivery-date questions."),
+        "a channel created before descriptions existed still explains itself"
+    );
+    assert_eq!(
+        bounce.available_channels[0].description, None,
+        "a channel with neither its own description nor an agent renders address and name only"
+    );
+
+    let body = format_bounce_email_body(&bounce, "mailagents.com");
+    assert!(body.contains("vendors@acme.mailagents.com — Supplier Desk"));
+    assert!(body.contains("      Answers supplier capacity and delivery-date questions."));
+    assert!(body.contains("support@acme.mailagents.com — Support Desk\n"));
+}
+
+#[test]
+fn the_bounce_body_omits_the_directory_section_when_there_is_nothing_to_list() {
+    let bounce = BounceInfo {
+        recipient_to: EmailAddress::from("team@acme.com"),
+        company_slug: Some(CompanySlug::from("acme")),
+        invalid_slugs: vec![ChannelSlug::from("suport")],
+        disabled_slugs: Vec::new(),
+        suggestions: vec![BounceSuggestion {
+            invalid_slug: ChannelSlug::from("suport"),
+            suggestions: vec![ChannelSlug::from("support")],
+        }],
+        available_channels: Vec::new(),
+        original_subject: "Quick question".to_string(),
+    };
+
+    let body = format_bounce_email_body(&bounce, "mailagents.com");
+    assert!(!body.contains("Channels you can write to:"));
+    assert!(body.contains("support@acme.mailagents.com"));
 }

@@ -33,9 +33,9 @@ use crate::{
 };
 
 use super::{
-    BounceInfo, BounceSuggestion, ChannelMatch, EmailIngressAdapter, InboundIngestResult,
-    InternalChannelSource, MAX_THREAD_MESSAGES_PER_HOUR, RecipientRole, ThreadUseCases,
-    durable_ingest_payload,
+    BounceInfo, BounceSuggestion, ChannelDirectoryEntry, ChannelMatch, EmailIngressAdapter,
+    InboundIngestResult, InternalChannelSource, MAX_THREAD_MESSAGES_PER_HOUR, RecipientRole,
+    ThreadUseCases, durable_ingest_payload,
     support::{
         DirectoryCache, body_mentions_email, body_mentions_slug, build_prompt_text,
         check_inbound_guards, parsed_email_from_normalized, reference_ids, strip_quoted_history,
@@ -129,13 +129,19 @@ impl UndeliverableSlugs {
         }
     }
 
-    fn into_bounce(self, parsed: &ParsedEmail, company_slug: Option<CompanySlug>) -> BounceInfo {
+    fn into_bounce(
+        self,
+        parsed: &ParsedEmail,
+        company_slug: Option<CompanySlug>,
+        available_channels: Vec<ChannelDirectoryEntry>,
+    ) -> BounceInfo {
         BounceInfo {
             recipient_to: EmailAddress::from(parsed.sender.clone()),
             company_slug,
             invalid_slugs: self.invalid,
             disabled_slugs: self.disabled,
             suggestions: self.suggestions,
+            available_channels,
             original_subject: parsed.subject.clone(),
         }
     }
@@ -294,7 +300,7 @@ impl ThreadUseCases {
         let mut seen_channels = std::collections::HashSet::new();
         let mut unauthorized_count = 0usize;
         let mut undeliverable = UndeliverableSlugs::default();
-        let mut matched_company_slug: Option<CompanySlug> = None;
+        let mut matched_company: Option<Company> = None;
 
         for (address, role) in addresses {
             let Some((company_slug, channel_slugs, is_address_context_only)) =
@@ -303,11 +309,11 @@ impl ThreadUseCases {
                 continue;
             };
             resolved.address_context_only |= is_address_context_only;
-            matched_company_slug = Some(company_slug.clone());
 
             let Some(company) = directory.company(&company_slug).await? else {
                 continue;
             };
+            matched_company = Some(company.clone());
             if let Some(source) = internal_source
                 && company.id != source.company_id
             {
@@ -376,10 +382,18 @@ impl ThreadUseCases {
         // A pipeline is all-or-nothing: one undeliverable hop bounces the whole message so the
         // sender learns about the typo (or the closed channel) instead of silently losing a step.
         if let Some(reason) = undeliverable.reason() {
+            let (company_slug, available_channels) = match matched_company {
+                Some(ref company) => (
+                    Some(company.slug.clone()),
+                    self.writable_channel_directory(company, parsed.sender.trim(), directory)
+                        .await?,
+                ),
+                None => (None, Vec::new()),
+            };
             return Ok(ControlFlow::Break(
                 InboundIngestResult::rejected_with_bounce(
                     reason,
-                    undeliverable.into_bounce(parsed, matched_company_slug),
+                    undeliverable.into_bounce(parsed, company_slug, available_channels),
                 ),
             ));
         }
@@ -400,6 +414,70 @@ impl ThreadUseCases {
         }
 
         Ok(ControlFlow::Continue(resolved))
+    }
+
+    /// The channels this sender could have written to, for the bounce body.
+    ///
+    /// Empty unless the sender is on the company's team: someone outside it who guesses at a
+    /// channel name must not learn the company's directory from the bounce they earn.
+    ///
+    /// Eligibility is decided by [`Channel::participant_access`] — the same predicate the delivery
+    /// path applies a few lines up — so the list can never advertise an address that would bounce
+    /// in turn.
+    async fn writable_channel_directory(
+        &self,
+        company: &Company,
+        sender: &str,
+        directory: &mut DirectoryCache<'_>,
+    ) -> AppResult<Vec<ChannelDirectoryEntry>> {
+        let membership = directory.membership(company.id, sender).await?;
+        if !membership.is_team() {
+            return Ok(Vec::new());
+        }
+
+        let mut entries = Vec::new();
+        for channel in directory.channels(company.id).await? {
+            if !channel.enabled || !channel.participant_access(sender, membership).authorized {
+                continue;
+            }
+            let description = match channel.description.clone() {
+                Some(own) => Some(own),
+                None => {
+                    self.responding_agent_description(&channel, directory)
+                        .await?
+                }
+            };
+            entries.push(ChannelDirectoryEntry {
+                address: channel.inbound_address(&company.slug, &self.config.app_domain_name),
+                name: channel.name.clone(),
+                description,
+            });
+        }
+
+        entries.sort_by(|a, b| a.address.cmp(&b.address));
+        Ok(entries)
+    }
+
+    /// What the channel's responding agent says it is for, when the channel itself says nothing.
+    ///
+    /// The same fallback the `list_company_agents` tool applies, so a channel created before
+    /// descriptions existed still explains itself.
+    async fn responding_agent_description(
+        &self,
+        channel: &Channel,
+        directory: &mut DirectoryCache<'_>,
+    ) -> AppResult<Option<String>> {
+        let Some(agent_id) = channel
+            .agent_ids
+            .as_ref()
+            .and_then(|ids| ids.first().copied())
+        else {
+            return Ok(None);
+        };
+        Ok(directory
+            .agent(agent_id)
+            .await?
+            .and_then(|agent| agent.description))
     }
 
     /// Loop protection, ACL and spam scoring for one candidate channel.
@@ -843,6 +921,9 @@ impl ThreadUseCases {
                     ))],
                     disabled_slugs: vec![],
                     suggestions: vec![],
+                    // This bounce fires *because* the sender has no standing on the thread, so it
+                    // must not hand them the company's channel directory.
+                    available_channels: vec![],
                     original_subject: parsed.subject.clone(),
                 },
             ),

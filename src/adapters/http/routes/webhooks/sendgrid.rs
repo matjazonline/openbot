@@ -1009,6 +1009,7 @@ mod tests {
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Inbound Flow".to_string(),
+                description: None,
                 slug: "inbound".into(),
                 alias_slugs: Vec::new(),
                 api_key: None,
