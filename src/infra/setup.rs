@@ -82,6 +82,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         )
         .with_egress_registry(egress_registry)
         .with_agent_persistence(postgres_arc.clone())
+        .with_agent_channel_provisioning(postgres_arc.clone())
         .with_approval_use_cases(approval_use_cases.clone())
         .with_monitoring(monitoring.clone())
         .with_file_storage(file_storage.clone()),

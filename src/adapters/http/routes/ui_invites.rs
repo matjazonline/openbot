@@ -16,6 +16,7 @@ use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::AppResult,
     entities::value_objects::EmailAddress,
+    infra::config::AppConfig,
     use_cases::{
         company::CompanyUseCases, company_invite::CompanyInviteUseCases, user::UserUseCases,
     },
@@ -35,11 +36,12 @@ struct InviteQuery {
     company_id: Option<Uuid>,
 }
 
-#[instrument(skip(company_use_cases, invite_use_cases, user_use_cases, user))]
+#[instrument(skip(company_use_cases, invite_use_cases, user_use_cases, config, user))]
 async fn invites_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Query(query): Query<InviteQuery>,
 ) -> AppResult<Html<String>> {
@@ -47,7 +49,7 @@ async fn invites_page(
     let (_, company) = load_readable_company(&company_use_cases, user.id, query.company_id).await?;
     let invites = invite_use_cases.list_user_invites(&account.email).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let mailbox_user = workspace_user(&account, &account_email);
+    let mailbox_user = workspace_user(&account, &account_email, &config);
 
     Ok(Html(pages::invite_settings_page(
         &pages::InviteSettingsPage {

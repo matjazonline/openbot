@@ -106,6 +106,7 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 | `JWT_SECRET` | Session signing key |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | Outbound relay credentials |
 | `SMTP_HOST` / `SMTP_FROM_ADDRESS` | Outbound relay and sender; when both are configured with a non-local host, new accounts must confirm a six-digit code sent by email. If outbound SMTP is not configured, registration skips confirmation. |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Optional Google registration/login. Set both and register `https://<APP_DOMAIN_NAME>/auth/google/callback` as an authorized redirect URI in Google Cloud. |
 | `OPENAI_API_KEY` | Or `ANTHROPIC_API_KEY` / `GROQ_API_KEY` / `GEMINI_API_KEY`, per the agent's configured provider |
 | `GCS_SERVICE_ACCOUNT_JSON_BASE64` | The Cloud Storage service account key, base64-encoded — see [Picture uploads](#picture-uploads) |
 | `JWT_SECRET` | Signs every session cookie. At least 32 characters; the app refuses to start with less |

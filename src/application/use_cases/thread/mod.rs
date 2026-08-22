@@ -10,6 +10,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::services::agent_channel_tool::AgentChannelProvisioning;
 use crate::{
     adapters::persistence::task::TaskPersistence,
     adapters::protocols::{
@@ -154,6 +155,7 @@ pub struct ThreadUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
     task_persistence: Arc<dyn TaskPersistence>,
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
+    agent_channel_provisioning: Option<Arc<dyn AgentChannelProvisioning>>,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
     egress_registry: Arc<EgressRegistry>,
@@ -180,6 +182,7 @@ impl ThreadUseCases {
             company_persistence,
             task_persistence,
             agent_persistence: None,
+            agent_channel_provisioning: None,
             approval_use_cases: None,
             monitoring: None,
             egress_registry,
@@ -195,6 +198,14 @@ impl ThreadUseCases {
 
     pub fn with_agent_persistence(mut self, agent_persistence: Arc<dyn AgentPersistence>) -> Self {
         self.agent_persistence = Some(agent_persistence);
+        self
+    }
+
+    pub fn with_agent_channel_provisioning(
+        mut self,
+        persistence: Arc<dyn AgentChannelProvisioning>,
+    ) -> Self {
+        self.agent_channel_provisioning = Some(persistence);
         self
     }
 

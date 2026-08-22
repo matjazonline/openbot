@@ -217,7 +217,7 @@ async fn schedules_page(
 ) -> AppResult<Html<String>> {
     let account = load_account(&workspace.user_use_cases, workspace.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let workspace_user = workspace_user(&account, &account_email);
+    let workspace_user = workspace_user(&account, &account_email, &workspace.config);
 
     let (companies, company) = workspace.scoped_company(query.company_id).await?;
     let Some(company) = company else {
@@ -825,6 +825,7 @@ mod tests {
             username: "admin",
             email: &user_email,
             avatar_url: None,
+            is_operator: false,
         };
 
         let run = ScheduleRun {
@@ -912,6 +913,7 @@ mod tests {
             username: "admin",
             email: &user_email,
             avatar_url: None,
+            is_operator: false,
         };
 
         let html = schedules_page(&SchedulesPage {

@@ -124,6 +124,8 @@ pub struct ComposeForm {
     pub text_body: Option<String>,
     /// Present only when the "deliver by email" toggle is on.
     pub deliver: Option<String>,
+    /// Present only when the message should be stored without running the agent.
+    pub quiet: Option<String>,
 }
 
 /// A further message in a thread that is already open; its subject comes from the thread.
@@ -135,11 +137,22 @@ pub struct ReplyForm {
     pub text_body: Option<String>,
     /// Present only when the "deliver by email" toggle is on.
     pub deliver: Option<String>,
+    /// Present only when the message should be stored without running the agent.
+    pub quiet: Option<String>,
 }
 
 /// How the "deliver by email" toggle arrives on both send forms.
 fn delivery_requested(deliver: Option<&str>) -> bool {
     matches!(deliver, Some("true") | Some("on"))
+}
+
+/// Quiet messages use the same explicit context-only marker accepted by inbound email.
+fn message_body(text_body: &str, quiet: bool) -> String {
+    if quiet {
+        format!("[[quiet]] {text_body}")
+    } else {
+        text_body.to_string()
+    }
 }
 
 /// Delivering means the agent's reply is really emailed; otherwise it stays in the mailbox.
@@ -276,6 +289,7 @@ async fn render_message_pane(
     channel: &Channel,
     thread: &Thread,
     agent: Option<&Agent>,
+    viewer_email: &EmailAddress,
 ) -> AppResult<String> {
     let messages = thread_use_cases.get_thread_history(thread.id).await?;
     Ok(pages::message_pane(&pages::MessagePane {
@@ -284,6 +298,7 @@ async fn render_message_pane(
         thread,
         messages: &messages,
         agent,
+        viewer_email,
         activity: thread_activity(thread_use_cases, thread.id).await?,
     }))
 }
@@ -311,7 +326,7 @@ async fn mailbox_page(
 ) -> AppResult<Html<String>> {
     let account = load_account(&user_use_cases, user.id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let mailbox_user = workspace_user(&account, &account_email);
+    let mailbox_user = workspace_user(&account, &account_email, &config);
 
     let (companies, access) =
         load_readable_company(&company_use_cases, user.id, query.company_id).await?;
@@ -350,6 +365,7 @@ async fn mailbox_page(
                 channel,
                 thread,
                 agent.as_ref(),
+                &viewer.email,
             )
             .await?
         }
@@ -478,6 +494,7 @@ async fn message_pane_fragment(
             &channel,
             &thread,
             agent.as_ref(),
+            &viewer.email,
         )
         .await?,
     ))
@@ -619,6 +636,7 @@ async fn thread_message_stream(
                                 .data(pages::message_bubble_chat(
                                     message,
                                     agent.as_ref(),
+                                    Some(&viewer.email),
                                     pages::MessageScope {
                                         company_id: query.company_id,
                                         channel_id: channel.id,
@@ -825,6 +843,7 @@ async fn compose_form(
         subject: "",
         text_body: "",
         deliver: false,
+        quiet: false,
         error: None,
     })))
 }
@@ -870,6 +889,7 @@ async fn create_thread(
     let subject = form.subject.unwrap_or_default();
     let text_body = form.text_body.unwrap_or_default();
     let deliver = delivery_requested(form.deliver.as_deref());
+    let quiet = delivery_requested(form.quiet.as_deref());
 
     let compose_error = |message: String| {
         Html(pages::compose_pane(&pages::ComposePane {
@@ -880,6 +900,7 @@ async fn create_thread(
             subject: &subject,
             text_body: &text_body,
             deliver,
+            quiet,
             error: Some(&message),
         }))
         .into_response()
@@ -895,7 +916,7 @@ async fn create_thread(
         to: address.to_string(),
         from: sender_email.clone(),
         subject: Some(subject.clone()),
-        text: Some(text_body.clone()),
+        text: Some(message_body(&text_body, quiet)),
         ..Default::default()
     };
     let ingest = match thread_use_cases
@@ -921,6 +942,7 @@ async fn create_thread(
         &channel,
         &thread,
         agent.as_ref(),
+        &viewer.email,
     )
     .await
 }
@@ -964,6 +986,7 @@ async fn reply_form(
         sender_email: &sender_email,
         text_body: "",
         deliver: false,
+        quiet: false,
         error: None,
     })))
 }
@@ -1008,6 +1031,7 @@ async fn send_reply(
 
     let text_body = form.text_body.unwrap_or_default();
     let deliver = delivery_requested(form.deliver.as_deref());
+    let quiet = delivery_requested(form.quiet.as_deref());
 
     let reply_error = |message: String| {
         Html(pages::reply_pane(&pages::ReplyPane {
@@ -1018,6 +1042,7 @@ async fn send_reply(
             sender_email: &sender_email,
             text_body: &text_body,
             deliver,
+            quiet,
             error: Some(&message),
         }))
         .into_response()
@@ -1035,7 +1060,7 @@ async fn send_reply(
         to: address.to_string(),
         from: sender_email.clone(),
         subject: Some(thread.reply_subject()),
-        text: Some(text_body.clone()),
+        text: Some(message_body(&text_body, quiet)),
         headers: reply_headers(in_reply_to),
         ..Default::default()
     };
@@ -1063,6 +1088,7 @@ async fn send_reply(
         &channel,
         &sent_thread,
         agent.as_ref(),
+        &viewer.email,
     )
     .await
 }
@@ -1074,8 +1100,17 @@ async fn sent_message_response(
     channel: &Channel,
     thread: &Thread,
     agent: Option<&Agent>,
+    viewer_email: &EmailAddress,
 ) -> AppResult<Response> {
-    let pane = render_message_pane(thread_use_cases, company_id, channel, thread, agent).await?;
+    let pane = render_message_pane(
+        thread_use_cases,
+        company_id,
+        channel,
+        thread,
+        agent,
+        viewer_email,
+    )
+    .await?;
     let page = load_thread_page(thread_use_cases, channel.id, &ThreadListQuery::default()).await?;
     let activity = page_activity(thread_use_cases, &page.threads).await?;
     let refreshed_list = pages::thread_list_oob(&pages::ThreadColumn {
@@ -1105,15 +1140,22 @@ async fn sent_message_response(
 ///
 /// The address is passed in rather than derived here because the caller already needs it as an
 /// [`EmailAddress`] of its own, and the shell borrows both for the length of the render.
+/// The signed-in reader as the `/ui` chrome shows them.
+///
+/// Operator status is settled here rather than at each call site, so every workspace's account
+/// menu offers the same set of entries -- the alternative is one page deciding differently from
+/// the next about who is an operator.
 pub(super) fn workspace_user<'a>(
     account: &'a User,
     account_email: &'a EmailAddress,
+    config: &AppConfig,
 ) -> pages::MailboxUser<'a> {
     pages::MailboxUser {
         id: account.id,
         username: &account.username,
         email: account_email,
         avatar_url: account.avatar_url.as_ref(),
+        is_operator: config.is_operator(account_email),
     }
 }
 

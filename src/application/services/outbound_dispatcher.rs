@@ -74,6 +74,13 @@ pub struct SentEmailResult {
     pub trace_channels: Vec<Uuid>,
 }
 
+/// Wrap an agent's answer in the shared plain-text email template.
+///
+/// Keep this at the delivery boundary so the thread and API retain the agent's original answer.
+pub fn agent_response_email_body(response: &str) -> String {
+    format!("{response}\n\nDone by busybots.net")
+}
+
 /// Mails confirmation codes over this deployment's SMTP relay.
 ///
 /// It exists so [`crate::use_cases::user::UserUseCases`] depends on the *act* of sending a code
@@ -535,6 +542,14 @@ mod tests {
             hop_count: 0,
             trace_channels: Vec::new(),
         }
+    }
+
+    #[test]
+    fn agent_response_email_template_adds_busy_bots_footer() {
+        assert_eq!(
+            agent_response_email_body("The report is ready."),
+            "The report is ready.\n\nDone by busybots.net"
+        );
     }
 
     #[tokio::test]

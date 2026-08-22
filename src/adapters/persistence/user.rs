@@ -11,9 +11,9 @@ use crate::{
         value_objects::{AvatarUrl, EmailAddress},
     },
     use_cases::user::{
-        AccountChange, AccountChangeKind, AccountChangePersistence, PendingAccountChange,
-        PendingChange, PendingRegistration, ProfileUpdate, RegistrationPersistence,
-        UserPersistence,
+        AccountChange, AccountChangeKind, AccountChangePersistence, GoogleIdentity, LoginMethod,
+        PendingAccountChange, PendingChange, PendingRegistration, ProfileUpdate,
+        RegistrationPersistence, UserPersistence,
     },
 };
 
@@ -76,6 +76,13 @@ impl RegistrationPersistence for PostgresPersistence {
         .map_err(AppError::from)?;
 
         if user.is_some() {
+            sqlx::query(
+                "INSERT INTO user_login_methods (user_id, provider) VALUES ($1, 'password')",
+            )
+            .bind(user.as_ref().expect("checked above").id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(AppError::from)?;
             sqlx::query("DELETE FROM pending_user_registrations WHERE email = $1")
                 .bind(email.as_str())
                 .execute(&mut *transaction)
@@ -110,19 +117,26 @@ impl UserPersistence for PostgresPersistence {
     ) -> AppResult<User> {
         let uuid = Uuid::new_v4();
 
-        let db = sqlx::query_as!(
-            UserDb,
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        let db = sqlx::query_as::<_, UserDb>(
             r#"INSERT INTO users (id, username, email, password_hash)
                VALUES ($1, $2, $3, $4)
-               RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
-            uuid,
-            username,
-            email,
-            password_hash
+               RETURNING id, username, email, password_hash, avatar_url, created_at"#,
         )
-        .fetch_one(&self.pool)
+        .bind(uuid)
+        .bind(username)
+        .bind(email)
+        .bind(password_hash)
+        .fetch_one(&mut *transaction)
         .await
         .map_err(AppError::from)?;
+
+        sqlx::query("INSERT INTO user_login_methods (user_id, provider) VALUES ($1, 'password')")
+            .bind(uuid)
+            .execute(&mut *transaction)
+            .await
+            .map_err(AppError::from)?;
+        transaction.commit().await.map_err(AppError::from)?;
 
         Ok(db.into())
     }
@@ -219,6 +233,88 @@ impl UserPersistence for PostgresPersistence {
         .map_err(AppError::from)?;
 
         Ok(result.map(Into::into))
+    }
+
+    async fn has_login_method(&self, id: Uuid, method: LoginMethod) -> AppResult<bool> {
+        sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM user_login_methods WHERE user_id = $1 AND provider = $2)",
+        )
+        .bind(id)
+        .bind(method.as_str())
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::from)
+    }
+
+    async fn create_google_user(&self, identity: GoogleIdentity<'_>) -> AppResult<User> {
+        let id = Uuid::new_v4();
+        let base = google_username(identity.display_name, identity.email.as_str());
+        let username = format!("{}-{}", base, &id.simple().to_string()[..8]);
+        // Not an Argon2 hash, and password authentication checks the method table before parsing.
+        let password_hash = format!("google-only:{id}");
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        let user = sqlx::query_as::<_, UserDb>(
+            r#"INSERT INTO users (id, username, email, password_hash)
+               VALUES ($1, $2, $3, $4)
+               RETURNING id, username, email, password_hash, avatar_url, created_at"#,
+        )
+        .bind(id)
+        .bind(username)
+        .bind(identity.email.as_str())
+        .bind(password_hash)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        sqlx::query(
+            "INSERT INTO user_login_methods (user_id, provider, provider_subject) VALUES ($1, 'google', $2)",
+        )
+        .bind(id)
+        .bind(identity.subject)
+        .execute(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        transaction.commit().await.map_err(AppError::from)?;
+        Ok(user.into())
+    }
+
+    async fn get_by_google_subject(&self, subject: &str) -> AppResult<Option<User>> {
+        sqlx::query_as::<_, UserDb>(
+            r#"SELECT users.id, users.username, users.email, users.password_hash,
+                      users.avatar_url, users.created_at
+               FROM users
+               JOIN user_login_methods methods ON methods.user_id = users.id
+               WHERE methods.provider = 'google' AND methods.provider_subject = $1"#,
+        )
+        .bind(subject)
+        .fetch_optional(&self.pool)
+        .await
+        .map(|user| user.map(Into::into))
+        .map_err(AppError::from)
+    }
+}
+
+fn google_username(display_name: Option<&str>, email: &str) -> String {
+    let source = display_name
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or_else(|| email.split('@').next().unwrap_or("user"));
+    let normalized: String = source
+        .chars()
+        .filter_map(|character| {
+            if character.is_ascii_alphanumeric() {
+                Some(character.to_ascii_lowercase())
+            } else if character == ' ' || character == '-' || character == '_' {
+                Some('-')
+            } else {
+                None
+            }
+        })
+        .take(40)
+        .collect();
+    let name = normalized.trim_matches('-');
+    if name.is_empty() {
+        "user".to_string()
+    } else {
+        name.to_string()
     }
 }
 
@@ -456,7 +552,7 @@ mod tests {
         let Some(pool) = test_pool().await else {
             return;
         };
-        let persistence = PostgresPersistence::new(pool);
+        let persistence = std::sync::Arc::new(PostgresPersistence::new(pool));
         let user = account(&persistence).await;
         let moved_to = EmailAddress::from(format!("moved_{}@example.com", Uuid::new_v4().simple()));
 
@@ -675,6 +771,100 @@ mod tests {
                 .expect("the account")
                 .email,
             mover.email
+        );
+    }
+
+    #[tokio::test]
+    async fn accounts_only_receive_the_login_method_they_registered() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = std::sync::Arc::new(PostgresPersistence::new(pool));
+        let suffix = Uuid::new_v4().simple().to_string();
+        let password_user = persistence
+            .create_user(
+                &format!("password-{suffix}"),
+                &format!("password-{suffix}@example.com"),
+                "hash",
+            )
+            .await
+            .expect("password registration");
+        assert!(
+            persistence
+                .has_login_method(password_user.id, LoginMethod::Password)
+                .await
+                .expect("method lookup")
+        );
+        assert!(
+            !persistence
+                .has_login_method(password_user.id, LoginMethod::Google)
+                .await
+                .expect("method lookup")
+        );
+
+        let google_email = EmailAddress::from(format!("google-{suffix}@example.com"));
+        let google_subject = format!("google-subject-{suffix}");
+        let google_user = persistence
+            .create_google_user(GoogleIdentity {
+                subject: &google_subject,
+                email: &google_email,
+                display_name: Some("Google Person"),
+            })
+            .await
+            .expect("Google registration");
+        assert!(
+            persistence
+                .has_login_method(google_user.id, LoginMethod::Google)
+                .await
+                .expect("method lookup")
+        );
+        assert!(
+            !persistence
+                .has_login_method(google_user.id, LoginMethod::Password)
+                .await
+                .expect("method lookup")
+        );
+        assert_eq!(
+            persistence
+                .get_by_google_subject(&google_subject)
+                .await
+                .expect("Google lookup")
+                .expect("registered identity")
+                .id,
+            google_user.id
+        );
+        assert!(
+            persistence
+                .get_by_google_subject("some-other-google-subject")
+                .await
+                .expect("Google lookup")
+                .is_none()
+        );
+
+        let use_cases = crate::use_cases::user::UserUseCases::new(
+            std::sync::Arc::new(crate::infra::argon2_password_hasher()),
+            persistence.clone(),
+        );
+        assert!(matches!(
+            use_cases
+                .login(
+                    &google_user.email,
+                    &secrecy::SecretString::from("irrelevant-password")
+                )
+                .await,
+            Err(AppError::InvalidCredentials)
+        ));
+        assert!(matches!(
+            use_cases.login_google("some-other-google-subject").await,
+            Err(AppError::InvalidCredentials)
+        ));
+        assert_eq!(
+            use_cases
+                .login_google(&google_subject)
+                .await
+                .expect("registered Google login")
+                .id,
+            google_user.id
         );
     }
 }

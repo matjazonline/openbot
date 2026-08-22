@@ -37,6 +37,7 @@ use crate::{
         task::BackgroundTask,
         value_objects::EmailAddress,
     },
+    infra::config::AppConfig,
     use_cases::{
         channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases,
         user::UserUseCases,
@@ -98,6 +99,7 @@ struct Workspace {
     channel_use_cases: Arc<ChannelUseCases>,
     thread_use_cases: Arc<ThreadUseCases>,
     user_use_cases: Arc<UserUseCases>,
+    config: Arc<AppConfig>,
     user_id: Uuid,
 }
 
@@ -115,6 +117,7 @@ impl FromRequestParts<AppState> for Workspace {
             channel_use_cases: state.channel_use_cases.clone(),
             thread_use_cases: state.thread_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
+            config: state.config.clone(),
             user_id: user.id,
         })
     }
@@ -147,7 +150,7 @@ async fn outbox_page(
 ) -> AppResult<Html<String>> {
     let account = load_account(&workspace.user_use_cases, workspace.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let workspace_user = workspace_user(&account, &account_email);
+    let workspace_user = workspace_user(&account, &account_email, &workspace.config);
 
     let (companies, company) = load_scoped_company(
         &workspace.company_use_cases,

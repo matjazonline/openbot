@@ -24,6 +24,27 @@ const CONFIRMATION_TTL_MINUTES: i64 = 15;
 /// one longer password, and refusing to lower it costs nobody anything.
 pub const MIN_PASSWORD_CHARS: usize = 8;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoginMethod {
+    Password,
+    Google,
+}
+
+impl LoginMethod {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Password => "password",
+            Self::Google => "google",
+        }
+    }
+}
+
+pub struct GoogleIdentity<'a> {
+    pub subject: &'a str,
+    pub email: &'a EmailAddress,
+    pub display_name: Option<&'a str>,
+}
+
 pub struct PendingRegistration<'a> {
     pub username: &'a str,
     pub email: &'a EmailAddress,
@@ -99,6 +120,22 @@ pub trait UserPersistence: Send + Sync {
     /// Stores an already-hashed password. Takes the hash rather than the password so the plaintext
     /// never reaches the adapter layer. `Ok(None)` means no such user.
     async fn update_password_hash(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>>;
+
+    async fn has_login_method(&self, _id: Uuid, method: LoginMethod) -> AppResult<bool> {
+        // Keeps lightweight persistence doubles focused on the behavior they test. Production
+        // persistence overrides this and treats the table as authoritative.
+        Ok(method == LoginMethod::Password)
+    }
+
+    async fn create_google_user(&self, _identity: GoogleIdentity<'_>) -> AppResult<User> {
+        Err(AppError::Internal(
+            "Google registration is not supported by this persistence".into(),
+        ))
+    }
+
+    async fn get_by_google_subject(&self, _subject: &str) -> AppResult<Option<User>> {
+        Ok(None)
+    }
 }
 
 /// Which account field a pending change will write when its code arrives.
@@ -446,6 +483,14 @@ impl UserUseCases {
             return Err(AppError::InvalidCredentials);
         };
 
+        if !self
+            .persistence
+            .has_login_method(user.id, LoginMethod::Password)
+            .await?
+        {
+            return Err(AppError::InvalidCredentials);
+        }
+
         let is_valid = self
             .hasher
             .verify_password(password.expose_secret(), &user.password_hash)?;
@@ -456,6 +501,32 @@ impl UserUseCases {
 
         info!("User login successful for {}", user.username);
         Ok(user)
+    }
+
+    pub async fn register_google(&self, identity: GoogleIdentity<'_>) -> AppResult<User> {
+        if self
+            .persistence
+            .get_by_email(&identity.email)
+            .await?
+            .is_some()
+            || self
+                .persistence
+                .get_by_google_subject(identity.subject)
+                .await?
+                .is_some()
+        {
+            return Err(AppError::BadRequest(
+                "An account with that Google identity or email already exists. Sign in using the method you registered.".into(),
+            ));
+        }
+        self.persistence.create_google_user(identity).await
+    }
+
+    pub async fn login_google(&self, subject: &str) -> AppResult<User> {
+        self.persistence
+            .get_by_google_subject(subject)
+            .await?
+            .ok_or(AppError::InvalidCredentials)
     }
 
     #[instrument(skip(self))]
@@ -551,6 +622,16 @@ impl UserUseCases {
         change: PasswordChange<'_>,
     ) -> AppResult<PasswordOutcome> {
         let user = self.account(id).await?;
+
+        if !self
+            .persistence
+            .has_login_method(id, LoginMethod::Password)
+            .await?
+        {
+            return Err(AppError::BadRequest(
+                "This account was not registered with a password.".into(),
+            ));
+        }
 
         if !self
             .hasher

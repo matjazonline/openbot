@@ -24,7 +24,7 @@ use crate::{
     infra::config::AppConfig,
     services::{
         agent_runner::{AgentRunner, ResolvedAgentParams},
-        outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
+        outbound_dispatcher::{OutboundDispatcher, OutboundEmail, agent_response_email_body},
     },
     use_cases::{
         schedule::{SCHEDULED_AGENT_RUN_TASK, ScheduleUseCases},
@@ -978,7 +978,7 @@ impl TaskWorker {
             recipient_to: primary_to.clone(),
             recipients_cc: cc_list.to_vec(),
             subject: reply_subject(&payload.subject),
-            body_text: answer.to_string(),
+            body_text: agent_response_email_body(answer),
             hop_count: 0,
             trace_channels: vec![channel.id],
         };
@@ -1960,6 +1960,7 @@ mod tests {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
 
@@ -2128,6 +2129,7 @@ mod tests {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
 
@@ -2259,6 +2261,7 @@ mod tests {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
 
@@ -2389,7 +2392,10 @@ mod tests {
             email.recipients_cc,
             vec![EmailAddress::from("cc@example.com")]
         );
-        assert_eq!(email.body_text, "Audit complete: nothing to report.");
+        assert_eq!(
+            email.body_text,
+            "Audit complete: nothing to report.\n\nDone by busybots.net"
+        );
         assert_eq!(email.subject, "Re: Audit Report");
     }
 

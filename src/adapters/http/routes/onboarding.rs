@@ -265,6 +265,7 @@ mod tests {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         };
 

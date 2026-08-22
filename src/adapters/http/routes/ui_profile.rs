@@ -28,6 +28,7 @@ use crate::{
         user::User,
         value_objects::{AvatarUrl, EmailAddress},
     },
+    infra::config::AppConfig,
     use_cases::{
         company::CompanyUseCases,
         user::{
@@ -111,14 +112,18 @@ impl Account {
 
     /// The pane, plus the top bar's account chip out of band -- a rename, a new picture or a
     /// confirmed address has to reach the chrome as well as the form that made it.
-    fn pane_with_chip(&self, outcome: pages::ProfileOutcome<'_>) -> Html<String> {
+    fn pane_with_chip(
+        &self,
+        config: &AppConfig,
+        outcome: pages::ProfileOutcome<'_>,
+    ) -> Html<String> {
         let email = EmailAddress::from(self.user.email.as_str());
 
         Html(format!(
             "{}{}",
             self.pane(None, outcome),
             pages::account_chip(
-                &workspace_user(&self.user, &email),
+                &workspace_user(&self.user, &email, config),
                 pages::FragmentSwap::OutOfBand,
             ),
         ))
@@ -126,10 +131,11 @@ impl Account {
 }
 
 /// GET /ui/profile - The account's own settings (Protected).
-#[instrument(skip(company_use_cases, user_use_cases, user))]
+#[instrument(skip(company_use_cases, user_use_cases, config, user))]
 async fn profile_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Query(query): Query<ProfileQuery>,
 ) -> AppResult<Html<String>> {
@@ -140,7 +146,7 @@ async fn profile_page(
     let account_email = EmailAddress::from(account.user.email.as_str());
 
     Ok(Html(pages::profile_page(&pages::ProfilePage {
-        user: &workspace_user(&account.user, &account_email),
+        user: &workspace_user(&account.user, &account_email, &config),
         company: company.as_ref().map(|access| &access.company),
         pane_html: &pane_html,
     })))
@@ -149,9 +155,10 @@ async fn profile_page(
 /// PUT /ui/profile - Save the account's picture, name and address (Protected).
 ///
 /// The account is always the caller's own: there is no id in the URL to point somewhere else.
-#[instrument(skip(user_use_cases, user, form))]
+#[instrument(skip(user_use_cases, config, user, form))]
 async fn update_profile(
     State(user_use_cases): State<Arc<UserUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Form(form): Form<IdentityForm>,
 ) -> AppResult<Html<String>> {
@@ -210,10 +217,10 @@ async fn update_profile(
         _ => "Your account details are saved.".to_string(),
     };
 
-    Ok(account.pane_with_chip(pages::ProfileOutcome::Saved(
-        pages::ProfileForm::Identity,
-        &message,
-    )))
+    Ok(account.pane_with_chip(
+        &config,
+        pages::ProfileOutcome::Saved(pages::ProfileForm::Identity, &message),
+    ))
 }
 
 /// PUT /ui/profile/password - Ask to replace the account's password (Protected).
@@ -274,9 +281,10 @@ async fn change_password(
 
 /// POST /ui/profile/changes/{kind} - Turn a mailed code into the change it was sent for
 /// (Protected).
-#[instrument(skip(user_use_cases, user, form))]
+#[instrument(skip(user_use_cases, config, user, form))]
 async fn confirm_change(
     State(user_use_cases): State<Arc<UserUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path(kind): Path<String>,
     Form(form): Form<CodeForm>,
@@ -297,7 +305,7 @@ async fn confirm_change(
 
         // The chip rides along either way: a confirmed address rewrites what the bar says the
         // reader is signed in as.
-        return Ok(account.pane_with_chip(pages::ProfileOutcome::Saved(section, &message)));
+        return Ok(account.pane_with_chip(&config, pages::ProfileOutcome::Saved(section, &message)));
     };
 
     rejected(

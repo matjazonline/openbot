@@ -2,14 +2,18 @@
 
 use super::*;
 
-pub fn login_page() -> String {
-    let content = r##"
+pub fn login_page(google_enabled: bool) -> String {
+    let google = google_button("login", "Sign in with Google", google_enabled);
+    let content = format!(
+        r##"
         <div class="mb-6 text-center">
             <h1 class="text-2xl font-bold">Welcome back</h1>
             <p class="mt-2 text-sm text-base-content/60">Sign in to continue to BusyBots.</p>
         </div>
 
         <div id="response-message"></div>
+
+        {google}
 
         <form hx-post="/api/user/login" hx-target="#response-message" hx-swap="innerHTML" class="space-y-5">
             <fieldset class="fieldset">
@@ -31,19 +35,24 @@ pub fn login_page() -> String {
             Don't have an account?
             <a href="/register" class="link link-primary ml-1 font-medium">Sign up</a>
         </div>
-    "##;
+    "##
+    );
 
-    public_layout("Login", content)
+    public_layout("Login", &content)
 }
 
-pub fn register_page() -> String {
-    let content = r##"
+pub fn register_page(google_enabled: bool) -> String {
+    let google = google_button("register", "Register with Google", google_enabled);
+    let content = format!(
+        r##"
         <div class="mb-6 text-center">
             <h1 class="text-2xl font-bold">Create an account</h1>
             <p class="mt-2 text-sm text-base-content/60">Get started with BusyBots.</p>
         </div>
 
         <div id="response-message"></div>
+
+        {google}
 
         <form hx-post="/api/user/register" hx-target="#response-message" hx-swap="innerHTML" class="space-y-4">
             <fieldset class="fieldset">
@@ -77,9 +86,20 @@ pub fn register_page() -> String {
             Already have an account?
             <a href="/login" class="link link-primary ml-1 font-medium">Sign in</a>
         </div>
-    "##;
+    "##
+    );
 
-    public_layout("Register", content)
+    public_layout("Register", &content)
+}
+
+fn google_button(action: &str, label: &str, enabled: bool) -> String {
+    if !enabled {
+        return String::new();
+    }
+    format!(
+        r##"<a href="/auth/google/{action}" class="btn btn-outline w-full">{label}</a>
+        <div class="divider text-xs text-base-content/50">OR</div>"##
+    )
 }
 
 pub fn confirmation_form(email: &str) -> String {

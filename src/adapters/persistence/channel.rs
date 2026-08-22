@@ -10,6 +10,7 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         channel::Channel,
+        creation::CreationProvenance,
         value_objects::{ChannelSlug, CompanySlug, EmailAddress},
     },
     use_cases::channel::{ChannelPersistence, ChannelWrite},
@@ -30,6 +31,7 @@ pub struct ChannelDb {
     pub channel_config: Option<serde_json::Value>,
     pub enabled: bool,
     pub add_3rd_party: bool,
+    pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
 }
 
@@ -51,6 +53,8 @@ impl From<ChannelDb> for Channel {
             channel_config: db.channel_config,
             enabled: db.enabled,
             add_3rd_party: db.add_3rd_party,
+            created_by: serde_json::from_value(db.created_by)
+                .expect("channels.created_by must match CreationProvenance"),
             created_at: db.created_at,
         }
     }
@@ -79,7 +83,7 @@ const CHANNEL_SELECT: &str = r#"
            END AS participant_emails,
            (SELECT array_agg(ca.agent_id ORDER BY ca.position)
             FROM channel_agents ca WHERE ca.channel_id = ch.id) AS agent_ids,
-           ch.channel_config, ch.enabled, ch.add_3rd_party, ch.created_at
+           ch.channel_config, ch.enabled, ch.add_3rd_party, ch.created_by, ch.created_at
     FROM channels ch
 "#;
 
@@ -175,8 +179,8 @@ impl ChannelPersistence for PostgresPersistence {
         sqlx::query(
             r#"INSERT INTO channels (
                     id, company_id, name, access_mode, api_key, provider, model,
-                    channel_config, enabled, add_3rd_party
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
+                    channel_config, enabled, add_3rd_party, created_by
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"#,
         )
         .bind(uuid)
         .bind(company_id)
@@ -188,6 +192,10 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(write.channel_config)
         .bind(write.enabled)
         .bind(write.add_3rd_party)
+        .bind(
+            serde_json::to_value(write.created_by.unwrap_or_else(CreationProvenance::system))
+                .map_err(|e| AppError::Internal(e.to_string()))?,
+        )
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -438,6 +446,7 @@ mod tests {
                 // Deliberately the opposite of `enabled`, so a swapped pair of same-typed binds
                 // cannot pass this test.
                 add_3rd_party: false,
+                created_by: None,
             },
         )
         .await
@@ -484,6 +493,7 @@ mod tests {
                 slug: "inbound-email-v2".into(),
                 enabled: false,
                 add_3rd_party: true,
+                created_by: None,
                 ..ChannelWrite::default()
             },
         )

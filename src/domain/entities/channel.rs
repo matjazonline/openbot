@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::entities::company_member::CompanyMembership;
-use crate::entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress};
+use crate::entities::{
+    creation::CreationProvenance,
+    value_objects::{ChannelSlug, CompanySlug, EmailAddress},
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
@@ -91,6 +94,7 @@ pub struct Channel {
     /// Defaulted on deserialize for the same reason as `enabled`.
     #[serde(default = "default_true")]
     pub add_3rd_party: bool,
+    pub created_by: CreationProvenance,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -408,6 +412,7 @@ mod tests {
             channel_config: None,
             enabled: true,
             add_3rd_party: true,
+            created_by: CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         }
     }

@@ -361,6 +361,7 @@ pub fn schedule_thread_pane(props: &ScheduleThreadPaneProps<'_>) -> String {
             message_bubble_chat(
                 msg,
                 props.agent,
+                None,
                 MessageScope {
                     company_id: props.company_id,
                     channel_id: props.channel.map(|channel| channel.id).unwrap_or_default(),

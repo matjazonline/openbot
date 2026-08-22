@@ -63,21 +63,47 @@ const CHANNEL_SETTINGS_SCRIPT: &str = r##"        function showChannelTab(advanc
         // A channel can run several agents in order, but a urlencoded form keeps only the last
         // value of a repeated name — so the options feed one hidden comma-separated field.
         //
-        // Library definitions use one dropdown; custom company definitions remain compact radios.
-        // Both feed the same hidden field consumed by the server.
+        // Library definitions are picked from a modal of cards and land in a hidden field; custom
+        // company definitions remain compact radios. Both feed the same field the server reads.
         function syncChannelAgents(el) {
             var form = el.closest('form');
             if (!form) return;
+            var fromLibrary = el.classList.contains('channel-library-agent-field');
             var options = form.querySelectorAll('.channel-agent-option');
             Array.prototype.forEach.call(options, function (option) {
-                if (el.tagName === 'SELECT' || option !== el) option.checked = false;
+                if (fromLibrary || option !== el) option.checked = false;
             });
-            var library = form.querySelector('.channel-library-agent-select');
-            if (library && library !== el) library.value = '';
+            if (!fromLibrary) setChannelLibraryAgent(form, '', '');
             var target = form.querySelector('input[name="agent_ids"]');
             if (!target) return;
             var checked = form.querySelector('.channel-agent-option:checked');
-            target.value = el.tagName === 'SELECT' ? el.value : (checked ? checked.value : '');
+            target.value = fromLibrary ? el.value : (checked ? checked.value : '');
+        }
+
+        // The library choice lives in a hidden field, so the button that opens the modal and the
+        // card inside it are what has to be kept in step with the value.
+        function setChannelLibraryAgent(form, id, name) {
+            var field = form.querySelector('.channel-library-agent-field');
+            if (!field) return;
+            field.value = id;
+            var label = form.querySelector('.channel-library-agent-label');
+            if (label) label.textContent = name || label.dataset.placeholder;
+            var cards = form.querySelectorAll('.channel-library-agent-card');
+            Array.prototype.forEach.call(cards, function (card) {
+                card.classList.toggle('border-primary', !!id && card.dataset.agentId === id);
+            });
+        }
+
+        // Picking a card is the whole modal: it fills the hidden field, clears any radio through
+        // the shared sync, and closes.
+        function pickChannelLibraryAgent(card) {
+            var form = card.closest('form');
+            if (!form) return;
+            setChannelLibraryAgent(form, card.dataset.agentId, card.dataset.agentName);
+            var field = form.querySelector('.channel-library-agent-field');
+            if (field) syncChannelAgents(field);
+            var dialog = card.closest('dialog');
+            if (dialog) dialog.close();
         }"##;
 
 /// The channel list in the sidebar — the only part of the workspace a write has to refresh.
@@ -313,6 +339,7 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
                 <div class="min-w-0">
                     <h2 class="truncate text-xl font-bold">{name}</h2>
                     <p class="truncate font-mono text-xs opacity-60">{address}</p>
+                    <p class="truncate text-xs opacity-50">{creator}</p>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
                     <a href="/ui?company_id={company_id}&channel_id={channel_id}" class="btn btn-ghost btn-sm">Open Mailbox</a>
@@ -352,6 +379,7 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
             pane.company,
             pane.app_domain_name
         )),
+        creator = escape_html_text(&pane.channel.created_by.label()),
         error_html = form_error_banner(pane.error),
         fields = channel_fields(&ChannelFields {
             company: pane.company,
@@ -640,25 +668,7 @@ fn agent_radios(company_id: Uuid, agents: &[Agent], selected: &[Uuid], id_prefix
         r#"<p class="px-3 py-2 text-xs opacity-60">No library agents are available.</p>"#
             .to_string()
     } else {
-        let options = library
-            .iter()
-            .map(|agent| {
-                format!(
-                    r#"<option value="{id}"{selected}>{name} (@{slug})</option>"#,
-                    id = agent.id,
-                    selected = if selected.contains(&agent.id) {
-                        " selected"
-                    } else {
-                        ""
-                    },
-                    name = escape_html_text(&agent.name),
-                    slug = escape_html_text(&agent.slug),
-                )
-            })
-            .collect::<String>();
-        format!(
-            r#"<select class="select channel-library-agent-select mx-3 my-2 w-[calc(100%-1.5rem)]" onchange="syncChannelAgents(this)"><option value="">Choose a library agent…</option>{options}</select>"#
-        )
+        library_agent_picker(&library, selected, id_prefix)
     };
     let custom_options = if custom.is_empty() {
         format!(
@@ -683,6 +693,89 @@ fn agent_radios(company_id: Uuid, agents: &[Agent], selected: &[Uuid], id_prefix
             .map(Uuid::to_string)
             .collect::<Vec<_>>()
             .join(","),
+    )
+}
+
+/// The agent library as a modal of cards, opened from the button that shows the current pick.
+///
+/// A `<select>` can only carry a name, and a library definition is chosen on what it *does* — so
+/// the choice is made against cards carrying the avatar, the handle and the description, and it
+/// lands in a hidden field the shared `syncChannelAgents` treats like any other option.
+fn library_agent_picker(library: &[&Agent], selected: &[Uuid], id_prefix: &str) -> String {
+    const PLACEHOLDER: &str = "Choose a library agent…";
+
+    let picked = library.iter().find(|agent| selected.contains(&agent.id));
+    let label = picked.map_or_else(
+        || PLACEHOLDER.to_string(),
+        |agent| escape_html_text(&agent.name),
+    );
+    let cards = library
+        .iter()
+        .map(|agent| library_agent_card(agent, picked.is_some_and(|p| p.id == agent.id)))
+        .collect::<String>();
+
+    format!(
+        r##"<div class="mx-3 my-2">
+                                    <input type="hidden" class="channel-library-agent-field" value="{picked_id}">
+                                    <button type="button" class="btn btn-block justify-start font-normal"
+                                        onclick="document.getElementById('library-agents-{id_prefix}').showModal()">
+                                        <span class="channel-library-agent-label truncate" data-placeholder="{PLACEHOLDER}">{label}</span>
+                                    </button>
+                                    <dialog id="library-agents-{id_prefix}" class="modal">
+                                        <div class="modal-box max-w-3xl">
+                                            <h3 class="text-lg font-bold">Agent library</h3>
+                                            <p class="pt-1 pb-4 text-sm opacity-70">Ready-made agents this channel can run.</p>
+                                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                {cards}
+                                            </div>
+                                            <div class="modal-action">
+                                                <button type="button" class="btn btn-ghost btn-sm"
+                                                    data-agent-id="" data-agent-name=""
+                                                    onclick="pickChannelLibraryAgent(this)">Clear</button>
+                                                <button type="button" class="btn btn-sm"
+                                                    onclick="this.closest('dialog').close()">Close</button>
+                                            </div>
+                                        </div>
+                                        <button type="button" class="modal-backdrop"
+                                            onclick="this.closest('dialog').close()">close</button>
+                                    </dialog>
+                                </div>"##,
+        picked_id = picked.map(|agent| agent.id.to_string()).unwrap_or_default(),
+    )
+}
+
+/// One library definition as a card: what it is called, what it answers as, and what it is for.
+fn library_agent_card(agent: &Agent, picked: bool) -> String {
+    let description = agent.description.as_deref().unwrap_or_default().trim();
+    let description_html = if description.is_empty() {
+        String::new()
+    } else {
+        format!(
+            r#"<span class="line-clamp-2 text-xs opacity-70">{}</span>"#,
+            escape_html_text(description)
+        )
+    };
+
+    format!(
+        r##"<button type="button" data-agent-id="{id}" data-agent-name="{name}"
+                                                    onclick="pickChannelLibraryAgent(this)"
+                                                    class="channel-library-agent-card flex items-start gap-3 rounded-box border-2 {border} bg-base-200 p-3 text-left hover:border-primary">
+                                                    {avatar}
+                                                    <span class="flex min-w-0 flex-col gap-0.5">
+                                                        <span class="truncate text-sm font-semibold">{name}</span>
+                                                        <span class="truncate font-mono text-[11px] opacity-60">@{slug}</span>
+                                                        {description_html}
+                                                    </span>
+                                                </button>"##,
+        id = agent.id,
+        border = if picked {
+            "border-primary"
+        } else {
+            "border-base-300"
+        },
+        avatar = avatar_bubble(agent.avatar_url.as_ref(), &agent.name, AvatarSize::Row),
+        name = escape_html_text(&agent.name),
+        slug = escape_html_text(&agent.slug),
     )
 }
 

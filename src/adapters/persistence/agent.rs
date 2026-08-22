@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::{agent::Agent, value_objects::AvatarUrl},
+    entities::{agent::Agent, creation::CreationProvenance, value_objects::AvatarUrl},
     use_cases::agent::{AgentPersistence, AgentWrite},
 };
 
@@ -23,6 +23,7 @@ pub struct AgentDb {
     pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
     pub avatar_url: Option<String>,
+    pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
 }
 
@@ -40,6 +41,8 @@ impl From<AgentDb> for Agent {
             description: db.description,
             config_json: db.config_json,
             avatar_url: db.avatar_url.map(AvatarUrl::from),
+            created_by: serde_json::from_value(db.created_by)
+                .expect("agents.created_by must match CreationProvenance"),
             created_at: db.created_at,
         }
     }
@@ -51,9 +54,9 @@ impl AgentPersistence for PostgresPersistence {
         let uuid = Uuid::new_v4();
 
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_at"#,
+            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at"#,
         )
         .bind(uuid)
         .bind(company_id)
@@ -66,6 +69,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(&write.description)
         .bind(&write.config_json)
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
+        .bind(serde_json::to_value(write.created_by.unwrap_or_else(CreationProvenance::system)).map_err(|e| AppError::Internal(e.to_string()))?)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -76,9 +80,9 @@ impl AgentPersistence for PostgresPersistence {
     async fn create_library(&self, write: AgentWrite) -> AppResult<Agent> {
         let uuid = Uuid::new_v4();
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url)
-               VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_at"#,
+            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by)
+               VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at"#,
         )
         .bind(uuid)
         .bind(&write.name)
@@ -90,6 +94,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(&write.description)
         .bind(&write.config_json)
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
+        .bind(serde_json::to_value(write.created_by.unwrap_or_else(CreationProvenance::system)).map_err(|e| AppError::Internal(e.to_string()))?)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -98,7 +103,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>> {
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_at
+            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at
                FROM agents WHERE id = $1"#,
         )
         .bind(id)
@@ -115,7 +120,7 @@ impl AgentPersistence for PostgresPersistence {
         agent_slug: &str,
     ) -> AppResult<Option<Agent>> {
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT a.id, a.company_id, a.name, a.slug, a.provider, a.model, a.api_key, a.system_prompt, a.description, a.config_json, a.avatar_url, a.created_at
+            r#"SELECT a.id, a.company_id, a.name, a.slug, a.provider, a.model, a.api_key, a.system_prompt, a.description, a.config_json, a.avatar_url, a.created_by, a.created_at
                FROM agents a
                JOIN companies c ON c.id = a.company_id
                WHERE c.slug = $1 AND a.slug = $2"#,
@@ -131,7 +136,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>> {
         let db_list = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_at
+            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at
                FROM agents WHERE company_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -145,7 +150,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn list_library(&self) -> AppResult<Vec<Agent>> {
         let rows = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_at
+            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at
                FROM agents WHERE company_id IS NULL
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -160,7 +165,7 @@ impl AgentPersistence for PostgresPersistence {
             r#"UPDATE agents
                SET name = $1, slug = $2, provider = $3, model = $4, api_key = $5, system_prompt = $6, description = $7, config_json = $8, avatar_url = $9
                WHERE id = $10
-               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_at"#,
+               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at"#,
         )
         .bind(&write.name)
         .bind(&write.slug)
@@ -257,6 +262,7 @@ mod tests {
                 description: Some("Answers customer support questions.".to_string()),
                 config_json: Some(config.clone()),
                 avatar_url: Some(AvatarUrl::from("https://example.com/support.png")),
+                created_by: None,
             },
         )
         .await

@@ -394,6 +394,7 @@ async fn create_channel_handler(
         participant_emails: parse_emails_form(form.participant_emails),
         agent_ids,
         channel_config,
+        created_by: None,
     };
     match channel_use_cases
         .create_channel(user.id, company_id, write, confirm_spam_disabled)
@@ -633,6 +634,7 @@ async fn update_channel_handler(
         channel_config,
         enabled,
         add_3rd_party,
+        created_by: None,
     };
 
     match channel_use_cases
@@ -1330,6 +1332,7 @@ async fn create_channel_json(
         channel_config: payload.channel_config,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
+        created_by: None,
     };
 
     let channel = channel_use_cases
@@ -1387,6 +1390,7 @@ async fn update_channel_json(
         channel_config: payload.channel_config,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
+        created_by: None,
     };
 
     let channel = channel_use_cases
@@ -1477,6 +1481,7 @@ mod tests {
             participant_emails: Some(vec!["agent@test.com".into()]),
             agent_ids: None,
             channel_config: Some(json!({ "mode": "async" })),
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         };
 

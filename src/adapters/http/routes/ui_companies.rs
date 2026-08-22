@@ -6,6 +6,10 @@
 //! Everything else is shared — the chrome comes from [`crate::adapters::http::pages::ui_shell`]
 //! and every write goes through the same [`CompanyUseCases`] the classic `/companies` page uses,
 //! so the two UIs cannot drift on what a submitted company means.
+//!
+//! The selected company's pane has two tabs: its own settings, and its team, which
+//! [`super::ui_team`] renders into it — a team is only ever the team *of* a company, so it is
+//! shown inside the one it belongs to rather than in a workspace of its own.
 
 use std::sync::Arc;
 
@@ -24,11 +28,11 @@ use crate::{
     adapters::http::{
         app_state::AppState,
         auth::{AuthError, AuthenticatedUser},
-        pages::{self, CompanyCounts, SpamGuardrail},
+        pages::{self, CompanyCounts, CompanyTab, SpamGuardrail},
     },
     app_error::{AppError, AppResult},
     entities::{
-        company::Company,
+        company::{Company, CompanyAccess},
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
@@ -36,13 +40,15 @@ use crate::{
         agent::AgentUseCases,
         channel::ChannelUseCases,
         company::{CompanyUseCases, CompanyWrite},
+        company_invite::CompanyInviteUseCases,
         user::UserUseCases,
     },
 };
 
 use super::{
     channel::slugify,
-    ui::{load_account, load_scoped_company, workspace_user},
+    ui::{load_account, load_readable_company, workspace_user},
+    ui_team::{TeamRequest, team_tab_body},
 };
 
 pub fn router() -> Router<AppState> {
@@ -56,12 +62,21 @@ pub fn router() -> Router<AppState> {
         )
 }
 
-/// What the workspace has selected, both optional so `/ui/companies` alone is a valid entry point.
+/// What the workspace has selected, all optional so `/ui/companies` alone is a valid entry point.
+///
+/// The Team tab's own selection rides along in here rather than in a query of its own: the tab is
+/// part of the company's pane, so it is part of the same page and the same URL.
 #[derive(Debug, Clone, Deserialize)]
 pub struct WorkspaceQuery {
     pub company_id: Option<Uuid>,
-    /// `?new=1` opens the create form instead of a company's settings.
+    /// `?tab=team` opens the company's people instead of its settings.
+    pub tab: Option<String>,
+    /// `?new=1` opens a create form: a new company on the Settings tab, a new invite on Team.
     pub new: Option<String>,
+    /// The Team tab's selected member, keyed by `user_id`.
+    pub member_id: Option<Uuid>,
+    /// The Team tab's selected invite.
+    pub invite_id: Option<Uuid>,
 }
 
 /// A submitted company, before it is a [`Company`].
@@ -83,14 +98,15 @@ pub struct CompanyForm {
 
 const NO_SELECTION: &str = "Select a company to configure it, or create a new one.";
 
-/// Whether a write changed the company the rail at the far left is drawn for.
+/// Whether a write changed the company the shell's chrome is drawn for.
 ///
-/// The rail ends on that company's picture, and no pane swap touches it, so a save that renames a
-/// company or gives it a new picture has to send the badge back out of band. Which company the
-/// rail is showing is not in the request, so it is read off the write instead: the sidebar's
-/// entries are ordinary links, so the pane and the rail always hold the same company on an edit,
-/// while a company that has only just been created is not yet the one the rail points at.
-enum RailRefresh {
+/// Two pieces speak for that company -- the picture the rail ends on and the name at the centre of
+/// the top bar -- and no pane swap touches either, so a save that renames a company or gives it a
+/// new picture has to send both back out of band. Which company the chrome is showing is not in
+/// the request, so it is read off the write instead: the sidebar's entries are ordinary links, so
+/// the pane and the chrome always hold the same company on an edit, while a company that has only
+/// just been created is not yet the one the chrome is drawn for.
+enum ChromeRefresh {
     SameCompany,
     OtherCompany,
 }
@@ -103,6 +119,7 @@ struct Workspace {
     company_use_cases: Arc<CompanyUseCases>,
     channel_use_cases: Arc<ChannelUseCases>,
     agent_use_cases: Arc<AgentUseCases>,
+    invite_use_cases: Arc<CompanyInviteUseCases>,
     user_use_cases: Arc<UserUseCases>,
     config: Arc<AppConfig>,
     user_id: Uuid,
@@ -121,6 +138,7 @@ impl FromRequestParts<AppState> for Workspace {
             company_use_cases: state.company_use_cases.clone(),
             channel_use_cases: state.channel_use_cases.clone(),
             agent_use_cases: state.agent_use_cases.clone(),
+            invite_use_cases: state.company_invite_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             config: state.config.clone(),
             user_id: user.id,
@@ -129,24 +147,31 @@ impl FromRequestParts<AppState> for Workspace {
 }
 
 impl Workspace {
-    /// The caller's own companies — the sidebar's contents, and the only companies any handler
-    /// here will act on.
+    /// Every company the caller can open, including companies whose invitations they accepted.
     async fn companies(&self) -> AppResult<Vec<Company>> {
         self.company_use_cases
-            .list_user_companies(self.user_id)
+            .list_accessible_companies(self.user_id)
             .await
+            .map(|companies| companies.into_iter().map(|access| access.company).collect())
     }
 
-    /// One company, always picked from the caller's own so a guessed `company_id` cannot reach
-    /// another user's settings.
-    async fn scoped_company(&self, company_id: Uuid) -> AppResult<Company> {
-        let (_, company) =
-            load_scoped_company(&self.company_use_cases, self.user_id, Some(company_id)).await?;
-        company.ok_or_else(|| AppError::NotFound("Company not found".into()))
+    /// One company the caller may read, together with whether they own it.
+    async fn scoped_company(&self, company_id: Uuid) -> AppResult<CompanyAccess> {
+        self.company_use_cases
+            .company_access(self.user_id, company_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Company not found".into()))
     }
 
     /// What the company holds, for the summary above its form.
-    async fn counts(&self, company_id: Uuid) -> AppResult<CompanyCounts> {
+    async fn counts(&self, company_id: Uuid, editable: bool) -> AppResult<CompanyCounts> {
+        // These use cases intentionally list configuration records for owners only. A member's
+        // company pane does not render those administration counts, so do not turn a valid read
+        // into an ownership error merely to populate hidden data.
+        if !editable {
+            return Ok(CompanyCounts::default());
+        }
+
         let channels = self
             .channel_use_cases
             .list_company_channels(self.user_id, company_id)
@@ -162,12 +187,14 @@ impl Workspace {
         })
     }
 
-    fn edit_pane(
+    /// The Settings tab: the company's own form, with whatever was rejected still in it.
+    fn settings_pane(
         &self,
         company: &Company,
         counts: CompanyCounts,
         draft: Option<&pages::CompanyDraft<'_>>,
         error: Option<&str>,
+        editable: bool,
     ) -> String {
         pages::company_edit_pane(&pages::CompanyEditPane {
             company,
@@ -175,7 +202,26 @@ impl Workspace {
             counts,
             draft,
             error,
+            editable,
+            body: pages::CompanyPaneBody::Settings,
         })
+    }
+
+    /// The Team tab: the same pane, with the company's people in it instead of its settings.
+    async fn team_pane(&self, company: &Company, request: TeamRequest) -> AppResult<String> {
+        let editable = company.user_id == self.user_id;
+        let counts = self.counts(company.id, editable).await?;
+        let team = team_tab_body(&self.invite_use_cases, self.user_id, company, request).await?;
+
+        Ok(pages::company_edit_pane(&pages::CompanyEditPane {
+            company,
+            app_domain_name: &self.config.app_domain_name,
+            counts,
+            draft: None,
+            error: None,
+            editable,
+            body: pages::CompanyPaneBody::Team(&team),
+        }))
     }
 
     /// The sidebar with nothing lit, out of band beside a pane that belongs to no company —
@@ -203,9 +249,13 @@ impl Workspace {
 
     /// What every successful write returns: the saved company's pane, with the sidebar list
     /// refreshed beside it so a create or a rename shows up immediately.
-    async fn saved_response(&self, company: &Company, rail: RailRefresh) -> AppResult<Response> {
-        let counts = self.counts(company.id).await?;
-        let pane = self.edit_pane(company, counts, None, None);
+    async fn saved_response(
+        &self,
+        company: &Company,
+        chrome: ChromeRefresh,
+    ) -> AppResult<Response> {
+        let counts = self.counts(company.id, true).await?;
+        let pane = self.settings_pane(company, counts, None, None, true);
         let companies = self.companies().await?;
         let list = pages::company_settings_list(
             &pages::CompanySettingsList {
@@ -214,11 +264,13 @@ impl Workspace {
             },
             pages::FragmentSwap::OutOfBand,
         );
-        let rail_html = match rail {
-            RailRefresh::SameCompany => {
-                pages::rail_company_badge(company, pages::FragmentSwap::OutOfBand)
-            }
-            RailRefresh::OtherCompany => String::new(),
+        let chrome_html = match chrome {
+            ChromeRefresh::SameCompany => format!(
+                "{}{}",
+                pages::rail_company_badge(company, pages::FragmentSwap::OutOfBand),
+                pages::topbar_company(company, pages::FragmentSwap::OutOfBand),
+            ),
+            ChromeRefresh::OtherCompany => String::new(),
         };
 
         Ok((
@@ -226,7 +278,7 @@ impl Workspace {
                 "HX-Push-Url",
                 format!("/ui/companies?company_id={}", company.id),
             )],
-            Html(format!("{pane}{list}{rail_html}")),
+            Html(format!("{pane}{list}{chrome_html}")),
         )
             .into_response())
     }
@@ -240,24 +292,47 @@ async fn companies_page(
 ) -> AppResult<Html<String>> {
     let account = load_account(&workspace.user_use_cases, workspace.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let workspace_user = workspace_user(&account, &account_email);
+    let workspace_user = workspace_user(&account, &account_email, &workspace.config);
 
-    let (companies, company) = load_scoped_company(
+    let (companies, access) = load_readable_company(
         &workspace.company_use_cases,
         workspace.user_id,
         query.company_id,
     )
     .await?;
 
+    let tab = CompanyTab::from_query(query.tab.as_deref());
     let creating = matches!(query.new.as_deref(), Some("1") | Some("true"));
-    let selected = if creating { None } else { company.as_ref() };
+    // `?new=1` means a different thing on each tab, and only the Settings one deselects the
+    // company: an invite is created *for* the company whose pane is open.
+    let creating_company = creating && tab == CompanyTab::Settings;
+    let selected = if creating_company {
+        None
+    } else {
+        access.as_ref().map(|access| &access.company)
+    };
 
     let pane_html = match selected {
-        Some(company) => {
-            let counts = workspace.counts(company.id).await?;
-            workspace.edit_pane(company, counts, None, None)
+        Some(company) if tab == CompanyTab::Team => {
+            workspace
+                .team_pane(
+                    company,
+                    TeamRequest {
+                        member_id: query.member_id,
+                        invite_id: query.invite_id,
+                        creating,
+                    },
+                )
+                .await?
         }
-        None if creating => pages::company_create_pane(&pages::CompanyCreatePane {
+        Some(company) => {
+            let editable = access
+                .as_ref()
+                .is_some_and(|access| access.membership.is_owner());
+            let counts = workspace.counts(company.id, editable).await?;
+            workspace.settings_pane(company, counts, None, None, editable)
+        }
+        None if creating_company => pages::company_create_pane(&pages::CompanyCreatePane {
             draft: &pages::CompanyDraft::default(),
             error: None,
         }),
@@ -273,7 +348,7 @@ async fn companies_page(
             },
             // The create form deselects the list, but the rail keeps pointing at the company the
             // request was scoped to, so the other workspaces stay one click away.
-            rail_company: company.as_ref(),
+            rail_company: access.as_ref().map(|access| &access.company),
             pane_html: &pane_html,
         },
     )))
@@ -307,10 +382,17 @@ async fn close_pane(workspace: Workspace) -> AppResult<Response> {
 /// GET /ui/companies/{company_id} - One company's settings for the pane (Protected).
 #[instrument(skip(workspace))]
 async fn edit_pane(workspace: Workspace, Path(company_id): Path<Uuid>) -> AppResult<Html<String>> {
-    let company = workspace.scoped_company(company_id).await?;
-    let counts = workspace.counts(company.id).await?;
+    let access = workspace.scoped_company(company_id).await?;
+    let editable = access.membership.is_owner();
+    let counts = workspace.counts(access.company.id, editable).await?;
 
-    Ok(Html(workspace.edit_pane(&company, counts, None, None)))
+    Ok(Html(workspace.settings_pane(
+        &access.company,
+        counts,
+        None,
+        None,
+        editable,
+    )))
 }
 
 /// POST /ui/companies - Create a company from the pane's form (Protected).
@@ -330,7 +412,7 @@ async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> 
 
     match created {
         Ok(company) => match workspace
-            .saved_response(&company, RailRefresh::OtherCompany)
+            .saved_response(&company, ChromeRefresh::OtherCompany)
             .await
         {
             Ok(response) => response,
@@ -351,8 +433,11 @@ async fn update_company(
     Path(company_id): Path<Uuid>,
     Form(form): Form<CompanyForm>,
 ) -> AppResult<Response> {
-    let stored = workspace.scoped_company(company_id).await?;
-    let counts = workspace.counts(company_id).await?;
+    let stored = workspace
+        .company_use_cases
+        .owned_company(workspace.user_id, company_id)
+        .await?;
+    let counts = workspace.counts(company_id, true).await?;
     let submitted = SubmittedCompany::new(form);
 
     let saved = match submitted.write() {
@@ -368,14 +453,15 @@ async fn update_company(
     match saved {
         Ok(company) => {
             workspace
-                .saved_response(&company, RailRefresh::SameCompany)
+                .saved_response(&company, ChromeRefresh::SameCompany)
                 .await
         }
-        Err(err) => Ok(Html(workspace.edit_pane(
+        Err(err) => Ok(Html(workspace.settings_pane(
             &stored,
             counts,
             Some(&submitted.draft()),
             Some(&format!("Failed to save company: {err}")),
+            true,
         ))
         .into_response()),
     }

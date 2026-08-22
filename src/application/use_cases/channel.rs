@@ -9,6 +9,7 @@ use crate::{
     entities::{
         channel::{Channel, PUBLIC_PARTICIPANT},
         company::{Company, CompanyAccess},
+        creation::CreationProvenance,
         user::Viewer,
         value_objects::{ChannelSlug, CompanySlug},
     },
@@ -36,12 +37,13 @@ pub struct ChannelWrite {
     pub enabled: bool,
     /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
     pub add_3rd_party: bool,
+    pub created_by: Option<CreationProvenance>,
 }
 
 impl ChannelWrite {
     /// Trim and lower-case the fields that have canonical forms, and drop the blanks. Runs once,
     /// in the use case, so every entry point stores the same shape.
-    fn normalize(&mut self) -> AppResult<()> {
+    pub(crate) fn normalize(&mut self) -> AppResult<()> {
         self.name = self.name.trim().to_string();
         self.slug = self.slug.trim().to_lowercase().replace(' ', "-");
 
@@ -171,6 +173,7 @@ impl ChannelUseCases {
         confirm_spam_disabled: bool,
     ) -> AppResult<Channel> {
         self.verify_company_owner(user_id, company_id).await?;
+        write.created_by = Some(CreationProvenance::user(user_id));
 
         write.normalize()?;
         self.check_spam_interlock(&write, confirm_spam_disabled)?;
@@ -946,6 +949,7 @@ mod tests {
             channel_config: write.channel_config,
             enabled: write.enabled,
             add_3rd_party: write.add_3rd_party,
+            created_by: write.created_by.unwrap_or_else(CreationProvenance::system),
             created_at: Utc::now(),
         }
     }
@@ -1383,6 +1387,7 @@ mod tests {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
             },
             Channel {
@@ -1399,6 +1404,7 @@ mod tests {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
             },
         ];

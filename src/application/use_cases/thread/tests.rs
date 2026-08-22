@@ -807,6 +807,7 @@ async fn test_inter_channel_hop_limit_rejection() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
             Channel {
@@ -823,6 +824,7 @@ async fn test_inter_channel_hop_limit_rejection() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
         ]),
@@ -939,6 +941,7 @@ async fn test_spf_authentication_failure_rejection() {
             participant_emails: Some(vec!["@public".into()]),
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         }]),
     });
@@ -1040,6 +1043,7 @@ async fn test_high_spam_score_rejection() {
             participant_emails: Some(vec!["@public".into()]),
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         }]),
     });
@@ -1143,6 +1147,7 @@ async fn test_dmarc_authentication_failure_rejection() {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         }]),
     });
@@ -1246,6 +1251,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
             participant_emails: Some(vec!["alice@example.com".into()]),
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         }]),
     });
@@ -1350,6 +1356,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
             participant_emails: Some(vec!["alice@example.com".into()]),
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         }]),
     });
@@ -1452,6 +1459,7 @@ async fn test_channel_in_cc_resolves_properly() {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         }]),
     });
@@ -1560,6 +1568,7 @@ async fn test_multi_channel_to_and_cc_execution() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
             Channel {
@@ -1576,6 +1585,7 @@ async fn test_multi_channel_to_and_cc_execution() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
         ]),
@@ -1696,6 +1706,7 @@ async fn test_pipeline_address_chaining_execution() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
             Channel {
@@ -1712,6 +1723,7 @@ async fn test_pipeline_address_chaining_execution() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
             Channel {
@@ -1728,6 +1740,7 @@ async fn test_pipeline_address_chaining_execution() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
         ]),
@@ -1840,6 +1853,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
             Channel {
@@ -1856,6 +1870,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
         ]),
@@ -1988,6 +2003,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         }]),
     });
@@ -2143,6 +2159,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 participant_emails: None, // Default = Company Team
                 agent_ids: None,
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
             Channel {
@@ -2159,6 +2176,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 participant_emails: Some(vec!["@public".into()]), // Public
                 agent_ids: None,
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
             Channel {
@@ -2175,6 +2193,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 participant_emails: Some(vec!["allowed@external.com".into()]), // Explicit list
                 agent_ids: None,
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
         ]),
@@ -2332,6 +2351,7 @@ async fn test_sender_verification_and_delegation_target_check() {
             participant_emails: Some(vec!["@public".into()]),
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         }]),
     });
@@ -2519,6 +2539,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
                 participant_emails: Some(vec!["@public".into()]),
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
             Channel {
@@ -2535,6 +2556,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
         ]),
@@ -2714,6 +2736,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
             Channel {
@@ -2730,6 +2753,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
         ]),
@@ -2816,6 +2840,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
             Channel {
@@ -2832,6 +2857,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 participant_emails: None,
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 channel_config: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             },
         ]),
@@ -2921,6 +2947,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
             participant_emails: None, // Default = company team members
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         }]),
     });
@@ -3137,6 +3164,7 @@ async fn test_context_only_quiet_mode_ingestion() {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         }]),
     });
@@ -3310,6 +3338,7 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
             participant_emails,
             agent_ids,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         }]),
     });
@@ -3426,6 +3455,7 @@ async fn a_cc_d_channel_runs_for_its_assigned_agent_slug() {
                 description: None,
                 config_json: None,
                 avatar_url: None,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             }],
         }));

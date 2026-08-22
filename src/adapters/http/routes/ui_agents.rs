@@ -34,6 +34,7 @@ use crate::{
         company::Company,
         value_objects::{AvatarUrl, EmailAddress},
     },
+    infra::config::AppConfig,
     use_cases::{
         agent::AgentUseCases, channel::ChannelUseCases, company::CompanyUseCases,
         user::UserUseCases,
@@ -107,6 +108,7 @@ struct Workspace {
     agent_use_cases: Arc<AgentUseCases>,
     channel_use_cases: Arc<ChannelUseCases>,
     user_use_cases: Arc<UserUseCases>,
+    config: Arc<AppConfig>,
     user_id: Uuid,
 }
 
@@ -124,6 +126,7 @@ impl FromRequestParts<AppState> for Workspace {
             agent_use_cases: state.agent_use_cases.clone(),
             channel_use_cases: state.channel_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
+            config: state.config.clone(),
             user_id: user.id,
         })
     }
@@ -156,7 +159,7 @@ async fn agents_page(
 ) -> AppResult<Html<String>> {
     let account = load_account(&workspace.user_use_cases, workspace.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let workspace_user = workspace_user(&account, &account_email);
+    let workspace_user = workspace_user(&account, &account_email, &workspace.config);
 
     let (companies, company) = load_scoped_company(
         &workspace.company_use_cases,
@@ -317,6 +320,7 @@ async fn create_agent(
                     description: submitted.form.description.clone(),
                     config_json,
                     avatar_url,
+                    created_by: None,
                 },
             )
             .await
@@ -372,6 +376,7 @@ async fn update_agent(
                 description: submitted.form.description.clone(),
                 config_json,
                 avatar_url,
+                created_by: None,
             },
         )
         .await;

@@ -52,6 +52,7 @@ struct LibraryAgentResponse {
     description: Option<String>,
     config_json: Option<serde_json::Value>,
     avatar_url: Option<AvatarUrl>,
+    created_by: crate::entities::creation::CreationProvenance,
     created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -68,6 +69,7 @@ impl From<Agent> for LibraryAgentResponse {
             description: agent.description,
             config_json: agent.config_json,
             avatar_url: agent.avatar_url,
+            created_by: agent.created_by,
             created_at: agent.created_at,
         }
     }
@@ -103,6 +105,7 @@ fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
         description: payload.description,
         config_json: payload.config_json,
         avatar_url,
+        created_by: None,
     })
 }
 
@@ -248,7 +251,7 @@ async fn workspace(
         .await?
         .ok_or(AppError::InvalidCredentials)?;
     let account_email = account.email.as_str().into();
-    let workspace_user = workspace_user(&account, &account_email);
+    let workspace_user = workspace_user(&account, &account_email, &config);
     let rows = agents
         .list_library_agents()
         .await?

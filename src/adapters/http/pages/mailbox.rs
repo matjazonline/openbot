@@ -33,6 +33,9 @@ pub struct MailboxUser<'a> {
     pub email: &'a EmailAddress,
     /// Their profile picture; `None` falls back to the letter bubble.
     pub avatar_url: Option<&'a AvatarUrl>,
+    /// Whether they are a system operator, and so entitled to the cross-company workspaces.
+    /// Decided once per request from [`AppConfig::is_operator`] -- see `routes::ui::workspace_user`.
+    pub is_operator: bool,
 }
 
 /// Which `/ui` workspace a response belongs to, i.e. which rail icon is lit.
@@ -48,7 +51,6 @@ pub enum UiSection {
     Tasks,
     Outbox,
     Companies,
-    Team,
     Invites,
     /// The signed-in account's own details. Reached from the account menu rather than the rail --
     /// it is the one `/ui` page that is about the reader instead of about a company.
@@ -110,7 +112,7 @@ pub fn ui_shell(shell: &UiShell<'_>) -> String {
     </div>
     {LOGOUT_MODAL}
         "##,
-        top_bar = top_bar(shell.user),
+        top_bar = top_bar(shell.user, shell.company),
         content = shell.content,
     );
 
@@ -154,6 +156,8 @@ pub struct MessagePane<'a> {
     pub messages: &'a [Message],
     /// The face and name the agent side of this thread is drawn with -- see [`message_bubble_chat`].
     pub agent: Option<&'a Agent>,
+    /// The signed-in reader's address, used to put their own messages on the right.
+    pub viewer_email: &'a EmailAddress,
     /// What this thread is doing right now, for the strip above the composer.
     pub activity: Option<ThreadActivity>,
 }
@@ -168,6 +172,7 @@ pub struct ReplyPane<'a> {
     pub sender_email: &'a str,
     pub text_body: &'a str,
     pub deliver: bool,
+    pub quiet: bool,
     pub error: Option<&'a str>,
 }
 
@@ -181,6 +186,7 @@ pub struct ComposePane<'a> {
     pub subject: &'a str,
     pub text_body: &'a str,
     pub deliver: bool,
+    pub quiet: bool,
     pub error: Option<&'a str>,
 }
 
@@ -188,7 +194,7 @@ pub struct ComposePane<'a> {
 /// scrolled to its newest message — every load is htmx.
 ///
 /// Kept out of the `format!` blocks below so its braces need no escaping.
-const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox already repaints the page by itself -- daisyUI matches
+pub(crate) const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox already repaints the page by itself -- daisyUI matches
         // on `:root:has(.theme-controller[value=light]:checked)`. All this does is write the
         // choice down for the next request and put `data-theme` back in agreement with the box,
         // so THEME_INIT_SCRIPT can restore it before the next paint.
@@ -292,12 +298,14 @@ const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox alre
             }
         }
 
-        // A thread reads newest-last, so opening one should land on its latest message.
-        function scrollMessagesToBottom() {
+        // Put the newest message's first line at the top of the viewport. For a short message the
+        // browser naturally clamps at the bottom; for a long reply this avoids landing at its end.
+        function scrollToNewestMessageStart() {
             var pane = document.getElementById('message-scroll');
-            if (pane) {
-                pane.scrollTop = pane.scrollHeight;
-            }
+            if (!pane) return;
+            var newest = pane.lastElementChild;
+            if (!newest || newest.id === 'no-messages') return;
+            pane.scrollTop = newest.offsetTop - pane.offsetTop;
         }
 
         // Enter sends, Shift+Enter keeps writing — the chat convention, not the textarea one.
@@ -318,7 +326,7 @@ const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox alre
 
         // Tailwind's browser build styles the page after it is parsed, so on a direct /ui load the
         // pane has nothing to scroll until everything has been applied.
-        window.addEventListener('load', scrollMessagesToBottom);
+        window.addEventListener('load', scrollToNewestMessageStart);
 
         // A streamed message is appended through htmx's normal swap machinery, so it reaches the
         // afterSettle handler below too. That handler is written for a *whole pane* arriving and
@@ -394,7 +402,7 @@ const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox alre
             // the newest message out of view for someone sitting at the live edge.
             if (swapped && swapped.id === 'thread-activity') {
                 if (wasAtBottomBeforeStream) {
-                    scrollMessagesToBottom();
+                    scrollToNewestMessageStart();
                 }
                 return;
             }
@@ -420,12 +428,12 @@ const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox alre
                 placeholder.remove();
             }
             if (wasAtBottomBeforeStream) {
-                scrollMessagesToBottom();
+                scrollToNewestMessageStart();
             }
         });
 
         // Only the swaps that bring in the messages themselves: paging the thread column must not
-        // yank an already-open thread back down.
+        // yank an already-open thread to its newest message.
         document.body.addEventListener('htmx:afterSettle', function (event) {
             // A streamed append settles here too, and it has already decided about scrolling. The
             // flag is cleared here rather than on sseMessage because this event fires *after* it.
@@ -436,7 +444,7 @@ const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` checkbox alre
             var settled = event.target;
             if (settled && settled.nodeType === 1 &&
                 (settled.id === 'message-scroll' || settled.querySelector('#message-scroll'))) {
-                scrollMessagesToBottom();
+                scrollToNewestMessageStart();
                 // A sent message swaps the whole pane, so hand the caret back to the new box.
                 var composer = document.getElementById('thread-composer');
                 if (composer) {
@@ -748,21 +756,35 @@ const THEME_CONTROLLER: &str = r##"
                 </label>
 "##;
 
-/// The bar across the top of every mailbox response: the brand mark on the left, the signed-in
-/// account on the right. It sits above all four columns, so it is the one piece of chrome that
-/// never moves when htmx swaps a column.
+/// The bar across the top of every mailbox response: the brand mark on the left, the company the
+/// response is scoped to in the middle, the signed-in account on the right. It sits above all four
+/// columns, so it is the one piece of chrome that never moves when htmx swaps a column.
 ///
 /// The brand mark comes in two inks, one per theme -- see [`BRAND_LOGO_STYLES`]. Nothing in the
-/// account menu is scoped to a company, so unlike the rail the bar renders the same for a reader
-/// who has no company yet.
-fn top_bar(user: &MailboxUser<'_>) -> String {
+/// account menu is scoped to a company, so apart from the middle group the bar renders the same
+/// for a reader who has no company yet.
+///
+/// The two outer groups are given the same `flex-1 basis-0`, so they split whatever the middle
+/// group leaves and the company name sits on the bar's centre line rather than merely between its
+/// neighbours -- which would drift as the account's name grows.
+fn top_bar(user: &MailboxUser<'_>, company: Option<&Company>) -> String {
+    let company_name = match company {
+        Some(company) => topbar_company(company, FragmentSwap::Inline),
+        None => String::new(),
+    };
+
     format!(
         r##"
-        <header class="app-topbar navbar z-40 h-16 min-h-16 shrink-0 justify-between gap-4 border-b border-base-300 px-4 lg:px-5">
-            <a href="/ui" class="flex items-center" title="BusyBots">
+        <header class="app-topbar navbar z-40 h-16 min-h-16 shrink-0 gap-4 border-b border-base-300 px-4 lg:px-5">
+            <div class="flex flex-1 basis-0 items-center">
+                <a href="/ui" class="flex items-center" title="BusyBots">
 {BRAND_LOGO}
-            </a>
-            <div class="flex items-center gap-1">
+                </a>
+            </div>
+            <div class="flex min-w-0 items-center justify-center">
+                {company_name}
+            </div>
+            <div class="flex flex-1 basis-0 items-center justify-end gap-1">
 {THEME_CONTROLLER}
                 <div class="dropdown dropdown-end">
                     <div tabindex="0" role="button" class="btn btn-ghost h-auto gap-3 px-2 py-1">
@@ -772,7 +794,7 @@ fn top_bar(user: &MailboxUser<'_>) -> String {
                         <li class="menu-title truncate">{email}</li>
                         <li><a href="/ui/profile">Profile</a></li>
                         <li><a href="/ui/invites">My Invites</a></li>
-                        <li><a href="/ui/companies">Companies</a></li>
+{agent_library}
                         <li>
                             <button type="button" class="w-full text-left" onclick="confirmLogout()">{sign_out} Log out</button>
                         </li>
@@ -784,7 +806,22 @@ fn top_bar(user: &MailboxUser<'_>) -> String {
         email = escape_html_text(user.email),
         sign_out = icon(Icon::SignOut, BUTTON_ICON),
         chip = account_chip(user, FragmentSwap::Inline),
+        agent_library = agent_library_entry(user),
     )
+}
+
+/// The operator-only way into the global agent library.
+///
+/// Hidden from everyone else rather than shown disabled: `/ui/agent-library` answers a
+/// non-operator with "not found", so an entry they could see would promise a page that, for them,
+/// is not there. It lives in the account menu rather than the rail because the library is global
+/// -- it is the one workspace that is not scoped to the company the rail points at.
+fn agent_library_entry(user: &MailboxUser<'_>) -> &'static str {
+    if user.is_operator {
+        r##"                        <li><a href="/ui/agent-library">Agent library</a></li>"##
+    } else {
+        ""
+    }
 }
 
 /// Who the top bar says you are: your name, your address and your face, as one fragment.
@@ -846,8 +883,6 @@ fn icon_rail(company: &Company, section: UiSection) -> String {
             Icon::Organization,
             "Companies",
         ),
-        (UiSection::Team, "/ui/team", Icon::People, "Team"),
-        (UiSection::Invites, "/ui/invites", Icon::Mail, "My Invites"),
     ];
 
     let links: String = destinations
@@ -895,6 +930,27 @@ pub fn rail_company_badge(company: &Company, swap: FragmentSwap) -> String {
         name = escape_html_text(&company.name),
         oob = swap.oob_attribute(),
         avatar = avatar_bubble(company.avatar_url.as_ref(), &company.name, AvatarSize::Bar),
+    )
+}
+
+/// The company at the centre of the top bar: the one every workspace above the rail is scoped to,
+/// said in words rather than as the rail badge's picture alone.
+///
+/// It is deliberately not a link. The rail badge already leads to the company's settings, and a
+/// second way in would make the bar's job -- naming where you are -- read as navigation.
+///
+/// Rendered out of band after a company is saved, for the same reason as
+/// [`rail_company_badge`]: a rename reaches no pane swap, so without this the bar would keep
+/// announcing the old name until the next full page load.
+pub fn topbar_company(company: &Company, swap: FragmentSwap) -> String {
+    format!(
+        r##"<div id="topbar-company" class="flex min-w-0 items-center gap-2"{oob}>
+                    {avatar}
+                    <span class="truncate text-sm font-semibold">{name}</span>
+                </div>"##,
+        oob = swap.oob_attribute(),
+        name = escape_html_text(&company.name),
+        avatar = avatar_bubble(company.avatar_url.as_ref(), &company.name, AvatarSize::Row),
     )
 }
 
@@ -1340,6 +1396,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                 message_bubble_chat(
                     message,
                     pane.agent,
+                    Some(pane.viewer_email),
                     MessageScope {
                         company_id: pane.company_id,
                         channel_id: pane.channel.id,
@@ -1430,6 +1487,10 @@ fn thread_composer(pane: &MessagePane<'_>) -> String {
                     <input type="checkbox" name="deliver" value="true" class="toggle toggle-primary toggle-xs">
                     <span class="text-xs opacity-60">Deliver the agent reply by email (off keeps it in-app)</span>
                 </label>
+                <label class="label mt-1 cursor-pointer justify-start gap-2 p-0">
+                    <input type="checkbox" name="quiet" value="true" class="checkbox checkbox-primary checkbox-xs">
+                    <span class="text-xs opacity-60">Send quietly (save to history without running the agent)</span>
+                </label>
             </form>
         "##,
         company_id = pane.company_id,
@@ -1452,10 +1513,13 @@ fn thread_composer(pane: &MessagePane<'_>) -> String {
 pub fn message_bubble_chat(
     message: &Message,
     agent: Option<&Agent>,
+    viewer_email: Option<&EmailAddress>,
     scope: MessageScope,
 ) -> String {
     let is_agent =
         message.role == MessageRole::Agent || message.direction == MessageDirection::Outbound;
+    let is_viewer =
+        viewer_email.is_some_and(|email| message.sender.eq_ignore_ascii_case(email.as_ref()));
     let body = if is_agent {
         format!(
             r##"<div class="{MARKDOWN_CONTENT_STYLES}">{}</div>"##,
@@ -1485,11 +1549,11 @@ pub fn message_bubble_chat(
                     <div class="chat-footer font-mono text-[11px] opacity-40">{subject}</div>
                 </div>
         "##,
-        side = if is_agent { "chat-end" } else { "chat-start" },
+        side = if is_viewer { "chat-end" } else { "chat-start" },
         // Read by the column when a bubble streams in: only the agent's own reply answers the
         // question its row's activity mark was asking.
         role = if is_agent { "agent" } else { "human" },
-        bubble_class = if is_agent { "chat-bubble-primary" } else { "" },
+        bubble_class = if is_viewer { "chat-bubble-primary" } else { "" },
         avatar = avatar_bubble(avatar_url, writer, AvatarSize::Row),
         writer = escape_html_text(writer),
         created_at = super::format_date_time(message.created_at),
@@ -1597,11 +1661,15 @@ fn readonly_field(label: &str, value: &str) -> String {
 /// The delivery toggle and the Send / Cancel row, shared by both send forms.
 ///
 /// Only Cancel differs between them, so it arrives as the htmx attributes that undo this form.
-fn send_form_footer(deliver: bool, cancel_attributes: &str) -> String {
+fn send_form_footer(deliver: bool, quiet: bool, cancel_attributes: &str) -> String {
     format!(
         r##"<label class="label cursor-pointer justify-start gap-3">
                         <input type="checkbox" name="deliver" value="true" class="toggle toggle-primary toggle-sm" {deliver_checked}>
                         <span class="text-xs opacity-70">Deliver the agent reply by email (off keeps it in-app)</span>
+                    </label>
+                    <label class="label cursor-pointer justify-start gap-3">
+                        <input type="checkbox" name="quiet" value="true" class="checkbox checkbox-primary checkbox-sm" {quiet_checked}>
+                        <span class="text-xs opacity-70">Send quietly (save to history without running the agent)</span>
                     </label>
                     <div class="flex items-center gap-3 pt-2">
                         <button type="submit" class="btn btn-primary">
@@ -1612,6 +1680,7 @@ fn send_form_footer(deliver: bool, cancel_attributes: &str) -> String {
                         <button type="button" class="btn btn-ghost" {cancel_attributes}>Cancel</button>
                     </div>"##,
         deliver_checked = if deliver { "checked" } else { "" },
+        quiet_checked = if quiet { "checked" } else { "" },
     )
 }
 
@@ -1655,6 +1724,7 @@ pub fn compose_pane(pane: &ComposePane<'_>) -> String {
         error_html = form_error_banner(pane.error),
         footer = send_form_footer(
             pane.deliver,
+            pane.quiet,
             &format!(
                 r##"hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
                             hx-target="#thread-column" hx-swap="outerHTML""##,
@@ -1707,6 +1777,7 @@ pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
         error_html = form_error_banner(pane.error),
         footer = send_form_footer(
             pane.deliver,
+            pane.quiet,
             &format!(
                 r##"hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
                             hx-target="#detail-pane" hx-swap="outerHTML""##,

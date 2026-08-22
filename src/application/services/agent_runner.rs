@@ -7,6 +7,9 @@ use crate::entities::company::Company;
 use crate::entities::message::{Message, MessageRole};
 use crate::entities::task::TokenUsage;
 use crate::entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress};
+use crate::services::agent_channel_tool::{
+    AgentChannelProvisioning, AgentChannelToolContext, CreateAgentChannelTool,
+};
 use crate::services::agent_directory_tool::{AgentDirectoryContext, ListCompanyAgentsTool};
 use crate::services::outreach_tool::{
     OUTREACH_TOOL_ID, OutreachAndAwaitQuorumTool, OutreachToolContext,
@@ -173,6 +176,10 @@ fn base_agent_config_with_observability(observability_enabled: bool) -> serde_js
             "default_timeout_seconds": 86400,
             "on_timeout": "reject",
             "tools": {
+                "create_agent_channel": {
+                    "require_approval": true,
+                    "approval_context": ["name", "slug", "description"]
+                },
                 "outreach_and_await_quorum": {
                     "require_approval": true,
                     "approval_context": [
@@ -186,6 +193,10 @@ fn base_agent_config_with_observability(observability_enabled: bool) -> serde_js
         },
         "tool_security": {
             "tools": {
+                "create_agent_channel": {
+                    "timeout_ms": 10000,
+                    "max_output_chars": 2000
+                },
                 "outreach_and_await_quorum": {
                     "timeout_ms": 10000,
                     "max_output_chars": 4000,
@@ -815,6 +826,7 @@ pub struct AgentRunner<'a> {
     channel_persistence: Option<Arc<dyn ChannelPersistence>>,
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
     outreach_context: Option<OutreachToolContext>,
+    agent_channel_tool: Option<(Arc<dyn AgentChannelProvisioning>, AgentChannelToolContext)>,
 }
 
 impl<'a> AgentRunner<'a> {
@@ -838,6 +850,7 @@ impl<'a> AgentRunner<'a> {
             channel_persistence: None,
             agent_persistence: None,
             outreach_context: None,
+            agent_channel_tool: None,
         }
     }
 
@@ -924,6 +937,15 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
+    pub fn agent_channel_tool(
+        mut self,
+        persistence: Arc<dyn AgentChannelProvisioning>,
+        context: AgentChannelToolContext,
+    ) -> Self {
+        self.agent_channel_tool = Some((persistence, context));
+        self
+    }
+
     pub async fn execute(self) -> anyhow::Result<AgentExecutionOutput> {
         let start_time = std::time::Instant::now();
         let history_message_count = self.history.len();
@@ -992,6 +1014,7 @@ impl<'a> AgentRunner<'a> {
                 .zip(self.outreach_context.clone())
                 .map(|((tasks, channels), context)| (tasks, channels, context)),
             agent_persistence: self.agent_persistence.clone(),
+            agent_channel_tool: self.agent_channel_tool.clone(),
             recipient_role: self.recipient_role,
             full_prompt,
             history_message_count,
@@ -1124,6 +1147,7 @@ struct AgentTask {
     )>,
     /// Present when the run may list its sibling agent channels.
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
+    agent_channel_tool: Option<(Arc<dyn AgentChannelProvisioning>, AgentChannelToolContext)>,
     recipient_role: Option<RecipientRole>,
     full_prompt: String,
     history_message_count: usize,
@@ -1267,6 +1291,9 @@ impl AgentTask {
                 context,
                 self.suspended.clone(),
             )));
+        }
+        if let Some((persistence, context)) = self.agent_channel_tool.clone() {
+            builder = builder.tool(Arc::new(CreateAgentChannelTool::new(persistence, context)));
         }
 
         let agent = builder.build()?;
@@ -1439,6 +1466,7 @@ mod tests {
             participant_emails: None,
             agent_ids: None,
             channel_config: Some(custom_config),
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
         let params = ResolvedAgentParams::new(None, Some(&channel), None)?;
@@ -1595,6 +1623,7 @@ mod tests {
                 "system_prompt": "Channel prompt",
                 "temperature": 0.2
             })),
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
 
@@ -1653,6 +1682,7 @@ mod tests {
                 "temperature": 0.2,
                 "channel_only_field": true
             })),
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
 
@@ -1671,6 +1701,7 @@ mod tests {
                 "temperature": 0.7
             })),
             avatar_url: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
 
@@ -1733,6 +1764,7 @@ mod tests {
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
 
@@ -1809,6 +1841,7 @@ mod tests {
                     // model and api_key missing in llm block
                 }
             })),
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
 
@@ -1846,6 +1879,7 @@ mod tests {
             description: None,
             config_json: None,
             avatar_url: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
 
@@ -2185,6 +2219,7 @@ system_prompt: Hello
             channel_config: None,
             enabled: true,
             add_3rd_party: true,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         }
     }

@@ -45,6 +45,32 @@ pub struct AppConfig {
     pub operator_emails: Vec<EmailAddress>,
 }
 
+#[derive(Debug, Clone)]
+pub struct GoogleOAuthConfig {
+    pub client_id: String,
+    pub client_secret: String,
+}
+
+impl GoogleOAuthConfig {
+    /// Loads Google sign-in when both credentials are present. A half-configured deployment is a
+    /// startup/configuration error rather than a button that fails after it is clicked.
+    pub fn from_env() -> Option<Self> {
+        match (
+            non_empty_var("GOOGLE_OAUTH_CLIENT_ID"),
+            non_empty_var("GOOGLE_OAUTH_CLIENT_SECRET"),
+        ) {
+            (Some(client_id), Some(client_secret)) => Some(Self {
+                client_id,
+                client_secret,
+            }),
+            (None, None) => None,
+            _ => panic!(
+                "GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET must either both be set or both be absent"
+            ),
+        }
+    }
+}
+
 /// The Google Cloud Storage bucket uploads are written to.
 ///
 /// One value rather than three loose `Option<String>`s on [`AppConfig`], because a bucket without
@@ -154,6 +180,9 @@ impl AppConfig {
     }
 
     pub fn from_env() -> Self {
+        // Validate the optional pair at startup even though the OAuth routes load it only when a
+        // flow begins (credentials are deliberately not copied into the broad application config).
+        let _ = GoogleOAuthConfig::from_env();
         let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
         assert!(
             jwt_secret.len() >= MIN_SECRET_BYTES,

@@ -221,6 +221,7 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
                     <div class="min-w-0">
                         <h2 class="truncate text-xl font-bold">{name}</h2>
                         <p class="truncate font-mono text-xs opacity-60">@{slug} · {model}</p>
+                        <p class="truncate text-xs opacity-50">{creator}</p>
                     </div>
                 </div>
             </div>
@@ -258,6 +259,7 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
         name = escape_html_text(&pane.agent.name),
         slug = escape_html_text(&pane.agent.slug),
         model = escape_html_text(&agent_model_summary(pane.agent)),
+        creator = escape_html_text(&pane.agent.created_by.label()),
         error_html = form_error_banner(pane.error),
         used_by_html = used_by_channels(company_id, pane.used_by),
         delete_warning = delete_warning(pane.used_by),

@@ -3,6 +3,7 @@ use sqlx::PgPool;
 use crate::app_error::AppError;
 
 pub mod agent;
+pub mod agent_channel;
 pub mod approval;
 pub mod channel;
 pub mod company;

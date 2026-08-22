@@ -27,12 +27,15 @@ use crate::{
         value_objects::{EmailAddress, MessageId},
     },
     services::{
+        agent_channel_tool::AgentChannelToolContext,
         agent_runner::{
             AgentExecutionDisposition, AgentRunner, ApprovalContext as AgentRunnerApprovalContext,
             ResolvedAgentParams,
         },
         email_parser::ParsedEmail,
-        outbound_dispatcher::{OutboundDispatcher, OutboundEmail, SentEmailResult},
+        outbound_dispatcher::{
+            OutboundDispatcher, OutboundEmail, SentEmailResult, agent_response_email_body,
+        },
         outreach_tool::OutreachToolContext,
     },
 };
@@ -225,6 +228,22 @@ impl ThreadUseCases {
                         // The address book only makes sense alongside the tool that uses it.
                         if let Some(agent_persistence) = self.agent_persistence() {
                             runner = runner.agent_directory(agent_persistence.clone());
+                        }
+                        if let (Some(provisioning), Some(agent)) =
+                            (self.agent_channel_provisioning.clone(), agent.as_ref())
+                        {
+                            runner = runner.agent_channel_tool(
+                                provisioning,
+                                AgentChannelToolContext {
+                                    company_id: channel_match.company.id,
+                                    company_slug: channel_match.company.slug.clone(),
+                                    source_agent_id: agent.id,
+                                    source_agent_name: agent.name.clone(),
+                                    source_channel_id: channel_match.channel.id,
+                                    task_id,
+                                    app_domain_name: self.config.app_domain_name.clone(),
+                                },
+                            );
                         }
                     }
                     runner.execute().await
@@ -437,7 +456,7 @@ impl ThreadUseCases {
                 .map(EmailAddress::from)
                 .collect(),
             subject: parsed.subject.clone(),
-            body_text: response.to_string(),
+            body_text: agent_response_email_body(response),
             hop_count: parsed.hop_count,
             trace_channels: parsed.trace_channels.clone(),
         };

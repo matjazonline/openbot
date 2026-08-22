@@ -1,10 +1,12 @@
-//! `/ui/team` — the Team workspace: the `/ui` shell showing who is in the company and who has
-//! been invited to it.
+//! `/ui/companies/{company_id}/team` — the Team tab of the Companies workspace: who is in the
+//! selected company, and who has been invited to it.
 //!
-//! The shell, the company scoping and the authorization are all shared: chrome comes from
-//! [`crate::adapters::http::pages::ui_shell`], the company from [`super::ui::load_scoped_company`],
-//! and every write goes through the same [`CompanyInviteUseCases`] the classic
-//! `/companies/{id}/invites` page uses, so the two UIs cannot drift on who may change a team.
+//! There is no Team workspace any more; a team only means anything as the team *of* a company, so
+//! its list and its panes are drawn inside that company's own pane by
+//! [`super::ui_companies::companies_page`], which calls [`team_tab_body`] here. Every fragment
+//! and every write is nested under the company it belongs to, and all of them go through the same
+//! [`CompanyInviteUseCases`] the classic `/companies/{id}/invites` page uses, so the two UIs
+//! cannot drift on who may change a team.
 
 use std::sync::Arc;
 
@@ -12,7 +14,7 @@ use axum::{
     Form, Router,
     extract::{FromRequestParts, Path, Query},
     http::request::Parts,
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post, put},
 };
 use serde::Deserialize;
@@ -32,46 +34,54 @@ use crate::{
         company_member::CompanyMember,
         value_objects::{AvatarUrl, EmailAddress},
     },
+    infra::config::AppConfig,
     use_cases::{
         company::CompanyUseCases, company_invite::CompanyInviteUseCases, user::UserUseCases,
     },
 };
 
-use super::ui::{load_account, load_scoped_company, workspace_user};
+use super::ui::{load_scoped_company, workspace_user};
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/ui/team", get(team_page))
-        .route("/ui/team/new", get(invite_form_pane))
-        .route("/ui/team/close", get(close_pane))
-        .route("/ui/team/invites", post(create_invite))
+        .route("/ui/team", get(team_redirect))
+        .route("/ui/companies/{company_id}/team/new", get(invite_form_pane))
+        .route("/ui/companies/{company_id}/team/close", get(close_pane))
         .route(
-            "/ui/team/invites/{invite_id}",
+            "/ui/companies/{company_id}/team/invites",
+            post(create_invite),
+        )
+        .route(
+            "/ui/companies/{company_id}/team/invites/{invite_id}",
             get(invite_pane).put(update_invite).delete(delete_invite),
         )
         .route(
-            "/ui/team/members/{user_id}",
+            "/ui/companies/{company_id}/team/members/{user_id}",
             get(member_pane).delete(remove_member),
         )
-        .route("/ui/team/members/{user_id}/avatar", put(set_member_avatar))
+        .route(
+            "/ui/companies/{company_id}/team/members/{user_id}/avatar",
+            put(set_member_avatar),
+        )
 }
 
-/// What the workspace has selected, all optional so `/ui/team` alone is a valid entry point.
-#[derive(Debug, Clone, Deserialize)]
-pub struct WorkspaceQuery {
-    pub company_id: Option<Uuid>,
+/// What the Team tab has selected, all optional so the tab alone is a valid entry point.
+///
+/// It arrives as part of [`super::ui_companies::WorkspaceQuery`] rather than being parsed here:
+/// the tab and the company it sits in are one page, and so are one query.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TeamRequest {
     /// The selected member's `user_id`, which is what removing one takes.
     pub member_id: Option<Uuid>,
     pub invite_id: Option<Uuid>,
-    /// `?new=1` opens the invite form instead of a person.
-    pub new: Option<String>,
+    /// Whether the pane should hold the invite form instead of a person.
+    pub creating: bool,
 }
 
-/// The company scope every fragment and every write carries, in the URL rather than the body so
-/// the form itself stays exactly [`InviteForm`].
+/// The company a stale `/ui/team` link named, if it named one at all.
 #[derive(Debug, Clone, Deserialize)]
-pub struct CompanyQuery {
-    pub company_id: Uuid,
+pub struct LegacyTeamQuery {
+    pub company_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -96,6 +106,7 @@ struct Workspace {
     company_use_cases: Arc<CompanyUseCases>,
     invite_use_cases: Arc<CompanyInviteUseCases>,
     user_use_cases: Arc<UserUseCases>,
+    config: Arc<AppConfig>,
     user_id: Uuid,
 }
 
@@ -112,6 +123,7 @@ impl FromRequestParts<AppState> for Workspace {
             company_use_cases: state.company_use_cases.clone(),
             invite_use_cases: state.company_invite_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
+            config: state.config.clone(),
             user_id: user.id,
         })
     }
@@ -135,110 +147,106 @@ impl Workspace {
     }
 }
 
-/// GET /ui/team - The Team workspace for the selected company / person (Protected).
-#[instrument(skip(workspace))]
-async fn team_page(
-    workspace: Workspace,
-    Query(query): Query<WorkspaceQuery>,
-) -> AppResult<Html<String>> {
-    let account = load_account(&workspace.user_use_cases, workspace.user_id).await?;
-    let account_email = EmailAddress::from(account.email.as_str());
-    let workspace_user = workspace_user(&account, &account_email);
-
-    let (companies, company) = load_scoped_company(
-        &workspace.company_use_cases,
-        workspace.user_id,
-        query.company_id,
-    )
-    .await?;
-    let Some(company) = company else {
-        return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
+/// The Team tab's body for one company, as the Companies workspace embeds it.
+///
+/// It builds from the same [`TeamView`] the fragments below do, so the list's entries and the
+/// panes they click through to cannot drift on what a member or an invite is allowed to do.
+pub(super) async fn team_tab_body(
+    invite_use_cases: &CompanyInviteUseCases,
+    user_id: Uuid,
+    company: &Company,
+    request: TeamRequest,
+) -> AppResult<String> {
+    let view = TeamView {
+        invite_use_cases,
+        user_id,
+        company,
     };
-
-    let view = workspace.view(&company);
     let members = view.members().await?;
     let invites = view.invites().await?;
 
-    let creating = matches!(query.new.as_deref(), Some("1") | Some("true"));
+    // Only the owner has an invite form to open, so a member's `?new=1` is an ordinary empty tab
+    // rather than a pane full of buttons the server would refuse.
+    let creating = request.creating && view.role().manages();
     let selected = if creating {
         TeamSelection::None
     } else {
-        view.selection(&members, &invites, query.member_id, query.invite_id)
+        view.selection(&members, &invites, request.member_id, request.invite_id)
     };
 
-    let pane_html = match selected {
-        _ if creating && view.role().manages() => view.invite_create_pane("", None),
-        TeamSelection::Member(user_id) => match members.iter().find(|m| m.user_id == user_id) {
-            Some(member) => view.member_pane(member, None),
-            None => pages::team_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline),
-        },
-        TeamSelection::Invite(invite_id) => match invites.iter().find(|i| i.id == invite_id) {
-            Some(invite) => view.invite_pane(invite, None, None),
-            None => pages::team_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline),
-        },
-        TeamSelection::None => {
-            pages::team_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline)
-        }
+    let pane_html = if creating {
+        view.invite_create_pane("", None)
+    } else {
+        view.selected_pane(&members, &invites, selected)
     };
 
-    Ok(Html(pages::team_settings_page(&pages::TeamSettingsPage {
-        user: &workspace_user,
-        companies: &companies,
-        list: &view.list(&members, &invites, selected),
-        pane_html: &pane_html,
-    })))
+    Ok(pages::team_tab(
+        &view.list(&members, &invites, selected),
+        &pane_html,
+    ))
 }
 
-/// GET /ui/team/new - The invite form for the pane (Protected).
+/// GET /ui/team - Where the Team workspace used to be (Protected).
+///
+/// The team lives in its company's pane now, so a stale link is answered with the company it named
+/// rather than a 404; without one there is nothing to show, and the Companies workspace is where a
+/// company gets picked.
+#[instrument]
+async fn team_redirect(Query(query): Query<LegacyTeamQuery>) -> Redirect {
+    match query.company_id {
+        Some(company_id) => Redirect::to(&pages::team_url(company_id, TeamSelection::None)),
+        None => Redirect::to("/ui/companies"),
+    }
+}
+
+/// GET /ui/companies/{company_id}/team/new - The invite form for the pane (Protected).
+///
+/// The list comes with it, deselected: the form belongs to nobody, so leaving whoever was open
+/// before it lit would say the pane is showing a person it is not.
 #[instrument(skip(workspace))]
 async fn invite_form_pane(
     workspace: Workspace,
-    Query(query): Query<CompanyQuery>,
-) -> AppResult<Html<String>> {
-    let company = workspace.scoped_company(query.company_id).await?;
+    Path(company_id): Path<Uuid>,
+) -> AppResult<Response> {
+    let company = workspace.scoped_company(company_id).await?;
     let view = workspace.view(&company);
     view.require_owner()?;
 
-    Ok(Html(view.invite_create_pane("", None)))
+    view.invite_form_response().await
 }
 
-/// GET /ui/team/close - Dismiss whichever form the pane holds (Protected).
+/// GET /ui/companies/{company_id}/team/close - Dismiss whichever form the pane holds (Protected).
 ///
-/// What Cancel does: the pane goes back to its placeholder and the sidebar loses its highlight,
-/// so cancelling a form and closing a person both leave the workspace in the same state as
-/// arriving at `/ui/team` with nothing selected.
+/// What Cancel does: the pane goes back to its placeholder and the list loses its highlight, so
+/// cancelling a form and closing a person both leave the tab in the same state as arriving at it
+/// with nothing selected.
 #[instrument(skip(workspace))]
-async fn close_pane(
-    workspace: Workspace,
-    Query(query): Query<CompanyQuery>,
-) -> AppResult<Response> {
-    let company = workspace.scoped_company(query.company_id).await?;
+async fn close_pane(workspace: Workspace, Path(company_id): Path<Uuid>) -> AppResult<Response> {
+    let company = workspace.scoped_company(company_id).await?;
     workspace.view(&company).cleared_response().await
 }
 
-/// GET /ui/team/members/{user_id} - One member's access for the pane (Protected).
+/// GET /ui/companies/{company_id}/team/members/{user_id} - One member's access (Protected).
 #[instrument(skip(workspace))]
 async fn member_pane(
     workspace: Workspace,
-    Path(user_id): Path<Uuid>,
-    Query(query): Query<CompanyQuery>,
+    Path((company_id, user_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Html<String>> {
-    let company = workspace.scoped_company(query.company_id).await?;
+    let company = workspace.scoped_company(company_id).await?;
     let view = workspace.view(&company);
     let member = view.member(user_id).await?;
 
     Ok(Html(view.member_pane(&member, None)))
 }
 
-/// PUT /ui/team/members/{user_id}/avatar - Save your own profile picture (Protected).
+/// PUT /ui/companies/{company_id}/team/members/{user_id}/avatar - Save your own picture (Protected).
 ///
 /// An avatar belongs to the account, not to the membership, so this refuses any `user_id` but the
 /// caller's -- being the company owner does not make somebody else's picture yours to set.
 #[instrument(skip(workspace, form))]
 async fn set_member_avatar(
     workspace: Workspace,
-    Path(user_id): Path<Uuid>,
-    Query(query): Query<CompanyQuery>,
+    Path((company_id, user_id)): Path<(Uuid, Uuid)>,
     Form(form): Form<AvatarForm>,
 ) -> AppResult<Response> {
     if user_id != workspace.user_id {
@@ -247,7 +255,7 @@ async fn set_member_avatar(
         ));
     }
 
-    let company = workspace.scoped_company(query.company_id).await?;
+    let company = workspace.scoped_company(company_id).await?;
     let view = workspace.view(&company);
 
     let avatar_url = match AvatarUrl::parse(&form.avatar_url) {
@@ -280,7 +288,7 @@ async fn set_member_avatar(
         }
     };
 
-    // Re-read the member so the pane and the sidebar both show what was just stored, and send the
+    // Re-read the member so the pane and the list both show what was just stored, and send the
     // top bar's own avatar along -- it is chrome no pane swap would otherwise touch.
     let member = view.member(user_id).await?;
     let saved_email = EmailAddress::from(saved.email.as_str());
@@ -288,7 +296,7 @@ async fn set_member_avatar(
         "{}{}",
         view.member_pane(&member, None),
         pages::account_chip(
-            &workspace_user(&saved, &saved_email),
+            &workspace_user(&saved, &saved_email, &workspace.config),
             pages::FragmentSwap::OutOfBand,
         ),
     );
@@ -297,28 +305,27 @@ async fn set_member_avatar(
         .await
 }
 
-/// GET /ui/team/invites/{invite_id} - One invite for the pane (Protected).
+/// GET /ui/companies/{company_id}/team/invites/{invite_id} - One invite for the pane (Protected).
 #[instrument(skip(workspace))]
 async fn invite_pane(
     workspace: Workspace,
-    Path(invite_id): Path<Uuid>,
-    Query(query): Query<CompanyQuery>,
+    Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Html<String>> {
-    let company = workspace.scoped_company(query.company_id).await?;
+    let company = workspace.scoped_company(company_id).await?;
     let view = workspace.view(&company);
     let invite = view.invite(invite_id).await?;
 
     Ok(Html(view.invite_pane(&invite, None, None)))
 }
 
-/// POST /ui/team/invites - Invite someone from the pane's form (Protected).
+/// POST /ui/companies/{company_id}/team/invites - Invite someone from the form (Protected).
 #[instrument(skip(workspace, form))]
 async fn create_invite(
     workspace: Workspace,
-    Query(query): Query<CompanyQuery>,
+    Path(company_id): Path<Uuid>,
     Form(form): Form<InviteForm>,
 ) -> AppResult<Response> {
-    let company = workspace.scoped_company(query.company_id).await?;
+    let company = workspace.scoped_company(company_id).await?;
     let view = workspace.view(&company);
 
     let created = view
@@ -339,15 +346,14 @@ async fn create_invite(
     }
 }
 
-/// PUT /ui/team/invites/{invite_id} - Save one invite's address (Protected).
+/// PUT /ui/companies/{company_id}/team/invites/{invite_id} - Save one address (Protected).
 #[instrument(skip(workspace, form))]
 async fn update_invite(
     workspace: Workspace,
-    Path(invite_id): Path<Uuid>,
-    Query(query): Query<CompanyQuery>,
+    Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
     Form(form): Form<InviteForm>,
 ) -> AppResult<Response> {
-    let company = workspace.scoped_company(query.company_id).await?;
+    let company = workspace.scoped_company(company_id).await?;
     let view = workspace.view(&company);
     let stored = view.invite(invite_id).await?;
 
@@ -371,14 +377,13 @@ async fn update_invite(
     }
 }
 
-/// DELETE /ui/team/invites/{invite_id} - Withdraw an invite and clear the pane (Protected).
+/// DELETE /ui/companies/{company_id}/team/invites/{invite_id} - Withdraw an invite (Protected).
 #[instrument(skip(workspace))]
 async fn delete_invite(
     workspace: Workspace,
-    Path(invite_id): Path<Uuid>,
-    Query(query): Query<CompanyQuery>,
+    Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Response> {
-    let company = workspace.scoped_company(query.company_id).await?;
+    let company = workspace.scoped_company(company_id).await?;
     let view = workspace.view(&company);
     view.invite_use_cases
         .delete_company_invite(view.user_id, company.id, invite_id)
@@ -387,14 +392,13 @@ async fn delete_invite(
     view.cleared_response().await
 }
 
-/// DELETE /ui/team/members/{user_id} - Remove someone from the team and clear the pane (Protected).
+/// DELETE /ui/companies/{company_id}/team/members/{user_id} - Remove someone (Protected).
 #[instrument(skip(workspace))]
 async fn remove_member(
     workspace: Workspace,
-    Path(user_id): Path<Uuid>,
-    Query(query): Query<CompanyQuery>,
+    Path((company_id, user_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Response> {
-    let company = workspace.scoped_company(query.company_id).await?;
+    let company = workspace.scoped_company(company_id).await?;
     let view = workspace.view(&company);
 
     // A refused removal is the pane's own error, not a 500: the owner row is the case that hits
@@ -414,7 +418,7 @@ async fn remove_member(
     view.cleared_response().await
 }
 
-/// Everything the workspace renders from, so each handler names its data once.
+/// Everything the tab renders from, so each handler names its data once.
 struct TeamView<'a> {
     invite_use_cases: &'a CompanyInviteUseCases,
     user_id: Uuid,
@@ -450,7 +454,7 @@ impl TeamView<'_> {
             .await
     }
 
-    /// Only the owner may see invites, and the sidebar hides the section for everyone else, so a
+    /// Only the owner may see invites, and the list hides the section for everyone else, so a
     /// member's list is empty rather than an error.
     async fn invites(&self) -> AppResult<Vec<CompanyInvite>> {
         match self.role() {
@@ -478,7 +482,7 @@ impl TeamView<'_> {
             .ok_or_else(|| AppError::NotFound("Invite not found".into()))
     }
 
-    /// Which sidebar entry the query names, keeping only a selection that actually exists.
+    /// Which list entry the query names, keeping only a selection that actually exists.
     fn selection(
         &self,
         members: &[CompanyMember],
@@ -497,6 +501,30 @@ impl TeamView<'_> {
             return TeamSelection::Invite(invite_id);
         }
         TeamSelection::None
+    }
+
+    /// The pane one selection opens, or the placeholder when it opens nothing.
+    fn selected_pane(
+        &self,
+        members: &[CompanyMember],
+        invites: &[CompanyInvite],
+        selected: TeamSelection,
+    ) -> String {
+        let pane = match selected {
+            TeamSelection::Member(user_id) => members
+                .iter()
+                .find(|member| member.user_id == user_id)
+                .map(|member| self.member_pane(member, None)),
+            TeamSelection::Invite(invite_id) => invites
+                .iter()
+                .find(|invite| invite.id == invite_id)
+                .map(|invite| self.invite_pane(invite, None, None)),
+            TeamSelection::None => None,
+        };
+
+        pane.unwrap_or_else(|| {
+            pages::team_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline)
+        })
     }
 
     fn list<'l>(
@@ -558,36 +586,40 @@ impl TeamView<'_> {
         })
     }
 
-    /// The empty pane plus a sidebar with nothing selected — what cancelling a form, closing a
+    /// The empty pane plus a list with nothing selected — what cancelling a form, closing a
     /// person, and every removal all leave behind.
     async fn cleared_response(&self) -> AppResult<Response> {
         self.refreshed_response(
             TeamSelection::None,
             pages::team_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline),
-            format!("/ui/team?company_id={}", self.company.id),
+            pages::team_url(self.company.id, TeamSelection::None),
         )
         .await
     }
 
-    /// What every successful write returns: the saved person's pane, with the sidebar list
-    /// refreshed beside it so a new invite or a changed address shows up immediately.
-    async fn saved_response(&self, selected: TeamSelection, pane: String) -> AppResult<Response> {
-        let push_url = match selected {
-            TeamSelection::Member(user_id) => format!(
-                "/ui/team?company_id={}&member_id={user_id}",
-                self.company.id
-            ),
-            TeamSelection::Invite(invite_id) => format!(
-                "/ui/team?company_id={}&invite_id={invite_id}",
-                self.company.id
-            ),
-            TeamSelection::None => format!("/ui/team?company_id={}", self.company.id),
-        };
+    /// The invite form plus a list with nothing lit — an invite is not somebody yet, so it is not
+    /// a selection, which is why this cannot go through [`Self::saved_response`].
+    async fn invite_form_response(&self) -> AppResult<Response> {
+        self.refreshed_response(
+            TeamSelection::None,
+            self.invite_create_pane("", None),
+            pages::team_invite_form_url(self.company.id),
+        )
+        .await
+    }
 
+    /// What every successful write returns: the saved person's pane, with the list refreshed
+    /// beside it so a new invite or a changed address shows up immediately.
+    async fn saved_response(&self, selected: TeamSelection, pane: String) -> AppResult<Response> {
+        let push_url = pages::team_url(self.company.id, selected);
         self.refreshed_response(selected, pane, push_url).await
     }
 
-    /// One pane plus the sidebar it belongs to, swapped out of band beside it.
+    /// One pane plus the list it belongs to, swapped out of band beside it, with the address bar
+    /// moved to where that pane is reachable.
+    ///
+    /// The URL is passed in rather than derived from `selected`: the invite form lights nothing
+    /// and still has an address of its own, so the two are not the same fact.
     async fn refreshed_response(
         &self,
         selected: TeamSelection,

@@ -214,7 +214,7 @@ async fn dashboard_page(
 ) -> AppResult<Html<String>> {
     let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let user = workspace_user(&account, &account_email);
+    let user = workspace_user(&account, &account_email, &dashboard.config);
 
     let scope = DashboardScope::resolve(&dashboard, &account_email, query.company_id).await?;
 
@@ -242,7 +242,7 @@ async fn dashboard_panels_fragment(
 ) -> AppResult<Response> {
     let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let user = workspace_user(&account, &account_email);
+    let user = workspace_user(&account, &account_email, &dashboard.config);
 
     let scope = DashboardScope::resolve(&dashboard, &account_email, query.company_id).await?;
     let window = query.window();
@@ -266,7 +266,7 @@ async fn dashboard_stream(
     let window = query.window();
 
     let stream = async_stream::stream! {
-        let user = workspace_user(&account, &account_email);
+        let user = workspace_user(&account, &account_email, &dashboard.config);
         let mut ticker = tokio::time::interval(TICK);
         // The first tick is immediate. Spend it: a reader that just connected wants the current
         // numbers, not the ones from five seconds hence.

@@ -256,6 +256,7 @@ fn mailbox_channel(company_id: Uuid) -> Channel {
         participant_emails: Some(vec!["person@example.com".into()]),
         agent_ids: None,
         channel_config: None,
+        created_by: crate::entities::creation::CreationProvenance::system(),
         created_at: Utc::now(),
     }
 }
@@ -281,6 +282,7 @@ fn mailbox_user(email: &EmailAddress) -> MailboxUser<'_> {
         username: "dana",
         email,
         avatar_url: None,
+        is_operator: false,
     }
 }
 
@@ -328,6 +330,7 @@ fn top_bar_carries_a_theme_controller_that_survives_a_reload() {
         username: "dana",
         email: &email,
         avatar_url: None,
+        is_operator: false,
     };
 
     let html = mailbox_page(&MailboxPage {
@@ -418,6 +421,7 @@ fn dark_theme_recuts_the_blues_at_the_logos_hue() {
         username: "dana",
         email: &email,
         avatar_url: None,
+        is_operator: false,
     };
 
     let html = mailbox_no_company_page(&user);
@@ -447,6 +451,7 @@ fn top_bar_shows_the_logo_and_the_signed_in_account() {
         username: "dana",
         email: &email,
         avatar_url: None,
+        is_operator: false,
     };
 
     let html = mailbox_page(&MailboxPage {
@@ -654,6 +659,42 @@ fn the_rail_badge_can_be_sent_back_out_of_band_after_a_company_is_saved() {
     let oob = rail_company_badge(&company, FragmentSwap::OutOfBand);
     assert!(oob.contains(r##"id="rail-company""##));
     assert!(oob.contains(r##"hx-swap-oob="outerHTML""##));
+}
+
+#[test]
+fn the_top_bar_names_the_selected_company_between_the_brand_and_the_account() {
+    let mut company = mailbox_company();
+    company.name = "Acme Logistics".to_string();
+    let email = mailbox_account_email();
+    let user = mailbox_user(&email);
+
+    let bar = ui_shell(&UiShell {
+        title: "Mailbox",
+        user: &user,
+        company: Some(&company),
+        section: UiSection::Mailbox,
+        content: "",
+        script: "",
+    });
+    assert!(bar.contains(r##"id="topbar-company""##));
+    assert!(bar.contains("Acme Logistics"));
+
+    // A reader with no company yet has nothing to name, so the middle of the bar stays empty
+    // rather than holding a placeholder.
+    let bare = ui_shell(&UiShell {
+        title: "Profile",
+        user: &user,
+        company: None,
+        section: UiSection::Mailbox,
+        content: "",
+        script: "",
+    });
+    assert!(!bare.contains(r##"id="topbar-company""##));
+
+    // A rename reaches no pane swap, so the name rides back out of band beside the rail badge.
+    let oob = topbar_company(&company, FragmentSwap::OutOfBand);
+    assert!(oob.contains(r##"hx-swap-oob="outerHTML""##));
+    assert!(!topbar_company(&company, FragmentSwap::Inline).contains("hx-swap-oob"));
 }
 
 #[test]
@@ -1071,6 +1112,7 @@ fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
         description: None,
         config_json: None,
         avatar_url: None,
+        created_by: crate::entities::creation::CreationProvenance::system(),
         created_at: Utc::now(),
     }
 }
@@ -1130,6 +1172,61 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
 
     // Spam scanning is on, so the interlock has nothing to ask.
     assert!(!html.contains("confirm_spam_disabled"));
+}
+
+/// A library definition is picked on what it does, so the pane opens a modal of cards rather than
+/// a dropdown that could only carry names.
+#[test]
+fn library_agents_are_picked_from_a_modal_of_cards() {
+    let company = mailbox_company();
+    let scheduler = Agent {
+        company_id: None,
+        description: Some("Books meetings from the thread.".to_string()),
+        ..settings_agent(company.id, "Scheduler", "scheduler")
+    };
+    let researcher = Agent {
+        company_id: None,
+        ..settings_agent(company.id, "Researcher", "researcher")
+    };
+    let channel = Channel {
+        agent_ids: Some(vec![scheduler.id]),
+        ..mailbox_channel(company.id)
+    };
+
+    let html = channel_edit_pane(&ChannelEditPane {
+        company: &company,
+        app_domain_name: "example.com",
+        channel: &channel,
+        agents: &[scheduler.clone(), researcher.clone()],
+        schedules: &[],
+        spam_scan_enabled: true,
+        draft: None,
+        error: None,
+    });
+
+    // The button names the current pick and opens the modal; the choice itself rides a hidden
+    // field, since a card is a button and cannot be submitted.
+    assert!(html.contains("showModal()"));
+    assert!(html.contains(&format!(
+        "<input type=\"hidden\" class=\"channel-library-agent-field\" value=\"{}\">",
+        scheduler.id
+    )));
+    assert!(html.contains("data-placeholder=\"Choose a library agent…\">Scheduler</span>"));
+
+    // Both definitions are cards, and only the assigned one is marked.
+    assert!(html.contains(&format!("data-agent-id=\"{}\"", scheduler.id)));
+    assert!(html.contains(&format!("data-agent-id=\"{}\"", researcher.id)));
+    assert_eq!(html.matches("channel-library-agent-card").count(), 2);
+    assert_eq!(html.matches("border-2 border-primary").count(), 1);
+
+    // The card carries what the dropdown could not.
+    assert!(html.contains("Books meetings from the thread."));
+    assert!(html.contains("@scheduler"));
+
+    // A nested <form> would be dropped by the parser and could submit the pane, so the backdrop
+    // closes the dialog itself.
+    assert!(!html.contains("modal-backdrop\">\n"));
+    assert!(html.contains("class=\"modal-backdrop\""));
 }
 
 /// The third-party switch is a checkbox, and an unticked checkbox submits no key at all — so the
@@ -1408,7 +1505,7 @@ fn appended_thread_page_swaps_pagination_out_of_band() {
 }
 
 #[test]
-fn message_pane_separates_agent_and_human_bubbles() {
+fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_left() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
     let thread = mailbox_thread(channel.id);
@@ -1419,7 +1516,7 @@ fn message_pane_separates_agent_and_human_bubbles() {
         message_id: "<in@test.com>".into(),
         in_reply_to: None,
         references_list: vec![],
-        sender: "person@example.com".into(),
+        sender: mailbox_account_email(),
         recipients_to: vec![],
         recipients_cc: vec![],
         subject: "Question".to_string(),
@@ -1458,11 +1555,14 @@ fn message_pane_separates_agent_and_human_bubbles() {
         thread: &thread,
         messages: &[inbound, outbound],
         agent: None,
+        viewer_email: &mailbox_account_email(),
         activity: None,
     });
 
     assert!(html.contains("chat chat-start"));
     assert!(html.contains("chat chat-end"));
+    assert_eq!(html.matches("chat chat-start").count(), 1);
+    assert_eq!(html.matches("chat chat-end").count(), 1);
     assert!(html.contains("Plain &lt;b&gt;text&lt;/b&gt; body"));
     assert!(html.contains("<strong>Answered</strong>"));
 
@@ -1516,6 +1616,7 @@ fn message_pane_streams_new_messages_from_where_it_was_rendered() {
         thread: &thread,
         messages: &[mailbox_message(thread.id, "older"), newest.clone()],
         agent: None,
+        viewer_email: &mailbox_account_email(),
         activity: None,
     });
 
@@ -1548,6 +1649,7 @@ fn message_pane_omits_the_resume_cursor_for_an_empty_thread() {
         thread: &thread,
         messages: &[],
         agent: None,
+        viewer_email: &mailbox_account_email(),
         activity: None,
     });
 
@@ -1795,10 +1897,19 @@ fn the_open_thread_is_identifiable_from_the_pane() {
         thread: &thread,
         messages: &[],
         agent: None,
+        viewer_email: &mailbox_account_email(),
         activity: None,
     });
 
     assert!(html.contains(&format!(r#"data-thread-id="{}""#, thread.id)));
+}
+
+#[test]
+fn opening_or_receiving_a_message_scrolls_to_the_start_of_the_newest_bubble() {
+    assert!(MAILBOX_SCRIPT.contains("function scrollToNewestMessageStart()"));
+    assert!(MAILBOX_SCRIPT.contains("pane.scrollTop = newest.offsetTop - pane.offsetTop"));
+    assert!(MAILBOX_SCRIPT.contains("window.addEventListener('load', scrollToNewestMessageStart)"));
+    assert!(!MAILBOX_SCRIPT.contains("scrollMessagesToBottom"));
 }
 
 /// The spinner is for work actually in progress. A thread parked on an approval gets a badge with
@@ -1836,6 +1947,7 @@ fn the_message_pane_has_a_slot_for_the_activity_strip() {
         thread: &thread,
         messages: &[],
         agent: None,
+        viewer_email: &mailbox_account_email(),
         activity: Some(ThreadActivity::Working),
     });
 
@@ -1870,6 +1982,7 @@ fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
     let html = message_bubble_chat(
         &reply,
         Some(&agent),
+        None,
         MessageScope {
             company_id: Uuid::new_v4(),
             channel_id: Uuid::new_v4(),
@@ -1882,6 +1995,7 @@ fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
     // With no single agent behind the channel, the address it was sent from stands in.
     let anonymous = message_bubble_chat(
         &reply,
+        None,
         None,
         MessageScope {
             company_id: Uuid::new_v4(),
@@ -1896,6 +2010,7 @@ fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
     let inbound_html = message_bubble_chat(
         &inbound,
         Some(&agent),
+        None,
         MessageScope {
             company_id: Uuid::new_v4(),
             channel_id: Uuid::new_v4(),
@@ -1982,6 +2097,7 @@ fn an_attachment_is_offered_as_a_download_scoped_to_its_thread() {
     let html = message_bubble_chat(
         &message,
         None,
+        None,
         MessageScope {
             company_id: company.id,
             channel_id: channel.id,
@@ -2023,6 +2139,7 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
         thread: &thread,
         messages: std::slice::from_ref(&message),
         agent: None,
+        viewer_email: &mailbox_account_email(),
         activity: None,
     });
 
@@ -2032,7 +2149,11 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
         company_id: company.id,
         channel_id: channel.id,
     };
-    assert!(pane.contains(message_bubble_chat(&message, None, scope).trim()));
+    assert!(pane.contains(
+        message_bubble_chat(&message, None, Some(&mailbox_account_email()), scope).trim()
+    ));
+    assert!(pane.contains("name=\"quiet\" value=\"true\""));
+    assert!(pane.contains("save to history without running the agent"));
 }
 
 #[test]
@@ -2049,6 +2170,7 @@ fn reply_pane_fixes_the_subject_to_the_thread_it_continues() {
         sender_email: "owner@example.com",
         text_body: "Draft reply",
         deliver: true,
+        quiet: true,
         error: Some("Channel rejected the message"),
     });
 
@@ -2059,6 +2181,9 @@ fn reply_pane_fixes_the_subject_to_the_thread_it_continues() {
     assert!(html.contains("value=\"Re: Question &lt;script&gt;\" readonly"));
     assert!(html.contains("Draft reply</textarea>"));
     assert!(html.contains("toggle toggle-primary toggle-sm\" checked"));
+    assert!(html.contains(
+        "name=\"quiet\" value=\"true\" class=\"checkbox checkbox-primary checkbox-sm\" checked"
+    ));
     assert!(html.contains("Channel rejected the message"));
 
     // Cancel puts the thread's messages back in the pane it replaced.
@@ -2081,6 +2206,7 @@ fn compose_pane_shows_the_channel_address_and_errors() {
         subject: "Draft subject",
         text_body: "Draft body",
         deliver: true,
+        quiet: true,
         error: Some("Channel rejected the message"),
     });
 
@@ -2089,6 +2215,9 @@ fn compose_pane_shows_the_channel_address_and_errors() {
     assert!(html.contains("value=\"Draft subject\""));
     assert!(html.contains("Draft body</textarea>"));
     assert!(html.contains("toggle toggle-primary toggle-sm\" checked"));
+    assert!(html.contains(
+        "name=\"quiet\" value=\"true\" class=\"checkbox checkbox-primary checkbox-sm\" checked"
+    ));
     assert!(html.contains("alert alert-error"));
     assert!(html.contains("Channel rejected the message"));
     assert!(html.contains("hx-post=\"/ui/compose\""));
@@ -2413,6 +2542,8 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
         },
         draft: None,
         error: None,
+        editable: true,
+        body: CompanyPaneBody::Settings,
     });
 
     assert!(html.contains(r##"value="Acme &amp; Co""##));
@@ -2432,7 +2563,43 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
         company.id
     )));
     assert!(html.contains(&format!(r##"href="/ui/agents?company_id={}""##, company.id)));
-    assert!(html.contains(&format!(r##"href="/ui/team?company_id={}""##, company.id)));
+    // The team is the pane's other half rather than somewhere it links out to, so the Settings
+    // tab is the lit one and Team is one click away in the same pane.
+    assert!(html.contains(&format!(
+        r##"<a role="tab" class="tab tab-active" href="/ui/companies?company_id={}">Settings</a>"##,
+        company.id
+    )));
+    assert!(html.contains(&format!(
+        r##"href="/ui/companies?company_id={}&tab=team">Team</a>"##,
+        company.id
+    )));
+}
+
+#[test]
+fn company_member_can_open_company_without_edit_controls_or_api_key() {
+    let company = Company {
+        api_key: Some("owner-secret".into()),
+        ..settings_company("Acme", "acme")
+    };
+
+    let html = company_edit_pane(&CompanyEditPane {
+        company: &company,
+        app_domain_name: "example.com",
+        counts: CompanyCounts {
+            channels: 3,
+            agents: 2,
+        },
+        draft: None,
+        error: None,
+        editable: false,
+        body: CompanyPaneBody::Settings,
+    });
+
+    assert!(html.contains("Only the company owner can edit these settings."));
+    assert!(html.contains(&format!(r##"href="/ui?company_id={}""##, company.id)));
+    assert!(!html.contains("hx-put="));
+    assert!(!html.contains("hx-delete="));
+    assert!(!html.contains("owner-secret"));
 }
 
 #[test]
@@ -2446,6 +2613,8 @@ fn the_company_form_picks_a_picture_and_saves_it_with_the_rest_of_the_settings()
         counts: CompanyCounts::default(),
         draft: None,
         error: None,
+        editable: true,
+        body: CompanyPaneBody::Settings,
     });
 
     // The picker is the same control every other picture is set with, in this form's own field.
@@ -2482,6 +2651,8 @@ fn a_rejected_company_save_keeps_the_picture_that_was_picked() {
         counts: CompanyCounts::default(),
         draft: Some(&draft),
         error: Some("Slug is taken"),
+        editable: true,
+        body: CompanyPaneBody::Settings,
     });
 
     assert!(html.contains(
@@ -2520,6 +2691,8 @@ fn company_edit_pane_keeps_a_rejected_save_in_the_form() {
         counts: CompanyCounts::default(),
         draft: Some(&draft),
         error: Some("Slug is taken"),
+        editable: true,
+        body: CompanyPaneBody::Settings,
     });
 
     assert!(html.contains("Slug is taken"));
@@ -2616,11 +2789,10 @@ fn team_invite(company_id: Uuid, email: &str, status: &str) -> CompanyInvite {
 }
 
 #[test]
-fn team_settings_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
+fn the_team_tab_sits_inside_its_company_pane_and_lights_the_company_rail_icon() {
     let company = mailbox_company();
     let member = team_member(company.id, company.user_id, "dana", "owner");
     let invite = team_invite(company.id, "kim@example.com", "pending");
-    let email = mailbox_account_email();
 
     let list = TeamSettingsList {
         company: &company,
@@ -2629,31 +2801,40 @@ fn team_settings_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
         selected: TeamSelection::None,
         role: TeamRole::Owner,
     };
-    let pane = team_settings_empty_pane("Select someone.", FragmentSwap::Inline);
-    let html = team_settings_page(&TeamSettingsPage {
-        user: &mailbox_user(&email),
-        companies: std::slice::from_ref(&company),
-        list: &list,
-        pane_html: &pane,
+    let tab = team_tab(
+        &list,
+        &team_settings_empty_pane("Select someone.", FragmentSwap::Inline),
+    );
+    let html = company_edit_pane(&CompanyEditPane {
+        company: &company,
+        app_domain_name: "example.com",
+        counts: CompanyCounts::default(),
+        draft: None,
+        error: None,
+        editable: true,
+        body: CompanyPaneBody::Team(&tab),
     });
 
-    // Same chrome as the other workspaces: its own rail icon lit, the others one click away.
+    // It is the company's pane, so it is the company's tab that is lit — and the reader is still
+    // in the Companies workspace rather than in one of the team's own.
+    assert!(html.contains("id=\"company-pane\""));
     assert!(html.contains(&format!(
-        r##"<a href="/ui/team?company_id={}" class="btn btn-square btn-md btn-primary"##,
+        r##"href="/ui/companies?company_id={}&tab=team">Team</a>"##,
         company.id
     )));
-    assert!(html.contains(&format!(
-        r##"<a href="/ui/companies?company_id={}" class="btn btn-square btn-md btn-ghost"##,
-        company.id
-    )));
-    // The team icon sits directly below the companies one.
-    assert!(
-        html.find(r##"title="Companies""##) < html.find(r##"title="Team""##),
-        "the team icon belongs below the companies icon"
-    );
+    assert!(html.contains(r##"class="tab tab-active" href="/ui/companies?company_id"##));
+    // The team's own two columns are inside it, and its endpoints are nested under the company.
+    assert!(html.contains("id=\"team-menu\""));
     assert!(html.contains("id=\"team-pane\""));
-    assert!(!html.contains("dropdown-bottom w-full p-3"));
-    assert!(html.contains(r##"hx-get="/ui/team/new?company_id="##));
+    assert!(html.contains(&format!(
+        r##"hx-get="/ui/companies/{}/team/new""##,
+        company.id
+    )));
+    // The form arrives with the list beside it, so the response pushes the URL and the button
+    // must not push a second one of its own -- `&new=1` is that URL, and nothing else emits it.
+    assert!(!html.contains("&new=1"));
+    // The Settings tab's own form is not in the pane while the team is.
+    assert!(!html.contains(r##"name="enable_llm_spam_guardrail""##));
 }
 
 #[test]
@@ -2675,12 +2856,17 @@ fn team_settings_list_groups_members_and_invites_and_swaps_out_of_band() {
 
     let inline = team_settings_list(&list, FragmentSwap::Inline);
     assert!(inline.contains(&format!(
-        "/ui/team/members/{}?company_id={}",
-        sam.user_id, company.id
+        r##"hx-get="/ui/companies/{}/team/members/{}""##,
+        company.id, sam.user_id
     )));
     assert!(inline.contains(&format!(
-        "/ui/team/invites/{}?company_id={}",
-        pending.id, company.id
+        r##"hx-get="/ui/companies/{}/team/invites/{}""##,
+        company.id, pending.id
+    )));
+    // Picking somebody moves the address bar to the tab they are reachable at.
+    assert!(inline.contains(&format!(
+        r##"hx-push-url="/ui/companies?company_id={}&tab=team&member_id={}""##,
+        company.id, sam.user_id
     )));
     assert!(inline.contains("hx-target=\"#team-pane\""));
     assert!(inline.contains("menu-active"));
@@ -2702,7 +2888,6 @@ fn a_member_sees_the_team_but_none_of_its_invites() {
     let company = mailbox_company();
     let owner = team_member(company.id, company.user_id, "dana", "owner");
     let invite = team_invite(company.id, "kim@example.com", "pending");
-    let email = mailbox_account_email();
 
     let list = TeamSettingsList {
         company: &company,
@@ -2712,13 +2897,10 @@ fn a_member_sees_the_team_but_none_of_its_invites() {
         selected: TeamSelection::None,
         role: TeamRole::Member,
     };
-    let pane = team_settings_empty_pane("Select someone.", FragmentSwap::Inline);
-    let html = team_settings_page(&TeamSettingsPage {
-        user: &mailbox_user(&email),
-        companies: std::slice::from_ref(&company),
-        list: &list,
-        pane_html: &pane,
-    });
+    let html = team_tab(
+        &list,
+        &team_settings_empty_pane("Select someone.", FragmentSwap::Inline),
+    );
 
     assert!(html.contains("dana"));
     assert!(!html.contains(">Invites</li>"));
@@ -2742,8 +2924,8 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
         error: None,
     });
     assert!(removable.contains(&format!(
-        r##"hx-delete="/ui/team/members/{}?company_id={}""##,
-        sam.user_id, company.id
+        r##"hx-delete="/ui/companies/{}/team/members/{}""##,
+        company.id, sam.user_id
     )));
     assert!(removable.contains("hx-confirm=\"Remove sam"));
 
@@ -2879,8 +3061,8 @@ fn only_your_own_member_pane_offers_the_avatar_field() {
         error: None,
     });
     assert!(own.contains(&format!(
-        r##"hx-put="/ui/team/members/{}/avatar?company_id={}""##,
-        dana.user_id, company.id
+        r##"hx-put="/ui/companies/{}/team/members/{}/avatar""##,
+        company.id, dana.user_id
     )));
     // The picture is picked from disk; the URL it was stored at rides along hidden, so the save
     // is still the same `avatar_url` field.
@@ -2900,7 +3082,7 @@ fn only_your_own_member_pane_offers_the_avatar_field() {
         avatar_draft: None,
         error: None,
     });
-    assert!(!someone_else.contains("/avatar?company_id="));
+    assert!(!someone_else.contains("/avatar\""));
     assert!(someone_else.contains(r#"src="https://example.com/dana.png""#));
 
     // A rejected save comes back with what was typed, not with what is stored.
@@ -2932,8 +3114,8 @@ fn the_invite_pane_only_edits_an_invite_that_is_still_pending() {
         error: None,
     });
     assert!(editable.contains(&format!(
-        r##"hx-put="/ui/team/invites/{}?company_id={}""##,
-        pending.id, company.id
+        r##"hx-put="/ui/companies/{}/team/invites/{}""##,
+        company.id, pending.id
     )));
     assert!(editable.contains(r##"value="kim@example.com""##));
     assert!(editable.contains("Cancel Invite"));
@@ -2988,10 +3170,13 @@ fn the_invite_forms_keep_a_rejected_submit_in_the_form() {
     assert!(rejected_create.contains("Please provide a valid email address."));
     assert!(rejected_create.contains(r##"value="typo@example""##));
     assert!(rejected_create.contains(&format!(
-        r##"hx-post="/ui/team/invites?company_id={}""##,
+        r##"hx-post="/ui/companies/{}/team/invites""##,
         company.id
     )));
-    assert!(rejected_create.contains(r##"hx-get="/ui/team/close?company_id="##));
+    assert!(rejected_create.contains(&format!(
+        r##"hx-get="/ui/companies/{}/team/close""##,
+        company.id
+    )));
 }
 
 #[test]
@@ -3496,20 +3681,6 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         companies_html
             .contains(r##"<h2 class="text-base font-semibold leading-tight">Companies</h2>"##)
     );
-
-    let team_html = team_settings_page(&TeamSettingsPage {
-        user: &user,
-        companies: &companies,
-        list: &TeamSettingsList {
-            company: &company,
-            members: &[],
-            invites: &[],
-            selected: TeamSelection::None,
-            role: TeamRole::Owner,
-        },
-        pane_html: "",
-    });
-    assert!(team_html.contains(r##"<h2 class="text-base font-semibold leading-tight">Team</h2>"##));
 }
 
 fn profile_account() -> User {
@@ -3661,6 +3832,45 @@ fn the_profile_page_renders_through_the_ui_shell_with_or_without_a_company() {
     });
     assert!(without_company.contains(r##"hx-put="/ui/profile""##));
     assert!(!without_company.contains("company_id="));
+}
+
+#[test]
+fn the_agent_library_reaches_the_account_menu_only_for_an_operator() {
+    let company = mailbox_company();
+    let email = mailbox_account_email();
+    let entry = r##"<a href="/ui/agent-library">Agent library</a>"##;
+
+    let reader = mailbox_no_company_page(&mailbox_user(&email));
+    assert!(!reader.contains(entry));
+
+    // The rest of the menu is what everyone gets, operator or not -- the library is the only
+    // entry the flag adds.
+    assert!(reader.contains(r##"<a href="/ui/profile">Profile</a>"##));
+
+    let operator = MailboxUser {
+        is_operator: true,
+        ..mailbox_user(&email)
+    };
+    assert!(mailbox_no_company_page(&operator).contains(entry));
+
+    // It is the account menu that carries it, not the rail: the library is global, so it has no
+    // company_id to be scoped by.
+    let detail = empty_detail_pane("Select a thread.", FragmentSwap::Inline);
+    let with_rail = mailbox_page(&MailboxPage {
+        user: &operator,
+        company: &company,
+        companies: std::slice::from_ref(&company),
+        app_domain_name: "example.com",
+        channels: &[],
+        selected_channel: None,
+        threads: &[],
+        next_cursor: None,
+        selected_thread_id: None,
+        activity: no_activity(),
+        detail_html: &detail,
+    });
+    assert!(with_rail.contains(entry));
+    assert!(!with_rail.contains("/ui/agent-library?company_id="));
 }
 
 fn in_fifteen_minutes() -> chrono::DateTime<Utc> {

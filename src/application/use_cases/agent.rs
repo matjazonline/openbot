@@ -7,7 +7,9 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::{agent::Agent, user::Viewer, value_objects::AvatarUrl},
+    entities::{
+        agent::Agent, creation::CreationProvenance, user::Viewer, value_objects::AvatarUrl,
+    },
     use_cases::{
         channel::{SlugKind, validate_slug},
         company::{CompanyPersistence, owned_company},
@@ -37,12 +39,13 @@ pub struct AgentWrite {
     pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
     pub avatar_url: Option<AvatarUrl>,
+    pub created_by: Option<CreationProvenance>,
 }
 
 impl AgentWrite {
     /// Trim the fields that have canonical forms and drop the blanks. Runs once, in the use case,
     /// so create and update store the same shape.
-    fn normalize(&mut self) -> AppResult<()> {
+    pub(crate) fn normalize(&mut self) -> AppResult<()> {
         self.name = self.name.trim().to_string();
         self.slug = self.slug.trim().to_lowercase().replace(' ', "-");
 
@@ -137,6 +140,7 @@ impl AgentUseCases {
         mut write: AgentWrite,
     ) -> AppResult<Agent> {
         self.verify_company_owner(user_id, company_id).await?;
+        write.created_by = Some(CreationProvenance::user(user_id));
         write.normalize()?;
 
         info!(
@@ -199,6 +203,7 @@ impl AgentUseCases {
     }
 
     pub async fn create_library_agent(&self, mut write: AgentWrite) -> AppResult<Agent> {
+        write.created_by = Some(CreationProvenance::system());
         write.normalize()?;
         self.agent_persistence.create_library(write).await
     }
@@ -677,6 +682,7 @@ mod tests {
                 description: write.description,
                 config_json: write.config_json,
                 avatar_url: write.avatar_url,
+                created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
             };
             self.agents.lock().unwrap().push(agent.clone());

@@ -1044,6 +1044,7 @@ mod tests {
             channel_config: None,
             enabled: true,
             add_3rd_party: true,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         };
 
@@ -1182,6 +1183,7 @@ mod tests {
             channel_config: None,
             enabled: true,
             add_3rd_party: true,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         };
 

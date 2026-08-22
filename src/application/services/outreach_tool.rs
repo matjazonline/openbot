@@ -489,6 +489,7 @@ mod tests {
             participant_emails: None,
             agent_ids: Some(vec![Uuid::new_v4()]),
             channel_config: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         }
     }

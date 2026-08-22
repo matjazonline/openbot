@@ -4,6 +4,10 @@
 //! It is the one `/ui` workspace whose sidebar is not scoped to a company — picking an entry
 //! swaps that company's settings into `#company-pane` over htmx, and every write re-renders the
 //! pane with the sidebar list riding along out of band, so a rename or a delete shows up at once.
+//!
+//! The pane has two tabs: the company's own settings, and its team — see [`team_tab`], which is
+//! rendered into [`CompanyPaneBody::Team`] rather than into a workspace of its own, because a
+//! team only means anything as the team *of* a company.
 
 use super::*;
 
@@ -43,6 +47,47 @@ impl SpamGuardrail {
             SpamGuardrail::ServerDefault => None,
             SpamGuardrail::Enabled => Some(true),
             SpamGuardrail::Disabled => Some(false),
+        }
+    }
+}
+
+/// Which half of a company's pane the request asked for.
+///
+/// The team used to be a workspace of its own; it is now the second tab of the company it belongs
+/// to, so `?tab=` is what says which one to draw.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CompanyTab {
+    #[default]
+    Settings,
+    Team,
+}
+
+impl CompanyTab {
+    /// What `?tab=` names. Anything unrecognised is the settings the pane opens on.
+    pub fn from_query(value: Option<&str>) -> Self {
+        match value.map(str::trim) {
+            Some("team") => CompanyTab::Team,
+            _ => CompanyTab::Settings,
+        }
+    }
+}
+
+/// What the company pane holds below its tabs.
+///
+/// The team arrives pre-rendered rather than as its parts: it is [`team_tab`]'s own two columns,
+/// and this pane's job is only to give them somewhere to sit. Holding the body rather than a
+/// `tab` field beside it is also what keeps "Team is lit" and "the team is showing" the same
+/// fact.
+pub enum CompanyPaneBody<'a> {
+    Settings,
+    Team(&'a str),
+}
+
+impl CompanyPaneBody<'_> {
+    fn tab(&self) -> CompanyTab {
+        match self {
+            CompanyPaneBody::Settings => CompanyTab::Settings,
+            CompanyPaneBody::Team(_) => CompanyTab::Team,
         }
     }
 }
@@ -108,6 +153,10 @@ pub struct CompanyEditPane<'a> {
     /// What the user last typed, when a save was rejected; `None` shows the stored company.
     pub draft: Option<&'a CompanyDraft<'a>>,
     pub error: Option<&'a str>,
+    /// Only owners may change company-level configuration.
+    pub editable: bool,
+    /// Which tab the pane is open on, and — for the team — what it is showing.
+    pub body: CompanyPaneBody<'a>,
 }
 
 /// The pane for a company that does not exist yet.
@@ -215,23 +264,83 @@ pub fn company_settings_empty_pane(message: &str, swap: FragmentSwap) -> String 
 }
 
 pub fn company_edit_pane(pane: &CompanyEditPane<'_>) -> String {
+    let company_id = pane.company.id;
+
+    format!(
+        r##"
+        <section id="company-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-6 pt-4">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <h2 class="truncate text-xl font-bold">{name}</h2>
+                        <p class="truncate font-mono text-xs opacity-60">@{slug}.{app_domain_name} &middot; added {created_at}</p>
+                    </div>
+                    <a href="/ui?company_id={company_id}" class="btn btn-ghost btn-sm shrink-0">Open Mailbox</a>
+                </div>
+                {tabs}
+            </div>
+            {body}
+        </section>
+        "##,
+        name = escape_html_text(&pane.company.name),
+        slug = escape_html_text(&pane.company.slug),
+        app_domain_name = escape_html_text(pane.app_domain_name),
+        created_at = super::format_date(pane.company.created_at),
+        tabs = company_tabs(company_id, pane.body.tab()),
+        body = match pane.body {
+            CompanyPaneBody::Settings => company_settings_body(pane),
+            CompanyPaneBody::Team(html) => html.to_string(),
+        },
+    )
+}
+
+/// The pane's two halves, as ordinary links rather than htmx swaps.
+///
+/// A tab is a whole pane, and a plain URL is what makes one shareable and what the back button
+/// already understands — the same reason the sidebar's own entries are links.
+fn company_tabs(company_id: Uuid, tab: CompanyTab) -> String {
+    format!(
+        r##"
+                <div role="tablist" class="tabs tabs-border -mb-px mt-3">
+                    <a role="tab" class="tab {settings_active}" href="/ui/companies?company_id={company_id}">Settings</a>
+                    <a role="tab" class="tab {team_active}" href="{team_url}">Team</a>
+                </div>
+        "##,
+        settings_active = if tab == CompanyTab::Settings {
+            "tab-active"
+        } else {
+            ""
+        },
+        team_active = if tab == CompanyTab::Team {
+            "tab-active"
+        } else {
+            ""
+        },
+        team_url = team_url(company_id, TeamSelection::None),
+    )
+}
+
+/// The Settings tab: what the company holds, and the form that changes it.
+fn company_settings_body(pane: &CompanyEditPane<'_>) -> String {
+    if !pane.editable {
+        return format!(
+            r##"
+            <div class="flex-1 overflow-y-auto px-6 py-4">
+                <div class="rounded-box border border-base-300 bg-base-200 p-5">
+                    <h3 class="font-semibold">Company settings</h3>
+                    <p class="mt-1 text-sm opacity-70">Only the company owner can edit these settings.</p>
+                </div>
+            </div>
+            "##
+        );
+    }
+
     let stored = stored_draft(pane.company);
     let draft = pane.draft.unwrap_or(&stored);
     let company_id = pane.company.id;
 
     format!(
         r##"
-        <section id="company-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
-            <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
-                <div class="min-w-0">
-                    <h2 class="truncate text-xl font-bold">{name}</h2>
-                    <p class="truncate font-mono text-xs opacity-60">@{slug}.{app_domain_name} &middot; added {created_at}</p>
-                </div>
-                <div class="flex shrink-0 items-center gap-2">
-                    <a href="/ui?company_id={company_id}" class="btn btn-ghost btn-sm">Open Mailbox</a>
-                    <a href="/ui/team?company_id={company_id}" class="btn btn-outline btn-sm">Team &amp; Invites</a>
-                </div>
-            </div>
             <div class="flex-1 overflow-y-auto px-6 py-4">
                 {error_html}
                 {workspace_links}
@@ -255,12 +364,8 @@ pub fn company_edit_pane(pane: &CompanyEditPane<'_>) -> String {
                     </div>
                 </form>
             </div>
-        </section>
         "##,
         name = escape_html_text(&pane.company.name),
-        slug = escape_html_text(&pane.company.slug),
-        app_domain_name = escape_html_text(pane.app_domain_name),
-        created_at = super::format_date(pane.company.created_at),
         error_html = form_error_banner(pane.error),
         workspace_links = workspace_links(company_id, pane.counts),
         fields = company_fields(draft),

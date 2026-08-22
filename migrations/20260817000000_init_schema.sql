@@ -85,6 +85,7 @@ CREATE TABLE agents (
     config_json JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     avatar_url TEXT,
+    created_by JSONB NOT NULL,
     CONSTRAINT agents_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT agents_company_slug_key UNIQUE (company_id, slug),
     CONSTRAINT agents_name_not_blank CHECK (btrim(name) <> ''),
@@ -119,6 +120,7 @@ CREATE TABLE channels (
     -- Whether a trusted sender may pull CC'd outsiders onto this channel's threads. Off means the
     -- channel is internal: outsiders never join a thread and never appear on an agent reply's Cc.
     add_3rd_party BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by JSONB NOT NULL,
     CONSTRAINT channels_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT channels_name_not_blank CHECK (btrim(name) <> ''),
     CONSTRAINT channels_access_mode_check
@@ -373,6 +375,15 @@ CREATE INDEX background_tasks_thread_idx
 CREATE INDEX background_tasks_waiting_due_idx
     ON background_tasks (wait_expires_at, id)
     WHERE status = 'waiting_for_third_party_reply' AND wait_expires_at IS NOT NULL;
+
+CREATE TABLE agent_channel_provisions (
+    task_id UUID NOT NULL REFERENCES background_tasks(id) ON DELETE CASCADE,
+    request_hash TEXT NOT NULL,
+    agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (task_id, request_hash)
+);
 
 -- The runs column filters background_tasks by the schedule id inside the payload. Without this the
 -- lookup scans every task ever queued, scheduled or not.

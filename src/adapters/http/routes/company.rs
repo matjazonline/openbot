@@ -289,7 +289,7 @@ mod tests {
         assert!(page_html.contains(">Account</summary>"));
         assert!(page_html.find(">Account</summary>") < page_html.find(">Companies</a>"));
         assert!(page_html.find(">Companies</a>") < page_html.find(">My Invites</a>"));
-        assert!(page_html.contains("href=\"/invites\""));
+        assert!(page_html.contains("href=\"/ui/invites\""));
         assert!(page_html.contains("action=\"/logout\""));
         assert!(page_html.contains("selectCompany"));
 

@@ -276,6 +276,7 @@ async fn create_agent_handler(
                 description: form.description.clone(),
                 config_json,
                 avatar_url,
+                created_by: None,
             },
         )
         .await
@@ -511,6 +512,7 @@ async fn update_agent_handler(
                 description: form.description.clone(),
                 config_json,
                 avatar_url,
+                created_by: None,
             },
         )
         .await
@@ -568,6 +570,7 @@ async fn create_agent_json(
                 description: payload.description.clone(),
                 config_json: payload.config_json.clone(),
                 avatar_url,
+                created_by: None,
             },
         )
         .await?;
@@ -619,6 +622,7 @@ async fn update_agent_json(
                 description: payload.description.clone(),
                 config_json: payload.config_json.clone(),
                 avatar_url,
+                created_by: None,
             },
         )
         .await?;
@@ -824,6 +828,7 @@ mod tests {
             description: None,
             config_json: Some(json!({ "temperature": 0.5 })),
             avatar_url: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         };
 

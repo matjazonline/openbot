@@ -1117,6 +1117,7 @@ mod tests {
             username: "ops",
             email: &email,
             avatar_url: None,
+            is_operator: false,
         };
         let html = dashboard_page(&DashboardShell {
             user: &user,
@@ -1149,6 +1150,7 @@ mod tests {
             username: "ops",
             email: &email,
             avatar_url: None,
+            is_operator: false,
         };
         let html = dashboard_page(&DashboardShell {
             user: &user,
@@ -1197,6 +1199,7 @@ mod tests {
             username: "ops",
             email: &email,
             avatar_url: None,
+            is_operator: false,
         };
         let process = ProcessGauges::default();
         dashboard_panels(&DashboardPage {
