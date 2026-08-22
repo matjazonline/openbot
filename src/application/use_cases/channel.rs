@@ -10,6 +10,7 @@ use crate::{
         channel::{Channel, PUBLIC_PARTICIPANT},
         company::{Company, CompanyAccess},
         creation::CreationProvenance,
+        memory::{MemoryRecallMode, default_memory_max_results},
         user::Viewer,
         value_objects::{ChannelSlug, CompanySlug},
     },
@@ -22,7 +23,7 @@ use serde::{Deserialize, Serialize};
 /// cannot transpose two same-typed arguments in a nine-parameter list.
 ///
 /// Values reach persistence already normalized — see [`ChannelWrite::normalize`].
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ChannelWrite {
     pub name: String,
     pub slug: String,
@@ -37,7 +38,42 @@ pub struct ChannelWrite {
     pub enabled: bool,
     /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
     pub add_3rd_party: bool,
+    pub retrieve_company_memory: bool,
+    pub retrieve_agent_memory: bool,
+    pub retrieve_user_memory: bool,
+    pub persist_company_memory: bool,
+    pub persist_agent_memory: bool,
+    pub persist_user_memory: bool,
+    pub memory_recall_mode: MemoryRecallMode,
+    pub memory_max_results: u8,
     pub created_by: Option<CreationProvenance>,
+}
+
+impl Default for ChannelWrite {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            slug: String::new(),
+            alias_slugs: Vec::new(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: None,
+            channel_config: None,
+            enabled: false,
+            add_3rd_party: false,
+            created_by: None,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: MemoryRecallMode::Fast,
+            memory_max_results: default_memory_max_results(),
+        }
+    }
 }
 
 impl ChannelWrite {
@@ -71,6 +107,15 @@ impl ChannelWrite {
             });
         }
 
+        if self.memory_max_results == 0 {
+            self.memory_max_results = default_memory_max_results();
+        }
+        if !(1..=20).contains(&self.memory_max_results) {
+            return Err(AppError::BadRequest(
+                "Memory result limit must be between 1 and 20.".into(),
+            ));
+        }
+
         Ok(())
     }
 
@@ -102,6 +147,14 @@ impl ChannelWrite {
         self.participant_emails
             .as_ref()
             .is_some_and(|emails| emails.iter().any(|e| e == PUBLIC_PARTICIPANT))
+    }
+}
+
+impl ChannelWrite {
+    pub fn memory_defaults(mut self) -> Self {
+        self.memory_recall_mode = MemoryRecallMode::Fast;
+        self.memory_max_results = default_memory_max_results();
+        self
     }
 }
 
@@ -949,6 +1002,14 @@ mod tests {
             channel_config: write.channel_config,
             enabled: write.enabled,
             add_3rd_party: write.add_3rd_party,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             created_by: write.created_by.unwrap_or_else(CreationProvenance::system),
             created_at: Utc::now(),
         }
@@ -1003,6 +1064,7 @@ mod tests {
             model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: Utc::now(),
         };
         let company_persistence = Arc::new(MockCompanyPersistence {
@@ -1105,6 +1167,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 avatar_url: None,
+                memory_provider: None,
                 created_at: Utc::now(),
             }]),
         });
@@ -1387,6 +1450,14 @@ mod tests {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
+                retrieve_company_memory: false,
+                retrieve_agent_memory: false,
+                retrieve_user_memory: false,
+                persist_company_memory: false,
+                persist_agent_memory: false,
+                persist_user_memory: false,
+                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+                memory_max_results: 5,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
             },
@@ -1404,6 +1475,14 @@ mod tests {
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
+                retrieve_company_memory: false,
+                retrieve_agent_memory: false,
+                retrieve_user_memory: false,
+                persist_company_memory: false,
+                persist_agent_memory: false,
+                persist_user_memory: false,
+                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+                memory_max_results: 5,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
             },
@@ -1432,6 +1511,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 avatar_url: None,
+                memory_provider: None,
                 created_at: Utc::now(),
             }]),
         });
@@ -1549,6 +1629,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 avatar_url: None,
+                memory_provider: None,
                 created_at: Utc::now(),
             }]),
         });

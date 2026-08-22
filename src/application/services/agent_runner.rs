@@ -1411,6 +1411,7 @@ mod tests {
             model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: chrono::Utc::now(),
         };
         let result = ResolvedAgentParams::new(Some(&company), None, None);
@@ -1432,6 +1433,7 @@ mod tests {
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: chrono::Utc::now(),
         };
         let result = ResolvedAgentParams::new(Some(&company), None, None);
@@ -1455,6 +1457,14 @@ mod tests {
         let channel = Channel {
             enabled: true,
             add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
             name: "Test".to_string(),
@@ -1488,6 +1498,7 @@ mod tests {
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: chrono::Utc::now(),
         };
         let params = ResolvedAgentParams::new(Some(&company), None, None)?;
@@ -1508,6 +1519,7 @@ mod tests {
             model: Some("invalid-custom-model-xyz".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: chrono::Utc::now(),
         };
         let params = ResolvedAgentParams::new(Some(&company), None, None)?;
@@ -1565,6 +1577,7 @@ mod tests {
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -1603,12 +1616,21 @@ mod tests {
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
             enabled: true,
             add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
@@ -1661,12 +1683,21 @@ mod tests {
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
             enabled: true,
             add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
@@ -1747,12 +1778,21 @@ mod tests {
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
             enabled: true,
             add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
@@ -1790,6 +1830,7 @@ mod tests {
             model: Some("some-model".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -1819,12 +1860,21 @@ mod tests {
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
             enabled: true,
             add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
@@ -1864,6 +1914,7 @@ mod tests {
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -1903,6 +1954,7 @@ mod tests {
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: chrono::Utc::now(),
         };
 
@@ -2219,6 +2271,14 @@ system_prompt: Hello
             channel_config: None,
             enabled: true,
             add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         }

@@ -9,6 +9,7 @@ use crate::{
     entities::{
         company::{Company, CompanyAccess},
         company_member::CompanyMembership,
+        memory::MemoryProviderKind,
         value_objects::AvatarUrl,
     },
 };
@@ -26,6 +27,7 @@ pub struct CompanyWrite {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub enable_llm_spam_guardrail: Option<bool>,
+    pub memory_provider: Option<MemoryProviderKind>,
     /// The company's picture, already parsed as a URL a page may render.
     pub avatar_url: Option<AvatarUrl>,
 }
@@ -275,6 +277,7 @@ mod tests {
                 model: write.model,
                 enable_llm_spam_guardrail: write.enable_llm_spam_guardrail,
                 avatar_url: write.avatar_url,
+                memory_provider: None,
                 created_at: Utc::now(),
             };
             self.companies.lock().unwrap().push(company.clone());
@@ -366,6 +369,7 @@ mod tests {
                     provider: Some("google".to_string()),
                     model: Some("gemini-2.5-flash".to_string()),
                     enable_llm_spam_guardrail: Some(true),
+                    memory_provider: None,
                     avatar_url: Some(AvatarUrl::from("https://cdn.example.com/acme.png")),
                 },
             )
@@ -426,6 +430,7 @@ mod tests {
             model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: Utc::now(),
         };
         let persistence = MockCompanyPersistence {

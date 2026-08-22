@@ -394,6 +394,14 @@ async fn create_channel_handler(
         participant_emails: parse_emails_form(form.participant_emails),
         agent_ids,
         channel_config,
+        retrieve_company_memory: false,
+        retrieve_agent_memory: false,
+        retrieve_user_memory: false,
+        persist_company_memory: false,
+        persist_agent_memory: false,
+        persist_user_memory: false,
+        memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+        memory_max_results: 5,
         created_by: None,
     };
     match channel_use_cases
@@ -634,6 +642,14 @@ async fn update_channel_handler(
         channel_config,
         enabled,
         add_3rd_party,
+        retrieve_company_memory: false,
+        retrieve_agent_memory: false,
+        retrieve_user_memory: false,
+        persist_company_memory: false,
+        persist_agent_memory: false,
+        persist_user_memory: false,
+        memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+        memory_max_results: 5,
         created_by: None,
     };
 
@@ -1332,6 +1348,14 @@ async fn create_channel_json(
         channel_config: payload.channel_config,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
+        retrieve_company_memory: false,
+        retrieve_agent_memory: false,
+        retrieve_user_memory: false,
+        persist_company_memory: false,
+        persist_agent_memory: false,
+        persist_user_memory: false,
+        memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+        memory_max_results: 5,
         created_by: None,
     };
 
@@ -1390,6 +1414,14 @@ async fn update_channel_json(
         channel_config: payload.channel_config,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
+        retrieve_company_memory: false,
+        retrieve_agent_memory: false,
+        retrieve_user_memory: false,
+        persist_company_memory: false,
+        persist_agent_memory: false,
+        persist_user_memory: false,
+        memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+        memory_max_results: 5,
         created_by: None,
     };
 
@@ -1464,6 +1496,7 @@ mod tests {
             model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: Utc::now(),
         };
 
@@ -1481,6 +1514,14 @@ mod tests {
             participant_emails: Some(vec!["agent@test.com".into()]),
             agent_ids: None,
             channel_config: Some(json!({ "mode": "async" })),
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         };

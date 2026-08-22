@@ -112,6 +112,14 @@ impl CreateAgentChannelTool {
             slug: input.slug,
             enabled: true,
             add_3rd_party: false,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             created_by: Some(provenance),
             ..ChannelWrite::default()
         };

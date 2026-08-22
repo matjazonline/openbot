@@ -61,6 +61,7 @@ impl CompanyForm {
             provider: self.provider.clone(),
             model: self.model.clone(),
             enable_llm_spam_guardrail: self.enable_llm_spam_guardrail,
+            memory_provider: None,
             avatar_url: parsed_avatar(self.avatar_url.as_deref())?,
         })
     }
@@ -273,6 +274,7 @@ mod tests {
             model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: Utc::now(),
         };
 
@@ -336,6 +338,7 @@ mod tests {
             model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: Some(AvatarUrl::from("https://cdn.example.com/acme.png")),
+            memory_provider: None,
             created_at: Utc::now(),
         };
         assert!(pages::company_edit_fragment(&company).contains(
@@ -356,6 +359,7 @@ mod tests {
             model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: Utc::now(),
         };
 

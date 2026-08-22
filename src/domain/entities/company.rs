@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 use crate::entities::{
     company_member::CompanyMembership,
+    memory::MemoryProviderKind,
     value_objects::{AvatarUrl, CompanySlug},
 };
 
@@ -17,6 +18,8 @@ pub struct Company {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub enable_llm_spam_guardrail: Option<bool>,
+    #[serde(default)]
+    pub memory_provider: Option<MemoryProviderKind>,
     /// The company's picture; `None` falls back to the letter bubble.
     pub avatar_url: Option<AvatarUrl>,
     pub created_at: chrono::DateTime<chrono::Utc>,

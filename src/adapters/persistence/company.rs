@@ -9,6 +9,7 @@ use crate::{
     entities::{
         company::{Company, CompanyAccess},
         company_member::CompanyMembership,
+        memory::MemoryProviderKind,
         value_objects::{AvatarUrl, CompanySlug},
     },
     use_cases::company::{CompanyPersistence, CompanyWrite},
@@ -24,6 +25,7 @@ pub struct CompanyDb {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub enable_llm_spam_guardrail: Option<bool>,
+    pub memory_provider: Option<String>,
     pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
 }
@@ -39,6 +41,13 @@ impl From<CompanyDb> for Company {
             provider: db.provider,
             model: db.model,
             enable_llm_spam_guardrail: db.enable_llm_spam_guardrail,
+            memory_provider: db.memory_provider.as_deref().map(|kind| {
+                if kind == "hydradb" {
+                    MemoryProviderKind::Hydradb
+                } else {
+                    MemoryProviderKind::None
+                }
+            }),
             avatar_url: db.avatar_url.map(AvatarUrl::from),
             created_at: db.created_at,
         }
@@ -73,9 +82,9 @@ impl CompanyPersistence for PostgresPersistence {
 
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"INSERT INTO companies (id, user_id, name, slug, api_key, provider, model,
-                                      enable_llm_spam_guardrail, avatar_url)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-               RETURNING id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail,
+                                      enable_llm_spam_guardrail, memory_provider, avatar_url)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+               RETURNING id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
                       avatar_url, created_at"#,
         )
         .bind(uuid)
@@ -86,6 +95,7 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(&write.provider)
         .bind(&write.model)
         .bind(write.enable_llm_spam_guardrail)
+        .bind(write.memory_provider.map(|kind| match kind { MemoryProviderKind::None => "none", MemoryProviderKind::Hydradb => "hydradb" }))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .fetch_one(&self.pool)
         .await
@@ -96,7 +106,7 @@ impl CompanyPersistence for PostgresPersistence {
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail,
+            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
                       avatar_url, created_at 
                FROM companies WHERE id = $1"#,
         )
@@ -110,7 +120,7 @@ impl CompanyPersistence for PostgresPersistence {
 
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail,
+            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
                       avatar_url, created_at
                FROM companies WHERE slug = $1"#,
         )
@@ -124,7 +134,7 @@ impl CompanyPersistence for PostgresPersistence {
 
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         let db_list = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail,
+            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
                       avatar_url, created_at 
                FROM companies WHERE user_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
@@ -143,7 +153,7 @@ impl CompanyPersistence for PostgresPersistence {
         // and both need to know *which* of the two the caller is.
         let db_list = sqlx::query_as::<_, AccessibleCompanyDb>(
             r#"SELECT c.id, c.user_id, c.name, c.slug, c.api_key, c.provider, c.model,
-                      c.enable_llm_spam_guardrail, c.avatar_url, c.created_at,
+                      c.enable_llm_spam_guardrail, c.memory_provider, c.avatar_url, c.created_at,
                       (c.user_id = $1) AS is_owner
                FROM companies c
                WHERE c.user_id = $1
@@ -164,9 +174,9 @@ impl CompanyPersistence for PostgresPersistence {
     async fn update(&self, id: Uuid, write: CompanyWrite) -> AppResult<Company> {
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"UPDATE companies SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5,
-                      enable_llm_spam_guardrail = $6, avatar_url = $7
-               WHERE id = $8
-               RETURNING id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail,
+                      enable_llm_spam_guardrail = $6, memory_provider = $7, avatar_url = $8
+               WHERE id = $9
+               RETURNING id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
                       avatar_url, created_at"#,
         )
         .bind(&write.name)
@@ -175,6 +185,7 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(&write.provider)
         .bind(&write.model)
         .bind(write.enable_llm_spam_guardrail)
+        .bind(write.memory_provider.map(|kind| match kind { MemoryProviderKind::None => "none", MemoryProviderKind::Hydradb => "hydradb" }))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(id)
         .fetch_one(&self.pool)
@@ -202,10 +213,10 @@ impl CompanyPersistence for PostgresPersistence {
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"UPDATE companies
                SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5,
-                   enable_llm_spam_guardrail = $6, avatar_url = $7
-               WHERE id = $8 AND user_id = $9
+                   enable_llm_spam_guardrail = $6, memory_provider = $7, avatar_url = $8
+               WHERE id = $9 AND user_id = $10
                RETURNING id, user_id, name, slug, api_key, provider, model,
-                         enable_llm_spam_guardrail, avatar_url, created_at"#,
+                         enable_llm_spam_guardrail, memory_provider, avatar_url, created_at"#,
         )
         .bind(&write.name)
         .bind(&write.slug)
@@ -213,6 +224,10 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(&write.provider)
         .bind(&write.model)
         .bind(write.enable_llm_spam_guardrail)
+        .bind(write.memory_provider.map(|kind| match kind {
+            MemoryProviderKind::None => "none",
+            MemoryProviderKind::Hydradb => "hydradb",
+        }))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(id)
         .bind(user_id)

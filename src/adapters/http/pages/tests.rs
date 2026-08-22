@@ -237,6 +237,7 @@ fn mailbox_company() -> Company {
         model: None,
         enable_llm_spam_guardrail: None,
         avatar_url: None,
+        memory_provider: None,
         created_at: Utc::now(),
     }
 }
@@ -256,6 +257,14 @@ fn mailbox_channel(company_id: Uuid) -> Channel {
         participant_emails: Some(vec!["person@example.com".into()]),
         agent_ids: None,
         channel_config: None,
+        retrieve_company_memory: false,
+        retrieve_agent_memory: false,
+        retrieve_user_memory: false,
+        persist_company_memory: false,
+        persist_agent_memory: false,
+        persist_user_memory: false,
+        memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+        memory_max_results: 5,
         created_by: crate::entities::creation::CreationProvenance::system(),
         created_at: Utc::now(),
     }

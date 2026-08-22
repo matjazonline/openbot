@@ -11,6 +11,7 @@ use crate::{
     entities::{
         channel::Channel,
         creation::CreationProvenance,
+        memory::MemoryRecallMode,
         value_objects::{ChannelSlug, CompanySlug, EmailAddress},
     },
     use_cases::channel::{ChannelPersistence, ChannelWrite},
@@ -31,6 +32,14 @@ pub struct ChannelDb {
     pub channel_config: Option<serde_json::Value>,
     pub enabled: bool,
     pub add_3rd_party: bool,
+    pub retrieve_company_memory: bool,
+    pub retrieve_agent_memory: bool,
+    pub retrieve_user_memory: bool,
+    pub persist_company_memory: bool,
+    pub persist_agent_memory: bool,
+    pub persist_user_memory: bool,
+    pub memory_recall_mode: String,
+    pub memory_max_results: i16,
     pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
 }
@@ -53,6 +62,18 @@ impl From<ChannelDb> for Channel {
             channel_config: db.channel_config,
             enabled: db.enabled,
             add_3rd_party: db.add_3rd_party,
+            retrieve_company_memory: db.retrieve_company_memory,
+            retrieve_agent_memory: db.retrieve_agent_memory,
+            retrieve_user_memory: db.retrieve_user_memory,
+            persist_company_memory: db.persist_company_memory,
+            persist_agent_memory: db.persist_agent_memory,
+            persist_user_memory: db.persist_user_memory,
+            memory_recall_mode: if db.memory_recall_mode == "thinking" {
+                MemoryRecallMode::Thinking
+            } else {
+                MemoryRecallMode::Fast
+            },
+            memory_max_results: db.memory_max_results as u8,
             created_by: serde_json::from_value(db.created_by)
                 .expect("channels.created_by must match CreationProvenance"),
             created_at: db.created_at,
@@ -83,7 +104,10 @@ const CHANNEL_SELECT: &str = r#"
            END AS participant_emails,
            (SELECT array_agg(ca.agent_id ORDER BY ca.position)
             FROM channel_agents ca WHERE ca.channel_id = ch.id) AS agent_ids,
-           ch.channel_config, ch.enabled, ch.add_3rd_party, ch.created_by, ch.created_at
+           ch.channel_config, ch.enabled, ch.add_3rd_party,
+           ch.retrieve_company_memory, ch.retrieve_agent_memory, ch.retrieve_user_memory,
+           ch.persist_company_memory, ch.persist_agent_memory, ch.persist_user_memory,
+           ch.memory_recall_mode, ch.memory_max_results, ch.created_by, ch.created_at
     FROM channels ch
 "#;
 
@@ -179,8 +203,12 @@ impl ChannelPersistence for PostgresPersistence {
         sqlx::query(
             r#"INSERT INTO channels (
                     id, company_id, name, access_mode, api_key, provider, model,
-                    channel_config, enabled, add_3rd_party, created_by
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"#,
+                    channel_config, enabled, add_3rd_party, created_by,
+                    retrieve_company_memory, retrieve_agent_memory, retrieve_user_memory,
+                    persist_company_memory, persist_agent_memory, persist_user_memory,
+                    memory_recall_mode, memory_max_results
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+                         $12, $13, $14, $15, $16, $17, $18, $19)"#,
         )
         .bind(uuid)
         .bind(company_id)
@@ -196,6 +224,14 @@ impl ChannelPersistence for PostgresPersistence {
             serde_json::to_value(write.created_by.unwrap_or_else(CreationProvenance::system))
                 .map_err(|e| AppError::Internal(e.to_string()))?,
         )
+        .bind(write.retrieve_company_memory)
+        .bind(write.retrieve_agent_memory)
+        .bind(write.retrieve_user_memory)
+        .bind(write.persist_company_memory)
+        .bind(write.persist_agent_memory)
+        .bind(write.persist_user_memory)
+        .bind(write.memory_recall_mode.as_str())
+        .bind(i16::from(write.memory_max_results))
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -275,8 +311,12 @@ impl ChannelPersistence for PostgresPersistence {
             r#"UPDATE channels
                SET name = $1, access_mode = $2, api_key = $3,
                    provider = $4, model = $5, channel_config = $6, enabled = $7,
-                   add_3rd_party = $8
-               WHERE id = $9"#,
+                   add_3rd_party = $8, retrieve_company_memory = $9,
+                   retrieve_agent_memory = $10, retrieve_user_memory = $11,
+                   persist_company_memory = $12, persist_agent_memory = $13,
+                   persist_user_memory = $14, memory_recall_mode = $15,
+                   memory_max_results = $16
+               WHERE id = $17"#,
         )
         .bind(write.name)
         .bind(access_mode)
@@ -286,6 +326,14 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(write.channel_config)
         .bind(write.enabled)
         .bind(write.add_3rd_party)
+        .bind(write.retrieve_company_memory)
+        .bind(write.retrieve_agent_memory)
+        .bind(write.retrieve_user_memory)
+        .bind(write.persist_company_memory)
+        .bind(write.persist_agent_memory)
+        .bind(write.persist_user_memory)
+        .bind(write.memory_recall_mode.as_str())
+        .bind(i16::from(write.memory_max_results))
         .bind(id)
         .execute(&mut *tx)
         .await
@@ -446,6 +494,14 @@ mod tests {
                 // Deliberately the opposite of `enabled`, so a swapped pair of same-typed binds
                 // cannot pass this test.
                 add_3rd_party: false,
+                retrieve_company_memory: false,
+                retrieve_agent_memory: false,
+                retrieve_user_memory: false,
+                persist_company_memory: false,
+                persist_agent_memory: false,
+                persist_user_memory: false,
+                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+                memory_max_results: 5,
                 created_by: None,
             },
         )
@@ -493,6 +549,14 @@ mod tests {
                 slug: "inbound-email-v2".into(),
                 enabled: false,
                 add_3rd_party: true,
+                retrieve_company_memory: false,
+                retrieve_agent_memory: false,
+                retrieve_user_memory: false,
+                persist_company_memory: false,
+                persist_agent_memory: false,
+                persist_user_memory: false,
+                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+                memory_max_results: 5,
                 created_by: None,
                 ..ChannelWrite::default()
             },

@@ -7,6 +7,7 @@ pub mod company_member;
 pub mod creation;
 pub mod cursor;
 pub mod dashboard;
+pub mod memory;
 pub mod message;
 pub mod message_contract;
 pub mod outbox;

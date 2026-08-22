@@ -528,6 +528,7 @@ impl SubmittedCompany {
             provider: self.form.provider.clone(),
             model: self.form.model.clone(),
             enable_llm_spam_guardrail: self.spam_guardrail.stored(),
+            memory_provider: None,
             avatar_url: AvatarUrl::parse(self.form.avatar_url.as_deref().unwrap_or(""))?,
         })
     }

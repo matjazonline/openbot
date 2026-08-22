@@ -1028,6 +1028,7 @@ mod tests {
             model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: Utc::now(),
         };
         let channel_of = |id: Uuid, company_id: Uuid| Channel {
@@ -1044,6 +1045,14 @@ mod tests {
             channel_config: None,
             enabled: true,
             add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         };
@@ -1166,6 +1175,7 @@ mod tests {
             model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
+            memory_provider: None,
             created_at: Utc::now(),
         };
 
@@ -1183,6 +1193,14 @@ mod tests {
             channel_config: None,
             enabled: true,
             add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         };

@@ -199,6 +199,7 @@ mod tests {
             model: None,
             enable_llm_spam_guardrail: Some(true),
             avatar_url: None,
+            memory_provider: None,
             created_at: Utc::now(),
         };
 

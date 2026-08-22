@@ -529,6 +529,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 avatar_url: None,
+                memory_provider: None,
                 created_at: Utc::now(),
             }]),
         });
@@ -602,6 +603,7 @@ mod tests {
                 model: None,
                 enable_llm_spam_guardrail: None,
                 avatar_url: None,
+                memory_provider: None,
                 created_at: Utc::now(),
             }]),
         });

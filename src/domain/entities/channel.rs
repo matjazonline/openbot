@@ -4,6 +4,7 @@ use uuid::Uuid;
 use crate::entities::company_member::CompanyMembership;
 use crate::entities::{
     creation::CreationProvenance,
+    memory::{MemoryRecallMode, default_memory_max_results},
     value_objects::{ChannelSlug, CompanySlug, EmailAddress},
 };
 
@@ -94,6 +95,22 @@ pub struct Channel {
     /// Defaulted on deserialize for the same reason as `enabled`.
     #[serde(default = "default_true")]
     pub add_3rd_party: bool,
+    #[serde(default)]
+    pub retrieve_company_memory: bool,
+    #[serde(default)]
+    pub retrieve_agent_memory: bool,
+    #[serde(default)]
+    pub retrieve_user_memory: bool,
+    #[serde(default)]
+    pub persist_company_memory: bool,
+    #[serde(default)]
+    pub persist_agent_memory: bool,
+    #[serde(default)]
+    pub persist_user_memory: bool,
+    #[serde(default)]
+    pub memory_recall_mode: MemoryRecallMode,
+    #[serde(default = "default_memory_max_results")]
+    pub memory_max_results: u8,
     pub created_by: CreationProvenance,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
@@ -412,6 +429,14 @@ mod tests {
             channel_config: None,
             enabled: true,
             add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             created_by: CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         }
