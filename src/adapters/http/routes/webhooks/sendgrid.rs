@@ -941,6 +941,7 @@ mod tests {
         async fn update(
             &self,
             _existing: &crate::entities::schedule::ChannelSchedule,
+            _channel_id: Uuid,
             _write: crate::entities::schedule::ScheduleWrite,
         ) -> AppResult<crate::entities::schedule::ChannelSchedule> {
             unimplemented!()

@@ -849,6 +849,49 @@ mod tests {
             second_thread.id
         );
 
+        let foreign_company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Foreign Thread Test".to_string(),
+                slug: format!("foreign-thread-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let foreign_email_id = Uuid::new_v4();
+        sqlx::query(
+            r#"INSERT INTO email_messages (
+                   id, company_id, message_id, content_hash, sender, subject
+               ) VALUES ($1, $2, $3, $4, $5, $6)"#,
+        )
+        .bind(foreign_email_id)
+        .bind(foreign_company.id)
+        .bind(format!("<foreign-{suffix}@example.com>"))
+        .bind(vec![0_u8; 32])
+        .bind("sender@example.com")
+        .bind("Foreign")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let cross_tenant = sqlx::query(
+            r#"INSERT INTO thread_messages (
+                   id, company_id, channel_id, thread_id, email_message_id,
+                   clean_text_body, direction, role
+               ) VALUES ($1, $2, $3, $4, $5, $6, 'inbound', 'human')"#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(foreign_company.id)
+        .bind(first_channel.id)
+        .bind(first_thread.id)
+        .bind(foreign_email_id)
+        .bind("Invalid cross-tenant association")
+        .execute(&pool)
+        .await;
+        assert!(cross_tenant.is_err());
+
         CompanyPersistence::delete(&persistence, company.id)
             .await
             .unwrap();

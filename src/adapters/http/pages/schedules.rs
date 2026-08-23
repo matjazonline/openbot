@@ -122,7 +122,7 @@ pub fn schedules_sidebar_list(
                             {status_badge}
                         </div>
                         <div class="flex w-full items-center justify-between text-[11px] opacity-70">
-                            <span class="text-primary font-mono">{cadence}</span>
+                            <span class="font-mono">{cadence}</span>
                         </div>
                     </a>
                 </li>
@@ -371,10 +371,20 @@ pub fn schedule_thread_pane(props: &ScheduleThreadPaneProps<'_>) -> String {
         .collect();
 
     let channel_name = props.channel.map(|c| c.name.as_str()).unwrap_or("Channel");
+    let channel_id = props.channel.map(|channel| channel.id).unwrap_or_default();
+    // Reuse the mailbox's live thread stream. Starting after the newest rendered message closes
+    // the snapshot/subscribe race without replaying bubbles already present in this pane.
+    let after = props
+        .messages
+        .last()
+        .map(|message| format!("&after={}", message.cursor()))
+        .unwrap_or_default();
 
     format!(
         r##"
-        <section id="schedule-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100" data-thread-id="{thread_id}">
+        <section id="schedule-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100" data-thread-id="{thread_id}"
+            hx-ext="sse"
+            sse-connect="/ui/events?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}{after}">
             <div class="flex items-center justify-between border-b border-base-300 px-6 py-4">
                 <div class="min-w-0">
                     <h2 class="truncate text-lg font-bold">{subject}</h2>
@@ -382,9 +392,12 @@ pub fn schedule_thread_pane(props: &ScheduleThreadPaneProps<'_>) -> String {
                 </div>
             </div>
 
-            <div id="message-scroll" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            <div id="message-scroll" class="flex-1 overflow-y-auto px-6 py-4 space-y-4"
+                sse-swap="message" hx-swap="beforeend">
                 {bubbles}
             </div>
+
+            <div id="thread-activity" sse-swap="activity" hx-target="this" hx-swap="innerHTML"></div>
 
             <div class="border-t border-base-300 p-4">
                 <form hx-post="/ui/schedules/thread/{thread_id}/reply?company_id={company_id}&schedule_id={schedule_id}"
@@ -404,6 +417,8 @@ pub fn schedule_thread_pane(props: &ScheduleThreadPaneProps<'_>) -> String {
         schedule_name = escape_html_text(&props.schedule.name),
         channel_name = escape_html_text(channel_name),
         company_id = props.company_id,
+        channel_id = channel_id,
+        after = after,
         bubbles = bubbles,
     )
 }

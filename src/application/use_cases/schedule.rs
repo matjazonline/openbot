@@ -216,9 +216,13 @@ impl ScheduleUseCases {
         user_id: Uuid,
         company_id: Uuid,
         id: Uuid,
+        channel_id: Uuid,
         write: ScheduleWrite,
     ) -> AppResult<ChannelSchedule> {
         let existing = self.owned_schedule(user_id, company_id, id).await?;
+        let channel_id = self
+            .owned_channel_id(user_id, company_id, channel_id)
+            .await?;
         Self::validate_write(&write)?;
 
         info!(
@@ -226,7 +230,9 @@ impl ScheduleUseCases {
             id, company_id, write.name
         );
 
-        self.schedule_persistence.update(&existing, write).await
+        self.schedule_persistence
+            .update(&existing, channel_id, write)
+            .await
     }
 
     #[instrument(skip(self))]
@@ -626,6 +632,7 @@ mod tests {
         async fn update(
             &self,
             existing: &ChannelSchedule,
+            channel_id: Uuid,
             write: ScheduleWrite,
         ) -> AppResult<ChannelSchedule> {
             let mut list = self.schedules.lock().unwrap();
@@ -633,6 +640,7 @@ mod tests {
                 .iter_mut()
                 .find(|s| s.id == existing.id)
                 .ok_or_else(|| AppError::NotFound("Not found".into()))?;
+            s.channel_id = channel_id;
             s.name = write.name;
             s.schedule_type = write.schedule_type;
             s.interval_seconds = write.interval_seconds;
@@ -1242,6 +1250,12 @@ mod tests {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         };
+        let target_channel = Channel {
+            id: Uuid::new_v4(),
+            name: "Planning".into(),
+            slug: "planning".into(),
+            ..channel.clone()
+        };
 
         let schedule_persistence = Arc::new(MockSchedulePersistence {
             schedules: Mutex::new(vec![]),
@@ -1250,7 +1264,7 @@ mod tests {
             companies: Mutex::new(vec![company.clone()]),
         });
         let channel_persistence = Arc::new(MockChannelPersistence {
-            channels: Mutex::new(vec![channel.clone()]),
+            channels: Mutex::new(vec![channel.clone(), target_channel.clone()]),
         });
         let thread_persistence = Arc::new(MockThreadPersistence {
             threads: Mutex::new(vec![]),
@@ -1303,6 +1317,30 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(list.len(), 1);
+
+        // Editing can move a schedule to another channel in the same company.
+        let moved = use_cases
+            .update_schedule(
+                user_id,
+                company_id,
+                created.id,
+                target_channel.id,
+                ScheduleWrite {
+                    name: created.name.clone(),
+                    schedule_type: created.schedule_type,
+                    interval_seconds: created.interval_seconds,
+                    scheduled_at: None,
+                    subject_template: created.subject_template.clone(),
+                    prompt_template: created.prompt_template.clone(),
+                    delivery_mode: created.delivery_mode,
+                    recipient_emails: created.recipient_emails.clone(),
+                    timezone: created.timezone,
+                    enabled: created.enabled,
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(moved.channel_id, target_channel.id);
 
         // 3. Trigger schedule now
         let triggered = use_cases

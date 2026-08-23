@@ -450,6 +450,13 @@ fn company_fields(draft: &CompanyDraft<'_>) -> String {
     // Taken as text and parsed here rather than carried as a URL, so a tampered hidden field
     // cannot reach the `<img src>` the bubble draws.
     let picture = AvatarUrl::parse(draft.avatar_url).ok().flatten();
+    let model_connection_fields = model_connection_fields(&ModelConnectionFields {
+        agent_id_suffix: None,
+        provider: draft.provider,
+        model: draft.model,
+        api_key: draft.api_key,
+        api_key_placeholder: "Overrides the server key",
+    });
 
     format!(
         r##"
@@ -480,23 +487,7 @@ fn company_fields(draft: &CompanyDraft<'_>) -> String {
                         <summary class="collapse-title text-sm font-medium">Default model &amp; key</summary>
                         <div class="collapse-content space-y-4">
                             <p class="text-[11px] opacity-60">What every channel and agent in this company falls back to when it sets nothing of its own.</p>
-                            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                <label class="form-control w-full">
-                                    <div class="label"><span class="text-xs opacity-70">LLM Provider</span></div>
-                                    <input type="text" name="provider" value="{provider}" placeholder="google, openai, anthropic"
-                                        class="input w-full font-mono text-sm">
-                                </label>
-                                <label class="form-control w-full">
-                                    <div class="label"><span class="text-xs opacity-70">LLM Model</span></div>
-                                    <input type="text" name="model" value="{model}" placeholder="gemini-2.5-flash, gpt-4o"
-                                        class="input w-full font-mono text-sm">
-                                </label>
-                                <label class="form-control w-full">
-                                    <div class="label"><span class="text-xs opacity-70">LLM API Key</span></div>
-                                    <input type="password" name="api_key" value="{api_key}" placeholder="Overrides the server key"
-                                        class="input w-full font-mono text-sm">
-                                </label>
-                            </div>
+                            {model_connection_fields}
                         </div>
                     </details>
         "##,
@@ -512,9 +503,6 @@ fn company_fields(draft: &CompanyDraft<'_>) -> String {
         default_selected = selected_attr(draft.spam_guardrail, SpamGuardrail::ServerDefault),
         enabled_selected = selected_attr(draft.spam_guardrail, SpamGuardrail::Enabled),
         disabled_selected = selected_attr(draft.spam_guardrail, SpamGuardrail::Disabled),
-        provider = escape_html_text(draft.provider),
-        model = escape_html_text(draft.model),
-        api_key = escape_html_text(draft.api_key),
     )
 }
 

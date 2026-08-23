@@ -255,11 +255,11 @@ pub async fn get_schedule_json(
 pub async fn update_schedule_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
-    Path((company_id, _channel_id, id)): Path<(Uuid, Uuid, Uuid)>,
+    Path((company_id, channel_id, id)): Path<(Uuid, Uuid, Uuid)>,
     Json(body): Json<ScheduleRequest>,
 ) -> AppResult<Json<ChannelSchedule>> {
     let updated = schedule_use_cases
-        .update_schedule(user.id, company_id, id, body.into_write())
+        .update_schedule(user.id, company_id, id, channel_id, body.into_write())
         .await?;
     Ok(Json(updated))
 }

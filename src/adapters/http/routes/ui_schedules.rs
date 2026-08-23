@@ -685,11 +685,12 @@ async fn update_schedule(
     Form(form): Form<CreateScheduleForm>,
 ) -> AppResult<Response> {
     let company_id = form.schedule.company_id;
+    let channel_id = form.channel_id;
     let write = form.schedule.into_write()?;
 
     let updated = workspace
         .schedule_use_cases
-        .update_schedule(workspace.user_id, company_id, id, write)
+        .update_schedule(workspace.user_id, company_id, id, channel_id, write)
         .await?;
 
     Ok((
@@ -934,6 +935,7 @@ mod tests {
         // Column 1: Sidebar list with schedule name and cadence
         assert!(html.contains("Morning Report"));
         assert!(html.contains("Every hour"));
+        assert!(!html.contains(r#"class="text-primary font-mono"#));
 
         // Column 2 & 3 wrapped in workspace
         assert!(html.contains("id=\"schedules-workspace\""));
@@ -1040,6 +1042,13 @@ mod tests {
         assert!(html.contains("Daily Audit"));
         assert!(html.contains("Please run morning audit."));
         assert!(html.contains("0 errors found")); // Markdown rendered
+        assert!(html.contains(r#"hx-ext="sse""#));
+        assert!(html.contains(&format!(
+            r#"sse-connect="/ui/events?company_id={company_id}&channel_id={}&thread_id={thread_id}&after="#,
+            Uuid::nil()
+        )));
+        assert!(html.contains(r#"sse-swap="message""#));
+        assert!(html.contains(r#"sse-swap="activity""#));
         assert!(html.contains("hx-post=\"/ui/schedules/thread/"));
         assert!(html.contains("Reply</button>"));
     }

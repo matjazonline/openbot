@@ -398,6 +398,13 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
             "Shown to agents in companies that select it",
         ),
     };
+    let model_connection_fields = model_connection_fields(&ModelConnectionFields {
+        agent_id_suffix: Some(&id_prefix),
+        provider: draft.provider,
+        model: draft.model,
+        api_key: draft.api_key,
+        api_key_placeholder,
+    });
 
     format!(
         r##"
@@ -427,23 +434,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
                         <summary class="collapse-title text-sm font-medium">Custom model &amp; config</summary>
                         <div class="collapse-content space-y-4">
-                            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                <label class="form-control w-full">
-                                    <div class="label"><span class="text-xs opacity-70">LLM Provider</span></div>
-                                    <input type="text" id="agent-provider-{id_prefix}" name="provider" value="{provider}" placeholder="google, openai, anthropic"
-                                        class="input w-full font-mono text-sm">
-                                </label>
-                                <label class="form-control w-full">
-                                    <div class="label"><span class="text-xs opacity-70">LLM Model</span></div>
-                                    <input type="text" id="agent-model-{id_prefix}" name="model" value="{model}" placeholder="gemini-2.5-flash, gpt-4o"
-                                        class="input w-full font-mono text-sm">
-                                </label>
-                                <label class="form-control w-full">
-                                    <div class="label"><span class="text-xs opacity-70">LLM API Key</span></div>
-                                    <input type="password" id="agent-api-key-{id_prefix}" name="api_key" value="{api_key}" placeholder="{api_key_placeholder}"
-                                        class="input w-full font-mono text-sm">
-                                </label>
-                            </div>
+                            {model_connection_fields}
                             <label class="form-control w-full">
                                 <div class="label">
                                     <span class="text-xs opacity-70">Description</span>
@@ -466,10 +457,6 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
             agent_prompt_textarea(&id_prefix, draft.system_prompt, FragmentSwap::Inline),
         name = escape_html_text(draft.name),
         slug = escape_html_text(draft.slug),
-        provider = escape_html_text(draft.provider),
-        model = escape_html_text(draft.model),
-        api_key = escape_html_text(draft.api_key),
-        api_key_placeholder = api_key_placeholder,
         description_help = description_help,
         description = escape_html_text(draft.description),
         config_json = escape_html_text(draft.config_json),

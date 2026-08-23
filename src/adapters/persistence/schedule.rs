@@ -192,6 +192,7 @@ pub trait SchedulePersistence: Send + Sync {
     async fn update(
         &self,
         existing: &ChannelSchedule,
+        channel_id: Uuid,
         write: ScheduleWrite,
     ) -> AppResult<ChannelSchedule>;
 
@@ -331,6 +332,7 @@ impl SchedulePersistence for PostgresPersistence {
     async fn update(
         &self,
         existing: &ChannelSchedule,
+        channel_id: Uuid,
         write: ScheduleWrite,
     ) -> AppResult<ChannelSchedule> {
         let recipient_strs: Vec<String> = write
@@ -350,13 +352,14 @@ impl SchedulePersistence for PostgresPersistence {
 
         let db = sqlx::query_as::<_, ScheduleDb>(&format!(
             r#"UPDATE channel_schedules
-               SET name = $1, schedule_type = $2, interval_seconds = $3,
-                   subject_template = $4, prompt_template = $5, delivery_mode = $6,
-                   recipient_emails = $7, timezone = $8, next_run_at = $9,
+               SET channel_id = $1, name = $2, schedule_type = $3, interval_seconds = $4,
+                   subject_template = $5, prompt_template = $6, delivery_mode = $7,
+                   recipient_emails = $8, timezone = $9, next_run_at = $10,
                    updated_at = CURRENT_TIMESTAMP
-               WHERE id = $10
+               WHERE id = $11
                RETURNING {SCHEDULE_COLUMNS}"#
         ))
+        .bind(channel_id)
         .bind(&write.name)
         .bind(write.schedule_type.as_str())
         .bind(write.interval_seconds)
@@ -653,6 +656,36 @@ mod tests {
         )
         .await
         .unwrap();
+        let foreign_company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Foreign Schedule Corp".to_string(),
+                slug: format!("foreign-sched-{}", Uuid::new_v4().simple()),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let cross_tenant = SchedulePersistence::create(
+            &persistence,
+            foreign_company.id,
+            channel.id,
+            ScheduleWrite {
+                name: "Invalid tenant pairing".into(),
+                schedule_type: ScheduleType::Interval,
+                interval_seconds: Some(3600),
+                scheduled_at: None,
+                subject_template: "Invalid".into(),
+                prompt_template: "Invalid".into(),
+                delivery_mode: ScheduleDeliveryMode::MailboxOnly,
+                recipient_emails: vec![],
+                timezone: ScheduleTimezone::utc(),
+                enabled: true,
+            },
+        )
+        .await;
+        assert!(cross_tenant.is_err());
 
         let hourly = SchedulePersistence::create(
             &persistence,
@@ -759,6 +792,18 @@ mod tests {
             ChannelWrite {
                 name: "Ops".into(),
                 slug: "ops".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let moved_channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Planning".into(),
+                slug: "planning".into(),
                 enabled: true,
                 ..ChannelWrite::default()
             },
@@ -894,6 +939,7 @@ mod tests {
         let updated = SchedulePersistence::update(
             &persistence,
             &schedule,
+            moved_channel.id,
             ScheduleWrite {
                 name: "Updated Triage".into(),
                 schedule_type: ScheduleType::Interval,
@@ -911,6 +957,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(updated.name, "Updated Triage");
+        assert_eq!(updated.channel_id, moved_channel.id);
         assert_eq!(updated.interval_seconds, Some(1800));
         assert_eq!(
             updated.delivery_mode,
@@ -930,6 +977,7 @@ mod tests {
         let renamed = SchedulePersistence::update(
             &persistence,
             &paused,
+            paused.channel_id,
             ScheduleWrite {
                 name: "Renamed Only".into(),
                 schedule_type: ScheduleType::Interval,
@@ -968,6 +1016,7 @@ mod tests {
         );
 
         let _ = SchedulePersistence::delete(&persistence, one_off.id).await;
+        let _ = ChannelPersistence::delete(&persistence, moved_channel.id).await;
         let _ = ChannelPersistence::delete(&persistence, channel.id).await;
         let _ = CompanyPersistence::delete(&persistence, company.id).await;
     }

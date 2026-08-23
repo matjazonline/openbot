@@ -1385,16 +1385,17 @@ fn cancelling_a_channel_form_dismisses_the_pane() {
     });
     assert!(edit.contains(&close));
 
-    // Both create tabs offer the same way out, so backing out of a new channel is possible at all.
+    // All three create tabs offer the same way out.
     let create = channel_create_pane(&ChannelCreatePane {
         company: &company,
         app_domain_name: "example.com",
         agents: &[],
         spam_scan_enabled: true,
         draft: &ChannelDraft::default(),
+        easy: false,
         error: None,
     });
-    assert_eq!(create.matches(&close).count(), 2);
+    assert_eq!(create.matches(&close).count(), 3);
 }
 
 #[test]
@@ -1407,6 +1408,7 @@ fn channel_create_pane_opens_on_the_tab_that_was_submitted() {
             agents: &[],
             spam_scan_enabled: true,
             draft,
+            easy: false,
             error,
         })
     };
@@ -1418,6 +1420,12 @@ fn channel_create_pane_opens_on_the_tab_that_was_submitted() {
     )));
     assert!(fresh.contains("<input type=\"hidden\" name=\"form_mode\" value=\"simple\">"));
     assert!(fresh.contains("<input type=\"hidden\" name=\"form_mode\" value=\"advanced\">"));
+    assert!(fresh.contains(">Easy</button>"));
+    assert!(fresh.contains(&format!(
+        "hx-post=\"/ui/channels/easy?company_id={}\"",
+        company.id
+    )));
+    assert!(fresh.contains(r##"id="channel-tab-easy" class="hidden space-y-4"##));
     assert!(fresh.contains(r##"id="channel-tab-simple" class=" space-y-4"##));
     assert!(fresh.contains(r##"id="channel-tab-advanced" class="hidden space-y-4"##));
 
@@ -1447,6 +1455,31 @@ fn channel_create_pane_opens_on_the_tab_that_was_submitted() {
     );
     assert!(simple_retry.contains("Answer billing questions</textarea>"));
     assert!(simple_retry.contains(r##"id="channel-tab-simple" class=" space-y-4"##));
+
+    let scheduler = Agent {
+        company_id: None,
+        description: Some("Books meetings from email.".to_string()),
+        ..settings_agent(company.id, "Scheduler", "scheduler")
+    };
+    let selected = [scheduler.id];
+    let easy_draft = ChannelDraft {
+        agent_ids: &selected,
+        ..ChannelDraft::default()
+    };
+    let easy_retry = channel_create_pane(&ChannelCreatePane {
+        company: &company,
+        app_domain_name: "example.com",
+        agents: &[scheduler.clone()],
+        spam_scan_enabled: true,
+        draft: &easy_draft,
+        easy: true,
+        error: Some("channel already exists"),
+    });
+    assert!(easy_retry.contains(r##"id="channel-tab-easy" class=" space-y-4"##));
+    assert!(easy_retry.contains(&format!("value=\"{}\"", scheduler.id)));
+    assert!(easy_retry.contains("class=\"checkbox checkbox-primary mt-1\" checked"));
+    assert!(easy_retry.contains("Books meetings from email."));
+    assert!(easy_retry.contains("channel already exists"));
 }
 
 #[test]
@@ -4057,6 +4090,7 @@ fn the_channel_form_offers_a_description_and_escapes_what_was_typed_into_it() {
         agents: &[],
         spam_scan_enabled: true,
         draft: &draft,
+        easy: false,
         error: None,
     });
 

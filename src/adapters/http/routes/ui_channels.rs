@@ -6,6 +6,7 @@
 //! and every field is parsed by the same helpers the classic Channels page uses, so the two UIs
 //! cannot drift on what a submitted channel means.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use axum::{
@@ -51,6 +52,10 @@ use super::{
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/ui/channels", get(channels_page).post(create_channel))
+        .route(
+            "/ui/channels/easy",
+            axum::routing::post(create_easy_channels),
+        )
         .route("/ui/channels/new", get(create_pane))
         .route("/ui/channels/close", get(close_pane))
         .route(
@@ -73,6 +78,11 @@ pub struct WorkspaceQuery {
 #[derive(Debug, Clone, Deserialize)]
 pub struct CompanyQuery {
     pub company_id: Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+struct EasyChannelForm {
+    library_agent_ids: Option<String>,
 }
 
 const NO_SELECTION: &str = "Select a channel to configure it, or create a new one.";
@@ -287,6 +297,79 @@ async fn create_channel(
     }
 }
 
+/// POST /ui/channels/easy - Provision one same-named channel per selected library agent.
+#[instrument(skip(workspace, form))]
+async fn create_easy_channels(
+    workspace: Workspace,
+    Query(query): Query<CompanyQuery>,
+    Form(form): Form<EasyChannelForm>,
+) -> AppResult<Response> {
+    let company = workspace.scoped_company(query.company_id).await?;
+    let view = workspace.view(&company);
+    let agents = view.agents().await?;
+    let submitted_ids = parse_agent_ids_form(form.library_agent_ids).unwrap_or_default();
+    let mut seen = HashSet::new();
+    let selected_ids = submitted_ids
+        .into_iter()
+        .filter(|id| seen.insert(*id))
+        .collect::<Vec<_>>();
+    let draft = pages::ChannelDraft {
+        agent_ids: &selected_ids,
+        ..pages::ChannelDraft::default()
+    };
+    let rejected = |message: String| {
+        Ok(Html(view.create_pane_mode(&agents, &draft, true, Some(&message))).into_response())
+    };
+
+    if selected_ids.is_empty() {
+        return rejected("Select at least one library agent.".to_string());
+    }
+    let selected = selected_ids
+        .iter()
+        .map(|id| {
+            agents
+                .iter()
+                .find(|agent| agent.id == *id && agent.is_library())
+        })
+        .collect::<Option<Vec<_>>>();
+    let Some(selected) = selected else {
+        return rejected(
+            "One or more selected library agents are no longer available.".to_string(),
+        );
+    };
+
+    let mut created = Vec::new();
+    for agent in selected {
+        let write = ChannelWrite {
+            name: agent.name.clone(),
+            slug: agent.slug.clone(),
+            agent_ids: Some(vec![agent.id]),
+            enabled: true,
+            add_3rd_party: true,
+            ..ChannelWrite::default()
+        };
+        match workspace
+            .channel_use_cases
+            .create_channel(workspace.user_id, company.id, write, false)
+            .await
+        {
+            Ok(channel) => created.push(channel),
+            Err(err) => {
+                for channel in created {
+                    let _ = workspace
+                        .channel_use_cases
+                        .delete_channel(workspace.user_id, company.id, channel.id)
+                        .await;
+                }
+                return rejected(format!("Failed to create channels: {err}"));
+            }
+        }
+    }
+
+    let channel = created.first().expect("at least one channel was selected");
+    view.saved_response(channel, &agents).await
+}
+
 /// PUT /ui/channels/{channel_id} - Save one channel's settings (Protected).
 #[instrument(skip(workspace, form))]
 async fn update_channel(
@@ -406,12 +489,23 @@ impl ChannelSettingsView<'_> {
         draft: &pages::ChannelDraft<'_>,
         error: Option<&str>,
     ) -> String {
+        self.create_pane_mode(agents, draft, false, error)
+    }
+
+    fn create_pane_mode(
+        &self,
+        agents: &[Agent],
+        draft: &pages::ChannelDraft<'_>,
+        easy: bool,
+        error: Option<&str>,
+    ) -> String {
         pages::channel_create_pane(&pages::ChannelCreatePane {
             company: self.company,
             app_domain_name: &self.config.app_domain_name,
             agents,
             spam_scan_enabled: self.config.is_spam_scan_enabled(),
             draft,
+            easy,
             error,
         })
     }

@@ -27,6 +27,7 @@ use crate::use_cases::{
     user::{AccountChangeKind, PendingChange},
 };
 
+mod agent_library_multi_select;
 mod agent_settings;
 mod agents;
 mod approvals;
@@ -42,6 +43,7 @@ mod icon;
 mod invite_settings;
 mod layout;
 mod mailbox;
+mod model_connection;
 mod onboarding;
 mod outbox;
 mod profile;
@@ -52,6 +54,7 @@ mod task_monitor;
 mod tasks;
 mod team_settings;
 
+pub use agent_library_multi_select::*;
 pub use agent_settings::*;
 pub use agents::*;
 pub use approvals::*;
@@ -66,6 +69,7 @@ pub use icon::*;
 pub use invite_settings::*;
 pub use layout::*;
 pub use mailbox::*;
+pub(crate) use model_connection::*;
 pub use onboarding::*;
 pub use outbox::*;
 pub use profile::*;

@@ -28,18 +28,30 @@ fn onboarding_shell(
     })
 }
 
-pub fn onboarding_company_page(user: &MailboxUser<'_>, error: Option<&str>) -> String {
+pub fn onboarding_company_page(
+    user: &MailboxUser<'_>,
+    app_domain_name: &str,
+    error: Option<&str>,
+) -> String {
     let error_html = error.map(error_alert).unwrap_or_default();
+    let app_domain_name = escape_html_text(app_domain_name);
+    let model_connection_fields = model_connection_fields(&ModelConnectionFields {
+        agent_id_suffix: None,
+        provider: "",
+        model: "",
+        api_key: "",
+        api_key_placeholder: "API key",
+    });
     let pane = format!(
         r##"<div><h1 class="card-title text-2xl">Create your workspace</h1><p class="mt-2 opacity-70">Your company groups its email channels, agents, teammates, and model settings.</p></div>
         {error_html}
         <form method="post" action="/ui/onboarding/company" class="space-y-6">
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <fieldset class="fieldset"><legend class="fieldset-legend">Company name</legend><input id="onboarding_company_name" name="name" type="text" required autofocus class="input w-full" oninput="document.getElementById('onboarding_company_slug').value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')" placeholder="Acme Corporation"></fieldset>
-                <fieldset class="fieldset"><legend class="fieldset-legend">Email namespace</legend><input id="onboarding_company_slug" name="slug" type="text" required class="input w-full font-mono" placeholder="acme-corporation"><p class="label opacity-60">Used in the inbound email address.</p></fieldset>
+                <fieldset class="fieldset"><legend class="fieldset-legend">Email namespace</legend><label class="input w-full font-mono"><input id="onboarding_company_slug" name="slug" type="text" required class="grow font-mono" placeholder="acme-corporation"><span class="shrink-0 opacity-60">.{app_domain_name}</span></label><p class="label opacity-60">Used in the inbound email address.</p></fieldset>
             </div>
             <div class="rounded-box border border-base-300 bg-base-200/40 p-4"><h2 class="font-semibold">Model connection <span class="badge badge-ghost badge-sm ml-1">Optional</span></h2><p class="mb-4 mt-1 text-sm opacity-60">Leave these blank when the server provides model defaults.</p>
-                <div class="grid grid-cols-1 gap-3 md:grid-cols-3"><input name="provider" type="text" class="input w-full" placeholder="Provider, e.g. google"><input name="model" type="text" class="input w-full" placeholder="Model, e.g. gemini-2.5-flash"><input name="api_key" type="password" class="input w-full font-mono" placeholder="API key"></div>
+                {model_connection_fields}
             </div>
             <div class="card-actions justify-end"><button type="submit" class="btn btn-primary">Continue to channel</button></div>
         </form>"##
@@ -50,20 +62,32 @@ pub fn onboarding_company_page(user: &MailboxUser<'_>, error: Option<&str>) -> S
 pub fn onboarding_channel_page(
     user: &MailboxUser<'_>,
     company: &Company,
+    library_agents: &[Agent],
     error: Option<&str>,
 ) -> String {
     let error_html = error.map(error_alert).unwrap_or_default();
+    let library_picker = agent_library_multi_select(library_agents, &[], "library_agent_ids");
+    let library_html = if library_picker.is_empty() {
+        String::new()
+    } else {
+        format!(
+            r##"{library_picker}
+            <div class="divider">and / or create a custom agent</div>"##
+        )
+    };
     let pane = format!(
-        r##"<div><h1 class="card-title text-2xl">Create your first email agent</h1><p class="mt-2 opacity-70">Give <strong>{company_name}</strong> a channel and describe the work it should handle.</p></div>
+        r##"<div><h1 class="card-title text-2xl">Create your first email agent</h1><p class="mt-2 opacity-70">Choose ready-made agents, create a custom one, or do both for <strong>{company_name}</strong>.</p></div>
         {error_html}
         <form method="post" action="/ui/onboarding/companies/{company_id}/channel" class="space-y-5">
-            <fieldset class="fieldset"><legend class="fieldset-legend">Channel name</legend><input id="onboarding_channel_name" name="name" type="text" required autofocus class="input w-full" placeholder="Customer Support"><p class="label opacity-60">For example: <span class="font-mono">customer-support@{company_slug}...</span></p></fieldset>
-            <fieldset class="fieldset"><legend class="fieldset-legend">What should this agent do?</legend><textarea id="onboarding_instructions" name="instructions" rows="7" required class="textarea w-full" placeholder="Read incoming customer emails, identify the request, draft a concise and friendly answer, ask for missing details, and clearly list any next actions."></textarea><p class="label opacity-60">Include its role, desired output, tone, constraints, and when it should ask for clarification.</p></fieldset>
-            <div class="card-actions items-center justify-between"><a href="/ui" class="btn btn-ghost">Finish later</a><button type="submit" class="btn btn-primary">Create email agent</button></div>
+            {library_html}
+            <fieldset class="fieldset"><legend class="fieldset-legend">Channel name <span class="font-normal opacity-60">(optional)</span></legend><input id="onboarding_channel_name" name="name" type="text" class="input w-full" placeholder="Customer Support"><p class="label opacity-60">For example: <span class="font-mono">customer-support@{company_slug}...</span></p></fieldset>
+            <fieldset class="fieldset"><legend class="fieldset-legend">What should this custom agent do?</legend><textarea id="onboarding_instructions" name="instructions" rows="7" class="textarea w-full" placeholder="Read incoming customer emails, identify the request, draft a concise and friendly answer, ask for missing details, and clearly list any next actions."></textarea><p class="label opacity-60">Required only when creating a custom agent.</p></fieldset>
+            <div class="card-actions items-center justify-between"><a href="/ui" class="btn btn-ghost">Finish later</a><button type="submit" class="btn btn-primary">Create email agents</button></div>
         </form>"##,
         company_name = escape_html_text(&company.name),
         company_slug = escape_html_text(company.slug.as_ref()),
-        company_id = company.id
+        company_id = company.id,
+        library_html = library_html,
     );
     onboarding_shell("Create your first channel", user, Some(company), 2, &pane)
 }

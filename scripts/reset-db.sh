@@ -6,9 +6,9 @@
 #   ./scripts/reset-db.sh --yes        the same, unattended
 #   ./scripts/reset-db.sh --all        development database and its _test sibling
 #
-# The development schema is rebuilt by the server: `src/infra/db.rs` runs `sqlx::migrate!()` on
-# startup. The test database is rebuilt by the first `cargo test` run that reaches it, through the
-# same macro in `src/adapters/persistence/test_support.rs`. Neither needs `sqlx migrate run`.
+# The development schema is rebuilt here because `sqlx::query!` checks the live database while
+# compiling, before the server can run its embedded migrations. The test database is rebuilt by
+# the first `cargo test` run that reaches it, through the migration macro in test support.
 
 set -euo pipefail
 
@@ -43,6 +43,19 @@ for argument in "$@"; do
 done
 
 DATABASE_NAME="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atqc 'select current_database()')"
+DATABASE_USER="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atqc 'select current_user')"
+
+# libpq (used by psql/dropdb) defaults a missing URL username to the operating-system user. SQLx
+# instead parses it as `anonymous`, so give its migration URL the same explicit user that libpq
+# resolved. Keep URLs that already contain credentials unchanged.
+MIGRATION_DATABASE_URL="$DATABASE_URL"
+DATABASE_AUTHORITY="${DATABASE_URL#*://}"
+DATABASE_AUTHORITY="${DATABASE_AUTHORITY%%/*}"
+if [[ "$DATABASE_AUTHORITY" != *"@"* ]]; then
+  DATABASE_SCHEME="${DATABASE_URL%%://*}"
+  DATABASE_LOCATION="${DATABASE_URL#*://}"
+  MIGRATION_DATABASE_URL="${DATABASE_SCHEME}://${DATABASE_USER}@${DATABASE_LOCATION}"
+fi
 
 # Connect through the maintenance database while replacing the configured target.
 DATABASE_BASE_URL="${DATABASE_URL%%\?*}"
@@ -88,16 +101,11 @@ for target in "${TARGETS[@]}"; do
   echo "Database '$target' recreated."
 done
 
-cat <<'NEXT'
+echo "Applying development database migrations..."
+(cd "$ROOT_DIR" && cargo sqlx migrate run --database-url "$MIGRATION_DATABASE_URL")
 
-Next: the development schema is rebuilt by `cargo run` on startup, the test schema by the first
-`cargo test` run that reaches it.
-
-Rebuild the development one *before* compiling with DATABASE_URL set. The `sqlx::query!` macros
-check themselves against a live database at compile time, so against an empty one every one of
-them fails with `relation "users" does not exist`:
-
-    DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" sqlx migrate run
-
-or start the server once. `SQLX_OFFLINE=true` also works, since it sends the macros to .sqlx.
-NEXT
+echo
+echo "Reset complete. The development database is ready for cargo run."
+if [[ "$INCLUDE_TEST" == true ]]; then
+  echo "The test schema will be rebuilt by the first cargo test run that reaches it."
+fi

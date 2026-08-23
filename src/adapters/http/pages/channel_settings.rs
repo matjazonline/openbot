@@ -14,15 +14,19 @@ use crate::entities::{
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
 ///
 /// Kept out of the `format!` blocks below so its braces need no escaping.
-const CHANNEL_SETTINGS_SCRIPT: &str = r##"        function showChannelTab(advanced) {
+const CHANNEL_SETTINGS_SCRIPT: &str = r##"        function showChannelTab(mode) {
+            var easy = document.getElementById('channel-tab-easy');
             var simple = document.getElementById('channel-tab-simple');
             var advancedForm = document.getElementById('channel-tab-advanced');
+            var easyBtn = document.getElementById('channel-tab-easy-btn');
             var simpleBtn = document.getElementById('channel-tab-simple-btn');
             var advancedBtn = document.getElementById('channel-tab-advanced-btn');
-            if (simple) simple.classList.toggle('hidden', advanced);
-            if (advancedForm) advancedForm.classList.toggle('hidden', !advanced);
-            if (simpleBtn) simpleBtn.classList.toggle('tab-active', !advanced);
-            if (advancedBtn) advancedBtn.classList.toggle('tab-active', advanced);
+            if (easy) easy.classList.toggle('hidden', mode !== 'easy');
+            if (simple) simple.classList.toggle('hidden', mode !== 'simple');
+            if (advancedForm) advancedForm.classList.toggle('hidden', mode !== 'advanced');
+            if (easyBtn) easyBtn.classList.toggle('tab-active', mode === 'easy');
+            if (simpleBtn) simpleBtn.classList.toggle('tab-active', mode === 'simple');
+            if (advancedBtn) advancedBtn.classList.toggle('tab-active', mode === 'advanced');
         }
 
         function toggleScheduleType(select) {
@@ -207,6 +211,8 @@ pub struct ChannelCreatePane<'a> {
     pub agents: &'a [Agent],
     pub spam_scan_enabled: bool,
     pub draft: &'a ChannelDraft<'a>,
+    /// Easy is activated explicitly after an Easy submission is rejected.
+    pub easy: bool,
     pub error: Option<&'a str>,
 }
 
@@ -397,10 +403,12 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
 }
 
 pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
-    let (simple_hidden, advanced_hidden) = if pane.draft.advanced {
-        ("hidden", "")
+    let (easy_hidden, simple_hidden, advanced_hidden) = if pane.easy {
+        ("", "hidden", "hidden")
+    } else if pane.draft.advanced {
+        ("hidden", "hidden", "")
     } else {
-        ("", "hidden")
+        ("hidden", "", "hidden")
     };
     let active = |lit: bool| if lit { "tab-active" } else { "" };
 
@@ -414,11 +422,29 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
             <div class="flex-1 overflow-y-auto px-6 py-4">
                 {error_html}
                 <div role="tablist" class="tabs tabs-box mb-4 w-fit">
+                    <button type="button" role="tab" id="channel-tab-easy-btn" class="tab {easy_active}"
+                        onclick="showChannelTab('easy')">Easy</button>
                     <button type="button" role="tab" id="channel-tab-simple-btn" class="tab {simple_active}"
-                        onclick="showChannelTab(false)">Simple</button>
+                        onclick="showChannelTab('simple')">Simple</button>
                     <button type="button" role="tab" id="channel-tab-advanced-btn" class="tab {advanced_active}"
-                        onclick="showChannelTab(true)">Advanced</button>
+                        onclick="showChannelTab('advanced')">Advanced</button>
                 </div>
+                <form id="channel-tab-easy" class="{easy_hidden} space-y-4"
+                    hx-post="/ui/channels/easy?company_id={company_id}" hx-target="#channel-pane" hx-swap="outerHTML"
+                    hx-disabled-elt="find button[type='submit']">
+                    {library_picker}
+                    <div class="flex items-center gap-3">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                            <span class="[.htmx-request_&]:hidden">Create Channels</span>
+                            <span class="hidden [.htmx-request_&]:inline">Creating...</span>
+                        </button>
+                        <button type="button" class="btn btn-ghost"
+                            hx-get="/ui/channels/close?company_id={company_id}"
+                            hx-target="#channel-pane" hx-swap="outerHTML"
+                            hx-push-url="/ui/channels?company_id={company_id}">Cancel</button>
+                    </div>
+                </form>
                 <form id="channel-tab-simple" class="{simple_hidden} space-y-4"
                     hx-post="/ui/channels?company_id={company_id}" hx-target="#channel-pane" hx-swap="outerHTML"
                     hx-disabled-elt="find button[type='submit']">
@@ -481,11 +507,15 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
         app_domain_name = escape_html_text(pane.app_domain_name),
         company_id = pane.company.id,
         error_html = form_error_banner(pane.error),
-        simple_active = active(!pane.draft.advanced),
-        advanced_active = active(pane.draft.advanced),
+        easy_active = active(pane.easy),
+        simple_active = active(!pane.easy && !pane.draft.advanced),
+        advanced_active = active(!pane.easy && pane.draft.advanced),
+        easy_hidden = easy_hidden,
         name = escape_html_text(pane.draft.name),
         description = escape_html_text(pane.draft.description),
         system_prompt = escape_html_text(pane.draft.system_prompt),
+        library_picker =
+            agent_library_multi_select(pane.agents, pane.draft.agent_ids, "library_agent_ids",),
         fields = channel_fields(&ChannelFields {
             company: pane.company,
             app_domain_name: pane.app_domain_name,
@@ -519,6 +549,13 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
     } else {
         " open"
     };
+    let model_connection_fields = model_connection_fields(&ModelConnectionFields {
+        agent_id_suffix: None,
+        provider: draft.provider,
+        model: draft.model,
+        api_key: draft.api_key,
+        api_key_placeholder: "Overrides the company key",
+    });
 
     format!(
         r##"
@@ -564,23 +601,7 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
                         <summary class="collapse-title text-sm font-medium">Custom model &amp; config</summary>
                         <div class="collapse-content space-y-4">
-                            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                <label class="form-control w-full">
-                                    <div class="label"><span class="text-xs opacity-70">LLM Provider</span></div>
-                                    <input type="text" name="provider" value="{provider}" placeholder="google, openai, anthropic"
-                                        class="input w-full font-mono text-sm">
-                                </label>
-                                <label class="form-control w-full">
-                                    <div class="label"><span class="text-xs opacity-70">LLM Model</span></div>
-                                    <input type="text" name="model" value="{model}" placeholder="gemini-2.5-flash, gpt-4o"
-                                        class="input w-full font-mono text-sm">
-                                </label>
-                                <label class="form-control w-full">
-                                    <div class="label"><span class="text-xs opacity-70">LLM API Key</span></div>
-                                    <input type="password" name="api_key" value="{api_key}" placeholder="Overrides the company key"
-                                        class="input w-full font-mono text-sm">
-                                </label>
-                            </div>
+                            {model_connection_fields}
                             <label class="form-control w-full">
                                 <div class="label"><span class="text-xs opacity-70">Channel Config (JSON)</span></div>
                                 <textarea name="channel_config" rows="4" placeholder='{{ "trigger": "email", "action": "ai_reply" }}'
@@ -621,9 +642,6 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
             fields.id_prefix
         ),
         participant_emails = escape_html_text(draft.participant_emails),
-        provider = escape_html_text(draft.provider),
-        model = escape_html_text(draft.model),
-        api_key = escape_html_text(draft.api_key),
         channel_config = escape_html_text(draft.channel_config),
         enabled_checked = if draft.enabled { " checked" } else { "" },
         add_3rd_party_checked = if draft.add_3rd_party { " checked" } else { "" },
