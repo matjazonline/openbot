@@ -2047,9 +2047,9 @@ mod tests {
             cc: None,
             spam_score: None,
             attachments_data: vec![],
-            spf: None,
-            dkim: None,
-            dmarc: None,
+            spf: Default::default(),
+            dkim: Default::default(),
+            dmarc: Default::default(),
         };
         let parsed_email = crate::services::email_parser::EmailParser::parse(raw, "mailagents.com");
 

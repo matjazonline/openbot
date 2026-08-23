@@ -1027,7 +1027,8 @@ async fn test_spf_authentication_failure_rejection() {
         subject: Some("Spoofed email".to_string()),
         text: Some("Hello".to_string()),
         headers: Some(format!("X-MailAgents-Channel-ID: {channel_id}\n")),
-        spf: Some("fail".to_string()),
+        spf: crate::entities::auth::AuthVerdict::Fail,
+        dmarc: crate::entities::auth::AuthVerdict::Unknown,
         ..Default::default()
     };
 
@@ -1036,7 +1037,10 @@ async fn test_spf_authentication_failure_rejection() {
         .await
         .unwrap();
     assert!(!result.accepted);
-    assert_eq!(result.reason.as_deref(), Some("SPF authentication failed"));
+    assert_eq!(
+        result.reason.as_deref(),
+        Some("DMARC authentication did not pass")
+    );
 }
 
 #[tokio::test]
@@ -1252,7 +1256,7 @@ async fn test_dmarc_authentication_failure_rejection() {
         from: "spoofed@external.com".to_string(),
         subject: Some("Spoofed email".to_string()),
         text: Some("Hello".to_string()),
-        dmarc: Some("fail".to_string()),
+        dmarc: crate::entities::auth::AuthVerdict::Fail,
         ..Default::default()
     };
 
@@ -1263,7 +1267,7 @@ async fn test_dmarc_authentication_failure_rejection() {
     assert!(!result.accepted);
     assert_eq!(
         result.reason.as_deref(),
-        Some("DMARC authentication failed")
+        Some("DMARC authentication did not pass")
     );
 }
 
@@ -4603,9 +4607,9 @@ async fn an_agent_cannot_use_help_to_enumerate_its_company() {
         hop_count: 1,
         trace_channels: vec![source.channel_id],
         protocol: crate::entities::channel::ChannelType::Email,
-        spf_status: None,
-        dkim_status: None,
-        dmarc_status: None,
+        spf_status: Default::default(),
+        dkim_status: Default::default(),
+        dmarc_status: Default::default(),
         spam_score: None,
         is_context_only: false,
     };

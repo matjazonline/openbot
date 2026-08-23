@@ -162,21 +162,12 @@ pub(super) fn check_inbound_guards(
 
     // Trusted internal transport is authenticated by channel identity, not by SPF/DKIM/DMARC.
     if !is_inter_channel {
-        let checks = [
-            ("SPF", parsed.spf_status.as_deref()),
-            ("DKIM", parsed.dkim_status.as_deref()),
-            ("DMARC", parsed.dmarc_status.as_deref()),
-        ];
-        for (mechanism, status) in checks {
-            if status.is_some_and(|s| s.eq_ignore_ascii_case("fail")) {
-                tracing::warn!(
-                    "{mechanism} authentication failed for sender '{}'",
-                    parsed.sender
-                );
-                return Some(InboundIngestResult::rejected(&format!(
-                    "{mechanism} authentication failed"
-                )));
-            }
+        if external_dmarc_rejection(parsed.dmarc_status).is_some() {
+            tracing::warn!(sender = %parsed.sender, verdict = ?parsed.dmarc_status,
+                "External message rejected because DMARC did not pass");
+            return Some(InboundIngestResult::rejected(
+                "DMARC authentication did not pass",
+            ));
         }
     }
 
@@ -202,6 +193,19 @@ pub(super) fn check_inbound_guards(
     }
 
     None
+}
+
+fn external_dmarc_rejection(verdict: crate::entities::auth::AuthVerdict) -> Option<&'static str> {
+    match verdict {
+        crate::entities::auth::AuthVerdict::Pass => None,
+        crate::entities::auth::AuthVerdict::Fail
+        | crate::entities::auth::AuthVerdict::SoftFail
+        | crate::entities::auth::AuthVerdict::Neutral
+        | crate::entities::auth::AuthVerdict::TempError
+        | crate::entities::auth::AuthVerdict::PermError
+        | crate::entities::auth::AuthVerdict::Unavailable
+        | crate::entities::auth::AuthVerdict::Unknown => Some("DMARC authentication did not pass"),
+    }
 }
 
 /// Projection of the protocol-neutral inbound message onto the email-shaped view the rest of the
@@ -343,7 +347,24 @@ fn is_slug_token_char(ch: char) -> bool {
 
 #[cfg(test)]
 mod mention_tests {
-    use super::{body_mentions_email, body_mentions_slug};
+    use super::{body_mentions_email, body_mentions_slug, external_dmarc_rejection};
+    use crate::entities::auth::AuthVerdict;
+
+    #[test]
+    fn only_a_dmarc_pass_authorizes_external_mail() {
+        assert_eq!(external_dmarc_rejection(AuthVerdict::Pass), None);
+        for verdict in [
+            AuthVerdict::Fail,
+            AuthVerdict::SoftFail,
+            AuthVerdict::Neutral,
+            AuthVerdict::TempError,
+            AuthVerdict::PermError,
+            AuthVerdict::Unavailable,
+            AuthVerdict::Unknown,
+        ] {
+            assert!(external_dmarc_rejection(verdict).is_some(), "{verdict:?}");
+        }
+    }
 
     #[test]
     fn email_mentions_are_case_insensitive_and_bounded() {

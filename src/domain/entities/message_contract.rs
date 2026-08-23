@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::entities::{
+    auth::AuthVerdict,
     channel::{ChannelType, ParticipantIdentity},
     message::AttachmentMetadata,
     value_objects::{MessageId, ThreadIndex},
@@ -27,9 +28,12 @@ pub struct NormalizedInboundMessage {
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,
     pub protocol: ChannelType,
-    pub spf_status: Option<String>,
-    pub dkim_status: Option<String>,
-    pub dmarc_status: Option<String>,
+    #[serde(default)]
+    pub spf_status: AuthVerdict,
+    #[serde(default)]
+    pub dkim_status: AuthVerdict,
+    #[serde(default)]
+    pub dmarc_status: AuthVerdict,
     pub spam_score: Option<f64>,
     pub is_context_only: bool,
 }

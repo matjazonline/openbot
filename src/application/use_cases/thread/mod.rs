@@ -418,9 +418,9 @@ impl ThreadUseCases {
             hop_count: sent.hop_count,
             trace_channels: sent.trace_channels.clone(),
             protocol: ChannelType::Email,
-            spf_status: None,
-            dkim_status: None,
-            dmarc_status: None,
+            spf_status: Default::default(),
+            dkim_status: Default::default(),
+            dmarc_status: Default::default(),
             spam_score: None,
             is_context_only: false,
         };

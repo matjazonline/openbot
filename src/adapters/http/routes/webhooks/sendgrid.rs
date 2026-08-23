@@ -2,10 +2,16 @@ use std::sync::Arc;
 
 use axum::{
     Form, Json, Router,
+    body::to_bytes,
     extract::{FromRequest, Multipart, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::post,
+};
+use base64::Engine;
+use p256::{
+    ecdsa::{Signature, VerifyingKey, signature::Verifier},
+    pkcs8::DecodePublicKey,
 };
 use serde::{Deserialize, Serialize};
 use tracing::{instrument, warn};
@@ -48,6 +54,17 @@ async fn sendgrid_inbound_webhook(
     headers: HeaderMap,
     req: axum::extract::Request,
 ) -> Result<impl IntoResponse, StatusCode> {
+    let config = thread_use_cases.config();
+    if !config.sendgrid_inbound_enabled() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let (parts, body) = req.into_parts();
+    let body = to_bytes(body, 21 * 1024 * 1024)
+        .await
+        .map_err(|_| StatusCode::PAYLOAD_TOO_LARGE)?;
+    verify_sendgrid_signature(&headers, &body, config).map_err(|status| status)?;
+    let req = axum::extract::Request::from_parts(parts, axum::body::Body::from(body));
+
     let content_type = headers
         .get("content-type")
         .and_then(|v| v.to_str().ok())
@@ -55,6 +72,8 @@ async fn sendgrid_inbound_webhook(
         .to_lowercase();
 
     let mut raw_payload = RawInboundPayload::default();
+    let mut raw_mime = None;
+    let mut sender_ip = None;
 
     if content_type.contains("multipart/form-data") {
         if let Ok(mut multipart) = Multipart::from_request(req, &State(())).await {
@@ -62,6 +81,15 @@ async fn sendgrid_inbound_webhook(
                 let name = field.name().unwrap_or_default().to_string();
                 let file_name = field.file_name().map(|f| f.to_string());
                 let field_content_type = field.content_type().map(|c| c.to_string());
+
+                if name == "email" {
+                    raw_mime = field.bytes().await.ok().map(|bytes| bytes.to_vec());
+                    continue;
+                }
+                if name == "sender_ip" {
+                    sender_ip = field.text().await.ok().and_then(|value| value.parse().ok());
+                    continue;
+                }
 
                 if let Some(filename) = file_name {
                     if let Ok(bytes) = field.bytes().await {
@@ -90,8 +118,8 @@ async fn sendgrid_inbound_webhook(
                         "text" => raw_payload.text = Some(value),
                         "html" => raw_payload.html = Some(value),
                         "headers" => raw_payload.headers = Some(value),
-                        "spf" => raw_payload.spf = Some(value),
-                        "dkim" => raw_payload.dkim = Some(value),
+                        // Provider-supplied authentication verdicts are deliberately ignored.
+                        "spf" | "dkim" | "dmarc" => {}
                         "spam_score" => raw_payload.spam_score = value.parse().ok(),
                         "envelope" => {
                             if let Ok(env) = serde_json::from_str::<SendGridEnvelope>(&value) {
@@ -119,6 +147,26 @@ async fn sendgrid_inbound_webhook(
             extract_from_payload(payload, &mut raw_payload);
         }
     }
+
+    let raw_mime = raw_mime.ok_or(StatusCode::UNPROCESSABLE_ENTITY)?;
+    let sender_ip = sender_ip.ok_or(StatusCode::UNPROCESSABLE_ENTITY)?;
+    let envelope_from = raw_payload.from.clone();
+    let envelope_to = raw_payload.to.clone();
+    let auth = crate::adapters::smtp::server::verify_email_authentication(
+        &raw_mime,
+        Some(&envelope_from),
+        sender_ip,
+    )
+    .await;
+    raw_payload = crate::adapters::smtp::server::parse_raw_mime_to_payload(
+        &raw_mime,
+        Some(&envelope_from),
+        Some(&envelope_to),
+        &[envelope_to.clone()],
+        auth.spf,
+        auth.dkim,
+        auth.dmarc,
+    );
 
     // Synchronous Ingestion: Parse MIME into normalized message, resolve thread, verify ACL, and save inbound message
     let norm_payload = EmailIngressAdapter::parse_and_store(
@@ -160,8 +208,6 @@ fn extract_from_payload(payload: SendGridPayload, raw: &mut RawInboundPayload) {
     raw.html = payload.html;
     raw.headers = payload.headers;
     raw.cc = payload.cc;
-    raw.spf = payload.spf;
-    raw.dkim = payload.dkim;
     raw.spam_score = payload.spam_score;
 
     if let Some(ref env_str) = payload.envelope {
@@ -190,6 +236,60 @@ fn extract_from_payload(payload: SendGridPayload, raw: &mut RawInboundPayload) {
     }
 }
 
+fn verify_sendgrid_signature(
+    headers: &HeaderMap,
+    body: &[u8],
+    config: &crate::infra::config::AppConfig,
+) -> Result<(), StatusCode> {
+    let public_key = config
+        .sendgrid_webhook_public_key()
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?
+        .as_secs();
+    verify_sendgrid_signature_at(
+        headers,
+        body,
+        &public_key,
+        config.sendgrid_webhook_max_age_secs(),
+        now,
+    )
+}
+
+fn verify_sendgrid_signature_at(
+    headers: &HeaderMap,
+    body: &[u8],
+    public_key: &str,
+    max_age_secs: u64,
+    now: u64,
+) -> Result<(), StatusCode> {
+    const SIGNATURE: &str = "x-twilio-email-event-webhook-signature";
+    const TIMESTAMP: &str = "x-twilio-email-event-webhook-timestamp";
+    let timestamp = headers
+        .get(TIMESTAMP)
+        .and_then(|value| value.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let timestamp_secs: u64 = timestamp.parse().map_err(|_| StatusCode::UNAUTHORIZED)?;
+    if timestamp_secs > now || now - timestamp_secs > max_age_secs {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    let signature = headers
+        .get(SIGNATURE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| base64::engine::general_purpose::STANDARD.decode(value).ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let signature = Signature::from_der(&signature)
+        .or_else(|_| Signature::from_slice(&signature))
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let key = VerifyingKey::from_public_key_pem(public_key)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut signed = timestamp.as_bytes().to_vec();
+    signed.extend_from_slice(body);
+    key.verify(&signed, &signature)
+        .map_err(|_| StatusCode::UNAUTHORIZED)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,9 +298,49 @@ mod tests {
     use axum::body::Body;
     use axum::http::Request;
     use chrono::Utc;
+    use p256::{
+        ecdsa::{SigningKey, signature::Signer},
+        pkcs8::EncodePublicKey,
+    };
     use std::sync::Mutex;
     use tower::ServiceExt;
     use uuid::Uuid;
+
+    #[test]
+    fn signature_covers_timestamp_and_untouched_body_and_expires() {
+        let signing_key = SigningKey::from_bytes((&[7_u8; 32]).into()).unwrap();
+        let public_key = signing_key
+            .verifying_key()
+            .to_public_key_pem(Default::default())
+            .unwrap();
+        let body = b"multipart bytes must stay exactly like this\r\n";
+        let timestamp = "1000";
+        let mut signed = timestamp.as_bytes().to_vec();
+        signed.extend_from_slice(body);
+        let signature: Signature = signing_key.sign(&signed);
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-twilio-email-event-webhook-timestamp",
+            timestamp.parse().unwrap(),
+        );
+        headers.insert(
+            "x-twilio-email-event-webhook-signature",
+            base64::engine::general_purpose::STANDARD
+                .encode(signature.to_der().as_bytes())
+                .parse()
+                .unwrap(),
+        );
+
+        assert!(verify_sendgrid_signature_at(&headers, body, &public_key, 300, 1100).is_ok());
+        assert_eq!(
+            verify_sendgrid_signature_at(&headers, b"changed", &public_key, 300, 1100),
+            Err(StatusCode::UNAUTHORIZED)
+        );
+        assert_eq!(
+            verify_sendgrid_signature_at(&headers, body, &public_key, 300, 1301),
+            Err(StatusCode::UNAUTHORIZED)
+        );
+    }
 
     use crate::{
         app_error::AppResult,
@@ -1002,10 +1142,18 @@ mod tests {
         ) -> AppResult<Vec<crate::entities::schedule::ScheduleRun>> {
             Ok(vec![])
         }
+        async fn schedule_run_contains_thread(
+            &self,
+            _company_id: Uuid,
+            _schedule_id: Uuid,
+            _thread_id: Uuid,
+        ) -> AppResult<bool> {
+            Ok(false)
+        }
     }
 
     #[tokio::test]
-    async fn sendgrid_webhook_processes_email_creates_thread_and_dispatches() {
+    async fn sendgrid_webhook_is_absent_when_disabled() {
         let company_id = Uuid::new_v4();
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![Company {
@@ -1185,30 +1333,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-        assert!(body_str.contains("\"processed\":true"));
-        assert!(body_str.contains("\"inbound_message_id\":\"<MSG123@external.com>\""));
-
-        // Ingestion persists the inbound message; the durable worker sends the reply.
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
         let threads = thread_persistence.threads.lock().unwrap();
-        assert_eq!(threads.len(), 1);
-        assert_eq!(threads[0].subject, "Help Needed");
-
+        assert!(threads.is_empty());
         let messages = thread_persistence.messages.lock().unwrap();
-        assert_eq!(messages.len(), 1);
-
-        assert_eq!(
-            messages[0].role,
-            crate::entities::message::MessageRole::Human
-        );
-        assert_eq!(
-            messages[0].direction,
-            crate::entities::message::MessageDirection::Inbound
-        );
+        assert!(messages.is_empty());
     }
 }

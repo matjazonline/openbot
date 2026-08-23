@@ -1,5 +1,6 @@
 use std::env;
 
+use p256::{ecdsa::VerifyingKey, pkcs8::DecodePublicKey};
 use time::Duration;
 
 use crate::{adapters::http::session::MIN_SECRET_BYTES, entities::value_objects::EmailAddress};
@@ -280,6 +281,34 @@ impl AppConfig {
             .parse()
             .unwrap_or(2525);
 
+        let sendgrid_inbound_enabled: bool = env::var("SENDGRID_INBOUND_ENABLED")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse()
+            .expect("SENDGRID_INBOUND_ENABLED must be true or false");
+        let sendgrid_webhook_public_key = non_empty_var("SENDGRID_WEBHOOK_PUBLIC_KEY");
+        assert!(
+            !sendgrid_inbound_enabled || sendgrid_webhook_public_key.is_some(),
+            "SENDGRID_WEBHOOK_PUBLIC_KEY is required when SENDGRID_INBOUND_ENABLED=true"
+        );
+        if sendgrid_inbound_enabled {
+            VerifyingKey::from_public_key_pem(
+                sendgrid_webhook_public_key
+                    .as_deref()
+                    .expect("checked above"),
+            )
+            .expect(
+                "SENDGRID_WEBHOOK_PUBLIC_KEY must be a valid ECDSA P-256 public key in PEM format",
+            );
+        }
+        let sendgrid_webhook_max_age_secs: u64 = env::var("SENDGRID_WEBHOOK_MAX_AGE_SECS")
+            .unwrap_or_else(|_| "300".to_string())
+            .parse()
+            .expect("SENDGRID_WEBHOOK_MAX_AGE_SECS must be a positive integer");
+        assert!(
+            sendgrid_webhook_max_age_secs > 0,
+            "SENDGRID_WEBHOOK_MAX_AGE_SECS must be positive"
+        );
+
         let max_spam_score: f64 = env::var("MAX_SPAM_SCORE")
             .unwrap_or_else(|_| "5.0".to_string())
             .parse()
@@ -360,6 +389,23 @@ impl AppConfig {
 
     pub fn is_spam_scan_enabled(&self) -> bool {
         self.enable_heuristic_scanner || self.enable_spam_scanner || self.enable_llm_spam_guardrail
+    }
+
+    pub fn sendgrid_inbound_enabled(&self) -> bool {
+        env::var("SENDGRID_INBOUND_ENABLED")
+            .ok()
+            .is_some_and(|value| value.eq_ignore_ascii_case("true"))
+    }
+
+    pub fn sendgrid_webhook_public_key(&self) -> Option<String> {
+        non_empty_var("SENDGRID_WEBHOOK_PUBLIC_KEY")
+    }
+
+    pub fn sendgrid_webhook_max_age_secs(&self) -> u64 {
+        env::var("SENDGRID_WEBHOOK_MAX_AGE_SECS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(300)
     }
 }
 

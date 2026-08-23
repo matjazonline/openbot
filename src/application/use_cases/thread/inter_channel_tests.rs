@@ -209,9 +209,9 @@ fn inbound(from: &str, to: &str, message_id: &str, subject: &str) -> NormalizedI
         hop_count: 0,
         trace_channels: Vec::new(),
         protocol: ChannelType::Email,
-        spf_status: Some("pass".into()),
-        dkim_status: Some("pass".into()),
-        dmarc_status: Some("pass".into()),
+        spf_status: crate::entities::auth::AuthVerdict::Pass,
+        dkim_status: crate::entities::auth::AuthVerdict::Pass,
+        dmarc_status: crate::entities::auth::AuthVerdict::Pass,
         spam_score: Some(0.0),
         is_context_only: false,
     }

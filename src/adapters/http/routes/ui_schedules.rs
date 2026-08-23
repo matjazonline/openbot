@@ -431,6 +431,11 @@ async fn thread_pane(
         .await?
         .ok_or_else(|| AppError::NotFound("Schedule not found".into()))?;
 
+    workspace
+        .schedule_use_cases
+        .authorize_schedule_run_thread(workspace.user_id, company.id, schedule_id, thread_id)
+        .await?;
+
     let channel = workspace
         .channel_use_cases
         .get_company_channel(workspace.user_id, company.id, schedule.channel_id)
@@ -494,6 +499,11 @@ async fn reply_in_thread(
         .get_schedule(workspace.user_id, company.id, schedule_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Schedule not found".into()))?;
+
+    workspace
+        .schedule_use_cases
+        .authorize_schedule_run_thread(workspace.user_id, company.id, schedule_id, thread_id)
+        .await?;
 
     let channel = workspace
         .channel_use_cases

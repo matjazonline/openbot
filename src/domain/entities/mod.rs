@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod approval;
+pub mod auth;
 pub mod channel;
 pub mod company;
 pub mod company_invite;

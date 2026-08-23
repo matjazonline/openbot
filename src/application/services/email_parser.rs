@@ -3,7 +3,7 @@ use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::entities::{message::AttachmentMetadata, value_objects::ObjectKey};
+use crate::entities::{auth::AuthVerdict, message::AttachmentMetadata, value_objects::ObjectKey};
 
 use serde::{Deserialize, Serialize};
 
@@ -34,14 +34,14 @@ pub struct ParsedEmail {
     pub channel_id_header: Option<Uuid>,
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,
-    pub spf_status: Option<String>,
-    pub dkim_status: Option<String>,
-    pub dmarc_status: Option<String>,
+    pub spf_status: AuthVerdict,
+    pub dkim_status: AuthVerdict,
+    pub dmarc_status: AuthVerdict,
     pub spam_score: Option<f64>,
     pub is_context_only: bool,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RawInboundPayload {
     pub to: String,
     pub from: String,
@@ -50,11 +50,41 @@ pub struct RawInboundPayload {
     pub text: Option<String>,
     pub html: Option<String>,
     pub headers: Option<String>,
-    pub spf: Option<String>,
-    pub dkim: Option<String>,
-    pub dmarc: Option<String>,
+    pub spf: AuthVerdict,
+    pub dkim: AuthVerdict,
+    pub dmarc: AuthVerdict,
     pub spam_score: Option<f64>,
     pub attachments_data: Vec<RawAttachmentData>,
+}
+
+impl Default for RawInboundPayload {
+    fn default() -> Self {
+        Self {
+            to: String::new(),
+            from: String::new(),
+            cc: None,
+            subject: None,
+            text: None,
+            html: None,
+            headers: None,
+            spf: default_test_auth_verdict(),
+            dkim: default_test_auth_verdict(),
+            dmarc: default_test_auth_verdict(),
+            spam_score: None,
+            attachments_data: Vec::new(),
+        }
+    }
+}
+
+#[cfg(not(test))]
+fn default_test_auth_verdict() -> AuthVerdict {
+    AuthVerdict::Unknown
+}
+
+/// Existing unit fixtures represent mail that has already crossed the verifier boundary.
+#[cfg(test)]
+fn default_test_auth_verdict() -> AuthVerdict {
+    AuthVerdict::Pass
 }
 
 #[derive(Debug, Clone)]

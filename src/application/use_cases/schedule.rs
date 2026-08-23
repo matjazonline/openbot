@@ -278,6 +278,25 @@ impl ScheduleUseCases {
             .await
     }
 
+    pub async fn authorize_schedule_run_thread(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        schedule_id: Uuid,
+        thread_id: Uuid,
+    ) -> AppResult<()> {
+        self.owned_schedule(user_id, company_id, schedule_id)
+            .await?;
+        if !self
+            .schedule_persistence
+            .schedule_run_contains_thread(company_id, schedule_id, thread_id)
+            .await?
+        {
+            return Err(AppError::NotFound("Schedule run not found".into()));
+        }
+        Ok(())
+    }
+
     /// Manually triggers an immediate execution of this schedule without waiting for the timer.
     #[instrument(skip(self))]
     pub async fn trigger_schedule_now(
@@ -767,6 +786,14 @@ mod tests {
             _limit: i64,
         ) -> AppResult<Vec<crate::entities::schedule::ScheduleRun>> {
             Ok(vec![])
+        }
+        async fn schedule_run_contains_thread(
+            &self,
+            _company_id: Uuid,
+            _schedule_id: Uuid,
+            _thread_id: Uuid,
+        ) -> AppResult<bool> {
+            Ok(false)
         }
     }
 

@@ -244,6 +244,14 @@ pub trait SchedulePersistence: Send + Sync {
         offset: i64,
         limit: i64,
     ) -> AppResult<Vec<ScheduleRun>>;
+
+    /// Proves that a caller-selected thread is the persisted run of this tenant's schedule.
+    async fn schedule_run_contains_thread(
+        &self,
+        company_id: Uuid,
+        schedule_id: Uuid,
+        thread_id: Uuid,
+    ) -> AppResult<bool>;
 }
 
 #[async_trait]
@@ -674,6 +682,30 @@ impl SchedulePersistence for PostgresPersistence {
         .map_err(AppError::from)?;
 
         rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn schedule_run_contains_thread(
+        &self,
+        company_id: Uuid,
+        schedule_id: Uuid,
+        thread_id: Uuid,
+    ) -> AppResult<bool> {
+        sqlx::query_scalar::<_, bool>(
+            r#"SELECT EXISTS (
+                   SELECT 1
+                   FROM schedule_runs AS run
+                   JOIN channel_schedules AS schedule ON schedule.id = run.schedule_id
+                   WHERE schedule.company_id = $1
+                     AND run.schedule_id = $2
+                     AND run.thread_id = $3
+               )"#,
+        )
+        .bind(company_id)
+        .bind(schedule_id)
+        .bind(thread_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::from)
     }
 }
 
