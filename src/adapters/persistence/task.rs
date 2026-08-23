@@ -1237,7 +1237,10 @@ impl TaskPersistence for PostgresPersistence {
         // definition no worker still holds a claim on the row.
         let result = sqlx::query(&format!(
             "UPDATE email_outbox {}
-             WHERE status = 'sending' AND lock_expires_at <= CURRENT_TIMESTAMP",
+             WHERE status = 'sending'
+               AND (worker_id IS NULL OR locked_at IS NULL OR lock_expires_at IS NULL
+                    OR lock_expires_at <= locked_at
+                    OR lock_expires_at <= CURRENT_TIMESTAMP)",
             outbox_attempt_failed_set("'Delivery lease expired without a result'")
         ))
         .execute(&self.pool)
@@ -2557,8 +2560,9 @@ mod tests {
         // expiry was counted, this row came back every lease period at retry_count 0, forever.
         // Two attempts are already spent so the backoff is long enough to observe.
         sqlx::query(
-            "UPDATE email_outbox SET retry_count = 2, lock_expires_at = CURRENT_TIMESTAMP
-             - interval '1 minute' WHERE id = $1",
+            "UPDATE email_outbox SET retry_count = 2,
+                 locked_at = CURRENT_TIMESTAMP - interval '2 minutes',
+                 lock_expires_at = CURRENT_TIMESTAMP - interval '1 minute' WHERE id = $1",
         )
         .bind(outbox_id)
         .execute(&pool)
@@ -2579,10 +2583,12 @@ mod tests {
         // One attempt short of the cap: the next lapse is terminal, without any worker having
         // managed to write a failure.
         sqlx::query(
-            "UPDATE email_outbox SET status = 'sending', retry_count = 4,
+            "UPDATE email_outbox SET status = 'sending', retry_count = 4, worker_id = $2,
+                 locked_at = CURRENT_TIMESTAMP - interval '2 minutes',
                  lock_expires_at = CURRENT_TIMESTAMP - interval '1 minute' WHERE id = $1",
         )
         .bind(outbox_id)
+        .bind(worker_id)
         .execute(&pool)
         .await
         .unwrap();
@@ -2590,6 +2596,15 @@ mod tests {
         persistence.reap_expired_outbox_leases().await.unwrap();
         assert_eq!(state(outbox_id).await.0, "failed");
         assert!(!claimed_ours(1).await);
+
+        let incoherent = sqlx::query("UPDATE email_outbox SET status = 'sending' WHERE id = $1")
+            .bind(outbox_id)
+            .execute(&pool)
+            .await;
+        assert!(
+            incoherent.is_err(),
+            "a sending row without complete lease ownership must be rejected"
+        );
 
         CompanyPersistence::delete(&persistence, company.id)
             .await

@@ -80,7 +80,10 @@ const OUTBOX_QUEUE_SQL: &str = r#"
 /// maintenance pass will fail with `'Delivery lease expired without a result'`.
 const OUTBOX_PRESSURE_SQL: &str = r#"
     SELECT COUNT(*) FILTER (
-               WHERE status = 'sending' AND lock_expires_at <= CURRENT_TIMESTAMP
+               WHERE status = 'sending'
+                 AND (worker_id IS NULL OR locked_at IS NULL OR lock_expires_at IS NULL
+                      OR lock_expires_at <= locked_at
+                      OR lock_expires_at <= CURRENT_TIMESTAMP)
            )::bigint AS expired_leases,
            COUNT(*) FILTER (
                WHERE status = 'pending' AND available_at <= CURRENT_TIMESTAMP
