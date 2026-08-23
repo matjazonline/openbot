@@ -245,7 +245,11 @@ pub trait SchedulePersistence: Send + Sync {
         limit: i64,
     ) -> AppResult<Vec<ScheduleRun>>;
 
-    /// Proves that a caller-selected thread is the persisted run of this tenant's schedule.
+    /// Proves that a caller-selected thread was launched by this tenant's schedule.
+    ///
+    /// Scheduled runs are represented by their `scheduled_agent_run` task.  Timed runs also have
+    /// a durable `schedule_runs` record, but a manual "run now" deliberately launches directly
+    /// and therefore has no such record.
     async fn schedule_run_contains_thread(
         &self,
         company_id: Uuid,
@@ -693,11 +697,14 @@ impl SchedulePersistence for PostgresPersistence {
         sqlx::query_scalar::<_, bool>(
             r#"SELECT EXISTS (
                    SELECT 1
-                   FROM schedule_runs AS run
-                   JOIN channel_schedules AS schedule ON schedule.id = run.schedule_id
+                   FROM background_tasks AS task
+                   JOIN channel_schedules AS schedule ON schedule.id = $2
                    WHERE schedule.company_id = $1
-                     AND run.schedule_id = $2
-                     AND run.thread_id = $3
+                     AND task.company_id = schedule.company_id
+                     AND task.channel_id = schedule.channel_id
+                     AND task.thread_id = $3
+                     AND task.task_type = 'scheduled_agent_run'
+                     AND task.payload->>'schedule_id' = $2::text
                )"#,
         )
         .bind(company_id)
@@ -1090,6 +1097,45 @@ mod tests {
             )
             .await
             .unwrap()
+        );
+
+        // Manual runs are intentionally not materialized through `schedule_runs`, but they are
+        // still visible in the schedule workspace and must be authorized when selected there.
+        let manual_thread =
+            ThreadPersistence::create_thread(&persistence, channel.id, "Manual schedule run", &[])
+                .await
+                .unwrap();
+        TaskPersistence::enqueue_task(
+            &persistence,
+            company.id,
+            channel.id,
+            Some(manual_thread.id),
+            "scheduled_agent_run",
+            serde_json::json!({ "schedule_id": one_off.id }),
+        )
+        .await
+        .unwrap();
+        assert!(
+            SchedulePersistence::schedule_run_contains_thread(
+                &persistence,
+                company.id,
+                one_off.id,
+                manual_thread.id,
+            )
+            .await
+            .unwrap(),
+            "a manual run should be authorized from its scheduled task"
+        );
+        assert!(
+            !SchedulePersistence::schedule_run_contains_thread(
+                &persistence,
+                company.id,
+                schedule.id,
+                manual_thread.id,
+            )
+            .await
+            .unwrap(),
+            "a task cannot authorize the thread under a different schedule"
         );
 
         // A poison materialization is handed back with persisted backoff, rather than filling the
