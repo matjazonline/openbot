@@ -116,7 +116,7 @@ pub fn schedules_sidebar_list(
                         hx-get="/ui/schedules?company_id={company_id}&schedule_id={schedule_id}"
                         hx-target="#schedules-workspace"
                         hx-push-url="/ui/schedules?company_id={company_id}&schedule_id={schedule_id}"
-                        onclick="selectSidebarItem(this)">
+                        data-action="select-sidebar-item">
                         <div class="flex w-full min-w-0 items-center justify-between gap-1">
                             <span class="min-w-0 truncate font-semibold text-sm">{name}</span>
                             {status_badge}
@@ -239,7 +239,7 @@ pub fn schedule_runs_column(props: &ScheduleRunsColumnProps<'_>, swap: FragmentS
                         hx-get="/ui/schedules/thread/{thread_id}?company_id={company_id}&schedule_id={schedule_id}"
                         hx-target="#schedule-pane" hx-swap="outerHTML"
                         data-thread-id="{thread_id}"
-                        onclick="selectThreadRow(this)">
+                        data-action="select-thread-row">
                         <div class="flex items-center justify-between gap-1">
                             <span class="text-xs font-semibold truncate text-base-content">{subject}</span>
                             {badge}
@@ -586,7 +586,7 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <label class="form-control w-full">
                             <div class="label"><span class="text-xs opacity-70">Schedule Type</span></div>
-                            <select name="schedule_type" class="select w-full" onchange="toggleScheduleType(this)">
+                            <select name="schedule_type" class="select w-full" data-action="toggle-schedule-type">
                                 <option value="interval" {interval_selected}>Recurring Interval</option>
                                 <option value="one_off" {oneoff_selected}>One-Off Scheduled Run</option>
                             </select>
@@ -638,7 +638,7 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <label class="form-control w-full">
                             <div class="label"><span class="text-xs opacity-70">Output Delivery Mode</span></div>
-                            <select name="delivery_mode" class="select w-full" onchange="toggleScheduleDelivery(this)">
+                            <select name="delivery_mode" class="select w-full" data-action="toggle-schedule-delivery">
                                 <option value="mailbox_only" {d_mailbox}>Mailbox Only (In-App Review)</option>
                                 <option value="email_participants" {d_participants}>Post to Mailbox &amp; Email Participants</option>
                                 <option value="email_custom" {d_custom}>Post to Mailbox &amp; Email Custom List</option>
@@ -741,7 +741,7 @@ pub fn schedules_empty_pane(message: &str, swap: FragmentSwap) -> String {
     )
 }
 
-const SCHEDULES_SCRIPT: &str = r##"        function toggleScheduleType(select) {
+pub(crate) const SCHEDULES_SCRIPT: &str = r##"        function toggleScheduleType(select) {
             var form = select.closest('form');
             if (!form) return;
             var isInterval = select.value === 'interval';

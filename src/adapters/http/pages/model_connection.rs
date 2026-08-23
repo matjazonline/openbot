@@ -71,7 +71,7 @@ pub(crate) fn model_connection_fields(fields: &ModelConnectionFields<'_>) -> Str
         r##"<div class="grid grid-cols-1 gap-4 md:grid-cols-3" data-model-connection>
             <label class="form-control w-full">
                 <div class="label"><span class="text-xs opacity-70">LLM Provider</span></div>
-                <select class="select w-full font-mono text-sm" onchange="const grid = this.closest('[data-model-connection]'); const providerInput = this.nextElementSibling; const modelSelect = grid.querySelector('[data-model-select]'); const modelInput = grid.querySelector('[data-model-input]'); const custom = this.value === '__custom__'; const models = this.value === 'google' ? ['gemini-3.6-flash', 'gemini-3.7-flash'] : this.value === 'openai' ? ['gpt-5.6-sol', 'gpt-5.6-terra'] : []; providerInput.value = custom ? '' : this.value; providerInput.classList.toggle('hidden', !custom); modelSelect.replaceChildren(new Option(this.value ? 'Select model' : 'Select provider first', ''), ...models.map(model => new Option(model, model))); modelSelect.disabled = !this.value || custom; modelSelect.classList.toggle('hidden', custom); modelInput.value = ''; modelInput.classList.toggle('hidden', !custom); if (custom) providerInput.focus();">
+                <select class="select w-full font-mono text-sm" data-action="model-provider">
                     <option value="">Server default</option>
                     <option value="google"{google_selected}>google</option>
                     <option value="openai"{openai_selected}>openai</option>
@@ -81,7 +81,7 @@ pub(crate) fn model_connection_fields(fields: &ModelConnectionFields<'_>) -> Str
             </label>
             <label class="form-control w-full">
                 <div class="label"><span class="text-xs opacity-70">LLM Model</span></div>
-                <select data-model-select class="select w-full font-mono text-sm{model_select_hidden}" onchange="this.nextElementSibling.value = this.value"{model_select_disabled}>
+                <select data-model-select class="select w-full font-mono text-sm{model_select_hidden}" data-action="model-select"{model_select_disabled}>
                     <option value="">{model_prompt}</option>
                     {model_options}
                 </select>

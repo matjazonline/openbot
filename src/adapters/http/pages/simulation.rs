@@ -71,21 +71,21 @@ fn simulation_compose_form(
                                 <label class="block text-xs font-medium text-slate-300 mb-2">Execution Mode</label>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-indigo-500 transition">
-                                        <input type="radio" name="simulation_mode" value="verify" onchange="this.form.elements.namedItem('from').disabled = false" class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                                        <input type="radio" name="simulation_mode" value="verify" data-action="simulation-mode" class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
                                         <div class="ml-2.5">
                                             <span class="block text-xs font-bold text-white">Verify</span>
                                             <span class="block text-[11px] text-slate-400 mt-0.5">Verification only (Recipient & Sender ACL check)</span>
                                         </div>
                                     </label>
                                     <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-amber-500 transition">
-                                        <input type="radio" name="simulation_mode" value="run_test" checked onchange="const sender = this.form.elements.namedItem('from'); sender.value = sender.dataset.serverSender; sender.disabled = true" class="mt-0.5 text-amber-500 focus:ring-amber-500">
+                                        <input type="radio" name="simulation_mode" value="run_test" checked data-action="simulation-mode" class="mt-0.5 text-amber-500 focus:ring-amber-500">
                                         <div class="ml-2.5">
                                             <span class="block text-xs font-bold text-amber-300">Run_Test</span>
                                             <span class="block text-[11px] text-slate-400 mt-0.5">Execute full channel & agent, skip email dispatch</span>
                                         </div>
                                     </label>
                                     <label class="flex items-start p-3 bg-slate-800 border border-slate-700 rounded-lg cursor-pointer hover:border-emerald-500 transition">
-                                        <input type="radio" name="simulation_mode" value="run" onchange="const sender = this.form.elements.namedItem('from'); sender.value = sender.dataset.serverSender; sender.disabled = true" class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
+                                        <input type="radio" name="simulation_mode" value="run" data-action="simulation-mode" class="mt-0.5 text-emerald-500 focus:ring-emerald-500">
                                         <div class="ml-2.5">
                                             <span class="block text-xs font-bold text-emerald-400">Run</span>
                                             <span class="block text-[11px] text-slate-400 mt-0.5">Live execution with full AI agent & outbound SMTP send</span>

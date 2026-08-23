@@ -319,7 +319,7 @@ fn mailbox_page_renders_three_columns_and_escapes_thread_subjects() {
         detail_html: &detail,
     });
 
-    assert!(html.contains("daisyui@5"));
+    assert!(html.contains("/assets/app.css"));
     assert!(html.contains("id=\"channel-menu\""));
     assert!(html.contains("id=\"thread-column\""));
     assert!(html.contains("id=\"detail-pane\""));
@@ -365,15 +365,16 @@ fn top_bar_carries_a_theme_controller_that_survives_a_reload() {
     assert!(html.contains("swap-rotate"));
 
     // The choice has to outlive the response: written on change, re-applied before the next paint.
-    assert!(html.contains("localStorage.setItem('ui_theme', theme)"));
-    assert!(html.contains("localStorage.getItem('ui_theme')"));
+    let script = application_javascript();
+    assert!(script.contains("localStorage.setItem('ui_theme', theme)"));
+    assert!(theme_init_javascript().contains("localStorage.getItem('ui_theme')"));
 
     // The restore runs in `<head>`, ahead of the body, or a light-theme reload flashes dark.
     let head = &html[..html.find("<body").expect("a body")];
-    assert!(head.contains("document.documentElement.setAttribute('data-theme', saved)"));
+    assert!(head.contains("/assets/theme-init.js"));
 
     // ...and the box is caught up with whatever that restore chose.
-    assert!(html.contains("syncThemeController();"));
+    assert!(script.contains("syncThemeController();"));
 
     // Every `/ui` page shares the bar, so the switch is on all of them.
     assert!(mailbox_no_company_page(&user).contains(r##"class="theme-controller""##));
@@ -439,7 +440,7 @@ fn dark_theme_recuts_the_blues_at_the_logos_hue() {
 
     // The override has to reach the browser after daisyUI's own themes, or it loses the cascade.
     let head = &html[..html.find("<body").expect("a body")];
-    let themes = head.find("daisyui@5/themes.css").expect("daisyui themes");
+    let themes = head.find("/assets/app.css").expect("vendored themes");
     let override_at = head.find("--color-primary:").expect("a primary override");
     assert!(themes < override_at);
 
@@ -486,7 +487,7 @@ fn top_bar_shows_the_logo_and_the_signed_in_account() {
     assert!(html.contains("dana&lt;script&gt;@example.com"));
     assert!(html.contains(">D</span>"));
     // Logging out goes through the confirmation dialog, not a bare post.
-    assert!(html.contains(r##"onclick="confirmLogout()""##));
+    assert!(html.contains(r##"data-action="confirm-logout""##));
     assert!(html.contains(r##"<dialog id="logout-modal" class="modal">"##));
     assert!(html.contains(r##"<form method="post" action="/logout">"##));
 
@@ -649,7 +650,7 @@ fn the_rail_ends_on_the_company_it_is_scoped_to_rather_than_on_a_way_out() {
 
     // Signing out is not what the bottom of the rail does any more; the account menu owns it.
     assert!(!letter.contains(r##"title="Log out""##));
-    assert!(letter.contains(r##"onclick="confirmLogout()""##));
+    assert!(letter.contains(r##"data-action="confirm-logout""##));
 
     company.avatar_url = Some(AvatarUrl::from("https://cdn.example.com/acme.png"));
     let pictured = page(&company);
@@ -723,12 +724,13 @@ fn the_ui_shell_reports_live_update_interruptions_without_replacing_sse_retries(
 
     assert!(html.contains(r#"id="live-update-status" role="status" aria-live="polite""#));
     assert!(html.contains("alert alert-warning"));
-    assert!(html.contains("status.classList.toggle('alert-success', restored)"));
+    let script = application_javascript();
+    assert!(script.contains("status.classList.toggle('alert-success', restored)"));
     assert!(html.contains("Live updates paused. Reconnecting&hellip;"));
-    assert!(html.contains("htmx:sseError"));
-    assert!(html.contains("htmx:sseOpen"));
-    assert!(html.contains("Live updates restored."));
-    assert!(!html.contains("new EventSource"));
+    assert!(script.contains("htmx:sseError"));
+    assert!(script.contains("htmx:sseOpen"));
+    assert!(script.contains("Live updates restored."));
+    assert!(!script.contains("new EventSource"));
 }
 
 #[test]
@@ -2119,20 +2121,21 @@ fn a_reply_in_the_open_thread_quiets_that_thread_s_activity_mark() {
 
     // The rule that hides it, and the reply that puts the row under it.
     assert!(page.contains(".thread-row.thread-replied .thread-activity { display: none; }"));
-    assert!(page.contains("function quietRepliedRow(bubble)"));
-    assert!(page.contains("quietRepliedRow(swapped.lastElementChild)"));
+    let script = application_javascript();
+    assert!(script.contains("function quietRepliedRow(bubble)"));
+    assert!(script.contains("quietRepliedRow(swapped.lastElementChild)"));
     // Only the agent's own bubble counts as the reply.
-    assert!(page.contains("bubble.dataset.role !== 'agent'"));
+    assert!(script.contains("bubble.dataset.role !== 'agent'"));
 
     // A reply on a row the reader was not watching quiets it too, and each arrival is spent once
     // so a later insert cannot re-settle a thread that has since started working again.
-    assert!(page.contains("row.classList.add('thread-replied')"));
-    assert!(page.contains("row.removeAttribute('data-last-role')"));
+    assert!(script.contains("row.classList.add('thread-replied')"));
+    assert!(script.contains("row.removeAttribute('data-last-role')"));
 
     // Quiet ends on a badge that carries a state, not on the reader opening something else.
-    assert!(page.contains("badgeRow.classList.remove('thread-replied')"));
-    assert!(page.contains("if (swapped.firstElementChild)"));
-    assert!(!page.contains("row.classList.remove('thread-replied')"));
+    assert!(script.contains("badgeRow.classList.remove('thread-replied')"));
+    assert!(script.contains("if (swapped.firstElementChild)"));
+    assert!(!script.contains("row.classList.remove('thread-replied')"));
 }
 
 #[test]
@@ -3545,9 +3548,10 @@ fn the_ui_shell_carries_the_placeholder_machinery_for_its_swap_targets() {
     assert!(html.contains(r##"id="thread-column" data-skeleton="thread-column""##));
     assert!(html.contains(r##"id="thread-list" data-skeleton="thread-rows""##));
 
-    assert!(html.contains("var UI_SKELETONS = {"));
-    assert!(html.contains("htmx:beforeRequest"));
-    assert!(html.contains("class=\\\"skeleton "));
+    let script = application_javascript();
+    assert!(script.contains("var UI_SKELETONS = {"));
+    assert!(script.contains("htmx:beforeRequest"));
+    assert!(script.contains("class=\\\"skeleton "));
 }
 
 /// The dashboard is the one workspace whose body is not rendered with the page, so the placeholder

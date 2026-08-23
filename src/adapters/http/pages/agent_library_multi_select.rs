@@ -20,7 +20,7 @@ pub fn agent_library_multi_select(agents: &[Agent], selected: &[Uuid], input_nam
             format!(
                 r##"<label class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 bg-base-200/40 p-4 hover:border-primary">
                     <input type="checkbox" value="{id}" class="checkbox checkbox-primary mt-1"{checked}
-                        onchange="var root=this.closest('[data-library-multi-select]');root.querySelector('input[type=hidden]').value=Array.from(root.querySelectorAll('input[type=checkbox]:checked')).map(function(item){{return item.value}}).join(',')">
+                        data-action="library-multi-select">
                     <span class="min-w-0"><span class="block font-semibold">{name}</span><span class="block font-mono text-xs opacity-60">{slug}</span><span class="mt-1 block text-sm opacity-70">{description}</span></span>
                 </label>"##,
                 id = agent.id,

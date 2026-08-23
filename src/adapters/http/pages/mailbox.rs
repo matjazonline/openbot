@@ -536,7 +536,7 @@ const THEME_INIT_SCRIPT: &str = r#"
 
 /// The HTML shell for every `/ui` response: daisyUI over the Tailwind browser build, plus htmx.
 fn ui_layout(title: &str, body: &str, script: &str) -> String {
-    let skeletons = skeleton_script();
+    let _ = script;
 
     format!(
         r##"<!DOCTYPE html>
@@ -545,27 +545,95 @@ fn ui_layout(title: &str, body: &str, script: &str) -> String {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Mail Agents</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="/assets/app.css" rel="stylesheet" type="text/css" />
     <style>{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}{APP_SHELL_STYLES}{THREAD_ROW_STYLES}</style>
-    <script>{THEME_INIT_SCRIPT}</script>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <script src="https://unpkg.com/htmx-ext-sse@2.2.3/sse.js"></script>
+    <script src="/assets/theme-init.js"></script>
+    <script src="/assets/htmx-2.0.4.min.js" defer></script>
+    <script src="/assets/htmx-ext-sse-2.2.3.js" defer></script>
 </head>
 <body class="h-full overflow-hidden bg-base-100 text-base-content">
 {body}
-    <script>
-        var AGENT_REPLIED_MARK = '{agent_replied_mark}';
-{MAILBOX_SCRIPT}
-{LOCAL_TIME_SCRIPT}
-{skeletons}
-{script}
-    </script>
+    <script src="/assets/app.js"></script>
 </body>
-</html>"##,
-        agent_replied_mark = icon(Icon::Check, BUTTON_ICON),
+</html>"##
     )
+}
+
+pub(crate) fn application_javascript() -> String {
+    format!(
+        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{delegation}",
+        selected = icon(Icon::Check, BUTTON_ICON),
+        add = icon(Icon::Plus, BUTTON_ICON),
+        replied = icon(Icon::Check, BUTTON_ICON),
+        app = super::layout::APP_SCRIPT,
+        mailbox = MAILBOX_SCRIPT,
+        local = LOCAL_TIME_SCRIPT,
+        skeletons = skeleton_script(),
+        schedules = super::schedules::SCHEDULES_SCRIPT,
+        agents = super::agent_settings::AGENT_SETTINGS_SCRIPT,
+        channels = super::channel_settings::CHANNEL_SETTINGS_SCRIPT,
+        delegation = EVENT_DELEGATION_SCRIPT,
+    )
+}
+
+const EVENT_DELEGATION_SCRIPT: &str = r##"
+document.addEventListener('click', function (event) {
+    var control = event.target.closest('[data-action]');
+    if (!control) return;
+    switch (control.dataset.action) {
+        case 'confirm-logout': confirmLogout(); break;
+        case 'select-sidebar-item': selectSidebarItem(control); break;
+        case 'select-thread-row': selectThreadRow(control); break;
+        case 'show-agent-tab': showAgentTab(control.dataset.advanced === 'true'); break;
+        case 'toggle-agent-prompt': toggleAgentPromptGenerator(control.dataset.prefix); break;
+        case 'show-channel-tab': showChannelTab(control.dataset.tab); break;
+    }
+});
+document.addEventListener('change', function (event) {
+    var control = event.target.closest('[data-action]');
+    if (!control) return;
+    switch (control.dataset.action) {
+        case 'theme-toggle': applyTheme(control.checked ? 'light' : 'dark'); break;
+        case 'toggle-schedule-type': toggleScheduleType(control); break;
+        case 'toggle-schedule-delivery': toggleScheduleDelivery(control); break;
+        case 'sync-channel-agents': syncChannelAgents(control); break;
+        case 'submit-form': control.form.requestSubmit(); break;
+        case 'simulation-mode': {
+            var sender = control.form.elements.namedItem('from');
+            var live = control.value !== 'verify';
+            if (live) sender.value = sender.dataset.serverSender;
+            sender.disabled = live;
+            break;
+        }
+        case 'library-multi-select': {
+            var root = control.closest('[data-library-multi-select]');
+            root.querySelector('input[type=hidden]').value = Array.from(root.querySelectorAll('input[type=checkbox]:checked')).map(function (item) { return item.value; }).join(',');
+            break;
+        }
+        case 'model-provider': {
+            var grid = control.closest('[data-model-connection]');
+            var providerInput = control.nextElementSibling;
+            var modelSelect = grid.querySelector('[data-model-select]');
+            var modelInput = grid.querySelector('[data-model-input]');
+            var custom = control.value === '__custom__';
+            var models = control.value === 'google' ? ['gemini-3.6-flash', 'gemini-3.7-flash'] : control.value === 'openai' ? ['gpt-5.6-sol', 'gpt-5.6-terra'] : [];
+            providerInput.value = custom ? '' : control.value;
+            providerInput.classList.toggle('hidden', !custom);
+            modelSelect.replaceChildren(new Option(control.value ? 'Select model' : 'Select provider first', ''), ...models.map(function (model) { return new Option(model, model); }));
+            modelSelect.disabled = !control.value || custom;
+            modelSelect.classList.toggle('hidden', custom);
+            modelInput.value = '';
+            modelInput.classList.toggle('hidden', !custom);
+            if (custom) providerInput.focus();
+            break;
+        }
+        case 'model-select': control.nextElementSibling.value = control.value; break;
+    }
+});
+"##;
+
+pub(crate) fn theme_init_javascript() -> &'static str {
+    THEME_INIT_SCRIPT
 }
 
 pub fn mailbox_page(page: &MailboxPage<'_>) -> String {
@@ -811,7 +879,7 @@ const THEME_CONTROLLER: &str = r##"
                 <label class="swap swap-rotate btn btn-ghost btn-circle" title="Switch between light and dark">
                     <input id="theme-toggle" type="checkbox" class="theme-controller" value="light"
                         aria-label="Switch between light and dark"
-                        onchange="applyTheme(this.checked ? 'light' : 'dark')" />
+                        data-action="theme-toggle" />
                     <svg class="swap-off h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
                     </svg>
@@ -861,7 +929,7 @@ fn top_bar(user: &MailboxUser<'_>, company: Option<&Company>) -> String {
                         <li><a href="/ui/invites">My Invites</a></li>
 {agent_library}
                         <li>
-                            <button type="button" class="w-full text-left" onclick="confirmLogout()">{sign_out} Log out</button>
+                            <button type="button" class="w-full text-left" data-action="confirm-logout">{sign_out} Log out</button>
                         </li>
                     </ul>
                 </div>
@@ -1156,7 +1224,7 @@ fn channel_menu_item(
                         hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
                         hx-target="#thread-column" hx-swap="outerHTML"
                         hx-push-url="/ui?company_id={company_id}&channel_id={channel_id}"
-                        onclick="selectSidebarItem(this)">
+                        data-action="select-sidebar-item">
                         <span class="flex w-full items-center gap-2">
                             <span class="truncate">{name}</span>
                             <span class="badge badge-ghost badge-sm font-mono">{slug}</span>{disabled_badge}
@@ -1380,7 +1448,7 @@ pub fn thread_row_fragment(
                     hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
                     hx-target="#detail-pane" hx-swap="outerHTML"
                     hx-push-url="/ui?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
-                    onclick="selectThreadRow(this)">
+                    data-action="select-thread-row">
                     <div class="flex items-baseline justify-between gap-2">
                         <span class="truncate font-semibold">{subject}</span>
                         <span class="flex shrink-0 items-center gap-1.5">

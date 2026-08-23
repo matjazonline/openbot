@@ -432,7 +432,7 @@ mod tests {
         assert!(company_page.contains("Step 1 of 3"));
         assert!(company_page.contains("action=\"/ui/onboarding/company\""));
         assert!(company_page.contains(">.example.com</span>"));
-        assert!(company_page.contains("daisyui"));
+        assert!(company_page.contains("/assets/app.css"));
         assert!(company_page.contains("/ui/profile"));
 
         let library_agent = library_agent("Scheduler", "scheduler");

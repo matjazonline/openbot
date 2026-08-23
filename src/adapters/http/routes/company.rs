@@ -372,7 +372,10 @@ mod tests {
         assert!(base_html.contains("action=\"/logout\""));
         assert!(!base_html.contains(">Sign In</a>"));
         assert!(!base_html.contains(">Sign Up</a>"));
-        assert!(base_html.contains("localStorage.getItem('cached_company_id')"));
-        assert!(base_html.contains("autoDetectAndSyncCompany"));
+        assert!(base_html.contains("/assets/app.js"));
+
+        let script = pages::application_javascript();
+        assert!(script.contains("localStorage.getItem('cached_company_id')"));
+        assert!(script.contains("autoDetectAndSyncCompany"));
     }
 }

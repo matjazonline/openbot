@@ -29,8 +29,7 @@ pub(crate) fn public_layout(title: &str, content: &str) -> String {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Mail Agents</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="/assets/app.css" rel="stylesheet" type="text/css" />
     <style>
         [data-theme="dark"] {{
             --color-primary: oklch(50% 0.19 264.05);
@@ -39,8 +38,7 @@ pub(crate) fn public_layout(title: &str, content: &str) -> String {
         :root, [data-theme] {{ --radius-field: .5rem !important; }}
         .input:focus, .input:focus-within {{ outline-offset: -1px; }}
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="/assets/htmx-2.0.4.min.js" defer></script>
 </head>
 <body class="min-h-full bg-base-100 text-base-content">
     <div class="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-6 sm:px-6 lg:px-8">
@@ -95,7 +93,7 @@ const PUBLIC_NAV: &str = r##"
 /// interlock, and the participant/team autocomplete.
 ///
 /// Kept out of the `format!` above so its braces need no escaping and it reads as plain JavaScript.
-const APP_SCRIPT: &str = r##"        function getCachedCompanyId() {
+pub(crate) const APP_SCRIPT: &str = r##"        function getCachedCompanyId() {
             return localStorage.getItem('cached_company_id');
         }
 
@@ -381,8 +379,8 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Mail Agents</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <link href="/assets/app.css" rel="stylesheet" type="text/css" />
+    <script src="/assets/htmx-2.0.4.min.js" defer></script>
 </head>
 <body class="h-full font-sans antialiased text-slate-100 flex flex-col items-center p-4 md:p-8">
     <div class="w-full max-w-4xl">
@@ -398,16 +396,9 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
             {content}
         </div>
     </div>
-    <script>
-        var CHIP_SELECTED_MARK = '{chip_selected_mark}';
-        var CHIP_ADD_MARK = '{chip_add_mark}';
-{APP_SCRIPT}
-{LOCAL_TIME_SCRIPT}
-    </script>
+    <script src="/assets/app.js"></script>
 </body>
-</html>"##,
-        chip_selected_mark = icon(Icon::Check, BUTTON_ICON),
-        chip_add_mark = icon(Icon::Plus, BUTTON_ICON),
+</html>"##
     )
 }
 
@@ -482,7 +473,7 @@ pub(crate) fn avatar_bubble(
 ) -> String {
     let picture = match avatar_url {
         Some(url) => format!(
-            r##"<img src="{url}" alt="" loading="lazy" onerror="this.remove()"
+            r##"<img src="{url}" alt="" loading="lazy"
                             class="absolute inset-0 h-full w-full rounded-full object-cover">"##,
             url = escape_html_text(url.as_str()),
         ),

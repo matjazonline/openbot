@@ -14,7 +14,7 @@ use crate::entities::{
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
 ///
 /// Kept out of the `format!` blocks below so its braces need no escaping.
-const CHANNEL_SETTINGS_SCRIPT: &str = r##"        function showChannelTab(mode) {
+pub(crate) const CHANNEL_SETTINGS_SCRIPT: &str = r##"        function showChannelTab(mode) {
             var easy = document.getElementById('channel-tab-easy');
             var simple = document.getElementById('channel-tab-simple');
             var advancedForm = document.getElementById('channel-tab-advanced');
@@ -294,7 +294,7 @@ fn channel_settings_entry(
                         hx-get="/ui/channels/{channel_id}?company_id={company_id}"
                         hx-target="#channel-pane" hx-swap="outerHTML"
                         hx-push-url="/ui/channels?company_id={company_id}&channel_id={channel_id}"
-                        onclick="selectSidebarItem(this)">
+                        data-action="select-sidebar-item">
                         <span class="flex w-full min-w-0 items-center gap-2">
                             <span class="min-w-0 truncate">{name}</span>{disabled_badge}
                         </span>
@@ -423,11 +423,11 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
                 {error_html}
                 <div role="tablist" class="tabs tabs-box mb-4 w-fit">
                     <button type="button" role="tab" id="channel-tab-easy-btn" class="tab {easy_active}"
-                        onclick="showChannelTab('easy')">Easy</button>
+                        data-action="show-channel-tab" data-tab="easy">Easy</button>
                     <button type="button" role="tab" id="channel-tab-simple-btn" class="tab {simple_active}"
-                        onclick="showChannelTab('simple')">Simple</button>
+                        data-action="show-channel-tab" data-tab="simple">Simple</button>
                     <button type="button" role="tab" id="channel-tab-advanced-btn" class="tab {advanced_active}"
-                        onclick="showChannelTab('advanced')">Advanced</button>
+                        data-action="show-channel-tab" data-tab="advanced">Advanced</button>
                 </div>
                 <form id="channel-tab-easy" class="{easy_hidden} space-y-4"
                     hx-post="/ui/channels/easy?company_id={company_id}" hx-target="#channel-pane" hx-swap="outerHTML"
@@ -674,7 +674,7 @@ fn agent_radios(company_id: Uuid, agents: &[Agent], selected: &[Uuid], id_prefix
                             <label class="label cursor-pointer justify-start gap-3 rounded-box px-3 py-2 hover:bg-base-300" for="agent-{id_prefix}-{agent_id}">
                                 <input type="radio" id="agent-{id_prefix}-{agent_id}" value="{agent_id}" {checked}
                                     class="channel-agent-option radio radio-sm radio-primary"
-                                    onchange="syncChannelAgents(this)">
+                                    data-action="sync-channel-agents">
                                 <span class="flex min-w-0 flex-col items-start">
                                     <span class="truncate text-sm">{name}</span>
                                     <span class="truncate font-mono text-[11px] opacity-60">@{slug}</span>
@@ -1041,7 +1041,7 @@ pub fn channel_schedules_card(
                             </label>
                             <label class="form-control w-full">
                                 <div class="label py-1"><span class="text-xs opacity-70">Schedule Type</span></div>
-                                <select name="schedule_type" class="select select-sm w-full" onchange="toggleScheduleType(this)">
+                                <select name="schedule_type" class="select select-sm w-full" data-action="toggle-schedule-type">
                                     <option value="interval" selected>Recurring Interval</option>
                                     <option value="one_off">One-Off Scheduled Run</option>
                                 </select>
@@ -1083,7 +1083,7 @@ pub fn channel_schedules_card(
                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <label class="form-control w-full">
                                 <div class="label py-1"><span class="text-xs opacity-70">Output Delivery Mode</span></div>
-                                <select name="delivery_mode" class="select select-sm w-full" onchange="toggleScheduleDelivery(this)">
+                                <select name="delivery_mode" class="select select-sm w-full" data-action="toggle-schedule-delivery">
                                     <option value="mailbox_only" selected>Mailbox Only (In-App Review)</option>
                                     <option value="email_participants">Post to Mailbox &amp; Email Participants</option>
                                     <option value="email_custom">Post to Mailbox &amp; Email Custom List</option>

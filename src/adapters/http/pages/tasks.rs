@@ -129,21 +129,21 @@ fn task_filter_bar(
                 <input type="hidden" name="limit" value="{limit}">
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Filter by Channel</label>
-                    <select name="channel_id" onchange="this.form.requestSubmit()"
+                    <select name="channel_id" data-action="submit-form"
                         class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         {wf_options}
                     </select>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Filter by Status</label>
-                    <select name="status" onchange="this.form.requestSubmit()"
+                    <select name="status" data-action="submit-form"
                         class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         {status_options}
                     </select>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Sort by Time</label>
-                    <select name="sort" onchange="this.form.requestSubmit()"
+                    <select name="sort" data-action="submit-form"
                         class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         <option value="desc" {sort_desc_selected}>Newest First</option>
                         <option value="asc" {sort_asc_selected}>Oldest First</option>

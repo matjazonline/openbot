@@ -236,7 +236,7 @@ fn task_menu_entry(list: &TaskMonitorList<'_>, task: &BackgroundTask) -> String 
                         hx-get="/ui/tasks/{task_id}?company_id={company_id}"
                         hx-target="#task-pane" hx-swap="outerHTML"
                         hx-push-url="{push_url}"
-                        onclick="selectSidebarItem(this)">
+                        data-action="select-sidebar-item">
                         <span class="flex w-full items-center gap-2">
                             <span class="badge badge-sm shrink-0 {status_style}">{status_label}</span>
                             <span class="min-w-0 truncate text-xs">{task_type}</span>

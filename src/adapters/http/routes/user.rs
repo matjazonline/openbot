@@ -686,7 +686,7 @@ mod tests {
     #[tokio::test]
     async fn login_page_contains_htmx_attributes() {
         let html = pages::login_page(false, false);
-        assert!(html.contains("htmx.org"));
+        assert!(html.contains("/assets/htmx-2.0.4.min.js"));
         assert!(html.contains("hx-post=\"/api/user/login\""));
         assert!(html.contains("hx-target=\"#response-message\""));
         assert!(!html.contains(">Companies</a>"));
@@ -696,7 +696,7 @@ mod tests {
     #[tokio::test]
     async fn register_page_contains_htmx_attributes() {
         let html = pages::register_page(false, false);
-        assert!(html.contains("htmx.org"));
+        assert!(html.contains("/assets/htmx-2.0.4.min.js"));
         assert!(html.contains("hx-post=\"/api/user/register\""));
         assert!(html.contains("hx-target=\"#response-message\""));
         assert!(!html.contains(">Companies</a>"));

@@ -161,7 +161,7 @@ fn agent_settings_entry(company_id: Uuid, agent: &Agent, selected: bool) -> Stri
                         hx-get="/ui/agents/{agent_id}?company_id={company_id}"
                         hx-target="#agent-pane" hx-swap="outerHTML"
                         hx-push-url="/ui/agents?company_id={company_id}&agent_id={agent_id}"
-                        onclick="selectSidebarItem(this)">
+                        data-action="select-sidebar-item">
                         {avatar}
                         <span class="flex min-w-0 flex-col items-start gap-0.5">
                             <span class="flex w-full items-center gap-2">
@@ -290,9 +290,9 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                 {error_html}
                 <div role="tablist" class="tabs tabs-box mb-4 w-fit">
                     <button type="button" role="tab" id="agent-tab-simple-btn" class="tab {simple_active}"
-                        onclick="showAgentTab(false)">Simple</button>
+                        data-action="show-agent-tab" data-advanced="false">Simple</button>
                     <button type="button" role="tab" id="agent-tab-advanced-btn" class="tab {advanced_active}"
-                        onclick="showAgentTab(true)">Advanced</button>
+                        data-action="show-agent-tab" data-advanced="true">Advanced</button>
                 </div>
                 <form id="agent-tab-simple" class="{simple_hidden} space-y-4"
                     hx-post="/ui/agents?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
@@ -426,7 +426,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                         <div class="label justify-between">
                             <span class="text-xs opacity-70">System Prompt</span>
                             <button type="button" class="btn btn-ghost btn-xs"
-                                onclick="toggleAgentPromptGenerator('{id_prefix}')">{sparkle} Generate with AI</button>
+                                data-action="toggle-agent-prompt" data-prefix="{id_prefix}">{sparkle} Generate with AI</button>
                         </div>
                         {generator}
                         {prompt_textarea}

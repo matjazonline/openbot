@@ -292,7 +292,7 @@ fn member_entry(company: &Company, member: &CompanyMember, selected: bool) -> St
                         hx-get="{endpoint}"
                         hx-target="#team-pane" hx-swap="outerHTML"
                         hx-push-url="{push_url}"
-                        onclick="selectSidebarItem(this)">
+                        data-action="select-sidebar-item">
                         {avatar}
                         <span class="flex min-w-0 flex-col items-start gap-0.5">
                             <span class="flex w-full items-center gap-2">
@@ -328,7 +328,7 @@ fn invite_entry(company_id: Uuid, invite: &CompanyInvite, selected: bool) -> Str
                         hx-get="{endpoint}"
                         hx-target="#team-pane" hx-swap="outerHTML"
                         hx-push-url="{push_url}"
-                        onclick="selectSidebarItem(this)">
+                        data-action="select-sidebar-item">
                         <span class="min-w-0 truncate font-mono text-[13px]">{email}</span>
                         <span class="badge {badge} badge-sm ml-auto shrink-0">{label}</span>
                     </a>
