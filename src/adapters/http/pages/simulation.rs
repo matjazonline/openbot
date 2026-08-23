@@ -540,16 +540,16 @@ fn simulation_routing_report(
         </div>
         "##,
         status_banner = status_banner,
-        provider_str = provider_str,
-        model_str = model_str,
-        api_key_status = api_key_status,
-        to = to,
-        from = from,
-        company_name = company_name,
-        channel_name = channel_name,
-        subject_str = subject_str,
-        body_str = body_str,
-        channel_config_str = channel_config_str,
+        provider_str = super::escape_html_text(provider_str),
+        model_str = super::escape_html_text(model_str),
+        api_key_status = super::escape_html_text(api_key_status),
+        to = super::escape_html_text(to),
+        from = super::escape_html_text(from),
+        company_name = super::escape_html_text(company_name),
+        channel_name = super::escape_html_text(channel_name),
+        subject_str = super::escape_html_text(subject_str),
+        body_str = super::escape_html_text(body_str),
+        channel_config_str = super::escape_html_text(channel_config_str),
     )
 }
 
@@ -783,7 +783,7 @@ pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> Str
                     "##,
             author_glyph = icon(Icon::Hubot, BUTTON_ICON),
             created_at = created_at,
-            msg_id = msg.message_id,
+            msg_id = super::escape_html_text(&msg.message_id),
             body = body,
             markdown_styles = MARKDOWN_CONTENT_STYLES,
             params_html = params_html,
@@ -815,10 +815,10 @@ pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> Str
                     "##,
             author_glyph = icon(Icon::Person, BUTTON_ICON),
             created_at = created_at,
-            sender = msg.sender,
-            msg_id = msg.message_id,
-            subject = msg.subject,
-            body = msg.clean_text_body,
+            sender = super::escape_html_text(&msg.sender),
+            msg_id = super::escape_html_text(&msg.message_id),
+            subject = super::escape_html_text(&msg.subject),
+            body = super::escape_html_text(&msg.clean_text_body),
             params_html = params_html,
         )
     }
@@ -1140,7 +1140,7 @@ pub(crate) fn loaded_thread_overview_card(
             </div>
         </div>
         "##,
-        subject = thread.subject,
+        subject = super::escape_html_text(&thread.subject),
         created_at_fmt = super::format_date_time(thread.created_at),
         updated_at_fmt = super::format_date_time(thread.updated_at),
     )

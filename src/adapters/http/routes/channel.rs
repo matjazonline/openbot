@@ -969,7 +969,7 @@ async fn simulate_channel_handler(
             // Queued like any other message: the worker runs the agent and the view below fills
             // itself in over its own stream.
             let ingest = match thread_use_cases
-                .queue_inbound_for_agent(raw_payload, delivery_for(mode))
+                .queue_authenticated_inbound_for_agent(raw_payload, delivery_for(mode))
                 .await
             {
                 Ok(ingest) => ingest,

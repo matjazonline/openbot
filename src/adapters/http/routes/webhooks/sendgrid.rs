@@ -19,7 +19,7 @@ use tracing::{instrument, warn};
 use crate::{
     adapters::http::app_state::AppState,
     adapters::protocols::email::EmailIngressAdapter,
-    services::email_parser::{RawAttachmentData, RawInboundPayload},
+    services::email_parser::{MAX_INBOUND_MESSAGE_BYTES, RawAttachmentData, RawInboundPayload},
     use_cases::thread::ThreadUseCases,
 };
 
@@ -149,6 +149,9 @@ async fn sendgrid_inbound_webhook(
     }
 
     let raw_mime = raw_mime.ok_or(StatusCode::UNPROCESSABLE_ENTITY)?;
+    if raw_mime.len() > MAX_INBOUND_MESSAGE_BYTES {
+        return Err(StatusCode::PAYLOAD_TOO_LARGE);
+    }
     let sender_ip = sender_ip.ok_or(StatusCode::UNPROCESSABLE_ENTITY)?;
     let envelope_from = raw_payload.from.clone();
     let envelope_to = raw_payload.to.clone();

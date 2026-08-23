@@ -63,6 +63,18 @@ struct InternalChannelSource {
     channel_id: Uuid,
 }
 
+/// Where an inbound-shaped message entered the application.
+///
+/// Mailbox and simulation messages are authorized by the signed-in HTTP route, so they have no
+/// meaningful DMARC result. Keeping that fact separate from [`AuthVerdict::Pass`] prevents a
+/// synthetic application message from masquerading as externally authenticated email.
+#[derive(Clone, Copy)]
+enum InboundOrigin {
+    ExternalEmail,
+    AuthenticatedApplication,
+    InternalChannel,
+}
+
 #[async_trait]
 pub trait ThreadPersistence: Send + Sync {
     async fn create_thread(
@@ -430,6 +442,7 @@ impl ThreadUseCases {
                 company_id: company.id,
                 channel_id: source_channel_id,
             }),
+            InboundOrigin::InternalChannel,
             ingest::ReplyDelivery::Send,
         )
         .await
@@ -491,12 +504,17 @@ impl ThreadUseCases {
         Ok(())
     }
 
-    /// Take in a message composed in the mailbox and queue its agent run.
+    /// Take in a message from an authenticated application route and queue its agent run.
     ///
     /// Returns as soon as the message is committed. The worker picks the task up on its next poll
     /// and the reply reaches the open thread over the message stream — the same route every piece
     /// of real inbound mail already takes.
-    pub async fn queue_inbound_for_agent(
+    ///
+    /// This skips DMARC because there is no email transport at this boundary. Callers must derive
+    /// the sender from the authenticated account and authorize the requested company/channel (and
+    /// thread, for replies) before calling. Ingest still enforces channel participant access so a
+    /// fabricated sender or recipient is not accepted merely because this method was selected.
+    pub(crate) async fn queue_authenticated_inbound_for_agent(
         &self,
         raw_payload: RawInboundPayload,
         delivery: ReplyDelivery,

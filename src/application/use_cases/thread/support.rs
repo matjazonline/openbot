@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-use super::{InboundIngestResult, InternalChannelSource, ThreadUseCases};
+use super::{InboundIngestResult, InboundOrigin, InternalChannelSource, ThreadUseCases};
 
 /// Memoized directory lookups for a single ingest run.
 ///
@@ -149,6 +149,7 @@ pub(super) fn thread_index_of(parsed: &ParsedEmail) -> Option<ThreadIndex> {
 pub(super) fn check_inbound_guards(
     parsed: &ParsedEmail,
     internal_source: Option<InternalChannelSource>,
+    origin: InboundOrigin,
 ) -> Option<InboundIngestResult> {
     let is_inter_channel = internal_source.is_some();
 
@@ -161,7 +162,7 @@ pub(super) fn check_inbound_guards(
     }
 
     // Trusted internal transport is authenticated by channel identity, not by SPF/DKIM/DMARC.
-    if !is_inter_channel {
+    if !is_inter_channel && matches!(origin, InboundOrigin::ExternalEmail) {
         if external_dmarc_rejection(parsed.dmarc_status).is_some() {
             tracing::warn!(sender = %parsed.sender, verdict = ?parsed.dmarc_status,
                 "External message rejected because DMARC did not pass");

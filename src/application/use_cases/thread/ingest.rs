@@ -40,8 +40,8 @@ use crate::{
 
 use super::{
     BounceInfo, BounceSuggestion, ChannelDirectoryEntry, ChannelMatch, EmailIngressAdapter,
-    InboundIngestResult, InternalChannelSource, MAX_THREAD_MESSAGES_PER_HOUR, RecipientRole,
-    ThreadUseCases, durable_ingest_payload, format_help_email_body,
+    InboundIngestResult, InboundOrigin, InternalChannelSource, MAX_THREAD_MESSAGES_PER_HOUR,
+    RecipientRole, ThreadUseCases, durable_ingest_payload, format_help_email_body,
     support::{
         DirectoryCache, body_mentions_email, body_mentions_slug, build_prompt_text,
         check_inbound_guards, parsed_email_from_normalized, reference_ids, strip_quoted_history,
@@ -206,8 +206,13 @@ impl ThreadUseCases {
         &self,
         norm: NormalizedInboundMessage,
     ) -> AppResult<InboundIngestResult> {
-        self.ingest_normalized_message_with_source(norm, None, ReplyDelivery::Send)
-            .await
+        self.ingest_normalized_message_with_source(
+            norm,
+            None,
+            InboundOrigin::ExternalEmail,
+            ReplyDelivery::Send,
+        )
+        .await
     }
 
     /// Ingest a message composed in the mailbox, which may ask for its reply to stay in-app.
@@ -219,14 +224,20 @@ impl ThreadUseCases {
         let norm =
             EmailIngressAdapter::parse_and_store(raw_payload, &self.config, self.file_storage())
                 .await;
-        self.ingest_normalized_message_with_source(norm, None, delivery)
-            .await
+        self.ingest_normalized_message_with_source(
+            norm,
+            None,
+            InboundOrigin::AuthenticatedApplication,
+            delivery,
+        )
+        .await
     }
 
     pub(super) async fn ingest_normalized_message_with_source(
         &self,
         norm: NormalizedInboundMessage,
         internal_source: Option<InternalChannelSource>,
+        origin: InboundOrigin,
         delivery: ReplyDelivery,
     ) -> AppResult<InboundIngestResult> {
         let mut parsed = parsed_email_from_normalized(&norm);
@@ -235,7 +246,7 @@ impl ThreadUseCases {
             parsed.message_id, parsed.sender, parsed.recipients_to
         );
 
-        if let Some(rejection) = check_inbound_guards(&parsed, internal_source) {
+        if let Some(rejection) = check_inbound_guards(&parsed, internal_source, origin) {
             return Ok(rejection);
         }
 

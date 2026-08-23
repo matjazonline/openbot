@@ -2,9 +2,12 @@ use mail_parser::MimeHeaders;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use std::time::{Duration, Instant};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Semaphore;
+use tokio::task::JoinSet;
+use tokio::time::timeout;
 use tracing::{error, info, warn};
 
 use crate::{
@@ -15,7 +18,9 @@ use crate::{
     entities::auth::AuthVerdict,
     entities::company_member::CompanyMembership,
     infra::config::AppConfig,
-    services::email_parser::{RawAttachmentData, RawInboundPayload, extract_email},
+    services::email_parser::{
+        MAX_INBOUND_MESSAGE_BYTES, RawAttachmentData, RawInboundPayload, extract_email,
+    },
 };
 
 static MAIL_FROM_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
@@ -23,6 +28,16 @@ static MAIL_FROM_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::ne
 });
 static RCPT_TO_RE: std::sync::LazyLock<regex::Regex> =
     std::sync::LazyLock::new(|| regex::Regex::new(r"(?i)to:\s*<([^>]+)>|to:\s*([^\s]+)").unwrap());
+
+const MAX_COMMAND_LINE_BYTES: usize = 512;
+const MAX_DATA_LINE_BYTES: usize = 1_000;
+const MAX_RECIPIENTS: usize = 100;
+const MAX_COMMANDS: usize = 1_000;
+const MAX_CONNECTIONS: usize = 256;
+const COMMAND_TIMEOUT: Duration = Duration::from_secs(60);
+const DATA_TIMEOUT: Duration = Duration::from_secs(300);
+const SESSION_TIMEOUT: Duration = Duration::from_secs(600);
+const DNS_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, PartialEq, Eq)]
 enum SmtpState {
@@ -87,6 +102,7 @@ pub struct SmtpServer {
     /// scaling out quietly loosens the effective limit. Enforcing a true global cap would require
     /// moving this to shared storage (Postgres or Redis) and paying a round trip per connection.
     active_conns: Arc<RwLock<HashMap<IpAddr, usize>>>,
+    connection_slots: Arc<Semaphore>,
 }
 
 impl SmtpServer {
@@ -96,6 +112,7 @@ impl SmtpServer {
             config,
             monitoring: None,
             active_conns: Arc::new(RwLock::new(HashMap::new())),
+            connection_slots: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
         }
     }
 
@@ -128,13 +145,20 @@ impl SmtpServer {
 
         info!("Incoming SMTP server listening on {addr}");
 
+        let mut connections = JoinSet::new();
         loop {
             tokio::select! {
                 res = listener.accept() => {
                     match res {
                         Ok((stream, peer_addr)) => {
+                            let Ok(slot) = self.connection_slots.clone().try_acquire_owned() else {
+                                let mut stream = stream;
+                                let _ = stream.write_all(b"421 4.3.2 Server busy, try again later\r\n").await;
+                                continue;
+                            };
                             let server = self.clone();
-                            tokio::spawn(async move {
+                            connections.spawn(async move {
+                                let _slot = slot;
                                 if let Err(err) = server.handle_connection(stream, peer_addr).await {
                                     warn!("Error handling SMTP connection from {peer_addr}: {err}");
                                 }
@@ -149,11 +173,28 @@ impl SmtpServer {
                     info!("Shutting down incoming SMTP server listener...");
                     break;
                 }
+                Some(result) = connections.join_next(), if !connections.is_empty() => {
+                    if let Err(error) = result {
+                        warn!(%error, "SMTP connection task failed");
+                    }
+                }
             }
         }
+        connections.abort_all();
+        while connections.join_next().await.is_some() {}
     }
 
     async fn handle_connection(
+        &self,
+        stream: TcpStream,
+        peer_addr: std::net::SocketAddr,
+    ) -> anyhow::Result<()> {
+        timeout(SESSION_TIMEOUT, self.handle_session(stream, peer_addr))
+            .await
+            .map_err(|_| anyhow::anyhow!("SMTP session timed out"))?
+    }
+
+    async fn handle_session(
         &self,
         mut stream: TcpStream,
         peer_addr: std::net::SocketAddr,
@@ -180,17 +221,46 @@ impl SmtpServer {
 
         let mut state = SmtpState::Command;
         let mut session = SmtpSession::default();
-        let mut line_buf = String::new();
+        let mut command_count = 0usize;
 
         loop {
-            line_buf.clear();
-            if reader.read_line(&mut line_buf).await? == 0 {
+            let (line_limit, wait) = match state {
+                SmtpState::Command => (MAX_COMMAND_LINE_BYTES, COMMAND_TIMEOUT),
+                SmtpState::Data => (MAX_DATA_LINE_BYTES, DATA_TIMEOUT),
+            };
+            let line = match timeout(wait, read_limited_line(&mut reader, line_limit)).await {
+                Err(_) => {
+                    writer
+                        .write_all(b"421 4.4.2 Timeout waiting for input\r\n")
+                        .await?;
+                    break;
+                }
+                Ok(Err(LineReadError::TooLong)) => {
+                    writer.write_all(b"500 5.2.3 Line too long\r\n").await?;
+                    break;
+                }
+                Ok(Err(LineReadError::Io(error))) => return Err(error.into()),
+                Ok(Ok(line)) => line,
+            };
+            if line.is_empty() {
                 break; // Connection closed
             }
-            let trimmed = line_buf.trim_end_matches(['\r', '\n']);
+            let trimmed = line.strip_suffix(b"\n").unwrap_or(&line);
+            let trimmed = trimmed.strip_suffix(b"\r").unwrap_or(trimmed);
 
             match state {
                 SmtpState::Command => {
+                    command_count += 1;
+                    if command_count > MAX_COMMANDS {
+                        writer.write_all(b"421 4.5.3 Too many commands\r\n").await?;
+                        break;
+                    }
+                    let Ok(trimmed) = std::str::from_utf8(trimmed) else {
+                        writer
+                            .write_all(b"500 5.5.2 Command must be ASCII\r\n")
+                            .await?;
+                        continue;
+                    };
                     let outcome = self
                         .handle_command(trimmed, &mut session, &mut writer, peer_addr, start_time)
                         .await?;
@@ -202,18 +272,36 @@ impl SmtpServer {
                     }
                 }
                 SmtpState::Data => {
-                    if trimmed == "." {
-                        self.finish_data_transaction(
-                            &mut session,
-                            &mut writer,
-                            peer_addr,
-                            start_time,
+                    if trimmed == b"." {
+                        match timeout(
+                            DATA_TIMEOUT,
+                            self.finish_data_transaction(
+                                &mut session,
+                                &mut writer,
+                                peer_addr,
+                                start_time,
+                            ),
                         )
-                        .await?;
+                        .await
+                        {
+                            Ok(result) => result?,
+                            Err(_) => {
+                                writer
+                                    .write_all(b"451 4.4.2 Message processing timed out\r\n")
+                                    .await?
+                            }
+                        }
                         session.reset_transaction();
                         state = SmtpState::Command;
                     } else {
-                        session.push_data_line(&line_buf);
+                        if !session.push_data_line(&line) {
+                            writer
+                                .write_all(
+                                    b"552 5.3.4 Message exceeds fixed maximum message size\r\n",
+                                )
+                                .await?;
+                            break;
+                        }
                     }
                 }
             }
@@ -265,7 +353,11 @@ impl SmtpServer {
         };
 
         if self.config.dnsbl_enabled
-            && let Some(rbl) = check_dnsbl(client_ip, &self.config.dnsbl_servers).await
+            && let Ok(Some(rbl)) = timeout(
+                DNS_TIMEOUT,
+                check_dnsbl(client_ip, &self.config.dnsbl_servers),
+            )
+            .await
         {
             warn!("Connection from {} blocked by DNSBL {}", client_ip, rbl);
             self.record_connection(client_ip, SmtpStatus::BlockedDnsbl, start_time, None, None);
@@ -324,13 +416,21 @@ impl SmtpServer {
                     session.ehlo_domain = Some(arg.to_string());
                 }
                 let resp = format!(
-                    "250-{} Hello {}\r\n250-SIZE 20971520\r\n250 OK\r\n",
-                    self.config.app_domain_name, client_ip
+                    "250-{} Hello {}\r\n250-SIZE {}\r\n250 OK\r\n",
+                    self.config.app_domain_name, client_ip, MAX_INBOUND_MESSAGE_BYTES
                 );
                 writer.write_all(resp.as_bytes()).await?;
             }
             "MAIL" => match extract_command_address(&MAIL_FROM_RE, arg) {
                 Some(address) => {
+                    if declared_message_size(arg)
+                        .is_some_and(|size| size > MAX_INBOUND_MESSAGE_BYTES)
+                    {
+                        writer
+                            .write_all(b"552 5.3.4 Message exceeds fixed maximum message size\r\n")
+                            .await?;
+                        return Ok(CommandOutcome::Continue);
+                    }
                     session.mailfrom = Some(address);
                     writer.write_all(b"250 2.1.0 Ok\r\n").await?;
                 }
@@ -348,6 +448,12 @@ impl SmtpServer {
                 } else {
                     match extract_command_address(&RCPT_TO_RE, arg) {
                         Some(address) => {
+                            if session.rcpts.len() >= MAX_RECIPIENTS {
+                                writer
+                                    .write_all(b"452 4.5.3 Too many recipients\r\n")
+                                    .await?;
+                                return Ok(CommandOutcome::Continue);
+                            }
                             session.rcpts.push(address);
                             writer.write_all(b"250 2.1.5 Ok\r\n").await?;
                         }
@@ -402,14 +508,14 @@ impl SmtpServer {
     ) -> anyhow::Result<()> {
         let client_ip = peer_addr.ip();
         let auth = verify_email_authentication(
-            session.data_buffer.as_bytes(),
+            &session.data_buffer,
             session.mailfrom.as_deref(),
             client_ip,
         )
         .await;
 
         let mut raw_payload = parse_raw_mime_to_payload(
-            session.data_buffer.as_bytes(),
+            &session.data_buffer,
             session.mailfrom.as_deref(),
             session.rcpts.first().map(|s| s.as_str()),
             &session.rcpts,
@@ -447,14 +553,8 @@ impl SmtpServer {
                         .write_all(b"250 2.0.0 Message queued for delivery\r\n")
                         .await?;
                 } else {
-                    // Bounces go out on their own task so a slow SMTP send can't stall this reply.
-                    let thread_use_cases_bg = self.thread_use_cases.clone();
-                    let ingest_bg = ingest.clone();
-                    tokio::spawn(async move {
-                        thread_use_cases_bg.handle_bounce_dispatch(&ingest_bg).await;
-                    });
                     let msg = format!(
-                        "250 2.0.0 Message processed ({})\r\n",
+                        "550 5.7.1 Message rejected ({})\r\n",
                         ingest.reason.as_deref().unwrap_or("ok")
                     );
                     writer.write_all(msg.as_bytes()).await?;
@@ -524,7 +624,7 @@ impl SmtpServer {
         let scanner = crate::services::spam_scanner::SpamScannerService::new(self.config.clone());
         let scan_res = scanner
             .scan(
-                session.data_buffer.as_bytes(),
+                &session.data_buffer,
                 raw_payload.subject.as_deref(),
                 Some(&raw_payload.from),
                 raw_payload.text.as_deref(),
@@ -566,7 +666,7 @@ struct SmtpSession {
     ehlo_domain: Option<String>,
     mailfrom: Option<String>,
     rcpts: Vec<String>,
-    data_buffer: String,
+    data_buffer: Vec<u8>,
 }
 
 impl SmtpSession {
@@ -577,15 +677,50 @@ impl SmtpSession {
         self.data_buffer.clear();
     }
 
-    fn push_data_line(&mut self, raw_line: &str) {
+    fn push_data_line(&mut self, raw_line: &[u8]) -> bool {
         // Dot un-stuffing per RFC 5321.
-        let line = if raw_line.starts_with("..") {
+        let line = if raw_line.starts_with(b"..") {
             &raw_line[1..]
         } else {
             raw_line
         };
-        self.data_buffer.push_str(line);
+        if self.data_buffer.len().saturating_add(line.len()) > MAX_INBOUND_MESSAGE_BYTES {
+            return false;
+        }
+        self.data_buffer.extend_from_slice(line);
+        true
     }
+}
+
+#[derive(Debug)]
+enum LineReadError {
+    Io(std::io::Error),
+    TooLong,
+}
+
+async fn read_limited_line<R: AsyncBufRead + Unpin>(
+    reader: &mut R,
+    max_bytes: usize,
+) -> Result<Vec<u8>, LineReadError> {
+    let mut line = Vec::with_capacity(max_bytes.min(1024));
+    let read = reader
+        .take((max_bytes + 1) as u64)
+        .read_until(b'\n', &mut line)
+        .await
+        .map_err(LineReadError::Io)?;
+    if read > max_bytes || (read == max_bytes && !line.ends_with(b"\n")) {
+        return Err(LineReadError::TooLong);
+    }
+    Ok(line)
+}
+
+fn declared_message_size(argument: &str) -> Option<usize> {
+    argument.split_ascii_whitespace().find_map(|part| {
+        let (name, value) = part.split_once('=')?;
+        name.eq_ignore_ascii_case("SIZE")
+            .then(|| value.parse().ok())
+            .flatten()
+    })
 }
 
 /// What the command loop should do after one verb.
@@ -826,6 +961,44 @@ pub fn parse_raw_mime_to_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn smtp_line_limits_accept_boundary_and_reject_one_over() {
+        let mut at_limit = vec![b'a'; MAX_COMMAND_LINE_BYTES];
+        at_limit[MAX_COMMAND_LINE_BYTES - 1] = b'\n';
+        let mut reader = BufReader::new(at_limit.as_slice());
+        assert_eq!(
+            read_limited_line(&mut reader, MAX_COMMAND_LINE_BYTES)
+                .await
+                .unwrap()
+                .len(),
+            MAX_COMMAND_LINE_BYTES
+        );
+
+        let over_limit = vec![b'a'; MAX_COMMAND_LINE_BYTES + 1];
+        let mut reader = BufReader::new(over_limit.as_slice());
+        assert!(matches!(
+            read_limited_line(&mut reader, MAX_COMMAND_LINE_BYTES).await,
+            Err(LineReadError::TooLong)
+        ));
+    }
+
+    #[test]
+    fn declared_size_and_streamed_data_share_the_twenty_mib_limit() {
+        assert_eq!(
+            declared_message_size("FROM:<sender@example.com> SIZE=20971520"),
+            Some(MAX_INBOUND_MESSAGE_BYTES)
+        );
+        assert_eq!(
+            declared_message_size("FROM:<sender@example.com> size=20971521"),
+            Some(MAX_INBOUND_MESSAGE_BYTES + 1)
+        );
+
+        let mut session = SmtpSession::default();
+        session.data_buffer = vec![b'x'; MAX_INBOUND_MESSAGE_BYTES - 1];
+        assert!(session.push_data_line(b"x"));
+        assert!(!session.push_data_line(b"y"));
+    }
     use async_trait::async_trait;
     use chrono::Utc;
     use mail_auth::common::verify::VerifySignature;
@@ -1417,7 +1590,11 @@ mod tests {
         writer.write_all(email_data).await.unwrap();
         writer.flush().await.unwrap();
         buf_reader.read_line(&mut response).await.unwrap();
-        assert!(response.contains("250"));
+        assert!(
+            response.starts_with("550 5.7.1"),
+            "unexpected SMTP response: {response:?}"
+        );
+        assert!(response.contains("DMARC authentication did not pass"));
 
         // QUIT
         response.clear();
@@ -1636,7 +1813,11 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         writer.flush().await.unwrap();
         response.clear();
         buf_reader.read_line(&mut response).await.unwrap();
-        assert!(response.contains("250"));
+        assert!(
+            response.starts_with("550 5.7.1"),
+            "unexpected SMTP response: {response:?}"
+        );
+        assert!(response.contains("DMARC authentication did not pass"));
 
         writer.write_all(b"QUIT\r\n").await.unwrap();
         writer.flush().await.unwrap();

@@ -10,6 +10,7 @@ use lettre::{
     transport::smtp::authentication::Credentials,
 };
 use sha2::{Digest, Sha256};
+use std::time::Duration;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -202,17 +203,7 @@ impl OutboundDispatcher {
             ))
             .map_err(|e| AppError::Internal(format!("Failed to build confirmation email: {e}")))?;
 
-        let mut transport = AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_host)
-            .map_err(|e| AppError::Internal(format!("Invalid SMTP host: {e}")))?
-            .port(config.smtp_port);
-        if !config.smtp_username.is_empty() {
-            transport = transport.credentials(Credentials::new(
-                config.smtp_username.clone(),
-                config.smtp_password.clone(),
-            ));
-        }
-        transport
-            .build()
+        smtp_transport(config)?
             .send(message)
             .await
             .map_err(|e| AppError::Internal(format!("SMTP dispatch failed: {e}")))?;
@@ -398,19 +389,7 @@ impl OutboundDispatcher {
 
         // If SMTP credentials/host configured, dispatch via SMTP; otherwise log
         if !config.smtp_host.is_empty() && config.smtp_host != "localhost" {
-            let mut transport_builder =
-                AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_host)
-                    .map_err(|e| AppError::Internal(format!("Invalid SMTP host: {}", e)))?
-                    .port(config.smtp_port);
-
-            if !config.smtp_username.is_empty() {
-                transport_builder = transport_builder.credentials(Credentials::new(
-                    config.smtp_username.clone(),
-                    config.smtp_password.clone(),
-                ));
-            }
-
-            let transport = transport_builder.build();
+            let transport = smtp_transport(config)?;
             match transport.send(lettre_msg).await {
                 Ok(_) => {
                     info!("Successfully dispatched outbound SMTP email for thread");
@@ -544,22 +523,13 @@ impl OutboundDispatcher {
             AppError::Internal(format!("Failed to build system email message: {}", e))
         })?;
 
-        if !config.smtp_host.is_empty() {
-            let mut mailer_builder =
-                AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&config.smtp_host)
-                    .port(config.smtp_port);
-
-            if !config.smtp_username.is_empty() {
-                mailer_builder = mailer_builder.credentials(Credentials::new(
-                    config.smtp_username.clone(),
-                    config.smtp_password.clone(),
-                ));
-            }
-
-            let mailer = mailer_builder.build();
-            if let Err(err) = mailer.send(email_msg).await {
-                warn!("Failed to dispatch system email via SMTP: {err}");
-            }
+        if !config.smtp_host.is_empty() && config.smtp_host != "localhost" {
+            smtp_transport(config)?
+                .send(email_msg)
+                .await
+                .map_err(|err| {
+                    AppError::Internal(format!("Failed to dispatch system email via SMTP: {err}"))
+                })?;
         }
 
         Ok(SentEmailResult {
@@ -577,6 +547,20 @@ impl OutboundDispatcher {
             trace_channels: Vec::new(),
         })
     }
+}
+
+fn smtp_transport(config: &AppConfig) -> AppResult<AsyncSmtpTransport<Tokio1Executor>> {
+    let mut builder = AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_host)
+        .map_err(|error| AppError::Internal(format!("Invalid SMTP host: {error}")))?
+        .port(config.smtp_port)
+        .timeout(Some(Duration::from_secs(30)));
+    if !config.smtp_username.is_empty() {
+        builder = builder.credentials(Credentials::new(
+            config.smtp_username.clone(),
+            config.smtp_password.clone(),
+        ));
+    }
+    Ok(builder.build())
 }
 
 #[cfg(test)]

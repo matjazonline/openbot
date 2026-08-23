@@ -398,6 +398,7 @@ const BADGE_TOKENS: &str =
 
 /// One summary chip above the raw task payload.
 fn badge(style: &str, label: impl std::fmt::Display) -> String {
+    let label = super::escape_html_text(&label.to_string());
     format!(r#"<span class="px-2 py-0.5 rounded text-[11px] font-mono {style}">{label}</span>"#)
 }
 

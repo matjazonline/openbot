@@ -543,7 +543,7 @@ async fn reply_in_thread(
 
     let ingest = workspace
         .thread_use_cases
-        .queue_inbound_for_agent(payload, ReplyDelivery::InAppOnly)
+        .queue_authenticated_inbound_for_agent(payload, ReplyDelivery::InAppOnly)
         .await?;
 
     if ingest.thread.is_none() {

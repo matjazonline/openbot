@@ -8,6 +8,8 @@ use crate::entities::{auth::AuthVerdict, message::AttachmentMetadata, value_obje
 use serde::{Deserialize, Serialize};
 
 pub const MAX_CHANNEL_HOPS: u32 = 5;
+/// Maximum untouched RFC 5322 message accepted by every public mail ingress.
+pub const MAX_INBOUND_MESSAGE_BYTES: usize = 20 * 1024 * 1024;
 pub const RESERVED_CONTEXT_SUFFIXES: &[&str] = &["noagent", "quiet", "message", "msg", "na"];
 
 /// Inline images below this size are treated as signature/decoration rather than content, and are

@@ -3643,6 +3643,56 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
     (thread_use_cases, channel_id)
 }
 
+#[tokio::test]
+async fn authenticated_application_message_does_not_require_dmarc() {
+    let (use_cases, _) = use_cases_with_channel(TestChannel::default());
+    let result = use_cases
+        .queue_authenticated_inbound_for_agent(
+            RawInboundPayload {
+                to: "support@acme.mailagents.com".to_string(),
+                from: "team@acme.com".to_string(),
+                subject: Some("Mailbox message".to_string()),
+                text: Some("Sent by a signed-in user".to_string()),
+                spf: crate::entities::auth::AuthVerdict::Unknown,
+                dkim: crate::entities::auth::AuthVerdict::Unknown,
+                dmarc: crate::entities::auth::AuthVerdict::Unknown,
+                ..Default::default()
+            },
+            ReplyDelivery::InAppOnly,
+        )
+        .await
+        .unwrap();
+
+    assert!(result.accepted, "{:?}", result.reason);
+}
+
+#[tokio::test]
+async fn authenticated_application_origin_does_not_bypass_participant_authorization() {
+    let (use_cases, _) = use_cases_with_channel(TestChannel::default());
+    let result = use_cases
+        .queue_authenticated_inbound_for_agent(
+            RawInboundPayload {
+                // Treat every payload field as hostile even though the HTTP route normally derives
+                // this value from the authenticated account.
+                to: "support@acme.mailagents.com".to_string(),
+                from: "fabricated-attacker@example.net".to_string(),
+                subject: Some("Forged mailbox message".to_string()),
+                text: Some("Try to cross the channel boundary".to_string()),
+                dmarc: crate::entities::auth::AuthVerdict::Unknown,
+                ..Default::default()
+            },
+            ReplyDelivery::InAppOnly,
+        )
+        .await
+        .unwrap();
+
+    assert!(!result.accepted);
+    assert_eq!(
+        result.reason.as_deref(),
+        Some("Sender unauthorized for channel")
+    );
+}
+
 /// A message from a team member that copies someone outside the platform.
 fn message_to_support_cc_outsider() -> RawInboundPayload {
     RawInboundPayload {
@@ -4615,7 +4665,12 @@ async fn an_agent_cannot_use_help_to_enumerate_its_company() {
     };
 
     let result = use_cases
-        .ingest_normalized_message_with_source(norm, Some(source), ReplyDelivery::Send)
+        .ingest_normalized_message_with_source(
+            norm,
+            Some(source),
+            InboundOrigin::InternalChannel,
+            ReplyDelivery::Send,
+        )
         .await
         .unwrap();
 

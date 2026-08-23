@@ -920,7 +920,7 @@ async fn create_thread(
         ..Default::default()
     };
     let ingest = match thread_use_cases
-        .queue_inbound_for_agent(payload, delivery_mode(deliver))
+        .queue_authenticated_inbound_for_agent(payload, delivery_mode(deliver))
         .await
     {
         Ok(ingest) => ingest,
@@ -1066,7 +1066,7 @@ async fn send_reply(
     };
 
     let ingest = match thread_use_cases
-        .queue_inbound_for_agent(payload, delivery_mode(deliver))
+        .queue_authenticated_inbound_for_agent(payload, delivery_mode(deliver))
         .await
     {
         Ok(ingest) => ingest,
