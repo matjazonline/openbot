@@ -1809,7 +1809,13 @@ async fn insert_task(
     let source_message_id = payload
         .pointer("/inbound_message/message_id")
         .and_then(Value::as_str)
-        .map(str::to_owned);
+        .map(str::to_owned)
+        .or_else(|| {
+            payload
+                .get("schedule_run_id")
+                .and_then(Value::as_str)
+                .map(|id| format!("schedule-run:{id}"))
+        });
     let targets = task_targets(&payload, company_id, channel_id, thread_id)?;
     let db = sqlx::query_as::<_, BackgroundTaskDb>(
         r#"INSERT INTO background_tasks (

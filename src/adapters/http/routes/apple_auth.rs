@@ -27,6 +27,8 @@ use crate::{
     use_cases::user::{ExternalIdentity, LoginMethod, UserUseCases},
 };
 
+use super::user::SIGNED_IN_LANDING;
+
 const APPLE_FLOW_COOKIE: &str = "apple_oauth_transaction";
 
 #[derive(Clone, Copy)]
@@ -184,7 +186,7 @@ async fn callback(
             .into_response(),
         Ok((user, _)) => (
             cleared.add(sessions.cookie(user.id)),
-            Redirect::temporary("/ui"),
+            Redirect::temporary(SIGNED_IN_LANDING),
         )
             .into_response(),
         Err(error) => (

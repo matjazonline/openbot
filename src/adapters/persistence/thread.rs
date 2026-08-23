@@ -204,6 +204,68 @@ impl ThreadPersistence for PostgresPersistence {
             .ok_or_else(|| AppError::Internal("Created thread was not found".into()))
     }
 
+    async fn ensure_schedule_run_thread(
+        &self,
+        run_id: Uuid,
+        channel_id: Uuid,
+        subject: &str,
+        participant_emails: &[EmailAddress],
+    ) -> AppResult<Thread> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let run: Option<(Option<Uuid>,)> =
+            sqlx::query_as("SELECT thread_id FROM schedule_runs WHERE id = $1 FOR UPDATE")
+                .bind(run_id)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+        let (existing,) =
+            run.ok_or_else(|| AppError::Internal("Durable schedule run was not found".into()))?;
+
+        if let Some(thread_id) = existing {
+            tx.commit().await.map_err(AppError::from)?;
+            return load_thread(&self.pool, thread_id).await?.ok_or_else(|| {
+                AppError::Internal("Durable schedule run references a missing thread".into())
+            });
+        }
+
+        let id = Uuid::new_v4();
+        let inserted = sqlx::query(
+            r#"INSERT INTO threads (id, company_id, channel_id, subject)
+               SELECT $1, company_id, id, $3 FROM channels WHERE id = $2"#,
+        )
+        .bind(id)
+        .bind(channel_id)
+        .bind(subject)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        if inserted.rows_affected() == 0 {
+            return Err(AppError::Internal("Channel not found".into()));
+        }
+
+        for email in normalized_participants(participant_emails) {
+            sqlx::query("INSERT INTO thread_participants (thread_id, email) VALUES ($1, $2)")
+                .bind(id)
+                .bind(email)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+        }
+        sqlx::query(
+            "UPDATE schedule_runs SET thread_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+        )
+        .bind(run_id)
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        tx.commit().await.map_err(AppError::from)?;
+
+        load_thread(&self.pool, id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Created thread was not found".into()))
+    }
+
     async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>> {
         load_thread(&self.pool, id).await
     }

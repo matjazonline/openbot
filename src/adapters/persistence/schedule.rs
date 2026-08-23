@@ -9,8 +9,8 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         schedule::{
-            ChannelSchedule, ScheduleDeliveryMode, ScheduleRun, ScheduleTimezone, ScheduleType,
-            ScheduleWrite,
+            ChannelSchedule, ClaimedScheduleRun, ScheduleDeliveryMode, ScheduleRun,
+            ScheduleTimezone, ScheduleType, ScheduleWrite,
         },
         task::TaskStatus,
         value_objects::EmailAddress,
@@ -95,6 +95,32 @@ pub struct ScheduleRunDb {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(FromRow, Debug)]
+struct ClaimedScheduleRunDb {
+    id: Uuid,
+    scheduled_for: DateTime<Utc>,
+    schedule_snapshot: serde_json::Value,
+    thread_id: Option<Uuid>,
+    task_id: Option<Uuid>,
+}
+
+impl TryFrom<ClaimedScheduleRunDb> for ClaimedScheduleRun {
+    type Error = AppError;
+
+    fn try_from(db: ClaimedScheduleRunDb) -> AppResult<Self> {
+        let schedule = serde_json::from_value(db.schedule_snapshot).map_err(|err| {
+            AppError::Internal(format!("Invalid durable schedule-run snapshot: {err}"))
+        })?;
+        Ok(Self {
+            id: db.id,
+            scheduled_for: db.scheduled_for,
+            schedule,
+            thread_id: db.thread_id,
+            task_id: db.task_id,
+        })
+    }
+}
+
 impl TryFrom<ScheduleRunDb> for ScheduleRun {
     type Error = AppError;
 
@@ -173,8 +199,20 @@ pub trait SchedulePersistence: Send + Sync {
 
     async fn set_enabled(&self, id: Uuid, enabled: bool) -> AppResult<bool>;
 
-    /// Claims due schedules and advances their `next_run_at` in a single atomic transaction.
-    async fn claim_and_advance_due_schedules(&self, limit: i64) -> AppResult<Vec<ChannelSchedule>>;
+    /// Persists each logical slot and advances its schedule in one transaction. Previously
+    /// persisted, unfinished slots are returned as well so a process restart resumes them.
+    async fn claim_and_advance_due_schedules(
+        &self,
+        limit: i64,
+    ) -> AppResult<Vec<ClaimedScheduleRun>>;
+
+    async fn record_run_task(&self, _run_id: Uuid, _task_id: Uuid) -> AppResult<()> {
+        Ok(())
+    }
+
+    async fn record_run_error(&self, _run_id: Uuid, _error: &str) -> AppResult<()> {
+        Ok(())
+    }
 
     /// Updates `last_run_at` on a manual "run now" execution.
     async fn record_manual_run(&self, id: Uuid) -> AppResult<Option<ChannelSchedule>>;
@@ -361,47 +399,118 @@ impl SchedulePersistence for PostgresPersistence {
         Ok(result.rows_affected() == 1)
     }
 
-    async fn claim_and_advance_due_schedules(&self, limit: i64) -> AppResult<Vec<ChannelSchedule>> {
-        let rows = sqlx::query_as::<_, ScheduleDb>(&format!(
-            r#"WITH claimable AS (
-                   SELECT id AS claimed_id
+    async fn claim_and_advance_due_schedules(
+        &self,
+        limit: i64,
+    ) -> AppResult<Vec<ClaimedScheduleRun>> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let due = sqlx::query_as::<_, ScheduleDb>(&format!(
+            r#"SELECT {SCHEDULE_COLUMNS}
                    FROM channel_schedules
                    WHERE enabled = true AND next_run_at IS NOT NULL AND next_run_at <= CURRENT_TIMESTAMP
                    ORDER BY next_run_at, id
                    FOR UPDATE SKIP LOCKED
-                   LIMIT $1
-               )
-               UPDATE channel_schedules AS s
+                   LIMIT $1"#
+        ))
+        .bind(limit.max(1))
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+
+        for db in due {
+            let schedule: ChannelSchedule = db.try_into()?;
+            let scheduled_for = schedule
+                .next_run_at
+                .ok_or_else(|| AppError::Internal("Claimed schedule had no due slot".into()))?;
+            let snapshot = serde_json::to_value(&schedule).map_err(|err| {
+                AppError::Internal(format!("Failed to encode schedule-run snapshot: {err}"))
+            })?;
+
+            sqlx::query(
+                r#"INSERT INTO schedule_runs (id, schedule_id, scheduled_for, schedule_snapshot)
+                   VALUES ($1, $2, $3, $4)
+                   ON CONFLICT (schedule_id, scheduled_for) DO NOTHING"#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(schedule.id)
+            .bind(scheduled_for)
+            .bind(snapshot)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+
+            sqlx::query(
+                r#"UPDATE channel_schedules AS schedule
                SET last_run_at = CURRENT_TIMESTAMP,
                    -- Step from the slot that was due, not from now, so a run never drifts later
                    -- than its slot. The arithmetic happens in the schedule's own zone so a daily
                    -- cadence holds its local time across a DST shift, and `ceil` skips whole
                    -- missed slots in one go rather than replaying a backlog after an outage.
                    next_run_at = CASE
-                       WHEN s.schedule_type <> 'interval' THEN NULL
+                       WHEN schedule.schedule_type <> 'interval' THEN NULL
                        ELSE (
-                           (s.next_run_at AT TIME ZONE s.timezone)
-                           + make_interval(secs => s.interval_seconds::double precision)
+                           (schedule.next_run_at AT TIME ZONE schedule.timezone)
+                           + make_interval(secs => schedule.interval_seconds::double precision)
                              * (
                                  floor(
-                                     EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - s.next_run_at))
-                                     / s.interval_seconds
+                                     EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - schedule.next_run_at))
+                                     / schedule.interval_seconds
                                  ) + 1
                              )::double precision
-                       ) AT TIME ZONE s.timezone
+                       ) AT TIME ZONE schedule.timezone
                    END,
-                   enabled = (s.schedule_type = 'interval'),
+                   enabled = (schedule.schedule_type = 'interval'),
                    updated_at = CURRENT_TIMESTAMP
-               FROM claimable
-               WHERE s.id = claimable.claimed_id
-               RETURNING {SCHEDULE_COLUMNS}"#
-        ))
-        .bind(limit)
-        .fetch_all(&self.pool)
+               WHERE schedule.id = $1"#,
+            )
+            .bind(schedule.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+        }
+
+        let rows = sqlx::query_as::<_, ClaimedScheduleRunDb>(
+            r#"SELECT id, scheduled_for, schedule_snapshot, thread_id, task_id
+               FROM schedule_runs
+               WHERE task_id IS NULL
+               ORDER BY created_at, id
+               LIMIT $1"#,
+        )
+        .bind(limit.max(1))
+        .fetch_all(&mut *tx)
         .await
         .map_err(AppError::from)?;
 
+        tx.commit().await.map_err(AppError::from)?;
+
         rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn record_run_task(&self, run_id: Uuid, task_id: Uuid) -> AppResult<()> {
+        sqlx::query(
+            r#"UPDATE schedule_runs SET task_id = $2, last_error = NULL,
+                      updated_at = CURRENT_TIMESTAMP
+               WHERE id = $1 AND thread_id IS NOT NULL AND (task_id IS NULL OR task_id = $2)"#,
+        )
+        .bind(run_id)
+        .bind(task_id)
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(())
+    }
+
+    async fn record_run_error(&self, run_id: Uuid, error: &str) -> AppResult<()> {
+        sqlx::query(
+            r#"UPDATE schedule_runs SET last_error = $2, updated_at = CURRENT_TIMESTAMP
+               WHERE id = $1 AND task_id IS NULL"#,
+        )
+        .bind(run_id)
+        .bind(error)
+        .execute(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(())
     }
 
     async fn record_manual_run(&self, id: Uuid) -> AppResult<Option<ChannelSchedule>> {
@@ -487,10 +596,12 @@ impl SchedulePersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool};
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
         company::{CompanyPersistence, CompanyWrite},
+        thread::ThreadPersistence,
         user::UserPersistence,
     };
 
@@ -575,7 +686,7 @@ mod tests {
         let claimed = SchedulePersistence::claim_and_advance_due_schedules(&persistence, 10)
             .await
             .unwrap();
-        assert!(claimed.iter().any(|s| s.id == hourly.id));
+        assert!(claimed.iter().any(|run| run.schedule.id == hourly.id));
 
         let advanced = SchedulePersistence::get_by_id(&persistence, hourly.id)
             .await
@@ -720,8 +831,55 @@ mod tests {
         let claimed = SchedulePersistence::claim_and_advance_due_schedules(&persistence, 10)
             .await
             .unwrap();
-        let claimed_one_off = claimed.iter().find(|s| s.id == one_off.id);
+        let claimed_one_off = claimed.iter().find(|run| run.schedule.id == one_off.id);
         assert!(claimed_one_off.is_some());
+        let durable_run = claimed_one_off.unwrap();
+
+        let first_thread = ThreadPersistence::ensure_schedule_run_thread(
+            &persistence,
+            durable_run.id,
+            channel.id,
+            "Durable run",
+            &[],
+        )
+        .await
+        .unwrap();
+        let resumed_thread = ThreadPersistence::ensure_schedule_run_thread(
+            &persistence,
+            durable_run.id,
+            channel.id,
+            "Durable run",
+            &[],
+        )
+        .await
+        .unwrap();
+        assert_eq!(first_thread.id, resumed_thread.id);
+
+        let payload = serde_json::json!({
+            "schedule_run_id": durable_run.id,
+            "schedule_id": one_off.id,
+        });
+        let first_task = TaskPersistence::enqueue_task(
+            &persistence,
+            company.id,
+            channel.id,
+            Some(first_thread.id),
+            "scheduled_agent_run",
+            payload.clone(),
+        )
+        .await
+        .unwrap();
+        let resumed_task = TaskPersistence::enqueue_task(
+            &persistence,
+            company.id,
+            channel.id,
+            Some(first_thread.id),
+            "scheduled_agent_run",
+            payload,
+        )
+        .await
+        .unwrap();
+        assert_eq!(first_task.id, resumed_task.id);
 
         // One-off schedule should now be disabled with next_run_at = None
         let re_read_one_off = SchedulePersistence::get_by_id(&persistence, one_off.id)

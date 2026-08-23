@@ -28,10 +28,12 @@ use crate::{
     },
 };
 
-/// Where a browser goes the moment it holds a session: the mailbox, not the sign-in form.
+/// Where a browser goes the moment it holds a session.
 ///
-/// Named once so registration and sign-in cannot drift to different destinations.
-const SIGNED_IN_LANDING: &str = "/ui";
+/// The authenticated root is the post-authentication gateway: it checks pending invitations
+/// before deciding between onboarding and the mailbox. Named once so every sign-in method uses
+/// the same decision path.
+pub(super) const SIGNED_IN_LANDING: &str = "/";
 const GOOGLE_FLOW_COOKIE: &str = "google_oauth_flow";
 
 pub fn public_router() -> Router<AppState> {
@@ -80,9 +82,11 @@ async fn index(
         return Ok(Redirect::temporary("/ui/invites"));
     }
 
-    let destination = match company_use_cases.list_user_companies(user.id).await {
-        Ok(companies) if companies.is_empty() => "/onboarding",
-        _ => "/companies",
+    let companies = company_use_cases.list_user_companies(user.id).await?;
+    let destination = if companies.is_empty() {
+        "/ui/onboarding"
+    } else {
+        "/ui"
     };
     Ok(Redirect::temporary(destination))
 }
@@ -839,7 +843,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn registering_lands_on_the_mailbox() {
+    async fn registering_lands_on_the_post_authentication_gateway() {
         let sessions = Arc::new(SessionAuthority::new(
             &crate::infra::config::AppConfig::for_test(),
         ));
@@ -853,7 +857,7 @@ mod tests {
         .await
         .into_response();
 
-        assert_eq!(response.headers().get("HX-Redirect").unwrap(), "/ui");
+        assert_eq!(response.headers().get("HX-Redirect").unwrap(), "/");
     }
 
     /// A rejected registration must not hand out a session for an account that was never created.

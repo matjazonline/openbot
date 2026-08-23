@@ -270,6 +270,9 @@ pub struct ScheduleWrite {
 /// running the agent with an empty prompt.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ScheduledRunPayload {
+    /// Stable identity of the logical schedule slot. Older queued payloads predate durable runs.
+    #[serde(default)]
+    pub schedule_run_id: Option<Uuid>,
     pub schedule_id: Uuid,
     pub schedule_name: String,
     pub channel_id: Uuid,
@@ -281,6 +284,16 @@ pub struct ScheduledRunPayload {
     #[serde(default)]
     pub recipient_emails: Vec<EmailAddress>,
     pub trigger_message_id: MessageId,
+}
+
+/// A durable logical slot waiting to be materialized into a thread, prompt, and task.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ClaimedScheduleRun {
+    pub id: Uuid,
+    pub scheduled_for: DateTime<Utc>,
+    pub schedule: ChannelSchedule,
+    pub thread_id: Option<Uuid>,
+    pub task_id: Option<Uuid>,
 }
 
 impl ScheduledRunPayload {

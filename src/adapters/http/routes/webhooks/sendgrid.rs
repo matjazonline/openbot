@@ -954,7 +954,7 @@ mod tests {
         async fn claim_and_advance_due_schedules(
             &self,
             _limit: i64,
-        ) -> AppResult<Vec<crate::entities::schedule::ChannelSchedule>> {
+        ) -> AppResult<Vec<crate::entities::schedule::ClaimedScheduleRun>> {
             Ok(vec![])
         }
         async fn record_manual_run(

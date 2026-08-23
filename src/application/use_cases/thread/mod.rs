@@ -72,6 +72,19 @@ pub trait ThreadPersistence: Send + Sync {
         participant_emails: &[EmailAddress],
     ) -> AppResult<Thread>;
 
+    /// Creates the thread for a durable schedule run and records that identity atomically.
+    /// Test doubles may use the ordinary creation path; PostgreSQL provides the crash-safe form.
+    async fn ensure_schedule_run_thread(
+        &self,
+        _run_id: Uuid,
+        channel_id: Uuid,
+        subject: &str,
+        participant_emails: &[EmailAddress],
+    ) -> AppResult<Thread> {
+        self.create_thread(channel_id, subject, participant_emails)
+            .await
+    }
+
     async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>>;
 
     async fn list_threads_by_channel_id(

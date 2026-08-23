@@ -301,7 +301,18 @@ impl ScheduleUseCases {
 
     /// Spawns the thread and enqueues the `background_tasks` entry for this schedule run.
     pub async fn execute_schedule_trigger(&self, schedule: &ChannelSchedule) -> AppResult<Uuid> {
-        let now = Utc::now();
+        self.execute_schedule_run(schedule, None).await
+    }
+
+    async fn execute_schedule_run(
+        &self,
+        schedule: &ChannelSchedule,
+        durable_run: Option<(Uuid, chrono::DateTime<Utc>)>,
+    ) -> AppResult<Uuid> {
+        let run_id = durable_run.map(|(id, _)| id);
+        let now = durable_run
+            .map(|(_, scheduled_for)| scheduled_for)
+            .unwrap_or_else(Utc::now);
         let rendered_subject = schedule.render_subject(now);
         let rendered_prompt = schedule.render_prompt(now);
 
@@ -329,10 +340,23 @@ impl ScheduleUseCases {
         }
 
         // 1. Create a fresh thread in the channel
-        let thread = self
-            .thread_persistence
-            .create_thread(channel.id, &rendered_subject, &participants)
-            .await?;
+        let thread = match run_id {
+            Some(run_id) => {
+                self.thread_persistence
+                    .ensure_schedule_run_thread(
+                        run_id,
+                        channel.id,
+                        &rendered_subject,
+                        &participants,
+                    )
+                    .await?
+            }
+            None => {
+                self.thread_persistence
+                    .create_thread(channel.id, &rendered_subject, &participants)
+                    .await?
+            }
+        };
 
         info!(
             "Created thread {} ('{}') for scheduled run '{}'",
@@ -341,12 +365,15 @@ impl ScheduleUseCases {
 
         // 2. Save the initial prompt message into the thread
         let sender = channel.inbound_address(&company.slug, &self.config.app_domain_name);
-        let prompt_message_id = MessageId::new(format!(
-            "<schedule-{}-{}@{}>",
-            schedule.id,
-            now.timestamp(),
-            self.config.app_domain_name
-        ));
+        let prompt_message_id = MessageId::new(match run_id {
+            Some(run_id) => format!("<schedule-run-{run_id}@{}>", self.config.app_domain_name),
+            None => format!(
+                "<schedule-{}-{}@{}>",
+                schedule.id,
+                now.timestamp(),
+                self.config.app_domain_name
+            ),
+        });
 
         let prompt_message = self
             .thread_persistence
@@ -373,6 +400,7 @@ impl ScheduleUseCases {
 
         // 3. Enqueue background task for the TaskWorker to execute the agent pipeline
         let task_payload = ScheduledRunPayload {
+            schedule_run_id: run_id,
             schedule_id: schedule.id,
             schedule_name: schedule.name.clone(),
             channel_id: channel.id,
@@ -404,37 +432,45 @@ impl ScheduleUseCases {
             task.id, schedule.name
         );
 
+        if let Some(run_id) = run_id {
+            self.schedule_persistence
+                .record_run_task(run_id, task.id)
+                .await?;
+        }
+
         Ok(task.id)
     }
 
     /// Process all currently due schedules (called by the background poller loop).
     pub async fn process_due_schedules(&self, batch_size: i64) -> AppResult<usize> {
-        let due_schedules = self
+        let due_runs = self
             .schedule_persistence
             .claim_and_advance_due_schedules(batch_size)
             .await?;
 
-        let count = due_schedules.len();
-        for schedule in due_schedules {
+        let count = due_runs.len();
+        for run in due_runs {
+            let schedule = &run.schedule;
             info!(
                 "Triggering due schedule '{}' ({})",
                 schedule.name, schedule.id
             );
-            match self.execute_schedule_trigger(&schedule).await {
+            match self
+                .execute_schedule_run(schedule, Some((run.id, run.scheduled_for)))
+                .await
+            {
                 Ok(_) => {
                     self.schedule_persistence
                         .clear_last_error(schedule.id)
                         .await?;
                 }
                 Err(err) => {
-                    // The claim already advanced this slot -- and disabled it outright if it was a
-                    // one-off -- so leaving it here would drop the run silently.
                     warn!(
-                        "Failed to execute triggered schedule '{}' ({}): {}. Releasing the claim.",
-                        schedule.name, schedule.id, err
+                        "Failed to materialize durable schedule run {} for '{}' ({}): {}.",
+                        run.id, schedule.name, schedule.id, err
                     );
                     self.schedule_persistence
-                        .release_failed_claim(&schedule, &err.to_string())
+                        .record_run_error(run.id, &err.to_string())
                         .await?;
                 }
             }
@@ -652,7 +688,7 @@ mod tests {
         async fn claim_and_advance_due_schedules(
             &self,
             _limit: i64,
-        ) -> AppResult<Vec<ChannelSchedule>> {
+        ) -> AppResult<Vec<crate::entities::schedule::ClaimedScheduleRun>> {
             Ok(vec![])
         }
 
