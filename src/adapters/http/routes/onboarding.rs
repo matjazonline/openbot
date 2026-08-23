@@ -457,5 +457,9 @@ mod tests {
         assert!(complete_page.contains("customer-support@acme.example.com"));
         assert!(complete_page.contains("Forward a message"));
         assert!(complete_page.contains("Reply in the thread"));
+        assert!(complete_page.contains(&format!(
+            "href=\"/ui?company_id={}&channel_id={}\" class=\"btn btn-primary\">Finish</a>",
+            company.id, channel.id
+        )));
     }
 }

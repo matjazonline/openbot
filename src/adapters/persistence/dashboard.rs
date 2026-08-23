@@ -659,6 +659,7 @@ mod tests {
         let attempt = TaskAttemptRef {
             task_id,
             attempt_number: 9_998,
+            execution_generation: Uuid::new_v4(),
         };
         persistence
             .begin_task_attempt(attempt)
@@ -704,6 +705,7 @@ mod tests {
         let attempt = TaskAttemptRef {
             task_id,
             attempt_number: 9_999,
+            execution_generation: Uuid::new_v4(),
         };
 
         persistence
@@ -737,10 +739,32 @@ mod tests {
 
         // A task re-claimed after its lease lapsed comes back with the same attempt number. The
         // conflict must reopen the row rather than fail the insert.
+        let replacement = TaskAttemptRef {
+            execution_generation: Uuid::new_v4(),
+            ..attempt
+        };
         persistence
-            .begin_task_attempt(attempt)
+            .begin_task_attempt(replacement)
             .await
             .expect("a re-run reopens the same attempt rather than colliding with it");
+
+        assert!(
+            !persistence
+                .finish_task_attempt(&outcome)
+                .await
+                .expect("the stale execution can report without writing"),
+            "the execution replaced during reclaim must not finish the new ledger row"
+        );
+        assert!(
+            persistence
+                .finish_task_attempt(&TaskAttemptOutcome {
+                    attempt: replacement,
+                    ..outcome.clone()
+                })
+                .await
+                .expect("the replacement execution closes"),
+            "the current execution generation must still be able to finish"
+        );
 
         let reopened: (String, Option<i32>) = sqlx::query_as(
             "SELECT status, prompt_tokens FROM task_attempts WHERE task_id = $1 AND attempt_number = $2",
@@ -751,11 +775,8 @@ mod tests {
         .await
         .expect("the reopened row is readable");
 
-        assert_eq!(reopened.0, "processing", "the re-run is in progress again");
-        assert_eq!(
-            reopened.1, None,
-            "the superseded run's token count must not be left behind on the new attempt"
-        );
+        assert_eq!(reopened.0, "completed", "the replacement run finished");
+        assert_eq!(reopened.1, Some(11));
 
         CompanyPersistence::delete(&persistence, company)
             .await

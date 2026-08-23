@@ -155,6 +155,7 @@ impl ThreadActivity {
 pub struct TaskAttemptRef {
     pub task_id: Uuid,
     pub attempt_number: i32,
+    pub execution_generation: Uuid,
 }
 
 impl TaskAttemptRef {
@@ -163,6 +164,7 @@ impl TaskAttemptRef {
         Self {
             task_id: task.id,
             attempt_number: task.retry_count + 1,
+            execution_generation: Uuid::new_v4(),
         }
     }
 }

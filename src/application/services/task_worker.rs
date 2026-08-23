@@ -269,9 +269,11 @@ impl TaskWorker {
         for task in tasks {
             info!("Processing task {} (type = '{}')", task.id, task.task_type);
             let start_time = std::time::Instant::now();
-            let result = self.execute_single_task_with_lease(&task).await;
+            let attempt = TaskAttemptRef::current(&task);
+            let result = self.execute_single_task_with_lease(&task, attempt).await;
             let duration_ms = start_time.elapsed().as_millis() as u64;
-            self.close_out_task(&task, result, duration_ms).await;
+            self.close_out_task(&task, attempt, result, duration_ms)
+                .await;
         }
 
         Ok(polled(claimed, TASK_CLAIM_BATCH))
@@ -300,6 +302,7 @@ impl TaskWorker {
     async fn close_out_task(
         &self,
         task: &BackgroundTask,
+        attempt: TaskAttemptRef,
         result: Result<(), String>,
         duration_ms: u64,
     ) {
@@ -331,8 +334,14 @@ impl TaskWorker {
                     return;
                 }
                 info!("Successfully completed background task {}", task_id);
-                self.close_out_attempt(task, current.as_ref(), TaskAttemptStatus::Completed, None)
-                    .await;
+                self.close_out_attempt(
+                    task,
+                    attempt,
+                    current.as_ref(),
+                    TaskAttemptStatus::Completed,
+                    None,
+                )
+                .await;
                 let outcome = self
                     .task_persistence
                     .mark_task_completed(task_id, self.worker_id)
@@ -347,6 +356,7 @@ impl TaskWorker {
         warn!("Failed background task {}: {}", task_id, err_msg);
         self.close_out_attempt(
             task,
+            attempt,
             current.as_ref(),
             TaskAttemptStatus::Failed,
             Some(err_msg.clone()),
@@ -377,12 +387,13 @@ impl TaskWorker {
     async fn close_out_attempt(
         &self,
         task: &BackgroundTask,
+        attempt: TaskAttemptRef,
         current: Option<&BackgroundTask>,
         status: TaskAttemptStatus,
         error: Option<String>,
     ) {
         let outcome = TaskAttemptOutcome {
-            attempt: TaskAttemptRef::current(task),
+            attempt,
             status,
             error,
             // The run writes its usage into the payload, so it is only on the re-read row; the
@@ -1034,15 +1045,12 @@ impl TaskWorker {
     async fn execute_single_task_with_lease(
         &self,
         task: &crate::entities::task::BackgroundTask,
+        attempt: TaskAttemptRef,
     ) -> Result<(), String> {
         // Open the ledger row alongside the lease: both describe this one run, and both are wanted
         // even if it never reaches a terminal state. A failure to open it is logged, not fatal —
         // the run is the point, the bookkeeping is not.
-        if let Err(error) = self
-            .task_persistence
-            .begin_task_attempt(TaskAttemptRef::current(task))
-            .await
-        {
+        if let Err(error) = self.task_persistence.begin_task_attempt(attempt).await {
             warn!(
                 "Could not open the attempt ledger for task {}: {error}",
                 task.id

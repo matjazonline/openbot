@@ -107,7 +107,7 @@ pub fn onboarding_complete_page(
             <section class="rounded-box border border-base-300 p-4"><span class="badge badge-warning badge-outline">2 · Existing work</span><h2 class="mt-3 font-semibold">Forward a message</h2><p class="mt-2 text-sm opacity-70">Forward any email and add your instruction at the top.</p></section>
             <section class="rounded-box border border-base-300 p-4"><span class="badge badge-success badge-outline">3 · Iterate</span><h2 class="mt-3 font-semibold">Reply in the thread</h2><p class="mt-2 text-sm opacity-70">Reply to refine the result, answer questions, or request another pass.</p></section>
         </div>
-        <div class="card-actions justify-end"><a href="/ui/channels?company_id={company_id}&channel_id={channel_id}" class="btn btn-ghost">Manage channel</a><a href="mailto:{email_address}" class="btn btn-primary">Compose first email</a></div>"##,
+        <div class="card-actions justify-end"><a href="/ui/channels?company_id={company_id}&channel_id={channel_id}" class="btn btn-ghost">Manage channel</a><a href="mailto:{email_address}" class="btn btn-primary">Compose first email</a><a href="/ui?company_id={company_id}&channel_id={channel_id}" class="btn btn-primary">Finish</a></div>"##,
         check = icon(Icon::Check, "size-6"),
         channel_name = escape_html_text(&channel.name),
         company_id = company.id,

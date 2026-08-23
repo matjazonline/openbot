@@ -42,18 +42,20 @@ const CLAIM_TASK_SQL: &str = r#"UPDATE background_tasks
 /// attempt number as the run that vanished. That earlier run reported nothing, so its half-written
 /// row is reset here rather than left to be read as a finished attempt that took forever.
 const BEGIN_ATTEMPT_SQL: &str = r#"INSERT INTO task_attempts
-       (id, task_id, attempt_number, status, started_at)
-   VALUES ($1, $2, $3, 'processing', CURRENT_TIMESTAMP)
+       (id, task_id, attempt_number, execution_generation, status, started_at)
+   VALUES ($1, $2, $3, $4, 'processing', CURRENT_TIMESTAMP)
    ON CONFLICT (task_id, attempt_number) DO UPDATE
       SET status = 'processing', started_at = CURRENT_TIMESTAMP, finished_at = NULL,
-          error = NULL, prompt_tokens = NULL, completion_tokens = NULL"#;
+          error = NULL, prompt_tokens = NULL, completion_tokens = NULL,
+          execution_generation = EXCLUDED.execution_generation"#;
 
 /// Close the ledger row, but only while it is still the open one. If another worker took the task
 /// over and reopened the row, this run is no longer the run of record and must not overwrite it.
 const FINISH_ATTEMPT_SQL: &str = r#"UPDATE task_attempts
-   SET status = $3, error = $4, prompt_tokens = $5, completion_tokens = $6,
+   SET status = $4, error = $5, prompt_tokens = $6, completion_tokens = $7,
        finished_at = CURRENT_TIMESTAMP
-   WHERE task_id = $1 AND attempt_number = $2 AND status = 'processing'"#;
+   WHERE task_id = $1 AND attempt_number = $2 AND execution_generation = $3
+     AND status = 'processing'"#;
 
 /// Log when a lease-guarded state change was ignored because the lease or status moved on.
 ///
@@ -1409,6 +1411,7 @@ impl TaskPersistence for PostgresPersistence {
             .bind(Uuid::new_v4())
             .bind(attempt.task_id)
             .bind(attempt.attempt_number)
+            .bind(attempt.execution_generation)
             .execute(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -1428,6 +1431,7 @@ impl TaskPersistence for PostgresPersistence {
         let result = sqlx::query(FINISH_ATTEMPT_SQL)
             .bind(outcome.attempt.task_id)
             .bind(outcome.attempt.attempt_number)
+            .bind(outcome.attempt.execution_generation)
             .bind(outcome.status.as_str())
             .bind(outcome.error.as_deref())
             .bind(tokens(|usage| usage.prompt_tokens))
