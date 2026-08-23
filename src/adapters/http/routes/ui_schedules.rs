@@ -3,16 +3,20 @@
 //! 2nd column: Paginated schedule runs (threads)
 //! 3rd column: Thread messages and interactive chat / review
 
-use std::sync::Arc;
+use std::{convert::Infallible, sync::Arc};
 
 use axum::{
     Form, Router,
-    extract::{FromRequestParts, Path, Query},
+    extract::{FromRequestParts, Path, Query, State},
     http::request::Parts,
-    response::{Html, IntoResponse, Response},
+    response::{
+        Html, IntoResponse, Response,
+        sse::{Event, KeepAlive, Sse},
+    },
     routing::get,
 };
 use serde::Deserialize;
+use tokio_stream::{Stream, StreamExt};
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -24,12 +28,13 @@ use crate::{
         routes::{
             channel::reply_headers,
             schedule::UiScheduleForm,
-            ui::{load_account, load_scoped_company, workspace_user},
+            ui::{load_account, load_scoped_company, wake_ups, workspace_user},
         },
     },
     app_error::{AppError, AppResult},
     entities::{company::Company, schedule::ScheduleRun, value_objects::EmailAddress},
     infra::config::AppConfig,
+    infra::events::MailboxEvents,
     services::email_parser::RawInboundPayload,
     use_cases::{
         agent::AgentUseCases, channel::ChannelUseCases, company::CompanyUseCases,
@@ -52,6 +57,7 @@ pub(crate) const SCHEDULE_UI_PATHS: &[&str] = &[
     "/ui/schedules/{id}/edit",
     "/ui/schedules/{id}/run-now",
     "/ui/schedules/{id}/toggle",
+    "/ui/schedules/{id}/events",
     "/ui/schedules/thread/{thread_id}",
     "/ui/schedules/thread/{thread_id}/reply",
 ];
@@ -74,8 +80,9 @@ pub fn router() -> Router<AppState> {
         .route(SCHEDULE_UI_PATHS[5], get(edit_schedule_pane))
         .route(SCHEDULE_UI_PATHS[6], axum::routing::post(run_schedule_now))
         .route(SCHEDULE_UI_PATHS[7], axum::routing::post(toggle_schedule))
-        .route(SCHEDULE_UI_PATHS[8], get(thread_pane))
-        .route(SCHEDULE_UI_PATHS[9], axum::routing::post(reply_in_thread))
+        .route(SCHEDULE_UI_PATHS[8], get(schedule_runs_stream))
+        .route(SCHEDULE_UI_PATHS[9], get(thread_pane))
+        .route(SCHEDULE_UI_PATHS[10], axum::routing::post(reply_in_thread))
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -367,6 +374,42 @@ async fn schedule_runs_fragment(
         .await
 }
 
+/// Keep the schedule-specific run list current using the same committed-message and activity
+/// notifications as the inbox. The database remains the source of truth: an event is only a
+/// prompt to re-render the current page, so lagged/coalesced notifications are harmless.
+#[instrument(skip(workspace, events))]
+async fn schedule_runs_stream(
+    workspace: SchedulesWorkspace,
+    State(events): State<MailboxEvents>,
+    Path(schedule_id): Path<Uuid>,
+    Query(query): Query<CompanyScopedQuery>,
+) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
+    let schedule = workspace
+        .schedule_use_cases
+        .get_schedule(workspace.user_id, query.company_id, schedule_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Schedule not found".into()))?;
+    let channel_id = schedule.channel_id;
+    let page = query.page;
+    let mut changes = Box::pin(wake_ups(&events, "schedule-runs", move |event| {
+        event.is_message_in_channel(channel_id) || event.is_activity_in_channel(channel_id)
+    }));
+
+    let stream = async_stream::stream! {
+        while let Some(_change) = changes.next().await {
+            match workspace.runs_column(query.company_id, schedule_id, page).await {
+                Ok(Html(column)) => yield Ok(Event::default().event("schedule-runs").data(column)),
+                Err(error) => {
+                    tracing::warn!(%error, %schedule_id, "Schedule runs stream query failed");
+                    return;
+                }
+            }
+        }
+    };
+
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+}
+
 #[instrument(skip(workspace))]
 async fn thread_pane(
     workspace: SchedulesWorkspace,
@@ -628,7 +671,22 @@ async fn toggle_schedule(
         .toggle_schedule(workspace.user_id, form.company_id, id, form.wants_enabled())
         .await?;
 
-    workspace.runs_column(form.company_id, id, form.page).await
+    let Html(runs_column) = workspace
+        .runs_column(form.company_id, id, form.page)
+        .await?;
+    let schedules = workspace
+        .schedule_use_cases
+        .list_company_schedules(workspace.user_id, form.company_id)
+        .await?;
+    let sidebar = pages::schedules_sidebar_list(
+        form.company_id,
+        &schedules,
+        Some(id),
+        pages::FragmentSwap::OutOfBand,
+    );
+
+    // The button targets the runs column; htmx applies the sidebar copy separately via OOB swap.
+    Ok(Html(format!("{runs_column}{sidebar}")))
 }
 
 #[instrument(skip(_workspace))]
@@ -980,6 +1038,11 @@ mod tests {
         assert!(html.contains("2 msgs"));
         assert!(html.contains("Running")); // Processing with active lease
         assert!(html.contains("Run Now"));
+        assert!(html.contains(&format!(
+            r#"sse-connect="/ui/schedules/{}/events?company_id={company_id}&page=1""#,
+            schedule.id
+        )));
+        assert!(html.contains(r#"sse-swap="schedule-runs""#));
     }
 
     #[test]

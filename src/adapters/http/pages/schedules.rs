@@ -280,7 +280,9 @@ pub fn schedule_runs_column(props: &ScheduleRunsColumnProps<'_>, swap: FragmentS
 
     format!(
         r##"
-        <section id="schedule-runs-column"{PANE_SKELETON} class="flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-100"{oob}>
+        <section id="schedule-runs-column"{PANE_SKELETON} class="flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-100"{oob}
+            hx-ext="sse" sse-connect="/ui/schedules/{schedule_id}/events?company_id={company_id}&page={page}"
+            sse-swap="schedule-runs" hx-swap="outerHTML">
             <div class="border-b border-base-300 p-4 space-y-2">
                 <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0">
@@ -772,6 +774,14 @@ const SCHEDULES_SCRIPT: &str = r##"        function toggleScheduleType(select) {
             });
             el.classList.add('bg-base-300');
         }
+
+        document.body.addEventListener('htmx:afterSettle', function (event) {
+            if (!event.target || event.target.id !== 'schedule-runs-column') return;
+            var pane = document.getElementById('schedule-pane');
+            if (!pane || !pane.dataset.threadId) return;
+            var selected = document.querySelector('#schedule-runs-list .thread-row[data-thread-id="' + pane.dataset.threadId + '"]');
+            if (selected) selectThreadRow(selected);
+        });
 
         function composerKeydown(event) {
             if (event.key !== 'Enter' || event.shiftKey) return;

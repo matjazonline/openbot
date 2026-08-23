@@ -722,6 +722,8 @@ fn the_ui_shell_reports_live_update_interruptions_without_replacing_sse_retries(
     });
 
     assert!(html.contains(r#"id="live-update-status" role="status" aria-live="polite""#));
+    assert!(html.contains("alert alert-warning"));
+    assert!(html.contains("status.classList.toggle('alert-success', restored)"));
     assert!(html.contains("Live updates paused. Reconnecting&hellip;"));
     assert!(html.contains("htmx:sseError"));
     assert!(html.contains("htmx:sseOpen"));

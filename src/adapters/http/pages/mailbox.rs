@@ -83,7 +83,7 @@ const LOGOUT_MODAL: &str = r##"
 /// connections at once, so connection state belongs in the shell rather than beside one pane.
 const LIVE_UPDATE_STATUS: &str = r##"
         <div id="live-update-status" role="status" aria-live="polite" aria-atomic="true"
-            class="pointer-events-none fixed left-1/2 top-4 z-50 hidden -translate-x-1/2 rounded-box border border-warning/30 bg-base-200 px-4 py-2 text-sm font-medium shadow-lg">
+            class="alert alert-warning pointer-events-none fixed left-1/2 top-4 z-50 hidden w-auto -translate-x-1/2 px-4 py-2 text-sm font-medium shadow-lg">
             <span>Live updates paused. Reconnecting&hellip;</span>
         </div>
         "##;
@@ -245,8 +245,8 @@ pub(crate) const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` ch
             var status = document.getElementById('live-update-status');
             if (!status) return;
             status.querySelector('span').textContent = message;
-            status.classList.toggle('border-warning/30', !restored);
-            status.classList.toggle('border-success/30', restored);
+            status.classList.toggle('alert-warning', !restored);
+            status.classList.toggle('alert-success', restored);
             status.classList.remove('hidden');
         }
 

@@ -109,3 +109,19 @@ const c = getComputedStyle(document.querySelector('input.input'));
 
 Then flip the theme toggle in the top bar and read it again. Both themes, every time — see the
 `!important` rule above for why one of them is not evidence about the other.
+
+# Escape for the output context
+
+Every value originating from a user, inbound email, provider, database free-text field, or URL
+parameter is untrusted when rendered. Escape text nodes with `escape_html_text`; use a dedicated
+attribute/URL encoder for attributes, `hx-confirm`, data attributes, and links. Escaping for a text
+node is not automatically safe inside a quoted attribute or JavaScript context.
+
+This includes subjects, sender/display names, message ids, clean and raw bodies, company/channel/
+agent names, badges, toast messages, and confirmation prompts. Helpers that return HTML do not make
+their arguments safe: either accept an already-escaped type or escape inside the helper exactly
+once. Never place inbound HTML directly into the page.
+
+Sanitized Markdown rendered through the shared `ammonia` policy is the only raw-HTML exception.
+Keep that sanitizer centralized and test hostile tags, event handlers, URLs, quotes, and markup in
+both text and attribute sinks. CSP is a backstop, not a reason to omit escaping.

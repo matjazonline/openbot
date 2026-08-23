@@ -147,3 +147,53 @@ without a live `DATABASE_URL` (Fly.io deploy included — see `docs/deploy.md`).
 cache after a query edit either fails the build there or, worse, silently keeps building against
 the old query shape. Requires `sqlx-cli` (`cargo install sqlx-cli --no-default-features --features
 postgres,rustls`) and a local Postgres reachable at that URL.
+
+# Bound work at every external boundary
+
+Anything driven by a client, peer, provider, queue row, or stored payload needs an explicit bound.
+Choose and enforce the bound at the boundary: body/message and line size, recipient/item count,
+connection and worker concurrency, operation and idle timeout, retry/attempt count, prompt-token
+budget, pagination, and data retention. Advertising or documenting a limit without rejecting input
+that exceeds it is not enforcement.
+
+Make overload produce a controlled rejection, backoff, or terminal state. Do not let the default
+failure mode be unbounded allocation, an immortal task, a hot retry loop, or one tenant consuming
+the entire worker pool. Defaults exposed on public listeners must be safe for production rather
+than relying on every deployment to override them.
+
+# Own background work through shutdown
+
+Do not detach correctness-critical work with an untracked `tokio::spawn`. Keep its `JoinHandle` (or
+put it in a supervised `JoinSet`), propagate cancellation into the actual work, and await it during
+bounded graceful shutdown. Dropping a `JoinHandle` does not cancel the task it represents.
+
+When shutdown or lease loss interrupts durable work, either release ownership safely or leave a
+short, recoverable lease whose expiry consumes an attempt. A deploy must not silently discard a
+notification, keep making side effects after ownership is lost, or strand work for a full lease
+period without retry accounting.
+
+# Preserve dependency direction
+
+The domain remains independent of application and adapters. The application layer describes the
+ports it needs; adapters implement them. Application code must not import transport, framework, or
+database implementation types such as `lettre`, `axum`, or `sqlx`, and an abstraction must not live
+inside the outer adapter it is intended to abstract.
+
+When touching an inverted dependency, move or introduce the port in the consuming inner layer and
+adapt the implementation rather than adding another upward import. Port traits must not use
+silently-successful default methods for correctness operations such as authorization, lease
+renewal, completion, or durable writes; require every implementation and test double to state its
+behavior.
+
+# Make operations traceable without leaking data
+
+Initialize structured tracing before configuration validation, migrations, storage checks, or any
+other fallible startup work. Accept or create one correlation id at ingress, echo it where the
+protocol permits, and carry it as structured data through the message, task, agent, and outbox
+stages. Log identifiers and state transitions as fields, not as opaque interpolated sentences.
+
+Never record secrets, credentials, session or approval tokens, raw authorization headers, full
+request structs, or full message bodies in spans. Log addresses and other PII only where the
+operational need is explicit and the configured level is appropriate. Metrics needed for alerts
+must distinguish retries, terminal failures, lease loss, and stuck work; in-process counters alone
+are not durable or multi-instance observability.
