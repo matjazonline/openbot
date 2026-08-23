@@ -7,6 +7,119 @@ not.
 A one-field change is never one edit. It lands in seven places, and the compiler only finds five of
 them. Work the list in order; the two it cannot find are steps 2 and 7.
 
+# Preserve invariants at the database boundary
+
+Application checks are useful error messages, not substitutes for constraints. If a relationship
+is tenant-scoped, the tenant identifier must participate in the foreign key. Do not model two facts
+such as `(company_id -> companies)` and `(channel_id -> channels)` when the real invariant is
+`(company_id, channel_id) -> channels(company_id, id)`. The same applies to join tables: every side
+must be proven to belong to the same tenant, rather than independently referencing valid rows.
+
+Before adding a composite foreign key:
+
+- query for existing mismatches and decide how they will be repaired;
+- add the required composite `UNIQUE` key on the referenced table when necessary;
+- use an additive migration and validate compatibility before removing weaker constraints; and
+- add a rollback-only or transaction-scoped database test that demonstrates the invalid
+  cross-tenant row is rejected.
+
+Keep tenant identifiers in writes even when they appear derivable. They make scoping explicit and
+support composite constraints; derivability alone is not a reason to drop them.
+
+# Multi-step work needs a durable unit of execution
+
+Advancing a cursor, disabling a one-off schedule, creating domain rows, and enqueueing work in
+separate transactions is not a reliable workflow. An ordinary `Err` cleanup cannot recover from a
+process crash between commits. For work that crosses transactions:
+
+- create a durable run/idempotency record in the same transaction that claims or advances the
+  source record;
+- give each logical occurrence a stable unique key (for schedules, the schedule plus logical
+  slot), not a fresh key generated on every retry;
+- make every materialization step resumable and idempotent from that record; and
+- treat partial thread/message/task creation as recoverable state, not as something a best-effort
+  release function can undo.
+
+When the state changes truly must agree, keep them in one transaction. When they cannot fit in one
+transaction, persist the workflow state and resume it.
+
+# Fence leases to an execution, not merely a row
+
+Any claimed/reclaimable operation must prevent a stale worker from completing the replacement
+worker's execution. Store a claim generation or execution UUID and require it in every renewal,
+completion, failure, and attempt-ledger update. A task id plus attempt number is insufficient when
+an expired attempt row can be reopened; worker id alone is also insufficient if worker ids may be
+reused.
+
+Preserve the existing atomic claim shape: one `UPDATE ... FROM` selection using `FOR UPDATE SKIP
+LOCKED`, deterministic ordering, and a bounded limit. Queue claims are intentionally global rather
+than tenant-scoped. Do not add tenant filtering to worker claims unless the worker architecture is
+being deliberately redesigned.
+
+# Encode queue state machines as constraints
+
+Status and lease columns are one state machine. Add database checks that make incoherent states
+impossible: an in-flight row has an owner and expiry, while pending/terminal rows do not retain
+lease data. Recovery and dashboard queries must temporarily classify legacy in-flight rows with
+missing lease data as stalled; a predicate such as `lock_expires_at <= CURRENT_TIMESTAMP` does not
+match `NULL`.
+
+Audit and repair existing rows before validating a new constraint. Mirror the strongest existing
+queue constraint rather than inventing subtly different semantics for each queue.
+
+# Preserve the existing correctness guards
+
+Do not weaken these patterns while refactoring adjacent persistence code:
+
+- completion, failure, payload replacement, and lease renewal stay conditional on the current
+  worker owning a live lease;
+- approval consumption stays atomic, status-checked, and expiry-checked;
+- approval, outreach, task, and outbox changes that must agree stay transactionally grouped;
+- message deduplication verifies the canonical content hash before reusing an existing message id;
+- dynamic list filters remain bound parameters (for example through `QueryBuilder`), never string
+  interpolation; and
+- password and confirmation material remains one-way hashed.
+
+When a proposed simplification removes one of these predicates or transaction boundaries, assume
+it changes correctness until a concurrency or adversarial database test proves otherwise.
+
+# Treat persisted JSON as untrusted, versioned input
+
+Never `expect` a JSONB value from the database to deserialize. Manual SQL, older application
+versions, and imports can all create shapes the current Rust type does not accept. Convert
+fallibly, attach row/type context to the `AppError`, and let the caller decide whether one bad row
+should fail a request or be quarantined.
+
+Inventory existing shapes before adding a JSON constraint. If the format is stable enough to
+constrain, include an explicit version/discriminator and roll the constraint out compatibly. This
+is separate from the `#[serde(default)]` rule below: defaults preserve old valid payloads; fallible
+decoding protects the process from invalid ones.
+
+# Secrets need their own persistence boundary
+
+Provider credentials must not be ordinary plaintext fields selected into general-purpose domain
+entities. New secret storage must use application-boundary envelope encryption (or the project's
+designated KMS), record a key version, and expose narrow credential-specific reads. List/detail
+projections should omit ciphertext as well as plaintext unless the caller explicitly needs the
+secret.
+
+A credential migration requires staged compatibility: support legacy reads, backfill encrypted
+values, switch writers/readers, remove plaintext, and rotate the external credentials. Do not log,
+serialize into durable task payloads, derive debug output from, or return secret material in broad
+entities.
+
+# Change performance only from production evidence
+
+Do not add an index or rewrite pagination solely because a query looks expensive on fixtures.
+Collect representative `EXPLAIN (ANALYZE, BUFFERS)` output plus table and index statistics first.
+Pay particular attention to correlated subqueries per result row, expressions with the parameter
+on the left side of `LIKE`, time-window filters unsupported by index prefixes, and large offset
+pagination. Record the before/after plan with the change.
+
+Keep cursor ordering deterministic with a unique tie-breaker (normally timestamp plus UUID). Offset
+pagination is acceptable for bounded administrative pages; replace it only when observed offsets
+and plans justify the API change.
+
 # 1. Migration
 
 New timestamped file in `migrations/`, never an edit to an installed one —

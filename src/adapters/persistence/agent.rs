@@ -27,9 +27,11 @@ pub struct AgentDb {
     pub created_at: DateTime<Utc>,
 }
 
-impl From<AgentDb> for Agent {
-    fn from(db: AgentDb) -> Self {
-        Agent {
+impl TryFrom<AgentDb> for Agent {
+    type Error = AppError;
+
+    fn try_from(db: AgentDb) -> AppResult<Self> {
+        Ok(Agent {
             id: db.id,
             company_id: db.company_id,
             name: db.name,
@@ -41,17 +43,18 @@ impl From<AgentDb> for Agent {
             description: db.description,
             config_json: db.config_json,
             avatar_url: db.avatar_url.map(AvatarUrl::from),
-            created_by: serde_json::from_value(db.created_by)
-                .expect("agents.created_by must match CreationProvenance"),
+            created_by: serde_json::from_value(db.created_by).map_err(|err| {
+                AppError::Internal(format!("Invalid agents.created_by provenance: {err}"))
+            })?,
             created_at: db.created_at,
-        }
+        })
     }
 }
 
 impl PostgresPersistence {
     fn decode_agent(&self, mut db: AgentDb) -> AppResult<Agent> {
         db.api_key = self.decrypt_credential(db.api_key)?;
-        Ok(db.into())
+        db.try_into()
     }
 }
 
@@ -154,7 +157,7 @@ impl AgentPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        Ok(db_list.into_iter().map(Into::into).collect())
+        db_list.into_iter().map(TryInto::try_into).collect()
     }
 
     async fn list_library(&self) -> AppResult<Vec<Agent>> {
@@ -166,7 +169,7 @@ impl AgentPersistence for PostgresPersistence {
         .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)?;
-        Ok(rows.into_iter().map(Into::into).collect())
+        rows.into_iter().map(TryInto::try_into).collect()
     }
 
     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
@@ -225,6 +228,28 @@ mod tests {
     use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
     use crate::use_cases::user::UserPersistence;
     use serde_json::json;
+
+    #[test]
+    fn malformed_provenance_is_a_conversion_error_not_a_panic() {
+        let db = AgentDb {
+            id: Uuid::new_v4(),
+            company_id: None,
+            name: "Broken".into(),
+            slug: "broken".into(),
+            provider: None,
+            model: None,
+            api_key: None,
+            system_prompt: None,
+            description: None,
+            config_json: None,
+            avatar_url: None,
+            created_by: json!({}),
+            created_at: Utc::now(),
+        };
+
+        let error = Agent::try_from(db).expect_err("malformed provenance must be fallible");
+        assert!(error.to_string().contains("agents.created_by"));
+    }
 
     #[tokio::test]
     async fn postgres_agent_persistence_works() {

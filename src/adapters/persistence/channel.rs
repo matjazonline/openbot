@@ -44,9 +44,11 @@ pub struct ChannelDb {
     pub created_at: DateTime<Utc>,
 }
 
-impl From<ChannelDb> for Channel {
-    fn from(db: ChannelDb) -> Self {
-        Channel {
+impl TryFrom<ChannelDb> for Channel {
+    type Error = AppError;
+
+    fn try_from(db: ChannelDb) -> AppResult<Self> {
+        Ok(Channel {
             id: db.id,
             company_id: db.company_id,
             name: db.name,
@@ -75,10 +77,11 @@ impl From<ChannelDb> for Channel {
                 MemoryRecallMode::Fast
             },
             memory_max_results: db.memory_max_results as u8,
-            created_by: serde_json::from_value(db.created_by)
-                .expect("channels.created_by must match CreationProvenance"),
+            created_by: serde_json::from_value(db.created_by).map_err(|err| {
+                AppError::Internal(format!("Invalid channels.created_by provenance: {err}"))
+            })?,
             created_at: db.created_at,
-        }
+        })
     }
 }
 
@@ -122,7 +125,7 @@ async fn load_channel(persistence: &PostgresPersistence, id: Uuid) -> AppResult<
 
     db.map(|mut db| {
         db.api_key = persistence.decrypt_credential(db.api_key)?;
-        Ok(db.into())
+        db.try_into()
     })
     .transpose()
 }
@@ -297,7 +300,7 @@ impl ChannelPersistence for PostgresPersistence {
 
         db.map(|mut db| {
             db.api_key = self.decrypt_credential(db.api_key)?;
-            Ok(db.into())
+            db.try_into()
         })
         .transpose()
     }
@@ -315,7 +318,7 @@ impl ChannelPersistence for PostgresPersistence {
             .await
             .map_err(AppError::from)?;
 
-        Ok(db_list.into_iter().map(Into::into).collect())
+        db_list.into_iter().map(TryInto::try_into).collect()
     }
 
     async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
