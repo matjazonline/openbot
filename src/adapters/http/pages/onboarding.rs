@@ -78,11 +78,11 @@ pub fn onboarding_channel_page(
     let pane = format!(
         r##"<div><h1 class="card-title text-2xl">Create your first email agent</h1><p class="mt-2 opacity-70">Choose ready-made agents, create a custom one, or do both for <strong>{company_name}</strong>.</p></div>
         {error_html}
-        <form method="post" action="/ui/onboarding/companies/{company_id}/channel" class="space-y-5">
+        <form method="post" action="/ui/onboarding/companies/{company_id}/channel" class="space-y-5" onsubmit="this.setAttribute('aria-busy', 'true'); const button = this.querySelector('[type=submit]'); button.disabled = true; button.querySelector('[data-progress]').classList.remove('hidden'); button.querySelector('[data-label]').textContent = 'Creating email agents…';">
             {library_html}
             <fieldset class="fieldset"><legend class="fieldset-legend">Channel name <span class="font-normal opacity-60">(optional)</span></legend><input id="onboarding_channel_name" name="name" type="text" class="input w-full" placeholder="Customer Support"><p class="label opacity-60">For example: <span class="font-mono">customer-support@{company_slug}...</span></p></fieldset>
             <fieldset class="fieldset"><legend class="fieldset-legend">What should this custom agent do?</legend><textarea id="onboarding_instructions" name="instructions" rows="7" class="textarea w-full" placeholder="Read incoming customer emails, identify the request, draft a concise and friendly answer, ask for missing details, and clearly list any next actions."></textarea><p class="label opacity-60">Required only when creating a custom agent.</p></fieldset>
-            <div class="card-actions items-center justify-between"><a href="/ui" class="btn btn-ghost">Finish later</a><button type="submit" class="btn btn-primary">Create email agents</button></div>
+            <div class="card-actions items-center justify-between"><a href="/ui" class="btn btn-ghost">Finish later</a><button type="submit" class="btn btn-primary"><span data-progress class="loading loading-spinner loading-sm hidden" aria-hidden="true"></span><span data-label>Create email agents</span></button></div>
         </form>"##,
         company_name = escape_html_text(&company.name),
         company_slug = escape_html_text(company.slug.as_ref()),

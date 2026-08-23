@@ -447,6 +447,9 @@ mod tests {
         assert!(channel_page.contains(&format!("value=\"{}\"", library_agent.id)));
         assert!(channel_page.contains("Scheduler"));
         assert!(channel_page.contains("Each agent gets a channel with the same name"));
+        assert!(channel_page.contains("this.setAttribute('aria-busy', 'true')"));
+        assert!(channel_page.contains("loading loading-spinner loading-sm hidden"));
+        assert!(channel_page.contains("Creating email agents…"));
 
         let complete_page =
             pages::onboarding_complete_page(&user, &company, &channel, "example.com");

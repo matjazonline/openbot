@@ -14,6 +14,26 @@ Nothing you add to the `/ui` `<style>` block reaches the second set, and daisyUI
 (`input`, `select`, `btn`, `card`) do nothing there. Check which shell a page renders through
 before styling it.
 
+# Every user action needs visible progress feedback
+
+When an interaction starts work that does not finish immediately, the UI must visibly acknowledge
+it. A click must never leave the user wondering whether the application received it. Show feedback
+on the control or region responsible for the work: for example, disable a submitted button, add a
+spinner, replace its label with a present-tense status such as `Saving…`, and mark the affected
+region `aria-busy="true"`. Keep the feedback visible until the work succeeds or fails.
+
+Start progress feedback only after the action is actually accepted. For native forms, use the
+`submit` event rather than the button's `click` event so browser validation failures do not leave
+the form looking busy. Prevent accidental duplicate actions while work is pending, but do not
+disable unrelated navigation or controls unless using them would corrupt the operation. On an
+in-place failure, restore the controls, clear the busy state, and show an actionable error; a full
+page response may replace the pending UI instead.
+
+Match the indicator to the scope of the work. Use button-level feedback for a single submitted
+action, a local loading or skeleton state for a region being refreshed, and page-level progress
+only when the whole page is unavailable. Do not use an indefinite spinner for a process that is
+waiting for user input or has otherwise stopped making progress; show its actual state instead.
+
 # Restyle daisyUI by redefining its variables, not its components
 
 daisyUI drives its look from CSS custom properties: `--radius-field` for every field-sized
