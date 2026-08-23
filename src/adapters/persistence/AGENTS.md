@@ -122,11 +122,11 @@ and plans justify the API change.
 
 # 1. Migration
 
-New timestamped file in `migrations/`, never an edit to an installed one —
-`20260817000000_init_schema.sql` is the squashed baseline every database has already applied, so
-editing it changes a checksum sqlx will reject. The minimal shape is one `ALTER TABLE ... ADD
-COLUMN`; the multi-statement shape backfills in an `UPDATE` between the `ADD COLUMN` and the
-`SET NOT NULL`.
+A migration is immutable as soon as it has been applied to any persistent development database.
+Refine it with a new timestamped follow-up migration; never edit the applied file or rewrite SQLx
+checksums. `20260817000000_init_schema.sql` is the squashed baseline every database has already
+applied. The minimal shape is one `ALTER TABLE ... ADD COLUMN`; the multi-statement shape backfills
+in an `UPDATE` between the `ADD COLUMN` and the `SET NOT NULL`.
 
 A `NOT NULL` column needs a `DEFAULT` (or an `UPDATE` backfill before `SET NOT NULL`) — existing rows
 must come out valid, because production has rows and your dev database mostly doesn't. State the

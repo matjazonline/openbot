@@ -290,6 +290,7 @@ pub struct ScheduledRunPayload {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ClaimedScheduleRun {
     pub id: Uuid,
+    pub materialization_generation: Uuid,
     pub scheduled_for: DateTime<Utc>,
     pub schedule: ChannelSchedule,
     pub thread_id: Option<Uuid>,

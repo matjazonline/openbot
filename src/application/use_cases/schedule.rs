@@ -313,11 +313,11 @@ impl ScheduleUseCases {
     async fn execute_schedule_run(
         &self,
         schedule: &ChannelSchedule,
-        durable_run: Option<(Uuid, chrono::DateTime<Utc>)>,
+        durable_run: Option<(Uuid, chrono::DateTime<Utc>, Uuid, Uuid)>,
     ) -> AppResult<Uuid> {
-        let run_id = durable_run.map(|(id, _)| id);
+        let run_id = durable_run.map(|(id, _, _, _)| id);
         let now = durable_run
-            .map(|(_, scheduled_for)| scheduled_for)
+            .map(|(_, scheduled_for, _, _)| scheduled_for)
             .unwrap_or_else(Utc::now);
         let rendered_subject = schedule.render_subject(now);
         let rendered_prompt = schedule.render_prompt(now);
@@ -438,20 +438,31 @@ impl ScheduleUseCases {
             task.id, schedule.name
         );
 
-        if let Some(run_id) = run_id {
-            self.schedule_persistence
-                .record_run_task(run_id, task.id)
-                .await?;
+        if let Some((run_id, _, worker_id, generation)) = durable_run {
+            if !self
+                .schedule_persistence
+                .record_run_task(run_id, worker_id, generation, task.id)
+                .await?
+            {
+                return Err(AppError::Internal(
+                    "Schedule-run materialization lease was lost before completion".into(),
+                ));
+            }
         }
 
         Ok(task.id)
     }
 
     /// Process all currently due schedules (called by the background poller loop).
-    pub async fn process_due_schedules(&self, batch_size: i64) -> AppResult<usize> {
+    pub async fn process_due_schedules(
+        &self,
+        worker_id: Uuid,
+        lock_expires_at: chrono::DateTime<Utc>,
+        batch_size: i64,
+    ) -> AppResult<usize> {
         let due_runs = self
             .schedule_persistence
-            .claim_and_advance_due_schedules(batch_size)
+            .claim_and_advance_due_schedules(worker_id, lock_expires_at, batch_size)
             .await?;
 
         let count = due_runs.len();
@@ -462,7 +473,15 @@ impl ScheduleUseCases {
                 schedule.name, schedule.id
             );
             match self
-                .execute_schedule_run(schedule, Some((run.id, run.scheduled_for)))
+                .execute_schedule_run(
+                    schedule,
+                    Some((
+                        run.id,
+                        run.scheduled_for,
+                        worker_id,
+                        run.materialization_generation,
+                    )),
+                )
                 .await
             {
                 Ok(_) => {
@@ -475,9 +494,18 @@ impl ScheduleUseCases {
                         "Failed to materialize durable schedule run {} for '{}' ({}): {}.",
                         run.id, schedule.name, schedule.id, err
                     );
-                    self.schedule_persistence
-                        .record_run_error(run.id, &err.to_string())
+                    let recorded = self
+                        .schedule_persistence
+                        .record_run_error(
+                            run.id,
+                            worker_id,
+                            run.materialization_generation,
+                            &err.to_string(),
+                        )
                         .await?;
+                    if !recorded {
+                        warn!(run_id = %run.id, "Schedule-run failure ignored after lease loss");
+                    }
                 }
             }
         }
@@ -695,9 +723,31 @@ mod tests {
 
         async fn claim_and_advance_due_schedules(
             &self,
+            _worker_id: Uuid,
+            _lock_expires_at: chrono::DateTime<Utc>,
             _limit: i64,
         ) -> AppResult<Vec<crate::entities::schedule::ClaimedScheduleRun>> {
             Ok(vec![])
+        }
+
+        async fn record_run_task(
+            &self,
+            _run_id: Uuid,
+            _worker_id: Uuid,
+            _generation: Uuid,
+            _task_id: Uuid,
+        ) -> AppResult<bool> {
+            Ok(true)
+        }
+
+        async fn record_run_error(
+            &self,
+            _run_id: Uuid,
+            _worker_id: Uuid,
+            _generation: Uuid,
+            _error: &str,
+        ) -> AppResult<bool> {
+            Ok(true)
         }
 
         async fn record_manual_run(&self, id: Uuid) -> AppResult<Option<ChannelSchedule>> {

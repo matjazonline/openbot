@@ -2124,7 +2124,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn concurrent_workers_claim_a_task_once() {
+    async fn concurrent_workers_claim_once_and_a_failed_task_is_not_immediately_reclaimed() {
         let Some(pool) = test_pool().await else {
             return;
         };
@@ -2226,6 +2226,55 @@ mod tests {
                   WHERE id = ANY($1)",
             )
             .bind(&borrowed)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        // This single row fills the worker's one-task batch. Failing it must move it behind
+        // persisted backoff before `MoreWaiting` sends the worker straight into another
+        // iteration; otherwise a poison task is reclaimed without any clock advance.
+        let claimed_task = claimed
+            .iter()
+            .find(|claim| claim.id == task.id)
+            .expect("this task was claimed");
+        let claiming_worker = claimed_task.worker_id.expect("a claim records its worker");
+        assert!(
+            persistence
+                .mark_task_failed(
+                    task.id,
+                    claiming_worker,
+                    "poison task",
+                    Utc::now() + chrono::Duration::minutes(1),
+                    false,
+                )
+                .await
+                .unwrap()
+        );
+
+        let immediate_worker = Uuid::new_v4();
+        let immediate = persistence
+            .claim_pending_tasks(
+                immediate_worker,
+                Utc::now() + chrono::Duration::minutes(5),
+                1,
+            )
+            .await
+            .unwrap();
+        assert!(
+            immediate.iter().all(|claim| claim.id != task.id),
+            "a failed full batch must not reclaim the same task on the zero-delay iteration"
+        );
+        let immediate_borrowed: Vec<Uuid> = immediate.iter().map(|claim| claim.id).collect();
+        if !immediate_borrowed.is_empty() {
+            sqlx::query(
+                "UPDATE background_tasks
+                    SET status = 'pending', worker_id = NULL, locked_at = NULL,
+                        lock_expires_at = NULL
+                  WHERE id = ANY($1) AND worker_id = $2",
+            )
+            .bind(&immediate_borrowed)
+            .bind(immediate_worker)
             .execute(&pool)
             .await
             .unwrap();
@@ -2433,7 +2482,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_expired_delivery_lease_costs_an_attempt_and_reaches_the_cap() {
+    async fn failed_outbox_batch_is_backed_off_and_expired_leases_reach_the_cap() {
         let Some(pool) = test_pool().await else {
             return;
         };
@@ -2551,6 +2600,31 @@ mod tests {
             claimed_ours(1).await,
             "a pending row is the poller's to take"
         );
+
+        // One row fills this test's batch. A retryable delivery failure must make it unavailable
+        // before `MoreWaiting` drives the next iteration, so the unchanged clock cannot feed the
+        // same poison email back to the worker.
+        assert!(
+            persistence
+                .mark_outbox_email_failed(outbox_id, worker_id, "poison delivery")
+                .await
+                .unwrap()
+        );
+        assert!(
+            !claimed_ours(1).await,
+            "a failed full batch must not reclaim the same email on the zero-delay iteration"
+        );
+
+        // Make the same row due again so the remainder of the test can exercise lease expiry.
+        sqlx::query(
+            "UPDATE email_outbox SET available_at = CURRENT_TIMESTAMP - interval '1 second'
+              WHERE id = $1",
+        )
+        .bind(outbox_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(claimed_ours(1).await);
 
         // A lease that is still running belongs to the worker holding it.
         persistence.reap_expired_outbox_leases().await.unwrap();

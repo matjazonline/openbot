@@ -954,9 +954,29 @@ mod tests {
         }
         async fn claim_and_advance_due_schedules(
             &self,
+            _worker_id: Uuid,
+            _lock_expires_at: chrono::DateTime<chrono::Utc>,
             _limit: i64,
         ) -> AppResult<Vec<crate::entities::schedule::ClaimedScheduleRun>> {
             Ok(vec![])
+        }
+        async fn record_run_task(
+            &self,
+            _run_id: Uuid,
+            _worker_id: Uuid,
+            _generation: Uuid,
+            _task_id: Uuid,
+        ) -> AppResult<bool> {
+            Ok(true)
+        }
+        async fn record_run_error(
+            &self,
+            _run_id: Uuid,
+            _worker_id: Uuid,
+            _generation: Uuid,
+            _error: &str,
+        ) -> AppResult<bool> {
+            Ok(true)
         }
         async fn record_manual_run(
             &self,

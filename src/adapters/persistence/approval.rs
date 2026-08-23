@@ -30,6 +30,10 @@ pub struct HumanApprovalDb {
     pub updated_at: DateTime<Utc>,
 }
 
+const APPROVAL_COLUMNS: &str = r#"id, company_id, channel_id, thread_id, task_id,
+    step_key, approver_email, action_type, action_title, action_summary, payload, token,
+    status, expires_at, created_at, updated_at"#;
+
 impl TryFrom<HumanApprovalDb> for HumanApproval {
     type Error = AppError;
 
@@ -140,7 +144,7 @@ impl ApprovalPersistence for PostgresPersistence {
         let token = Uuid::parse_str(token)
             .map_err(|e| AppError::Internal(format!("Invalid approval token: {}", e)))?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let db = sqlx::query_as::<_, HumanApprovalDb>(
+        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
             INSERT INTO human_approvals (
                 id, company_id, channel_id, thread_id, task_id,
@@ -170,9 +174,9 @@ impl ApprovalPersistence for PostgresPersistence {
                     THEN EXCLUDED.expires_at ELSE human_approvals.expires_at END,
                 updated_at = CASE WHEN human_approvals.status = 'expired'
                     THEN CURRENT_TIMESTAMP ELSE human_approvals.updated_at END
-            RETURNING *
+            RETURNING {APPROVAL_COLUMNS}
             "#,
-        )
+        ))
         .bind(id)
         .bind(company_id)
         .bind(channel_id)
@@ -239,16 +243,16 @@ impl ApprovalPersistence for PostgresPersistence {
         thread_id: Option<Uuid>,
         step_key: &str,
     ) -> AppResult<Option<HumanApproval>> {
-        let db = sqlx::query_as::<_, HumanApprovalDb>(
+        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
-            SELECT * FROM human_approvals
+            SELECT {APPROVAL_COLUMNS} FROM human_approvals
             WHERE company_id = $1 AND channel_id = $2
               AND (thread_id = $3 OR ($3 IS NULL AND thread_id IS NULL))
               AND step_key = $4
             ORDER BY created_at DESC, id DESC
             LIMIT 1
             "#,
-        )
+        ))
         .bind(company_id)
         .bind(channel_id)
         .bind(thread_id)
@@ -264,12 +268,12 @@ impl ApprovalPersistence for PostgresPersistence {
         let Ok(token) = Uuid::parse_str(token) else {
             return Ok(None);
         };
-        let db = sqlx::query_as::<_, HumanApprovalDb>(
+        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
-            SELECT * FROM human_approvals
+            SELECT {APPROVAL_COLUMNS} FROM human_approvals
             WHERE token = $1
             "#,
-        )
+        ))
         .bind(token)
         .fetch_optional(&self.pool)
         .await
@@ -287,16 +291,16 @@ impl ApprovalPersistence for PostgresPersistence {
         let Ok(token) = Uuid::parse_str(token) else {
             return Ok(None);
         };
-        let db = sqlx::query_as::<_, HumanApprovalDb>(
+        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
             UPDATE human_approvals
             SET status = $2, updated_at = CURRENT_TIMESTAMP
             WHERE token = $1
               AND status = 'pending'
               AND expires_at >= $3
-            RETURNING *
+            RETURNING {APPROVAL_COLUMNS}
             "#,
-        )
+        ))
         .bind(token)
         .bind(status.as_str())
         .bind(now)
@@ -317,12 +321,12 @@ impl ApprovalPersistence for PostgresPersistence {
             return Ok(None);
         };
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let approval = sqlx::query_as::<_, HumanApprovalDb>(
-            r#"SELECT * FROM human_approvals
+        let approval = sqlx::query_as::<_, HumanApprovalDb>(&format!(
+            r#"SELECT {APPROVAL_COLUMNS} FROM human_approvals
                WHERE token = $1 AND status = 'pending' AND expires_at >= $2
                  AND action_type = 'quorum_timeout'
-               FOR UPDATE"#,
-        )
+               FOR UPDATE"#
+        ))
         .bind(token)
         .bind(now)
         .fetch_optional(&mut *tx)
@@ -427,10 +431,10 @@ impl ApprovalPersistence for PostgresPersistence {
         } else {
             ApprovalStatus::Approved
         };
-        let updated = sqlx::query_as::<_, HumanApprovalDb>(
+        let updated = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"UPDATE human_approvals SET status = $2, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $1 AND status = 'pending' RETURNING *"#,
-        )
+               WHERE id = $1 AND status = 'pending' RETURNING {APPROVAL_COLUMNS}"#
+        ))
         .bind(approval.id)
         .bind(status.as_str())
         .fetch_one(&mut *tx)
@@ -448,16 +452,16 @@ impl ApprovalPersistence for PostgresPersistence {
         let Ok(token) = Uuid::parse_str(token) else {
             return Ok(None);
         };
-        let db = sqlx::query_as::<_, HumanApprovalDb>(
+        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
             UPDATE human_approvals
             SET status = 'expired', updated_at = CURRENT_TIMESTAMP
             WHERE token = $1
               AND status = 'pending'
               AND expires_at < $2
-            RETURNING *
+            RETURNING {APPROVAL_COLUMNS}
             "#,
-        )
+        ))
         .bind(token)
         .bind(now)
         .fetch_optional(&self.pool)
@@ -472,14 +476,14 @@ impl ApprovalPersistence for PostgresPersistence {
         company_id: Uuid,
         channel_id: Uuid,
     ) -> AppResult<Vec<HumanApproval>> {
-        let list = sqlx::query_as::<_, HumanApprovalDb>(
+        let list = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
-            SELECT * FROM human_approvals
+            SELECT {APPROVAL_COLUMNS} FROM human_approvals
             WHERE company_id = $1 AND channel_id = $2
             ORDER BY created_at DESC, id DESC
             LIMIT 200
             "#,
-        )
+        ))
         .bind(company_id)
         .bind(channel_id)
         .fetch_all(&self.pool)

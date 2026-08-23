@@ -98,6 +98,7 @@ pub struct ScheduleRunDb {
 #[derive(FromRow, Debug)]
 struct ClaimedScheduleRunDb {
     id: Uuid,
+    materialization_generation: Uuid,
     scheduled_for: DateTime<Utc>,
     schedule_snapshot: serde_json::Value,
     thread_id: Option<Uuid>,
@@ -113,6 +114,7 @@ impl TryFrom<ClaimedScheduleRunDb> for ClaimedScheduleRun {
         })?;
         Ok(Self {
             id: db.id,
+            materialization_generation: db.materialization_generation,
             scheduled_for: db.scheduled_for,
             schedule,
             thread_id: db.thread_id,
@@ -204,16 +206,26 @@ pub trait SchedulePersistence: Send + Sync {
     /// persisted, unfinished slots are returned as well so a process restart resumes them.
     async fn claim_and_advance_due_schedules(
         &self,
+        worker_id: Uuid,
+        lock_expires_at: DateTime<Utc>,
         limit: i64,
     ) -> AppResult<Vec<ClaimedScheduleRun>>;
 
-    async fn record_run_task(&self, _run_id: Uuid, _task_id: Uuid) -> AppResult<()> {
-        Ok(())
-    }
+    async fn record_run_task(
+        &self,
+        run_id: Uuid,
+        worker_id: Uuid,
+        generation: Uuid,
+        task_id: Uuid,
+    ) -> AppResult<bool>;
 
-    async fn record_run_error(&self, _run_id: Uuid, _error: &str) -> AppResult<()> {
-        Ok(())
-    }
+    async fn record_run_error(
+        &self,
+        run_id: Uuid,
+        worker_id: Uuid,
+        generation: Uuid,
+        error: &str,
+    ) -> AppResult<bool>;
 
     /// Updates `last_run_at` on a manual "run now" execution.
     async fn record_manual_run(&self, id: Uuid) -> AppResult<Option<ChannelSchedule>>;
@@ -404,6 +416,8 @@ impl SchedulePersistence for PostgresPersistence {
 
     async fn claim_and_advance_due_schedules(
         &self,
+        worker_id: Uuid,
+        lock_expires_at: DateTime<Utc>,
         limit: i64,
     ) -> AppResult<Vec<ClaimedScheduleRun>> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
@@ -473,13 +487,47 @@ impl SchedulePersistence for PostgresPersistence {
         }
 
         let rows = sqlx::query_as::<_, ClaimedScheduleRunDb>(
-            r#"SELECT id, scheduled_for, schedule_snapshot, thread_id, task_id
-               FROM schedule_runs
-               WHERE task_id IS NULL
-               ORDER BY created_at, id
-               LIMIT $1"#,
+            r#"WITH terminal AS (
+                   UPDATE schedule_runs
+                   SET materialization_status = 'failed',
+                       last_error = COALESCE(last_error, 'Materialization lease expired at retry limit'),
+                       materialization_worker_id = NULL, materialization_generation = NULL,
+                       materialization_locked_at = NULL, materialization_lock_expires_at = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE materialization_status = 'materializing'
+                     AND materialization_attempts >= 5
+                     AND materialization_lock_expires_at <= CURRENT_TIMESTAMP
+                   RETURNING id
+               ), candidates AS (
+                   SELECT id
+                   FROM schedule_runs
+                   WHERE (materialization_status = 'pending'
+                          AND materialization_available_at <= CURRENT_TIMESTAMP
+                          AND materialization_attempts < 5)
+                      OR (materialization_status = 'materializing'
+                          AND materialization_lock_expires_at <= CURRENT_TIMESTAMP
+                          AND materialization_attempts < 5)
+                   ORDER BY materialization_available_at, created_at, id
+                   FOR UPDATE SKIP LOCKED
+                   LIMIT $1
+               )
+               UPDATE schedule_runs AS run
+               SET materialization_status = 'materializing',
+                   materialization_attempts = materialization_attempts + 1,
+                   materialization_worker_id = $2,
+                   materialization_generation = gen_random_uuid(),
+                   materialization_locked_at = CURRENT_TIMESTAMP,
+                   materialization_lock_expires_at = $3,
+                   updated_at = CURRENT_TIMESTAMP
+               FROM candidates
+               WHERE run.id = candidates.id
+                 AND run.materialization_attempts < 5
+               RETURNING run.id, run.materialization_generation, run.scheduled_for,
+                         run.schedule_snapshot, run.thread_id, run.task_id"#,
         )
-        .bind(limit.max(1))
+        .bind(limit.clamp(1, 100))
+        .bind(worker_id)
+        .bind(lock_expires_at)
         .fetch_all(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -489,31 +537,64 @@ impl SchedulePersistence for PostgresPersistence {
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
-    async fn record_run_task(&self, run_id: Uuid, task_id: Uuid) -> AppResult<()> {
-        sqlx::query(
-            r#"UPDATE schedule_runs SET task_id = $2, last_error = NULL,
-                      updated_at = CURRENT_TIMESTAMP
-               WHERE id = $1 AND thread_id IS NOT NULL AND (task_id IS NULL OR task_id = $2)"#,
+    async fn record_run_task(
+        &self,
+        run_id: Uuid,
+        worker_id: Uuid,
+        generation: Uuid,
+        task_id: Uuid,
+    ) -> AppResult<bool> {
+        let result = sqlx::query(
+            r#"UPDATE schedule_runs
+               SET task_id = $4, last_error = NULL, materialization_status = 'materialized',
+                   materialization_worker_id = NULL, materialization_generation = NULL,
+                   materialization_locked_at = NULL, materialization_lock_expires_at = NULL,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = $1 AND thread_id IS NOT NULL AND task_id IS NULL
+                 AND materialization_status = 'materializing'
+                 AND materialization_worker_id = $2 AND materialization_generation = $3
+                 AND materialization_lock_expires_at > CURRENT_TIMESTAMP"#,
         )
         .bind(run_id)
+        .bind(worker_id)
+        .bind(generation)
         .bind(task_id)
         .execute(&self.pool)
         .await
         .map_err(AppError::from)?;
-        Ok(())
+        Ok(result.rows_affected() == 1)
     }
 
-    async fn record_run_error(&self, run_id: Uuid, error: &str) -> AppResult<()> {
-        sqlx::query(
-            r#"UPDATE schedule_runs SET last_error = $2, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $1 AND task_id IS NULL"#,
+    async fn record_run_error(
+        &self,
+        run_id: Uuid,
+        worker_id: Uuid,
+        generation: Uuid,
+        error: &str,
+    ) -> AppResult<bool> {
+        let result = sqlx::query(
+            r#"UPDATE schedule_runs
+               SET last_error = $4,
+                   materialization_status = CASE WHEN materialization_attempts >= 5
+                       THEN 'failed' ELSE 'pending' END,
+                   materialization_available_at = CURRENT_TIMESTAMP + make_interval(secs =>
+                       CASE materialization_attempts WHEN 1 THEN 5 WHEN 2 THEN 15
+                            WHEN 3 THEN 60 WHEN 4 THEN 300 ELSE 900 END),
+                   materialization_worker_id = NULL, materialization_generation = NULL,
+                   materialization_locked_at = NULL, materialization_lock_expires_at = NULL,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = $1 AND task_id IS NULL
+                 AND materialization_status = 'materializing'
+                 AND materialization_worker_id = $2 AND materialization_generation = $3"#,
         )
         .bind(run_id)
+        .bind(worker_id)
+        .bind(generation)
         .bind(error)
         .execute(&self.pool)
         .await
         .map_err(AppError::from)?;
-        Ok(())
+        Ok(result.rows_affected() == 1)
     }
 
     async fn record_manual_run(&self, id: Uuid) -> AppResult<Option<ChannelSchedule>> {
@@ -716,9 +797,14 @@ mod tests {
             .await
             .unwrap();
 
-        let claimed = SchedulePersistence::claim_and_advance_due_schedules(&persistence, 10)
-            .await
-            .unwrap();
+        let claimed = SchedulePersistence::claim_and_advance_due_schedules(
+            &persistence,
+            Uuid::new_v4(),
+            Utc::now() + chrono::Duration::minutes(1),
+            10,
+        )
+        .await
+        .unwrap();
         assert!(claimed.iter().any(|run| run.schedule.id == hourly.id));
 
         let advanced = SchedulePersistence::get_by_id(&persistence, hourly.id)
@@ -873,12 +959,49 @@ mod tests {
                 .unwrap();
 
         // 4. Claim and advance due schedules
-        let claimed = SchedulePersistence::claim_and_advance_due_schedules(&persistence, 10)
-            .await
-            .unwrap();
+        let first_worker = Uuid::new_v4();
+        let second_worker = Uuid::new_v4();
+        let lease_expires_at = Utc::now() + chrono::Duration::minutes(1);
+        let (first_claim, second_claim) = tokio::join!(
+            SchedulePersistence::claim_and_advance_due_schedules(
+                &persistence,
+                first_worker,
+                lease_expires_at,
+                10,
+            ),
+            SchedulePersistence::claim_and_advance_due_schedules(
+                &persistence,
+                second_worker,
+                lease_expires_at,
+                10,
+            )
+        );
+        let first_claim = first_claim.unwrap();
+        let second_claim = second_claim.unwrap();
+        let owners: Vec<_> = [(&first_claim, first_worker), (&second_claim, second_worker)]
+            .into_iter()
+            .filter(|(runs, _)| runs.iter().any(|run| run.schedule.id == one_off.id))
+            .collect();
+        assert_eq!(owners.len(), 1, "only one worker may claim a durable run");
+        let (claimed, claiming_worker) = owners[0];
         let claimed_one_off = claimed.iter().find(|run| run.schedule.id == one_off.id);
         assert!(claimed_one_off.is_some());
         let durable_run = claimed_one_off.unwrap();
+
+        let immediate_retry = SchedulePersistence::claim_and_advance_due_schedules(
+            &persistence,
+            Uuid::new_v4(),
+            lease_expires_at,
+            10,
+        )
+        .await
+        .unwrap();
+        assert!(
+            immediate_retry
+                .iter()
+                .all(|run| run.schedule.id != one_off.id),
+            "a live materialization lease must exclude the run from another claim"
+        );
 
         let first_thread = ThreadPersistence::ensure_schedule_run_thread(
             &persistence,
@@ -925,6 +1048,80 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(first_task.id, resumed_task.id);
+        assert!(
+            SchedulePersistence::record_run_task(
+                &persistence,
+                durable_run.id,
+                claiming_worker,
+                durable_run.materialization_generation,
+                first_task.id,
+            )
+            .await
+            .unwrap()
+        );
+
+        // A poison materialization is handed back with persisted backoff, rather than filling the
+        // next batch and driving the worker's zero-delay backlog path forever.
+        let poison_run_id = Uuid::new_v4();
+        sqlx::query(
+            r#"INSERT INTO schedule_runs (id, schedule_id, scheduled_for, schedule_snapshot)
+               VALUES ($1, $2, $3, $4)"#,
+        )
+        .bind(poison_run_id)
+        .bind(schedule.id)
+        .bind(Utc::now())
+        .bind(serde_json::to_value(&schedule).unwrap())
+        .execute(&persistence.pool)
+        .await
+        .unwrap();
+        let poison_worker = Uuid::new_v4();
+        let poison_claim = SchedulePersistence::claim_and_advance_due_schedules(
+            &persistence,
+            poison_worker,
+            lease_expires_at,
+            10,
+        )
+        .await
+        .unwrap();
+        let poison = poison_claim
+            .iter()
+            .find(|run| run.id == poison_run_id)
+            .expect("the pending poison run is claimed once");
+        assert!(
+            !SchedulePersistence::record_run_error(
+                &persistence,
+                poison.id,
+                poison_worker,
+                Uuid::new_v4(),
+                "stale worker",
+            )
+            .await
+            .unwrap(),
+            "a stale generation cannot fail the replacement claim"
+        );
+        assert!(
+            SchedulePersistence::record_run_error(
+                &persistence,
+                poison.id,
+                poison_worker,
+                poison.materialization_generation,
+                "materialization failed",
+            )
+            .await
+            .unwrap()
+        );
+        let immediate_retry = SchedulePersistence::claim_and_advance_due_schedules(
+            &persistence,
+            Uuid::new_v4(),
+            lease_expires_at,
+            10,
+        )
+        .await
+        .unwrap();
+        assert!(
+            immediate_retry.iter().all(|run| run.id != poison_run_id),
+            "a failed run must stay out of the queue until its backoff expires"
+        );
 
         // One-off schedule should now be disabled with next_run_at = None
         let re_read_one_off = SchedulePersistence::get_by_id(&persistence, one_off.id)

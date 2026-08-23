@@ -59,6 +59,12 @@ Any parked state such as approval, quorum, or scheduled materialization needs a 
 sweeper, and a terminal transition. Pending queries must claim with a lease/backoff or exclude
 failed rows so a fixed set of poison records cannot monopolize a batch and hot-spin the poll loop.
 
+A full claim batch justifies the worker's `MoreWaiting`/zero-delay decision only when persistence
+has transitioned those rows out of the claimable set. Failed or unchanged rows are not evidence of
+additional backlog. For every retryable worker queue, add a poison-batch regression test: fill one
+batch with failures, run two consecutive iterations without advancing time, and prove the second
+iteration does not reclaim the same rows.
+
 # Treat prompt input as untrusted data
 
 Delimit inbound content from system instructions and label it as untrusted. Tool approval remains

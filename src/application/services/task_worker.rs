@@ -45,6 +45,10 @@ const OUTBOX_POLL_INTERVAL: Duration = Duration::from_millis(500);
 /// How often the schedule loop checks for due recurring or one-off runs.
 const SCHEDULE_POLL_INTERVAL: Duration = Duration::from_secs(2);
 
+/// Schedule materialization performs only bounded database work. A short lease makes a crashed
+/// worker recover promptly while leaving ample room for ordinary database latency.
+const SCHEDULE_MATERIALIZATION_LEASE_SECONDS: i64 = 60;
+
 /// How often the slow lane runs. Quorum timeouts and expired delivery leases are measured in
 /// minutes; checking them at queue cadence scans a hundred outreaches to find nothing.
 const MAINTENANCE_INTERVAL: Duration = Duration::from_secs(30);
@@ -247,7 +251,12 @@ impl TaskWorker {
             return Ok(Polled::Idle);
         };
         let count = schedules
-            .process_due_schedules(10)
+            .process_due_schedules(
+                self.worker_id,
+                chrono::Utc::now()
+                    + chrono::Duration::seconds(SCHEDULE_MATERIALIZATION_LEASE_SECONDS),
+                10,
+            )
             .await
             .map_err(|e| e.to_string())?;
         Ok(polled(count, 10))
