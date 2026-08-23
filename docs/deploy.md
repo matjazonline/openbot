@@ -109,6 +109,13 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Optional Google registration/login. Set both and register `https://<APP_DOMAIN_NAME>/auth/google/callback` as an authorized redirect URI in Google Cloud. |
 | `APPLE_OAUTH_CLIENT_ID` / `APPLE_OAUTH_TEAM_ID` / `APPLE_OAUTH_KEY_ID` / `APPLE_OAUTH_PRIVATE_KEY_BASE64` | Optional Sign in with Apple. Set all four, use the Services ID as the client ID, base64-encode the `.p8` private key, and register `https://<APP_DOMAIN_NAME>/auth/apple/callback` as the return URL. Apple requires a real HTTPS domain and does not accept localhost. Register the outbound mail domain and sender with Apple's private email relay so confirmation codes reach relay addresses. |
 | `OPENAI_API_KEY` | Or `ANTHROPIC_API_KEY` / `GROQ_API_KEY` / `GEMINI_API_KEY`, per the agent's configured provider |
+| `CREDENTIAL_ENCRYPTION_KEYS` | Versioned AES-256-GCM keys (`1:<base64-32-bytes>,2:<base64-32-bytes>`). Keep prior versions during rotation; the highest version is active. |
+
+Credential encryption keys are rotated additively: append a higher version, deploy, and let startup
+re-encrypt stored provider credentials before removing the old version in a later deploy. After the
+first encrypted deployment, rotate the credentials themselves with each model provider and save the
+replacement values through the application; database encryption limits storage exposure but cannot
+invalidate provider keys that may already have been copied from an older dump.
 | `GCS_SERVICE_ACCOUNT_JSON_BASE64` | The Cloud Storage service account key, base64-encoded — see [Picture uploads](#picture-uploads) |
 | `JWT_SECRET` | Signs every session cookie. At least 32 characters; the app refuses to start with less |
 

@@ -1,5 +1,8 @@
 use crate::{
-    adapters::{crypto::argon2::ArgonPasswordHasher, persistence::PostgresPersistence},
+    adapters::{
+        crypto::argon2::ArgonPasswordHasher,
+        persistence::{PostgresPersistence, credentials::CredentialCipher},
+    },
     infra::db::init_db,
 };
 
@@ -11,7 +14,9 @@ pub mod setup;
 
 pub async fn postgres_persistence() -> anyhow::Result<PostgresPersistence> {
     let pool = init_db().await?;
-    let persistence = PostgresPersistence::new(pool);
+    let persistence =
+        PostgresPersistence::with_credential_cipher(pool, CredentialCipher::from_env()?);
+    persistence.rotate_credentials().await?;
     Ok(persistence)
 }
 

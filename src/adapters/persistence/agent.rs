@@ -48,10 +48,18 @@ impl From<AgentDb> for Agent {
     }
 }
 
+impl PostgresPersistence {
+    fn decode_agent(&self, mut db: AgentDb) -> AppResult<Agent> {
+        db.api_key = self.decrypt_credential(db.api_key)?;
+        Ok(db.into())
+    }
+}
+
 #[async_trait]
 impl AgentPersistence for PostgresPersistence {
     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
         let uuid = Uuid::new_v4();
+        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
 
         let db = sqlx::query_as::<_, AgentDb>(
             r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by)
@@ -64,7 +72,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(&write.slug)
         .bind(&write.provider)
         .bind(&write.model)
-        .bind(&write.api_key)
+        .bind(encrypted_api_key)
         .bind(&write.system_prompt)
         .bind(&write.description)
         .bind(&write.config_json)
@@ -74,11 +82,12 @@ impl AgentPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.into())
+        self.decode_agent(db)
     }
 
     async fn create_library(&self, write: AgentWrite) -> AppResult<Agent> {
         let uuid = Uuid::new_v4();
+        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let db = sqlx::query_as::<_, AgentDb>(
             r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by)
                VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -89,7 +98,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(&write.slug)
         .bind(&write.provider)
         .bind(&write.model)
-        .bind(&write.api_key)
+        .bind(encrypted_api_key)
         .bind(&write.system_prompt)
         .bind(&write.description)
         .bind(&write.config_json)
@@ -98,7 +107,7 @@ impl AgentPersistence for PostgresPersistence {
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
-        Ok(db.into())
+        self.decode_agent(db)
     }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>> {
@@ -111,7 +120,7 @@ impl AgentPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.map(Into::into))
+        db.map(|db| self.decode_agent(db)).transpose()
     }
 
     async fn get_by_company_slug_and_agent_slug(
@@ -131,12 +140,12 @@ impl AgentPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.map(Into::into))
+        db.map(|db| self.decode_agent(db)).transpose()
     }
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>> {
         let db_list = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at
+            r#"SELECT id, company_id, name, slug, provider, model, NULL::text AS api_key, system_prompt, description, config_json, avatar_url, created_by, created_at
                FROM agents WHERE company_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -150,7 +159,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn list_library(&self) -> AppResult<Vec<Agent>> {
         let rows = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at
+            r#"SELECT id, company_id, name, slug, provider, model, NULL::text AS api_key, system_prompt, description, config_json, avatar_url, created_by, created_at
                FROM agents WHERE company_id IS NULL
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -161,6 +170,7 @@ impl AgentPersistence for PostgresPersistence {
     }
 
     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
+        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let db = sqlx::query_as::<_, AgentDb>(
             r#"UPDATE agents
                SET name = $1, slug = $2, provider = $3, model = $4, api_key = $5, system_prompt = $6, description = $7, config_json = $8, avatar_url = $9
@@ -171,7 +181,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(&write.slug)
         .bind(&write.provider)
         .bind(&write.model)
-        .bind(&write.api_key)
+        .bind(encrypted_api_key)
         .bind(&write.system_prompt)
         .bind(&write.description)
         .bind(&write.config_json)
@@ -181,7 +191,7 @@ impl AgentPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.into())
+        self.decode_agent(db)
     }
 
     async fn delete(&self, id: Uuid) -> AppResult<()> {

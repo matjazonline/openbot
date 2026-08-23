@@ -39,6 +39,7 @@ url = "2"
 pulldown-cmark = "0.13"
 ammonia = "4"
 base64 = "0.22"
+ring = "0.17"
 # RS256 for the Google service-account assertion that buys a Cloud Storage access token.
 jsonwebtoken = "9"
 chrono-tz = "0.10.4"

@@ -75,11 +75,19 @@ impl From<AccessibleCompanyDb> for CompanyAccess {
     }
 }
 
+impl PostgresPersistence {
+    fn decode_company(&self, mut db: CompanyDb) -> AppResult<Company> {
+        db.api_key = self.decrypt_credential(db.api_key)?;
+        Ok(db.into())
+    }
+}
+
 #[async_trait]
 impl CompanyPersistence for PostgresPersistence {
     async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company> {
         let uuid = Uuid::new_v4();
 
+        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"INSERT INTO companies (id, user_id, name, slug, api_key, provider, model,
                                       enable_llm_spam_guardrail, memory_provider, avatar_url)
@@ -91,7 +99,7 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(user_id)
         .bind(&write.name)
         .bind(&write.slug)
-        .bind(&write.api_key)
+        .bind(encrypted_api_key)
         .bind(&write.provider)
         .bind(&write.model)
         .bind(write.enable_llm_spam_guardrail)
@@ -101,7 +109,7 @@ impl CompanyPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.into())
+        self.decode_company(db)
     }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
@@ -115,7 +123,7 @@ impl CompanyPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.map(Into::into))
+        db.map(|db| self.decode_company(db)).transpose()
     }
 
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
@@ -129,12 +137,12 @@ impl CompanyPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.map(Into::into))
+        db.map(|db| self.decode_company(db)).transpose()
     }
 
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         let db_list = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
+            r#"SELECT id, user_id, name, slug, NULL::text AS api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
                       avatar_url, created_at 
                FROM companies WHERE user_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
@@ -152,7 +160,7 @@ impl CompanyPersistence for PostgresPersistence {
         // account id -- the read guards start from a session, the inbound path from an envelope,
         // and both need to know *which* of the two the caller is.
         let db_list = sqlx::query_as::<_, AccessibleCompanyDb>(
-            r#"SELECT c.id, c.user_id, c.name, c.slug, c.api_key, c.provider, c.model,
+            r#"SELECT c.id, c.user_id, c.name, c.slug, NULL::text AS api_key, c.provider, c.model,
                       c.enable_llm_spam_guardrail, c.memory_provider, c.avatar_url, c.created_at,
                       (c.user_id = $1) AS is_owner
                FROM companies c
@@ -172,6 +180,7 @@ impl CompanyPersistence for PostgresPersistence {
     }
 
     async fn update(&self, id: Uuid, write: CompanyWrite) -> AppResult<Company> {
+        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"UPDATE companies SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5,
                       enable_llm_spam_guardrail = $6, memory_provider = $7, avatar_url = $8
@@ -181,7 +190,7 @@ impl CompanyPersistence for PostgresPersistence {
         )
         .bind(&write.name)
         .bind(&write.slug)
-        .bind(&write.api_key)
+        .bind(encrypted_api_key)
         .bind(&write.provider)
         .bind(&write.model)
         .bind(write.enable_llm_spam_guardrail)
@@ -192,7 +201,7 @@ impl CompanyPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.into())
+        self.decode_company(db)
     }
 
     async fn delete(&self, id: Uuid) -> AppResult<()> {
@@ -210,6 +219,7 @@ impl CompanyPersistence for PostgresPersistence {
         id: Uuid,
         write: CompanyWrite,
     ) -> AppResult<Company> {
+        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"UPDATE companies
                SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5,
@@ -220,7 +230,7 @@ impl CompanyPersistence for PostgresPersistence {
         )
         .bind(&write.name)
         .bind(&write.slug)
-        .bind(&write.api_key)
+        .bind(encrypted_api_key)
         .bind(&write.provider)
         .bind(&write.model)
         .bind(write.enable_llm_spam_guardrail)
@@ -235,7 +245,7 @@ impl CompanyPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?
         .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
-        Ok(db.into())
+        self.decode_company(db)
     }
 
     async fn delete_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
@@ -325,7 +335,10 @@ mod tests {
         let Some(pool) = test_pool().await else {
             return;
         };
-        let persistence = PostgresPersistence::new(pool);
+        let persistence = PostgresPersistence::with_credential_cipher(
+            pool.clone(),
+            crate::adapters::persistence::credentials::CredentialCipher::for_test(),
+        );
 
         let owner = create_account(&persistence, "owner").await;
         let member = create_account(&persistence, "member").await;
@@ -337,11 +350,26 @@ mod tests {
                 CompanyWrite {
                     name: "Acme".to_string(),
                     slug: format!("acme-{}", Uuid::new_v4().simple()),
+                    api_key: Some("sk-company-secret".to_string()),
                     ..CompanyWrite::default()
                 },
             )
             .await
             .expect("a company");
+        assert_eq!(company.api_key.as_deref(), Some("sk-company-secret"));
+        let stored: String = sqlx::query_scalar("SELECT api_key FROM companies WHERE id = $1")
+            .bind(company.id)
+            .fetch_one(&pool)
+            .await
+            .expect("the stored credential");
+        assert!(stored.starts_with("enc:v1:1:"));
+        assert!(!stored.contains("sk-company-secret"));
+
+        let listed = persistence
+            .list_by_user_id(owner.0)
+            .await
+            .expect("the ordinary company list");
+        assert_eq!(listed[0].api_key, None);
 
         // Before the invite is accepted, the member is a stranger to it.
         assert!(accessible_ids(&persistence, member.0).await.is_empty());

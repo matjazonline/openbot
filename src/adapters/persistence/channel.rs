@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use sqlx::PgPool;
 use std::collections::HashSet;
 use uuid::Uuid;
 
@@ -113,15 +112,19 @@ const CHANNEL_SELECT: &str = r#"
     FROM channels ch
 "#;
 
-async fn load_channel(pool: &PgPool, id: Uuid) -> AppResult<Option<Channel>> {
+async fn load_channel(persistence: &PostgresPersistence, id: Uuid) -> AppResult<Option<Channel>> {
     let query = format!("{CHANNEL_SELECT} WHERE ch.id = $1");
     let db = sqlx::query_as::<_, ChannelDb>(&query)
         .bind(id)
-        .fetch_optional(pool)
+        .fetch_optional(&persistence.pool)
         .await
         .map_err(AppError::from)?;
 
-    Ok(db.map(Into::into))
+    db.map(|mut db| {
+        db.api_key = persistence.decrypt_credential(db.api_key)?;
+        Ok(db.into())
+    })
+    .transpose()
 }
 
 /// Write a channel's canonical slug plus its aliases into the shared per-company slug namespace.
@@ -199,6 +202,7 @@ fn channel_access(participant_emails: Option<Vec<String>>) -> (&'static str, Vec
 impl ChannelPersistence for PostgresPersistence {
     async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
         let uuid = Uuid::new_v4();
+        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let (access_mode, participants) = channel_access(write.participant_emails);
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
 
@@ -217,7 +221,7 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(write.name)
         .bind(write.description)
         .bind(access_mode)
-        .bind(write.api_key)
+        .bind(encrypted_api_key)
         .bind(write.provider)
         .bind(write.model)
         .bind(write.channel_config)
@@ -265,13 +269,13 @@ impl ChannelPersistence for PostgresPersistence {
         }
 
         tx.commit().await.map_err(AppError::from)?;
-        load_channel(&self.pool, uuid)
+        load_channel(self, uuid)
             .await?
             .ok_or_else(|| AppError::Internal("Created channel was not found".into()))
     }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>> {
-        load_channel(&self.pool, id).await
+        load_channel(self, id).await
     }
 
     async fn get_by_company_slug_and_channel_slug(
@@ -291,13 +295,20 @@ impl ChannelPersistence for PostgresPersistence {
             .await
             .map_err(AppError::from)?;
 
-        Ok(db.map(Into::into))
+        db.map(|mut db| {
+            db.api_key = self.decrypt_credential(db.api_key)?;
+            Ok(db.into())
+        })
+        .transpose()
     }
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
-        let query = format!(
-            "{CHANNEL_SELECT} WHERE ch.company_id = $1 ORDER BY ch.created_at DESC, ch.id DESC"
+        let select = CHANNEL_SELECT.replace(
+            "ch.api_key, ch.provider, ch.model",
+            "NULL::text AS api_key, ch.provider, ch.model",
         );
+        let query =
+            format!("{select} WHERE ch.company_id = $1 ORDER BY ch.created_at DESC, ch.id DESC");
         let db_list = sqlx::query_as::<_, ChannelDb>(&query)
             .bind(company_id)
             .fetch_all(&self.pool)
@@ -309,6 +320,7 @@ impl ChannelPersistence for PostgresPersistence {
 
     async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
         let (access_mode, participants) = channel_access(write.participant_emails);
+        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let result = sqlx::query(
             r#"UPDATE channels
@@ -324,7 +336,7 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(write.name)
         .bind(write.description)
         .bind(access_mode)
-        .bind(write.api_key)
+        .bind(encrypted_api_key)
         .bind(write.provider)
         .bind(write.model)
         .bind(write.channel_config)
@@ -393,7 +405,7 @@ impl ChannelPersistence for PostgresPersistence {
         }
 
         tx.commit().await.map_err(AppError::from)?;
-        load_channel(&self.pool, id)
+        load_channel(self, id)
             .await?
             .ok_or_else(|| AppError::Internal("Updated channel was not found".into()))
     }

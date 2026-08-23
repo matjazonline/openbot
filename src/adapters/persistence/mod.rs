@@ -1,4 +1,5 @@
 use sqlx::PgPool;
+use std::sync::Arc;
 
 use crate::app_error::AppError;
 
@@ -8,6 +9,7 @@ pub mod approval;
 pub mod channel;
 pub mod company;
 pub mod company_invite;
+pub mod credentials;
 pub mod dashboard;
 pub mod schedule;
 pub mod task;
@@ -19,15 +21,86 @@ pub mod user;
 #[derive(Clone)]
 pub struct PostgresPersistence {
     pool: PgPool,
+    credential_cipher: Option<Arc<credentials::CredentialCipher>>,
 }
 
 impl PostgresPersistence {
     pub fn new(pool: PgPool) -> Self {
-        PostgresPersistence { pool }
+        PostgresPersistence {
+            pool,
+            credential_cipher: None,
+        }
+    }
+
+    pub fn with_credential_cipher(
+        pool: PgPool,
+        credential_cipher: credentials::CredentialCipher,
+    ) -> Self {
+        Self {
+            pool,
+            credential_cipher: Some(Arc::new(credential_cipher)),
+        }
     }
 
     pub fn pool(&self) -> &PgPool {
         &self.pool
+    }
+
+    pub(crate) fn encrypt_credential(
+        &self,
+        value: Option<&str>,
+    ) -> Result<Option<String>, AppError> {
+        value
+            .map(|value| match &self.credential_cipher {
+                Some(cipher) => cipher.encrypt(value),
+                None => Ok(value.to_string()),
+            })
+            .transpose()
+    }
+
+    pub(crate) fn decrypt_credential(
+        &self,
+        value: Option<String>,
+    ) -> Result<Option<String>, AppError> {
+        value
+            .map(|value| match &self.credential_cipher {
+                Some(cipher) => cipher.decrypt(&value),
+                None => Ok(value),
+            })
+            .transpose()
+    }
+
+    /// Encrypts legacy plaintext and re-wraps values written with an older configured key.
+    pub async fn rotate_credentials(&self) -> Result<u64, AppError> {
+        let Some(cipher) = &self.credential_cipher else {
+            return Ok(0);
+        };
+        let mut rotated = 0;
+        for table in ["companies", "agents", "channels"] {
+            let query = format!("SELECT id, api_key FROM {table} WHERE api_key IS NOT NULL");
+            let rows: Vec<(uuid::Uuid, String)> = sqlx::query_as(&query)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(AppError::from)?;
+            for (id, stored) in rows {
+                if !cipher.needs_rotation(&stored) {
+                    continue;
+                }
+                let plaintext = cipher.decrypt(&stored)?;
+                let encrypted = cipher.encrypt(&plaintext)?;
+                let update =
+                    format!("UPDATE {table} SET api_key = $2 WHERE id = $1 AND api_key = $3");
+                rotated += sqlx::query(&update)
+                    .bind(id)
+                    .bind(encrypted)
+                    .bind(stored)
+                    .execute(&self.pool)
+                    .await
+                    .map_err(AppError::from)?
+                    .rows_affected();
+            }
+        }
+        Ok(rotated)
     }
 }
 
