@@ -79,6 +79,15 @@ const LOGOUT_MODAL: &str = r##"
         </dialog>
         "##;
 
+/// One quiet, shared status for every live region on the page. A mailbox can own several SSE
+/// connections at once, so connection state belongs in the shell rather than beside one pane.
+const LIVE_UPDATE_STATUS: &str = r##"
+        <div id="live-update-status" role="status" aria-live="polite" aria-atomic="true"
+            class="pointer-events-none fixed left-1/2 top-4 z-50 hidden -translate-x-1/2 rounded-box border border-warning/30 bg-base-200 px-4 py-2 text-sm font-medium shadow-lg">
+            <span>Live updates paused. Reconnecting&hellip;</span>
+        </div>
+        "##;
+
 /// The chrome every `/ui` response shares: the top bar, the icon rail, and the HTML shell around
 /// them. Only what sits to the right of the rail differs between workspaces.
 pub struct UiShell<'a> {
@@ -110,6 +119,7 @@ pub fn ui_shell(shell: &UiShell<'_>) -> String {
             {content}
         </div>
     </div>
+    {LIVE_UPDATE_STATUS}
     {LOGOUT_MODAL}
         "##,
         top_bar = top_bar(shell.user, shell.company),
@@ -217,6 +227,61 @@ pub(crate) const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` ch
         function confirmLogout() {
             document.getElementById('logout-modal').showModal();
         }
+
+        // The SSE extension owns reconnection and emits these lifecycle events around it. Track
+        // URLs rather than EventSource objects because a retry replaces the object while keeping
+        // the stream URL. Brief network blips stay silent; a visible interruption is acknowledged
+        // when every affected stream is open again.
+        var interruptedLiveStreams = new Set();
+        var liveUpdateWarningTimer = null;
+        var liveUpdateRestoredTimer = null;
+
+        function liveStreamKey(event) {
+            var source = event.detail && event.detail.source;
+            return source && source.url ? source.url : 'unknown';
+        }
+
+        function showLiveUpdateStatus(message, restored) {
+            var status = document.getElementById('live-update-status');
+            if (!status) return;
+            status.querySelector('span').textContent = message;
+            status.classList.toggle('border-warning/30', !restored);
+            status.classList.toggle('border-success/30', restored);
+            status.classList.remove('hidden');
+        }
+
+        document.body.addEventListener('htmx:sseError', function (event) {
+            interruptedLiveStreams.add(liveStreamKey(event));
+            window.clearTimeout(liveUpdateRestoredTimer);
+            var status = document.getElementById('live-update-status');
+            if (status && !status.classList.contains('hidden')) {
+                showLiveUpdateStatus('Live updates paused. Reconnecting…', false);
+                return;
+            }
+            if (liveUpdateWarningTimer) return;
+            liveUpdateWarningTimer = window.setTimeout(function () {
+                liveUpdateWarningTimer = null;
+                if (interruptedLiveStreams.size) {
+                    showLiveUpdateStatus('Live updates paused. Reconnecting…', false);
+                }
+            }, 1000);
+        });
+
+        document.body.addEventListener('htmx:sseOpen', function (event) {
+            interruptedLiveStreams.delete(liveStreamKey(event));
+            interruptedLiveStreams.delete('unknown');
+            if (interruptedLiveStreams.size) return;
+
+            window.clearTimeout(liveUpdateWarningTimer);
+            liveUpdateWarningTimer = null;
+            var status = document.getElementById('live-update-status');
+            if (!status || status.classList.contains('hidden')) return;
+
+            showLiveUpdateStatus('Live updates restored.', true);
+            liveUpdateRestoredTimer = window.setTimeout(function () {
+                status.classList.add('hidden');
+            }, 2000);
+        });
 
         // Scoped to the clicked entry's own list, so every `/ui` sidebar highlights with it.
         function selectSidebarItem(el) {

@@ -709,6 +709,27 @@ fn the_top_bar_names_the_selected_company_between_the_brand_and_the_account() {
 }
 
 #[test]
+fn the_ui_shell_reports_live_update_interruptions_without_replacing_sse_retries() {
+    let email = mailbox_account_email();
+    let user = mailbox_user(&email);
+    let html = ui_shell(&UiShell {
+        title: "Mailbox",
+        user: &user,
+        company: None,
+        section: UiSection::Mailbox,
+        content: "",
+        script: "",
+    });
+
+    assert!(html.contains(r#"id="live-update-status" role="status" aria-live="polite""#));
+    assert!(html.contains("Live updates paused. Reconnecting&hellip;"));
+    assert!(html.contains("htmx:sseError"));
+    assert!(html.contains("htmx:sseOpen"));
+    assert!(html.contains("Live updates restored."));
+    assert!(!html.contains("new EventSource"));
+}
+
+#[test]
 fn icon_rail_lights_the_workspace_the_response_belongs_to() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
