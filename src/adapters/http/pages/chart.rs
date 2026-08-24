@@ -80,6 +80,7 @@ pub(crate) enum ChartKind {
 pub(crate) enum YUnit {
     Count,
     Millis,
+    Percent,
 }
 
 /// One line, band, or stack segment.
@@ -244,6 +245,7 @@ fn format_value(value: f64, unit: YUnit) -> String {
         YUnit::Count => thousands(value.round() as i64),
         YUnit::Millis if value >= 1000.0 => format!("{:.1}s", value / 1000.0),
         YUnit::Millis => format!("{}ms", value.round() as i64),
+        YUnit::Percent => format!("{}%", value.round() as i64),
     }
 }
 
@@ -770,6 +772,7 @@ mod tests {
         assert_eq!(format_value(412.0, YUnit::Millis), "412ms");
         assert_eq!(format_value(1500.0, YUnit::Millis), "1.5s");
         assert_eq!(format_value(12_000.0, YUnit::Count), "12,000");
+        assert_eq!(format_value(12.4, YUnit::Percent), "12%");
     }
 
     #[test]

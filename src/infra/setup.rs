@@ -6,6 +6,7 @@ use crate::{
         storage::{FileStorage, gcs::GcsFileStorage},
     },
     domain::monitoring::MonitoringService,
+    entities::runtime_metrics::MachineIdentity,
     infra::{
         argon2_password_hasher, config::AppConfig, events::MailboxEvents, postgres_persistence,
     },
@@ -43,6 +44,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     };
 
     let postgres_arc = Arc::new(postgres_persistence().await?);
+    let runtime_identity = MachineIdentity::from_runtime_environment();
     let argon_hasher = argon2_password_hasher();
 
     let user_use_cases = UserUseCases::new(Arc::new(argon_hasher), postgres_arc.clone())
@@ -110,6 +112,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         thread_use_cases,
         approval_use_cases,
         dashboard_persistence: postgres_arc.clone(),
+        runtime_metrics: postgres_arc.clone(),
+        runtime_identity,
         sessions,
         file_storage,
         events: MailboxEvents::new(),

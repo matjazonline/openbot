@@ -11,6 +11,7 @@ pub mod company;
 pub mod company_invite;
 pub mod credentials;
 pub mod dashboard;
+pub mod runtime_metrics;
 pub mod schedule;
 pub mod task;
 #[cfg(test)]

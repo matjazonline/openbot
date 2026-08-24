@@ -11,6 +11,7 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use super::dashboard_runtime::machine_section;
 use super::{
     PANELS_SKELETON,
     chart::{self, ChartKind, Series, TimeChart, YUnit, thousands},
@@ -23,9 +24,10 @@ use crate::entities::{
     company::Company,
     dashboard::{
         AttemptStats, DashboardSnapshot, DashboardWindow, LatencyBucket, OUTSTANDING_LIMIT,
-        OutboxHealth, OutstandingTask, ProcessGauges, TaskQueueHealth,
+        OutboxHealth, OutstandingTask, ProcessGauges, RetryRateBucket, TaskQueueHealth,
     },
     outbox::OutboxStatus,
+    runtime_metrics::{MachineIdentity, RuntimeMetricSnapshot},
     task::TaskStatus,
 };
 
@@ -89,7 +91,10 @@ pub struct DashboardPage<'a> {
     pub companies: &'a [Company],
     pub snapshot: &'a DashboardSnapshot,
     pub window: DashboardWindow,
-    pub process: &'a ProcessGauges,
+    pub process: Option<&'a ProcessGauges>,
+    /// Present only after an operator-authorized runtime query.
+    pub runtime: Option<&'a RuntimeMetricSnapshot>,
+    pub machine: &'a MachineIdentity,
 }
 
 impl DashboardPage<'_> {
@@ -193,12 +198,13 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
                 <h2 class="mb-3 text-lg font-semibold">{window_label}</h2>
                 <div class="flex flex-col gap-3">
                     {attempts}
+                    {retry_rate}
                     {throughput}
                     {latency}
                     {queue_depth}
                 </div>
             </div>
-            {process}
+            {machine}
         </div>
         "##,
         chart_style = chart::STYLE,
@@ -208,10 +214,11 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
         outstanding = outstanding_panel(page),
         window_label = page.window.label(),
         attempts = attempt_panel(&page.snapshot.attempts),
+        retry_rate = retry_rate_panel(page.snapshot, page.window),
         throughput = throughput_panel(page.snapshot, page.window),
         latency = latency_panel(page.snapshot, page.window),
         queue_depth = queue_depth_panel(page.snapshot, page.window),
-        process = process_panel(page.process),
+        machine = machine_section(page),
     )
 }
 
@@ -569,15 +576,24 @@ fn attempt_panel(attempts: &AttemptStats) -> String {
         Some(rate) => format!("{rate:.0}%"),
         None => "—".to_string(),
     };
+    let retry_rate = match attempts.retry_rate_percent() {
+        Some(rate) => format!("{rate:.0}%"),
+        None => "—".to_string(),
+    };
 
     stat_row(
         "Agent attempts",
         &format!(
-            "{ran}{failed}{p50}{p95}{tokens}",
+            "{ran}{retries}{failed}{p50}{p95}{tokens}",
             ran = stat(Stat::new(
                 "Attempts",
                 &attempts.attempts.to_string(),
                 "started"
+            )),
+            retries = stat(Stat::new(
+                "Retry rate",
+                &retry_rate,
+                &format!("{} retry attempts", attempts.retries),
             )),
             failed = stat(
                 Stat::new(
@@ -598,6 +614,47 @@ fn attempt_panel(attempts: &AttemptStats) -> String {
                     thousands(attempts.completion_tokens)
                 ),
             )),
+        ),
+    )
+}
+
+fn retry_rate_panel(snapshot: &DashboardSnapshot, window: DashboardWindow) -> String {
+    if !snapshot.retry_rate.iter().any(|bucket| bucket.attempts > 0) {
+        return panel(
+            "Retry rate",
+            r##"<div class="px-4 py-6 text-sm opacity-60">No attempt has started in this window yet.</div>"##,
+        );
+    }
+
+    let series = [Series {
+        label: "retry attempts",
+        color: "var(--color-warning)",
+        values: snapshot
+            .retry_rate
+            .iter()
+            .map(RetryRateBucket::rate_percent)
+            .collect(),
+    }];
+    let buckets: Vec<_> = snapshot
+        .retry_rate
+        .iter()
+        .map(|bucket| bucket.bucket)
+        .collect();
+
+    panel(
+        "Retry rate",
+        &format!(
+            "{chart}{footer}",
+            chart = chart::time_chart(&TimeChart {
+                buckets: &buckets,
+                series: &series,
+                kind: ChartKind::Line,
+                unit: YUnit::Percent,
+                tick_format: window.tick_format(),
+            }),
+            footer = chart_footer(
+                "Attempts numbered two or higher divided by all attempts started in each bucket",
+            ),
         ),
     )
 }
@@ -768,7 +825,7 @@ fn queue_depth_panel(snapshot: &DashboardSnapshot, window: DashboardWindow) -> S
 }
 
 /// The line under a chart: what it is measuring, or what it cannot quite claim to measure.
-fn chart_footer(note: &str) -> String {
+pub(super) fn chart_footer(note: &str) -> String {
     format!(
         r##"<div class="px-4 pb-3 text-xs opacity-60">{note}</div>"##,
         note = escape_html_text(note),
@@ -776,7 +833,7 @@ fn chart_footer(note: &str) -> String {
 }
 
 /// This process's own counters, fenced off and labelled so they are not read as system-wide truth.
-fn process_panel(process: &ProcessGauges) -> String {
+pub(super) fn process_panel(process: &ProcessGauges) -> String {
     format!(
         r##"
         <div>
@@ -883,7 +940,7 @@ fn scope_legend(scope: &str) -> String {
     )
 }
 
-fn panel(heading: &str, body: &str) -> String {
+pub(super) fn panel(heading: &str, body: &str) -> String {
     format!(
         r##"<div class="rounded-box border border-base-300 bg-base-200">
             <div class="border-b border-base-300 px-4 py-2 text-sm font-semibold opacity-80">{heading}</div>
@@ -893,7 +950,7 @@ fn panel(heading: &str, body: &str) -> String {
     )
 }
 
-fn stat_row(heading: &str, stats: &str) -> String {
+pub(super) fn stat_row(heading: &str, stats: &str) -> String {
     panel(
         heading,
         &format!(r##"<div class="stats stats-horizontal w-full overflow-x-auto">{stats}</div>"##),
@@ -904,7 +961,7 @@ fn stat_row(heading: &str, stats: &str) -> String {
 ///
 /// A struct rather than a fifth positional argument: `alarming` is already a bool, and a bare
 /// `stat(.., false, None)` at seventeen call sites says nothing about which flag is which.
-struct Stat<'a> {
+pub(super) struct Stat<'a> {
     title: &'a str,
     value: &'a str,
     caption: &'a str,
@@ -915,7 +972,7 @@ struct Stat<'a> {
 }
 
 impl<'a> Stat<'a> {
-    fn new(title: &'a str, value: &'a str, caption: &'a str) -> Self {
+    pub(super) fn new(title: &'a str, value: &'a str, caption: &'a str) -> Self {
         Self {
             title,
             value,
@@ -940,7 +997,7 @@ impl<'a> Stat<'a> {
 ///
 /// The two share every class, so a linked figure is not visually a different kind of thing — only
 /// the cursor and the hover tint say it can be clicked.
-fn stat(stat: Stat<'_>) -> String {
+pub(super) fn stat(stat: Stat<'_>) -> String {
     let body = format!(
         r##"<div class="stat-title text-xs">{title}</div>
             <div class="stat-value text-2xl {tone}">{value}</div>
@@ -981,7 +1038,7 @@ fn elapsed_label(since: DateTime<Utc>, now: DateTime<Utc>) -> String {
     format!("{}d ago", hours / 24)
 }
 
-fn relative_time(since: DateTime<Utc>) -> String {
+pub(super) fn relative_time(since: DateTime<Utc>) -> String {
     elapsed_label(since, Utc::now())
 }
 
@@ -1203,19 +1260,100 @@ mod tests {
             is_operator: false,
         };
         let process = ProcessGauges::default();
+        let machine = MachineIdentity {
+            id: crate::entities::runtime_metrics::MachineId::new("machine-test"),
+            region: None,
+        };
         dashboard_panels(&DashboardPage {
             user: &user,
             scope,
             companies,
             snapshot,
             window: DashboardWindow::last_hour(),
-            process: &process,
+            process: Some(&process),
+            runtime: None,
+            machine: &machine,
         })
     }
 
     /// The caller belongs to the company every fixture row names, so links are offered.
     fn rendered(scope: DashboardScopeView<'_>, snapshot: &DashboardSnapshot) -> String {
         rendered_for(scope, &[company()], snapshot)
+    }
+
+    #[test]
+    fn infrastructure_panels_are_operator_only_and_missing_samples_render_safely() {
+        let company = company();
+        let companies = [company.clone()];
+        let email = crate::entities::value_objects::EmailAddress::from("ops@example.test");
+        let user = MailboxUser {
+            id: Uuid::new_v4(),
+            username: "ops",
+            email: &email,
+            avatar_url: None,
+            is_operator: true,
+        };
+        let machine = MachineIdentity {
+            id: crate::entities::runtime_metrics::MachineId::new("serving-machine"),
+            region: None,
+        };
+        let snapshot = DashboardSnapshot::default();
+        let process = ProcessGauges::default();
+        let runtime = RuntimeMetricSnapshot::default();
+
+        let hidden = dashboard_panels(&DashboardPage {
+            user: &user,
+            scope: DashboardScopeView::Company(&company),
+            companies: &companies,
+            snapshot: &snapshot,
+            window: DashboardWindow::last_hour(),
+            process: None,
+            runtime: None,
+            machine: &machine,
+        });
+        assert!(!hidden.contains("This machine"), "{hidden}");
+        assert!(!hidden.contains("serving-machine"), "{hidden}");
+
+        let visible = dashboard_panels(&DashboardPage {
+            user: &user,
+            scope: DashboardScopeView::Company(&company),
+            companies: &companies,
+            snapshot: &snapshot,
+            window: DashboardWindow::last_hour(),
+            process: Some(&process),
+            runtime: Some(&runtime),
+            machine: &machine,
+        });
+        assert!(visible.contains("This machine"), "{visible}");
+        assert!(visible.contains("serving-machine"), "{visible}");
+        assert!(
+            visible.contains('—'),
+            "missing values use em dashes: {visible}"
+        );
+        assert!(visible.contains("Suggested maximum"), "{visible}");
+        assert!(visible.contains("needs 24h and 100 samples"), "{visible}");
+    }
+
+    #[test]
+    fn attempt_summary_and_chart_report_actual_retries() {
+        let attempts = attempt_panel(&AttemptStats {
+            attempts: 4,
+            retries: 1,
+            ..AttemptStats::default()
+        });
+        assert!(attempts.contains("Retry rate"), "{attempts}");
+        assert!(attempts.contains("25%"), "{attempts}");
+        assert!(attempts.contains("1 retry attempts"), "{attempts}");
+
+        let mut snapshot = DashboardSnapshot::default();
+        snapshot.retry_rate.push(RetryRateBucket {
+            bucket: Utc::now(),
+            attempts: 4,
+            retries: 1,
+        });
+        let chart = retry_rate_panel(&snapshot, DashboardWindow::last_hour());
+        assert!(chart.contains("Retry rate"), "{chart}");
+        assert!(chart.contains("25%"), "{chart}");
     }
 
     #[test]

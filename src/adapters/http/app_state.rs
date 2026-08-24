@@ -9,7 +9,9 @@ use crate::{
         storage::FileStorage,
     },
     domain::monitoring::MonitoringService,
+    entities::runtime_metrics::MachineIdentity,
     infra::{config::AppConfig, events::MailboxEvents},
+    services::runtime_metrics::RuntimeMetricPersistence,
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
         company::CompanyUseCases, company_invite::CompanyInviteUseCases,
@@ -32,6 +34,9 @@ pub struct AppState {
     pub approval_use_cases: Arc<ApprovalUseCases>,
     /// Read-only aggregates behind `/ui/dashboard`.
     pub dashboard_persistence: Arc<dyn DashboardPersistence>,
+    /// Deployment-wide runtime history; handlers must authorize operators before reading it.
+    pub runtime_metrics: Arc<dyn RuntimeMetricPersistence>,
+    pub runtime_identity: MachineIdentity,
     /// Issues and verifies sessions; the only thing that decides who a request is.
     pub sessions: Arc<SessionAuthority>,
     /// Where a picked file is stored; `None` when no bucket is configured, which is what the

@@ -1,7 +1,7 @@
 use dotenvy::dotenv;
 use std::future::{Future, IntoFuture};
 use std::sync::Arc;
-use tokio::time::{Duration, sleep};
+use tokio::time::{Duration, sleep, timeout};
 use tracing::{info, warn};
 
 /// How long to let in-flight requests finish after a stop signal before exiting regardless.
@@ -18,18 +18,36 @@ enum DrainOutcome {
 
 use mail_agents::{
     adapters::smtp::SmtpServer,
-    infra::{app::create_app, events::run_mailbox_event_listener, setup::init_app_state},
-    services::task_worker::TaskWorker,
+    infra::{
+        app::create_app, config::task_worker_concurrency_from_env,
+        events::run_mailbox_event_listener, runtime_metrics::LinuxRuntimeMetricSource,
+        setup::init_app_state,
+    },
+    services::{
+        runtime_metrics::{ActiveTaskExecutions, RuntimeMetricSampler},
+        task_worker::TaskWorker,
+    },
 };
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
 
+    let task_worker_concurrency = task_worker_concurrency_from_env();
     let app_state = init_app_state().await?;
 
     // Create broadcast channel for background worker graceful shutdown
     let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel(1);
+
+    let active_task_executions = ActiveTaskExecutions::default();
+    let runtime_source = LinuxRuntimeMetricSource::new(
+        app_state.runtime_identity.clone(),
+        active_task_executions.clone(),
+        task_worker_concurrency,
+    );
+    let runtime_sampler =
+        RuntimeMetricSampler::new(app_state.runtime_metrics.clone(), runtime_source);
+    let mut runtime_sampler_handle = tokio::spawn(runtime_sampler.run(shutdown_rx.resubscribe()));
 
     // Initialize Task Worker poller loop
     let task_worker = Arc::new(
@@ -38,6 +56,8 @@ async fn main() -> anyhow::Result<()> {
             app_state.thread_use_cases.clone(),
             app_state.config.clone(),
         )
+        .with_task_concurrency(task_worker_concurrency)
+        .with_active_task_executions(active_task_executions)
         .with_schedules(app_state.schedule_use_cases.clone())
         .with_monitoring(app_state.monitoring.clone()),
     );
@@ -68,7 +88,7 @@ async fn main() -> anyhow::Result<()> {
     // Serve axum app with graceful shutdown listener
     let mut draining = shutdown_tx.subscribe();
     let server = axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal(shutdown_tx))
+        .with_graceful_shutdown(shutdown_signal(shutdown_tx.clone()))
         .into_future();
     tokio::pin!(server);
 
@@ -90,6 +110,19 @@ async fn main() -> anyhow::Result<()> {
                     );
                 }
             }
+        }
+    }
+
+    // Also covers an HTTP server that ended without a signal: every background owner receives the
+    // same stop notification, and the sampler is explicitly joined rather than detached.
+    let _ = shutdown_tx.send(());
+    match timeout(Duration::from_secs(5), &mut runtime_sampler_handle).await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => warn!(%error, "Runtime metric sampler task ended unexpectedly"),
+        Err(_) => {
+            warn!("Runtime metric sampler did not stop within 5s; aborting it");
+            runtime_sampler_handle.abort();
+            let _ = runtime_sampler_handle.await;
         }
     }
 

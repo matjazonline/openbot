@@ -40,9 +40,11 @@ use crate::{
     entities::{
         company::Company,
         dashboard::{DashboardSnapshot, DashboardWindow, ProcessGauges},
+        runtime_metrics::{MachineIdentity, RuntimeMetricSnapshot},
         value_objects::EmailAddress,
     },
     infra::config::AppConfig,
+    services::runtime_metrics::RuntimeMetricPersistence,
     use_cases::{company::CompanyUseCases, user::UserUseCases},
 };
 
@@ -85,6 +87,8 @@ struct Dashboard {
     company_use_cases: Arc<CompanyUseCases>,
     user_use_cases: Arc<UserUseCases>,
     dashboard_persistence: Arc<dyn DashboardPersistence>,
+    runtime_metrics: Arc<dyn RuntimeMetricPersistence>,
+    runtime_identity: MachineIdentity,
     monitoring: Arc<dyn MonitoringService>,
     config: Arc<AppConfig>,
     user_id: Uuid,
@@ -103,6 +107,8 @@ impl FromRequestParts<AppState> for Dashboard {
             company_use_cases: state.company_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             dashboard_persistence: state.dashboard_persistence.clone(),
+            runtime_metrics: state.runtime_metrics.clone(),
+            runtime_identity: state.runtime_identity.clone(),
             monitoring: state.monitoring.clone(),
             config: state.config.clone(),
             user_id: user.id,
@@ -171,19 +177,49 @@ impl DashboardScope {
 /// One reading plus the process gauges that go beside it.
 struct Reading {
     snapshot: DashboardSnapshot,
-    process: ProcessGauges,
+    process: Option<ProcessGauges>,
+    runtime: Option<RuntimeMetricSnapshot>,
+    machine: MachineIdentity,
 }
 
 impl Dashboard {
-    async fn read(&self, company: Option<Uuid>, window: DashboardWindow) -> AppResult<Reading> {
+    async fn read(
+        &self,
+        company: Option<Uuid>,
+        window: DashboardWindow,
+        operator: bool,
+    ) -> AppResult<Reading> {
         Ok(Reading {
             snapshot: self
                 .dashboard_persistence
                 .dashboard_snapshot(company, window)
                 .await?,
-            process: ProcessGauges::from_stats_json(&self.monitoring.get_stats_json()),
+            process: operator
+                .then(|| ProcessGauges::from_stats_json(&self.monitoring.get_stats_json())),
+            runtime: load_runtime_snapshot(
+                self.runtime_metrics.as_ref(),
+                &self.runtime_identity,
+                window,
+                operator,
+            )
+            .await?,
+            machine: self.runtime_identity.clone(),
         })
     }
+}
+
+/// Keep the authorization branch outside the persistence implementation. A company user does not
+/// issue a runtime query whose result is later hidden; the deployment-wide table is never touched.
+async fn load_runtime_snapshot(
+    persistence: &dyn RuntimeMetricPersistence,
+    identity: &MachineIdentity,
+    window: DashboardWindow,
+    operator: bool,
+) -> AppResult<Option<RuntimeMetricSnapshot>> {
+    if !operator {
+        return Ok(None);
+    }
+    persistence.snapshot(&identity.id, window).await.map(Some)
 }
 
 /// Render the panels for a scope that has already been authorized.
@@ -202,7 +238,9 @@ fn render(
         companies: &scope.companies,
         snapshot: &reading.snapshot,
         window,
-        process: &reading.process,
+        process: reading.process.as_ref(),
+        runtime: reading.runtime.as_ref(),
+        machine: &reading.machine,
     })
 }
 
@@ -246,7 +284,9 @@ async fn dashboard_panels_fragment(
 
     let scope = DashboardScope::resolve(&dashboard, &account_email, query.company_id).await?;
     let window = query.window();
-    let reading = dashboard.read(scope.company_id(), window).await?;
+    let reading = dashboard
+        .read(scope.company_id(), window, scope.operator)
+        .await?;
 
     Ok(Html(render(&scope, &reading, &user, window)).into_response())
 }
@@ -263,6 +303,7 @@ async fn dashboard_stream(
     let account_email = EmailAddress::from(account.email.as_str());
     let scope = DashboardScope::resolve(&dashboard, &account_email, query.company_id).await?;
     let company = scope.company_id();
+    let operator = scope.operator;
     let window = query.window();
 
     let stream = async_stream::stream! {
@@ -273,7 +314,7 @@ async fn dashboard_stream(
         loop {
             ticker.tick().await;
 
-            match dashboard.read(company, window).await {
+            match dashboard.read(company, window, operator).await {
                 Ok(reading) => {
                     yield Ok(Event::default()
                         .event(pages::DASHBOARD_EVENT)
@@ -289,4 +330,69 @@ async fn dashboard_stream(
     // Without the heartbeat an idle stream looks dead to the proxy in front of the app. The ticker
     // alone would carry it, but only while reads keep succeeding.
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use chrono::{DateTime, Utc};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use crate::{
+        entities::runtime_metrics::{
+            MachineId, RuntimeMetricObservation, RuntimeMetricSample, RuntimeMetricSnapshot,
+        },
+        services::runtime_metrics::RuntimeMetricProbeError,
+    };
+
+    #[derive(Default)]
+    struct RuntimeReads(AtomicUsize);
+
+    #[async_trait]
+    impl RuntimeMetricPersistence for RuntimeReads {
+        async fn probe_and_record(
+            &self,
+            _observation: RuntimeMetricObservation,
+            _failed: &[RuntimeMetricSample],
+        ) -> Result<RuntimeMetricSample, RuntimeMetricProbeError> {
+            unreachable!("the route read test never samples")
+        }
+
+        async fn snapshot(
+            &self,
+            _machine_id: &MachineId,
+            _window: DashboardWindow,
+        ) -> AppResult<RuntimeMetricSnapshot> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Ok(RuntimeMetricSnapshot::default())
+        }
+
+        async fn prune_before(&self, _cutoff: DateTime<Utc>) -> AppResult<u64> {
+            unreachable!("the route read test never prunes")
+        }
+    }
+
+    #[tokio::test]
+    async fn infrastructure_is_not_queried_until_operator_authorization_succeeds() {
+        let persistence = RuntimeReads::default();
+        let identity = MachineIdentity {
+            id: MachineId::new("serving-machine"),
+            region: None,
+        };
+
+        let hidden =
+            load_runtime_snapshot(&persistence, &identity, DashboardWindow::last_hour(), false)
+                .await
+                .unwrap();
+        assert!(hidden.is_none());
+        assert_eq!(persistence.0.load(Ordering::SeqCst), 0);
+
+        let visible =
+            load_runtime_snapshot(&persistence, &identity, DashboardWindow::last_hour(), true)
+                .await
+                .unwrap();
+        assert!(visible.is_some());
+        assert_eq!(persistence.0.load(Ordering::SeqCst), 1);
+    }
 }

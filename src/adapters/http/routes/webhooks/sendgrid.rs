@@ -1279,6 +1279,14 @@ mod tests {
                         .expect("valid lazy pool url"),
                 ),
             ),
+            runtime_metrics: Arc::new(crate::adapters::persistence::PostgresPersistence::new(
+                sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                    .expect("valid lazy pool url"),
+            )),
+            runtime_identity: crate::entities::runtime_metrics::MachineIdentity {
+                id: crate::entities::runtime_metrics::MachineId::new("webhook-test"),
+                region: None,
+            },
             user_use_cases: Arc::new(crate::use_cases::user::UserUseCases::new(
                 Arc::new(crate::infra::argon2_password_hasher()),
                 Arc::new(MockUserPersistence {}),

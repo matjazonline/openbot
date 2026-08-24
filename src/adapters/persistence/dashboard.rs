@@ -23,8 +23,8 @@ use crate::{
     entities::{
         dashboard::{
             AttemptStats, DashboardSnapshot, DashboardWindow, LatencyBucket, OUTSTANDING_LIMIT,
-            OutboxHealth, OutboxStatusCount, OutstandingTask, QueueDepthBucket, TaskQueueHealth,
-            TaskStatusCount, ThroughputBucket,
+            OutboxHealth, OutboxStatusCount, OutstandingTask, QueueDepthBucket, RetryRateBucket,
+            TaskQueueHealth, TaskStatusCount, ThroughputBucket,
         },
         outbox::OutboxStatus,
         task::TaskStatus,
@@ -216,12 +216,13 @@ const QUEUE_DEPTH_BODY: &str = r#",
      GROUP BY slots.bucket
      ORDER BY slots.bucket"#;
 
-/// The three bucketed statements, each [`SLOTS_CTE`] followed by its own body.
+/// The four bucketed statements, each [`SLOTS_CTE`] followed by its own body.
 ///
 /// Assembled once at first use rather than on every read: the dashboard re-reads on a five-second
-/// tick for every connected tab, and there is no reason for that to rebuild three strings each time.
+/// tick for every connected tab, and there is no reason for that to rebuild four strings each time.
 static THROUGHPUT_SQL: LazyLock<String> = LazyLock::new(|| format!("{SLOTS_CTE}{THROUGHPUT_BODY}"));
 static LATENCY_SQL: LazyLock<String> = LazyLock::new(|| format!("{SLOTS_CTE}{LATENCY_BODY}"));
+static RETRY_RATE_SQL: LazyLock<String> = LazyLock::new(|| format!("{SLOTS_CTE}{RETRY_RATE_BODY}"));
 static QUEUE_DEPTH_SQL: LazyLock<String> =
     LazyLock::new(|| format!("{SLOTS_CTE}{QUEUE_DEPTH_BODY}"));
 
@@ -238,6 +239,7 @@ static QUEUE_DEPTH_SQL: LazyLock<String> =
 /// which is exactly the kind of bug an empty table hides.
 const ATTEMPT_STATS_SQL: &str = r#"
     SELECT COUNT(*)::bigint AS attempts,
+           COUNT(*) FILTER (WHERE attempt.attempt_number > 1)::bigint AS retries,
            COUNT(*) FILTER (WHERE attempt.status = 'failed')::bigint AS failed,
            percentile_disc(0.5) WITHIN GROUP (
                ORDER BY (extract(epoch FROM (attempt.finished_at - attempt.started_at))
@@ -249,10 +251,30 @@ const ATTEMPT_STATS_SQL: &str = r#"
            ) AS p95_ms,
            COALESCE(SUM(attempt.prompt_tokens), 0)::bigint AS prompt_tokens,
            COALESCE(SUM(attempt.completion_tokens), 0)::bigint AS completion_tokens
-      FROM task_attempts attempt
-      JOIN background_tasks task ON task.id = attempt.task_id
+      FROM task_attempts AS attempt
+      JOIN background_tasks AS task ON task.id = attempt.task_id
      WHERE ($1::uuid IS NULL OR task.company_id = $1)
        AND attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)"#;
+
+/// Retry share per bucket, including empty buckets as `attempts = 0` so the chart keeps its time
+/// axis without claiming that an idle interval had a zero-percent retry rate.
+const RETRY_RATE_BODY: &str = r#",
+    measured AS (
+        SELECT to_timestamp(floor(extract(epoch FROM attempt.started_at) / $2) * $2) AS bucket,
+               COUNT(*)::bigint AS attempts,
+               COUNT(*) FILTER (WHERE attempt.attempt_number > 1)::bigint AS retries
+          FROM task_attempts AS attempt
+          JOIN background_tasks AS task ON task.id = attempt.task_id
+         WHERE ($1::uuid IS NULL OR task.company_id = $1)
+           AND attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $3)
+         GROUP BY bucket
+    )
+    SELECT slots.bucket,
+           COALESCE(measured.attempts, 0)::bigint AS attempts,
+           COALESCE(measured.retries, 0)::bigint AS retries
+      FROM slots
+      LEFT JOIN measured ON measured.bucket = slots.bucket
+     ORDER BY slots.bucket"#;
 
 /// The tasks a reader might want to open, newest trouble first.
 ///
@@ -310,6 +332,7 @@ impl DashboardPersistence for PostgresPersistence {
             outbox: self.outbox_health(company).await?,
             throughput: self.throughput(company, window).await?,
             latency: self.latency(company, window).await?,
+            retry_rate: self.retry_rate(company, window).await?,
             queue_depth: self.queue_depth(company, window).await?,
             attempts: self.attempt_stats(company, window).await?,
             outstanding: self.outstanding(company).await?,
@@ -465,6 +488,32 @@ impl PostgresPersistence {
             .collect()
     }
 
+    async fn retry_rate(
+        &self,
+        company: Option<Uuid>,
+        window: DashboardWindow,
+    ) -> AppResult<Vec<RetryRateBucket>> {
+        let rows = sqlx::query(&*RETRY_RATE_SQL)
+            .bind(company)
+            .bind(window.bucket_seconds())
+            .bind(window.minutes() as i32)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+
+        rows.into_iter()
+            .map(|row| {
+                Ok(RetryRateBucket {
+                    bucket: row
+                        .try_get::<DateTime<Utc>, _>("bucket")
+                        .map_err(AppError::from)?,
+                    attempts: row.try_get("attempts").map_err(AppError::from)?,
+                    retries: row.try_get("retries").map_err(AppError::from)?,
+                })
+            })
+            .collect()
+    }
+
     async fn outstanding(&self, company: Option<Uuid>) -> AppResult<Vec<OutstandingTask>> {
         let rows = sqlx::query(OUTSTANDING_SQL)
             .bind(company)
@@ -516,6 +565,7 @@ impl PostgresPersistence {
 
         Ok(AttemptStats {
             attempts: row.try_get("attempts").map_err(AppError::from)?,
+            retries: row.try_get("retries").map_err(AppError::from)?,
             failed: row.try_get("failed").map_err(AppError::from)?,
             p50_ms: percentile("p50_ms")?,
             p95_ms: percentile("p95_ms")?,
@@ -689,6 +739,55 @@ mod tests {
             snapshot.attempts.p50_ms.is_some(),
             "a finished attempt must produce a latency: {:?}",
             snapshot.attempts
+        );
+
+        CompanyPersistence::delete(&persistence, company)
+            .await
+            .expect("the fixture company is removed");
+    }
+
+    #[tokio::test]
+    async fn retry_rate_counts_only_attempt_numbers_above_one_and_stays_company_scoped() {
+        let Some(persistence) = test_persistence().await else {
+            return;
+        };
+        let (task_id, company) = task_fixture(&persistence, "retry-rate").await;
+
+        for attempt_number in [1, 2] {
+            persistence
+                .begin_task_attempt(TaskAttemptRef {
+                    task_id,
+                    attempt_number,
+                    execution_generation: Uuid::new_v4(),
+                })
+                .await
+                .expect("the attempt starts");
+        }
+
+        for window in DashboardWindow::PRESETS {
+            let snapshot = persistence
+                .dashboard_snapshot(Some(company), window)
+                .await
+                .expect("the scoped attempt aggregates run");
+            assert_eq!(snapshot.attempts.attempts, 2);
+            assert_eq!(snapshot.attempts.retries, 1);
+            assert_eq!(snapshot.attempts.retry_rate_percent(), Some(50.0));
+            assert_eq!(snapshot.retry_rate.len() as i64, window.bucket_count());
+            assert!(snapshot.retry_rate.iter().any(|bucket| {
+                bucket.attempts == 2 && bucket.retries == 1 && bucket.rate_percent() == Some(50.0)
+            }));
+        }
+
+        let unrelated = persistence
+            .dashboard_snapshot(Some(Uuid::new_v4()), DashboardWindow::last_hour())
+            .await
+            .expect("an unrelated company scope runs");
+        assert_eq!(unrelated.attempts, AttemptStats::default());
+        assert!(
+            unrelated
+                .retry_rate
+                .iter()
+                .all(|bucket| bucket.attempts == 0)
         );
 
         CompanyPersistence::delete(&persistence, company)

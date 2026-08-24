@@ -1,7 +1,8 @@
 use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use tokio::time::{Duration, sleep};
+use tokio::task::JoinSet;
+use tokio::time::{Duration, Instant, sleep, sleep_until};
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -25,6 +26,7 @@ use crate::{
     services::{
         agent_runner::{AgentRunner, ResolvedAgentParams},
         outbound_dispatcher::{OutboundDispatcher, OutboundEmail, agent_response_email_body},
+        runtime_metrics::ActiveTaskExecutions,
     },
     use_cases::{
         schedule::{SCHEDULED_AGENT_RUN_TASK, ScheduleUseCases},
@@ -56,10 +58,6 @@ const MAINTENANCE_INTERVAL: Duration = Duration::from_secs(30);
 /// How long to wait after an iteration that failed outright. Without it a Postgres outage fills the
 /// log twice a second per loop rather than once every few seconds.
 const ERROR_BACKOFF: Duration = Duration::from_secs(5);
-
-/// How many tasks one iteration claims. One, because the run happens inline on the loop — running
-/// two agents at once is a different decision from how often to look for one.
-const TASK_CLAIM_BATCH: i64 = 1;
 
 /// How many queued emails one iteration claims.
 const OUTBOX_CLAIM_BATCH: i64 = 10;
@@ -122,6 +120,83 @@ async fn poll_until_shutdown<State, Work>(
     }
 }
 
+/// Keep a bounded set of durable tasks busy, replenishing a slot as soon as its task finishes.
+/// A short claim means the queue is empty, so the next database poll waits for `interval`; a full
+/// claim fills every available slot and completion immediately triggers another claim.
+async fn run_bounded_task_loop<Item, Claim, ClaimFuture, Execute, ExecuteFuture>(
+    interval: Duration,
+    mut shutdown: broadcast::Receiver<()>,
+    concurrency: usize,
+    mut claim: Claim,
+    execute: Execute,
+) where
+    Item: Send + 'static,
+    Claim: FnMut(usize) -> ClaimFuture,
+    ClaimFuture: Future<Output = Result<Vec<Item>, String>>,
+    Execute: Fn(Item) -> ExecuteFuture,
+    ExecuteFuture: Future<Output = ()> + Send + 'static,
+{
+    debug_assert!(concurrency > 0);
+    let mut running = JoinSet::new();
+    let mut next_poll = Instant::now();
+
+    loop {
+        let available = concurrency.saturating_sub(running.len());
+        if available > 0 && Instant::now() >= next_poll {
+            match claim(available).await {
+                Ok(items) => {
+                    let claimed = items.len();
+                    debug_assert!(claimed <= available, "claim exceeded requested capacity");
+                    for item in items {
+                        running.spawn(execute(item));
+                    }
+                    next_poll = if claimed < available {
+                        Instant::now() + interval
+                    } else {
+                        Instant::now()
+                    };
+                }
+                Err(error) => {
+                    warn!("Error in the task poll loop: {}", error);
+                    next_poll = Instant::now() + ERROR_BACKOFF;
+                }
+            }
+        }
+
+        if running.is_empty() {
+            tokio::select! {
+                _ = shutdown.recv() => break,
+                _ = sleep_until(next_poll) => {}
+            }
+        } else if running.len() >= concurrency {
+            tokio::select! {
+                _ = shutdown.recv() => break,
+                result = running.join_next() => report_task_join(result)
+            }
+        } else {
+            tokio::select! {
+                _ = shutdown.recv() => break,
+                result = running.join_next() => report_task_join(result),
+                _ = sleep_until(next_poll) => {}
+            }
+        }
+    }
+
+    info!(
+        "Shutdown signal received. Stopping task claims and draining {} active task(s)...",
+        running.len()
+    );
+    while let Some(result) = running.join_next().await {
+        report_task_join(Some(result));
+    }
+}
+
+fn report_task_join(result: Option<Result<(), tokio::task::JoinError>>) {
+    if let Some(Err(error)) = result {
+        warn!("Background task execution ended unexpectedly: {}", error);
+    }
+}
+
 /// What a scheduled run needs loaded before the agent can answer: the company and channel it runs
 /// as, and the agent configured on that channel, if any.
 struct ScheduledRunContext {
@@ -166,6 +241,8 @@ pub struct TaskWorker {
     config: Arc<AppConfig>,
     monitoring: Option<Arc<dyn MonitoringService>>,
     worker_id: uuid::Uuid,
+    task_concurrency: usize,
+    active_task_executions: ActiveTaskExecutions,
 }
 
 impl TaskWorker {
@@ -181,6 +258,8 @@ impl TaskWorker {
             config,
             monitoring: None,
             worker_id: uuid::Uuid::new_v4(),
+            task_concurrency: 1,
+            active_task_executions: ActiveTaskExecutions::default(),
         }
     }
 
@@ -194,28 +273,37 @@ impl TaskWorker {
         self
     }
 
+    pub fn with_task_concurrency(mut self, concurrency: usize) -> Self {
+        assert!(concurrency > 0, "task worker concurrency must be positive");
+        self.task_concurrency = concurrency;
+        self
+    }
+
+    pub fn with_active_task_executions(mut self, gauge: ActiveTaskExecutions) -> Self {
+        self.active_task_executions = gauge;
+        self
+    }
+
     /// Run the worker's poll loops until shutdown.
     ///
-    /// They are separate on purpose. A task run holds its loop for as long as the agent takes --
-    /// seconds, sometimes minutes — and while the outbox shared that tick, no reply went out for
-    /// the whole of it. Maintenance is split off for the opposite reason: its deadlines are minutes
-    /// away, so it must not be re-run every time the queue loops look.
+    /// They are separate on purpose. Agent runs occupy bounded task slots for seconds or minutes,
+    /// while outbox delivery must continue independently. Maintenance is split off for the opposite
+    /// reason: its deadlines are minutes away, so it must not be re-run every time the queue loops
+    /// look.
     pub async fn start_worker_loop(
         self: Arc<Self>,
         shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     ) {
         info!(
-            "Starting Background Task Worker (tasks every {:?}, outbox every {:?}, schedules every {:?}, maintenance every {:?})...",
-            TASK_POLL_INTERVAL, OUTBOX_POLL_INTERVAL, SCHEDULE_POLL_INTERVAL, MAINTENANCE_INTERVAL
+            "Starting Background Task Worker (task concurrency {}, tasks every {:?}, outbox every {:?}, schedules every {:?}, maintenance every {:?})...",
+            self.task_concurrency,
+            TASK_POLL_INTERVAL,
+            OUTBOX_POLL_INTERVAL,
+            SCHEDULE_POLL_INTERVAL,
+            MAINTENANCE_INTERVAL
         );
 
-        let tasks = tokio::spawn(poll_until_shutdown(
-            "task",
-            TASK_POLL_INTERVAL,
-            shutdown_rx.resubscribe(),
-            Arc::clone(&self),
-            |worker| async move { worker.process_next_task_batch().await },
-        ));
+        let tasks = tokio::spawn(Arc::clone(&self).run_task_loop(shutdown_rx.resubscribe()));
         let outbox = tokio::spawn(poll_until_shutdown(
             "outbox",
             OUTBOX_POLL_INTERVAL,
@@ -262,30 +350,56 @@ impl TaskWorker {
         Ok(polled(count, 10))
     }
 
-    /// Claim and run the next due task.
-    async fn process_next_task_batch(&self) -> Result<Polled, String> {
-        let tasks = self
-            .task_persistence
+    async fn run_task_loop(self: Arc<Self>, shutdown: broadcast::Receiver<()>) {
+        let concurrency = self.task_concurrency;
+        let claimant = Arc::clone(&self);
+        let executor = self;
+        run_bounded_task_loop(
+            TASK_POLL_INTERVAL,
+            shutdown,
+            concurrency,
+            move |available| {
+                let worker = Arc::clone(&claimant);
+                async move { worker.claim_pending_task_batch(available).await }
+            },
+            move |task| {
+                let worker = Arc::clone(&executor);
+                async move { worker.process_claimed_task(task).await }
+            },
+        )
+        .await;
+    }
+
+    async fn claim_pending_task_batch(&self, limit: usize) -> Result<Vec<BackgroundTask>, String> {
+        self.task_persistence
             .claim_pending_tasks(
                 self.worker_id,
                 chrono::Utc::now() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
-                TASK_CLAIM_BATCH,
+                limit as i64,
             )
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())
+    }
 
+    async fn process_claimed_task(&self, task: BackgroundTask) {
+        let _active_execution = self.active_task_executions.enter();
+        info!("Processing task {} (type = '{}')", task.id, task.task_type);
+        let start_time = std::time::Instant::now();
+        let attempt = TaskAttemptRef::current(&task);
+        let result = self.execute_single_task_with_lease(&task, attempt).await;
+        let duration_ms = start_time.elapsed().as_millis() as u64;
+        self.close_out_task(&task, attempt, result, duration_ms)
+            .await;
+    }
+
+    #[cfg(test)]
+    async fn process_next_task_batch(&self) -> Result<Polled, String> {
+        let tasks = self.claim_pending_task_batch(1).await?;
         let claimed = tasks.len();
         for task in tasks {
-            info!("Processing task {} (type = '{}')", task.id, task.task_type);
-            let start_time = std::time::Instant::now();
-            let attempt = TaskAttemptRef::current(&task);
-            let result = self.execute_single_task_with_lease(&task, attempt).await;
-            let duration_ms = start_time.elapsed().as_millis() as u64;
-            self.close_out_task(&task, attempt, result, duration_ms)
-                .await;
+            self.process_claimed_task(task).await;
         }
-
-        Ok(polled(claimed, TASK_CLAIM_BATCH))
+        Ok(polled(claimed, 1))
     }
 
     /// The slow lane: work whose deadlines are minutes away, kept off the queue loops so that
@@ -1157,7 +1271,11 @@ mod tests {
     use crate::entities::company_member::CompanyMembership;
     use async_trait::async_trait;
     use chrono::Utc;
-    use std::sync::Mutex;
+    use std::sync::{
+        Mutex,
+        atomic::{AtomicUsize, Ordering},
+    };
+    use tokio::sync::Semaphore;
     use uuid::Uuid;
 
     use crate::{
@@ -1651,6 +1769,77 @@ mod tests {
                 .cloned()
                 .collect())
         }
+    }
+
+    #[tokio::test]
+    async fn bounded_task_loop_runs_up_to_its_limit_and_refills_finished_slots() {
+        let remaining = Arc::new(AtomicUsize::new(8));
+        let claim_sizes = Arc::new(Mutex::new(Vec::new()));
+        let running = Arc::new(AtomicUsize::new(0));
+        let maximum_running = Arc::new(AtomicUsize::new(0));
+        let started = Arc::new(AtomicUsize::new(0));
+        let permits = Arc::new(Semaphore::new(0));
+        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+
+        let claim_remaining = Arc::clone(&remaining);
+        let observed_claim_sizes = Arc::clone(&claim_sizes);
+        let execution_running = Arc::clone(&running);
+        let execution_maximum = Arc::clone(&maximum_running);
+        let execution_started = Arc::clone(&started);
+        let execution_permits = Arc::clone(&permits);
+        let driver = tokio::spawn(run_bounded_task_loop(
+            Duration::from_secs(3600),
+            shutdown_rx,
+            4,
+            move |available| {
+                observed_claim_sizes.lock().unwrap().push(available);
+                let count = claim_remaining
+                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                        Some(remaining.saturating_sub(available))
+                    })
+                    .unwrap()
+                    .min(available);
+                async move { Ok((0..count).collect::<Vec<_>>()) }
+            },
+            move |_| {
+                let running = Arc::clone(&execution_running);
+                let maximum = Arc::clone(&execution_maximum);
+                let started = Arc::clone(&execution_started);
+                let permits = Arc::clone(&execution_permits);
+                async move {
+                    let current = running.fetch_add(1, Ordering::SeqCst) + 1;
+                    maximum.fetch_max(current, Ordering::SeqCst);
+                    started.fetch_add(1, Ordering::SeqCst);
+                    permits.acquire().await.unwrap().forget();
+                    running.fetch_sub(1, Ordering::SeqCst);
+                }
+            },
+        ));
+
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while started.load(Ordering::SeqCst) < 4 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(running.load(Ordering::SeqCst), 4);
+
+        permits.add_permits(1);
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while started.load(Ordering::SeqCst) < 5 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(maximum_running.load(Ordering::SeqCst), 4);
+        assert_eq!(&*claim_sizes.lock().unwrap(), &[4, 1]);
+
+        let _ = shutdown_tx.send(());
+        permits.add_permits(8);
+        driver.await.unwrap();
     }
 
     /// The driver runs before it sleeps. A queue with something already in it at startup must be

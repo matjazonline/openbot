@@ -39,6 +39,7 @@ mod chart;
 mod companies;
 mod company_settings;
 mod dashboard;
+mod dashboard_runtime;
 mod icon;
 mod invite_settings;
 mod layout;

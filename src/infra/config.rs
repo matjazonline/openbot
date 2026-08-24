@@ -5,6 +5,27 @@ use time::Duration;
 
 use crate::{adapters::http::session::MIN_SECRET_BYTES, entities::value_objects::EmailAddress};
 
+pub const DEFAULT_TASK_WORKER_CONCURRENCY: usize = 4;
+pub const MAX_TASK_WORKER_CONCURRENCY: usize = 64;
+
+/// Load the bounded background-task parallelism once during process startup.
+pub fn task_worker_concurrency_from_env() -> usize {
+    parse_task_worker_concurrency(env::var("TASK_WORKER_CONCURRENCY").ok().as_deref())
+}
+
+fn parse_task_worker_concurrency(value: Option<&str>) -> usize {
+    let concurrency = value.map_or(DEFAULT_TASK_WORKER_CONCURRENCY, |value| {
+        value
+            .parse::<usize>()
+            .expect("TASK_WORKER_CONCURRENCY must be a positive integer")
+    });
+    assert!(
+        (1..=MAX_TASK_WORKER_CONCURRENCY).contains(&concurrency),
+        "TASK_WORKER_CONCURRENCY must be between 1 and {MAX_TASK_WORKER_CONCURRENCY}"
+    );
+    concurrency
+}
+
 pub struct AppConfig {
     pub jwt_secret: String,
     pub access_token_ttl: Duration,
@@ -453,6 +474,18 @@ mod tests {
 
     /// Long enough to pass the startup check, which is itself part of what is under test.
     const TEST_SECRET: &str = "a-test-secret-long-enough-to-sign-with-01";
+
+    #[test]
+    fn task_worker_concurrency_is_bounded_and_defaults_to_four() {
+        assert_eq!(parse_task_worker_concurrency(None), 4);
+        assert_eq!(parse_task_worker_concurrency(Some("8")), 8);
+    }
+
+    #[test]
+    #[should_panic(expected = "TASK_WORKER_CONCURRENCY must be between 1 and 64")]
+    fn task_worker_concurrency_rejects_zero() {
+        parse_task_worker_concurrency(Some("0"));
+    }
 
     #[test]
     fn test_app_config_from_env() {

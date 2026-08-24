@@ -196,6 +196,20 @@ pub struct LatencyBucket {
     pub p95_ms: Option<i64>,
 }
 
+/// Retry attempts among all attempts started in one slice of the selected window.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetryRateBucket {
+    pub bucket: DateTime<Utc>,
+    pub attempts: i64,
+    pub retries: i64,
+}
+
+impl RetryRateBucket {
+    pub fn rate_percent(&self) -> Option<f64> {
+        (self.attempts > 0).then(|| self.retries as f64 * 100.0 / self.attempts as f64)
+    }
+}
+
 /// How many tasks were still open at the end of one slice of the window.
 ///
 /// Reconstructed from the task rows themselves rather than sampled: nothing records queue depth as
@@ -216,6 +230,7 @@ pub struct QueueDepthBucket {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AttemptStats {
     pub attempts: i64,
+    pub retries: i64,
     pub failed: i64,
     pub p50_ms: Option<i64>,
     pub p95_ms: Option<i64>,
@@ -231,6 +246,12 @@ impl AttemptStats {
     /// Share of attempts that failed, as a percentage, or `None` when nothing ran.
     pub fn failure_rate_percent(&self) -> Option<f64> {
         (self.attempts > 0).then(|| self.failed as f64 * 100.0 / self.attempts as f64)
+    }
+
+    /// Share of starts that are retries. The attempt ledger's first run is numbered one; every
+    /// larger attempt number is a retry regardless of its final status.
+    pub fn retry_rate_percent(&self) -> Option<f64> {
+        (self.attempts > 0).then(|| self.retries as f64 * 100.0 / self.attempts as f64)
     }
 }
 
@@ -338,6 +359,7 @@ pub struct DashboardSnapshot {
     pub outbox: OutboxHealth,
     pub throughput: Vec<ThroughputBucket>,
     pub latency: Vec<LatencyBucket>,
+    pub retry_rate: Vec<RetryRateBucket>,
     pub queue_depth: Vec<QueueDepthBucket>,
     pub attempts: AttemptStats,
     /// Capped at [`OUTSTANDING_LIMIT`]; the page links to the task monitor for the rest.

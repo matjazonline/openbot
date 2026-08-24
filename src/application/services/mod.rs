@@ -7,5 +7,6 @@ pub mod llm_guardrail;
 pub mod memory_provider;
 pub mod outbound_dispatcher;
 pub mod outreach_tool;
+pub mod runtime_metrics;
 pub mod spam_scanner;
 pub mod task_worker;

@@ -19,6 +19,8 @@ kill_timeout = "30s"
   ENABLE_HEURISTIC_SCANNER = "true"
   ENABLE_SPAM_SCANNER = "false"
   ENABLE_LLM_SPAM_GUARDRAIL = "false"
+  # API-bound agent executions; four is conservative for one shared CPU.
+  TASK_WORKER_CONCURRENCY = "4"
   INCOMING_SMTP_DNSBL_ENABLED = "true"
   REFRESH_TOKEN_TTL_DAYS = "30"
   # Comma-separated addresses that see /ui/dashboard across every company rather than

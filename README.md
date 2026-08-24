@@ -59,9 +59,9 @@ Email clients append the entire historical thread below newly typed text. Feedin
 
 ### 3.4 Background Task Queue & Worker
 - **Durable Task Store (`background_tasks`):** Ingests inbound emails synchronously and enqueues background processing tasks, allowing the webhook to return `HTTP 200 OK` in < 100ms.
-- **Task Worker Poller (`TaskWorker`):** Three independent loops so that a long agent run cannot hold up mail delivery. The task loop claims at most one due task every 500ms; the outbox loop claims and sends up to 10 emails every 500ms; a maintenance loop reaps expired delivery leases and checks quorum timeouts every 30 seconds. A loop that finds a full batch comes straight back without pausing, and one whose iteration failed backs off for 5 seconds. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
+- **Task Worker Poller (`TaskWorker`):** Independent loops keep long agent runs from holding up mail delivery. The task loop continuously fills up to `TASK_WORKER_CONCURRENCY` execution slots (default 4), polling an empty queue every 500ms and refilling a slot immediately when a task finishes. The outbox loop claims and sends up to 10 emails every 500ms; a maintenance loop reaps expired delivery leases and checks quorum timeouts every 30 seconds. A failed poll backs off for 5 seconds. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
 - **Leased Execution:** Claims use `FOR UPDATE SKIP LOCKED` and a 15-minute lease. Background executions renew the lease every 5 minutes, and an expired lease can be reclaimed by another worker.
-- **Shutdown:** `Ctrl+C` broadcasts a shutdown signal to the worker and SMTP listener. The loops exit when control returns to their outer `select`; spawned worker and SMTP tasks are not explicitly awaited before runtime shutdown.
+- **Shutdown:** `Ctrl+C` broadcasts a shutdown signal to the worker and SMTP listener. The task loop stops claiming and drains its active execution slots; the process-level worker and SMTP tasks are not explicitly awaited beyond the runtime's bounded shutdown window.
 
 #### Task Execution Flow
 
@@ -101,7 +101,7 @@ flowchart TD
 
     subgraph Worker[TaskWorker poll loops]
         TASK_TICK[Task loop<br/>every 500ms]
-        CLAIM[Atomically claim one due task<br/>FOR UPDATE SKIP LOCKED]
+        CLAIM[Atomically claim tasks for free worker slots<br/>FOR UPDATE SKIP LOCKED]
         OUTBOX_TICK[Outbox loop<br/>every 500ms]
         OUTBOX_STEP[Claim and send up to 10 outbox emails]
         MAINT_TICK[Maintenance loop<br/>every 30s]
