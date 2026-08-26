@@ -36,6 +36,15 @@ pub struct MailboxUser<'a> {
     /// Whether they are a system operator, and so entitled to the cross-company workspaces.
     /// Decided once per request from [`AppConfig::is_operator`] -- see `routes::ui::workspace_user`.
     pub is_operator: bool,
+    /// What this account is to the company currently anchoring the rail.
+    pub company_membership: CompanyMembership,
+}
+
+impl MailboxUser<'_> {
+    pub fn with_company_membership(mut self, membership: CompanyMembership) -> Self {
+        self.company_membership = membership;
+        self
+    }
 }
 
 /// Which `/ui` workspace a response belongs to, i.e. which rail icon is lit.
@@ -106,7 +115,7 @@ pub struct UiShell<'a> {
 /// The full HTML document for one `/ui` response.
 pub fn ui_shell(shell: &UiShell<'_>) -> String {
     let rail = match shell.company {
-        Some(company) => icon_rail(company, shell.section),
+        Some(company) => icon_rail(shell.user, company, shell.section),
         None => String::new(),
     };
 
@@ -1037,7 +1046,7 @@ pub fn account_chip(user: &MailboxUser<'_>, swap: FragmentSwap) -> String {
 ///
 /// The workspace the response belongs to is lit, so the rail says where you are as well as where
 /// you can go.
-fn icon_rail(company: &Company, section: UiSection) -> String {
+fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> String {
     let company_id = company.id;
     let destinations = [
         (UiSection::Mailbox, "/ui", Icon::Mail, "Mailbox"),
@@ -1072,6 +1081,7 @@ fn icon_rail(company: &Company, section: UiSection) -> String {
 
     let links: String = destinations
         .iter()
+        .filter(|(destination, _, _, _)| rail_section_visible(user, *destination))
         .map(|(destination, path, glyph, title)| {
             format!(
                 r##"<a href="{path}?company_id={company_id}" class="btn btn-square btn-md {style}" title="{title}" aria-label="{title}"{current}>{glyph}</a>"##,
@@ -1093,8 +1103,30 @@ fn icon_rail(company: &Company, section: UiSection) -> String {
             {company_badge}
         </nav>
         "##,
-        company_badge = rail_company_badge(company, FragmentSwap::Inline),
+        company_badge = user
+            .company_membership
+            .is_team()
+            .then(|| rail_company_badge(company, FragmentSwap::Inline))
+            .unwrap_or_default(),
     )
+}
+
+/// The rail mirrors route authorization instead of advertising workspaces the caller cannot open.
+fn rail_section_visible(user: &MailboxUser<'_>, section: UiSection) -> bool {
+    match section {
+        UiSection::Mailbox => user.company_membership.is_team(),
+        UiSection::Channels
+        | UiSection::Agents
+        | UiSection::Schedules
+        | UiSection::Tasks
+        | UiSection::Outbox => user.company_membership.manages_company_operations(),
+        UiSection::Dashboard => {
+            user.company_membership.manages_company_operations() || user.is_operator
+        }
+        // Company settings are readable by the team, while their edit controls remain owner-only.
+        UiSection::Companies => user.company_membership.is_team(),
+        UiSection::Invites | UiSection::Profile => false,
+    }
 }
 
 /// The foot of the rail: the company everything above it is scoped to, as its picture or its

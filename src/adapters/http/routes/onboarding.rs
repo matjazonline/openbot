@@ -354,7 +354,9 @@ mod tests {
     use chrono::Utc;
 
     use super::*;
-    use crate::entities::{agent::Agent, channel::Channel, company::Company};
+    use crate::entities::{
+        agent::Agent, channel::Channel, company::Company, company_member::CompanyMembership,
+    };
 
     fn company() -> Company {
         Company {
@@ -400,6 +402,7 @@ mod tests {
             email: &email,
             avatar_url: None,
             is_operator: false,
+            company_membership: CompanyMembership::Owner,
         };
         let channel = Channel {
             enabled: true,
@@ -431,6 +434,7 @@ mod tests {
         let company_page = pages::onboarding_company_page(&user, "example.com", None);
         assert!(company_page.contains("Step 1 of 3"));
         assert!(company_page.contains("action=\"/ui/onboarding/company\""));
+        assert!(company_page.contains("href=\"/ui\" class=\"btn btn-ghost\">Skip</a>"));
         assert!(company_page.contains(">.example.com</span>"));
         assert!(company_page.contains("/assets/app.css"));
         assert!(company_page.contains("/ui/profile"));

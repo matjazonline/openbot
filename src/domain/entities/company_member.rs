@@ -81,8 +81,8 @@ impl CompanyMembership {
         matches!(self, Self::Owner)
     }
 
-    /// Whether this account may configure the company's channels, agents and schedules.
-    pub fn manages_automation(self) -> bool {
+    /// Whether this account may manage the company's operational workspaces and automation.
+    pub fn manages_company_operations(self) -> bool {
         matches!(self, Self::Owner | Self::Admin)
     }
 }

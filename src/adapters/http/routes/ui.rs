@@ -37,6 +37,7 @@ use crate::{
         agent::Agent,
         channel::Channel,
         company::{Company, CompanyAccess},
+        company_member::CompanyMembership,
         task::ThreadActivity,
         thread::Thread,
         user::{User, Viewer},
@@ -179,7 +180,7 @@ pub(super) async fn load_scoped_company(
     Ok((companies, selected))
 }
 
-/// The company a channel, agent or schedule settings request is scoped to.
+/// The company an operational or automation-management request is scoped to.
 ///
 /// Owners and company admins may configure these resources. Ordinary members are intentionally
 /// absent from both the returned list and the selection, so a guessed company id grants nothing.
@@ -194,6 +195,15 @@ pub(super) async fn load_managed_company(
         None => companies.first().cloned(),
     };
     Ok((companies, selected))
+}
+
+/// Membership implied by a successful [`load_managed_company`] selection.
+pub(super) fn managed_company_membership(company: &Company, user_id: Uuid) -> CompanyMembership {
+    if company.user_id == user_id {
+        CompanyMembership::Owner
+    } else {
+        CompanyMembership::Admin
+    }
 }
 
 /// The company a *read* is scoped to, from the companies the caller may see rather than only the
@@ -350,6 +360,7 @@ async fn mailbox_page(
     let Some(access) = access else {
         return Ok(Html(pages::mailbox_no_company_page(&mailbox_user)));
     };
+    let mailbox_user = mailbox_user.with_company_membership(access.membership);
     let company = access.company;
 
     let channels = channel_use_cases
@@ -1173,6 +1184,7 @@ pub(super) fn workspace_user<'a>(
         email: account_email,
         avatar_url: account.avatar_url.as_ref(),
         is_operator: config.is_operator(account_email),
+        company_membership: CompanyMembership::None,
     }
 }
 

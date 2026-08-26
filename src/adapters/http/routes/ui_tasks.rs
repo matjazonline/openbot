@@ -2,7 +2,8 @@
 //! watched rather than its mail read.
 //!
 //! The shell and the company scoping are shared: chrome comes from
-//! [`crate::adapters::http::pages::ui_shell`] and the company from [`super::ui::load_scoped_company`].
+//! [`crate::adapters::http::pages::ui_shell`] and the company from
+//! [`super::ui::load_managed_company`].
 //! Which page of tasks a request means is one [`TaskFilter`], the same value the classic tasks page
 //! pages by, so the two UIs cannot disagree about what `?page=2` contains.
 
@@ -42,7 +43,7 @@ use crate::{
 
 use super::{
     task::deserialize_empty_string_as_none,
-    ui::{load_account, load_scoped_company, workspace_user},
+    ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
 };
 
 pub fn router() -> Router<AppState> {
@@ -130,7 +131,7 @@ impl Workspace {
     /// guessed `company_id` cannot reach another user's tasks.
     async fn scoped_company(&self, company_id: Option<Uuid>) -> AppResult<Company> {
         let (_, company) =
-            load_scoped_company(&self.company_use_cases, self.user_id, company_id).await?;
+            load_managed_company(&self.company_use_cases, self.user_id, company_id).await?;
         company.ok_or_else(|| AppError::NotFound("Company not found".into()))
     }
 
@@ -155,7 +156,7 @@ async fn tasks_page(
     let account_email = EmailAddress::from(account.email.as_str());
     let workspace_user = workspace_user(&account, &account_email, &workspace.config);
 
-    let (companies, company) = load_scoped_company(
+    let (companies, company) = load_managed_company(
         &workspace.company_use_cases,
         workspace.user_id,
         query.company_id,
@@ -164,6 +165,8 @@ async fn tasks_page(
     let Some(company) = company else {
         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
     };
+    let workspace_user = workspace_user
+        .with_company_membership(managed_company_membership(&company, workspace.user_id));
 
     let view = workspace.view(&company);
     let filter = query.filter();

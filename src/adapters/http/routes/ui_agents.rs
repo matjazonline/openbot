@@ -44,7 +44,7 @@ use crate::{
 use super::{
     agent::{AgentForm, ModelOverrides, create_agent_from_instructions},
     channel::parse_config_form,
-    ui::{load_account, load_managed_company, workspace_user},
+    ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
 };
 
 pub fn router() -> Router<AppState> {
@@ -170,6 +170,8 @@ async fn agents_page(
     let Some(company) = company else {
         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
     };
+    let workspace_user = workspace_user
+        .with_company_membership(managed_company_membership(&company, workspace.user_id));
 
     let view = workspace.view(&company);
     let agents = view.agents().await?;

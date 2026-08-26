@@ -33,6 +33,7 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         company::{Company, CompanyAccess},
+        company_member::CompanyMembership,
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
@@ -300,6 +301,12 @@ async fn companies_page(
         query.company_id,
     )
     .await?;
+    let workspace_user = workspace_user.with_company_membership(
+        access
+            .as_ref()
+            .map(|access| access.membership)
+            .unwrap_or(CompanyMembership::None),
+    );
 
     let tab = CompanyTab::from_query(query.tab.as_deref());
     let creating = matches!(query.new.as_deref(), Some("1") | Some("true"));

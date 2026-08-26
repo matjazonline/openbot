@@ -1,9 +1,9 @@
 //! `/ui/dashboard` — the operational overview, for one company or for all of them.
 //!
 //! The scope is decided once, by [`DashboardScope::resolve`], and everything downstream takes the
-//! `Option<Uuid>` it produces. A normal user is pinned to a company they belong to by
-//! [`super::ui::load_scoped_company`]; an operator named in `OPERATOR_EMAILS` gets `None`, which the
-//! queries read as "every company".
+//! `Option<Uuid>` it produces. A company administrator is pinned to a company they manage by
+//! [`super::ui::load_managed_company`]; an operator named in `OPERATOR_EMAILS` gets `None`, which
+//! the queries read as "every company".
 //!
 //! The stream is a ticker rather than an event subscription. These are sampled gauges — a queue
 //! depth has no "changed" moment to subscribe to — so re-reading on an interval is both simpler and
@@ -35,10 +35,11 @@ use crate::{
         },
         persistence::dashboard::DashboardPersistence,
     },
-    app_error::AppResult,
+    app_error::{AppError, AppResult},
     domain::monitoring::MonitoringService,
     entities::{
         company::Company,
+        company_member::CompanyMembership,
         dashboard::{DashboardSnapshot, DashboardWindow, ProcessGauges},
         runtime_metrics::{MachineIdentity, RuntimeMetricSnapshot},
         value_objects::EmailAddress,
@@ -48,7 +49,7 @@ use crate::{
     use_cases::{company::CompanyUseCases, user::UserUseCases},
 };
 
-use super::ui::{load_account, load_scoped_company, workspace_user};
+use super::ui::{load_account, load_managed_company, workspace_user};
 
 /// How often a connected dashboard re-reads. Slow enough that a room full of open tabs is not a
 /// load generator, fast enough that a queue draining is visibly a queue draining.
@@ -155,7 +156,8 @@ impl DashboardScope {
     ) -> AppResult<Self> {
         let requested = query.company_id;
         let (companies, selected) =
-            load_scoped_company(&dashboard.company_use_cases, dashboard.user_id, requested).await?;
+            load_managed_company(&dashboard.company_use_cases, dashboard.user_id, requested)
+                .await?;
 
         let operator = dashboard.config.is_operator(email);
 
@@ -165,8 +167,8 @@ impl DashboardScope {
         // are watching — and it discloses nothing new, since the global rollup already shows those
         // companies' tasks by name.
         //
-        // Everyone else stays pinned to `load_scoped_company`'s answer, which only ever returns a
-        // company the caller belongs to.
+        // Everyone else stays pinned to `load_managed_company`'s answer, which only ever returns a
+        // company the caller owns or administers.
         let selected_company = match (operator, requested) {
             (true, Some(company_id)) => dashboard.company_use_cases.get_company(company_id).await?,
             _ => selected,
@@ -187,6 +189,32 @@ impl DashboardScope {
     /// The filter the queries take: `None` scans every company.
     fn company_id(&self) -> Option<Uuid> {
         self.company.as_ref().map(|company| company.id)
+    }
+
+    /// The persistence scope after authorization. Only an operator may request the global rollup.
+    fn authorized_company_id(&self) -> AppResult<Option<Uuid>> {
+        match (self.company_id(), self.operator) {
+            (company_id @ Some(_), _) | (company_id @ None, true) => Ok(company_id),
+            (None, false) => Err(AppError::NotFound("Company not found".into())),
+        }
+    }
+
+    /// What the caller is to the company anchoring the rail, if there is one.
+    fn membership(&self, user_id: Uuid) -> CompanyMembership {
+        let Some(company) = &self.selected_company else {
+            return CompanyMembership::None;
+        };
+        if company.user_id == user_id {
+            CompanyMembership::Owner
+        } else if self
+            .companies
+            .iter()
+            .any(|managed| managed.id == company.id)
+        {
+            CompanyMembership::Admin
+        } else {
+            CompanyMembership::None
+        }
     }
 
     fn view(&self) -> pages::DashboardScopeView<'_> {
@@ -278,6 +306,7 @@ async fn dashboard_page(
     let user = workspace_user(&account, &account_email, &dashboard.config);
 
     let scope = DashboardScope::resolve(&dashboard, &account_email, &query).await?;
+    let user = user.with_company_membership(scope.membership(dashboard.user_id));
 
     // A user with no company and no operator grant has nothing to show; the shell's own empty
     // state says so rather than rendering a page of zeroes.
@@ -307,10 +336,9 @@ async fn dashboard_panels_fragment(
     let user = workspace_user(&account, &account_email, &dashboard.config);
 
     let scope = DashboardScope::resolve(&dashboard, &account_email, &query).await?;
+    let company = scope.authorized_company_id()?;
     let window = query.window();
-    let reading = dashboard
-        .read(scope.company_id(), window, scope.operator)
-        .await?;
+    let reading = dashboard.read(company, window, scope.operator).await?;
 
     Ok(Html(render(&scope, &reading, &user, window)).into_response())
 }
@@ -326,7 +354,7 @@ async fn dashboard_stream(
     let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
     let scope = DashboardScope::resolve(&dashboard, &account_email, &query).await?;
-    let company = scope.company_id();
+    let company = scope.authorized_company_id()?;
     let operator = scope.operator;
     let window = query.window();
 
@@ -418,5 +446,25 @@ mod tests {
                 .unwrap();
         assert!(visible.is_some());
         assert_eq!(persistence.0.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn only_an_operator_may_resolve_the_global_dashboard_scope() {
+        let company_user_scope = DashboardScope {
+            company: None,
+            selected_company: None,
+            companies: Vec::new(),
+            operator: false,
+        };
+        assert!(matches!(
+            company_user_scope.authorized_company_id(),
+            Err(AppError::NotFound(_))
+        ));
+
+        let operator_scope = DashboardScope {
+            operator: true,
+            ..company_user_scope
+        };
+        assert_eq!(operator_scope.authorized_company_id().unwrap(), None);
     }
 }

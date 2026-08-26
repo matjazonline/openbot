@@ -25,6 +25,7 @@ use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
     entities::{
+        company_member::CompanyMembership,
         user::User,
         value_objects::{AvatarUrl, EmailAddress},
     },
@@ -156,9 +157,16 @@ async fn profile_page(
 
     let pane_html = account.pane(None, pages::ProfileOutcome::Untouched);
     let account_email = EmailAddress::from(account.user.email.as_str());
+    let workspace_user = workspace_user(&account.user, &account_email, &config)
+        .with_company_membership(
+            company
+                .as_ref()
+                .map(|access| access.membership)
+                .unwrap_or(CompanyMembership::None),
+        );
 
     Ok(Html(pages::profile_page(&pages::ProfilePage {
-        user: &workspace_user(&account.user, &account_email, &config),
+        user: &workspace_user,
         company: company.as_ref().map(|access| &access.company),
         pane_html: &pane_html,
     })))

@@ -472,7 +472,7 @@ fn member_access_role_form(pane: &MemberPane<'_>) -> String {
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Access Role</span></div>
                         <select name="role" class="select w-full">{options}</select>
-                        <div class="label"><span class="text-[11px] opacity-60">Admins can manage channels, agents and schedules. Members can work in the inbox.</span></div>
+                        <div class="label"><span class="text-[11px] opacity-60">Admins can manage channels, agents, schedules, tasks and the outbox, and view the company dashboard. Members can work in the inbox.</span></div>
                     </label>
                     <button type="submit" class="btn btn-primary btn-sm">
                         <span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>

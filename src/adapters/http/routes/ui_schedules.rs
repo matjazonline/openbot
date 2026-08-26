@@ -28,7 +28,10 @@ use crate::{
         routes::{
             channel::reply_headers,
             schedule::UiScheduleForm,
-            ui::{load_account, load_managed_company, wake_ups, workspace_user},
+            ui::{
+                load_account, load_managed_company, managed_company_membership, wake_ups,
+                workspace_user,
+            },
         },
     },
     app_error::{AppError, AppResult},
@@ -230,6 +233,8 @@ async fn schedules_page(
     let Some(company) = company else {
         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
     };
+    let workspace_user = workspace_user
+        .with_company_membership(managed_company_membership(&company, workspace.user_id));
 
     let schedules = workspace
         .schedule_use_cases
@@ -823,6 +828,7 @@ mod tests {
     };
     use crate::entities::{
         company::Company,
+        company_member::CompanyMembership,
         message::{Message, MessageDirection, MessageRole},
         schedule::{
             ChannelSchedule, ScheduleDeliveryMode, ScheduleRun, ScheduleTimezone, ScheduleType,
@@ -896,6 +902,7 @@ mod tests {
             email: &user_email,
             avatar_url: None,
             is_operator: false,
+            company_membership: CompanyMembership::Admin,
         };
 
         let run = ScheduleRun {
@@ -984,6 +991,7 @@ mod tests {
             email: &user_email,
             avatar_url: None,
             is_operator: false,
+            company_membership: CompanyMembership::Admin,
         };
 
         let html = schedules_page(&SchedulesPage {

@@ -1119,7 +1119,7 @@ fn plural(count: i64) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::dashboard::TaskStatusCount;
+    use crate::entities::{company_member::CompanyMembership, dashboard::TaskStatusCount};
 
     fn snapshot() -> DashboardSnapshot {
         DashboardSnapshot::default()
@@ -1237,6 +1237,7 @@ mod tests {
             email: &email,
             avatar_url: None,
             is_operator: false,
+            company_membership: CompanyMembership::Admin,
         };
         let html = dashboard_page(&DashboardShell {
             user: &user,
@@ -1277,6 +1278,7 @@ mod tests {
             email: &email,
             avatar_url: None,
             is_operator: true,
+            company_membership: CompanyMembership::Admin,
         };
         let company_html = dashboard_page(&DashboardShell {
             user: &user,
@@ -1347,6 +1349,7 @@ mod tests {
             email: &email,
             avatar_url: None,
             is_operator: false,
+            company_membership: CompanyMembership::None,
         };
         let process = ProcessGauges::default();
         let machine = MachineIdentity {
@@ -1381,6 +1384,7 @@ mod tests {
             email: &email,
             avatar_url: None,
             is_operator: true,
+            company_membership: CompanyMembership::None,
         };
         let machine = MachineIdentity {
             id: crate::entities::runtime_metrics::MachineId::new("serving-machine"),

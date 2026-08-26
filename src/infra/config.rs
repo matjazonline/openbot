@@ -151,7 +151,8 @@ pub struct GcsConfig {
     /// arrives on a channel is only ever served through the app, to somebody the channel's own
     /// rules allow. `None` means attachments are not stored at all.
     pub attachments_bucket: Option<String>,
-    /// The folder inside the private bucket attachments are written to.
+    /// The folder inside the private bucket attachments are written to. By default it namespaces
+    /// them under this deployment's application domain.
     pub attachments_folder: String,
 }
 
@@ -161,7 +162,7 @@ impl GcsConfig {
     /// Both the bucket and the key are required together: a deployment naming one but not the
     /// other has a mistake in it, and starting with uploads silently disabled would hide it until
     /// somebody tried to change their picture.
-    fn from_env() -> Option<Self> {
+    fn from_env(app_domain_name: &str) -> Option<Self> {
         let bucket = non_empty_var("GCS_BUCKET");
         let service_account_json_base64 = non_empty_var("GCS_SERVICE_ACCOUNT_JSON_BASE64");
 
@@ -174,7 +175,7 @@ impl GcsConfig {
                     .unwrap_or_else(|| "avatars".to_string()),
                 attachments_bucket: non_empty_var("GCS_ATTACHMENTS_BUCKET"),
                 attachments_folder: non_empty_var("GCS_ATTACHMENTS_FOLDER")
-                    .unwrap_or_else(|| "attachments".to_string()),
+                    .unwrap_or_else(|| default_attachments_folder(app_domain_name)),
             }),
             (None, None) => None,
             (bucket, _) => panic!(
@@ -202,6 +203,10 @@ impl GcsConfig {
             )
         })
     }
+}
+
+fn default_attachments_folder(app_domain_name: &str) -> String {
+    format!("{app_domain_name}/mail-attachments")
 }
 
 /// Whether this is a developer's machine rather than a deployment, for the purpose of cookies.
@@ -387,6 +392,8 @@ impl AppConfig {
             .parse()
             .unwrap_or(false);
 
+        let gcs = GcsConfig::from_env(&app_domain_name);
+
         Self {
             jwt_secret,
             refresh_token_ttl: Duration::days(refresh_token_ttl_days),
@@ -411,7 +418,7 @@ impl AppConfig {
             spam_scanner_url,
             enable_llm_spam_guardrail,
             secure_cookies,
-            gcs: GcsConfig::from_env(),
+            gcs,
             operator_emails,
             sendgrid_inbound,
         }
@@ -471,6 +478,14 @@ mod tests {
     fn task_worker_concurrency_is_bounded_and_defaults_to_four() {
         assert_eq!(parse_task_worker_concurrency(None), 4);
         assert_eq!(parse_task_worker_concurrency(Some("8")), 8);
+    }
+
+    #[test]
+    fn attachments_are_namespaced_by_application_domain_by_default() {
+        assert_eq!(
+            default_attachments_folder("mail.example.com"),
+            "mail.example.com/mail-attachments"
+        );
     }
 
     #[test]

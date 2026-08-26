@@ -294,6 +294,7 @@ fn mailbox_user(email: &EmailAddress) -> MailboxUser<'_> {
         email,
         avatar_url: None,
         is_operator: false,
+        company_membership: CompanyMembership::Owner,
     }
 }
 
@@ -342,6 +343,7 @@ fn top_bar_carries_a_theme_controller_that_survives_a_reload() {
         email: &email,
         avatar_url: None,
         is_operator: false,
+        company_membership: CompanyMembership::Owner,
     };
 
     let html = mailbox_page(&MailboxPage {
@@ -434,6 +436,7 @@ fn dark_theme_recuts_the_blues_at_the_logos_hue() {
         email: &email,
         avatar_url: None,
         is_operator: false,
+        company_membership: CompanyMembership::None,
     };
 
     let html = mailbox_no_company_page(&user);
@@ -464,6 +467,7 @@ fn top_bar_shows_the_logo_and_the_signed_in_account() {
         email: &email,
         avatar_url: None,
         is_operator: false,
+        company_membership: CompanyMembership::Owner,
     };
 
     let html = mailbox_page(&MailboxPage {
@@ -811,6 +815,61 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
         r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-md btn-ghost"##,
         company.id
     )));
+}
+
+#[test]
+fn the_icon_rail_only_advertises_company_workspaces_the_role_can_open() {
+    let company = mailbox_company();
+    let email = mailbox_account_email();
+    let render = |membership, is_operator| {
+        let user = MailboxUser {
+            company_membership: membership,
+            is_operator,
+            ..mailbox_user(&email)
+        };
+        ui_shell(&UiShell {
+            title: "Mailbox",
+            user: &user,
+            company: Some(&company),
+            section: UiSection::Mailbox,
+            content: "",
+            script: "",
+        })
+    };
+    let link = |path: &str| format!(r#"href="{path}?company_id={}""#, company.id);
+
+    let member = render(CompanyMembership::Member, false);
+    assert!(member.contains(&link("/ui")));
+    assert!(member.contains(&link("/ui/companies")));
+    for path in [
+        "/ui/channels",
+        "/ui/agents",
+        "/ui/schedules",
+        "/ui/tasks",
+        "/ui/outbox",
+        "/ui/dashboard",
+    ] {
+        assert!(!member.contains(&link(path)), "member rail exposed {path}");
+    }
+
+    let admin = render(CompanyMembership::Admin, false);
+    for path in [
+        "/ui",
+        "/ui/channels",
+        "/ui/agents",
+        "/ui/schedules",
+        "/ui/tasks",
+        "/ui/outbox",
+        "/ui/dashboard",
+        "/ui/companies",
+    ] {
+        assert!(admin.contains(&link(path)), "admin rail omitted {path}");
+    }
+
+    let operator = render(CompanyMembership::None, true);
+    assert!(operator.contains(&link("/ui/dashboard")));
+    assert!(!operator.contains(&link("/ui")));
+    assert!(!operator.contains(r#"id="rail-company""#));
 }
 
 #[test]

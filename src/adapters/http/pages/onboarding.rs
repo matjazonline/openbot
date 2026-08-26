@@ -53,7 +53,7 @@ pub fn onboarding_company_page(
             <div class="rounded-box border border-base-300 bg-base-200/40 p-4"><h2 class="font-semibold">Model connection <span class="badge badge-ghost badge-sm ml-1">Optional</span></h2><p class="mb-4 mt-1 text-sm opacity-60">Leave these blank when the server provides model defaults.</p>
                 {model_connection_fields}
             </div>
-            <div class="card-actions justify-end"><button type="submit" class="btn btn-primary">Continue to channel</button></div>
+            <div class="card-actions items-center justify-between"><a href="/ui" class="btn btn-ghost">Skip</a><button type="submit" class="btn btn-primary">Continue to channel</button></div>
         </form>"##
     );
     onboarding_shell("Set up your company", user, None, 1, &pane)

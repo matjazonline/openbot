@@ -150,7 +150,7 @@ pub async fn owned_company(
     }
 }
 
-/// Resolve a company whose channels, agents and schedules the caller may configure.
+/// Resolve a company whose operational workspaces and automation the caller may manage.
 ///
 /// Ownership still outranks the stored membership row. Otherwise the caller must be an accepted
 /// company admin; an ordinary member and a stranger receive the same not-found response so this
@@ -172,17 +172,17 @@ pub async fn managed_company(
     let may_manage = persistence
         .company_access(user_id, company_id)
         .await?
-        .is_some_and(|access| access.membership.manages_automation());
+        .is_some_and(|access| access.membership.manages_company_operations());
     if may_manage {
         return Ok(company);
     }
 
-    warn!("User {user_id} may not manage automation for company {company_id}");
+    warn!("User {user_id} may not manage operations for company {company_id}");
     Err(company_not_found())
 }
 
 pub fn company_not_found() -> AppError {
-    AppError::NotFound("Company not found, or you are not its owner.".into())
+    AppError::NotFound("Company not found, or you do not have permission.".into())
 }
 
 #[derive(Clone)]
@@ -238,7 +238,7 @@ impl CompanyUseCases {
         self.persistence.list_accessible_by_user_id(user_id).await
     }
 
-    /// Companies whose channels, agents and schedules the caller may configure.
+    /// Companies whose operational workspaces and automation the caller may manage.
     #[instrument(skip(self))]
     pub async fn list_managed_companies(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         Ok(self
@@ -246,7 +246,7 @@ impl CompanyUseCases {
             .list_accessible_by_user_id(user_id)
             .await?
             .into_iter()
-            .filter(|access| access.membership.manages_automation())
+            .filter(|access| access.membership.manages_company_operations())
             .map(|access| access.company)
             .collect())
     }

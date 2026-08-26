@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::AppResult,
-    entities::value_objects::EmailAddress,
+    entities::{company_member::CompanyMembership, value_objects::EmailAddress},
     infra::config::AppConfig,
     use_cases::{
         company::CompanyUseCases, company_invite::CompanyInviteUseCases, user::UserUseCases,
@@ -49,7 +49,12 @@ async fn invites_page(
     let (_, company) = load_readable_company(&company_use_cases, user.id, query.company_id).await?;
     let invites = invite_use_cases.list_user_invites(&account.email).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let mailbox_user = workspace_user(&account, &account_email, &config);
+    let mailbox_user = workspace_user(&account, &account_email, &config).with_company_membership(
+        company
+            .as_ref()
+            .map(|access| access.membership)
+            .unwrap_or(CompanyMembership::None),
+    );
 
     Ok(Html(pages::invite_settings_page(
         &pages::InviteSettingsPage {
