@@ -163,7 +163,7 @@ impl GcsConfig {
     /// other has a mistake in it, and starting with uploads silently disabled would hide it until
     /// somebody tried to change their picture.
     fn from_env(app_domain_name: &str) -> Option<Self> {
-        let bucket = non_empty_var("GCS_BUCKET");
+        let bucket = non_empty_var("GCS_AVATAR_BUCKET_PUBLIC");
         let service_account_json_base64 = non_empty_var("GCS_SERVICE_ACCOUNT_JSON_BASE64");
 
         match (bucket, service_account_json_base64) {
@@ -173,7 +173,7 @@ impl GcsConfig {
                 public_base_url_override: non_empty_var("GCS_PUBLIC_BASE_URL"),
                 avatar_folder: non_empty_var("GCS_AVATAR_FOLDER")
                     .unwrap_or_else(|| "avatars".to_string()),
-                attachments_bucket: non_empty_var("GCS_ATTACHMENTS_BUCKET"),
+                attachments_bucket: non_empty_var("GCS_ATTACHMENTS_BUCKET_PRIVATE"),
                 attachments_folder: non_empty_var("GCS_ATTACHMENTS_FOLDER")
                     .unwrap_or_else(|| default_attachments_folder(app_domain_name)),
             }),
@@ -181,14 +181,14 @@ impl GcsConfig {
             (bucket, _) => panic!(
                 "{} is set but {} is not; both are needed to store uploads",
                 if bucket.is_some() {
-                    "GCS_BUCKET"
+                    "GCS_AVATAR_BUCKET_PUBLIC"
                 } else {
                     "GCS_SERVICE_ACCOUNT_JSON_BASE64"
                 },
                 if bucket.is_some() {
                     "GCS_SERVICE_ACCOUNT_JSON_BASE64"
                 } else {
-                    "GCS_BUCKET"
+                    "GCS_AVATAR_BUCKET_PUBLIC"
                 },
             ),
         }

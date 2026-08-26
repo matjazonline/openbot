@@ -213,8 +213,8 @@ impl GcsFileStorage {
             BucketKind::Public => Ok(&self.bucket),
             BucketKind::Private => self.private_bucket.as_deref().ok_or_else(|| {
                 AppError::Internal(
-                    "No private bucket is configured (GCS_ATTACHMENTS_BUCKET), so there is nowhere \
-                     to keep this that is not public"
+                    "No private bucket is configured (GCS_ATTACHMENTS_BUCKET_PRIVATE), so there is \
+                     nowhere to keep this that is not public"
                         .to_string(),
                 )
             }),

@@ -123,7 +123,7 @@ documents the full set.
 ### Picture uploads
 
 Avatars are picked from disk and stored in a Google Cloud Storage bucket, so two
-settings travel together — `GCS_BUCKET` (non-secret, `fly.toml`) and
+settings travel together — `GCS_AVATAR_BUCKET_PUBLIC` (non-secret, `fly.toml`) and
 `GCS_SERVICE_ACCOUNT_JSON_BASE64` (a secret). Setting one without the other
 fails the boot rather than starting with uploads quietly disabled.
 
@@ -136,7 +136,7 @@ fly secrets set GCS_SERVICE_ACCOUNT_JSON_BASE64="$(base64 -i key.json | tr -d '\
 rm key.json
 ```
 
-The bucket has to be readable without credentials for a browser to load what it
+The avatar bucket has to be readable without credentials for a browser to load what it
 stores (`gcloud storage buckets add-iam-policy-binding gs://<bucket>
 --member=allUsers --role=roles/storage.objectViewer`). Objects are named by a
 fresh UUID and written with a one-year immutable `Cache-Control`, so a URL's
@@ -148,7 +148,7 @@ that uploads are not configured; avatars already stored keep rendering.
 ### Mail attachments
 
 Attachments arriving on a channel are stored in a **second bucket with no public access**
-(`GCS_ATTACHMENTS_BUCKET`), never the avatar bucket. They are downloaded through the app
+(`GCS_ATTACHMENTS_BUCKET_PRIVATE`), never the avatar bucket. They are downloaded through the app
 (`/ui/threads/{thread}/attachments/{sha256}`), which authorizes each request the same way opening
 the thread is authorized, and serves the bytes with `Content-Disposition: attachment` and
 `X-Content-Type-Options: nosniff` so nothing emailed to us ever renders as a page on this origin.
