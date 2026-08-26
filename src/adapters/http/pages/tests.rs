@@ -2792,6 +2792,7 @@ fn a_rejected_company_save_keeps_the_picture_that_was_picked() {
     // `<img src>` the bubble draws.
     let tampered = CompanyDraft {
         avatar_url: "javascript:alert(1)",
+        memory_provider: "",
         ..CompanyDraft::default()
     };
     let refused = company_create_pane(&CompanyCreatePane {
@@ -2812,6 +2813,7 @@ fn company_edit_pane_keeps_a_rejected_save_in_the_form() {
         api_key: "",
         spam_guardrail: SpamGuardrail::Disabled,
         avatar_url: "",
+        memory_provider: "",
     };
 
     let html = company_edit_pane(&CompanyEditPane {

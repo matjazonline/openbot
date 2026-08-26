@@ -28,6 +28,7 @@ fn loop_test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
+        hydradb: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: APP_DOMAIN.to_string(),
         cors_allowed_origins: vec![],

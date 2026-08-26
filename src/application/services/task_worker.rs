@@ -25,6 +25,7 @@ use crate::{
     infra::config::AppConfig,
     services::{
         agent_runner::{AgentRunner, ResolvedAgentParams},
+        memory_coordinator::{MemoryPersistInput, MemoryRecallInput},
         outbound_dispatcher::{OutboundDispatcher, OutboundEmail, agent_response_email_body},
         runtime_metrics::ActiveTaskExecutions,
     },
@@ -950,12 +951,28 @@ impl TaskWorker {
                 existing.clean_text_body
             }
             None => {
-                let answer = self.run_scheduled_agent(&payload, &context).await?;
+                let answer = self
+                    .run_scheduled_agent(task.id, &payload, &context)
+                    .await?;
                 self.save_scheduled_reply(task, &payload, &context, &answer)
                     .await?;
                 answer
             }
         };
+
+        if let Some(memory) = self.thread_use_cases.memory_coordinator() {
+            memory
+                .persist(MemoryPersistInput {
+                    company: &context.company,
+                    channel: &context.channel,
+                    agent: context.agent.as_ref(),
+                    sender: None,
+                    task_id: task.id,
+                    user_context: &payload.prompt,
+                    final_answer: &answer,
+                })
+                .await;
+        }
 
         self.deliver_scheduled_reply(task, &payload, &context, &answer)
             .await
@@ -1001,6 +1018,7 @@ impl TaskWorker {
     /// The agent's answer to the schedule's prompt, with the thread so far as context.
     async fn run_scheduled_agent(
         &self,
+        task_id: Uuid,
         payload: &ScheduledRunPayload,
         context: &ScheduledRunContext,
     ) -> Result<String, String> {
@@ -1018,7 +1036,25 @@ impl TaskWorker {
         )
         .map_err(|e| format!("Failed to resolve agent parameters: {e}"))?;
 
-        let output = AgentRunner::new(&payload.prompt, &params)
+        let mut prompt = payload.prompt.clone();
+        if let Some(memory) = self.thread_use_cases.memory_coordinator()
+            && let Some(recalled) = memory
+                .recall(MemoryRecallInput {
+                    company: &context.company,
+                    channel: &context.channel,
+                    agent: context.agent.as_ref(),
+                    sender: None,
+                    task_id,
+                    latest_prompt: &payload.prompt,
+                })
+                .await
+                .map_err(|error| error.to_string())?
+        {
+            prompt.push_str("\n\n");
+            prompt.push_str(&recalled);
+        }
+
+        let output = AgentRunner::new(&prompt, &params)
             .history(&history)
             .monitoring(self.monitoring.clone())
             .config(Some(self.config.clone()))
@@ -2057,6 +2093,7 @@ mod tests {
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
+            hydradb: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],
@@ -2190,6 +2227,7 @@ mod tests {
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
+            hydradb: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],
@@ -2367,6 +2405,7 @@ mod tests {
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
+            hydradb: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],
@@ -2530,6 +2569,7 @@ mod tests {
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
+            hydradb: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],

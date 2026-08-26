@@ -127,6 +127,7 @@ pub struct CompanyDraft<'a> {
     /// submitted text so a rejected save comes back showing what was picked -- see
     /// [`company_fields`], which is where it becomes an [`AvatarUrl`] again.
     pub avatar_url: &'a str,
+    pub memory_provider: &'a str,
 }
 
 impl Default for CompanyDraft<'_> {
@@ -139,6 +140,7 @@ impl Default for CompanyDraft<'_> {
             api_key: "",
             spam_guardrail: SpamGuardrail::ServerDefault,
             avatar_url: "",
+            memory_provider: "",
         }
     }
 }
@@ -264,6 +266,14 @@ pub fn company_settings_empty_pane(message: &str, swap: FragmentSwap) -> String 
 }
 
 pub fn company_edit_pane(pane: &CompanyEditPane<'_>) -> String {
+    company_edit_pane_with_memory(pane, None, false)
+}
+
+pub fn company_edit_pane_with_memory(
+    pane: &CompanyEditPane<'_>,
+    memory: Option<&MemoryConnection>,
+    hydradb_configured: bool,
+) -> String {
     let company_id = pane.company.id;
 
     format!(
@@ -288,7 +298,7 @@ pub fn company_edit_pane(pane: &CompanyEditPane<'_>) -> String {
         created_at = super::format_date(pane.company.created_at),
         tabs = company_tabs(company_id, pane.body.tab()),
         body = match pane.body {
-            CompanyPaneBody::Settings => company_settings_body(pane),
+            CompanyPaneBody::Settings => company_settings_body(pane, memory, hydradb_configured),
             CompanyPaneBody::Team(html) => html.to_string(),
         },
     )
@@ -321,7 +331,11 @@ fn company_tabs(company_id: Uuid, tab: CompanyTab) -> String {
 }
 
 /// The Settings tab: what the company holds, and the form that changes it.
-fn company_settings_body(pane: &CompanyEditPane<'_>) -> String {
+fn company_settings_body(
+    pane: &CompanyEditPane<'_>,
+    memory: Option<&MemoryConnection>,
+    hydradb_configured: bool,
+) -> String {
     if !pane.editable {
         return format!(
             r##"
@@ -346,6 +360,7 @@ fn company_settings_body(pane: &CompanyEditPane<'_>) -> String {
                 {workspace_links}
                 <form hx-put="/ui/companies/{company_id}" hx-target="#company-pane" hx-swap="outerHTML" class="space-y-4">
                     {fields}
+                    {memory_status}
                     <div class="flex items-center gap-3 border-t border-base-300 pt-4">
                         <button type="submit" class="btn btn-primary">
                             <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
@@ -368,11 +383,19 @@ fn company_settings_body(pane: &CompanyEditPane<'_>) -> String {
         name = escape_html_text(&pane.company.name),
         error_html = form_error_banner(pane.error),
         workspace_links = workspace_links(company_id, pane.counts),
-        fields = company_fields(draft),
+        fields = company_fields(draft, hydradb_configured),
+        memory_status = memory_status(pane.company.id, memory, hydradb_configured),
     )
 }
 
 pub fn company_create_pane(pane: &CompanyCreatePane<'_>) -> String {
+    company_create_pane_with_memory(pane, false)
+}
+
+pub fn company_create_pane_with_memory(
+    pane: &CompanyCreatePane<'_>,
+    hydradb_configured: bool,
+) -> String {
     format!(
         r##"
         <section id="company-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
@@ -401,7 +424,7 @@ pub fn company_create_pane(pane: &CompanyCreatePane<'_>) -> String {
         </section>
         "##,
         error_html = form_error_banner(pane.error),
-        fields = company_fields(pane.draft),
+        fields = company_fields(pane.draft, hydradb_configured),
     )
 }
 
@@ -439,7 +462,7 @@ fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
 }
 
 /// Everything about a company except which URL its form submits to.
-fn company_fields(draft: &CompanyDraft<'_>) -> String {
+fn company_fields(draft: &CompanyDraft<'_>, hydradb_configured: bool) -> String {
     let overrides_open =
         if draft.provider.is_empty() && draft.model.is_empty() && draft.api_key.is_empty() {
             ""
@@ -483,6 +506,14 @@ fn company_fields(draft: &CompanyDraft<'_>) -> String {
                         </select>
                         <div class="label"><span class="text-[11px] opacity-60">An extra model pass over inbound mail before an agent ever sees it.</span></div>
                     </label>
+                    <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Long-term memory</span></div>
+                        <select name="memory_provider" class="select w-full">
+                            <option value="" {memory_disabled_selected}>Disabled</option>
+                            <option value="hydradb" {memory_hydradb_selected} {memory_hydradb_disabled}>HydraDB</option>
+                        </select>
+                        <div class="label"><span class="text-[11px] opacity-60">HydraDB is provisioned asynchronously after this company is saved.</span></div>
+                    </label>
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
                         <summary class="collapse-title text-sm font-medium">Default model &amp; key</summary>
                         <div class="collapse-content space-y-4">
@@ -503,6 +534,59 @@ fn company_fields(draft: &CompanyDraft<'_>) -> String {
         default_selected = selected_attr(draft.spam_guardrail, SpamGuardrail::ServerDefault),
         enabled_selected = selected_attr(draft.spam_guardrail, SpamGuardrail::Enabled),
         disabled_selected = selected_attr(draft.spam_guardrail, SpamGuardrail::Disabled),
+        memory_disabled_selected = if draft.memory_provider.is_empty() {
+            "selected"
+        } else {
+            ""
+        },
+        memory_hydradb_selected = if draft.memory_provider == MemoryProviderKind::Hydradb.as_str() {
+            "selected"
+        } else {
+            ""
+        },
+        memory_hydradb_disabled = if hydradb_configured { "" } else { "disabled" },
+    )
+}
+
+fn memory_status(
+    company_id: Uuid,
+    memory: Option<&MemoryConnection>,
+    hydradb_configured: bool,
+) -> String {
+    let Some(memory) = memory else {
+        let detail = if hydradb_configured {
+            "Long-term memory is disabled."
+        } else {
+            "HydraDB is unavailable because this deployment is not configured for it."
+        };
+        return format!(
+            r#"<div class="alert"><span>{}</span></div>"#,
+            escape_html_text(detail),
+        );
+    };
+    let readiness = memory.readiness.as_str();
+    let retry = if memory.readiness == MemoryConnectionReadiness::Failed && hydradb_configured {
+        format!(
+            r##"<button type="button" class="btn btn-sm" hx-post="/ui/companies/{company_id}/memory/retry" hx-target="#company-pane" hx-swap="outerHTML" hx-disabled-elt="this"><span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>Retry provisioning</button>"##
+        )
+    } else {
+        String::new()
+    };
+    let error = memory
+        .last_error
+        .as_deref()
+        .map(|error| {
+            format!(
+                r#"<p class="text-xs opacity-70">{}</p>"#,
+                escape_html_text(error)
+            )
+        })
+        .unwrap_or_default();
+    format!(
+        r#"<div class="alert flex items-center justify-between"><div><span class="badge badge-outline">HydraDB: {}</span>{}</div>{}</div>"#,
+        escape_html_text(readiness),
+        error,
+        retry,
     )
 }
 
@@ -520,5 +604,9 @@ fn stored_draft(company: &Company) -> CompanyDraft<'_> {
         api_key: company.api_key.as_deref().unwrap_or(""),
         spam_guardrail: SpamGuardrail::from_stored(company.enable_llm_spam_guardrail),
         avatar_url: company.avatar_url.as_deref().unwrap_or(""),
+        memory_provider: company
+            .memory_provider
+            .map(MemoryProviderKind::as_str)
+            .unwrap_or(""),
     }
 }

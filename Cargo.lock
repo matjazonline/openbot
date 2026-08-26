@@ -53,7 +53,7 @@ dependencies = [
 [[package]]
 name = "ai-agents"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-context",
  "ai-agents-core",
@@ -82,7 +82,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-context"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "async-trait",
@@ -99,7 +99,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-core"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "async-trait",
  "chrono",
@@ -114,7 +114,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-disambiguation"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -127,7 +127,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-eval"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-facts",
@@ -160,7 +160,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-facts"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -178,7 +178,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-hitl"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -193,7 +193,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-hooks"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-hitl",
@@ -211,7 +211,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-llm"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "async-stream",
@@ -229,7 +229,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-memory"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -245,7 +245,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-observability"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-hitl",
@@ -268,7 +268,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-persona"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-context",
  "ai-agents-core",
@@ -285,7 +285,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-process"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -301,7 +301,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-reasoning"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "chrono",
  "serde",
@@ -312,7 +312,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-recovery"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -328,7 +328,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-relationships"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "async-trait",
@@ -344,7 +344,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-runtime"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-context",
  "ai-agents-core",
@@ -386,7 +386,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-skills"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-disambiguation",
@@ -406,7 +406,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-state"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-disambiguation",
@@ -424,7 +424,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-storage"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "async-trait",
@@ -440,7 +440,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-template"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "minijinja",
@@ -454,7 +454,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-tools"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -2242,6 +2242,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "dotenvy",
+ "futures",
  "htmd",
  "jsonwebtoken",
  "lettre",

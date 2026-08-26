@@ -2,9 +2,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 
-use crate::{
-    app_error::AppResult,
-    entities::memory::{MemoryChunk, MemoryProviderKind, MemoryRecallMode, ResolvedMemoryScope},
+use crate::entities::memory::{
+    MemoryChunk, MemoryProviderError, MemoryProviderKind, MemoryRecallMode, ResolvedMemoryScope,
 };
 
 #[derive(Debug, Clone)]
@@ -16,8 +15,8 @@ pub struct MemoryConversation {
 
 #[async_trait]
 pub trait MemoryProvider: Send + Sync {
-    async fn provision(&self, database_id: &str) -> AppResult<()>;
-    async fn is_ready(&self, database_id: &str) -> AppResult<bool>;
+    async fn provision(&self, database_id: &str) -> Result<(), MemoryProviderError>;
+    async fn is_ready(&self, database_id: &str) -> Result<bool, MemoryProviderError>;
     async fn recall(
         &self,
         database_id: &str,
@@ -26,14 +25,14 @@ pub trait MemoryProvider: Send + Sync {
         mode: MemoryRecallMode,
         max_results: u8,
         additional_context: Option<&str>,
-    ) -> AppResult<Vec<MemoryChunk>>;
+    ) -> Result<Vec<MemoryChunk>, MemoryProviderError>;
     async fn persist(
         &self,
         database_id: &str,
         collections: &[String],
         conversation: &MemoryConversation,
-    ) -> Vec<AppResult<()>>;
-    async fn delete(&self, database_id: &str) -> AppResult<()>;
+    ) -> Vec<Result<(), MemoryProviderError>>;
+    async fn delete(&self, database_id: &str) -> Result<(), MemoryProviderError>;
 }
 
 #[derive(Default)]

@@ -334,6 +334,7 @@ fn advanced_channel_form(
     app_domain_name: &str,
     agents_selection_html: &str,
     spam_warning_html: &str,
+    memory_fields_html: &str,
 ) -> String {
     format!(
         r##"            <form id="advanced-channel-form" hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" class="hidden space-y-4" data-company-id="{company_id}"
@@ -412,6 +413,7 @@ fn advanced_channel_form(
                         </div>
                     </div>
                 </div>
+                {memory_fields_html}
                 {spam_warning_html}
                 <div class="flex justify-end">
                     <button type="submit"
@@ -456,6 +458,7 @@ pub fn channels_page(page: &ChannelsPage<'_>) -> String {
     let list_html = focused_channel_list(page);
     let agents_selection_html = render_agents_selection(company.id, agents, None, "new");
     let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, true);
+    let memory_fields_html = classic_memory_fields(company.memory_provider.is_some(), None);
     let simple_form = simple_channel_form(company.id);
     let advanced_form = advanced_channel_form(
         company.id,
@@ -463,6 +466,7 @@ pub fn channels_page(page: &ChannelsPage<'_>) -> String {
         app_domain_name,
         &agents_selection_html,
         &spam_warning_html,
+        &memory_fields_html,
     );
     let (card_hidden, card_expanded) = if focus.create_form_open {
         ("", "true")
@@ -862,6 +866,8 @@ pub fn channel_edit_fragment(
     } else {
         "hidden"
     };
+    let memory_fields_html =
+        classic_memory_fields(company.memory_provider.is_some(), Some(channel));
 
     format!(
         r##"
@@ -935,6 +941,7 @@ pub fn channel_edit_fragment(
                     </div>
                 </div>
             </div>
+            {memory_fields_html}
             <div>
                 <label class="flex items-start gap-2.5 cursor-pointer">
                     <input type="checkbox" name="enabled" value="true" {enabled_checked}
@@ -983,5 +990,46 @@ pub fn channel_edit_fragment(
         config_str = config_str,
         agents_selection_html = agents_selection_html,
         custom_config_hidden = custom_config_hidden,
+    )
+}
+
+fn classic_memory_fields(memory_available: bool, channel: Option<&Channel>) -> String {
+    let disabled = if memory_available { "" } else { " disabled" };
+    let checked = |enabled: bool| if enabled { " checked" } else { "" };
+    let retrieve_company = checked(channel.is_some_and(|c| c.retrieve_company_memory));
+    let retrieve_agent = checked(channel.is_some_and(|c| c.retrieve_agent_memory));
+    let retrieve_user = checked(channel.is_some_and(|c| c.retrieve_user_memory));
+    let persist_company = checked(channel.is_some_and(|c| c.persist_company_memory));
+    let persist_agent = checked(channel.is_some_and(|c| c.persist_agent_memory));
+    let persist_user = checked(channel.is_some_and(|c| c.persist_user_memory));
+    let thinking = channel.is_some_and(|c| {
+        c.memory_recall_mode == crate::entities::memory::MemoryRecallMode::Thinking
+    });
+    let max_results = channel.map_or(5, |c| c.memory_max_results);
+    format!(
+        r##"<fieldset class="rounded-lg border border-slate-700 bg-slate-800/50 p-4"{disabled}>
+                <legend class="px-2 text-xs font-semibold text-slate-300">Memory</legend>
+                <p class="mb-3 text-[11px] text-slate-400">Enable recall and persistence by scope after the company provider is ready.</p>
+                <div class="grid grid-cols-4 gap-2 text-xs text-slate-300">
+                    <span></span><span>Company</span><span>Agent</span><span>User</span>
+                    <span>Retrieve</span>
+                    <input aria-label="Retrieve company memory" type="checkbox" name="retrieve_company_memory" value="true"{retrieve_company}{disabled}>
+                    <input aria-label="Retrieve agent memory" type="checkbox" name="retrieve_agent_memory" value="true"{retrieve_agent}{disabled}>
+                    <input aria-label="Retrieve user memory" type="checkbox" name="retrieve_user_memory" value="true"{retrieve_user}{disabled}>
+                    <span>Persist</span>
+                    <input aria-label="Persist company memory" type="checkbox" name="persist_company_memory" value="true"{persist_company}{disabled}>
+                    <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true"{persist_agent}{disabled}>
+                    <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true"{persist_user}{disabled}>
+                </div>
+                <div class="mt-3 grid grid-cols-2 gap-3">
+                    <select aria-label="Memory recall mode" name="memory_recall_mode" class="px-3 py-2 bg-slate-800 border border-slate-700 rounded"{disabled}>
+                        <option value="fast"{fast_selected}>Fast</option>
+                        <option value="thinking"{thinking_selected}>Thinking</option>
+                    </select>
+                    <input aria-label="Memory result limit" name="memory_max_results" type="number" min="1" max="20" value="{max_results}" class="px-3 py-2 bg-slate-800 border border-slate-700 rounded"{disabled}>
+                </div>
+            </fieldset>"##,
+        fast_selected = if thinking { "" } else { " selected" },
+        thinking_selected = if thinking { " selected" } else { "" },
     )
 }

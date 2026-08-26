@@ -15,6 +15,7 @@ use crate::entities::{
     company::Company,
     company_invite::CompanyInvite,
     company_member::{CompanyAccessRole, CompanyMember, CompanyMembership},
+    memory::{MemoryConnection, MemoryConnectionReadiness, MemoryProviderKind},
     message::{AttachmentMetadata, Message, MessageDirection, MessageRole},
     outbox::{OutboxEntry, OutboxFilter, OutboxStatus},
     task::{BackgroundTask, TaskFilter, TaskStatus, ThreadActivity},

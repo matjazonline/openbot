@@ -25,7 +25,7 @@ thiserror = "2.0"
 async-trait = "0.1.89"
 axum-extra = { version = "0.10", features = ["cookie"] }
 time = "0.3"
-ai-agents = { git = "https://github.com/geminik23/ai-agents.git" }
+ai-agents = { git = "https://github.com/geminik23/ai-agents.git", rev = "9ea972e3e3a5b777496c6d6b1b471cac4513a1e4" }
 lettre = { version = "0.11", default-features = false, features = ["tokio1", "tokio1-rustls-tls", "builder", "smtp-transport"] }
 htmd = "0.1"
 mail-parser = "0.9"
@@ -34,7 +34,8 @@ sha2 = "0.10"
 serde_yaml = "0.9"
 schemars = "1"
 regex = "1"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "multipart"] }
+futures = "0.3"
 url = "2"
 pulldown-cmark = "0.13"
 ammonia = "4"

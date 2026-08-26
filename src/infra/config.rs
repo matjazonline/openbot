@@ -1,6 +1,7 @@
-use std::env;
+use std::{env, time::Duration as StdDuration};
 
 use p256::{ecdsa::VerifyingKey, pkcs8::DecodePublicKey};
+use secrecy::SecretString;
 use time::Duration;
 
 use crate::{adapters::http::session::MIN_SECRET_BYTES, entities::value_objects::EmailAddress};
@@ -66,6 +67,88 @@ pub struct AppConfig {
     pub operator_emails: Vec<EmailAddress>,
     /// Authenticated SendGrid inbound webhook configuration. `None` disables the route.
     pub sendgrid_inbound: Option<SendGridInboundConfig>,
+    /// Deployment-wide HydraDB credentials. Company selection remains disabled when absent.
+    pub hydradb: Option<HydraDbConfig>,
+}
+
+#[derive(Clone)]
+pub struct HydraDbConfig {
+    pub api_key: SecretString,
+    pub base_url: String,
+    pub fast_timeout: StdDuration,
+    pub thinking_timeout: StdDuration,
+}
+
+impl HydraDbConfig {
+    fn from_env() -> Option<Self> {
+        Self::from_values(
+            non_empty_var("HYDRA_DB_API_KEY"),
+            non_empty_var("HYDRA_DB_BASE_URL"),
+            non_empty_var("HYDRA_DB_FAST_TIMEOUT_SECS"),
+            non_empty_var("HYDRA_DB_THINKING_TIMEOUT_SECS"),
+        )
+    }
+
+    fn from_values(
+        api_key: Option<String>,
+        base_url: Option<String>,
+        fast_timeout: Option<String>,
+        thinking_timeout: Option<String>,
+    ) -> Option<Self> {
+        if api_key.is_none()
+            && base_url.is_none()
+            && fast_timeout.is_none()
+            && thinking_timeout.is_none()
+        {
+            return None;
+        }
+        let api_key = api_key.expect(
+            "HYDRA_DB_API_KEY, HYDRA_DB_BASE_URL, HYDRA_DB_FAST_TIMEOUT_SECS and \
+             HYDRA_DB_THINKING_TIMEOUT_SECS must either all be set or all be absent",
+        );
+        let base_url = base_url.expect(
+            "HYDRA_DB_API_KEY, HYDRA_DB_BASE_URL, HYDRA_DB_FAST_TIMEOUT_SECS and \
+             HYDRA_DB_THINKING_TIMEOUT_SECS must either all be set or all be absent",
+        );
+        let fast_timeout = parse_positive_seconds(
+            "HYDRA_DB_FAST_TIMEOUT_SECS",
+            fast_timeout.expect(
+                "HYDRA_DB_API_KEY, HYDRA_DB_BASE_URL, HYDRA_DB_FAST_TIMEOUT_SECS and \
+                 HYDRA_DB_THINKING_TIMEOUT_SECS must either all be set or all be absent",
+            ),
+        );
+        let thinking_timeout = parse_positive_seconds(
+            "HYDRA_DB_THINKING_TIMEOUT_SECS",
+            thinking_timeout.expect(
+                "HYDRA_DB_API_KEY, HYDRA_DB_BASE_URL, HYDRA_DB_FAST_TIMEOUT_SECS and \
+                 HYDRA_DB_THINKING_TIMEOUT_SECS must either all be set or all be absent",
+            ),
+        );
+        let parsed_url = url::Url::parse(&base_url)
+            .expect("HYDRA_DB_BASE_URL must be an absolute http or https URL");
+        assert!(
+            matches!(parsed_url.scheme(), "http" | "https") && parsed_url.host().is_some(),
+            "HYDRA_DB_BASE_URL must be an absolute http or https URL"
+        );
+        assert!(
+            thinking_timeout >= fast_timeout,
+            "HYDRA_DB_THINKING_TIMEOUT_SECS must be at least HYDRA_DB_FAST_TIMEOUT_SECS"
+        );
+        Some(Self {
+            api_key: SecretString::from(api_key),
+            base_url: base_url.trim_end_matches('/').to_string(),
+            fast_timeout,
+            thinking_timeout,
+        })
+    }
+}
+
+fn parse_positive_seconds(name: &str, value: String) -> StdDuration {
+    let seconds = value
+        .parse::<u64>()
+        .unwrap_or_else(|_| panic!("{name} must be a positive integer"));
+    assert!(seconds > 0, "{name} must be positive");
+    StdDuration::from_secs(seconds)
 }
 
 pub struct SendGridInboundConfig {
@@ -393,6 +476,7 @@ impl AppConfig {
             .unwrap_or(false);
 
         let gcs = GcsConfig::from_env(&app_domain_name);
+        let hydradb = HydraDbConfig::from_env();
 
         Self {
             jwt_secret,
@@ -421,6 +505,7 @@ impl AppConfig {
             gcs,
             operator_emails,
             sendgrid_inbound,
+            hydradb,
         }
     }
 
@@ -463,6 +548,7 @@ impl AppConfig {
             gcs: None,
             operator_emails: Vec::new(),
             sendgrid_inbound: None,
+            hydradb: None,
         }
     }
 }
@@ -517,5 +603,19 @@ mod tests {
 
         assert!(!is_local_domain("example.com"));
         assert!(!is_local_domain("mail.example.com"));
+    }
+
+    #[test]
+    fn hydradb_config_is_all_or_nothing_and_validated() {
+        assert!(HydraDbConfig::from_values(None, None, None, None).is_none());
+        let config = HydraDbConfig::from_values(
+            Some("secret".into()),
+            Some("https://hydra.example/v2/".into()),
+            Some("5".into()),
+            Some("30".into()),
+        )
+        .unwrap();
+        assert_eq!(config.base_url, "https://hydra.example/v2");
+        assert_eq!(config.fast_timeout, StdDuration::from_secs(5));
     }
 }

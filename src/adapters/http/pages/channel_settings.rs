@@ -155,6 +155,14 @@ pub struct ChannelDraft<'a> {
     pub enabled: bool,
     /// Whether CC'd outsiders may join this channel's threads. Starts on, like `enabled`.
     pub add_3rd_party: bool,
+    pub retrieve_company_memory: bool,
+    pub retrieve_agent_memory: bool,
+    pub retrieve_user_memory: bool,
+    pub persist_company_memory: bool,
+    pub persist_agent_memory: bool,
+    pub persist_user_memory: bool,
+    pub memory_recall_mode: &'a str,
+    pub memory_max_results: String,
 }
 
 impl Default for ChannelDraft<'_> {
@@ -174,6 +182,14 @@ impl Default for ChannelDraft<'_> {
             advanced: false,
             enabled: true,
             add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: "fast",
+            memory_max_results: "5".into(),
         }
     }
 }
@@ -333,6 +349,10 @@ pub fn channel_settings_empty_pane(message: &str, swap: FragmentSwap) -> String 
 }
 
 pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
+    channel_edit_pane_with_memory(pane, pane.company.memory_provider.is_some())
+}
+
+pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: bool) -> String {
     let participants = stored_participants(pane.channel);
     let aliases = stored_alias_slugs(pane.channel);
     let config = stored_config(pane.channel);
@@ -397,12 +417,17 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
             id_prefix: &channel_id.to_string(),
             draft,
             spam_scan_enabled: pane.spam_scan_enabled,
+            memory_ready,
         }),
         schedules_html = channel_schedules_card(company_id, channel_id, pane.schedules),
     )
 }
 
 pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
+    channel_create_pane_with_memory(pane, pane.company.memory_provider.is_some())
+}
+
+pub fn channel_create_pane_with_memory(pane: &ChannelCreatePane<'_>, memory_ready: bool) -> String {
     let (easy_hidden, simple_hidden, advanced_hidden) = if pane.easy {
         ("", "hidden", "hidden")
     } else if pane.draft.advanced {
@@ -523,6 +548,7 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
             id_prefix: "new",
             draft: pane.draft,
             spam_scan_enabled: pane.spam_scan_enabled,
+            memory_ready,
         }),
     )
 }
@@ -536,6 +562,7 @@ struct ChannelFields<'a> {
     id_prefix: &'a str,
     draft: &'a ChannelDraft<'a>,
     spam_scan_enabled: bool,
+    memory_ready: bool,
 }
 
 fn channel_fields(fields: &ChannelFields<'_>) -> String {
@@ -609,6 +636,7 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                             </label>
                         </div>
                     </details>
+                    {memory_fields}
                     <div class="form-control w-full">
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
                             <input type="checkbox" name="enabled" value="true" class="checkbox checkbox-sm mt-0.5"{enabled_checked}>
@@ -643,6 +671,7 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
         ),
         participant_emails = escape_html_text(draft.participant_emails),
         channel_config = escape_html_text(draft.channel_config),
+        memory_fields = memory_fields(fields.memory_ready, draft),
         enabled_checked = if draft.enabled { " checked" } else { "" },
         add_3rd_party_checked = if draft.add_3rd_party { " checked" } else { "" },
         spam_html = spam_disabled_confirmation(fields.spam_scan_enabled, draft.is_public()),
@@ -874,7 +903,64 @@ fn stored_draft<'a>(
         advanced: true,
         enabled: channel.enabled,
         add_3rd_party: channel.add_3rd_party,
+        retrieve_company_memory: channel.retrieve_company_memory,
+        retrieve_agent_memory: channel.retrieve_agent_memory,
+        retrieve_user_memory: channel.retrieve_user_memory,
+        persist_company_memory: channel.persist_company_memory,
+        persist_agent_memory: channel.persist_agent_memory,
+        persist_user_memory: channel.persist_user_memory,
+        memory_recall_mode: channel.memory_recall_mode.as_str(),
+        memory_max_results: channel.memory_max_results.to_string(),
     }
+}
+
+fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {
+    let disabled = if memory_ready { "" } else { " disabled" };
+    let checked = |value: bool| if value { " checked" } else { "" };
+    let selected = |value: &str| {
+        if draft.memory_recall_mode == value {
+            " selected"
+        } else {
+            ""
+        }
+    };
+    format!(
+        r##"<fieldset class="rounded-box border border-base-300 bg-base-200 p-4"{disabled}>
+                        <legend class="px-2 text-sm font-semibold">Memory</legend>
+                        <p class="mb-3 text-[11px] opacity-60">Controls become authoritative only when the company's selected provider is ready.</p>
+                        <div class="grid grid-cols-4 gap-2 text-xs">
+                            <span></span><span>Company</span><span>Agent</span><span>User</span>
+                            <span>Retrieve</span>
+                            <input aria-label="Retrieve company memory" type="checkbox" name="retrieve_company_memory" value="true" class="checkbox checkbox-sm"{retrieve_company}{disabled}>
+                            <input aria-label="Retrieve agent memory" type="checkbox" name="retrieve_agent_memory" value="true" class="checkbox checkbox-sm"{retrieve_agent}{disabled}>
+                            <input aria-label="Retrieve user memory" type="checkbox" name="retrieve_user_memory" value="true" class="checkbox checkbox-sm"{retrieve_user}{disabled}>
+                            <span>Persist</span>
+                            <input aria-label="Persist company memory" type="checkbox" name="persist_company_memory" value="true" class="checkbox checkbox-sm"{persist_company}{disabled}>
+                            <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true" class="checkbox checkbox-sm"{persist_agent}{disabled}>
+                            <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true" class="checkbox checkbox-sm"{persist_user}{disabled}>
+                        </div>
+                        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <label class="form-control"><span class="mb-1 text-xs opacity-70">Recall mode</span>
+                                <select name="memory_recall_mode" class="select w-full"{disabled}>
+                                    <option value="fast"{fast_selected}>Fast</option>
+                                    <option value="thinking"{thinking_selected}>Thinking</option>
+                                </select>
+                            </label>
+                            <label class="form-control"><span class="mb-1 text-xs opacity-70">Maximum results</span>
+                                <input name="memory_max_results" type="number" min="1" max="20" value="{max_results}" class="input w-full"{disabled}>
+                            </label>
+                        </div>
+                    </fieldset>"##,
+        retrieve_company = checked(draft.retrieve_company_memory),
+        retrieve_agent = checked(draft.retrieve_agent_memory),
+        retrieve_user = checked(draft.retrieve_user_memory),
+        persist_company = checked(draft.persist_company_memory),
+        persist_agent = checked(draft.persist_agent_memory),
+        persist_user = checked(draft.persist_user_memory),
+        fast_selected = selected("fast"),
+        thinking_selected = selected("thinking"),
+        max_results = escape_html_text(&draft.memory_max_results),
+    )
 }
 
 /// Every address the channel answers on, canonical first, for the pane's identity line.

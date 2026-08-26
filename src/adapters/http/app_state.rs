@@ -11,10 +11,10 @@ use crate::{
     domain::monitoring::MonitoringService,
     entities::runtime_metrics::MachineIdentity,
     infra::{config::AppConfig, events::MailboxEvents},
-    services::runtime_metrics::RuntimeMetricPersistence,
+    services::{memory_worker::MemoryWorker, runtime_metrics::RuntimeMetricPersistence},
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
-        company::CompanyUseCases, company_invite::CompanyInviteUseCases,
+        company::CompanyUseCases, company_invite::CompanyInviteUseCases, memory::MemoryUseCases,
         schedule::ScheduleUseCases, thread::ThreadUseCases, user::UserUseCases,
     },
 };
@@ -32,6 +32,8 @@ pub struct AppState {
     pub agent_use_cases: Arc<AgentUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
     pub approval_use_cases: Arc<ApprovalUseCases>,
+    pub memory_use_cases: Arc<MemoryUseCases>,
+    pub memory_worker: Arc<MemoryWorker>,
     /// Read-only aggregates behind `/ui/dashboard`.
     pub dashboard_persistence: Arc<dyn DashboardPersistence>,
     /// Deployment-wide runtime history; handlers must authorize operators before reading it.
@@ -109,6 +111,12 @@ impl FromRef<AppState> for Arc<ThreadUseCases> {
 impl FromRef<AppState> for Arc<ApprovalUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.approval_use_cases.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<MemoryUseCases> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.memory_use_cases.clone()
     }
 }
 

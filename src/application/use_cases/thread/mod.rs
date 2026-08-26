@@ -33,6 +33,7 @@ use crate::{
     infra::config::AppConfig,
     services::{
         email_parser::{ParsedEmail, RawInboundPayload},
+        memory_coordinator::MemoryCoordinator,
         outbound_dispatcher::{OutboundDispatcher, OutboundEmail, SentEmailResult},
     },
     use_cases::{
@@ -186,6 +187,7 @@ pub struct ThreadUseCases {
     egress_registry: Arc<EgressRegistry>,
     /// Where inbound attachments are kept; `None` on a deployment with no private bucket.
     file_storage: Option<Arc<dyn FileStorage>>,
+    memory: Option<Arc<MemoryCoordinator>>,
     config: Arc<AppConfig>,
 }
 
@@ -212,6 +214,7 @@ impl ThreadUseCases {
             monitoring: None,
             egress_registry,
             file_storage: None,
+            memory: None,
             config,
         }
     }
@@ -255,6 +258,11 @@ impl ThreadUseCases {
         self
     }
 
+    pub fn with_memory(mut self, memory: Arc<MemoryCoordinator>) -> Self {
+        self.memory = Some(memory);
+        self
+    }
+
     /// The storage inbound attachments go to, for the adapters that parse on this use case's behalf.
     pub fn file_storage(&self) -> Option<&dyn FileStorage> {
         self.file_storage.as_deref()
@@ -282,6 +290,10 @@ impl ThreadUseCases {
 
     pub fn config(&self) -> &Arc<AppConfig> {
         &self.config
+    }
+
+    pub fn memory_coordinator(&self) -> Option<&Arc<MemoryCoordinator>> {
+        self.memory.as_ref()
     }
 
     async fn resolve_internal_destination(

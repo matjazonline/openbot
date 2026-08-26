@@ -18,7 +18,7 @@ use axum::{
     extract::{FromRequestParts, Path, Query},
     http::request::Parts,
     response::{Html, IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
 };
 use serde::Deserialize;
 use tracing::instrument;
@@ -42,6 +42,7 @@ use crate::{
         channel::ChannelUseCases,
         company::{CompanyUseCases, CompanyWrite},
         company_invite::CompanyInviteUseCases,
+        memory::MemoryUseCases,
         user::UserUseCases,
     },
 };
@@ -60,6 +61,10 @@ pub fn router() -> Router<AppState> {
         .route(
             "/ui/companies/{company_id}",
             get(edit_pane).put(update_company).delete(delete_company),
+        )
+        .route(
+            "/ui/companies/{company_id}/memory/retry",
+            post(retry_memory),
         )
 }
 
@@ -95,6 +100,7 @@ pub struct CompanyForm {
     pub enable_llm_spam_guardrail: Option<String>,
     /// What the pane's picker is holding: an uploaded picture's URL, or blank for the letter.
     pub avatar_url: Option<String>,
+    pub memory_provider: Option<String>,
 }
 
 const NO_SELECTION: &str = "Select a company to configure it, or create a new one.";
@@ -122,6 +128,7 @@ struct Workspace {
     agent_use_cases: Arc<AgentUseCases>,
     invite_use_cases: Arc<CompanyInviteUseCases>,
     user_use_cases: Arc<UserUseCases>,
+    memory_use_cases: Arc<MemoryUseCases>,
     config: Arc<AppConfig>,
     user_id: Uuid,
 }
@@ -141,6 +148,7 @@ impl FromRequestParts<AppState> for Workspace {
             agent_use_cases: state.agent_use_cases.clone(),
             invite_use_cases: state.company_invite_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
+            memory_use_cases: state.memory_use_cases.clone(),
             config: state.config.clone(),
             user_id: user.id,
         })
@@ -189,23 +197,34 @@ impl Workspace {
     }
 
     /// The Settings tab: the company's own form, with whatever was rejected still in it.
-    fn settings_pane(
+    async fn settings_pane(
         &self,
         company: &Company,
         counts: CompanyCounts,
         draft: Option<&pages::CompanyDraft<'_>>,
         error: Option<&str>,
         editable: bool,
-    ) -> String {
-        pages::company_edit_pane(&pages::CompanyEditPane {
-            company,
-            app_domain_name: &self.config.app_domain_name,
-            counts,
-            draft,
-            error,
-            editable,
-            body: pages::CompanyPaneBody::Settings,
-        })
+    ) -> AppResult<String> {
+        let memory = if editable {
+            self.memory_use_cases
+                .status(self.user_id, company.id)
+                .await?
+        } else {
+            None
+        };
+        Ok(pages::company_edit_pane_with_memory(
+            &pages::CompanyEditPane {
+                company,
+                app_domain_name: &self.config.app_domain_name,
+                counts,
+                draft,
+                error,
+                editable,
+                body: pages::CompanyPaneBody::Settings,
+            },
+            memory.as_ref(),
+            self.memory_use_cases.hydradb_configured(),
+        ))
     }
 
     /// The Team tab: the same pane, with the company's people in it instead of its settings.
@@ -256,7 +275,9 @@ impl Workspace {
         chrome: ChromeRefresh,
     ) -> AppResult<Response> {
         let counts = self.counts(company.id, true).await?;
-        let pane = self.settings_pane(company, counts, None, None, true);
+        let pane = self
+            .settings_pane(company, counts, None, None, true)
+            .await?;
         let companies = self.companies().await?;
         let list = pages::company_settings_list(
             &pages::CompanySettingsList {
@@ -337,12 +358,17 @@ async fn companies_page(
                 .as_ref()
                 .is_some_and(|access| access.membership.is_owner());
             let counts = workspace.counts(company.id, editable).await?;
-            workspace.settings_pane(company, counts, None, None, editable)
+            workspace
+                .settings_pane(company, counts, None, None, editable)
+                .await?
         }
-        None if creating_company => pages::company_create_pane(&pages::CompanyCreatePane {
-            draft: &pages::CompanyDraft::default(),
-            error: None,
-        }),
+        None if creating_company => pages::company_create_pane_with_memory(
+            &pages::CompanyCreatePane {
+                draft: &pages::CompanyDraft::default(),
+                error: None,
+            },
+            workspace.memory_use_cases.hydradb_configured(),
+        ),
         None => pages::company_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline),
     };
 
@@ -367,10 +393,13 @@ async fn companies_page(
 /// that was open before it lit would say the pane is showing a company it is not.
 #[instrument(skip(workspace))]
 async fn create_pane(workspace: Workspace) -> AppResult<Response> {
-    let pane = pages::company_create_pane(&pages::CompanyCreatePane {
-        draft: &pages::CompanyDraft::default(),
-        error: None,
-    });
+    let pane = pages::company_create_pane_with_memory(
+        &pages::CompanyCreatePane {
+            draft: &pages::CompanyDraft::default(),
+            error: None,
+        },
+        workspace.memory_use_cases.hydradb_configured(),
+    );
     let list = workspace.deselected_list().await?;
 
     Ok(Html(format!("{pane}{list}")).into_response())
@@ -393,13 +422,11 @@ async fn edit_pane(workspace: Workspace, Path(company_id): Path<Uuid>) -> AppRes
     let editable = access.membership.is_owner();
     let counts = workspace.counts(access.company.id, editable).await?;
 
-    Ok(Html(workspace.settings_pane(
-        &access.company,
-        counts,
-        None,
-        None,
-        editable,
-    )))
+    Ok(Html(
+        workspace
+            .settings_pane(&access.company, counts, None, None, editable)
+            .await?,
+    ))
 }
 
 /// POST /ui/companies - Create a company from the pane's form (Protected).
@@ -407,7 +434,10 @@ async fn edit_pane(workspace: Workspace, Path(company_id): Path<Uuid>) -> AppRes
 async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> Response {
     let submitted = SubmittedCompany::new(form);
 
-    let created = match submitted.write() {
+    let created = match submitted.write().and_then(|write| {
+        submitted.validate_memory(workspace.memory_use_cases.hydradb_configured())?;
+        Ok(write)
+    }) {
         Ok(write) => {
             workspace
                 .company_use_cases
@@ -418,17 +448,24 @@ async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> 
     };
 
     match created {
-        Ok(company) => match workspace
-            .saved_response(&company, ChromeRefresh::OtherCompany)
-            .await
-        {
-            Ok(response) => response,
-            Err(err) => err.into_response(),
-        },
-        Err(err) => Html(pages::company_create_pane(&pages::CompanyCreatePane {
-            draft: &submitted.draft(),
-            error: Some(&format!("Failed to create company: {err}")),
-        }))
+        Ok(company) => {
+            let response = match workspace.apply_memory(&submitted, company.id).await {
+                Ok(()) => {
+                    workspace
+                        .saved_response(&company, ChromeRefresh::OtherCompany)
+                        .await
+                }
+                Err(err) => Err(err),
+            };
+            response.unwrap_or_else(IntoResponse::into_response)
+        }
+        Err(err) => Html(pages::company_create_pane_with_memory(
+            &pages::CompanyCreatePane {
+                draft: &submitted.draft(),
+                error: Some(&format!("Failed to create company: {err}")),
+            },
+            workspace.memory_use_cases.hydradb_configured(),
+        ))
         .into_response(),
     }
 }
@@ -447,7 +484,10 @@ async fn update_company(
     let counts = workspace.counts(company_id, true).await?;
     let submitted = SubmittedCompany::new(form);
 
-    let saved = match submitted.write() {
+    let saved = match submitted.write().and_then(|write| {
+        submitted.validate_memory(workspace.memory_use_cases.hydradb_configured())?;
+        Ok(write)
+    }) {
         Ok(write) => {
             workspace
                 .company_use_cases
@@ -459,19 +499,45 @@ async fn update_company(
 
     match saved {
         Ok(company) => {
+            workspace.apply_memory(&submitted, company.id).await?;
             workspace
                 .saved_response(&company, ChromeRefresh::SameCompany)
                 .await
         }
-        Err(err) => Ok(Html(workspace.settings_pane(
-            &stored,
-            counts,
-            Some(&submitted.draft()),
-            Some(&format!("Failed to save company: {err}")),
-            true,
-        ))
+        Err(err) => Ok(Html(
+            workspace
+                .settings_pane(
+                    &stored,
+                    counts,
+                    Some(&submitted.draft()),
+                    Some(&format!("Failed to save company: {err}")),
+                    true,
+                )
+                .await?,
+        )
         .into_response()),
     }
+}
+
+#[instrument(skip(workspace))]
+async fn retry_memory(
+    workspace: Workspace,
+    Path(company_id): Path<Uuid>,
+) -> AppResult<Html<String>> {
+    workspace
+        .memory_use_cases
+        .retry(workspace.user_id, company_id)
+        .await?;
+    let company = workspace
+        .company_use_cases
+        .owned_company(workspace.user_id, company_id)
+        .await?;
+    let counts = workspace.counts(company_id, true).await?;
+    Ok(Html(
+        workspace
+            .settings_pane(&company, counts, None, None, true)
+            .await?,
+    ))
 }
 
 /// DELETE /ui/companies/{company_id} - Delete a company and clear the pane (Protected).
@@ -522,6 +588,7 @@ impl SubmittedCompany {
             api_key: self.form.api_key.as_deref().unwrap_or(""),
             spam_guardrail: self.spam_guardrail,
             avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
+            memory_provider: self.form.memory_provider.as_deref().unwrap_or(""),
         }
     }
 
@@ -538,5 +605,32 @@ impl SubmittedCompany {
             memory_provider: None,
             avatar_url: AvatarUrl::parse(self.form.avatar_url.as_deref().unwrap_or(""))?,
         })
+    }
+
+    fn validate_memory(&self, hydradb_configured: bool) -> Result<(), String> {
+        match self.form.memory_provider.as_deref().map(str::trim) {
+            None | Some("") | Some("none") => Ok(()),
+            Some("hydradb") if hydradb_configured => Ok(()),
+            Some("hydradb") => Err("HydraDB is not configured for this deployment.".into()),
+            Some(_) => Err("Unsupported memory provider.".into()),
+        }
+    }
+}
+
+impl Workspace {
+    async fn apply_memory(&self, submitted: &SubmittedCompany, company_id: Uuid) -> AppResult<()> {
+        match submitted.form.memory_provider.as_deref().map(str::trim) {
+            Some("hydradb") => {
+                self.memory_use_cases
+                    .select_hydradb(self.user_id, company_id)
+                    .await?;
+            }
+            _ => {
+                self.memory_use_cases
+                    .disable(self.user_id, company_id)
+                    .await?
+            }
+        }
+        Ok(())
     }
 }

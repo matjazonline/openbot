@@ -16,6 +16,7 @@ use crate::{
     },
     infra::config::AppConfig,
     use_cases::company::{CompanyPersistence, managed_company},
+    use_cases::memory::MemoryConnectionPersistence,
 };
 use serde::{Deserialize, Serialize};
 
@@ -111,9 +112,6 @@ impl ChannelWrite {
             });
         }
 
-        if self.memory_max_results == 0 {
-            self.memory_max_results = default_memory_max_results();
-        }
         if !(1..=20).contains(&self.memory_max_results) {
             return Err(AppError::BadRequest(
                 "Memory result limit must be between 1 and 20.".into(),
@@ -201,6 +199,7 @@ pub struct ChannelUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
     channel_persistence: Arc<dyn ChannelPersistence>,
     config: Arc<AppConfig>,
+    memory_persistence: Option<Arc<dyn MemoryConnectionPersistence>>,
 }
 
 impl ChannelUseCases {
@@ -213,7 +212,16 @@ impl ChannelUseCases {
             company_persistence,
             channel_persistence,
             config,
+            memory_persistence: None,
         }
+    }
+
+    pub fn with_memory_persistence(
+        mut self,
+        persistence: Arc<dyn MemoryConnectionPersistence>,
+    ) -> Self {
+        self.memory_persistence = Some(persistence);
+        self
     }
 
     async fn verify_company_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
@@ -234,6 +242,8 @@ impl ChannelUseCases {
 
         write.normalize()?;
         self.check_spam_interlock(&write, confirm_spam_disabled)?;
+        self.check_memory_interlock(user_id, company_id, &write)
+            .await?;
 
         info!(
             "Creating channel '{}' ({}) for company {}",
@@ -256,6 +266,64 @@ impl ChannelUseCases {
             ));
         }
         Ok(())
+    }
+
+    async fn check_memory_interlock(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        write: &ChannelWrite,
+    ) -> AppResult<()> {
+        let enabled = write.retrieve_company_memory
+            || write.retrieve_agent_memory
+            || write.retrieve_user_memory
+            || write.persist_company_memory
+            || write.persist_agent_memory
+            || write.persist_user_memory;
+        if !enabled {
+            return Ok(());
+        }
+        let company = self
+            .company_persistence
+            .get_by_id(company_id)
+            .await?
+            .ok_or_else(crate::use_cases::company::company_not_found)?;
+        if company.user_id != user_id {
+            return Err(AppError::NotFound(
+                "Company not found, or you do not have permission.".into(),
+            ));
+        }
+        let selected = company.memory_provider.ok_or_else(|| {
+            AppError::BadRequest("Select a memory provider before enabling memory.".into())
+        })?;
+        let persistence = self.memory_persistence.as_ref().ok_or_else(|| {
+            AppError::BadRequest("Memory is not configured for this deployment.".into())
+        })?;
+        let connection = persistence
+            .connection(company_id)
+            .await?
+            .ok_or_else(|| AppError::BadRequest("Memory provider is not provisioned.".into()))?;
+        if connection.provider != selected
+            || connection.readiness != crate::entities::memory::MemoryConnectionReadiness::Ready
+        {
+            return Err(AppError::BadRequest(
+                "Memory controls require a ready provider.".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub async fn memory_ready(&self, user_id: Uuid, company_id: Uuid) -> AppResult<bool> {
+        self.verify_company_manager(user_id, company_id).await?;
+        let Some(persistence) = self.memory_persistence.as_ref() else {
+            return Ok(false);
+        };
+        Ok(persistence
+            .connection(company_id)
+            .await?
+            .is_some_and(|connection| {
+                connection.readiness == crate::entities::memory::MemoryConnectionReadiness::Ready
+            }))
     }
 
     #[instrument(skip(self))]
@@ -372,6 +440,8 @@ impl ChannelUseCases {
 
         write.normalize()?;
         self.check_spam_interlock(&write, confirm_spam_disabled)?;
+        self.check_memory_interlock(user_id, company_id, &write)
+            .await?;
 
         info!(
             "Updating channel {} for company {}: {} ({}), enabled={}",
@@ -1103,6 +1173,7 @@ mod tests {
         Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
+            hydradb: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],

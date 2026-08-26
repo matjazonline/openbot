@@ -33,6 +33,7 @@ use crate::{
             ResolvedAgentParams,
         },
         email_parser::ParsedEmail,
+        memory_coordinator::{MemoryPersistInput, MemoryRecallInput},
         outbound_dispatcher::{
             OutboundDispatcher, OutboundEmail, SentEmailResult, agent_response_email_body,
         },
@@ -56,6 +57,8 @@ struct ActiveClaim {
 /// One agent's contribution to the reply.
 struct AgentOutput<'a> {
     channel_match: &'a ChannelMatch,
+    agent: Option<Agent>,
+    memory_user_context: String,
     content: String,
     metadata: Option<serde_json::Value>,
 }
@@ -69,6 +72,7 @@ struct AgentRun<'a> {
     primary_error: Option<String>,
     primary_params: Option<ResolvedAgentParams>,
     primary_agent: Option<Agent>,
+    had_error: bool,
 }
 
 /// The outbound side of the reply, real or simulated.
@@ -128,6 +132,7 @@ impl ThreadUseCases {
             .await?;
         self.record_dispatch_outcome(ingest, parsed, claim, &run, &delivery, &response, &metadata)
             .await?;
+        self.persist_memories(ingest, parsed, &run).await;
 
         Ok(Some(AgentExecutionResult {
             outbound_message_id: Some(delivery.message_id),
@@ -154,6 +159,7 @@ impl ThreadUseCases {
             primary_error: None,
             primary_params: None,
             primary_agent: None,
+            had_error: false,
         };
         let mut agent_cache: HashMap<Uuid, Option<Agent>> = HashMap::new();
         let mut membership_cache: HashMap<(Uuid, String), CompanyMembership> = HashMap::new();
@@ -195,9 +201,34 @@ impl ThreadUseCases {
                 .upstream_context_for(&run.outputs, ingest.task_id)
                 .await?;
 
+            let memory_user_context = match upstream_context.as_deref() {
+                Some(upstream) => format!("{upstream}\n\n{}", parsed.prompt_text),
+                None => parsed.prompt_text.clone(),
+            };
+            let mut agent_prompt = parsed.prompt_text.clone();
+            if let Some(memory) = self.memory.as_ref() {
+                let task_id = ingest.task_id.ok_or_else(|| {
+                    AppError::Internal("Memory recall requires a durable task id.".into())
+                })?;
+                if let Some(context) = memory
+                    .recall(MemoryRecallInput {
+                        company: &channel_match.company,
+                        channel: &channel_match.channel,
+                        agent: agent.as_ref(),
+                        sender: Some(&parsed.sender),
+                        task_id,
+                        latest_prompt: &parsed.prompt_text,
+                    })
+                    .await?
+                {
+                    agent_prompt.push_str("\n\n");
+                    agent_prompt.push_str(&context);
+                }
+            }
+
             let result = match &params {
                 Ok(params) => {
-                    let mut runner = AgentRunner::new(&parsed.prompt_text, params)
+                    let mut runner = AgentRunner::new(&agent_prompt, params)
                         .history(&history)
                         .approval_use_cases(self.approval_use_cases.clone())
                         .approval_context(Some(
@@ -260,17 +291,22 @@ impl ThreadUseCases {
                     run.completion_tokens += output.token_usage.completion_tokens;
                     run.outputs.push(AgentOutput {
                         channel_match,
+                        agent,
+                        memory_user_context,
                         content: output.content,
                         metadata: output.metadata,
                     });
                 }
                 Err(err) => {
+                    run.had_error = true;
                     let message = format!("Agent execution failed: {err}");
                     if index == 0 {
                         run.primary_error = Some(message.clone());
                     }
                     run.outputs.push(AgentOutput {
                         channel_match,
+                        agent,
+                        memory_user_context,
                         content: message,
                         metadata: None,
                     });
@@ -279,6 +315,33 @@ impl ThreadUseCases {
         }
 
         Ok(Some(run))
+    }
+
+    async fn persist_memories(
+        &self,
+        ingest: &InboundIngestResult,
+        parsed: &ParsedEmail,
+        run: &AgentRun<'_>,
+    ) {
+        if run.had_error {
+            return;
+        }
+        let (Some(memory), Some(task_id)) = (self.memory.as_ref(), ingest.task_id) else {
+            return;
+        };
+        for output in &run.outputs {
+            memory
+                .persist(MemoryPersistInput {
+                    company: &output.channel_match.company,
+                    channel: &output.channel_match.channel,
+                    agent: output.agent.as_ref(),
+                    sender: Some(&parsed.sender),
+                    task_id,
+                    user_context: &output.memory_user_context,
+                    final_answer: &output.content,
+                })
+                .await;
+        }
     }
 
     async fn first_agent_for(

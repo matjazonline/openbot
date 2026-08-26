@@ -14,8 +14,11 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
-    entities::{company::Company, value_objects::AvatarUrl},
-    use_cases::company::{CompanyUseCases, CompanyWrite},
+    entities::{company::Company, memory::MemoryConnection, value_objects::AvatarUrl},
+    use_cases::{
+        company::{CompanyUseCases, CompanyWrite},
+        memory::MemoryUseCases,
+    },
 };
 
 pub fn router() -> Router<AppState> {
@@ -35,6 +38,10 @@ pub fn router() -> Router<AppState> {
             "/api/companies/{id}",
             put(update_company_json).delete(delete_company_json),
         )
+        .route(
+            "/api/companies/{id}/memory",
+            get(memory_status_json).post(retry_memory_json),
+        )
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -48,6 +55,8 @@ pub struct CompanyForm {
     /// The company's picture. A save carries what it was sent, so the edit form keeps the stored
     /// URL in a hidden field rather than dropping the picture on every rename.
     pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub memory_provider: Option<String>,
 }
 
 impl CompanyForm {
@@ -79,6 +88,51 @@ fn parsed_avatar(submitted: Option<&str>) -> AppResult<Option<AvatarUrl>> {
 pub struct CompanyResponse {
     pub success: bool,
     pub company: Company,
+    pub memory: Option<MemoryStatusResponse>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MemoryStatusResponse {
+    pub provider: String,
+    pub readiness: String,
+    pub last_error: Option<String>,
+}
+
+impl From<MemoryConnection> for MemoryStatusResponse {
+    fn from(connection: MemoryConnection) -> Self {
+        Self {
+            provider: connection.provider.as_str().into(),
+            readiness: connection.readiness.as_str().into(),
+            last_error: connection.last_error,
+        }
+    }
+}
+
+fn validate_memory_provider(value: Option<&str>, hydradb_configured: bool) -> AppResult<()> {
+    match value.map(str::trim) {
+        None | Some("") | Some("none") => Ok(()),
+        Some("hydradb") if hydradb_configured => Ok(()),
+        Some("hydradb") => Err(AppError::BadRequest(
+            "HydraDB is not configured for this deployment.".into(),
+        )),
+        Some(_) => Err(AppError::BadRequest("Unsupported memory provider.".into())),
+    }
+}
+
+async fn apply_memory_provider(
+    memory: &MemoryUseCases,
+    user_id: Uuid,
+    company_id: Uuid,
+    value: Option<&str>,
+) -> AppResult<Option<MemoryConnection>> {
+    validate_memory_provider(value, memory.hydradb_configured())?;
+    match value.map(str::trim) {
+        Some("hydradb") => memory.select_hydradb(user_id, company_id).await.map(Some),
+        _ => {
+            memory.disable(user_id, company_id).await?;
+            Ok(None)
+        }
+    }
 }
 
 /// GET /companies - Full HTML page listing all user companies (Protected).
@@ -96,19 +150,37 @@ async fn list_companies(
 }
 
 /// POST /companies - HTMX create company form submission (Protected).
-#[instrument(skip(company_use_cases, user, form))]
+#[instrument(skip(company_use_cases, memory_use_cases, user, form))]
 async fn create_company(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
     user: AuthenticatedUser,
     Form(form): Form<CompanyForm>,
 ) -> impl IntoResponse {
-    let created = match form.write() {
+    let created = match validate_memory_provider(
+        form.memory_provider.as_deref(),
+        memory_use_cases.hydradb_configured(),
+    )
+    .and_then(|()| form.write())
+    {
         Ok(write) => company_use_cases.create_company(user.id, write).await,
         Err(err) => Err(err),
     };
 
     match created {
-        Ok(_) => {
+        Ok(company) => {
+            if let Err(err) = apply_memory_provider(
+                &memory_use_cases,
+                user.id,
+                company.id,
+                form.memory_provider.as_deref(),
+            )
+            .await
+            {
+                return Html(pages::error_alert(&format!(
+                    "Company created, but memory setup failed: {err}"
+                )));
+            }
             let companies = company_use_cases
                 .list_user_companies(user.id)
                 .await
@@ -163,14 +235,20 @@ async fn cancel_company_edit(
 }
 
 /// PUT /companies/{id} - Handles HTMX company update form submission (Protected).
-#[instrument(skip(company_use_cases, _user, form))]
+#[instrument(skip(company_use_cases, memory_use_cases, _user, form))]
 async fn update_company(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
     _user: AuthenticatedUser,
     Path(id): Path<Uuid>,
     Form(form): Form<CompanyForm>,
 ) -> impl IntoResponse {
-    let saved = match form.write() {
+    let saved = match validate_memory_provider(
+        form.memory_provider.as_deref(),
+        memory_use_cases.hydradb_configured(),
+    )
+    .and_then(|()| form.write())
+    {
         Ok(write) => {
             company_use_cases
                 .update_company_for_user(_user.id, id, write)
@@ -180,7 +258,17 @@ async fn update_company(
     };
 
     match saved {
-        Ok(company) => Html(pages::company_row_fragment(&company)),
+        Ok(company) => match apply_memory_provider(
+            &memory_use_cases,
+            _user.id,
+            company.id,
+            form.memory_provider.as_deref(),
+        )
+        .await
+        {
+            Ok(_) => Html(pages::company_row_fragment(&company)),
+            Err(err) => Html(pages::error_alert(&format!("Memory update failed: {err}"))),
+        },
         Err(err) => Html(pages::error_alert(&format!("Update failed: {err}"))),
     }
 }
@@ -210,17 +298,31 @@ async fn list_companies_json(
 /// JSON API: Create company (Protected).
 async fn create_company_json(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
     user: AuthenticatedUser,
     Json(payload): Json<CompanyForm>,
 ) -> AppResult<impl IntoResponse> {
+    validate_memory_provider(
+        payload.memory_provider.as_deref(),
+        memory_use_cases.hydradb_configured(),
+    )?;
     let company = company_use_cases
         .create_company(user.id, payload.write()?)
         .await?;
+    let memory = apply_memory_provider(
+        &memory_use_cases,
+        user.id,
+        company.id,
+        payload.memory_provider.as_deref(),
+    )
+    .await?
+    .map(Into::into);
     Ok((
         StatusCode::CREATED,
         Json(CompanyResponse {
             success: true,
             company,
+            memory,
         }),
     ))
 }
@@ -228,20 +330,53 @@ async fn create_company_json(
 /// JSON API: Update company (Protected).
 async fn update_company_json(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
     _user: AuthenticatedUser,
     Path(id): Path<Uuid>,
     Json(payload): Json<CompanyForm>,
 ) -> AppResult<impl IntoResponse> {
+    validate_memory_provider(
+        payload.memory_provider.as_deref(),
+        memory_use_cases.hydradb_configured(),
+    )?;
     let company = company_use_cases
         .update_company_for_user(_user.id, id, payload.write()?)
         .await?;
+    let memory = apply_memory_provider(
+        &memory_use_cases,
+        _user.id,
+        company.id,
+        payload.memory_provider.as_deref(),
+    )
+    .await?
+    .map(Into::into);
     Ok((
         StatusCode::OK,
         Json(CompanyResponse {
             success: true,
             company,
+            memory,
         }),
     ))
+}
+
+async fn memory_status_json(
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
+    user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<Option<MemoryStatusResponse>>> {
+    Ok(Json(
+        memory_use_cases.status(user.id, id).await?.map(Into::into),
+    ))
+}
+
+async fn retry_memory_json(
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
+    user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    memory_use_cases.retry(user.id, id).await?;
+    Ok(StatusCode::ACCEPTED)
 }
 
 /// JSON API: Delete company (Protected).
@@ -310,6 +445,7 @@ mod tests {
             model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: avatar_url.map(str::to_string),
+            memory_provider: None,
         };
 
         let kept = form(Some("https://cdn.example.com/acme.png"))

@@ -131,15 +131,50 @@ impl Workspace {
         company.ok_or_else(|| AppError::NotFound("Company not found".into()))
     }
 
-    fn view<'a>(&'a self, company: &'a Company) -> ChannelSettingsView<'a> {
-        ChannelSettingsView {
+    async fn view<'a>(&'a self, company: &'a Company) -> AppResult<ChannelSettingsView<'a>> {
+        let memory_ready = self
+            .channel_use_cases
+            .memory_ready(self.user_id, company.id)
+            .await?;
+        Ok(ChannelSettingsView {
             channel_use_cases: &self.channel_use_cases,
             schedule_use_cases: &self.schedule_use_cases,
             agent_use_cases: &self.agent_use_cases,
             config: &self.config,
             user_id: self.user_id,
             company,
-        }
+            memory_ready,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{
+        body::Body,
+        extract::{Form, FromRequest},
+        http::{Request, header},
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn rejected_memory_limit_is_preserved_in_the_draft() {
+        let request = Request::builder()
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from(
+                "name=Support&slug=support&memory_max_results=0&memory_recall_mode=fast",
+            ))
+            .unwrap();
+        let form = Form::<ChannelForm>::from_request(request, &())
+            .await
+            .unwrap()
+            .0;
+        let submitted = SubmittedChannel::new(form);
+
+        assert!(submitted.write(None, None).is_err());
+        assert_eq!(submitted.draft().memory_max_results, "0");
     }
 }
 
@@ -165,7 +200,7 @@ async fn channels_page(
     let workspace_user = workspace_user
         .with_company_membership(managed_company_membership(&company, workspace.user_id));
 
-    let view = workspace.view(&company);
+    let view = workspace.view(&company).await?;
     let channels = view.channels().await?;
     let agents = view.agents().await?;
     let selected = query
@@ -204,7 +239,7 @@ async fn create_pane(
     Query(query): Query<CompanyQuery>,
 ) -> AppResult<Html<String>> {
     let company = workspace.scoped_company(query.company_id).await?;
-    let view = workspace.view(&company);
+    let view = workspace.view(&company).await?;
     let agents = view.agents().await?;
 
     Ok(Html(view.create_pane(
@@ -225,7 +260,7 @@ async fn close_pane(
     Query(query): Query<CompanyQuery>,
 ) -> AppResult<Response> {
     let company = workspace.scoped_company(query.company_id).await?;
-    workspace.view(&company).cleared_response().await
+    workspace.view(&company).await?.cleared_response().await
 }
 
 /// GET /ui/channels/{channel_id} - One channel's settings for the pane (Protected).
@@ -236,7 +271,7 @@ async fn edit_pane(
     Query(query): Query<CompanyQuery>,
 ) -> AppResult<Html<String>> {
     let company = workspace.scoped_company(query.company_id).await?;
-    let view = workspace.view(&company);
+    let view = workspace.view(&company).await?;
     let channel = view.channel(channel_id).await?;
     let agents = view.agents().await?;
     let schedules = view.schedules(channel.id).await?;
@@ -254,7 +289,7 @@ async fn create_channel(
     Form(form): Form<ChannelForm>,
 ) -> AppResult<Response> {
     let company = workspace.scoped_company(query.company_id).await?;
-    let view = workspace.view(&company);
+    let view = workspace.view(&company).await?;
     let agents = view.agents().await?;
     let submitted = SubmittedChannel::new(form);
 
@@ -279,12 +314,16 @@ async fn create_channel(
         Err(message) => return rejected(message),
     };
 
+    let write = match submitted.write(agent_ids, channel_config) {
+        Ok(write) => write,
+        Err(message) => return rejected(message),
+    };
     let created = workspace
         .channel_use_cases
         .create_channel(
             workspace.user_id,
             company.id,
-            submitted.write(agent_ids, channel_config),
+            write,
             submitted.form.confirm_spam_disabled(),
         )
         .await;
@@ -307,7 +346,7 @@ async fn create_easy_channels(
     Form(form): Form<EasyChannelForm>,
 ) -> AppResult<Response> {
     let company = workspace.scoped_company(query.company_id).await?;
-    let view = workspace.view(&company);
+    let view = workspace.view(&company).await?;
     let agents = view.agents().await?;
     let submitted_ids = parse_agent_ids_form(form.library_agent_ids).unwrap_or_default();
     let mut seen = HashSet::new();
@@ -381,7 +420,7 @@ async fn update_channel(
     Form(form): Form<ChannelForm>,
 ) -> AppResult<Response> {
     let company = workspace.scoped_company(query.company_id).await?;
-    let view = workspace.view(&company);
+    let view = workspace.view(&company).await?;
     let stored = view.channel(channel_id).await?;
     let agents = view.agents().await?;
     let schedules = view.schedules(channel_id).await?;
@@ -403,13 +442,17 @@ async fn update_channel(
         Err(message) => return rejected(message),
     };
 
+    let write = match submitted.write(Some(submitted.agent_ids.clone()), channel_config) {
+        Ok(write) => write,
+        Err(message) => return rejected(message),
+    };
     let saved = workspace
         .channel_use_cases
         .update_channel(
             workspace.user_id,
             company.id,
             channel_id,
-            submitted.write(Some(submitted.agent_ids.clone()), channel_config),
+            write,
             submitted.form.confirm_spam_disabled(),
         )
         .await;
@@ -433,7 +476,7 @@ async fn delete_channel(
         .delete_channel(workspace.user_id, company.id, channel_id)
         .await?;
 
-    workspace.view(&company).cleared_response().await
+    workspace.view(&company).await?.cleared_response().await
 }
 
 /// Everything the workspace renders from, so each handler names its data once.
@@ -444,6 +487,7 @@ struct ChannelSettingsView<'a> {
     config: &'a AppConfig,
     user_id: Uuid,
     company: &'a Company,
+    memory_ready: bool,
 }
 
 impl ChannelSettingsView<'_> {
@@ -501,15 +545,18 @@ impl ChannelSettingsView<'_> {
         easy: bool,
         error: Option<&str>,
     ) -> String {
-        pages::channel_create_pane(&pages::ChannelCreatePane {
-            company: self.company,
-            app_domain_name: &self.config.app_domain_name,
-            agents,
-            spam_scan_enabled: self.config.is_spam_scan_enabled(),
-            draft,
-            easy,
-            error,
-        })
+        pages::channel_create_pane_with_memory(
+            &pages::ChannelCreatePane {
+                company: self.company,
+                app_domain_name: &self.config.app_domain_name,
+                agents,
+                spam_scan_enabled: self.config.is_spam_scan_enabled(),
+                draft,
+                easy,
+                error,
+            },
+            self.memory_ready,
+        )
     }
 
     fn edit_pane(
@@ -520,16 +567,19 @@ impl ChannelSettingsView<'_> {
         draft: Option<&pages::ChannelDraft<'_>>,
         error: Option<&str>,
     ) -> String {
-        pages::channel_edit_pane(&pages::ChannelEditPane {
-            company: self.company,
-            app_domain_name: &self.config.app_domain_name,
-            channel,
-            agents,
-            schedules,
-            spam_scan_enabled: self.config.is_spam_scan_enabled(),
-            draft,
-            error,
-        })
+        pages::channel_edit_pane_with_memory(
+            &pages::ChannelEditPane {
+                company: self.company,
+                app_domain_name: &self.config.app_domain_name,
+                channel,
+                agents,
+                schedules,
+                spam_scan_enabled: self.config.is_spam_scan_enabled(),
+                draft,
+                error,
+            },
+            self.memory_ready,
+        )
     }
 
     /// The empty pane plus a sidebar with nothing selected — what cancelling a form and deleting
@@ -614,6 +664,18 @@ impl SubmittedChannel {
             advanced: self.form.form_mode.as_deref() != Some("simple"),
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
+            retrieve_company_memory: self.form.retrieve_company_memory.is_some(),
+            retrieve_agent_memory: self.form.retrieve_agent_memory.is_some(),
+            retrieve_user_memory: self.form.retrieve_user_memory.is_some(),
+            persist_company_memory: self.form.persist_company_memory.is_some(),
+            persist_agent_memory: self.form.persist_agent_memory.is_some(),
+            persist_user_memory: self.form.persist_user_memory.is_some(),
+            memory_recall_mode: self.form.memory_recall_mode.as_deref().unwrap_or("fast"),
+            memory_max_results: self
+                .form
+                .memory_max_results
+                .clone()
+                .unwrap_or_else(|| "5".into()),
         }
     }
 
@@ -623,8 +685,9 @@ impl SubmittedChannel {
         &self,
         agent_ids: Option<Vec<Uuid>>,
         channel_config: Option<serde_json::Value>,
-    ) -> ChannelWrite {
-        ChannelWrite {
+    ) -> Result<ChannelWrite, String> {
+        let memory = self.form.memory_settings()?;
+        Ok(ChannelWrite {
             name: self.form.name.clone(),
             description: parse_text_form(self.form.description.clone()),
             slug: self.slug.clone(),
@@ -637,15 +700,15 @@ impl SubmittedChannel {
             channel_config,
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
+            retrieve_company_memory: memory.retrieve_company,
+            retrieve_agent_memory: memory.retrieve_agent,
+            retrieve_user_memory: memory.retrieve_user,
+            persist_company_memory: memory.persist_company,
+            persist_agent_memory: memory.persist_agent,
+            persist_user_memory: memory.persist_user,
+            memory_recall_mode: memory.recall_mode,
+            memory_max_results: memory.max_results,
             created_by: None,
-        }
+        })
     }
 }

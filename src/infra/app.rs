@@ -6,17 +6,12 @@ use tower_http::{
 };
 use uuid::Uuid;
 
-use crate::{
-    adapters::{
-        self,
-        http::{app_state::AppState, security},
-    },
-    infra::setup::init_tracing,
+use crate::adapters::{
+    self,
+    http::{app_state::AppState, security},
 };
 
 pub fn create_app(app_state: AppState) -> Router {
-    init_tracing();
-
     let allowed_origins: Vec<http::HeaderValue> = app_state
         .config
         .cors_allowed_origins

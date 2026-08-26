@@ -41,13 +41,12 @@ impl From<CompanyDb> for Company {
             provider: db.provider,
             model: db.model,
             enable_llm_spam_guardrail: db.enable_llm_spam_guardrail,
-            memory_provider: db.memory_provider.as_deref().map(|kind| {
-                if kind == "hydradb" {
-                    MemoryProviderKind::Hydradb
-                } else {
-                    MemoryProviderKind::None
-                }
-            }),
+            memory_provider: match db.memory_provider.as_deref() {
+                Some("hydradb") => Some(MemoryProviderKind::Hydradb),
+                // `none` is accepted only as a legacy stored representation. New writes use NULL.
+                Some("none") | None => None,
+                Some(_) => None,
+            },
             avatar_url: db.avatar_url.map(AvatarUrl::from),
             created_at: db.created_at,
         }
@@ -85,6 +84,61 @@ impl PostgresPersistence {
     }
 }
 
+async fn delete_company_with_cleanup(
+    persistence: &PostgresPersistence,
+    id: Uuid,
+    owner_id: Option<Uuid>,
+) -> AppResult<bool> {
+    let mut transaction = persistence.pool.begin().await.map_err(AppError::from)?;
+    let company_exists: bool = match owner_id {
+        Some(owner_id) => sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM companies WHERE id = $1 AND user_id = $2)",
+        )
+        .bind(id)
+        .bind(owner_id)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(AppError::from)?,
+        None => sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM companies WHERE id = $1)")
+            .bind(id)
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(AppError::from)?,
+    };
+    if !company_exists {
+        return Ok(false);
+    }
+    let remote_database_ids = sqlx::query_scalar::<_, String>(
+        r#"SELECT remote_database_id
+           FROM memory_provider_connections
+           WHERE company_id = $1 AND provider = 'hydradb'"#,
+    )
+    .bind(id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(AppError::from)?;
+    for remote_database_id in remote_database_ids {
+        sqlx::query(
+            r#"INSERT INTO memory_cleanup_jobs
+                   (id, provider, remote_database_id)
+               VALUES ($1, 'hydradb', $2)
+               ON CONFLICT (provider, remote_database_id) DO NOTHING"#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(remote_database_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+    }
+    sqlx::query("DELETE FROM companies WHERE id = $1")
+        .bind(id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+    transaction.commit().await.map_err(AppError::from)?;
+    Ok(true)
+}
+
 #[async_trait]
 impl CompanyPersistence for PostgresPersistence {
     async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company> {
@@ -106,7 +160,7 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(&write.provider)
         .bind(&write.model)
         .bind(write.enable_llm_spam_guardrail)
-        .bind(write.memory_provider.map(|kind| match kind { MemoryProviderKind::None => "none", MemoryProviderKind::Hydradb => "hydradb" }))
+        .bind(write.memory_provider.map(MemoryProviderKind::as_str))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .fetch_one(&self.pool)
         .await
@@ -117,8 +171,8 @@ impl CompanyPersistence for PostgresPersistence {
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
-                      avatar_url, created_at 
+            r#"SELECT id, user_id, name, slug, api_key, provider, model,
+                      enable_llm_spam_guardrail, memory_provider, avatar_url, created_at
                FROM companies WHERE id = $1"#,
         )
         .bind(id)
@@ -131,8 +185,8 @@ impl CompanyPersistence for PostgresPersistence {
 
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
-                      avatar_url, created_at
+            r#"SELECT id, user_id, name, slug, api_key, provider, model,
+                      enable_llm_spam_guardrail, memory_provider, avatar_url, created_at
                FROM companies WHERE slug = $1"#,
         )
         .bind(slug)
@@ -145,8 +199,8 @@ impl CompanyPersistence for PostgresPersistence {
 
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         let db_list = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, NULL::text AS api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
-                      avatar_url, created_at 
+            r#"SELECT id, user_id, name, slug, NULL::text AS api_key, provider, model,
+                      enable_llm_spam_guardrail, memory_provider, avatar_url, created_at
                FROM companies WHERE user_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -193,7 +247,8 @@ impl CompanyPersistence for PostgresPersistence {
         let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"UPDATE companies SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5,
-                      enable_llm_spam_guardrail = $6, memory_provider = $7, avatar_url = $8
+                      enable_llm_spam_guardrail = $6,
+                      memory_provider = COALESCE($7, memory_provider), avatar_url = $8
                WHERE id = $9
                RETURNING id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
                       avatar_url, created_at"#,
@@ -204,7 +259,7 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(&write.provider)
         .bind(&write.model)
         .bind(write.enable_llm_spam_guardrail)
-        .bind(write.memory_provider.map(|kind| match kind { MemoryProviderKind::None => "none", MemoryProviderKind::Hydradb => "hydradb" }))
+        .bind(write.memory_provider.map(MemoryProviderKind::as_str))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(id)
         .fetch_one(&self.pool)
@@ -215,11 +270,7 @@ impl CompanyPersistence for PostgresPersistence {
     }
 
     async fn delete(&self, id: Uuid) -> AppResult<()> {
-        sqlx::query!("DELETE FROM companies WHERE id = $1", id)
-            .execute(&self.pool)
-            .await
-            .map_err(AppError::from)?;
-
+        delete_company_with_cleanup(self, id, None).await?;
         Ok(())
     }
 
@@ -233,7 +284,8 @@ impl CompanyPersistence for PostgresPersistence {
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"UPDATE companies
                SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5,
-                   enable_llm_spam_guardrail = $6, memory_provider = $7, avatar_url = $8
+                   enable_llm_spam_guardrail = $6,
+                   memory_provider = COALESCE($7, memory_provider), avatar_url = $8
                WHERE id = $9 AND user_id = $10
                RETURNING id, user_id, name, slug, api_key, provider, model,
                          enable_llm_spam_guardrail, memory_provider, avatar_url, created_at"#,
@@ -244,10 +296,7 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(&write.provider)
         .bind(&write.model)
         .bind(write.enable_llm_spam_guardrail)
-        .bind(write.memory_provider.map(|kind| match kind {
-            MemoryProviderKind::None => "none",
-            MemoryProviderKind::Hydradb => "hydradb",
-        }))
+        .bind(write.memory_provider.map(MemoryProviderKind::as_str))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(id)
         .bind(user_id)
@@ -259,13 +308,7 @@ impl CompanyPersistence for PostgresPersistence {
     }
 
     async fn delete_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
-        let result = sqlx::query("DELETE FROM companies WHERE id = $1 AND user_id = $2")
-            .bind(id)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(AppError::from)?;
-        if result.rows_affected() != 1 {
+        if !delete_company_with_cleanup(self, id, Some(user_id)).await? {
             return Err(AppError::Internal("Company not found.".into()));
         }
         Ok(())

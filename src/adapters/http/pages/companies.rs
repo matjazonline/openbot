@@ -63,6 +63,14 @@ pub fn companies_page(companies: &[Company]) -> String {
                             placeholder="e.g. gemini-2.5-flash, gpt-4o">
                     </div>
                 </div>
+                <div>
+                    <label for="company_memory_provider" class="block text-xs font-medium text-slate-300 mb-1">Long-term Memory</label>
+                    <select id="company_memory_provider" name="memory_provider"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
+                        <option value="">Disabled</option>
+                        <option value="hydradb">HydraDB</option>
+                    </select>
+                </div>
                 <div class="flex justify-end">
                     <button type="submit"
                         class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer">
@@ -151,6 +159,16 @@ pub fn company_edit_fragment(company: &Company) -> String {
     let api_key_val = company.api_key.as_deref().unwrap_or("");
     let provider_val = company.provider.as_deref().unwrap_or("");
     let model_val = company.model.as_deref().unwrap_or("");
+    let memory_disabled_selected = if company.memory_provider.is_none() {
+        "selected"
+    } else {
+        ""
+    };
+    let memory_hydradb_selected = if company.memory_provider.is_some() {
+        "selected"
+    } else {
+        ""
+    };
     format!(
         r##"
         <form id="company-{id}" hx-put="/companies/{id}" hx-target="#company-{id}" hx-swap="outerHTML"
@@ -191,6 +209,13 @@ pub fn company_edit_fragment(company: &Company) -> String {
                         placeholder="e.g. gemini-2.5-flash">
                 </div>
             </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Long-term Memory</label>
+                <select name="memory_provider" class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
+                    <option value="" {memory_disabled_selected}>Disabled</option>
+                    <option value="hydradb" {memory_hydradb_selected}>HydraDB</option>
+                </select>
+            </div>
             <div class="flex items-center justify-end gap-2">
                 <button type="button" hx-get="/companies/{id}/cancel" hx-target="#company-{id}" hx-swap="outerHTML"
                     class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
@@ -210,6 +235,8 @@ pub fn company_edit_fragment(company: &Company) -> String {
         provider = provider_val,
         model = model_val,
         avatar_url = escape_html_text(company.avatar_url.as_deref().unwrap_or("")),
+        memory_disabled_selected = memory_disabled_selected,
+        memory_hydradb_selected = memory_hydradb_selected,
     )
 }
 

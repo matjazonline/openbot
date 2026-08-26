@@ -19,7 +19,12 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
-    entities::{channel::Channel, cursor::ThreadCursor, thread::Thread},
+    entities::{
+        channel::Channel,
+        cursor::ThreadCursor,
+        memory::{MemoryRecallMode, default_memory_max_results},
+        thread::Thread,
+    },
     infra::{config::AppConfig, events::MailboxEvents},
     services::email_parser::RawInboundPayload,
     use_cases::{
@@ -105,6 +110,14 @@ pub struct ChannelForm {
     pub confirm_spam_disabled: Option<String>,
     pub enabled: Option<String>,
     pub add_3rd_party: Option<String>,
+    pub retrieve_company_memory: Option<String>,
+    pub retrieve_agent_memory: Option<String>,
+    pub retrieve_user_memory: Option<String>,
+    pub persist_company_memory: Option<String>,
+    pub persist_agent_memory: Option<String>,
+    pub persist_user_memory: Option<String>,
+    pub memory_recall_mode: Option<String>,
+    pub memory_max_results: Option<String>,
 }
 
 impl ChannelForm {
@@ -125,6 +138,44 @@ impl ChannelForm {
     pub fn confirm_spam_disabled(&self) -> bool {
         checkbox_ticked(self.confirm_spam_disabled.as_deref())
     }
+
+    pub fn memory_settings(&self) -> Result<SubmittedMemorySettings, String> {
+        let recall_mode = match self.memory_recall_mode.as_deref().unwrap_or("fast") {
+            "fast" => MemoryRecallMode::Fast,
+            "thinking" => MemoryRecallMode::Thinking,
+            _ => return Err("Memory recall mode must be fast or thinking.".into()),
+        };
+        let max_results = self
+            .memory_max_results
+            .as_deref()
+            .unwrap_or("5")
+            .parse::<u8>()
+            .map_err(|_| "Memory result limit must be between 1 and 20.".to_string())?;
+        if !(1..=20).contains(&max_results) {
+            return Err("Memory result limit must be between 1 and 20.".into());
+        }
+        Ok(SubmittedMemorySettings {
+            retrieve_company: checkbox_ticked(self.retrieve_company_memory.as_deref()),
+            retrieve_agent: checkbox_ticked(self.retrieve_agent_memory.as_deref()),
+            retrieve_user: checkbox_ticked(self.retrieve_user_memory.as_deref()),
+            persist_company: checkbox_ticked(self.persist_company_memory.as_deref()),
+            persist_agent: checkbox_ticked(self.persist_agent_memory.as_deref()),
+            persist_user: checkbox_ticked(self.persist_user_memory.as_deref()),
+            recall_mode,
+            max_results,
+        })
+    }
+}
+
+pub struct SubmittedMemorySettings {
+    pub retrieve_company: bool,
+    pub retrieve_agent: bool,
+    pub retrieve_user: bool,
+    pub persist_company: bool,
+    pub persist_agent: bool,
+    pub persist_user: bool,
+    pub recall_mode: MemoryRecallMode,
+    pub max_results: u8,
 }
 
 /// The two shapes a browser sends for a ticked checkbox, in one place.
@@ -187,6 +238,22 @@ pub struct ChannelJsonPayload {
     pub enabled: Option<bool>,
     /// Omitted means on, for the same reason as `enabled`.
     pub add_3rd_party: Option<bool>,
+    #[serde(default)]
+    pub retrieve_company_memory: bool,
+    #[serde(default)]
+    pub retrieve_agent_memory: bool,
+    #[serde(default)]
+    pub retrieve_user_memory: bool,
+    #[serde(default)]
+    pub persist_company_memory: bool,
+    #[serde(default)]
+    pub persist_agent_memory: bool,
+    #[serde(default)]
+    pub persist_user_memory: bool,
+    #[serde(default)]
+    pub memory_recall_mode: MemoryRecallMode,
+    #[serde(default = "default_memory_max_results")]
+    pub memory_max_results: u8,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -388,6 +455,10 @@ async fn create_channel_handler(
     let confirm_spam_disabled = form.confirm_spam_disabled();
     let enabled = form.enabled();
     let add_3rd_party = form.add_3rd_party();
+    let memory = match form.memory_settings() {
+        Ok(memory) => memory,
+        Err(error) => return view.render(Some(error)).await,
+    };
 
     let channel_config = match parse_config_form(form.channel_config) {
         Ok(c) => c,
@@ -407,14 +478,14 @@ async fn create_channel_handler(
         participant_emails: parse_emails_form(form.participant_emails),
         agent_ids,
         channel_config,
-        retrieve_company_memory: false,
-        retrieve_agent_memory: false,
-        retrieve_user_memory: false,
-        persist_company_memory: false,
-        persist_agent_memory: false,
-        persist_user_memory: false,
-        memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-        memory_max_results: 5,
+        retrieve_company_memory: memory.retrieve_company,
+        retrieve_agent_memory: memory.retrieve_agent,
+        retrieve_user_memory: memory.retrieve_user,
+        persist_company_memory: memory.persist_company,
+        persist_agent_memory: memory.persist_agent,
+        persist_user_memory: memory.persist_user,
+        memory_recall_mode: memory.recall_mode,
+        memory_max_results: memory.max_results,
         created_by: None,
     };
     match channel_use_cases
@@ -635,6 +706,10 @@ async fn update_channel_handler(
     let confirm_spam_disabled = form.confirm_spam_disabled();
     let enabled = form.enabled();
     let add_3rd_party = form.add_3rd_party();
+    let memory = match form.memory_settings() {
+        Ok(memory) => memory,
+        Err(error) => return Html(pages::error_alert(&error)),
+    };
     let emails = parse_emails_form(form.participant_emails);
     let agent_ids = parse_agent_ids_form(form.agent_ids);
 
@@ -656,14 +731,14 @@ async fn update_channel_handler(
         channel_config,
         enabled,
         add_3rd_party,
-        retrieve_company_memory: false,
-        retrieve_agent_memory: false,
-        retrieve_user_memory: false,
-        persist_company_memory: false,
-        persist_agent_memory: false,
-        persist_user_memory: false,
-        memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-        memory_max_results: 5,
+        retrieve_company_memory: memory.retrieve_company,
+        retrieve_agent_memory: memory.retrieve_agent,
+        retrieve_user_memory: memory.retrieve_user,
+        persist_company_memory: memory.persist_company,
+        persist_agent_memory: memory.persist_agent,
+        persist_user_memory: memory.persist_user,
+        memory_recall_mode: memory.recall_mode,
+        memory_max_results: memory.max_results,
         created_by: None,
     };
 
@@ -1363,14 +1438,14 @@ async fn create_channel_json(
         channel_config: payload.channel_config,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
-        retrieve_company_memory: false,
-        retrieve_agent_memory: false,
-        retrieve_user_memory: false,
-        persist_company_memory: false,
-        persist_agent_memory: false,
-        persist_user_memory: false,
-        memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-        memory_max_results: 5,
+        retrieve_company_memory: payload.retrieve_company_memory,
+        retrieve_agent_memory: payload.retrieve_agent_memory,
+        retrieve_user_memory: payload.retrieve_user_memory,
+        persist_company_memory: payload.persist_company_memory,
+        persist_agent_memory: payload.persist_agent_memory,
+        persist_user_memory: payload.persist_user_memory,
+        memory_recall_mode: payload.memory_recall_mode,
+        memory_max_results: payload.memory_max_results,
         created_by: None,
     };
 
@@ -1430,14 +1505,14 @@ async fn update_channel_json(
         channel_config: payload.channel_config,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
-        retrieve_company_memory: false,
-        retrieve_agent_memory: false,
-        retrieve_user_memory: false,
-        persist_company_memory: false,
-        persist_agent_memory: false,
-        persist_user_memory: false,
-        memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-        memory_max_results: 5,
+        retrieve_company_memory: payload.retrieve_company_memory,
+        retrieve_agent_memory: payload.retrieve_agent_memory,
+        retrieve_user_memory: payload.retrieve_user_memory,
+        persist_company_memory: payload.persist_company_memory,
+        persist_agent_memory: payload.persist_agent_memory,
+        persist_user_memory: payload.persist_user_memory,
+        memory_recall_mode: payload.memory_recall_mode,
+        memory_max_results: payload.memory_max_results,
         created_by: None,
     };
 

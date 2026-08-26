@@ -1,6 +1,7 @@
 use crate::{
     adapters::{
         http::{app_state::AppState, session::SessionAuthority},
+        memory::hydradb::HydraDbProvider,
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
         protocols::{EgressRegistry, email::EmailEgressAdapter},
         storage::{FileStorage, gcs::GcsFileStorage},
@@ -10,19 +11,22 @@ use crate::{
     infra::{
         argon2_password_hasher, config::AppConfig, events::MailboxEvents, postgres_persistence,
     },
-    services::outbound_dispatcher::SmtpConfirmationSender,
+    services::{
+        memory_coordinator::MemoryCoordinator, memory_provider::MemoryProviderRegistry,
+        memory_worker::MemoryWorker, outbound_dispatcher::SmtpConfirmationSender,
+    },
     use_cases::{
         agent::AgentUseCases,
         approval::ApprovalUseCases,
         channel::ChannelUseCases,
         company::CompanyUseCases,
         company_invite::CompanyInviteUseCases,
+        memory::MemoryUseCases,
         schedule::ScheduleUseCases,
         thread::ThreadUseCases,
         user::{EmailConfirmation, UserUseCases},
     },
 };
-use std::fs::File;
 use std::sync::Arc;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -44,6 +48,35 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     };
 
     let postgres_arc = Arc::new(postgres_persistence().await?);
+    let mut memory_providers = MemoryProviderRegistry::default();
+    if let Some(hydradb) = config.hydradb.as_ref() {
+        let provider = HydraDbProvider::new(
+            hydradb.base_url.clone(),
+            hydradb.api_key.clone(),
+            hydradb.fast_timeout,
+            hydradb.thinking_timeout,
+        )?;
+        memory_providers = memory_providers.register(
+            crate::entities::memory::MemoryProviderKind::Hydradb,
+            Arc::new(provider),
+        );
+    }
+    let memory_providers = Arc::new(memory_providers);
+    let memory_coordinator = Arc::new(MemoryCoordinator::new(
+        postgres_arc.clone(),
+        memory_providers.clone(),
+        monitoring.clone(),
+    ));
+    let memory_use_cases = Arc::new(MemoryUseCases::new(
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        config.hydradb.is_some(),
+    ));
+    let memory_worker = Arc::new(MemoryWorker::new(
+        postgres_arc.clone(),
+        memory_providers,
+        monitoring.clone(),
+    ));
     let runtime_identity = MachineIdentity::from_runtime_environment();
     let argon_hasher = argon2_password_hasher();
 
@@ -57,11 +90,10 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
     let company_invite_use_cases =
         CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());
-    let channel_use_cases = Arc::new(ChannelUseCases::new(
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-        config.clone(),
-    ));
+    let channel_use_cases = Arc::new(
+        ChannelUseCases::new(postgres_arc.clone(), postgres_arc.clone(), config.clone())
+            .with_memory_persistence(postgres_arc.clone()),
+    );
     let agent_use_cases = AgentUseCases::new(postgres_arc.clone(), postgres_arc.clone());
 
     let approval_use_cases = Arc::new(ApprovalUseCases::new(
@@ -87,7 +119,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         .with_agent_channel_provisioning(postgres_arc.clone())
         .with_approval_use_cases(approval_use_cases.clone())
         .with_monitoring(monitoring.clone())
-        .with_file_storage(file_storage.clone()),
+        .with_file_storage(file_storage.clone())
+        .with_memory(memory_coordinator),
     );
 
     let schedule_use_cases = Arc::new(ScheduleUseCases::new(
@@ -111,6 +144,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         agent_use_cases: Arc::new(agent_use_cases),
         thread_use_cases,
         approval_use_cases,
+        memory_use_cases,
+        memory_worker,
         dashboard_persistence: postgres_arc.clone(),
         runtime_metrics: postgres_arc.clone(),
         runtime_identity,
@@ -122,7 +157,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
 
 pub fn init_tracing() {
     let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| "axum_trainer=debug,tower_http=debug".into());
+        .unwrap_or_else(|_| "mail_agents=info,tower_http=info".into());
 
     // Console (pretty logs)
     let console_layer = fmt::layer()
@@ -130,18 +165,9 @@ pub fn init_tracing() {
         .with_level(true) // show log level
         .pretty(); // human-friendly, with colors
 
-    // File (structured JSON logs)
-    let file = File::create("app.log").expect("cannot create log file");
-    let json_layer = fmt::layer()
-        .json()
-        .with_writer(file)
-        .with_current_span(true)
-        .with_span_list(true);
-
     tracing_subscriber::registry()
         .with(filter)
         .with(console_layer)
-        .with(json_layer)
         .try_init()
         .ok();
 }

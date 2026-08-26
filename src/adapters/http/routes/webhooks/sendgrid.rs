@@ -1208,6 +1208,7 @@ mod tests {
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
+            hydradb: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],
@@ -1258,12 +1259,19 @@ mod tests {
             channel_persistence.clone(),
             config.clone(),
         ));
+        let memory_persistence = Arc::new(crate::adapters::persistence::PostgresPersistence::new(
+            sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                .expect("valid lazy pool url"),
+        ));
+        let memory_providers =
+            Arc::new(crate::services::memory_provider::MemoryProviderRegistry::default());
+        let monitoring = Arc::new(crate::adapters::monitoring::InMemoryMonitor::new());
         let app_state = AppState {
             // Lazy: this test drives mocked persistence and never opens a connection.
             db: sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
                 .expect("valid lazy pool url"),
             config: config.clone(),
-            monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+            monitoring: monitoring.clone(),
             sessions: Arc::new(crate::adapters::http::session::SessionAuthority::new(
                 &config,
             )),
@@ -1311,11 +1319,21 @@ mod tests {
                 config.clone(),
             )),
             agent_use_cases: Arc::new(crate::use_cases::agent::AgentUseCases::new(
-                company_persistence,
+                company_persistence.clone(),
                 Arc::new(MockAgentPersistence),
             )),
             thread_use_cases,
             approval_use_cases,
+            memory_use_cases: Arc::new(crate::use_cases::memory::MemoryUseCases::new(
+                company_persistence.clone(),
+                memory_persistence.clone(),
+                false,
+            )),
+            memory_worker: Arc::new(crate::services::memory_worker::MemoryWorker::new(
+                memory_persistence,
+                memory_providers,
+                monitoring,
+            )),
             events: crate::infra::events::MailboxEvents::new(),
         };
 

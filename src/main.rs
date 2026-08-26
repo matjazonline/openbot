@@ -19,9 +19,11 @@ enum DrainOutcome {
 use mail_agents::{
     adapters::smtp::SmtpServer,
     infra::{
-        app::create_app, config::task_worker_concurrency_from_env,
-        events::run_mailbox_event_listener, runtime_metrics::LinuxRuntimeMetricSource,
-        setup::init_app_state,
+        app::create_app,
+        config::task_worker_concurrency_from_env,
+        events::run_mailbox_event_listener,
+        runtime_metrics::LinuxRuntimeMetricSource,
+        setup::{init_app_state, init_tracing},
     },
     services::{
         runtime_metrics::{ActiveTaskExecutions, RuntimeMetricSampler},
@@ -32,9 +34,11 @@ use mail_agents::{
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
+    init_tracing();
 
     let task_worker_concurrency = task_worker_concurrency_from_env();
     let app_state = init_app_state().await?;
+    let memory_worker = app_state.memory_worker.clone();
 
     // Create broadcast channel for background worker graceful shutdown
     let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel(1);
@@ -63,6 +67,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     tokio::spawn(task_worker.start_worker_loop(shutdown_rx.resubscribe()));
+    let mut memory_worker_handle = tokio::spawn(memory_worker.run(shutdown_rx.resubscribe()));
 
     // Initialize Incoming SMTP Server loop
     let smtp_server = Arc::new(
@@ -123,6 +128,15 @@ async fn main() -> anyhow::Result<()> {
             warn!("Runtime metric sampler did not stop within 5s; aborting it");
             runtime_sampler_handle.abort();
             let _ = runtime_sampler_handle.await;
+        }
+    }
+    match timeout(Duration::from_secs(5), &mut memory_worker_handle).await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => warn!(%error, "Memory worker task ended unexpectedly"),
+        Err(_) => {
+            warn!("Memory worker did not stop within 5s; aborting it");
+            memory_worker_handle.abort();
+            let _ = memory_worker_handle.await;
         }
     }
 
