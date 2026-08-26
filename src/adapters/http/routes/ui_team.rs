@@ -31,7 +31,7 @@ use crate::{
     entities::{
         company::Company,
         company_invite::CompanyInvite,
-        company_member::CompanyMember,
+        company_member::{CompanyAccessRole, CompanyMember},
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
@@ -57,7 +57,9 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/ui/companies/{company_id}/team/members/{user_id}",
-            get(member_pane).delete(remove_member),
+            get(member_pane)
+                .put(update_member_role)
+                .delete(remove_member),
         )
         .route(
             "/ui/companies/{company_id}/team/members/{user_id}/avatar",
@@ -87,6 +89,13 @@ pub struct LegacyTeamQuery {
 #[derive(Debug, Clone, Deserialize)]
 pub struct InviteForm {
     pub email: String,
+    #[serde(default)]
+    pub role: Option<CompanyAccessRole>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MemberRoleForm {
+    pub role: CompanyAccessRole,
 }
 
 /// The avatar field from a member's own pane. Blank means "back to my initial", which is why it is
@@ -175,7 +184,7 @@ pub(super) async fn team_tab_body(
     };
 
     let pane_html = if creating {
-        view.invite_create_pane("", None)
+        view.invite_create_pane("", CompanyAccessRole::Member, None)
     } else {
         view.selected_pane(&members, &invites, selected)
     };
@@ -315,7 +324,7 @@ async fn invite_pane(
     let view = workspace.view(&company);
     let invite = view.invite(invite_id).await?;
 
-    Ok(Html(view.invite_pane(&invite, None, None)))
+    Ok(Html(view.invite_pane(&invite, None, None, None)))
 }
 
 /// POST /ui/companies/{company_id}/team/invites - Invite someone from the form (Protected).
@@ -330,18 +339,25 @@ async fn create_invite(
 
     let created = view
         .invite_use_cases
-        .create_company_invite(view.user_id, company.id, &form.email)
+        .create_company_invite(
+            view.user_id,
+            company.id,
+            &form.email,
+            form.role.unwrap_or_default(),
+        )
         .await;
 
     match created {
         Ok(invite) => {
-            let pane = view.invite_pane(&invite, None, None);
+            let pane = view.invite_pane(&invite, None, None, None);
             view.saved_response(TeamSelection::Invite(invite.id), pane)
                 .await
         }
-        Err(err) => Ok(Html(
-            view.invite_create_pane(&form.email, Some(&format!("Failed to send invite: {err}"))),
-        )
+        Err(err) => Ok(Html(view.invite_create_pane(
+            &form.email,
+            form.role.unwrap_or_default(),
+            Some(&format!("Failed to send invite: {err}")),
+        ))
         .into_response()),
     }
 }
@@ -359,18 +375,19 @@ async fn update_invite(
 
     let saved = view
         .invite_use_cases
-        .update_company_invite_email(view.user_id, company.id, invite_id, &form.email)
+        .update_company_invite(view.user_id, company.id, invite_id, &form.email, form.role)
         .await;
 
     match saved {
         Ok(invite) => {
-            let pane = view.invite_pane(&invite, None, None);
+            let pane = view.invite_pane(&invite, None, None, None);
             view.saved_response(TeamSelection::Invite(invite.id), pane)
                 .await
         }
         Err(err) => Ok(Html(view.invite_pane(
             &stored,
             Some(&form.email),
+            Some(form.role.unwrap_or(stored.role)),
             Some(&format!("Failed to save invite: {err}")),
         ))
         .into_response()),
@@ -390,6 +407,37 @@ async fn delete_invite(
         .await?;
 
     view.cleared_response().await
+}
+
+/// PUT /ui/companies/{company_id}/team/members/{user_id} - Change access role (Protected).
+#[instrument(skip(workspace, form))]
+async fn update_member_role(
+    workspace: Workspace,
+    Path((company_id, user_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<MemberRoleForm>,
+) -> AppResult<Response> {
+    let company = workspace.scoped_company(company_id).await?;
+    let view = workspace.view(&company);
+
+    match view
+        .invite_use_cases
+        .update_company_team_member_role(view.user_id, company.id, user_id, form.role)
+        .await
+    {
+        Ok(member) => {
+            let pane = view.member_pane(&member, None);
+            view.saved_response(TeamSelection::Member(user_id), pane)
+                .await
+        }
+        Err(err) => {
+            let member = view.member(user_id).await?;
+            Ok(Html(view.member_pane(
+                &member,
+                Some(&format!("Failed to change access role: {err}")),
+            ))
+            .into_response())
+        }
+    }
 }
 
 /// DELETE /ui/companies/{company_id}/team/members/{user_id} - Remove someone (Protected).
@@ -518,7 +566,7 @@ impl TeamView<'_> {
             TeamSelection::Invite(invite_id) => invites
                 .iter()
                 .find(|invite| invite.id == invite_id)
-                .map(|invite| self.invite_pane(invite, None, None)),
+                .map(|invite| self.invite_pane(invite, None, None, None)),
             TeamSelection::None => None,
         };
 
@@ -566,22 +614,30 @@ impl TeamView<'_> {
     fn invite_pane(
         &self,
         invite: &CompanyInvite,
-        draft: Option<&str>,
+        email_draft: Option<&str>,
+        role_draft: Option<CompanyAccessRole>,
         error: Option<&str>,
     ) -> String {
         pages::invite_pane(&pages::InvitePane {
             company: self.company,
             invite,
             role: self.role(),
-            draft,
+            email_draft,
+            role_draft,
             error,
         })
     }
 
-    fn invite_create_pane(&self, draft: &str, error: Option<&str>) -> String {
+    fn invite_create_pane(
+        &self,
+        email_draft: &str,
+        role_draft: CompanyAccessRole,
+        error: Option<&str>,
+    ) -> String {
         pages::invite_create_pane(&pages::InviteCreatePane {
             company: self.company,
-            draft,
+            email_draft,
+            role_draft,
             error,
         })
     }
@@ -602,7 +658,7 @@ impl TeamView<'_> {
     async fn invite_form_response(&self) -> AppResult<Response> {
         self.refreshed_response(
             TeamSelection::None,
-            self.invite_create_pane("", None),
+            self.invite_create_pane("", CompanyAccessRole::Member, None),
             pages::team_invite_form_url(self.company.id),
         )
         .await

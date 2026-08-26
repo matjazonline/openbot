@@ -2,7 +2,7 @@
 //! rather than read.
 //!
 //! The shell, the company scoping and the form parsing are all shared: chrome comes from
-//! [`crate::adapters::http::pages::ui_shell`], the company from [`super::ui::load_scoped_company`],
+//! [`crate::adapters::http::pages::ui_shell`], the company from [`super::ui::load_managed_company`],
 //! and every field is parsed by the same helpers the classic Agents page uses, so the two UIs
 //! cannot drift on what a submitted agent means.
 
@@ -44,7 +44,7 @@ use crate::{
 use super::{
     agent::{AgentForm, ModelOverrides, create_agent_from_instructions},
     channel::parse_config_form,
-    ui::{load_account, load_scoped_company, workspace_user},
+    ui::{load_account, load_managed_company, workspace_user},
 };
 
 pub fn router() -> Router<AppState> {
@@ -133,11 +133,11 @@ impl FromRequestParts<AppState> for Workspace {
 }
 
 impl Workspace {
-    /// The company a request is scoped to, always picked from the caller's own companies so a
-    /// guessed `company_id` cannot reach another user's agents.
+    /// The company a request is scoped to, always picked from those the caller owns or administers
+    /// so a guessed `company_id` cannot reach another company's agents.
     async fn scoped_company(&self, company_id: Uuid) -> AppResult<Company> {
         let (_, company) =
-            load_scoped_company(&self.company_use_cases, self.user_id, Some(company_id)).await?;
+            load_managed_company(&self.company_use_cases, self.user_id, Some(company_id)).await?;
         company.ok_or_else(|| AppError::NotFound("Company not found".into()))
     }
 
@@ -161,7 +161,7 @@ async fn agents_page(
     let account_email = EmailAddress::from(account.email.as_str());
     let workspace_user = workspace_user(&account, &account_email, &workspace.config);
 
-    let (companies, company) = load_scoped_company(
+    let (companies, company) = load_managed_company(
         &workspace.company_use_cases,
         workspace.user_id,
         query.company_id,

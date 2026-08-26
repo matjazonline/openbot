@@ -242,6 +242,9 @@ pub fn company_invites_page(
                 hx-on::after-request="if(event.detail.successful && event.detail.elt === this) this.reset();">
                 <input type="email" name="email" required placeholder="colleague@example.com"
                     class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <select name="role" class="px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
+                    {role_options}
+                </select>
                 <button type="submit"
                     class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer">
                     Send Invite
@@ -270,6 +273,7 @@ pub fn company_invites_page(
         company_id = company.id,
         invites_html = invites_html,
         team_html = team_html,
+        role_options = company_access_role_options(CompanyAccessRole::Member),
     );
 
     base_layout(&format!("Manage {}", company.name), &content)
@@ -311,6 +315,7 @@ pub fn company_invite_row_fragment(company_id: Uuid, invite: &CompanyInvite) -> 
             <div>
                 <div class="flex items-center gap-3">
                     <span class="text-md font-semibold text-white">{email}</span>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-950 text-indigo-300 border border-indigo-700/50">{role}</span>
                     {status_badge}
                 </div>
                 <p class="text-xs text-slate-400 mt-1">Invited on {created_at_str}</p>
@@ -329,7 +334,8 @@ pub fn company_invite_row_fragment(company_id: Uuid, invite: &CompanyInvite) -> 
         "##,
         company_id = company_id,
         invite_id = invite.id,
-        email = invite.email,
+        email = escape_html_text(&invite.email),
+        role = invite.role.label(),
         status_badge = status_badge,
         created_at_str = created_at_str,
     )
@@ -342,6 +348,9 @@ pub fn company_invite_edit_fragment(company_id: Uuid, invite: &CompanyInvite) ->
             class="bg-slate-900 border border-indigo-500/60 rounded-xl p-4 md:p-5 flex items-center gap-3 shadow-lg">
             <input type="email" name="email" value="{email}" required
                 class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <select name="role" class="px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
+                {role_options}
+            </select>
             <div class="flex items-center gap-2">
                 <button type="button" hx-get="/companies/{company_id}/invites/{invite_id}/cancel" hx-target="#invite-{invite_id}" hx-swap="outerHTML"
                     class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
@@ -356,7 +365,8 @@ pub fn company_invite_edit_fragment(company_id: Uuid, invite: &CompanyInvite) ->
         "##,
         company_id = company_id,
         invite_id = invite.id,
-        email = invite.email,
+        email = escape_html_text(&invite.email),
+        role_options = company_access_role_options(invite.role),
     )
 }
 
@@ -388,7 +398,12 @@ pub fn company_team_row_fragment(company_id: Uuid, member: &CompanyMember) -> St
                 <div class="flex items-center gap-3">
                     <h4 class="text-md font-semibold text-white">{username}</h4>
                     <span class="text-xs text-slate-400">({email})</span>
-                    <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-950 text-indigo-300 border border-indigo-700/50 uppercase">{role}</span>
+                    <form hx-put="/companies/{company_id}/team/{user_id}" hx-target="#member-{user_id}" hx-swap="outerHTML" class="flex items-center gap-2">
+                        <select name="role" class="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs">
+                            {role_options}
+                        </select>
+                        <button type="submit" class="px-2.5 py-1 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg">Save</button>
+                    </form>
                 </div>
                 <p class="text-xs text-slate-400 mt-1">Joined {created_at_str}</p>
             </div>
@@ -404,9 +419,23 @@ pub fn company_team_row_fragment(company_id: Uuid, member: &CompanyMember) -> St
         user_id = member.user_id,
         username = username_display,
         email = email_display,
-        role = member.role,
+        role_options = company_access_role_options(member.role),
         created_at_str = created_at_str,
     )
+}
+
+fn company_access_role_options(selected: CompanyAccessRole) -> String {
+    CompanyAccessRole::ALL
+        .into_iter()
+        .map(|role| {
+            format!(
+                r#"<option value="{}"{}>{}</option>"#,
+                role.as_str(),
+                if role == selected { " selected" } else { "" },
+                role.label(),
+            )
+        })
+        .collect()
 }
 
 pub fn user_invites_page(user_email: &str, invites: &[CompanyInvite]) -> String {
@@ -478,7 +507,7 @@ pub fn user_invite_row_fragment(invite: &CompanyInvite) -> String {
                 <div class="flex items-center gap-3">
                     <h4 class="text-md font-semibold text-white">{company_name}</h4>
                 </div>
-                <p class="text-xs text-slate-400 mt-1">Invited to {email} on {created_at_str}</p>
+                <p class="text-xs text-slate-400 mt-1">Invited to {email} as {role} on {created_at_str}</p>
             </div>
             <div class="flex items-center gap-2">
                 {action_buttons}
@@ -486,8 +515,9 @@ pub fn user_invite_row_fragment(invite: &CompanyInvite) -> String {
         </div>
         "##,
         invite_id = invite.id,
-        company_name = company_name,
-        email = invite.email,
+        company_name = escape_html_text(company_name),
+        email = escape_html_text(&invite.email),
+        role = invite.role.label(),
         created_at_str = created_at_str,
         action_buttons = action_buttons,
     )

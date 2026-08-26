@@ -5,7 +5,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::{Html, IntoResponse},
-    routing::{delete, get, post, put},
+    routing::{get, post, put},
 };
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
@@ -14,7 +14,10 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::AppResult,
-    entities::{company_invite::CompanyInvite, company_member::CompanyMember},
+    entities::{
+        company_invite::CompanyInvite,
+        company_member::{CompanyAccessRole, CompanyMember},
+    },
     use_cases::{
         company::CompanyUseCases, company_invite::CompanyInviteUseCases, user::UserUseCases,
     },
@@ -41,7 +44,7 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/companies/{company_id}/team/{user_id}",
-            delete(remove_team_member),
+            put(update_team_member_role).delete(remove_team_member),
         )
         // Web / HTMX User Invites
         .route("/invites", get(user_invites_page))
@@ -62,7 +65,7 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/api/companies/{company_id}/team/{user_id}",
-            delete(remove_team_member_json),
+            put(update_team_member_role_json).delete(remove_team_member_json),
         )
         // JSON API User Invites
         .route("/api/invites", get(list_user_invites_json))
@@ -79,6 +82,13 @@ pub fn router() -> Router<AppState> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct InviteForm {
     pub email: String,
+    #[serde(default)]
+    pub role: Option<CompanyAccessRole>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MemberRoleForm {
+    pub role: CompanyAccessRole,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -135,7 +145,12 @@ async fn create_company_invite(
     Form(form): Form<InviteForm>,
 ) -> impl IntoResponse {
     match invite_use_cases
-        .create_company_invite(user.id, company_id, &form.email)
+        .create_company_invite(
+            user.id,
+            company_id,
+            &form.email,
+            form.role.unwrap_or_default(),
+        )
         .await
     {
         Ok(_) => {
@@ -203,11 +218,30 @@ async fn update_company_invite(
     Form(form): Form<InviteForm>,
 ) -> impl IntoResponse {
     match invite_use_cases
-        .update_company_invite_email(user.id, company_id, invite_id, &form.email)
+        .update_company_invite(user.id, company_id, invite_id, &form.email, form.role)
         .await
     {
         Ok(invite) => Html(pages::company_invite_row_fragment(company_id, &invite)),
         Err(err) => Html(pages::error_alert(&format!("Update failed: {err}"))),
+    }
+}
+
+/// PUT /companies/{company_id}/team/{user_id} - Update member access role (HTMX).
+#[instrument(skip(invite_use_cases, user, form))]
+async fn update_team_member_role(
+    State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, member_user_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<MemberRoleForm>,
+) -> impl IntoResponse {
+    match invite_use_cases
+        .update_company_team_member_role(user.id, company_id, member_user_id, form.role)
+        .await
+    {
+        Ok(member) => Html(pages::company_team_row_fragment(company_id, &member)),
+        Err(err) => Html(pages::error_alert(&format!(
+            "Failed to update member access: {err}"
+        ))),
     }
 }
 
@@ -328,7 +362,12 @@ async fn create_company_invite_json(
     Json(payload): Json<InviteForm>,
 ) -> AppResult<impl IntoResponse> {
     let invite = invite_use_cases
-        .create_company_invite(user.id, company_id, &payload.email)
+        .create_company_invite(
+            user.id,
+            company_id,
+            &payload.email,
+            payload.role.unwrap_or_default(),
+        )
         .await?;
     Ok((
         StatusCode::CREATED,
@@ -347,7 +386,7 @@ async fn update_company_invite_json(
     Json(payload): Json<InviteForm>,
 ) -> AppResult<impl IntoResponse> {
     let invite = invite_use_cases
-        .update_company_invite_email(user.id, company_id, invite_id, &payload.email)
+        .update_company_invite(user.id, company_id, invite_id, &payload.email, payload.role)
         .await?;
     Ok((
         StatusCode::OK,
@@ -386,6 +425,19 @@ async fn list_team_members_json(
             members,
         }),
     ))
+}
+
+/// PUT /api/companies/{company_id}/team/{user_id} - Update member access role.
+async fn update_team_member_role_json(
+    State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, member_user_id)): Path<(Uuid, Uuid)>,
+    Json(payload): Json<MemberRoleForm>,
+) -> AppResult<impl IntoResponse> {
+    let member = invite_use_cases
+        .update_company_team_member_role(user.id, company_id, member_user_id, payload.role)
+        .await?;
+    Ok((StatusCode::OK, Json(member)))
 }
 
 /// DELETE /api/companies/{company_id}/team/{user_id} - JSON remove member from team.
@@ -491,6 +543,7 @@ mod tests {
             company_id: company.id,
             company_name: Some(company.name.clone()),
             email: "invited@test.com".to_string(),
+            role: CompanyAccessRole::Admin,
             status: "pending".to_string(),
             created_at: Utc::now(),
         };
@@ -502,7 +555,7 @@ mod tests {
             username: Some("member1".to_string()),
             email: Some("member1@test.com".to_string()),
             avatar_url: None,
-            role: "member".to_string(),
+            role: CompanyAccessRole::Member,
             created_at: Utc::now(),
         };
 

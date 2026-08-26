@@ -161,7 +161,7 @@ mod tests {
 
         let config = AppConfig {
             jwt_secret: "secret".to_string(),
-            access_token_ttl: time::Duration::days(1),
+            sendgrid_inbound: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],

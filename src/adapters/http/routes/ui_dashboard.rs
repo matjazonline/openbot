@@ -61,11 +61,22 @@ pub fn router() -> Router<AppState> {
         .route("/ui/dashboard/events", get(dashboard_stream))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum DashboardScopeQuery {
+    System,
+    #[serde(other)]
+    Other,
+}
+
 #[derive(Debug, Clone, Deserialize)]
-pub struct DashboardQuery {
-    pub company_id: Option<Uuid>,
+struct DashboardQuery {
+    company_id: Option<Uuid>,
+    /// `system` keeps an operator on the deployment-wide rollup while `company_id` remembers the
+    /// company workspace they can switch back to. Other values retain the existing URL behavior.
+    scope: Option<DashboardScopeQuery>,
     /// Which trailing range to report over, as a [`DashboardWindow`] slug.
-    pub window: Option<String>,
+    window: Option<String>,
 }
 
 impl DashboardQuery {
@@ -79,6 +90,10 @@ impl DashboardQuery {
             .as_deref()
             .and_then(DashboardWindow::from_slug)
             .unwrap_or_default()
+    }
+
+    fn requests_system_scope(&self) -> bool {
+        self.scope == Some(DashboardScopeQuery::System)
     }
 }
 
@@ -120,6 +135,9 @@ impl FromRequestParts<AppState> for Dashboard {
 struct DashboardScope {
     /// `None` means every company — the operator rollup.
     company: Option<Company>,
+    /// The surrounding company workspace, retained while `company` is `None` so the scope control
+    /// and navigation rail can return to it.
+    selected_company: Option<Company>,
     companies: Vec<Company>,
     operator: bool,
 }
@@ -133,29 +151,34 @@ impl DashboardScope {
     async fn resolve(
         dashboard: &Dashboard,
         email: &EmailAddress,
-        requested: Option<Uuid>,
+        query: &DashboardQuery,
     ) -> AppResult<Self> {
+        let requested = query.company_id;
         let (companies, selected) =
             load_scoped_company(&dashboard.company_use_cases, dashboard.user_id, requested).await?;
 
         let operator = dashboard.config.is_operator(email);
 
-        // An operator asking for one company in particular gets that company: the global rollup is
-        // their default, not a cage, and drilling into a row of it is the obvious next move. The
-        // lookup goes through `get_company` rather than the caller's own list, because an operator
-        // is not usually a member of the companies they are watching — and it discloses nothing
-        // new, since the global rollup already shows those companies' tasks by name.
+        // An operator asking for one company in particular gets that company unless `scope=system`
+        // explicitly selects the global rollup. The lookup goes through `get_company` rather than
+        // the caller's own list, because an operator is not usually a member of the companies they
+        // are watching — and it discloses nothing new, since the global rollup already shows those
+        // companies' tasks by name.
         //
         // Everyone else stays pinned to `load_scoped_company`'s answer, which only ever returns a
         // company the caller belongs to.
-        let company = match (operator, requested) {
+        let selected_company = match (operator, requested) {
             (true, Some(company_id)) => dashboard.company_use_cases.get_company(company_id).await?,
-            (true, None) => None,
-            (false, _) => selected,
+            _ => selected,
+        };
+        let company = match (operator, requested, query.requests_system_scope()) {
+            (true, _, true) | (true, None, false) => None,
+            (true, Some(_), false) | (false, _, _) => selected_company.clone(),
         };
 
         Ok(Self {
             company,
+            selected_company,
             companies,
             operator,
         })
@@ -254,7 +277,7 @@ async fn dashboard_page(
     let account_email = EmailAddress::from(account.email.as_str());
     let user = workspace_user(&account, &account_email, &dashboard.config);
 
-    let scope = DashboardScope::resolve(&dashboard, &account_email, query.company_id).await?;
+    let scope = DashboardScope::resolve(&dashboard, &account_email, &query).await?;
 
     // A user with no company and no operator grant has nothing to show; the shell's own empty
     // state says so rather than rendering a page of zeroes.
@@ -267,6 +290,7 @@ async fn dashboard_page(
     Ok(Html(pages::dashboard_page(&pages::DashboardShell {
         user: &user,
         scope: scope.view(),
+        selected_company: scope.selected_company.as_ref(),
         companies: &scope.companies,
         window: query.window(),
     })))
@@ -282,7 +306,7 @@ async fn dashboard_panels_fragment(
     let account_email = EmailAddress::from(account.email.as_str());
     let user = workspace_user(&account, &account_email, &dashboard.config);
 
-    let scope = DashboardScope::resolve(&dashboard, &account_email, query.company_id).await?;
+    let scope = DashboardScope::resolve(&dashboard, &account_email, &query).await?;
     let window = query.window();
     let reading = dashboard
         .read(scope.company_id(), window, scope.operator)
@@ -301,7 +325,7 @@ async fn dashboard_stream(
     // re-checks it, exactly as the thread streams do.
     let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let scope = DashboardScope::resolve(&dashboard, &account_email, query.company_id).await?;
+    let scope = DashboardScope::resolve(&dashboard, &account_email, &query).await?;
     let company = scope.company_id();
     let operator = scope.operator;
     let window = query.window();

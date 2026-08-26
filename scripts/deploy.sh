@@ -13,7 +13,7 @@
 # POSTGRES_PASSWORD, before deploying; for the app target it creates the
 # mail-agents-server app, allocates a dedicated IPv4 (required for inbound
 # SMTP on port 25), and prompts for its secrets (DATABASE_URL, JWT_SECRET,
-# SMTP_USERNAME/PASSWORD, OPENAI_API_KEY) before deploying. It's a no-op
+# SMTP_USERNAME/PASSWORD) before deploying. It's a no-op
 # (skipped with a message) once the app already exists, so it's safe to
 # leave on. Remember to edit fly.toml (APP_DOMAIN_NAME,
 # CORS_ALLOWED_ORIGINS, primary_region) before the app's first deploy; see
@@ -104,10 +104,6 @@ bootstrap_app() {
   read -rsp "SMTP relay password: " smtp_password
   echo
 
-  local llm_api_key
-  read -rsp "OPENAI_API_KEY (leave empty to set later with 'fly secrets set'): " llm_api_key
-  echo
-
   echo "==> Setting secrets"
   local secrets_args=(
     "DATABASE_URL=$database_url"
@@ -115,9 +111,6 @@ bootstrap_app() {
     "SMTP_USERNAME=$smtp_username"
     "SMTP_PASSWORD=$smtp_password"
   )
-  if [[ -n "$llm_api_key" ]]; then
-    secrets_args+=("OPENAI_API_KEY=$llm_api_key")
-  fi
   fly secrets set "${secrets_args[@]}" --app mail-agents-server
 
   echo "==> Before deploying, edit fly.toml: APP_DOMAIN_NAME, CORS_ALLOWED_ORIGINS, primary_region"

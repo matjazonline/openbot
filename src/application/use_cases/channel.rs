@@ -15,7 +15,7 @@ use crate::{
         value_objects::{ChannelSlug, CompanySlug},
     },
     infra::config::AppConfig,
-    use_cases::company::{CompanyPersistence, owned_company},
+    use_cases::company::{CompanyPersistence, managed_company},
 };
 use serde::{Deserialize, Serialize};
 
@@ -172,7 +172,7 @@ fn blank_to_none(value: &mut Option<String>) {
 }
 
 /// A channel belonging to another company is reported exactly like a missing one, so an id probe
-/// cannot tell a foreign channel from a nonexistent one. See [`owned_company`].
+/// cannot tell a foreign channel from a nonexistent one. See [`managed_company`].
 pub fn channel_not_found() -> AppError {
     AppError::NotFound("Channel not found in this company.".into())
 }
@@ -216,8 +216,8 @@ impl ChannelUseCases {
         }
     }
 
-    async fn verify_company_owner(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        owned_company(self.company_persistence.as_ref(), user_id, company_id).await?;
+    async fn verify_company_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
+        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         Ok(())
     }
 
@@ -229,7 +229,7 @@ impl ChannelUseCases {
         mut write: ChannelWrite,
         confirm_spam_disabled: bool,
     ) -> AppResult<Channel> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
         write.created_by = Some(CreationProvenance::user(user_id));
 
         write.normalize()?;
@@ -264,7 +264,7 @@ impl ChannelUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<Channel>> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
         self.channel_persistence
             .list_by_company_id(company_id)
             .await
@@ -273,7 +273,7 @@ impl ChannelUseCases {
     /// Every channel of `company_id` this viewer may read.
     ///
     /// The read counterpart of [`ChannelUseCases::list_company_channels`]: that one is for the
-    /// pages that *configure* channels and stays owner-only, this one is what the mailbox lists,
+    /// pages that *configure* channels and stays owner-or-admin, this one is what the mailbox lists,
     /// and a restricted channel simply is not in it for a colleague who is not a participant.
     #[instrument(skip(self))]
     pub async fn list_readable_channels(
@@ -335,7 +335,7 @@ impl ChannelUseCases {
         company_id: Uuid,
         channel_id: Uuid,
     ) -> AppResult<Option<Channel>> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
         let channel = self.channel_persistence.get_by_id(channel_id).await?;
         if let Some(ref ch) = channel {
             if ch.company_id != company_id {
@@ -358,7 +358,7 @@ impl ChannelUseCases {
         mut write: ChannelWrite,
         confirm_spam_disabled: bool,
     ) -> AppResult<Channel> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
 
         let channel = self
             .channel_persistence
@@ -388,7 +388,7 @@ impl ChannelUseCases {
         company_id: Uuid,
         channel_id: Uuid,
     ) -> AppResult<()> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
 
         let channel = self
             .channel_persistence
@@ -912,7 +912,7 @@ pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<Ch
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::company::Company;
+    use crate::entities::company::{Company, CompanyAccess};
     use crate::entities::company_member::CompanyMembership;
     use crate::entities::value_objects::EmailAddress;
     use crate::use_cases::company::CompanyWrite;
@@ -922,6 +922,7 @@ mod tests {
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
+        memberships: Mutex<Vec<(Uuid, Uuid, CompanyMembership)>>,
     }
 
     #[async_trait]
@@ -952,6 +953,31 @@ mod tests {
 
         async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
             unimplemented!()
+        }
+
+        async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
+            let companies = self.companies.lock().unwrap();
+            let memberships = self.memberships.lock().unwrap();
+            Ok(companies
+                .iter()
+                .filter_map(|company| {
+                    let membership = if company.user_id == user_id {
+                        CompanyMembership::Owner
+                    } else if let Some((_, _, membership)) =
+                        memberships.iter().find(|(member_id, company_id, _)| {
+                            *member_id == user_id && *company_id == company.id
+                        })
+                    {
+                        *membership
+                    } else {
+                        return None;
+                    };
+                    Some(CompanyAccess {
+                        company: company.clone(),
+                        membership,
+                    })
+                })
+                .collect())
         }
 
         async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
@@ -1076,7 +1102,7 @@ mod tests {
     fn test_config(spam_enabled: bool) -> Arc<AppConfig> {
         Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
-            access_token_ttl: time::Duration::days(1),
+            sendgrid_inbound: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],
@@ -1127,6 +1153,7 @@ mod tests {
         };
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![company(company_id), company(other_company_id)]),
+            memberships: Mutex::new(Vec::new()),
         });
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(Vec::new()),
@@ -1210,6 +1237,103 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn admins_manage_channels_while_members_cannot() {
+        let owner_id = Uuid::new_v4();
+        let admin_id = Uuid::new_v4();
+        let member_id = Uuid::new_v4();
+        let company_id = Uuid::new_v4();
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![Company {
+                id: company_id,
+                user_id: owner_id,
+                name: "Acme Corp".into(),
+                slug: "acme".into(),
+                api_key: None,
+                provider: None,
+                model: None,
+                enable_llm_spam_guardrail: None,
+                avatar_url: None,
+                memory_provider: None,
+                created_at: Utc::now(),
+            }]),
+            memberships: Mutex::new(vec![
+                (admin_id, company_id, CompanyMembership::Admin),
+                (member_id, company_id, CompanyMembership::Member),
+            ]),
+        });
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(Vec::new()),
+        });
+        let use_cases =
+            ChannelUseCases::new(company_persistence, channel_persistence, test_config(true));
+
+        assert!(
+            use_cases
+                .create_channel(
+                    member_id,
+                    company_id,
+                    ChannelWrite {
+                        name: "Member Channel".into(),
+                        slug: "member-channel".into(),
+                        ..ChannelWrite::default()
+                    },
+                    false,
+                )
+                .await
+                .is_err()
+        );
+        assert!(
+            use_cases
+                .list_company_channels(member_id, company_id)
+                .await
+                .is_err()
+        );
+
+        let channel = use_cases
+            .create_channel(
+                admin_id,
+                company_id,
+                ChannelWrite {
+                    name: "Admin Channel".into(),
+                    slug: "admin-channel".into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
+                false,
+            )
+            .await
+            .expect("an admin creates a channel");
+        assert_eq!(
+            use_cases
+                .list_company_channels(admin_id, company_id)
+                .await
+                .expect("an admin lists channels")
+                .len(),
+            1
+        );
+        let channel = use_cases
+            .update_channel(
+                admin_id,
+                company_id,
+                channel.id,
+                ChannelWrite {
+                    name: "Managed Channel".into(),
+                    slug: "managed-channel".into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
+                false,
+            )
+            .await
+            .expect("an admin updates a channel");
+        assert_eq!(channel.name, "Managed Channel");
+        use_cases
+            .delete_channel(admin_id, company_id, channel.id)
+            .await
+            .expect("an admin deletes a channel");
+    }
+
+    #[tokio::test]
     async fn company_owner_channel_crud_flow_works() {
         let owner_id = Uuid::new_v4();
         let company_id = Uuid::new_v4();
@@ -1228,6 +1352,7 @@ mod tests {
                 memory_provider: None,
                 created_at: Utc::now(),
             }]),
+            memberships: Mutex::new(Vec::new()),
         });
 
         let channel_persistence = Arc::new(MockChannelPersistence {
@@ -1574,6 +1699,7 @@ mod tests {
                 memory_provider: None,
                 created_at: Utc::now(),
             }]),
+            memberships: Mutex::new(Vec::new()),
         });
 
         let channel_persistence = Arc::new(MockChannelPersistence {
@@ -1692,6 +1818,7 @@ mod tests {
                 memory_provider: None,
                 created_at: Utc::now(),
             }]),
+            memberships: Mutex::new(Vec::new()),
         });
 
         let channel_persistence = Arc::new(MockChannelPersistence {

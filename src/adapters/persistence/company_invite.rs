@@ -1,13 +1,16 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
-        company_invite::CompanyInvite, company_member::CompanyMember, value_objects::AvatarUrl,
+        company_invite::CompanyInvite,
+        company_member::{CompanyAccessRole, CompanyMember},
+        value_objects::AvatarUrl,
     },
     use_cases::company_invite::CompanyInvitePersistence,
 };
@@ -18,20 +21,24 @@ pub struct CompanyInviteDb {
     pub company_id: Uuid,
     pub company_name: Option<String>,
     pub email: String,
+    pub role: String,
     pub status: String,
     pub created_at: DateTime<Utc>,
 }
 
-impl From<CompanyInviteDb> for CompanyInvite {
-    fn from(db: CompanyInviteDb) -> Self {
-        CompanyInvite {
+impl TryFrom<CompanyInviteDb> for CompanyInvite {
+    type Error = AppError;
+
+    fn try_from(db: CompanyInviteDb) -> Result<Self, Self::Error> {
+        Ok(CompanyInvite {
             id: db.id,
             company_id: db.company_id,
             company_name: db.company_name,
             email: db.email,
+            role: CompanyAccessRole::from_str(&db.role).map_err(AppError::Internal)?,
             status: db.status,
             created_at: db.created_at,
-        }
+        })
     }
 }
 
@@ -47,104 +54,123 @@ pub struct CompanyMemberDb {
     pub created_at: DateTime<Utc>,
 }
 
-impl From<CompanyMemberDb> for CompanyMember {
-    fn from(db: CompanyMemberDb) -> Self {
-        CompanyMember {
+impl TryFrom<CompanyMemberDb> for CompanyMember {
+    type Error = AppError;
+
+    fn try_from(db: CompanyMemberDb) -> Result<Self, Self::Error> {
+        Ok(CompanyMember {
             id: db.id,
             company_id: db.company_id,
             user_id: db.user_id,
             username: db.username,
             email: db.email,
             avatar_url: db.avatar_url.map(AvatarUrl::from),
-            role: db.role,
+            role: CompanyAccessRole::from_str(&db.role).map_err(AppError::Internal)?,
             created_at: db.created_at,
-        }
+        })
     }
 }
 
 #[async_trait]
 impl CompanyInvitePersistence for PostgresPersistence {
-    async fn create_invite(&self, company_id: Uuid, email: &str) -> AppResult<CompanyInvite> {
+    async fn create_invite(
+        &self,
+        company_id: Uuid,
+        email: &str,
+        role: CompanyAccessRole,
+    ) -> AppResult<CompanyInvite> {
         let uuid = Uuid::new_v4();
 
         let db = sqlx::query_as::<_, CompanyInviteDb>(
             r#"
             WITH invite AS (
-                INSERT INTO company_invites (id, company_id, email, status)
-                VALUES ($1, $2, $3, 'pending')
+                INSERT INTO company_invites (id, company_id, email, role, status)
+                VALUES ($1, $2, $3, $4, 'pending')
                 ON CONFLICT (company_id, email)
-                DO UPDATE SET status = 'pending', created_at = CURRENT_TIMESTAMP
-                RETURNING id, company_id, email, status, created_at
+                DO UPDATE SET role = EXCLUDED.role, status = 'pending', created_at = CURRENT_TIMESTAMP
+                RETURNING id, company_id, email, role, status, created_at
             )
-            SELECT i.id, i.company_id, c.name AS company_name, i.email, i.status, i.created_at
-            FROM invite i
-            JOIN companies c ON c.id = i.company_id
+            SELECT invite.id, invite.company_id, company.name AS company_name, invite.email,
+                   invite.role, invite.status, invite.created_at
+            FROM invite
+            JOIN companies AS company ON company.id = invite.company_id
             "#,
         )
         .bind(uuid)
         .bind(company_id)
         .bind(email)
+        .bind(role.as_str())
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.into())
+        db.try_into()
     }
 
     async fn get_invite_by_id(&self, id: Uuid) -> AppResult<Option<CompanyInvite>> {
         let db = sqlx::query_as!(
             CompanyInviteDb,
-            r#"SELECT i.id, i.company_id, c.name as "company_name?", i.email, i.status, i.created_at as "created_at!"
-               FROM company_invites i
-               JOIN companies c ON c.id = i.company_id
-               WHERE i.id = $1"#,
+            r#"SELECT invite.id, invite.company_id, company.name AS "company_name?", invite.email,
+                      invite.role, invite.status, invite.created_at AS "created_at!"
+               FROM company_invites AS invite
+               JOIN companies AS company ON company.id = invite.company_id
+               WHERE invite.id = $1"#,
             id
         )
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.map(Into::into))
+        db.map(TryInto::try_into).transpose()
     }
 
     async fn list_invites_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyInvite>> {
         let db_list = sqlx::query_as!(
             CompanyInviteDb,
-            r#"SELECT i.id, i.company_id, c.name as "company_name?", i.email, i.status, i.created_at as "created_at!"
-               FROM company_invites i
-               JOIN companies c ON c.id = i.company_id
-               WHERE i.company_id = $1
-               ORDER BY i.created_at DESC, i.id DESC LIMIT 200"#,
+            r#"SELECT invite.id, invite.company_id, company.name AS "company_name?", invite.email,
+                      invite.role, invite.status, invite.created_at AS "created_at!"
+               FROM company_invites AS invite
+               JOIN companies AS company ON company.id = invite.company_id
+               WHERE invite.company_id = $1
+               ORDER BY invite.created_at DESC, invite.id DESC LIMIT 200"#,
             company_id
         )
         .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        Ok(db_list.into_iter().map(Into::into).collect())
+        db_list.into_iter().map(TryInto::try_into).collect()
     }
 
-    async fn update_invite_email(&self, id: Uuid, new_email: &str) -> AppResult<CompanyInvite> {
+    async fn update_invite(
+        &self,
+        id: Uuid,
+        new_email: &str,
+        role: CompanyAccessRole,
+    ) -> AppResult<CompanyInvite> {
         let db = sqlx::query_as::<_, CompanyInviteDb>(
             r#"
             WITH invite AS (
                 UPDATE company_invites
-                SET email = $1
-                WHERE id = $2
-                RETURNING id, company_id, email, status, created_at
+                SET email = $1, role = $2
+                WHERE id = $3
+                RETURNING id, company_id, email, role, status, created_at
             )
-            SELECT i.id, i.company_id, c.name AS company_name, i.email, i.status, i.created_at
-            FROM invite i
-            JOIN companies c ON c.id = i.company_id
+            SELECT invite.id, invite.company_id, company.name AS company_name, invite.email,
+                   invite.role, invite.status, invite.created_at
+            FROM invite
+            JOIN companies AS company ON company.id = invite.company_id
             "#,
         )
         .bind(new_email)
+        .bind(role.as_str())
         .bind(id)
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        db.map(Into::into)
+        db.map(TryInto::try_into)
+            .transpose()?
             .ok_or_else(|| AppError::Internal("Invite not found.".into()))
     }
 
@@ -160,18 +186,19 @@ impl CompanyInvitePersistence for PostgresPersistence {
     async fn list_invites_by_email(&self, email: &str) -> AppResult<Vec<CompanyInvite>> {
         let db_list = sqlx::query_as!(
             CompanyInviteDb,
-            r#"SELECT i.id, i.company_id, c.name as "company_name?", i.email, i.status, i.created_at as "created_at!"
-               FROM company_invites i
-               JOIN companies c ON c.id = i.company_id
-               WHERE i.email = $1
-               ORDER BY i.created_at DESC, i.id DESC LIMIT 200"#,
+            r#"SELECT invite.id, invite.company_id, company.name AS "company_name?", invite.email,
+                      invite.role, invite.status, invite.created_at AS "created_at!"
+               FROM company_invites AS invite
+               JOIN companies AS company ON company.id = invite.company_id
+               WHERE invite.email = $1
+               ORDER BY invite.created_at DESC, invite.id DESC LIMIT 200"#,
             email
         )
         .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        Ok(db_list.into_iter().map(Into::into).collect())
+        db_list.into_iter().map(TryInto::try_into).collect()
     }
 
     async fn accept_pending_invite(
@@ -187,19 +214,20 @@ impl CompanyInvitePersistence for PostgresPersistence {
                 UPDATE company_invites
                 SET status = 'accepted'
                 WHERE id = $1 AND status = 'pending' AND email = $2
-                RETURNING id, company_id, email, status, created_at
+                RETURNING id, company_id, email, role, status, created_at
             ), membership AS (
                 INSERT INTO company_members (id, company_id, user_id, role)
-                SELECT $3, company_id, $4, 'member'
+                SELECT $3, company_id, $4, role
                 FROM accepted
                 ON CONFLICT (company_id, user_id)
-                DO UPDATE SET role = company_members.role
+                DO UPDATE SET role = EXCLUDED.role
                 RETURNING company_id
             )
-            SELECT a.id, a.company_id, c.name AS company_name, a.email, a.status, a.created_at
-            FROM accepted a
-            JOIN membership m ON m.company_id = a.company_id
-            JOIN companies c ON c.id = a.company_id
+            SELECT accepted.id, accepted.company_id, company.name AS company_name, accepted.email,
+                   accepted.role, accepted.status, accepted.created_at
+            FROM accepted
+            JOIN membership ON membership.company_id = accepted.company_id
+            JOIN companies AS company ON company.id = accepted.company_id
             "#,
         )
         .bind(invite_id)
@@ -210,7 +238,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.map(Into::into))
+        db.map(TryInto::try_into).transpose()
     }
 
     async fn decline_pending_invite(
@@ -224,11 +252,12 @@ impl CompanyInvitePersistence for PostgresPersistence {
                 UPDATE company_invites
                 SET status = 'declined'
                 WHERE id = $1 AND status = 'pending' AND email = $2
-                RETURNING id, company_id, email, status, created_at
+                RETURNING id, company_id, email, role, status, created_at
             )
-            SELECT i.id, i.company_id, c.name AS company_name, i.email, i.status, i.created_at
-            FROM declined i
-            JOIN companies c ON c.id = i.company_id
+            SELECT declined.id, declined.company_id, company.name AS company_name, declined.email,
+                   declined.role, declined.status, declined.created_at
+            FROM declined
+            JOIN companies AS company ON company.id = declined.company_id
             "#,
         )
         .bind(invite_id)
@@ -237,24 +266,56 @@ impl CompanyInvitePersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        Ok(db.map(Into::into))
+        db.map(TryInto::try_into).transpose()
     }
 
     async fn list_members_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyMember>> {
         let db_list = sqlx::query_as!(
             CompanyMemberDb,
-            r#"SELECT m.id, m.company_id, m.user_id, u.username as "username?", u.email as "email?", u.avatar_url, m.role, m.created_at as "created_at!"
-               FROM company_members m
-               JOIN users u ON u.id = m.user_id
-               WHERE m.company_id = $1
-               ORDER BY m.created_at ASC, m.id ASC LIMIT 200"#,
+            r#"SELECT member.id, member.company_id, member.user_id,
+                      account.username AS "username?", account.email AS "email?", account.avatar_url,
+                      member.role, member.created_at AS "created_at!"
+               FROM company_members AS member
+               JOIN users AS account ON account.id = member.user_id
+               WHERE member.company_id = $1
+               ORDER BY member.created_at ASC, member.id ASC LIMIT 200"#,
             company_id
         )
         .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        Ok(db_list.into_iter().map(Into::into).collect())
+        db_list.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn update_member_role(
+        &self,
+        company_id: Uuid,
+        user_id: Uuid,
+        role: CompanyAccessRole,
+    ) -> AppResult<Option<CompanyMember>> {
+        let db = sqlx::query_as!(
+            CompanyMemberDb,
+            r#"WITH updated AS (
+                   UPDATE company_members
+                   SET role = $3
+                   WHERE company_id = $1 AND user_id = $2
+                   RETURNING id, company_id, user_id, role, created_at
+               )
+               SELECT updated.id, updated.company_id, updated.user_id,
+                      account.username AS "username?", account.email AS "email?", account.avatar_url,
+                      updated.role, updated.created_at AS "created_at!"
+               FROM updated
+               JOIN users AS account ON account.id = updated.user_id"#,
+            company_id,
+            user_id,
+            role.as_str(),
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        db.map(TryInto::try_into).transpose()
     }
 
     async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()> {
@@ -324,10 +385,11 @@ mod tests {
 
         // 1. Create Invite
         let invite = persistence
-            .create_invite(company.id, &member_email)
+            .create_invite(company.id, &member_email, CompanyAccessRole::Admin)
             .await
             .unwrap();
         assert_eq!(invite.email, member_email);
+        assert_eq!(invite.role, CompanyAccessRole::Admin);
         assert_eq!(invite.status, "pending");
 
         // 2. List Invites by Company
@@ -340,14 +402,15 @@ mod tests {
         // 3. Update Invite Email
         let updated_email = format!("new_{}", member_email);
         let updated = persistence
-            .update_invite_email(invite.id, &updated_email)
+            .update_invite(invite.id, &updated_email, CompanyAccessRole::Member)
             .await
             .unwrap();
         assert_eq!(updated.email, updated_email);
+        assert_eq!(updated.role, CompanyAccessRole::Member);
 
         // Update back
         let _ = persistence
-            .update_invite_email(invite.id, &member_email)
+            .update_invite(invite.id, &member_email, CompanyAccessRole::Admin)
             .await
             .unwrap();
 
@@ -370,6 +433,19 @@ mod tests {
             .unwrap();
         assert_eq!(members.len(), 1);
         assert_eq!(members[0].username, Some(member_username));
+        assert_eq!(members[0].role, CompanyAccessRole::Admin);
+
+        let changed = persistence
+            .update_member_role(company.id, member.id, CompanyAccessRole::Member)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(changed.role, CompanyAccessRole::Member);
+        let members = persistence
+            .list_members_by_company(company.id)
+            .await
+            .unwrap();
+        assert_eq!(members[0].role, CompanyAccessRole::Member);
 
         // 6. Remove team member
         persistence

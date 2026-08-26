@@ -300,6 +300,7 @@ mod tests {
 
         for channel in [channel_for(None), channel_for(Some(&[]))] {
             assert!(channel.viewer_access(&viewer, CompanyMembership::Owner));
+            assert!(channel.viewer_access(&viewer, CompanyMembership::Admin));
             assert!(channel.viewer_access(&viewer, CompanyMembership::Member));
             assert!(!channel.viewer_access(&viewer, CompanyMembership::None));
         }
@@ -318,6 +319,10 @@ mod tests {
         assert!(!channel.viewer_access(
             &EmailAddress::from("sam@acme.test"),
             CompanyMembership::Member
+        ));
+        assert!(!channel.viewer_access(
+            &EmailAddress::from("sam@acme.test"),
+            CompanyMembership::Admin
         ));
         // The owner is the one exception, so a company cannot lock itself out of its own data.
         assert!(channel.viewer_access(
@@ -338,6 +343,7 @@ mod tests {
 
         // `@public` lets anyone write in, so the whole team may read what arrives...
         assert!(channel.viewer_access(&stranger, CompanyMembership::Member));
+        assert!(channel.viewer_access(&stranger, CompanyMembership::Admin));
         assert!(channel.viewer_access(&stranger, CompanyMembership::Owner));
         // ...but it never makes the traffic readable to the public that sent it.
         assert!(!channel.viewer_access(&stranger, CompanyMembership::None));
@@ -382,7 +388,11 @@ mod tests {
     #[test]
     fn an_unrestricted_channel_takes_the_team_s_mail_and_no_one_else_s() {
         for channel in [channel_for(None), channel_for(Some(&[]))] {
-            for membership in [CompanyMembership::Owner, CompanyMembership::Member] {
+            for membership in [
+                CompanyMembership::Owner,
+                CompanyMembership::Admin,
+                CompanyMembership::Member,
+            ] {
                 let access = channel.participant_access("dana@acme.test", membership);
                 assert!(access.authorized);
                 assert!(access.trusted);

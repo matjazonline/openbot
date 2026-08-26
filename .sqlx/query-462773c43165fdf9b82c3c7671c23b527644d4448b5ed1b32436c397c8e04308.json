@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT i.id, i.company_id, c.name as \"company_name?\", i.email, i.status, i.created_at as \"created_at!\"\n               FROM company_invites i\n               JOIN companies c ON c.id = i.company_id\n               WHERE i.email = $1\n               ORDER BY i.created_at DESC, i.id DESC LIMIT 200",
+  "query": "SELECT invite.id, invite.company_id, company.name AS \"company_name?\", invite.email,\n                      invite.role, invite.status, invite.created_at AS \"created_at!\"\n               FROM company_invites AS invite\n               JOIN companies AS company ON company.id = invite.company_id\n               WHERE invite.company_id = $1\n               ORDER BY invite.created_at DESC, invite.id DESC LIMIT 200",
   "describe": {
     "columns": [
       {
@@ -30,23 +30,23 @@
       },
       {
         "ordinal": 4,
-        "name": "status",
+        "name": "role",
         "type_info": "Text"
       },
       {
         "ordinal": 5,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
         "name": "created_at!",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        {
-          "Custom": {
-            "name": "citext",
-            "kind": "Simple"
-          }
-        }
+        "Uuid"
       ]
     },
     "nullable": [
@@ -55,8 +55,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "38614da78f21e45a2c3ab3a36170a6d4d22e1b6124a9ee83f65b61da6c1ae228"
+  "hash": "462773c43165fdf9b82c3c7671c23b527644d4448b5ed1b32436c397c8e04308"
 }

@@ -16,7 +16,7 @@ use crate::{
     infra::config::AppConfig,
     use_cases::{
         channel::ChannelPersistence,
-        company::{CompanyPersistence, owned_company},
+        company::{CompanyPersistence, managed_company},
         thread::ThreadPersistence,
     },
 };
@@ -58,21 +58,21 @@ impl ScheduleUseCases {
         &self.schedule_persistence
     }
 
-    async fn verify_company_owner(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        owned_company(self.company_persistence.as_ref(), user_id, company_id).await?;
+    async fn verify_company_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
+        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         Ok(())
     }
 
-    /// The one place a schedule is resolved for a caller: the user must own the company, and the
-    /// schedule must belong to it. Every read and every write goes through here *before* touching
-    /// the row, so a schedule from another tenant is never loaded, mutated or returned.
-    async fn owned_schedule(
+    /// The one place a schedule is resolved for a caller: the user must own or administer the
+    /// company, and the schedule must belong to it. Every read and every write goes through here
+    /// *before* touching the row, so a schedule from another tenant is never loaded or mutated.
+    async fn managed_schedule(
         &self,
         user_id: Uuid,
         company_id: Uuid,
         id: Uuid,
     ) -> AppResult<ChannelSchedule> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
 
         let schedule = self
             .schedule_persistence
@@ -85,13 +85,13 @@ impl ScheduleUseCases {
     }
 
     /// The same check for a channel, which owns the schedules listed under it.
-    async fn owned_channel_id(
+    async fn managed_channel_id(
         &self,
         user_id: Uuid,
         company_id: Uuid,
         channel_id: Uuid,
     ) -> AppResult<Uuid> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
 
         let channel = self
             .channel_persistence
@@ -155,7 +155,7 @@ impl ScheduleUseCases {
         write: ScheduleWrite,
     ) -> AppResult<ChannelSchedule> {
         let channel_id = self
-            .owned_channel_id(user_id, company_id, channel_id)
+            .managed_channel_id(user_id, company_id, channel_id)
             .await?;
         Self::validate_write(&write)?;
 
@@ -176,7 +176,7 @@ impl ScheduleUseCases {
         company_id: Uuid,
         id: Uuid,
     ) -> AppResult<Option<ChannelSchedule>> {
-        match self.owned_schedule(user_id, company_id, id).await {
+        match self.managed_schedule(user_id, company_id, id).await {
             Ok(schedule) => Ok(Some(schedule)),
             Err(AppError::NotFound(_)) => Ok(None),
             Err(err) => Err(err),
@@ -191,7 +191,7 @@ impl ScheduleUseCases {
         channel_id: Uuid,
     ) -> AppResult<Vec<ChannelSchedule>> {
         let channel_id = self
-            .owned_channel_id(user_id, company_id, channel_id)
+            .managed_channel_id(user_id, company_id, channel_id)
             .await?;
         self.schedule_persistence
             .list_by_channel_id(company_id, channel_id)
@@ -204,7 +204,7 @@ impl ScheduleUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<ChannelSchedule>> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
         self.schedule_persistence
             .list_by_company_id(company_id)
             .await
@@ -219,9 +219,9 @@ impl ScheduleUseCases {
         channel_id: Uuid,
         write: ScheduleWrite,
     ) -> AppResult<ChannelSchedule> {
-        let existing = self.owned_schedule(user_id, company_id, id).await?;
+        let existing = self.managed_schedule(user_id, company_id, id).await?;
         let channel_id = self
-            .owned_channel_id(user_id, company_id, channel_id)
+            .managed_channel_id(user_id, company_id, channel_id)
             .await?;
         Self::validate_write(&write)?;
 
@@ -242,7 +242,7 @@ impl ScheduleUseCases {
         company_id: Uuid,
         id: Uuid,
     ) -> AppResult<()> {
-        self.owned_schedule(user_id, company_id, id).await?;
+        self.managed_schedule(user_id, company_id, id).await?;
 
         info!("Deleting schedule {} for company {}", id, company_id);
         self.schedule_persistence.delete(id).await
@@ -256,7 +256,7 @@ impl ScheduleUseCases {
         id: Uuid,
         enabled: bool,
     ) -> AppResult<bool> {
-        self.owned_schedule(user_id, company_id, id).await?;
+        self.managed_schedule(user_id, company_id, id).await?;
 
         self.schedule_persistence.set_enabled(id, enabled).await
     }
@@ -270,7 +270,7 @@ impl ScheduleUseCases {
         offset: i64,
         limit: i64,
     ) -> AppResult<Vec<crate::entities::schedule::ScheduleRun>> {
-        self.owned_schedule(user_id, company_id, schedule_id)
+        self.managed_schedule(user_id, company_id, schedule_id)
             .await?;
 
         self.schedule_persistence
@@ -285,7 +285,7 @@ impl ScheduleUseCases {
         schedule_id: Uuid,
         thread_id: Uuid,
     ) -> AppResult<()> {
-        self.owned_schedule(user_id, company_id, schedule_id)
+        self.managed_schedule(user_id, company_id, schedule_id)
             .await?;
         if !self
             .schedule_persistence
@@ -305,9 +305,9 @@ impl ScheduleUseCases {
         company_id: Uuid,
         id: Uuid,
     ) -> AppResult<ChannelSchedule> {
-        // Ownership is settled before `record_manual_run` writes: checking the row it returns
+        // Management access is settled before `record_manual_run` writes: checking the row it returns
         // would already have stamped another tenant's schedule on the way to the 404.
-        let schedule = self.owned_schedule(user_id, company_id, id).await?;
+        let schedule = self.managed_schedule(user_id, company_id, id).await?;
 
         info!(
             "Manually triggering schedule '{}' ({})",
@@ -538,7 +538,7 @@ mod tests {
     use super::*;
     use crate::entities::{
         channel::Channel,
-        company::Company,
+        company::{Company, CompanyAccess},
         company_member::CompanyMembership,
         cursor::{MessageCursor, ThreadCursor},
         schedule::ScheduleTimezone,
@@ -799,6 +799,7 @@ mod tests {
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
+        memberships: Mutex<Vec<(Uuid, Uuid, CompanyMembership)>>,
     }
 
     #[async_trait]
@@ -826,6 +827,30 @@ mod tests {
         }
         async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
             unimplemented!()
+        }
+        async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
+            let companies = self.companies.lock().unwrap();
+            let memberships = self.memberships.lock().unwrap();
+            Ok(companies
+                .iter()
+                .filter_map(|company| {
+                    let membership = if company.user_id == user_id {
+                        CompanyMembership::Owner
+                    } else if let Some((_, _, membership)) =
+                        memberships.iter().find(|(member_id, company_id, _)| {
+                            *member_id == user_id && *company_id == company.id
+                        })
+                    {
+                        *membership
+                    } else {
+                        return None;
+                    };
+                    Some(CompanyAccess {
+                        company: company.clone(),
+                        membership,
+                    })
+                })
+                .collect())
         }
         async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
@@ -1099,7 +1124,7 @@ mod tests {
     fn test_config() -> Arc<AppConfig> {
         Arc::new(AppConfig {
             jwt_secret: "secret".into(),
-            access_token_ttl: time::Duration::days(1),
+            sendgrid_inbound: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".into(),
             cors_allowed_origins: vec![],
@@ -1189,6 +1214,7 @@ mod tests {
                     company_of(mine_company, mine_user, "mine"),
                     company_of(theirs_company, theirs_user, "theirs"),
                 ]),
+                memberships: Mutex::new(Vec::new()),
             }),
             Arc::new(MockChannelPersistence {
                 channels: Mutex::new(vec![
@@ -1283,13 +1309,15 @@ mod tests {
 
     #[tokio::test]
     async fn schedule_use_cases_crud_and_manual_trigger_flow_works() {
-        let user_id = Uuid::new_v4();
+        let owner_id = Uuid::new_v4();
+        let admin_id = Uuid::new_v4();
+        let member_id = Uuid::new_v4();
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
 
         let company = Company {
             id: company_id,
-            user_id,
+            user_id: owner_id,
             name: "Acme Corp".into(),
             slug: "acme".into(),
             api_key: None,
@@ -1339,6 +1367,10 @@ mod tests {
         });
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![company.clone()]),
+            memberships: Mutex::new(vec![
+                (admin_id, company_id, CompanyMembership::Admin),
+                (member_id, company_id, CompanyMembership::Member),
+            ]),
         });
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![channel.clone(), target_channel.clone()]),
@@ -1374,8 +1406,16 @@ mod tests {
             enabled: true,
         };
 
+        assert!(
+            use_cases
+                .create_schedule(member_id, company_id, channel_id, write.clone())
+                .await
+                .is_err(),
+            "an ordinary member must not create schedules"
+        );
+
         let created = use_cases
-            .create_schedule(user_id, company_id, channel_id, write)
+            .create_schedule(admin_id, company_id, channel_id, write)
             .await
             .unwrap();
 
@@ -1383,14 +1423,14 @@ mod tests {
 
         // 2. Fetch and list
         let fetched = use_cases
-            .get_schedule(user_id, company_id, created.id)
+            .get_schedule(admin_id, company_id, created.id)
             .await
             .unwrap()
             .unwrap();
         assert_eq!(fetched.id, created.id);
 
         let list = use_cases
-            .list_channel_schedules(user_id, company_id, channel_id)
+            .list_channel_schedules(admin_id, company_id, channel_id)
             .await
             .unwrap();
         assert_eq!(list.len(), 1);
@@ -1398,7 +1438,7 @@ mod tests {
         // Editing can move a schedule to another channel in the same company.
         let moved = use_cases
             .update_schedule(
-                user_id,
+                admin_id,
                 company_id,
                 created.id,
                 target_channel.id,
@@ -1419,9 +1459,23 @@ mod tests {
             .unwrap();
         assert_eq!(moved.channel_id, target_channel.id);
 
-        // 3. Trigger schedule now
+        // 3. Toggle and trigger the schedule now.
+        let toggled = use_cases
+            .toggle_schedule(admin_id, company_id, created.id, false)
+            .await
+            .expect("an admin toggles a schedule");
+        assert!(toggled);
+        assert!(
+            !use_cases
+                .get_schedule(admin_id, company_id, created.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .enabled
+        );
+
         let triggered = use_cases
-            .trigger_schedule_now(user_id, company_id, created.id)
+            .trigger_schedule_now(admin_id, company_id, created.id)
             .await
             .unwrap();
         assert_eq!(triggered.id, created.id);
@@ -1440,5 +1494,13 @@ mod tests {
         assert_eq!(tasks.len(), 1);
         assert_eq!(tasks[0].task_type, "scheduled_agent_run");
         assert_eq!(tasks[0].thread_id, Some(threads[0].id));
+        drop(tasks);
+        drop(messages);
+        drop(threads);
+
+        use_cases
+            .delete_schedule(admin_id, company_id, created.id)
+            .await
+            .expect("an admin deletes a schedule");
     }
 }

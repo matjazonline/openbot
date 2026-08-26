@@ -39,9 +39,8 @@ pub const DASHBOARD_EVENT: &str = "dashboard";
 
 /// Which rollup is on screen.
 ///
-/// An operator sees every company at once, and there is no company to switch between in that case —
-/// which is why this is an enum rather than an `Option<&Company>` that each panel would have to
-/// re-interpret.
+/// An operator can switch between one company and every company. The active rollup remains an enum
+/// rather than an `Option<&Company>` so each panel does not have to re-interpret `None`.
 #[derive(Debug, Clone, Copy)]
 pub enum DashboardScopeView<'a> {
     Company(&'a Company),
@@ -77,6 +76,9 @@ impl<'a> DashboardScopeView<'a> {
 pub struct DashboardShell<'a> {
     pub user: &'a MailboxUser<'a>,
     pub scope: DashboardScopeView<'a>,
+    /// The company workspace around the dashboard. In the system scope it is retained solely for
+    /// the switch-back link and shared navigation; it never becomes a persistence filter.
+    pub selected_company: Option<&'a Company>,
     /// The caller's own companies, used to resolve company-scoped navigation.
     pub companies: &'a [Company],
     /// The range the panels will be read over. The shell needs it before any query has run, because
@@ -114,33 +116,26 @@ impl DashboardPage<'_> {
 
 pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
     let header = sidebar_header("Dashboard", "System metrics, queue health and activity.");
-    let range = range_picker(shell.scope.company_id(), shell.window);
-    let sidebar = match shell.scope {
-        DashboardScopeView::Company(_) => format!(
-            r##"<aside class="flex w-72 shrink-0 flex-col border-r border-base-300 bg-base-200">
-                {header}
-                {range}
-                {legend}
-            </aside>"##,
-            header = header,
-            legend = scope_legend("This company"),
-        ),
-        DashboardScopeView::Global => format!(
-            r##"<aside class="flex w-72 shrink-0 flex-col border-r border-base-300 bg-base-200">
-                {header}
-                <div class="p-3">
-                    <div class="alert alert-info py-2">
-                        <span class="text-sm font-semibold">Operator view</span>
-                    </div>
-                    <a href="/ui/agent-library" class="btn btn-primary btn-sm mt-3 w-full">Manage agent library</a>
+    let target = dashboard_target(shell.scope, shell.selected_company);
+    let range = range_picker(target, shell.window);
+    let operator_actions = matches!(shell.scope, DashboardScopeView::Global).then(|| {
+        r##"<div class="p-3">
+                <div class="alert alert-info py-2">
+                    <span class="text-sm font-semibold">Operator view</span>
                 </div>
-                {range}
-                {legend}
-            </aside>"##,
-            header = header,
-            legend = scope_legend("All companies"),
-        ),
-    };
+                <a href="/ui/agent-library" class="btn btn-primary btn-sm mt-3 w-full">Manage agent library</a>
+            </div>"##
+    });
+    let sidebar = format!(
+        r##"<aside class="flex w-72 shrink-0 flex-col border-r border-base-300 bg-base-200">
+            {header}
+            {operator_actions}
+            {range}
+            {scope}
+        </aside>"##,
+        operator_actions = operator_actions.unwrap_or_default(),
+        scope = scope_picker(shell),
+    );
 
     // `hx-ext="sse"` sits on the wrapper, not on the swapped element: a swap that replaced the
     // element carrying the connection would tear the stream down on its first tick.
@@ -158,7 +153,7 @@ pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
                 hx-get="/ui/dashboard/panels{query}" hx-trigger="load">{placeholder}</div>
         </section>
         "##,
-        query = dashboard_query(shell.scope.company_id(), shell.window),
+        query = dashboard_query(target, shell.window),
         panels_id = DASHBOARD_PANELS_ID,
         event = DASHBOARD_EVENT,
         placeholder = panels_placeholder(),
@@ -167,7 +162,7 @@ pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
     ui_shell(&UiShell {
         title: &shell.scope.title(),
         user: shell.user,
-        company: shell.scope.company(),
+        company: shell.selected_company,
         section: UiSection::Dashboard,
         content: &content,
         script: "",
@@ -887,15 +882,42 @@ pub(super) fn process_panel(process: &ProcessGauges) -> String {
     )
 }
 
-/// The query string that carries a dashboard's identity: which companies, and over what range.
+/// The rollup a dashboard URL requests. A system target may retain a company id as navigation
+/// context, but the route authorizes `scope=system` before treating that id as anything but a way
+/// back to the company view.
+#[derive(Debug, Clone, Copy)]
+enum DashboardTarget {
+    Company(Uuid),
+    System(Option<Uuid>),
+}
+
+fn dashboard_target(
+    scope: DashboardScopeView<'_>,
+    selected_company: Option<&Company>,
+) -> DashboardTarget {
+    match scope {
+        DashboardScopeView::Company(company) => DashboardTarget::Company(company.id),
+        DashboardScopeView::Global => {
+            DashboardTarget::System(selected_company.map(|company| company.id))
+        }
+    }
+}
+
+/// The query string that carries a dashboard's identity: active scope, company context, and range.
 ///
 /// One function because it is appended to three URLs that must agree — the page's own links, the
 /// panel fetch, and the SSE subscription. A range that reached the fetch but not the stream would
 /// show the right chart for five seconds and then the wrong one for as long as the tab stayed open.
-fn dashboard_query(company_id: Option<Uuid>, window: DashboardWindow) -> String {
-    match company_id {
-        Some(company_id) => format!("?company_id={company_id}&window={}", window.slug()),
-        None => format!("?window={}", window.slug()),
+fn dashboard_query(target: DashboardTarget, window: DashboardWindow) -> String {
+    match target {
+        DashboardTarget::Company(company_id) => {
+            format!("?company_id={company_id}&amp;window={}", window.slug())
+        }
+        DashboardTarget::System(Some(company_id)) => format!(
+            "?scope=system&amp;company_id={company_id}&amp;window={}",
+            window.slug()
+        ),
+        DashboardTarget::System(None) => format!("?scope=system&amp;window={}", window.slug()),
     }
 }
 
@@ -906,7 +928,7 @@ fn dashboard_query(company_id: Option<Uuid>, window: DashboardWindow) -> String 
 /// re-created under the reader's pointer several times a minute. Navigating is also what
 /// re-establishes the SSE subscription against the new range — a control that only re-fetched the
 /// panels would leave the stream ticking on the old one and overwrite itself.
-fn range_picker(company_id: Option<Uuid>, window: DashboardWindow) -> String {
+fn range_picker(target: DashboardTarget, window: DashboardWindow) -> String {
     let options: String = DashboardWindow::PRESETS
         .into_iter()
         .map(|preset| {
@@ -915,7 +937,7 @@ fn range_picker(company_id: Option<Uuid>, window: DashboardWindow) -> String {
             format!(
                 r##"<a class="btn btn-xs join-item{active}" href="/ui/dashboard{query}"{current}>{label}</a>"##,
                 active = if selected { " btn-active" } else { "" },
-                query = dashboard_query(company_id, preset),
+                query = dashboard_query(target, preset),
                 current = if selected { r#" aria-current="page""# } else { "" },
                 label = preset.slug(),
             )
@@ -927,6 +949,45 @@ fn range_picker(company_id: Option<Uuid>, window: DashboardWindow) -> String {
             <div class="mb-1 text-xs font-semibold uppercase tracking-wide opacity-60">Range</div>
             <div class="join">{options}</div>
         </div>"##
+    )
+}
+
+fn scope_picker(shell: &DashboardShell<'_>) -> String {
+    if !shell.user.is_operator {
+        return scope_legend("This company");
+    }
+
+    let company_link = shell.selected_company.map(|company| {
+        let active = matches!(shell.scope, DashboardScopeView::Company(_));
+        format!(
+            r##"<a class="btn btn-sm join-item justify-start{active}" href="/ui/dashboard{query}"{current}>{name}</a>"##,
+            active = if active { " btn-active" } else { "" },
+            query = dashboard_query(DashboardTarget::Company(company.id), shell.window),
+            current = if active { r##" aria-current="page""## } else { "" },
+            name = escape_html_text(&company.name),
+        )
+    });
+    let system_active = matches!(shell.scope, DashboardScopeView::Global);
+    let system_link = format!(
+        r##"<a class="btn btn-sm join-item justify-start{active}" href="/ui/dashboard{query}"{current}>Whole system</a>"##,
+        active = if system_active { " btn-active" } else { "" },
+        query = dashboard_query(
+            DashboardTarget::System(shell.selected_company.map(|company| company.id)),
+            shell.window,
+        ),
+        current = if system_active {
+            r##" aria-current="page""##
+        } else {
+            ""
+        },
+    );
+
+    format!(
+        r##"<div class="px-4 pb-4">
+            <div class="mb-1 text-xs font-semibold uppercase tracking-wide opacity-60">Scope</div>
+            <div class="join join-vertical w-full">{company_link}{system_link}</div>
+        </div>"##,
+        company_link = company_link.unwrap_or_default(),
     )
 }
 
@@ -1180,6 +1241,7 @@ mod tests {
         let html = dashboard_page(&DashboardShell {
             user: &user,
             scope: DashboardScopeView::Company(&companies[0]),
+            selected_company: Some(&companies[0]),
             companies: &companies,
             window: DashboardWindow::last_hour(),
         });
@@ -1197,34 +1259,61 @@ mod tests {
             "the page must listen for the name the stream actually sends"
         );
         assert!(html.contains(&format!(r#"id="{DASHBOARD_PANELS_ID}""#)));
+        assert!(
+            !html.contains("Whole system"),
+            "a non-operator must not be offered the global rollup"
+        );
     }
 
-    /// The operator view has no company to scope to, and must not invent one.
+    /// A system reading stays unscoped while retaining the selected company only as navigation
+    /// context, so either side of the scope control can reconstruct the other.
     #[test]
-    fn the_global_view_streams_unscoped_and_offers_no_switcher() {
+    fn the_global_view_streams_unscoped_and_can_switch_back_to_the_company() {
+        let companies = [company()];
         let email = crate::entities::value_objects::EmailAddress::from("ops@example.test");
         let user = MailboxUser {
             id: Uuid::new_v4(),
             username: "ops",
             email: &email,
             avatar_url: None,
-            is_operator: false,
+            is_operator: true,
         };
+        let company_html = dashboard_page(&DashboardShell {
+            user: &user,
+            scope: DashboardScopeView::Company(&companies[0]),
+            selected_company: Some(&companies[0]),
+            companies: &companies,
+            window: DashboardWindow::last_hour(),
+        });
+        assert!(
+            company_html.contains(
+                r#"href="/ui/dashboard?scope=system&amp;company_id=00000000-0000-0000-0000-000000000000&amp;window=1h""#
+            ),
+            "the company dashboard offers the whole-system scope: {company_html}"
+        );
+
         let html = dashboard_page(&DashboardShell {
             user: &user,
             scope: DashboardScopeView::Global,
-            companies: &[],
+            selected_company: Some(&companies[0]),
+            companies: &companies,
             window: DashboardWindow::last_hour(),
         });
 
         assert!(
-            html.contains(r#"sse-connect="/ui/dashboard/events?window=1h""#),
-            "a global stream carries the range but no company_id"
+            html.contains(
+                r#"sse-connect="/ui/dashboard/events?scope=system&amp;company_id=00000000-0000-0000-0000-000000000000&amp;window=1h""#
+            ),
+            "the system scope is explicit while the company id remains navigation context"
         );
         assert!(
-            !html.contains("company_id="),
-            "no company scoping anywhere on the page"
+            html.contains(
+                r#"href="/ui/dashboard?company_id=00000000-0000-0000-0000-000000000000&amp;window=1h""#
+            ),
+            "the selected company is one click away"
         );
+        assert!(html.contains("Whole system"));
+        assert!(html.contains("Acme"));
         assert!(html.contains("Operator view"));
     }
 

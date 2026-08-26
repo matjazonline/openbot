@@ -9,10 +9,7 @@ use axum::{
     routing::post,
 };
 use base64::Engine;
-use p256::{
-    ecdsa::{Signature, VerifyingKey, signature::Verifier},
-    pkcs8::DecodePublicKey,
-};
+use p256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
 use serde::{Deserialize, Serialize};
 use tracing::{instrument, warn};
 
@@ -55,14 +52,14 @@ async fn sendgrid_inbound_webhook(
     req: axum::extract::Request,
 ) -> Result<impl IntoResponse, StatusCode> {
     let config = thread_use_cases.config();
-    if !config.sendgrid_inbound_enabled() {
+    let Some(sendgrid_config) = config.sendgrid_inbound.as_ref() else {
         return Err(StatusCode::NOT_FOUND);
-    }
+    };
     let (parts, body) = req.into_parts();
     let body = to_bytes(body, 21 * 1024 * 1024)
         .await
         .map_err(|_| StatusCode::PAYLOAD_TOO_LARGE)?;
-    verify_sendgrid_signature(&headers, &body, config).map_err(|status| status)?;
+    verify_sendgrid_signature(&headers, &body, sendgrid_config).map_err(|status| status)?;
     let req = axum::extract::Request::from_parts(parts, axum::body::Body::from(body));
 
     let content_type = headers
@@ -242,11 +239,8 @@ fn extract_from_payload(payload: SendGridPayload, raw: &mut RawInboundPayload) {
 fn verify_sendgrid_signature(
     headers: &HeaderMap,
     body: &[u8],
-    config: &crate::infra::config::AppConfig,
+    config: &crate::infra::config::SendGridInboundConfig,
 ) -> Result<(), StatusCode> {
-    let public_key = config
-        .sendgrid_webhook_public_key()
-        .ok_or(StatusCode::UNAUTHORIZED)?;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|_| StatusCode::UNAUTHORIZED)?
@@ -254,8 +248,8 @@ fn verify_sendgrid_signature(
     verify_sendgrid_signature_at(
         headers,
         body,
-        &public_key,
-        config.sendgrid_webhook_max_age_secs(),
+        &config.verifying_key,
+        config.webhook_max_age_secs,
         now,
     )
 }
@@ -263,7 +257,7 @@ fn verify_sendgrid_signature(
 fn verify_sendgrid_signature_at(
     headers: &HeaderMap,
     body: &[u8],
-    public_key: &str,
+    verifying_key: &VerifyingKey,
     max_age_secs: u64,
     now: u64,
 ) -> Result<(), StatusCode> {
@@ -285,11 +279,10 @@ fn verify_sendgrid_signature_at(
     let signature = Signature::from_der(&signature)
         .or_else(|_| Signature::from_slice(&signature))
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let key = VerifyingKey::from_public_key_pem(public_key)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let mut signed = timestamp.as_bytes().to_vec();
     signed.extend_from_slice(body);
-    key.verify(&signed, &signature)
+    verifying_key
+        .verify(&signed, &signature)
         .map_err(|_| StatusCode::UNAUTHORIZED)
 }
 
@@ -301,10 +294,7 @@ mod tests {
     use axum::body::Body;
     use axum::http::Request;
     use chrono::Utc;
-    use p256::{
-        ecdsa::{SigningKey, signature::Signer},
-        pkcs8::EncodePublicKey,
-    };
+    use p256::ecdsa::{SigningKey, signature::Signer};
     use std::sync::Mutex;
     use tower::ServiceExt;
     use uuid::Uuid;
@@ -312,10 +302,7 @@ mod tests {
     #[test]
     fn signature_covers_timestamp_and_untouched_body_and_expires() {
         let signing_key = SigningKey::from_bytes((&[7_u8; 32]).into()).unwrap();
-        let public_key = signing_key
-            .verifying_key()
-            .to_public_key_pem(Default::default())
-            .unwrap();
+        let verifying_key = signing_key.verifying_key();
         let body = b"multipart bytes must stay exactly like this\r\n";
         let timestamp = "1000";
         let mut signed = timestamp.as_bytes().to_vec();
@@ -334,13 +321,13 @@ mod tests {
                 .unwrap(),
         );
 
-        assert!(verify_sendgrid_signature_at(&headers, body, &public_key, 300, 1100).is_ok());
+        assert!(verify_sendgrid_signature_at(&headers, body, verifying_key, 300, 1100).is_ok());
         assert_eq!(
-            verify_sendgrid_signature_at(&headers, b"changed", &public_key, 300, 1100),
+            verify_sendgrid_signature_at(&headers, b"changed", verifying_key, 300, 1100),
             Err(StatusCode::UNAUTHORIZED)
         );
         assert_eq!(
-            verify_sendgrid_signature_at(&headers, body, &public_key, 300, 1301),
+            verify_sendgrid_signature_at(&headers, body, verifying_key, 300, 1301),
             Err(StatusCode::UNAUTHORIZED)
         );
     }
@@ -934,6 +921,7 @@ mod tests {
             &self,
             _company_id: Uuid,
             _email: &str,
+            _role: crate::entities::company_member::CompanyAccessRole,
         ) -> AppResult<crate::entities::company_invite::CompanyInvite> {
             unimplemented!()
         }
@@ -949,10 +937,11 @@ mod tests {
         ) -> AppResult<Vec<crate::entities::company_invite::CompanyInvite>> {
             unimplemented!()
         }
-        async fn update_invite_email(
+        async fn update_invite(
             &self,
             _id: Uuid,
             _new_email: &str,
+            _role: crate::entities::company_member::CompanyAccessRole,
         ) -> AppResult<crate::entities::company_invite::CompanyInvite> {
             unimplemented!()
         }
@@ -984,6 +973,14 @@ mod tests {
             &self,
             _company_id: Uuid,
         ) -> AppResult<Vec<crate::entities::company_member::CompanyMember>> {
+            unimplemented!()
+        }
+        async fn update_member_role(
+            &self,
+            _company_id: Uuid,
+            _user_id: Uuid,
+            _role: crate::entities::company_member::CompanyAccessRole,
+        ) -> AppResult<Option<crate::entities::company_member::CompanyMember>> {
             unimplemented!()
         }
         async fn remove_member(&self, _company_id: Uuid, _user_id: Uuid) -> AppResult<()> {
@@ -1210,7 +1207,7 @@ mod tests {
 
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
-            access_token_ttl: time::Duration::days(1),
+            sendgrid_inbound: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],

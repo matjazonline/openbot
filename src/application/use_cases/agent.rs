@@ -12,12 +12,12 @@ use crate::{
     },
     use_cases::{
         channel::{SlugKind, validate_slug},
-        company::{CompanyPersistence, owned_company},
+        company::{CompanyPersistence, managed_company},
     },
 };
 
 /// An agent belonging to another company is reported exactly like a missing one, so an id probe
-/// cannot tell a foreign agent from a nonexistent one. See [`owned_company`].
+/// cannot tell a foreign agent from a nonexistent one. See [`managed_company`].
 pub fn agent_not_found() -> AppError {
     AppError::NotFound("Agent not found in this company.".into())
 }
@@ -127,8 +127,8 @@ impl AgentUseCases {
         }
     }
 
-    async fn verify_company_owner(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        owned_company(self.company_persistence.as_ref(), user_id, company_id).await?;
+    async fn verify_company_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
+        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         Ok(())
     }
 
@@ -139,7 +139,7 @@ impl AgentUseCases {
         company_id: Uuid,
         mut write: AgentWrite,
     ) -> AppResult<Agent> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
         write.created_by = Some(CreationProvenance::user(user_id));
         write.normalize()?;
 
@@ -157,17 +157,17 @@ impl AgentUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<Agent>> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
         self.agent_persistence.list_by_company_id(company_id).await
     }
 
-    /// Definitions a company owner may assign to a channel, grouped by ownership.
+    /// Definitions a company owner or admin may assign to a channel, grouped by ownership.
     pub async fn list_selectable_agents(
         &self,
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<SelectableAgents> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
         Ok(SelectableAgents {
             company_agents: self
                 .agent_persistence
@@ -234,7 +234,7 @@ impl AgentUseCases {
         company_id: Uuid,
         agent_id: Uuid,
     ) -> AppResult<Option<Agent>> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
         let agent = self.agent_persistence.get_by_id(agent_id).await?;
         if let Some(ref ag) = agent {
             if ag.company_id != Some(company_id) {
@@ -247,7 +247,7 @@ impl AgentUseCases {
     /// One agent, if this viewer is on the company's team.
     ///
     /// The read counterpart of [`AgentUseCases::get_company_agent`]: that one is for the pages
-    /// that *configure* agents and stays owner-only, this one is what a rendered thread names as
+    /// that *configure* agents and stays owner-or-admin, this one is what a rendered thread names as
     /// its responder, and an invited member reads that just as the owner does. Which channels the
     /// member may read at all is `Channel::viewer_access`'s question, asked before this one.
     #[instrument(skip(self))]
@@ -281,7 +281,7 @@ impl AgentUseCases {
         agent_id: Uuid,
         mut write: AgentWrite,
     ) -> AppResult<Agent> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
 
         let agent = self
             .agent_persistence
@@ -310,7 +310,7 @@ impl AgentUseCases {
         company_id: Uuid,
         agent_id: Uuid,
     ) -> AppResult<()> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
 
         let agent = self
             .agent_persistence
@@ -338,7 +338,7 @@ impl AgentUseCases {
         model_override: Option<&str>,
         api_key_override: Option<&str>,
     ) -> AppResult<String> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
 
         let company = self
             .company_persistence
@@ -401,8 +401,8 @@ Guidelines:
 - Keep the prompt structured, concise, and unambiguous.
 - Output ONLY the system prompt text itself. Do NOT include any intro/outro explanations, conversational filler, or markdown code blocks (```).";
 
-/// The model that writes system prompts, resolved from the form, then the company, then whatever
-/// the environment has credentials for.
+/// The model that writes system prompts, resolved from explicit operator input or company-owned
+/// settings. Deployment credentials are never shared with a company.
 struct PromptGeneratorLlm {
     provider: String,
     model: String,
@@ -417,13 +417,15 @@ impl PromptGeneratorLlm {
     ) -> AppResult<Self> {
         let provider = non_empty(provider_override)
             .map(str::to_lowercase)
-            .unwrap_or_else(provider_from_environment);
+            .ok_or_else(|| {
+                AppError::BadRequest(
+                    "A provider is required to generate a global library prompt.".into(),
+                )
+            })?;
         let model = non_empty(model_override)
             .unwrap_or_else(|| default_model_for(&provider))
             .to_string();
-        let environment_key = environment_api_key(&provider);
         let api_key = non_empty(api_key_override)
-            .or_else(|| non_empty(environment_key.as_deref()))
             .ok_or_else(|| {
                 AppError::BadRequest(format!(
                     "An API key is required to generate a prompt with provider '{provider}'."
@@ -446,17 +448,20 @@ impl PromptGeneratorLlm {
         let provider = non_empty(provider_override)
             .or_else(|| non_empty(company.provider.as_deref()))
             .map(|provider| provider.to_lowercase())
-            .unwrap_or_else(provider_from_environment);
+            .ok_or_else(|| {
+                AppError::Internal(
+                    "LLM provider is missing. Please configure one in company settings or in the form."
+                        .into(),
+                )
+            })?;
 
         let model = non_empty(model_override)
             .or_else(|| non_empty(company.model.as_deref()))
             .unwrap_or_else(|| default_model_for(&provider))
             .to_string();
 
-        let env_key = environment_api_key(&provider);
         let api_key = non_empty(api_key_override)
             .or_else(|| non_empty(company.api_key.as_deref()))
-            .or_else(|| non_empty(env_key.as_deref()))
             .ok_or_else(|| AppError::Internal(format!(
                 "API key is missing for provider '{}'. Please configure an API key in company settings or in the form.",
                 provider
@@ -488,24 +493,21 @@ impl PromptGeneratorLlm {
             indented_system_prompt, self.provider, self.model, self.api_key
         );
 
-        let mut builder = ai_agents::AgentBuilder::from_yaml(&config_yaml).map_err(|e| {
+        let builder = ai_agents::AgentBuilder::from_yaml(&config_yaml).map_err(|e| {
             AppError::Internal(format!("Failed to parse agent builder config: {e}"))
         })?;
 
-        if let Ok(provider_type) = std::str::FromStr::from_str(&self.provider) {
-            let provider = ai_agents::UnifiedLLMProvider::new(
-                provider_type,
-                self.model.clone(),
-                Some(self.api_key.clone()),
-                None,
-            )
-            .map_err(|e| AppError::Internal(format!("Failed to initialize LLM provider: {e}")))?;
-            builder = builder.llm(Arc::new(provider));
-        } else {
-            builder = builder
-                .auto_configure_llms()
-                .map_err(|e| AppError::Internal(format!("Failed to configure LLMs: {e}")))?;
-        }
+        let provider_type = std::str::FromStr::from_str(&self.provider).map_err(|_| {
+            AppError::BadRequest(format!("Unsupported LLM provider '{}'.", self.provider))
+        })?;
+        let provider = ai_agents::UnifiedLLMProvider::new(
+            provider_type,
+            self.model.clone(),
+            Some(self.api_key.clone()),
+            None,
+        )
+        .map_err(|e| AppError::Internal(format!("Failed to initialize LLM provider: {e}")))?;
+        let builder = builder.llm(Arc::new(provider));
 
         builder
             .build()
@@ -517,48 +519,14 @@ fn non_empty(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
 }
 
-fn env_var_non_empty(name: &str) -> Option<String> {
-    std::env::var(name)
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-}
-
-/// With nothing configured, pick the provider whose key is actually present.
-fn provider_from_environment() -> String {
-    for (env_var, provider) in [
-        ("OPENAI_API_KEY", "openai"),
-        ("ANTHROPIC_API_KEY", "anthropic"),
-        ("GROQ_API_KEY", "groq"),
-    ] {
-        if env_var_non_empty(env_var).is_some() {
-            return provider.to_string();
-        }
-    }
-    "google".to_string()
-}
-
 fn default_model_for(provider: &str) -> &'static str {
     match provider {
         "openai" => "gpt-4o",
         "anthropic" => "claude-3-5-sonnet-20241022",
         "groq" => "llama-3.3-70b-versatile",
-        // Google is also the fallback for unrecognized providers.
+        // Providers without a tailored default use the Google model default; unsupported
+        // providers are rejected when the prompt generator is built.
         _ => "gemini-2.5-flash",
-    }
-}
-
-fn environment_api_key(provider: &str) -> Option<String> {
-    match provider {
-        "google" | "gemini" => std::env::var("GEMINI_API_KEY")
-            .ok()
-            .or_else(|| std::env::var("GOOGLE_API_KEY").ok()),
-        "openai" => std::env::var("OPENAI_API_KEY").ok(),
-        "anthropic" => std::env::var("ANTHROPIC_API_KEY").ok(),
-        "groq" => std::env::var("GROQ_API_KEY").ok(),
-        "mistral" => std::env::var("MISTRAL_API_KEY").ok(),
-        _ => std::env::var("LLM_API_KEY")
-            .ok()
-            .or_else(|| std::env::var("API_KEY").ok()),
     }
 }
 
@@ -577,8 +545,8 @@ mod tests {
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
-        /// Accounts that hold an accepted invite to a company, as `(user_id, company_id)`.
-        members: Mutex<Vec<(Uuid, Uuid)>>,
+        /// Accepted memberships, as `(user_id, company_id, access)`.
+        members: Mutex<Vec<(Uuid, Uuid, CompanyMembership)>>,
     }
 
     #[async_trait]
@@ -626,11 +594,12 @@ mod tests {
                 .filter_map(|company| {
                     let membership = if company.user_id == user_id {
                         CompanyMembership::Owner
-                    } else if members
-                        .iter()
-                        .any(|(u, c)| *u == user_id && *c == company.id)
+                    } else if let Some((_, _, membership)) =
+                        members.iter().find(|(member_id, company_id, _)| {
+                            *member_id == user_id && *company_id == company.id
+                        })
                     {
-                        CompanyMembership::Member
+                        *membership
                     } else {
                         return None;
                     };
@@ -911,11 +880,48 @@ Guidelines:
         assert!(ai_agents::AgentBuilder::from_yaml(&config_yaml).is_ok());
     }
 
-    /// The read-scoped lookup exists so an invited member sees the agent answering the threads
-    /// they may read; it must still stop at the company's edge and stay read-only.
+    #[test]
+    fn prompt_generation_requires_explicitly_owned_credentials() {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".into(),
+            api_key: None,
+            provider: Some("openai".to_string()),
+            model: None,
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: Utc::now(),
+        };
+
+        let company_error = PromptGeneratorLlm::resolve(&company, None, None, None)
+            .err()
+            .expect("a company without its own key must be rejected");
+        assert!(company_error.to_string().contains("API key is missing"));
+
+        let global_provider_error = PromptGeneratorLlm::resolve_global(None, None, Some("key"))
+            .err()
+            .expect("a global prompt must name its provider");
+        assert!(
+            global_provider_error
+                .to_string()
+                .contains("provider is required")
+        );
+
+        let global_key_error = PromptGeneratorLlm::resolve_global(Some("openai"), None, None)
+            .err()
+            .expect("a global prompt must supply its own key");
+        assert!(global_key_error.to_string().contains("API key is required"));
+    }
+
+    /// Members may read agents used by their inbox, while only owners and admins may configure
+    /// them. Both paths must still stop at the company's edge.
     #[tokio::test]
-    async fn a_member_reads_the_agent_a_stranger_cannot() {
+    async fn members_read_agents_and_admins_manage_them() {
         let owner_id = Uuid::new_v4();
+        let admin_id = Uuid::new_v4();
         let member_id = Uuid::new_v4();
         let stranger_id = Uuid::new_v4();
         let company_id = Uuid::new_v4();
@@ -940,7 +946,10 @@ Guidelines:
                 company(company_id, owner_id, "acme"),
                 company(other_company_id, Uuid::new_v4(), "other"),
             ]),
-            members: Mutex::new(vec![(member_id, company_id)]),
+            members: Mutex::new(vec![
+                (admin_id, company_id, CompanyMembership::Admin),
+                (member_id, company_id, CompanyMembership::Member),
+            ]),
         });
         let agent_persistence = Arc::new(MockAgentPersistence {
             agents: Mutex::new(Vec::new()),
@@ -1013,12 +1022,52 @@ Guidelines:
                 .is_none()
         );
 
-        // Reading is all it grants: configuring the agent is still the owner's alone.
+        // Reading is all an ordinary membership grants.
         assert!(
             use_cases
                 .list_company_agents(member_id, company_id)
                 .await
                 .is_err()
         );
+
+        // An admin can list, create, update and delete company agents.
+        assert_eq!(
+            use_cases
+                .list_company_agents(admin_id, company_id)
+                .await
+                .expect("an admin lists agents")
+                .len(),
+            1
+        );
+        let managed = use_cases
+            .create_agent(
+                admin_id,
+                company_id,
+                AgentWrite {
+                    name: "Admin Bot".into(),
+                    slug: "admin-bot".into(),
+                    ..AgentWrite::default()
+                },
+            )
+            .await
+            .expect("an admin creates an agent");
+        let managed = use_cases
+            .update_agent(
+                admin_id,
+                company_id,
+                managed.id,
+                AgentWrite {
+                    name: "Managed Bot".into(),
+                    slug: "managed-bot".into(),
+                    ..AgentWrite::default()
+                },
+            )
+            .await
+            .expect("an admin updates an agent");
+        assert_eq!(managed.name, "Managed Bot");
+        use_cases
+            .delete_agent(admin_id, company_id, managed.id)
+            .await
+            .expect("an admin deletes an agent");
     }
 }

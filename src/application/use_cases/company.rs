@@ -150,6 +150,37 @@ pub async fn owned_company(
     }
 }
 
+/// Resolve a company whose channels, agents and schedules the caller may configure.
+///
+/// Ownership still outranks the stored membership row. Otherwise the caller must be an accepted
+/// company admin; an ordinary member and a stranger receive the same not-found response so this
+/// guard does not become a tenant-id probe.
+pub async fn managed_company(
+    persistence: &dyn CompanyPersistence,
+    user_id: Uuid,
+    company_id: Uuid,
+) -> AppResult<Company> {
+    let company = persistence
+        .get_by_id(company_id)
+        .await?
+        .ok_or_else(company_not_found)?;
+
+    if company.user_id == user_id {
+        return Ok(company);
+    }
+
+    let may_manage = persistence
+        .company_access(user_id, company_id)
+        .await?
+        .is_some_and(|access| access.membership.manages_automation());
+    if may_manage {
+        return Ok(company);
+    }
+
+    warn!("User {user_id} may not manage automation for company {company_id}");
+    Err(company_not_found())
+}
+
 pub fn company_not_found() -> AppError {
     AppError::NotFound("Company not found, or you are not its owner.".into())
 }
@@ -171,6 +202,11 @@ impl CompanyUseCases {
     /// is reported exactly like one that does not exist.
     pub async fn owned_company(&self, user_id: Uuid, company_id: Uuid) -> AppResult<Company> {
         owned_company(self.persistence.as_ref(), user_id, company_id).await
+    }
+
+    /// The company, only when the caller owns it or is one of its admins.
+    pub async fn managed_company(&self, user_id: Uuid, company_id: Uuid) -> AppResult<Company> {
+        managed_company(self.persistence.as_ref(), user_id, company_id).await
     }
 
     #[instrument(skip(self))]
@@ -195,12 +231,24 @@ impl CompanyUseCases {
 
     /// The companies a user may read, each with what they are to it.
     ///
-    /// What the mailbox scopes by, where an invited member belongs; the administration pages keep
-    /// using [`CompanyUseCases::list_user_companies`], so being invited to a company does not
-    /// become permission to reconfigure it.
+    /// What the mailbox scopes by, where an invited member belongs. Administration pages apply a
+    /// narrower owner-or-admin filter with [`CompanyUseCases::list_managed_companies`].
     #[instrument(skip(self))]
     pub async fn list_accessible_companies(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
         self.persistence.list_accessible_by_user_id(user_id).await
+    }
+
+    /// Companies whose channels, agents and schedules the caller may configure.
+    #[instrument(skip(self))]
+    pub async fn list_managed_companies(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
+        Ok(self
+            .persistence
+            .list_accessible_by_user_id(user_id)
+            .await?
+            .into_iter()
+            .filter(|access| access.membership.manages_automation())
+            .map(|access| access.company)
+            .collect())
     }
 
     /// What a user is to one company: its owner, an invited member, or nothing.
@@ -262,6 +310,7 @@ mod tests {
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
+        memberships: Mutex<Vec<(Uuid, Uuid, CompanyMembership)>>,
     }
 
     #[async_trait]
@@ -315,6 +364,31 @@ mod tests {
                 .collect())
         }
 
+        async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
+            let companies = self.companies.lock().unwrap();
+            let memberships = self.memberships.lock().unwrap();
+            Ok(companies
+                .iter()
+                .filter_map(|company| {
+                    let membership = if company.user_id == user_id {
+                        CompanyMembership::Owner
+                    } else if let Some((_, _, membership)) =
+                        memberships.iter().find(|(member_id, company_id, _)| {
+                            *member_id == user_id && *company_id == company.id
+                        })
+                    {
+                        *membership
+                    } else {
+                        return None;
+                    };
+                    Some(CompanyAccess {
+                        company: company.clone(),
+                        membership,
+                    })
+                })
+                .collect())
+        }
+
         async fn update(&self, id: Uuid, write: CompanyWrite) -> AppResult<Company> {
             let mut list = self.companies.lock().unwrap();
             let company = list
@@ -354,6 +428,7 @@ mod tests {
     async fn company_crud_flow_works() {
         let persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(Vec::new()),
+            memberships: Mutex::new(Vec::new()),
         });
         let use_cases = CompanyUseCases::new(persistence);
         let user_id = Uuid::new_v4();
@@ -435,6 +510,7 @@ mod tests {
         };
         let persistence = MockCompanyPersistence {
             companies: Mutex::new(vec![company.clone()]),
+            memberships: Mutex::new(Vec::new()),
         };
 
         owned_company(&persistence, owner, company.id)
@@ -454,5 +530,63 @@ mod tests {
             missing.to_string(),
             "a differing message would let an id probe enumerate other tenants"
         );
+    }
+
+    #[tokio::test]
+    async fn only_owners_and_admins_receive_company_management_access() {
+        let owner = Uuid::new_v4();
+        let admin = Uuid::new_v4();
+        let member = Uuid::new_v4();
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: owner,
+            name: "Acme".into(),
+            slug: "acme".into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: Utc::now(),
+        };
+        let persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![company.clone()]),
+            memberships: Mutex::new(vec![
+                (admin, company.id, CompanyMembership::Admin),
+                (member, company.id, CompanyMembership::Member),
+            ]),
+        });
+        let use_cases = CompanyUseCases::new(persistence);
+
+        assert_eq!(
+            use_cases
+                .list_managed_companies(owner)
+                .await
+                .expect("owner management list"),
+            vec![company.clone()]
+        );
+        assert_eq!(
+            use_cases
+                .list_managed_companies(admin)
+                .await
+                .expect("admin management list"),
+            vec![company.clone()]
+        );
+        assert!(
+            use_cases
+                .list_managed_companies(member)
+                .await
+                .expect("member management list")
+                .is_empty()
+        );
+        assert_eq!(
+            use_cases
+                .managed_company(admin, company.id)
+                .await
+                .expect("admin management access"),
+            company
+        );
+        assert!(use_cases.managed_company(member, company.id).await.is_err());
     }
 }

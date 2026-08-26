@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT member.role\n               FROM company_members AS member\n               JOIN users AS account ON member.user_id = account.id\n               WHERE member.company_id = $1 AND LOWER(account.email) = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "role",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f5e169cf6f0eaa7c721ad6fc2771e08d885580b789a68cc837efb28b6b82da18"
+}

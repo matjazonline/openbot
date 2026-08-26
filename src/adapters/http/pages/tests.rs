@@ -2842,7 +2842,7 @@ fn team_member(company_id: Uuid, user_id: Uuid, username: &str, role: &str) -> C
         username: Some(username.to_string()),
         email: Some(format!("{username}@example.com")),
         avatar_url: None,
-        role: role.to_string(),
+        role: role.parse().unwrap_or(CompanyAccessRole::Member),
         created_at: Utc::now(),
     }
 }
@@ -2853,6 +2853,7 @@ fn team_invite(company_id: Uuid, email: &str, status: &str) -> CompanyInvite {
         company_id,
         company_name: Some("Acme".to_string()),
         email: email.to_string(),
+        role: CompanyAccessRole::Member,
         status: status.to_string(),
         created_at: Utc::now(),
     }
@@ -2998,6 +2999,13 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
         company.id, sam.user_id
     )));
     assert!(removable.contains("hx-confirm=\"Remove sam"));
+    assert!(removable.contains("Access Role"));
+    assert!(removable.contains(&format!(
+        r##"hx-put="/ui/companies/{}/team/members/{}""##,
+        company.id, sam.user_id
+    )));
+    assert!(removable.contains(r#"<option value="member" selected>Member</option>"#));
+    assert!(removable.contains(r#"<option value="admin">Admin</option>"#));
 
     // The owner's own row: the use case refuses it, so the pane does not offer it.
     let owner_pane = member_pane(&MemberPane {
@@ -3009,6 +3017,7 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
         error: None,
     });
     assert!(!owner_pane.contains("hx-delete="));
+    assert!(!owner_pane.contains("Access Role"));
     assert!(owner_pane.contains("cannot be removed"));
     // The stored role says "member", but owning the company outranks it.
     assert!(owner_pane.contains(">owner</span>"));
@@ -3023,6 +3032,7 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
         error: None,
     });
     assert!(!read_only.contains("hx-delete="));
+    assert!(!read_only.contains("Access Role"));
     assert!(read_only.contains("Only the company owner"));
 }
 
@@ -3180,7 +3190,8 @@ fn the_invite_pane_only_edits_an_invite_that_is_still_pending() {
         company: &company,
         invite: &pending,
         role: TeamRole::Owner,
-        draft: None,
+        email_draft: None,
+        role_draft: None,
         error: None,
     });
     assert!(editable.contains(&format!(
@@ -3188,6 +3199,8 @@ fn the_invite_pane_only_edits_an_invite_that_is_still_pending() {
         company.id, pending.id
     )));
     assert!(editable.contains(r##"value="kim@example.com""##));
+    assert!(editable.contains(r#"<select name="role""#));
+    assert!(editable.contains(r#"<option value="member" selected>Member</option>"#));
     assert!(editable.contains("Cancel Invite"));
 
     // An answered invite is a record: rewriting its address would rewrite what somebody accepted.
@@ -3195,7 +3208,8 @@ fn the_invite_pane_only_edits_an_invite_that_is_still_pending() {
         company: &company,
         invite: &accepted,
         role: TeamRole::Owner,
-        draft: None,
+        email_draft: None,
+        role_draft: None,
         error: None,
     });
     assert!(!settled.contains("hx-put="));
@@ -3208,7 +3222,8 @@ fn the_invite_pane_only_edits_an_invite_that_is_still_pending() {
         company: &company,
         invite: &pending,
         role: TeamRole::Member,
-        draft: None,
+        email_draft: None,
+        role_draft: None,
         error: None,
     });
     assert!(!read_only.contains("hx-put="));
@@ -3224,21 +3239,25 @@ fn the_invite_forms_keep_a_rejected_submit_in_the_form() {
         company: &company,
         invite: &invite,
         role: TeamRole::Owner,
-        draft: Some("typo@example"),
+        email_draft: Some("typo@example"),
+        role_draft: Some(CompanyAccessRole::Admin),
         error: Some("Please provide a valid email address."),
     });
     assert!(rejected_edit.contains("Please provide a valid email address."));
     assert!(rejected_edit.contains(r##"value="typo@example""##));
+    assert!(rejected_edit.contains(r#"<option value="admin" selected>Admin</option>"#));
     // The header still names the stored invite — only the form carries what was typed.
     assert!(rejected_edit.contains(">kim@example.com</h2>"));
 
     let rejected_create = invite_create_pane(&InviteCreatePane {
         company: &company,
-        draft: "typo@example",
+        email_draft: "typo@example",
+        role_draft: CompanyAccessRole::Admin,
         error: Some("Please provide a valid email address."),
     });
     assert!(rejected_create.contains("Please provide a valid email address."));
     assert!(rejected_create.contains(r##"value="typo@example""##));
+    assert!(rejected_create.contains(r#"<option value="admin" selected>Admin</option>"#));
     assert!(rejected_create.contains(&format!(
         r##"hx-post="/ui/companies/{}/team/invites""##,
         company.id
@@ -3567,6 +3586,7 @@ fn the_dashboard_shows_a_placeholder_and_fetches_the_panels_behind_it() {
     let html = dashboard_page(&DashboardShell {
         user: &mailbox_user(&email),
         scope: DashboardScopeView::Company(&companies[0]),
+        selected_company: Some(&companies[0]),
         companies: &companies,
         window: DashboardWindow::last_hour(),
     });
@@ -3720,6 +3740,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
     let dashboard_html = dashboard_page(&DashboardShell {
         user: &user,
         scope: DashboardScopeView::Company(&company),
+        selected_company: Some(&company),
         companies: &companies,
         window: crate::entities::dashboard::DashboardWindow::last_hour(),
     });
@@ -3731,6 +3752,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
     let dashboard_global_html = dashboard_page(&DashboardShell {
         user: &user,
         scope: DashboardScopeView::Global,
+        selected_company: Some(&company),
         companies: &companies,
         window: crate::entities::dashboard::DashboardWindow::last_hour(),
     });

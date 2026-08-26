@@ -179,6 +179,23 @@ pub(super) async fn load_scoped_company(
     Ok((companies, selected))
 }
 
+/// The company a channel, agent or schedule settings request is scoped to.
+///
+/// Owners and company admins may configure these resources. Ordinary members are intentionally
+/// absent from both the returned list and the selection, so a guessed company id grants nothing.
+pub(super) async fn load_managed_company(
+    company_use_cases: &CompanyUseCases,
+    user_id: Uuid,
+    requested: Option<Uuid>,
+) -> AppResult<(Vec<Company>, Option<Company>)> {
+    let companies = company_use_cases.list_managed_companies(user_id).await?;
+    let selected = match requested {
+        Some(id) => companies.iter().find(|company| company.id == id).cloned(),
+        None => companies.first().cloned(),
+    };
+    Ok((companies, selected))
+}
+
 /// The company a *read* is scoped to, from the companies the caller may see rather than only the
 /// ones they own -- an invited member reads their team's mail, but still administers nothing.
 pub(super) async fn load_readable_company(

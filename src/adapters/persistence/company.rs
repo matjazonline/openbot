@@ -60,6 +60,7 @@ struct AccessibleCompanyDb {
     #[sqlx(flatten)]
     company: CompanyDb,
     is_owner: bool,
+    is_admin: bool,
 }
 
 impl From<AccessibleCompanyDb> for CompanyAccess {
@@ -67,6 +68,8 @@ impl From<AccessibleCompanyDb> for CompanyAccess {
         CompanyAccess {
             membership: if db.is_owner {
                 CompanyMembership::Owner
+            } else if db.is_admin {
+                CompanyMembership::Admin
             } else {
                 CompanyMembership::Member
             },
@@ -160,16 +163,23 @@ impl CompanyPersistence for PostgresPersistence {
         // account id -- the read guards start from a session, the inbound path from an envelope,
         // and both need to know *which* of the two the caller is.
         let db_list = sqlx::query_as::<_, AccessibleCompanyDb>(
-            r#"SELECT c.id, c.user_id, c.name, c.slug, NULL::text AS api_key, c.provider, c.model,
-                      c.enable_llm_spam_guardrail, c.memory_provider, c.avatar_url, c.created_at,
-                      (c.user_id = $1) AS is_owner
-               FROM companies c
-               WHERE c.user_id = $1
+            r#"SELECT company.id, company.user_id, company.name, company.slug,
+                      NULL::text AS api_key, company.provider, company.model,
+                      company.enable_llm_spam_guardrail, company.memory_provider,
+                      company.avatar_url, company.created_at,
+                      (company.user_id = $1) AS is_owner,
+                      COALESCE((
+                          SELECT member.role = 'admin'
+                          FROM company_members AS member
+                          WHERE member.company_id = company.id AND member.user_id = $1
+                      ), FALSE) AS is_admin
+               FROM companies AS company
+               WHERE company.user_id = $1
                   OR EXISTS (
-                       SELECT 1 FROM company_members m
-                       WHERE m.company_id = c.id AND m.user_id = $1
+                       SELECT 1 FROM company_members AS member
+                       WHERE member.company_id = company.id AND member.user_id = $1
                      )
-               ORDER BY c.created_at DESC, c.id DESC LIMIT 200"#,
+               ORDER BY company.created_at DESC, company.id DESC LIMIT 200"#,
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -269,8 +279,10 @@ impl CompanyPersistence for PostgresPersistence {
         let clean_email = email.trim().to_lowercase();
         let is_owner = sqlx::query_scalar!(
             r#"SELECT EXISTS (
-                SELECT 1 FROM companies c JOIN users u ON c.user_id = u.id
-                WHERE c.id = $1 AND LOWER(u.email) = $2
+                SELECT 1
+                FROM companies AS company
+                JOIN users AS account ON company.user_id = account.id
+                WHERE company.id = $1 AND LOWER(account.email) = $2
             ) as "exists!""#,
             company_id,
             clean_email
@@ -283,23 +295,26 @@ impl CompanyPersistence for PostgresPersistence {
             return Ok(CompanyMembership::Owner);
         }
 
-        let is_member = sqlx::query_scalar!(
-            r#"SELECT EXISTS (
-                SELECT 1 FROM company_members m JOIN users u ON m.user_id = u.id
-                WHERE m.company_id = $1 AND LOWER(u.email) = $2
-            ) as "exists!""#,
+        let role = sqlx::query_scalar!(
+            r#"SELECT member.role
+               FROM company_members AS member
+               JOIN users AS account ON member.user_id = account.id
+               WHERE member.company_id = $1 AND LOWER(account.email) = $2"#,
             company_id,
             clean_email
         )
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        Ok(if is_member {
-            CompanyMembership::Member
-        } else {
-            CompanyMembership::None
-        })
+        match role.as_deref() {
+            Some("admin") => Ok(CompanyMembership::Admin),
+            Some("member") => Ok(CompanyMembership::Member),
+            Some(role) => Err(AppError::Internal(format!(
+                "Unknown company access role: {role}"
+            ))),
+            None => Ok(CompanyMembership::None),
+        }
     }
 
     async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>> {
@@ -325,6 +340,7 @@ mod tests {
     use super::*;
     use crate::{
         adapters::persistence::test_support::test_pool,
+        entities::company_member::CompanyAccessRole,
         use_cases::{company_invite::CompanyInvitePersistence, user::UserPersistence},
     };
 
@@ -341,6 +357,7 @@ mod tests {
         );
 
         let owner = create_account(&persistence, "owner").await;
+        let admin = create_account(&persistence, "admin").await;
         let member = create_account(&persistence, "member").await;
         let stranger = create_account(&persistence, "stranger").await;
 
@@ -375,13 +392,21 @@ mod tests {
         assert!(accessible_ids(&persistence, member.0).await.is_empty());
 
         let invite = persistence
-            .create_invite(company.id, &member.1)
+            .create_invite(company.id, &member.1, CompanyAccessRole::Member)
             .await
             .expect("an invite");
         persistence
             .accept_pending_invite(invite.id, member.0, &member.1)
             .await
             .expect("the invite is accepted");
+        let admin_invite = persistence
+            .create_invite(company.id, &admin.1, CompanyAccessRole::Admin)
+            .await
+            .expect("an admin invite");
+        persistence
+            .accept_pending_invite(admin_invite.id, admin.0, &admin.1)
+            .await
+            .expect("the admin invite is accepted");
 
         // The owner owns it, the member was let in, and the stranger sees nothing.
         let owner_view = persistence
@@ -398,6 +423,13 @@ mod tests {
             .expect("a lookup")
             .expect("an accepted invite reaches the company");
         assert_eq!(member_view.membership, CompanyMembership::Member);
+
+        let admin_view = persistence
+            .company_access(admin.0, company.id)
+            .await
+            .expect("a lookup")
+            .expect("an accepted admin reaches the company");
+        assert_eq!(admin_view.membership, CompanyMembership::Admin);
 
         assert!(
             persistence
@@ -426,6 +458,13 @@ mod tests {
         );
         assert_eq!(
             persistence
+                .membership_for_email(company.id, &admin.1)
+                .await
+                .expect("a lookup"),
+            CompanyMembership::Admin
+        );
+        assert_eq!(
+            persistence
                 .membership_for_email(company.id, &stranger.1)
                 .await
                 .expect("a lookup"),
@@ -450,7 +489,9 @@ mod tests {
         );
 
         persistence.remove_member(company.id, member.0).await.ok();
+        persistence.remove_member(company.id, admin.0).await.ok();
         persistence.delete_invite(invite.id).await.ok();
+        persistence.delete_invite(admin_invite.id).await.ok();
         persistence.delete(company.id).await.ok();
     }
 

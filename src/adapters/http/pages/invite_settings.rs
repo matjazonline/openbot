@@ -63,11 +63,12 @@ pub fn invite_settings_row(invite: &CompanyInvite) -> String {
             <div class="card-body flex-row items-center justify-between gap-4 p-5">
                 <div class="min-w-0">
                     <h2 class="truncate font-semibold">{company_name}</h2>
-                    <p class="mt-1 text-xs opacity-60">Invited to {email} on {created_at}</p>
+                    <p class="mt-1 text-xs opacity-60">Invited to {email} as {role} on {created_at}</p>
                 </div>
                 <div class="flex shrink-0 gap-2">{actions}</div>
             </div>
         </article>"##,
         id = invite.id,
+        role = invite.role.label(),
     )
 }

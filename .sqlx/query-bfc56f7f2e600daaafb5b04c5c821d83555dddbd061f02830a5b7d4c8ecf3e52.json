@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT m.id, m.company_id, m.user_id, u.username as \"username?\", u.email as \"email?\", u.avatar_url, m.role, m.created_at as \"created_at!\"\n               FROM company_members m\n               JOIN users u ON u.id = m.user_id\n               WHERE m.company_id = $1\n               ORDER BY m.created_at ASC, m.id ASC LIMIT 200",
+  "query": "WITH updated AS (\n                   UPDATE company_members\n                   SET role = $3\n                   WHERE company_id = $1 AND user_id = $2\n                   RETURNING id, company_id, user_id, role, created_at\n               )\n               SELECT updated.id, updated.company_id, updated.user_id,\n                      account.username AS \"username?\", account.email AS \"email?\", account.avatar_url,\n                      updated.role, updated.created_at AS \"created_at!\"\n               FROM updated\n               JOIN users AS account ON account.id = updated.user_id",
   "describe": {
     "columns": [
       {
@@ -56,7 +56,9 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Uuid",
+        "Uuid",
+        "Text"
       ]
     },
     "nullable": [
@@ -70,5 +72,5 @@
       false
     ]
   },
-  "hash": "2bd424393ec6a410d526d89e0eb9e5356ecc219bd4cf9d4104006b40656333c6"
+  "hash": "bfc56f7f2e600daaafb5b04c5c821d83555dddbd061f02830a5b7d4c8ecf3e52"
 }

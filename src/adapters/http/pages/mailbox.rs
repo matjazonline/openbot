@@ -291,6 +291,34 @@ pub(crate) const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` ch
                 item.classList.remove('menu-active');
             });
             el.classList.add('menu-active');
+
+            var channelId = el.dataset.mailboxChannel;
+            if (channelId) {
+                document.querySelectorAll('[data-mailbox-channel]').forEach(function (item) {
+                    item.classList.toggle('menu-active', item.dataset.mailboxChannel === channelId);
+                });
+                var name = el.querySelector('[data-mailbox-channel-name]');
+                var label = document.getElementById('mailbox-selector-label');
+                if (name && label) label.textContent = name.textContent;
+                var dropdown = el.closest('details');
+                if (dropdown) dropdown.open = false;
+                setMailboxSidebarExpanded(false);
+            }
+        }
+
+        function setMailboxSidebarExpanded(expanded) {
+            var sidebar = document.getElementById('mailbox-sidebar');
+            if (!sidebar) return;
+            sidebar.classList.toggle('mailbox-sidebar-open', expanded);
+            document.querySelectorAll('[aria-controls="mailbox-sidebar"]').forEach(function (control) {
+                control.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            });
+        }
+
+        function toggleMailboxSidebar() {
+            var sidebar = document.getElementById('mailbox-sidebar');
+            if (!sidebar) return;
+            setMailboxSidebarExpanded(!sidebar.classList.contains('mailbox-sidebar-open'));
         }
 
         function selectThreadRow(el) {
@@ -546,7 +574,7 @@ fn ui_layout(title: &str, body: &str, script: &str) -> String {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Mail Agents</title>
     <link href="/assets/app.css" rel="stylesheet" type="text/css" />
-    <style>{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}{APP_SHELL_STYLES}{THREAD_ROW_STYLES}</style>
+    <style>{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}{APP_SHELL_STYLES}{THREAD_ROW_STYLES}{MAILBOX_LAYOUT_STYLES}</style>
     <script src="/assets/theme-init.js"></script>
     <script src="/assets/htmx-2.0.4.min.js" defer></script>
     <script src="/assets/htmx-ext-sse-2.2.3.js" defer></script>
@@ -584,6 +612,7 @@ document.addEventListener('click', function (event) {
         case 'confirm-logout': confirmLogout(); break;
         case 'select-sidebar-item': selectSidebarItem(control); break;
         case 'select-thread-row': selectThreadRow(control); break;
+        case 'toggle-mailbox-sidebar': toggleMailboxSidebar(); break;
         case 'show-agent-tab': showAgentTab(control.dataset.advanced === 'true'); break;
         case 'toggle-agent-prompt': toggleAgentPromptGenerator(control.dataset.prefix); break;
         case 'show-channel-tab': showChannelTab(control.dataset.tab); break;
@@ -650,8 +679,9 @@ pub fn mailbox_page(page: &MailboxPage<'_>) -> String {
     };
 
     let content = format!(
-        "{sidebar}{thread_column_html}{detail_html}",
+        "{sidebar}<div class=\"flex min-h-0 w-96 shrink-0 flex-col\">{compact_header}{thread_column_html}</div>{detail_html}",
         sidebar = channel_sidebar(page),
+        compact_header = compact_mailbox_header(page),
         detail_html = page.detail_html,
     );
 
@@ -867,6 +897,28 @@ const APP_SHELL_STYLES: &str = r##"
 /// current the moment `selectThreadRow` lifts the class and the row speaks again.
 const THREAD_ROW_STYLES: &str = r##"
         .thread-row.thread-replied .thread-activity { display: none; }
+"##;
+
+/// The channel sidebar becomes an overlay when the viewport cannot comfortably hold all three
+/// mailbox columns. Its compact replacement stays above the thread header: a quick channel
+/// dropdown plus a button that reveals the full mailbox, including channel addresses and actions.
+const MAILBOX_LAYOUT_STYLES: &str = r##"
+        .mailbox-compact-header, .mailbox-sidebar-close { display: none; }
+
+        @media (max-width: 79.999rem) {
+            #mailbox-sidebar {
+                display: none;
+                position: fixed;
+                z-index: 35;
+                top: 4rem;
+                bottom: 0;
+                left: 4rem;
+                box-shadow: 12px 0 32px color-mix(in oklab, #000 22%, transparent);
+            }
+            #mailbox-sidebar.mailbox-sidebar-open { display: flex; }
+            .mailbox-compact-header { display: flex; }
+            .mailbox-sidebar-close { display: inline-flex; }
+        }
 "##;
 
 /// The light/dark switch in the top bar: daisyUI's `theme-controller` checkbox wrapped in a
@@ -1129,8 +1181,15 @@ fn channel_sidebar(page: &MailboxPage<'_>) -> String {
 
     format!(
         r##"
-        <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
-            {header}
+        <aside id="mailbox-sidebar" class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
+            <div class="relative">
+                {header}
+                <button type="button" class="mailbox-sidebar-close btn btn-ghost btn-sm btn-square absolute right-3 top-3"
+                    title="Collapse mailbox column" aria-label="Collapse mailbox column"
+                    aria-controls="mailbox-sidebar" aria-expanded="false" data-action="toggle-mailbox-sidebar">
+                    {collapse}
+                </button>
+            </div>
             <ul id="channel-menu" class="menu w-full flex-1 flex-nowrap gap-1 overflow-y-auto px-2">
                 {menu_body}
             </ul>
@@ -1138,7 +1197,74 @@ fn channel_sidebar(page: &MailboxPage<'_>) -> String {
         </aside>
         "##,
         header = header,
+        collapse = icon(Icon::ArrowLeft, BUTTON_ICON),
         footer = channel_actions(page.company.id, page.selected_channel, FragmentSwap::Inline),
+    )
+}
+
+/// The mailbox controls that replace the channel sidebar at compact widths.
+///
+/// The selector stays outside `#thread-column`, so an htmx channel swap does not rebuild or move
+/// it. [`selectSidebarItem`] keeps its label and active item in sync with the full sidebar.
+fn compact_mailbox_header(page: &MailboxPage<'_>) -> String {
+    let selected_name = page
+        .selected_channel
+        .map(|channel| channel.name.as_str())
+        .unwrap_or("Select a channel");
+    let options = if page.channels.is_empty() {
+        r##"<li class="px-3 py-4 text-center text-xs opacity-60">No channels yet.</li>"##
+            .to_string()
+    } else {
+        page.channels
+            .iter()
+            .map(|channel| {
+                let active = page
+                    .selected_channel
+                    .is_some_and(|selected| selected.id == channel.id);
+                format!(
+                    r##"<li><a class="{active}" data-mailbox-channel="{channel_id}"
+                            hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
+                            hx-target="#thread-column" hx-swap="outerHTML"
+                            hx-push-url="/ui?company_id={company_id}&channel_id={channel_id}"
+                            data-action="select-sidebar-item">
+                            <span class="min-w-0 truncate" data-mailbox-channel-name>{name}</span>
+                            <span class="badge badge-ghost badge-sm font-mono">{slug}</span>
+                        </a></li>"##,
+                    active = if active { "menu-active" } else { "" },
+                    channel_id = channel.id,
+                    company_id = page.company.id,
+                    name = escape_html_text(&channel.name),
+                    slug = escape_html_text(&channel.slug),
+                )
+            })
+            .collect()
+    };
+
+    format!(
+        r##"
+            <div class="mailbox-compact-header shrink-0 items-center gap-2 border-b border-r border-base-300 bg-base-200 px-3 py-2">
+                <button type="button" class="btn btn-ghost btn-sm btn-square"
+                    title="Expand mailbox column" aria-label="Expand mailbox column"
+                    aria-controls="mailbox-sidebar" aria-expanded="false" data-action="toggle-mailbox-sidebar">
+                    {expand}
+                </button>
+                <details class="dropdown min-w-0 flex-1">
+                    <summary class="btn btn-ghost btn-sm w-full min-w-0 justify-between px-2">
+                        <span class="min-w-0 text-left leading-tight">
+                            <span class="block text-[10px] font-semibold uppercase tracking-wider opacity-50">Mailbox</span>
+                            <span id="mailbox-selector-label" class="block truncate">{selected_name}</span>
+                        </span>
+                        {chevron}
+                    </summary>
+                    <ul class="menu dropdown-content z-50 mt-2 w-72 flex-nowrap rounded-box border border-base-300 bg-base-100 p-2 shadow-2xl">
+                        {options}
+                    </ul>
+                </details>
+            </div>
+        "##,
+        expand = icon(Icon::ChevronRight, BUTTON_ICON),
+        chevron = icon(Icon::ChevronDown, BUTTON_ICON),
+        selected_name = escape_html_text(selected_name),
     )
 }
 
@@ -1220,13 +1346,13 @@ fn channel_menu_item(
     format!(
         r##"
                 <li>
-                    <a class="flex flex-col items-start gap-0.5 {active}"
+                    <a class="flex flex-col items-start gap-0.5 {active}" data-mailbox-channel="{channel_id}"
                         hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
                         hx-target="#thread-column" hx-swap="outerHTML"
                         hx-push-url="/ui?company_id={company_id}&channel_id={channel_id}"
                         data-action="select-sidebar-item">
                         <span class="flex w-full items-center gap-2">
-                            <span class="truncate">{name}</span>
+                            <span class="truncate" data-mailbox-channel-name>{name}</span>
                             <span class="badge badge-ghost badge-sm font-mono">{slug}</span>{disabled_badge}
                         </span>
                         <span class="w-full truncate font-mono text-[11px] opacity-60">{address}</span>
@@ -1502,7 +1628,7 @@ fn thread_pagination(column: &ThreadColumn<'_>, swap: FragmentSwap) -> String {
 pub fn empty_detail_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="detail-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="detail-pane"{PANE_SKELETON} class="flex min-w-0 flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -1550,7 +1676,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
 
     format!(
         r##"
-        <section id="detail-pane"{PANE_SKELETON} data-thread-id="{thread_id}" class="flex flex-1 flex-col bg-base-100" hx-ext="sse"
+        <section id="detail-pane"{PANE_SKELETON} data-thread-id="{thread_id}" class="flex min-w-0 flex-1 flex-col bg-base-100" hx-ext="sse"
             sse-connect="/ui/events?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}{after}">
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
                 <div class="min-w-0">
@@ -1820,7 +1946,7 @@ fn send_form_footer(deliver: bool, quiet: bool, cancel_attributes: &str) -> Stri
 pub fn compose_pane(pane: &ComposePane<'_>) -> String {
     format!(
         r##"
-        <section id="detail-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
+        <section id="detail-pane"{PANE_SKELETON} class="flex min-w-0 flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-6 py-4">
                 <h2 class="text-xl font-bold">New thread in {channel_name}</h2>
                 <p class="text-xs opacity-70">The message enters the channel as if it had been emailed in.</p>
@@ -1875,7 +2001,7 @@ pub fn compose_pane(pane: &ComposePane<'_>) -> String {
 pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
     format!(
         r##"
-        <section id="detail-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
+        <section id="detail-pane"{PANE_SKELETON} class="flex min-w-0 flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-6 py-4">
                 <h2 class="text-xl font-bold">New message in {subject}</h2>
                 <p class="text-xs opacity-70">The message enters the channel as if it had been emailed in, continuing this thread.</p>

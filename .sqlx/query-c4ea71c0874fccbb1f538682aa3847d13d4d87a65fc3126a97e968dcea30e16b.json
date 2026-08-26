@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT i.id, i.company_id, c.name as \"company_name?\", i.email, i.status, i.created_at as \"created_at!\"\n               FROM company_invites i\n               JOIN companies c ON c.id = i.company_id\n               WHERE i.company_id = $1\n               ORDER BY i.created_at DESC, i.id DESC LIMIT 200",
+  "query": "SELECT invite.id, invite.company_id, company.name AS \"company_name?\", invite.email,\n                      invite.role, invite.status, invite.created_at AS \"created_at!\"\n               FROM company_invites AS invite\n               JOIN companies AS company ON company.id = invite.company_id\n               WHERE invite.id = $1",
   "describe": {
     "columns": [
       {
@@ -30,11 +30,16 @@
       },
       {
         "ordinal": 4,
-        "name": "status",
+        "name": "role",
         "type_info": "Text"
       },
       {
         "ordinal": 5,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
         "name": "created_at!",
         "type_info": "Timestamptz"
       }
@@ -50,8 +55,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "20ab3d56bc94430e9c3e07c810d855aa025712f000512aae1be80ab0c163c325"
+  "hash": "c4ea71c0874fccbb1f538682aa3847d13d4d87a65fc3126a97e968dcea30e16b"
 }

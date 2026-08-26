@@ -87,15 +87,17 @@ pub struct InvitePane<'a> {
     pub company: &'a Company,
     pub invite: &'a CompanyInvite,
     pub role: TeamRole,
-    /// What the user last typed, when a save was rejected; `None` shows the stored invite.
-    pub draft: Option<&'a str>,
+    /// What the user last submitted when a save was rejected; `None` shows the stored invite.
+    pub email_draft: Option<&'a str>,
+    pub role_draft: Option<CompanyAccessRole>,
     pub error: Option<&'a str>,
 }
 
 /// The pane for an invite that does not exist yet.
 pub struct InviteCreatePane<'a> {
     pub company: &'a Company,
-    pub draft: &'a str,
+    pub email_draft: &'a str,
+    pub role_draft: CompanyAccessRole,
     pub error: Option<&'a str>,
 }
 
@@ -330,7 +332,8 @@ fn invite_entry(company_id: Uuid, invite: &CompanyInvite, selected: bool) -> Str
                         hx-push-url="{push_url}"
                         data-action="select-sidebar-item">
                         <span class="min-w-0 truncate font-mono text-[13px]">{email}</span>
-                        <span class="badge {badge} badge-sm ml-auto shrink-0">{label}</span>
+                        <span class="badge badge-ghost badge-sm ml-auto shrink-0">{role}</span>
+                        <span class="badge {badge} badge-sm shrink-0">{label}</span>
                     </a>
                 </li>
         "##,
@@ -338,6 +341,7 @@ fn invite_entry(company_id: Uuid, invite: &CompanyInvite, selected: bool) -> Str
         endpoint = team_endpoint(company_id, &format!("/invites/{}", invite.id)),
         push_url = team_url(company_id, TeamSelection::Invite(invite.id)),
         email = escape_html_text(&invite.email),
+        role = invite.role.label(),
         badge = status.badge_class(),
         label = status.label(),
     )
@@ -408,6 +412,7 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
             <div class="flex-1 overflow-y-auto px-6 py-4">
                 {error_html}
                 {avatar_form}
+                {access_role_form}
                 <dl class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div class="rounded-box bg-base-200 px-4 py-3">
                         <dt class="text-[11px] uppercase tracking-wider opacity-60">Joined</dt>
@@ -437,14 +442,65 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
         ),
         username = escape_html_text(member_name(member)),
         email = escape_html_text(member.email.as_deref().unwrap_or("")),
-        role = escape_html_text(if is_owner { "owner" } else { &member.role }),
+        role = escape_html_text(if is_owner {
+            "owner"
+        } else {
+            member.role.as_str()
+        }),
         error_html = form_error_banner(pane.error),
         avatar_form = avatar_form(pane),
+        access_role_form = member_access_role_form(pane),
         joined = super::format_date(member.created_at),
         company_name = escape_html_text(&pane.company.name),
         close_endpoint = team_endpoint(pane.company.id, "/close"),
         cleared_url = team_url(pane.company.id, TeamSelection::None),
     )
+}
+
+/// The owner's control for changing a joined user's company access.
+fn member_access_role_form(pane: &MemberPane<'_>) -> String {
+    if !pane.removable() {
+        return String::new();
+    }
+
+    format!(
+        r##"
+                <form class="mb-6 rounded-box bg-base-200 px-4 py-3"
+                    hx-put="{endpoint}"
+                    hx-target="#team-pane" hx-swap="outerHTML"
+                    hx-disabled-elt="find button[type='submit']">
+                    <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Access Role</span></div>
+                        <select name="role" class="select w-full">{options}</select>
+                        <div class="label"><span class="text-[11px] opacity-60">Admins can manage channels, agents and schedules. Members can work in the inbox.</span></div>
+                    </label>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>
+                        <span class="[.htmx-request_&]:hidden">Save Access</span>
+                        <span class="hidden [.htmx-request_&]:inline">Saving...</span>
+                    </button>
+                </form>
+        "##,
+        endpoint = team_endpoint(
+            pane.company.id,
+            &format!("/members/{}", pane.member.user_id),
+        ),
+        options = access_role_options(pane.member.role),
+    )
+}
+
+fn access_role_options(selected: CompanyAccessRole) -> String {
+    CompanyAccessRole::ALL
+        .into_iter()
+        .map(|role| {
+            format!(
+                r#"<option value="{}"{}>{}</option>"#,
+                role.as_str(),
+                if role == selected { " selected" } else { "" },
+                role.label(),
+            )
+        })
+        .collect()
 }
 
 /// The picture field, shown only in your own pane.
@@ -495,7 +551,8 @@ fn avatar_form(pane: &MemberPane<'_>) -> String {
 pub fn invite_pane(pane: &InvitePane<'_>) -> String {
     let invite = pane.invite;
     let status = InviteStatus::parse(&invite.status);
-    let email = pane.draft.unwrap_or(&invite.email);
+    let email = pane.email_draft.unwrap_or(&invite.email);
+    let role = pane.role_draft.unwrap_or(invite.role);
     let company_id = pane.company.id;
     let invite_endpoint = team_endpoint(company_id, &format!("/invites/{}", invite.id));
     let close_endpoint = team_endpoint(company_id, "/close");
@@ -512,6 +569,10 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
                         <input type="email" name="email" required value="{email}" placeholder="colleague@example.com"
                             class="input w-full font-mono">
                         <div class="label"><span class="text-[11px] opacity-60">They join the team by accepting this invite from their own account.</span></div>
+                    </label>
+                    <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Access Role</span></div>
+                        <select name="role" class="select w-full">{role_options}</select>
                     </label>
                     <div class="flex items-center gap-3 border-t border-base-300 pt-4">
                         <button type="submit" class="btn btn-primary">
@@ -532,6 +593,7 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
                 </form>
             "##,
             email = escape_html_text(email),
+            role_options = access_role_options(role),
         )
     } else {
         let delete_button = if pane.role.manages() {
@@ -569,7 +631,7 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
             <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
                 <div class="min-w-0">
                     <h2 class="truncate font-mono text-xl font-bold">{stored_email}</h2>
-                    <p class="text-xs opacity-60">Invited {created_at}</p>
+                    <p class="text-xs opacity-60">Invited {created_at} as {access_role}</p>
                 </div>
                 <span class="badge {badge} shrink-0">{label}</span>
             </div>
@@ -581,6 +643,7 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
         "##,
         stored_email = escape_html_text(&invite.email),
         created_at = super::format_date(invite.created_at),
+        access_role = invite.role.label(),
         badge = status.badge_class(),
         label = status.label(),
         error_html = form_error_banner(pane.error),
@@ -604,6 +667,11 @@ pub fn invite_create_pane(pane: &InviteCreatePane<'_>) -> String {
                         <input type="email" name="email" required value="{email}" placeholder="colleague@example.com"
                             class="input w-full font-mono">
                     </label>
+                    <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Access Role</span></div>
+                        <select name="role" class="select w-full">{role_options}</select>
+                        <div class="label"><span class="text-[11px] opacity-60">Choose the access they receive as soon as they accept.</span></div>
+                    </label>
                     <div class="flex items-center gap-3">
                         <button type="submit" class="btn btn-primary">
                             <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
@@ -624,6 +692,7 @@ pub fn invite_create_pane(pane: &InviteCreatePane<'_>) -> String {
         close_endpoint = team_endpoint(pane.company.id, "/close"),
         cleared_url = team_url(pane.company.id, TeamSelection::None),
         error_html = form_error_banner(pane.error),
-        email = escape_html_text(pane.draft),
+        email = escape_html_text(pane.email_draft),
+        role_options = access_role_options(pane.role_draft),
     )
 }

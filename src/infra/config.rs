@@ -28,7 +28,6 @@ fn parse_task_worker_concurrency(value: Option<&str>) -> usize {
 
 pub struct AppConfig {
     pub jwt_secret: String,
-    pub access_token_ttl: Duration,
     pub refresh_token_ttl: Duration,
     pub app_domain_name: String,
     pub cors_allowed_origins: Vec<String>,
@@ -65,6 +64,13 @@ pub struct AppConfig {
     /// `admin` *within one company*, which is not the same authority as reading every company's
     /// traffic. Empty by default, so the global view does not exist until someone is named.
     pub operator_emails: Vec<EmailAddress>,
+    /// Authenticated SendGrid inbound webhook configuration. `None` disables the route.
+    pub sendgrid_inbound: Option<SendGridInboundConfig>,
+}
+
+pub struct SendGridInboundConfig {
+    pub verifying_key: VerifyingKey,
+    pub webhook_max_age_secs: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -251,11 +257,6 @@ impl AppConfig {
             .parse()
             .expect("REFRESH_TOKEN_TTL_DAYS must be a valid number");
 
-        let access_token_ttl_secs: i64 = env::var("ACCESS_TOKEN_TTL_SECS")
-            .unwrap_or("30".to_string())
-            .parse()
-            .expect("ACCESS_TOKEN_TTL_SECS must be a valid number");
-
         let app_domain_name =
             env::var("APP_DOMAIN_NAME").unwrap_or_else(|_| "localhost".to_string());
 
@@ -311,16 +312,20 @@ impl AppConfig {
             !sendgrid_inbound_enabled || sendgrid_webhook_public_key.is_some(),
             "SENDGRID_WEBHOOK_PUBLIC_KEY is required when SENDGRID_INBOUND_ENABLED=true"
         );
-        if sendgrid_inbound_enabled {
-            VerifyingKey::from_public_key_pem(
-                sendgrid_webhook_public_key
-                    .as_deref()
-                    .expect("checked above"),
+        let sendgrid_verifying_key = if sendgrid_inbound_enabled {
+            Some(
+                VerifyingKey::from_public_key_pem(
+                    sendgrid_webhook_public_key
+                        .as_deref()
+                        .expect("checked above"),
+                )
+                .expect(
+                    "SENDGRID_WEBHOOK_PUBLIC_KEY must be a valid ECDSA P-256 public key in PEM format",
+                ),
             )
-            .expect(
-                "SENDGRID_WEBHOOK_PUBLIC_KEY must be a valid ECDSA P-256 public key in PEM format",
-            );
-        }
+        } else {
+            None
+        };
         let sendgrid_webhook_max_age_secs: u64 = env::var("SENDGRID_WEBHOOK_MAX_AGE_SECS")
             .unwrap_or_else(|_| "300".to_string())
             .parse()
@@ -329,6 +334,10 @@ impl AppConfig {
             sendgrid_webhook_max_age_secs > 0,
             "SENDGRID_WEBHOOK_MAX_AGE_SECS must be positive"
         );
+        let sendgrid_inbound = sendgrid_verifying_key.map(|verifying_key| SendGridInboundConfig {
+            verifying_key,
+            webhook_max_age_secs: sendgrid_webhook_max_age_secs,
+        });
 
         let max_spam_score: f64 = env::var("MAX_SPAM_SCORE")
             .unwrap_or_else(|_| "5.0".to_string())
@@ -380,7 +389,6 @@ impl AppConfig {
 
         Self {
             jwt_secret,
-            access_token_ttl: Duration::seconds(access_token_ttl_secs),
             refresh_token_ttl: Duration::days(refresh_token_ttl_days),
             app_domain_name,
             cors_allowed_origins,
@@ -405,28 +413,12 @@ impl AppConfig {
             secure_cookies,
             gcs: GcsConfig::from_env(),
             operator_emails,
+            sendgrid_inbound,
         }
     }
 
     pub fn is_spam_scan_enabled(&self) -> bool {
         self.enable_heuristic_scanner || self.enable_spam_scanner || self.enable_llm_spam_guardrail
-    }
-
-    pub fn sendgrid_inbound_enabled(&self) -> bool {
-        env::var("SENDGRID_INBOUND_ENABLED")
-            .ok()
-            .is_some_and(|value| value.eq_ignore_ascii_case("true"))
-    }
-
-    pub fn sendgrid_webhook_public_key(&self) -> Option<String> {
-        non_empty_var("SENDGRID_WEBHOOK_PUBLIC_KEY")
-    }
-
-    pub fn sendgrid_webhook_max_age_secs(&self) -> u64 {
-        env::var("SENDGRID_WEBHOOK_MAX_AGE_SECS")
-            .ok()
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(300)
     }
 }
 
@@ -439,7 +431,6 @@ impl AppConfig {
     pub fn for_test() -> Self {
         Self {
             jwt_secret: "a-test-secret-long-enough-to-sign-with-01".to_string(),
-            access_token_ttl: Duration::days(1),
             refresh_token_ttl: Duration::days(30),
             app_domain_name: "localhost".to_string(),
             cors_allowed_origins: Vec::new(),
@@ -464,6 +455,7 @@ impl AppConfig {
             secure_cookies: false,
             gcs: None,
             operator_emails: Vec::new(),
+            sendgrid_inbound: None,
         }
     }
 }

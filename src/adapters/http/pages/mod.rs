@@ -14,7 +14,7 @@ use crate::entities::{
     channel::Channel,
     company::Company,
     company_invite::CompanyInvite,
-    company_member::CompanyMember,
+    company_member::{CompanyAccessRole, CompanyMember},
     message::{AttachmentMetadata, Message, MessageDirection, MessageRole},
     outbox::{OutboxEntry, OutboxFilter, OutboxStatus},
     task::{BackgroundTask, TaskFilter, TaskStatus, ThreadActivity},

@@ -416,7 +416,7 @@ mod tests {
     fn test_config() -> Arc<AppConfig> {
         Arc::new(AppConfig {
             jwt_secret: "secret".into(),
-            access_token_ttl: time::Duration::days(1),
+            sendgrid_inbound: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".into(),
             cors_allowed_origins: vec![],

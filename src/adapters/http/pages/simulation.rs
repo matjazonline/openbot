@@ -221,7 +221,6 @@ pub fn resolve_llm_info(channel: Option<&Channel>, company: Option<&Company>) ->
                 .or_else(|| non_blank(company.model.as_deref()))
                 .or_else(|| config_value("model"));
 
-            let provider_name = provider.unwrap_or("google").to_lowercase();
             LlmInfo {
                 provider: provider.unwrap_or(DEFAULT_PROVIDER_LABEL).to_string(),
                 model: model.unwrap_or(DEFAULT_MODEL_LABEL).to_string(),
@@ -229,7 +228,6 @@ pub fn resolve_llm_info(channel: Option<&Channel>, company: Option<&Company>) ->
                     non_blank(channel.api_key.as_deref()).is_some(),
                     non_blank(company.api_key.as_deref()).is_some(),
                     config_value("api_key").is_some(),
-                    &provider_name,
                 ),
             }
         }
@@ -246,7 +244,7 @@ pub fn resolve_llm_info(channel: Option<&Channel>, company: Option<&Company>) ->
                 .to_string(),
             api_key_status: match non_blank(channel.api_key.as_deref()) {
                 Some(_) => configured_badge("Channel"),
-                None => missing_badge(None),
+                None => missing_badge(),
             },
         },
         (None, Some(company)) => LlmInfo {
@@ -262,7 +260,7 @@ pub fn resolve_llm_info(channel: Option<&Channel>, company: Option<&Company>) ->
                 .to_string(),
             api_key_status: match non_blank(company.api_key.as_deref()) {
                 Some(_) => configured_badge("Company"),
-                None => missing_badge(None),
+                None => missing_badge(),
             },
         },
         (None, None) => LlmInfo {
@@ -273,14 +271,8 @@ pub fn resolve_llm_info(channel: Option<&Channel>, company: Option<&Company>) ->
     }
 }
 
-/// Where the API key for a run would come from, most specific source first, falling back to the
-/// provider's environment variables.
-fn api_key_status(
-    on_channel: bool,
-    on_company: bool,
-    in_channel_config: bool,
-    provider_name: &str,
-) -> String {
+/// Where the company-owned API key for a run would come from, most specific source first.
+fn api_key_status(on_channel: bool, on_company: bool, in_channel_config: bool) -> String {
     if on_channel {
         return configured_badge("Channel");
     }
@@ -291,45 +283,18 @@ fn api_key_status(
         return configured_badge("Channel Config");
     }
 
-    let env_vars = provider_env_vars(provider_name);
-    let names = env_vars.join(" / ");
-    if env_vars.iter().any(|name| env_var_set(name)) {
-        format!("<span class=\"text-indigo-300 font-bold\">Env Var ({names})</span>")
-    } else {
-        missing_badge(Some(&names))
-    }
+    missing_badge()
 }
 
 fn configured_badge(source: &str) -> String {
     format!("<span class=\"text-emerald-400 font-bold\">Configured ({source})</span>")
 }
 
-fn missing_badge(env_vars: Option<&str>) -> String {
-    let names = match env_vars {
-        Some(names) => format!(" ({names})"),
-        None => String::new(),
-    };
-
+fn missing_badge() -> String {
     format!(
-        r##"<span class="inline-flex items-center gap-1.5 text-rose-400 font-bold">{glyph} Missing / Unset{names}</span>"##,
+        r##"<span class="inline-flex items-center gap-1.5 text-rose-400 font-bold">{glyph} Missing / Unset</span>"##,
         glyph = icon(Icon::Alert, BUTTON_ICON),
     )
-}
-
-/// Environment variables that can supply a key for this provider, in the order they're reported.
-fn provider_env_vars(provider_name: &str) -> &'static [&'static str] {
-    match provider_name {
-        "google" | "gemini" => &["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-        "openai" => &["OPENAI_API_KEY"],
-        "anthropic" => &["ANTHROPIC_API_KEY"],
-        "groq" => &["GROQ_API_KEY"],
-        "mistral" => &["MISTRAL_API_KEY"],
-        _ => &["LLM_API_KEY", "API_KEY"],
-    }
-}
-
-fn env_var_set(name: &str) -> bool {
-    std::env::var(name).is_ok_and(|value| !value.trim().is_empty())
 }
 
 fn non_blank(value: Option<&str>) -> Option<&str> {

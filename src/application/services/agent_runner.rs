@@ -1249,22 +1249,19 @@ impl AgentTask {
             }));
         }
 
-        // An unrecognized provider name falls back to whatever the environment can configure.
-        if let Ok(provider_type) = std::str::FromStr::from_str(&self.provider_name) {
-            let mut provider = ai_agents::UnifiedLLMProvider::from_spec_config(
-                provider_type,
-                &self.model_name,
-                Some(self.api_key.clone()),
-                self.base_url.clone(),
-                self.provider_config.clone(),
-            )?;
-            if let Some(choice) = self.tool_choice.clone() {
-                provider = provider.with_tool_choice(choice);
-            }
-            builder = builder.llm(std::sync::Arc::new(provider));
-        } else {
-            builder = builder.auto_configure_llms()?;
+        let provider_type = std::str::FromStr::from_str(&self.provider_name)
+            .map_err(|_| anyhow::anyhow!("Unsupported LLM provider '{}'.", self.provider_name))?;
+        let mut provider = ai_agents::UnifiedLLMProvider::from_spec_config(
+            provider_type,
+            &self.model_name,
+            Some(self.api_key.clone()),
+            self.base_url.clone(),
+            self.provider_config.clone(),
+        )?;
+        if let Some(choice) = self.tool_choice.clone() {
+            provider = provider.with_tool_choice(choice);
         }
+        builder = builder.llm(std::sync::Arc::new(provider));
 
         let mut builder = builder
             .auto_configure_features()?

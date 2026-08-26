@@ -28,7 +28,7 @@ use crate::{
         routes::{
             channel::reply_headers,
             schedule::UiScheduleForm,
-            ui::{load_account, load_scoped_company, wake_ups, workspace_user},
+            ui::{load_account, load_managed_company, wake_ups, workspace_user},
         },
     },
     app_error::{AppError, AppResult},
@@ -144,7 +144,7 @@ impl SchedulesWorkspace {
         &self,
         company_id: Option<Uuid>,
     ) -> AppResult<(Vec<Company>, Option<Company>)> {
-        load_scoped_company(&self.company_use_cases, self.user_id, company_id).await
+        load_managed_company(&self.company_use_cases, self.user_id, company_id).await
     }
 
     /// One page of a schedule's runs. `PAGE_SIZE + 1` is fetched so the pager knows whether a
