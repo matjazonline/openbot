@@ -274,9 +274,21 @@ const SKELETON_BEHAVIOUR: &str = r##"
                 }
                 painted.set(target, { nodes: kept, className: target.className });
                 if (shape.className) {
-                    target.className = shape.className;
+                    // The shape's classes describe the placeholder, not the region -- so anything
+                    // that says *which column this is* is carried across rather than overwritten.
+                    // Drop `ui-pane-detail` here and the compact layout loses track of the pane
+                    // for the length of the request, which is exactly when it is being opened.
+                    target.className = [identity(target), shape.className].filter(Boolean).join(' ');
                 }
                 target.innerHTML = shape.markup;
+            }
+
+            // What a region is, as opposed to how it currently looks: the classes the shell's
+            // layout matches on, which outlive whatever is painted into it.
+            function identity(target) {
+                return Array.prototype.filter.call(target.classList, function (name) {
+                    return name.indexOf('ui-pane-') === 0;
+                }).join(' ');
             }
 
             function restore(target) {

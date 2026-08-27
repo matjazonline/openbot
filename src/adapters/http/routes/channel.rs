@@ -22,7 +22,7 @@ use crate::{
     entities::{
         channel::Channel,
         cursor::ThreadCursor,
-        memory::{MemoryRecallMode, default_memory_max_results},
+        memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
         thread::Thread,
     },
     infra::{config::AppConfig, events::MailboxEvents},
@@ -116,6 +116,7 @@ pub struct ChannelForm {
     pub persist_company_memory: Option<String>,
     pub persist_agent_memory: Option<String>,
     pub persist_user_memory: Option<String>,
+    pub memory_persistence_mode: Option<String>,
     pub memory_recall_mode: Option<String>,
     pub memory_max_results: Option<String>,
 }
@@ -140,6 +141,19 @@ impl ChannelForm {
     }
 
     pub fn memory_settings(&self) -> Result<SubmittedMemorySettings, String> {
+        let persistence_mode = match self
+            .memory_persistence_mode
+            .as_deref()
+            .unwrap_or("audience_only")
+        {
+            "audience_only" => MemoryPersistenceMode::AudienceOnly,
+            "scope_specific_facts" => MemoryPersistenceMode::ScopeSpecificFacts,
+            _ => {
+                return Err(
+                    "Memory persistence mode must be audience_only or scope_specific_facts.".into(),
+                );
+            }
+        };
         let recall_mode = match self.memory_recall_mode.as_deref().unwrap_or("fast") {
             "fast" => MemoryRecallMode::Fast,
             "thinking" => MemoryRecallMode::Thinking,
@@ -161,6 +175,7 @@ impl ChannelForm {
             persist_company: checkbox_ticked(self.persist_company_memory.as_deref()),
             persist_agent: checkbox_ticked(self.persist_agent_memory.as_deref()),
             persist_user: checkbox_ticked(self.persist_user_memory.as_deref()),
+            persistence_mode,
             recall_mode,
             max_results,
         })
@@ -174,6 +189,7 @@ pub struct SubmittedMemorySettings {
     pub persist_company: bool,
     pub persist_agent: bool,
     pub persist_user: bool,
+    pub persistence_mode: MemoryPersistenceMode,
     pub recall_mode: MemoryRecallMode,
     pub max_results: u8,
 }
@@ -250,6 +266,8 @@ pub struct ChannelJsonPayload {
     pub persist_agent_memory: bool,
     #[serde(default)]
     pub persist_user_memory: bool,
+    #[serde(default)]
+    pub memory_persistence_mode: MemoryPersistenceMode,
     #[serde(default)]
     pub memory_recall_mode: MemoryRecallMode,
     #[serde(default = "default_memory_max_results")]
@@ -484,6 +502,7 @@ async fn create_channel_handler(
         persist_company_memory: memory.persist_company,
         persist_agent_memory: memory.persist_agent,
         persist_user_memory: memory.persist_user,
+        memory_persistence_mode: memory.persistence_mode,
         memory_recall_mode: memory.recall_mode,
         memory_max_results: memory.max_results,
         created_by: None,
@@ -737,6 +756,7 @@ async fn update_channel_handler(
         persist_company_memory: memory.persist_company,
         persist_agent_memory: memory.persist_agent,
         persist_user_memory: memory.persist_user,
+        memory_persistence_mode: memory.persistence_mode,
         memory_recall_mode: memory.recall_mode,
         memory_max_results: memory.max_results,
         created_by: None,
@@ -1444,6 +1464,7 @@ async fn create_channel_json(
         persist_company_memory: payload.persist_company_memory,
         persist_agent_memory: payload.persist_agent_memory,
         persist_user_memory: payload.persist_user_memory,
+        memory_persistence_mode: payload.memory_persistence_mode,
         memory_recall_mode: payload.memory_recall_mode,
         memory_max_results: payload.memory_max_results,
         created_by: None,
@@ -1511,6 +1532,7 @@ async fn update_channel_json(
         persist_company_memory: payload.persist_company_memory,
         persist_agent_memory: payload.persist_agent_memory,
         persist_user_memory: payload.persist_user_memory,
+        memory_persistence_mode: payload.memory_persistence_mode,
         memory_recall_mode: payload.memory_recall_mode,
         memory_max_results: payload.memory_max_results,
         created_by: None,
@@ -1612,6 +1634,7 @@ mod tests {
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
+            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
             memory_max_results: 5,
             created_by: crate::entities::creation::CreationProvenance::system(),

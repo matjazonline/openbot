@@ -10,7 +10,7 @@ use crate::{
     entities::{
         channel::Channel,
         creation::CreationProvenance,
-        memory::MemoryRecallMode,
+        memory::{MemoryPersistenceMode, MemoryRecallMode},
         value_objects::{ChannelSlug, CompanySlug, EmailAddress},
     },
     use_cases::channel::{ChannelPersistence, ChannelWrite},
@@ -38,6 +38,7 @@ pub struct ChannelDb {
     pub persist_company_memory: bool,
     pub persist_agent_memory: bool,
     pub persist_user_memory: bool,
+    pub memory_persistence_mode: String,
     pub memory_recall_mode: String,
     pub memory_max_results: i16,
     pub created_by: serde_json::Value,
@@ -71,6 +72,10 @@ impl TryFrom<ChannelDb> for Channel {
             persist_company_memory: db.persist_company_memory,
             persist_agent_memory: db.persist_agent_memory,
             persist_user_memory: db.persist_user_memory,
+            memory_persistence_mode: match db.memory_persistence_mode.as_str() {
+                "scope_specific_facts" => MemoryPersistenceMode::ScopeSpecificFacts,
+                _ => MemoryPersistenceMode::AudienceOnly,
+            },
             memory_recall_mode: if db.memory_recall_mode == "thinking" {
                 MemoryRecallMode::Thinking
             } else {
@@ -111,7 +116,8 @@ const CHANNEL_SELECT: &str = r#"
            ch.channel_config, ch.enabled, ch.add_3rd_party,
            ch.retrieve_company_memory, ch.retrieve_agent_memory, ch.retrieve_user_memory,
            ch.persist_company_memory, ch.persist_agent_memory, ch.persist_user_memory,
-           ch.memory_recall_mode, ch.memory_max_results, ch.created_by, ch.created_at
+           ch.memory_persistence_mode, ch.memory_recall_mode, ch.memory_max_results,
+           ch.created_by, ch.created_at
     FROM channels ch
 "#;
 
@@ -215,9 +221,9 @@ impl ChannelPersistence for PostgresPersistence {
                     channel_config, enabled, add_3rd_party, created_by,
                     retrieve_company_memory, retrieve_agent_memory, retrieve_user_memory,
                     persist_company_memory, persist_agent_memory, persist_user_memory,
-                    memory_recall_mode, memory_max_results
+                    memory_persistence_mode, memory_recall_mode, memory_max_results
                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-                         $13, $14, $15, $16, $17, $18, $19, $20)"#,
+                         $13, $14, $15, $16, $17, $18, $19, $20, $21)"#,
         )
         .bind(uuid)
         .bind(company_id)
@@ -240,6 +246,7 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(write.persist_company_memory)
         .bind(write.persist_agent_memory)
         .bind(write.persist_user_memory)
+        .bind(write.memory_persistence_mode.as_str())
         .bind(write.memory_recall_mode.as_str())
         .bind(i16::from(write.memory_max_results))
         .execute(&mut *tx)
@@ -332,9 +339,9 @@ impl ChannelPersistence for PostgresPersistence {
                    add_3rd_party = $9, retrieve_company_memory = $10,
                    retrieve_agent_memory = $11, retrieve_user_memory = $12,
                    persist_company_memory = $13, persist_agent_memory = $14,
-                   persist_user_memory = $15, memory_recall_mode = $16,
-                   memory_max_results = $17
-               WHERE id = $18"#,
+                   persist_user_memory = $15, memory_persistence_mode = $16,
+                   memory_recall_mode = $17, memory_max_results = $18
+               WHERE id = $19"#,
         )
         .bind(write.name)
         .bind(write.description)
@@ -351,6 +358,7 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(write.persist_company_memory)
         .bind(write.persist_agent_memory)
         .bind(write.persist_user_memory)
+        .bind(write.memory_persistence_mode.as_str())
         .bind(write.memory_recall_mode.as_str())
         .bind(i16::from(write.memory_max_results))
         .bind(id)
@@ -520,6 +528,8 @@ mod tests {
                 persist_company_memory: false,
                 persist_agent_memory: false,
                 persist_user_memory: false,
+                memory_persistence_mode:
+                    crate::entities::memory::MemoryPersistenceMode::ScopeSpecificFacts,
                 memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
                 memory_max_results: 5,
                 created_by: None,
@@ -550,6 +560,10 @@ mod tests {
         assert_eq!(channel.channel_config, Some(config));
         assert!(channel.enabled);
         assert!(!channel.add_3rd_party);
+        assert_eq!(
+            channel.memory_persistence_mode,
+            crate::entities::memory::MemoryPersistenceMode::ScopeSpecificFacts
+        );
 
         // 2. Get by ID
         let fetched = ChannelPersistence::get_by_id(&persistence, channel.id)
@@ -580,6 +594,8 @@ mod tests {
                 persist_company_memory: false,
                 persist_agent_memory: false,
                 persist_user_memory: false,
+                memory_persistence_mode:
+                    crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
                 memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
                 memory_max_results: 5,
                 created_by: None,
@@ -600,6 +616,10 @@ mod tests {
         assert!(
             updated.add_3rd_party,
             "the third-party switch must survive a round trip"
+        );
+        assert_eq!(
+            updated.memory_persistence_mode,
+            crate::entities::memory::MemoryPersistenceMode::AudienceOnly
         );
 
         let reread = ChannelPersistence::get_by_id(&persistence, channel.id)

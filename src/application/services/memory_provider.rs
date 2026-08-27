@@ -3,7 +3,8 @@ use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 
 use crate::entities::memory::{
-    MemoryChunk, MemoryProviderError, MemoryProviderKind, MemoryRecallMode, ResolvedMemoryScope,
+    MemoryChunk, MemoryProviderError, MemoryProviderKind, MemoryRecallMode, MemoryScope,
+    ResolvedMemoryScope,
 };
 
 #[derive(Debug, Clone)]
@@ -11,6 +12,13 @@ pub struct MemoryConversation {
     pub id: String,
     pub user: String,
     pub assistant: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MemoryPersistenceTarget {
+    pub scope: MemoryScope,
+    pub collection: String,
+    pub custom_instructions: Option<&'static str>,
 }
 
 #[async_trait]
@@ -29,7 +37,7 @@ pub trait MemoryProvider: Send + Sync {
     async fn persist(
         &self,
         database_id: &str,
-        collections: &[String],
+        targets: &[MemoryPersistenceTarget],
         conversation: &MemoryConversation,
     ) -> Vec<Result<(), MemoryProviderError>>;
     async fn delete(&self, database_id: &str) -> Result<(), MemoryProviderError>;

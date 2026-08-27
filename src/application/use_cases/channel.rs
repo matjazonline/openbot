@@ -10,7 +10,7 @@ use crate::{
         channel::{Channel, PUBLIC_PARTICIPANT},
         company::{Company, CompanyAccess},
         creation::CreationProvenance,
-        memory::{MemoryRecallMode, default_memory_max_results},
+        memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
         user::Viewer,
         value_objects::{ChannelSlug, CompanySlug},
     },
@@ -48,6 +48,7 @@ pub struct ChannelWrite {
     pub persist_company_memory: bool,
     pub persist_agent_memory: bool,
     pub persist_user_memory: bool,
+    pub memory_persistence_mode: MemoryPersistenceMode,
     pub memory_recall_mode: MemoryRecallMode,
     pub memory_max_results: u8,
     pub created_by: Option<CreationProvenance>,
@@ -75,6 +76,7 @@ impl Default for ChannelWrite {
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
+            memory_persistence_mode: MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: MemoryRecallMode::Fast,
             memory_max_results: default_memory_max_results(),
         }
@@ -154,6 +156,7 @@ impl ChannelWrite {
 
 impl ChannelWrite {
     pub fn memory_defaults(mut self) -> Self {
+        self.memory_persistence_mode = MemoryPersistenceMode::AudienceOnly;
         self.memory_recall_mode = MemoryRecallMode::Fast;
         self.memory_max_results = default_memory_max_results();
         self
@@ -1155,6 +1158,7 @@ mod tests {
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
+            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
             memory_max_results: 5,
             created_by: write.created_by.unwrap_or_else(CreationProvenance::system),
@@ -1704,6 +1708,8 @@ mod tests {
                 persist_company_memory: false,
                 persist_agent_memory: false,
                 persist_user_memory: false,
+                memory_persistence_mode:
+                    crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
                 memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
                 memory_max_results: 5,
                 created_by: crate::entities::creation::CreationProvenance::system(),
@@ -1730,6 +1736,8 @@ mod tests {
                 persist_company_memory: false,
                 persist_agent_memory: false,
                 persist_user_memory: false,
+                memory_persistence_mode:
+                    crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
                 memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
                 memory_max_results: 5,
                 created_by: crate::entities::creation::CreationProvenance::system(),

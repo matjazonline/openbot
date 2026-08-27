@@ -265,6 +265,7 @@ fn mailbox_channel(company_id: Uuid) -> Channel {
         persist_company_memory: false,
         persist_agent_memory: false,
         persist_user_memory: false,
+        memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
         memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
         memory_max_results: 5,
         created_by: crate::entities::creation::CreationProvenance::system(),
@@ -496,12 +497,68 @@ fn top_bar_shows_the_logo_and_the_signed_in_account() {
     assert!(html.contains(r##"<form method="post" action="/logout">"##));
 
     // The top bar owns the whole width: the columns start below it, not beside it.
-    assert!(html.contains(r##"<div class="flex h-screen flex-col">"##));
+    assert!(html.contains(r##"<div class="app-shell flex flex-col">"##));
 
     // A user with no companies still gets the same bar, since it is their only way out.
     let no_company = mailbox_no_company_page(&user);
     assert!(no_company.contains("/assets/busybots-logo-dark-hor.png"));
     assert!(no_company.contains("Log out"));
+}
+
+/// The compact layout is driven entirely by markers the workspaces put on their own columns, so
+/// what these assert is the contract between a page and the shell -- not how the shell draws it.
+#[test]
+fn a_workspace_names_its_list_and_detail_columns_for_the_compact_layout() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let email = mailbox_account_email();
+    let user = mailbox_user(&email);
+    let html = mailbox_page(&MailboxPage {
+        user: &user,
+        company: &company,
+        companies: std::slice::from_ref(&company),
+        app_domain_name: "mailagents.com",
+        channels: std::slice::from_ref(&channel),
+        selected_channel: Some(&channel),
+        threads: &[],
+        next_cursor: None,
+        selected_thread_id: None,
+        activity: no_activity(),
+        detail_html: &empty_detail_pane("Select a channel to get started.", FragmentSwap::Inline),
+    });
+
+    assert!(html.contains(r##"class="ui-pane-list"##));
+    assert!(html.contains(r##"class="ui-pane-detail"##));
+    // The drawer and the way back out of a detail both live in the one top bar, so no workspace
+    // has to grow a phone-only control of its own.
+    assert!(html.contains(r##"data-action="toggle-rail""##));
+    assert!(html.contains(r##"data-action="pane-back""##));
+    assert!(html.contains(r##"id="rail-backdrop""##));
+    // The rail's glyphs gain names when it is a drawer rather than a column.
+    assert!(html.contains(r##"<span class="rail-label">Mailbox</span>"##));
+}
+
+/// Which column a phone opens on is decided by whether the detail column has anything in it, and
+/// that is the server's answer rather than the browser's guess.
+#[test]
+fn a_detail_column_with_nothing_open_says_so() {
+    let placeholder = empty_detail_pane("Select a channel to get started.", FragmentSwap::Inline);
+    assert!(placeholder.contains("data-pane-empty"));
+
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let email = mailbox_account_email();
+    let occupied = message_pane(&MessagePane {
+        company_id: company.id,
+        channel: &channel,
+        thread: &thread,
+        messages: &[],
+        agent: None,
+        viewer_email: &email,
+        activity: None,
+    });
+    assert!(!occupied.contains("data-pane-empty"));
 }
 
 #[test]
