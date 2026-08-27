@@ -34,7 +34,7 @@ sha2 = "0.10"
 serde_yaml = "0.9"
 schemars = "1"
 regex = "1"
-reqwest = { version = "0.12", features = ["json", "multipart"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
 futures = "0.3"
 url = "2"
 pulldown-cmark = "0.13"

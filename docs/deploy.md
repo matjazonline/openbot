@@ -134,6 +134,25 @@ memory controls remain unavailable until that connection reports `ready`.
 | `HYDRA_DB_FAST_TIMEOUT_SECS` | Request timeout for fast calls; 1–110 seconds |
 | `HYDRA_DB_THINKING_TIMEOUT_SECS` | Request timeout for thinking calls; 1–110 seconds and at least the fast timeout |
 
+HydraDB traffic also has fixed, provider-neutral application bounds. They are intentionally not
+deployment settings, so increasing a provider timeout or changing a deployment cannot remove the
+safety envelope:
+
+| Boundary | Limit and behavior |
+| --- | --- |
+| Connect / request / worker operation | 10 seconds maximum connect time; configured 1–110 second request time; 120 second total background-provider operation |
+| Recall query / additional context | 16,000 / 512 Unicode characters; safely truncated with an explicit marker |
+| Persistence user context / assistant answer | 32,000 Unicode characters each; safely truncated with an explicit marker |
+| Multi-channel upstream context | 24,000 Unicode characters across all preceding steps; safely truncated with an explicit marker |
+| Target collections | At most 3 per operation; larger operations are rejected |
+| Request / successful response body | 384 KiB total request envelope (376 KiB body plus 8 KiB reserved for validated URL, credential, and headers) / 512 KiB response; checked before send and while streaming before JSON parsing |
+| Provider URL / credential | 2,048 / 4,096 UTF-8 bytes; oversized startup configuration is rejected without logging the credential |
+| Recall results | At most the requested count and never more than 20 rows |
+| Chunk / final formatted memory context | 16,000 Unicode characters, including truncation marker and final context framing |
+
+Metrics `memory_truncations_total` and `memory_bound_rejections_total` report the operation and
+boundary without recording query, conversation, or response content.
+
 Provider selection, provisioning state, retry attempts, and cleanup jobs are durable. Disabling
 memory is suspension: runtime recall returns no memory, persistence is skipped immediately, and
 the connection plus channel memory choices are retained. Re-enabling a previously ready connection

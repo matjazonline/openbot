@@ -484,7 +484,18 @@ impl MemoryWorker {
         outcome: MemoryLeaseOutcome<Result<T, MemoryProviderError>>,
     ) -> Result<SupervisedProvider<Result<T, MemoryProviderError>>, String> {
         match outcome {
-            MemoryLeaseOutcome::Completed(result) => Ok(SupervisedProvider::Outcome(result)),
+            MemoryLeaseOutcome::Completed(result) => {
+                if let Err(error) = &result
+                    && let Some(boundary) = error.bound_label()
+                {
+                    self.monitoring.increment_counter(
+                        "memory_bound_rejections_total",
+                        1,
+                        &[("operation", operation), ("boundary", boundary)],
+                    );
+                }
+                Ok(SupervisedProvider::Outcome(result))
+            }
             MemoryLeaseOutcome::DeadlineExceeded => {
                 self.record_job(operation, "timeout");
                 Ok(SupervisedProvider::Outcome(Err(
@@ -613,11 +624,11 @@ mod tests {
         async fn recall(
             &self,
             _database_id: &str,
-            _query: &str,
+            _query: &crate::services::memory_provider::MemoryRecallQuery,
             _scopes: &[ResolvedMemoryScope],
             _mode: MemoryRecallMode,
             _max_results: u8,
-            _additional_context: Option<&str>,
+            _additional_context: Option<&crate::services::memory_provider::MemoryAdditionalContext>,
         ) -> Result<Vec<MemoryChunk>, MemoryProviderError> {
             Ok(Vec::new())
         }
@@ -666,11 +677,11 @@ mod tests {
         async fn recall(
             &self,
             _database_id: &str,
-            _query: &str,
+            _query: &crate::services::memory_provider::MemoryRecallQuery,
             _scopes: &[ResolvedMemoryScope],
             _mode: MemoryRecallMode,
             _max_results: u8,
-            _additional_context: Option<&str>,
+            _additional_context: Option<&crate::services::memory_provider::MemoryAdditionalContext>,
         ) -> Result<Vec<MemoryChunk>, MemoryProviderError> {
             Ok(Vec::new())
         }
