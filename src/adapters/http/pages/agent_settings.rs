@@ -93,7 +93,7 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
     let company = page.list.company;
     let content = format!(
         r##"
-        <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
+        <aside class="ui-pane-list flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
             {list_html}
             <div class="border-t border-base-300 p-2">
@@ -196,7 +196,7 @@ fn agent_model_summary(agent: &Agent) -> String {
 pub fn agent_settings_empty_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="agent-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="agent-pane"{PANE_SKELETON} data-pane-empty class="ui-pane-detail flex min-w-0 flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -214,9 +214,9 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
 
     format!(
         r##"
-        <section id="agent-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
-            <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
-                <div class="flex min-w-0 items-center gap-3">
+        <section id="agent-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-base-300 px-4 py-4 sm:px-6">
+                <div class="flex min-w-0 grow basis-48 items-center gap-3">
                     {avatar}
                     <div class="min-w-0">
                         <h2 class="truncate text-xl font-bold">{name}</h2>
@@ -225,7 +225,7 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
                     </div>
                 </div>
             </div>
-            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 {used_by_html}
                 <form hx-put="/ui/agents/{agent_id}?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
@@ -281,12 +281,12 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
 
     format!(
         r##"
-        <section id="agent-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
-            <div class="border-b border-base-300 px-6 py-4">
+        <section id="agent-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">New agent in {company_name}</h2>
                 <p class="text-xs opacity-70">An agent is a system prompt plus the model that answers with it. Channels run their agents in order.</p>
             </div>
-            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 <div role="tablist" class="tabs tabs-box mb-4 w-fit">
                     <button type="button" role="tab" id="agent-tab-simple-btn" class="tab {simple_active}"

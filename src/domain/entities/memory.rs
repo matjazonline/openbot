@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt,
-};
+use std::{collections::HashSet, fmt};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -147,6 +144,23 @@ pub enum MemoryRecallMode {
     Thinking,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryPersistenceMode {
+    #[default]
+    AudienceOnly,
+    ScopeSpecificFacts,
+}
+
+impl MemoryPersistenceMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::AudienceOnly => "audience_only",
+            Self::ScopeSpecificFacts => "scope_specific_facts",
+        }
+    }
+}
+
 impl MemoryRecallMode {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -167,6 +181,36 @@ pub enum MemoryScope {
     User,
 }
 
+impl MemoryScope {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Company => "Company",
+            Self::Agent(_) => "Agent",
+            Self::User => "User",
+        }
+    }
+
+    fn precedence(self) -> u8 {
+        match self {
+            Self::User => 3,
+            Self::Agent(_) => 2,
+            Self::Company => 1,
+        }
+    }
+
+    pub fn extraction_instructions(self) -> &'static str {
+        match self {
+            Self::User => USER_MEMORY_EXTRACTION_INSTRUCTIONS,
+            Self::Agent(_) => AGENT_MEMORY_EXTRACTION_INSTRUCTIONS,
+            Self::Company => COMPANY_MEMORY_EXTRACTION_INSTRUCTIONS,
+        }
+    }
+}
+
+pub const USER_MEMORY_EXTRACTION_INSTRUCTIONS: &str = "Extract only durable preferences, facts, constraints, and corrections attributable to this user. Exclude credentials, secrets, unrelated personal facts, and transient request details. If there are no qualifying facts, extract nothing.";
+pub const AGENT_MEMORY_EXTRACTION_INSTRUCTIONS: &str = "Extract only reusable lessons about agent behavior, tools, workflows, failures, and successful strategies. Exclude credentials, secrets, unrelated personal facts, and transient request details. If there are no qualifying facts, extract nothing.";
+pub const COMPANY_MEMORY_EXTRACTION_INSTRUCTIONS: &str = "Extract only durable organization-wide policies, terminology, decisions, and processes. Exclude credentials, secrets, unrelated personal facts, and transient request details. If there are no qualifying facts, extract nothing.";
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResolvedMemoryScope {
     pub scope: MemoryScope,
@@ -174,8 +218,35 @@ pub struct ResolvedMemoryScope {
     pub weight: f32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnavailableMemoryScope {
+    Agent,
+    User,
+}
+
+impl UnavailableMemoryScope {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Agent => "agent",
+            Self::User => "user",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ResolvedMemoryScopes {
+    pub resolved: Vec<ResolvedMemoryScope>,
+    pub unavailable: Vec<UnavailableMemoryScope>,
+}
+
 pub fn normalize_sender_email(email: &str) -> String {
     email.trim().to_lowercase()
+}
+
+fn user_collection(email: &str) -> String {
+    let mut hash = Sha256::new();
+    hash.update(normalize_sender_email(email).as_bytes());
+    format!("user_{:x}", hash.finalize())
 }
 
 pub fn resolve_scopes(
@@ -184,55 +255,39 @@ pub fn resolve_scopes(
     user: bool,
     agent_id: Option<Uuid>,
     sender_email: Option<&str>,
-) -> (Vec<ResolvedMemoryScope>, Vec<&'static str>) {
-    let mut by_collection: HashMap<String, ResolvedMemoryScope> = HashMap::new();
-    let mut warnings = Vec::new();
-    let requested = [
-        (company, MemoryScope::Company, 1.0),
-        (
-            agent,
-            agent_id
-                .map(MemoryScope::Agent)
-                .unwrap_or(MemoryScope::Company),
-            2.0,
-        ),
-        (user, MemoryScope::User, 3.0),
-    ];
-    for (enabled, scope, weight) in requested {
-        if !enabled {
-            continue;
-        }
-        let collection = match scope {
-            MemoryScope::Company => "company".to_string(),
-            MemoryScope::Agent(id) => format!("agent_{id}"),
-            MemoryScope::User => match sender_email
-                .map(normalize_sender_email)
-                .filter(|e| !e.is_empty())
-            {
-                Some(email) => format!("user_{email}"),
-                None => {
-                    warnings.push("user");
-                    "company".to_string()
-                }
-            },
-        };
-        if agent && agent_id.is_none() && weight == 2.0 {
-            warnings.push("agent");
-        }
-        by_collection
-            .entry(collection.clone())
-            .and_modify(|existing| existing.weight = existing.weight.max(weight))
-            .or_insert(ResolvedMemoryScope {
-                scope,
-                collection,
-                weight,
-            });
+) -> ResolvedMemoryScopes {
+    let mut result = ResolvedMemoryScopes::default();
+    if company {
+        result.resolved.push(ResolvedMemoryScope {
+            scope: MemoryScope::Company,
+            collection: "company".to_string(),
+            weight: 1.0,
+        });
     }
-    let mut scopes: Vec<_> = by_collection.into_values().collect();
-    scopes.sort_by(|a, b| a.collection.cmp(&b.collection));
-    warnings.sort_unstable();
-    warnings.dedup();
-    (scopes, warnings)
+    if agent {
+        match agent_id {
+            Some(id) => result.resolved.push(ResolvedMemoryScope {
+                scope: MemoryScope::Agent(id),
+                collection: format!("agent_{id}"),
+                weight: 2.0,
+            }),
+            None => result.unavailable.push(UnavailableMemoryScope::Agent),
+        }
+    }
+    if user {
+        match sender_email
+            .map(normalize_sender_email)
+            .filter(|email| !email.is_empty())
+        {
+            Some(email) => result.resolved.push(ResolvedMemoryScope {
+                scope: MemoryScope::User,
+                collection: user_collection(&email),
+                weight: 3.0,
+            }),
+            None => result.unavailable.push(UnavailableMemoryScope::User),
+        }
+    }
+    result
 }
 
 pub fn stable_memory_id(task_id: Uuid, channel_id: Uuid, agent_id: Option<Uuid>) -> String {
@@ -250,6 +305,8 @@ pub fn remote_memory_database_id(company_id: Uuid) -> String {
 }
 
 pub fn deduplicate_chunks(chunks: impl IntoIterator<Item = MemoryChunk>) -> Vec<MemoryChunk> {
+    let mut chunks: Vec<_> = chunks.into_iter().collect();
+    chunks.sort_by_key(|chunk| std::cmp::Reverse(chunk.source_scope.precedence()));
     let mut ids = HashSet::new();
     let mut contents = HashSet::new();
     let mut total = 0usize;
@@ -284,31 +341,97 @@ pub fn deduplicate_chunks(chunks: impl IntoIterator<Item = MemoryChunk>) -> Vec<
 pub struct MemoryChunk {
     pub source_chunk_id: Option<String>,
     pub content: String,
+    pub source_scope: MemoryScope,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn fallback_deduplicates_and_keeps_highest_weight() {
-        let (scopes, warnings) = resolve_scopes(true, true, true, None, None);
-        assert_eq!(scopes.len(), 1);
-        assert_eq!(scopes[0].collection, "company");
-        assert_eq!(scopes[0].weight, 3.0);
-        assert_eq!(warnings, ["agent", "user"]);
+    fn unavailable_scopes_are_skipped_without_company_fallback() {
+        let scopes = resolve_scopes(false, true, true, None, None);
+        assert!(scopes.resolved.is_empty());
+        assert_eq!(
+            scopes.unavailable,
+            [UnavailableMemoryScope::Agent, UnavailableMemoryScope::User]
+        );
     }
     #[test]
     fn all_available_scopes_are_additive() {
         let agent = Uuid::nil();
-        let (scopes, warnings) =
-            resolve_scopes(true, true, true, Some(agent), Some(" USER@Example.COM "));
-        assert_eq!(scopes.len(), 3);
-        assert!(warnings.is_empty());
+        let scopes = resolve_scopes(true, true, true, Some(agent), Some(" USER@Example.COM "));
+        assert_eq!(scopes.resolved.len(), 3);
+        assert!(scopes.unavailable.is_empty());
         assert!(
             scopes
+                .resolved
                 .iter()
-                .any(|s| s.collection == "user_user@example.com" && s.weight == 3.0)
+                .any(|s| s.scope == MemoryScope::User && s.weight == 3.0)
         );
+        assert!(
+            scopes
+                .resolved
+                .iter()
+                .all(|scope| !scope.collection.contains('@'))
+        );
+    }
+
+    #[test]
+    fn each_retrieval_flag_selects_only_its_own_scope() {
+        let agent = Uuid::new_v4();
+        let cases = [
+            ((true, false, false), MemoryScope::Company),
+            ((false, true, false), MemoryScope::Agent(agent)),
+            ((false, false, true), MemoryScope::User),
+        ];
+        for ((company, agent_enabled, user), expected) in cases {
+            let scopes = resolve_scopes(
+                company,
+                agent_enabled,
+                user,
+                Some(agent),
+                Some("user@example.com"),
+            );
+            assert_eq!(scopes.resolved.len(), 1);
+            assert_eq!(scopes.resolved[0].scope, expected);
+            assert!(scopes.unavailable.is_empty());
+        }
+    }
+
+    #[test]
+    fn persistence_mode_uses_the_channel_wire_values() {
+        assert_eq!(
+            serde_json::to_string(&MemoryPersistenceMode::AudienceOnly).unwrap(),
+            "\"audience_only\""
+        );
+        assert_eq!(
+            serde_json::from_str::<MemoryPersistenceMode>("\"scope_specific_facts\"").unwrap(),
+            MemoryPersistenceMode::ScopeSpecificFacts
+        );
+    }
+
+    #[test]
+    fn user_collection_is_normalized_stable_and_pii_free() {
+        let first = resolve_scopes(false, false, true, None, Some(" User@Example.COM "));
+        let second = resolve_scopes(false, false, true, None, Some("user@example.com"));
+        assert_eq!(first.resolved[0].collection, second.resolved[0].collection);
+        assert!(!first.resolved[0].collection.contains('@'));
+        assert!(!first.resolved[0].collection.contains("example"));
+    }
+
+    #[test]
+    fn missing_user_does_not_suppress_available_company_and_agent_scopes() {
+        let agent = Uuid::new_v4();
+        let scopes = resolve_scopes(true, true, true, Some(agent), None);
+        assert_eq!(
+            scopes
+                .resolved
+                .iter()
+                .map(|scope| scope.scope)
+                .collect::<Vec<_>>(),
+            [MemoryScope::Company, MemoryScope::Agent(agent)]
+        );
+        assert_eq!(scopes.unavailable, [UnavailableMemoryScope::User]);
     }
     #[test]
     fn memory_id_is_stable_and_agent_sensitive() {
@@ -343,17 +466,21 @@ mod tests {
             MemoryChunk {
                 source_chunk_id: Some("source-1".into()),
                 content: "Same   CONTENT".into(),
+                source_scope: MemoryScope::Company,
             },
             MemoryChunk {
                 source_chunk_id: None,
                 content: "same content".into(),
+                source_scope: MemoryScope::User,
             },
             MemoryChunk {
                 source_chunk_id: Some("source-2".into()),
                 content: "different".into(),
+                source_scope: MemoryScope::Agent(Uuid::nil()),
             },
         ]);
         assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks[0].source_scope, MemoryScope::User);
     }
 
     #[test]
@@ -362,6 +489,7 @@ mod tests {
         let chunks = deduplicate_chunks([MemoryChunk {
             source_chunk_id: None,
             content,
+            source_scope: MemoryScope::Company,
         }]);
         assert_eq!(chunks[0].content.chars().count(), MAX_MEMORY_CONTEXT_CHARS);
     }

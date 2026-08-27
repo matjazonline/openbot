@@ -33,7 +33,7 @@ use crate::{
             ResolvedAgentParams,
         },
         email_parser::ParsedEmail,
-        memory_coordinator::{MemoryPersistInput, MemoryRecallInput},
+        memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
         outbound_dispatcher::{
             OutboundDispatcher, OutboundEmail, SentEmailResult, agent_response_email_body,
         },
@@ -216,6 +216,11 @@ impl ThreadUseCases {
                         channel: &channel_match.channel,
                         agent: agent.as_ref(),
                         sender: Some(&parsed.sender),
+                        audience: if membership.is_team() {
+                            MemoryRecallAudience::MemberOrSystem
+                        } else {
+                            MemoryRecallAudience::External
+                        },
                         task_id,
                         latest_prompt: &parsed.prompt_text,
                     })

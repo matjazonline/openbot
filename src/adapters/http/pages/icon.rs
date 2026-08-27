@@ -74,6 +74,8 @@ pub enum Icon {
     DotFill,
     /// Add the thing this sits on.
     Plus,
+    /// The navigation drawer, on a viewport too narrow to keep the rail in view.
+    Menu,
 }
 
 impl Icon {
@@ -133,6 +135,9 @@ impl Icon {
             }
             Icon::ChevronDown => {
                 r##"<path d="M12.78 5.22a.749.749 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.06 0L3.22 6.28a.749.749 0 1 1 1.06-1.06L8 8.939l3.72-3.719a.749.749 0 0 1 1.06 0Z"/>"##
+            }
+            Icon::Menu => {
+                r##"<path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"/>"##
             }
             Icon::ArrowLeft => {
                 r##"<path d="M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06Z"/>"##

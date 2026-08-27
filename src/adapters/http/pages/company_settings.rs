@@ -179,7 +179,7 @@ pub struct CompanyCounts {
 pub fn company_settings_page(page: &CompanySettingsPage<'_>) -> String {
     let content = format!(
         r##"
-        <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
+        <aside class="ui-pane-list flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
             {list_html}
             <div class="border-t border-base-300 p-2">
@@ -256,7 +256,7 @@ fn company_settings_entry(company: &Company, selected: bool) -> String {
 pub fn company_settings_empty_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="company-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="company-pane"{PANE_SKELETON} data-pane-empty class="ui-pane-detail flex min-w-0 flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -278,7 +278,7 @@ pub fn company_edit_pane_with_memory(
 
     format!(
         r##"
-        <section id="company-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
+        <section id="company-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-6 pt-4">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
@@ -339,7 +339,7 @@ fn company_settings_body(
     if !pane.editable {
         return format!(
             r##"
-            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 <div class="rounded-box border border-base-300 bg-base-200 p-5">
                     <h3 class="font-semibold">Company settings</h3>
                     <p class="mt-1 text-sm opacity-70">Only the company owner can edit these settings.</p>
@@ -355,7 +355,7 @@ fn company_settings_body(
 
     format!(
         r##"
-            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 {workspace_links}
                 <form hx-put="/ui/companies/{company_id}" hx-target="#company-pane" hx-swap="outerHTML" class="space-y-4">
@@ -398,12 +398,12 @@ pub fn company_create_pane_with_memory(
 ) -> String {
     format!(
         r##"
-        <section id="company-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
-            <div class="border-b border-base-300 px-6 py-4">
+        <section id="company-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">New company</h2>
                 <p class="text-xs opacity-70">A company owns its channels, agents and threads, and its slug is the domain part their addresses are built on.</p>
             </div>
-            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 <form class="space-y-4" hx-post="/ui/companies" hx-target="#company-pane" hx-swap="outerHTML"
                     hx-disabled-elt="find button[type='submit']">

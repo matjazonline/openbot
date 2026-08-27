@@ -92,7 +92,7 @@ const LOGOUT_MODAL: &str = r##"
 /// connections at once, so connection state belongs in the shell rather than beside one pane.
 const LIVE_UPDATE_STATUS: &str = r##"
         <div id="live-update-status" role="status" aria-live="polite" aria-atomic="true"
-            class="alert alert-warning pointer-events-none fixed left-1/2 top-4 z-50 hidden w-auto -translate-x-1/2 px-4 py-2 text-sm font-medium shadow-lg">
+            class="alert alert-warning pointer-events-none fixed left-1/2 top-4 z-50 hidden w-auto max-w-[calc(100vw-2rem)] -translate-x-1/2 px-4 py-2 text-sm font-medium shadow-lg">
             <span>Live updates paused. Reconnecting&hellip;</span>
         </div>
         "##;
@@ -121,13 +121,14 @@ pub fn ui_shell(shell: &UiShell<'_>) -> String {
 
     let body = format!(
         r##"
-    <div class="flex h-screen flex-col">
+    <div class="app-shell flex flex-col">
         {top_bar}
-        <div class="flex min-h-0 flex-1">
+        <div class="app-workspace flex min-h-0 flex-1">
             {rail}
             {content}
         </div>
     </div>
+    <div id="rail-backdrop" data-action="close-rail" aria-hidden="true"></div>
     {LIVE_UPDATE_STATUS}
     {LOGOUT_MODAL}
         "##,
@@ -329,6 +330,53 @@ pub(crate) const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` ch
             if (!sidebar) return;
             setMailboxSidebarExpanded(!sidebar.classList.contains('mailbox-sidebar-open'));
         }
+
+        // Below the compact breakpoint the rail is a drawer rather than a column, and these two
+        // attributes on <body> are the whole of the phone layout's state -- COMPACT_LAYOUT_STYLES
+        // reads them and nothing else does. On a wide window they are inert.
+        function setRailOpen(open) {
+            document.body.dataset.rail = open ? 'open' : 'closed';
+            var toggle = document.querySelector('[data-action="toggle-rail"]');
+            if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+
+        function toggleRail() {
+            setRailOpen(document.body.dataset.rail !== 'open');
+        }
+
+        // Which of a workspace's two columns the phone is showing. Opening something takes the
+        // reader to it and closes whatever navigation is over the top; the back button in the top
+        // bar is the way out.
+        function setMobilePane(pane) {
+            document.body.dataset.pane = pane;
+            setRailOpen(false);
+        }
+
+        // What the server just rendered decides where a fresh load starts: a detail pane marked
+        // empty means nothing is open, so the list is what the reader wants to see first. This is
+        // also what makes a deep link -- a thread, a task, a channel in the URL -- open on the
+        // thing it names rather than on the list beside it.
+        function syncMobilePane() {
+            var detail = document.querySelector('.ui-pane-detail');
+            setMobilePane(detail && !detail.hasAttribute('data-pane-empty') ? 'detail' : 'list');
+        }
+
+        syncMobilePane();
+        document.addEventListener('htmx:historyRestore', syncMobilePane);
+
+        // Every workspace opens its detail the same way -- an htmx swap of the pane -- so one
+        // listener covers all of them, and none of the pages has to know the phone layout exists.
+        // A swap that puts an *empty* pane back (a cancelled form, a deleted record) means the
+        // selection is gone, and the reader belongs back on the list.
+        document.body.addEventListener('htmx:beforeSwap', function (event) {
+            // Only a request the reader made is navigation. A live stream writing into the pane
+            // they are not looking at must not drag them over to it, and carries no `xhr`.
+            if (!event.detail.xhr) return;
+            var target = event.detail.target;
+            if (!target || !target.closest || !target.closest('.ui-pane-detail')) return;
+            var empty = (event.detail.serverResponse || '').indexOf('data-pane-empty') !== -1;
+            setMobilePane(empty ? 'list' : 'detail');
+        });
 
         function selectThreadRow(el) {
             document.querySelectorAll('#thread-list .thread-row').forEach(function (row) {
@@ -583,7 +631,7 @@ fn ui_layout(title: &str, body: &str, script: &str) -> String {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Mail Agents</title>
     <link href="/assets/app.css" rel="stylesheet" type="text/css" />
-    <style>{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}{APP_SHELL_STYLES}{THREAD_ROW_STYLES}{MAILBOX_LAYOUT_STYLES}</style>
+    <style>{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}{APP_SHELL_STYLES}{THREAD_ROW_STYLES}{MAILBOX_LAYOUT_STYLES}{COMPACT_LAYOUT_STYLES}</style>
     <script src="/assets/theme-init.js"></script>
     <script src="/assets/htmx-2.0.4.min.js" defer></script>
     <script src="/assets/htmx-ext-sse-2.2.3.js" defer></script>
@@ -622,6 +670,9 @@ document.addEventListener('click', function (event) {
         case 'select-sidebar-item': selectSidebarItem(control); break;
         case 'select-thread-row': selectThreadRow(control); break;
         case 'toggle-mailbox-sidebar': toggleMailboxSidebar(); break;
+        case 'toggle-rail': toggleRail(); break;
+        case 'close-rail': setRailOpen(false); break;
+        case 'pane-back': setMobilePane('list'); break;
         case 'show-agent-tab': showAgentTab(control.dataset.advanced === 'true'); break;
         case 'toggle-agent-prompt': toggleAgentPromptGenerator(control.dataset.prefix); break;
         case 'show-channel-tab': showChannelTab(control.dataset.tab); break;
@@ -688,7 +739,7 @@ pub fn mailbox_page(page: &MailboxPage<'_>) -> String {
     };
 
     let content = format!(
-        "{sidebar}<div class=\"flex min-h-0 w-96 shrink-0 flex-col\">{compact_header}{thread_column_html}</div>{detail_html}",
+        "{sidebar}<div class=\"ui-pane-list flex min-h-0 w-96 shrink-0 flex-col\">{compact_header}{thread_column_html}</div>{detail_html}",
         sidebar = channel_sidebar(page),
         compact_header = compact_mailbox_header(page),
         detail_html = page.detail_html,
@@ -796,6 +847,8 @@ const FIELD_STYLES: &str = r##"
         .select:focus, .select:focus-within, .select:open,
         .textarea:focus, .textarea:focus-within,
         .file-input:focus, .file-input:focus-within { outline-offset: -1px; }
+
+        .form-control > .label { white-space: normal; }
 "##;
 
 /// Shared visual language for every authenticated workspace.
@@ -911,6 +964,9 @@ const THREAD_ROW_STYLES: &str = r##"
 /// The channel sidebar becomes an overlay when the viewport cannot comfortably hold all three
 /// mailbox columns. Its compact replacement stays above the thread header: a quick channel
 /// dropdown plus a button that reveals the full mailbox, including channel addresses and actions.
+///
+/// On a phone -- see [`COMPACT_LAYOUT_STYLES`] -- the rail has left the flow too, so the overlay
+/// starts at the edge of the window rather than beside a column that is no longer there.
 const MAILBOX_LAYOUT_STYLES: &str = r##"
         .mailbox-compact-header, .mailbox-sidebar-close { display: none; }
 
@@ -927,6 +983,102 @@ const MAILBOX_LAYOUT_STYLES: &str = r##"
             #mailbox-sidebar.mailbox-sidebar-open { display: flex; }
             .mailbox-compact-header { display: flex; }
             .mailbox-sidebar-close { display: inline-flex; }
+        }
+
+        @media (max-width: 47.999rem) {
+            #mailbox-sidebar {
+                left: 0;
+                width: min(20rem, 85vw);
+                z-index: 46;
+            }
+        }
+"##;
+
+/// What a workspace becomes on a phone: one column at a time, with the rail as a drawer over it.
+///
+/// The three-column reader assumes a window wide enough to hold a list *and* what it points at.
+/// Below `48rem` there is room for one of them, so the shell stops laying the columns out side by
+/// side and starts showing whichever one the reader is actually in: the list until they pick
+/// something, the detail until they come back. `data-pane` on `<body>` is that one bit of state --
+/// written by `syncMobilePane` on load and by the pane swaps themselves, and read only here, so
+/// nothing about the wider layout depends on it.
+///
+/// A workspace opts in by naming its columns rather than by being special-cased: `ui-pane-list`
+/// on the column that lists, `ui-pane-detail` on the column that shows one thing, `ui-split` on a
+/// pair of columns that should stack rather than drill, and `ui-pane-stacked` on the one of that
+/// pair that sits on top -- the Dashboard's filters, the Team tab's members, a schedule's runs.
+const COMPACT_LAYOUT_STYLES: &str = r##"
+        /* `dvh` follows a mobile browser's collapsing toolbars; `vh` does not, and leaves the
+           composer under the address bar. The `vh` line is the fallback for browsers without it. */
+        .app-shell { height: 100vh; height: 100dvh; }
+
+        #rail-backdrop { display: none; }
+        .ui-mobile-only, .ui-mobile-back, .rail-label { display: none; }
+
+        @media (max-width: 47.999rem) {
+            .ui-desktop-only { display: none; }
+            .ui-mobile-only { display: inline-flex; }
+            body[data-pane="detail"] .ui-mobile-back { display: inline-flex; }
+
+            /* The rail slides in over the workspace, wide enough here to name its destinations --
+               a column of unlabelled glyphs is affordable beside content, not on top of it. */
+            .app-rail {
+                position: fixed;
+                top: 4rem;
+                bottom: 0;
+                left: 0;
+                z-index: 47;
+                width: 15rem;
+                align-items: stretch;
+                transform: translateX(-100%);
+                transition: transform 180ms ease;
+                box-shadow: 12px 0 32px color-mix(in oklab, #000 28%, transparent);
+            }
+            body[data-rail="open"] .app-rail { transform: none; }
+            .app-rail .btn {
+                width: 100%;
+                justify-content: flex-start;
+                gap: .75rem;
+                padding-inline: .75rem;
+            }
+            .app-rail .btn-primary::before { left: .125rem; }
+            .rail-label { display: inline; }
+
+            #rail-backdrop {
+                display: block;
+                position: fixed;
+                inset: 4rem 0 0 0;
+                z-index: 46;
+                background: color-mix(in oklab, #000 45%, transparent);
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 180ms ease;
+            }
+            body[data-rail="open"] #rail-backdrop { opacity: 1; pointer-events: auto; }
+
+            /* Stacking the workspace lets a column that is on its own take the full window, and
+               lets the two that are not sit above one another instead of shoulder to shoulder. */
+            .app-workspace { flex-direction: column; }
+
+            .ui-pane-list, .ui-pane-detail {
+                width: 100%;
+                min-width: 0;
+                min-height: 0;
+                flex: 1 1 auto;
+                border-right-width: 0;
+            }
+            body[data-pane="detail"] .ui-pane-list { display: none; }
+            body:not([data-pane="detail"]) .ui-pane-detail { display: none; }
+
+            .ui-split { flex-direction: column; }
+            .ui-pane-stacked {
+                width: 100%;
+                flex: 0 0 auto;
+                max-height: 45vh;
+                overflow-y: auto;
+                border-right-width: 0;
+                border-bottom: 1px solid var(--color-base-300);
+            }
         }
 "##;
 
@@ -969,9 +1121,12 @@ fn top_bar(user: &MailboxUser<'_>, company: Option<&Company>) -> String {
 
     format!(
         r##"
-        <header class="app-topbar navbar z-40 h-16 min-h-16 shrink-0 gap-4 border-b border-base-300 px-4 lg:px-5">
-            <div class="flex flex-1 basis-0 items-center">
-                <a href="/ui" class="flex items-center" title="BusyBots">
+        <header class="app-topbar navbar z-40 h-16 min-h-16 shrink-0 gap-2 border-b border-base-300 px-3 sm:gap-4 sm:px-4 lg:px-5">
+            <div class="flex flex-1 basis-0 items-center gap-1">
+{rail_toggle}
+                <button type="button" class="ui-mobile-back btn btn-ghost btn-square btn-sm"
+                    title="Back to the list" aria-label="Back to the list" data-action="pane-back">{back}</button>
+                <a href="/ui" class="ui-desktop-only flex items-center" title="BusyBots">
 {BRAND_LOGO}
                 </a>
             </div>
@@ -998,9 +1153,28 @@ fn top_bar(user: &MailboxUser<'_>, company: Option<&Company>) -> String {
         </header>
         "##,
         email = escape_html_text(user.email),
+        rail_toggle = if company.is_some() {
+            rail_toggle_button()
+        } else {
+            String::new()
+        },
+        back = icon(Icon::ArrowLeft, BUTTON_ICON),
         sign_out = icon(Icon::SignOut, BUTTON_ICON),
         chip = account_chip(user, FragmentSwap::Inline),
         agent_library = agent_library_entry(user),
+    )
+}
+
+/// The button that brings the rail out on a phone, where it is a drawer rather than a column.
+///
+/// An account with no company yet gets no rail — [`ui_shell`] leaves it out — so it gets no
+/// button for one either, rather than one that opens nothing.
+fn rail_toggle_button() -> String {
+    format!(
+        r##"<button type="button" class="ui-mobile-only btn btn-ghost btn-square btn-sm"
+                    title="Show navigation" aria-label="Show navigation"
+                    aria-controls="app-rail" aria-expanded="false" data-action="toggle-rail">{menu}</button>"##,
+        menu = icon(Icon::Menu, BUTTON_ICON),
     )
 }
 
@@ -1084,7 +1258,7 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
         .filter(|(destination, _, _, _)| rail_section_visible(user, *destination))
         .map(|(destination, path, glyph, title)| {
             format!(
-                r##"<a href="{path}?company_id={company_id}" class="btn btn-square btn-md {style}" title="{title}" aria-label="{title}"{current}>{glyph}</a>"##,
+                r##"<a href="{path}?company_id={company_id}" class="btn btn-square btn-md {style}" title="{title}" aria-label="{title}"{current}>{glyph}<span class="rail-label">{title}</span></a>"##,
                 style = if section == *destination {
                     "btn-primary"
                 } else {
@@ -1098,7 +1272,7 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
 
     format!(
         r##"
-        <nav class="app-rail flex w-16 shrink-0 flex-col items-center gap-1.5 overflow-y-auto border-r border-base-300 px-2 py-3" aria-label="Primary navigation">
+        <nav id="app-rail" class="app-rail flex w-16 shrink-0 flex-col items-center gap-1.5 overflow-y-auto border-r border-base-300 px-2 py-3" aria-label="Primary navigation">
             {links}
             {company_badge}
         </nav>
@@ -1142,7 +1316,7 @@ fn rail_section_visible(user: &MailboxUser<'_>, section: UiSection) -> bool {
 pub fn rail_company_badge(company: &Company, swap: FragmentSwap) -> String {
     format!(
         r##"<a id="rail-company" href="/ui/companies?company_id={company_id}"
-                class="btn btn-square btn-md btn-ghost mt-auto" title="{name}" aria-label="Company: {name}"{oob}>{avatar}</a>"##,
+                class="btn btn-square btn-md btn-ghost mt-auto" title="{name}" aria-label="Company: {name}"{oob}>{avatar}<span class="rail-label">{name}</span></a>"##,
         company_id = company.id,
         name = escape_html_text(&company.name),
         oob = swap.oob_attribute(),
@@ -1404,7 +1578,7 @@ fn channel_menu_item(
 pub fn empty_thread_column() -> String {
     format!(
         r##"
-        <section id="thread-column"{THREAD_COLUMN_SKELETON} class="flex w-96 shrink-0 flex-col border-r border-base-300 bg-base-100">
+        <section id="thread-column"{THREAD_COLUMN_SKELETON} class="flex w-full min-w-0 flex-col border-r border-base-300 bg-base-100">
             <div class="flex items-center justify-between border-b border-base-300 px-4 py-3">
                 <h2 class="text-lg font-bold">Threads</h2>
             </div>
@@ -1427,7 +1601,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
 
     format!(
         r##"
-        <section id="thread-column"{THREAD_COLUMN_SKELETON} class="flex w-96 shrink-0 flex-col border-r border-base-300 bg-base-100"
+        <section id="thread-column"{THREAD_COLUMN_SKELETON} class="flex w-full min-w-0 flex-col border-r border-base-300 bg-base-100"
             hx-ext="sse"
             sse-connect="/ui/threads/events?company_id={company_id}&channel_id={channel_id}{after}">
             <div class="flex items-center justify-between gap-2 border-b border-base-300 px-4 py-3">
@@ -1435,7 +1609,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
                     <h2 class="truncate text-lg font-bold">{channel_name}</h2>
                     <p class="truncate text-xs opacity-60">Newest threads first</p>
                 </div>
-                <div class="flex shrink-0 items-center gap-2">
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
                     {compose_button}
                     <button type="button" class="btn btn-ghost btn-sm btn-square text-xl leading-none" title="Reload threads"
                         hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
@@ -1660,7 +1834,7 @@ fn thread_pagination(column: &ThreadColumn<'_>, swap: FragmentSwap) -> String {
 pub fn empty_detail_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="detail-pane"{PANE_SKELETON} class="flex min-w-0 flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="detail-pane"{PANE_SKELETON} data-pane-empty class="ui-pane-detail flex min-w-0 flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -1708,15 +1882,15 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
 
     format!(
         r##"
-        <section id="detail-pane"{PANE_SKELETON} data-thread-id="{thread_id}" class="flex min-w-0 flex-1 flex-col bg-base-100" hx-ext="sse"
+        <section id="detail-pane"{PANE_SKELETON} data-thread-id="{thread_id}" class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100" hx-ext="sse"
             sse-connect="/ui/events?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}{after}">
-            <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
-                <div class="min-w-0">
-                    <h2 class="truncate text-xl font-bold">{subject}</h2>
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-base-300 px-4 py-3 sm:px-6 sm:py-4">
+                <div class="min-w-0 grow basis-48">
+                    <h2 class="truncate text-lg font-bold sm:text-xl">{subject}</h2>
                     <p class="truncate text-xs opacity-70">{participants}</p>
                     <p class="truncate font-mono text-[11px] opacity-40">{thread_id}</p>
                 </div>
-                <div class="flex shrink-0 items-center gap-2">
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
                     <button type="button" class="btn btn-primary btn-sm" title="Send another message in this thread"
                         hx-get="/ui/reply?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
                         hx-target="#detail-pane" hx-swap="outerHTML">{pencil} New Message</button>
@@ -1727,7 +1901,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                         class="btn btn-outline btn-sm">Open in Simulator</a>
                 </div>
             </div>
-            <div id="message-scroll" class="flex-1 space-y-1 overflow-y-auto px-6 py-4"
+            <div id="message-scroll" class="flex-1 space-y-1 overflow-y-auto px-4 py-4 sm:px-6"
                 sse-swap="message" hx-swap="beforeend">
                 {messages_html}
             </div>
@@ -1757,7 +1931,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
 fn thread_composer(pane: &MessagePane<'_>) -> String {
     format!(
         r##"
-            <form class="border-t border-base-300 px-6 py-3" hx-post="/ui/reply"
+            <form class="border-t border-base-300 px-4 py-3 sm:px-6" hx-post="/ui/reply"
                 hx-target="#detail-pane" hx-swap="outerHTML">
                 <input type="hidden" name="company_id" value="{company_id}">
                 <input type="hidden" name="channel_id" value="{channel_id}">
@@ -1978,12 +2152,12 @@ fn send_form_footer(deliver: bool, quiet: bool, cancel_attributes: &str) -> Stri
 pub fn compose_pane(pane: &ComposePane<'_>) -> String {
     format!(
         r##"
-        <section id="detail-pane"{PANE_SKELETON} class="flex min-w-0 flex-1 flex-col bg-base-100">
-            <div class="border-b border-base-300 px-6 py-4">
+        <section id="detail-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">New thread in {channel_name}</h2>
                 <p class="text-xs opacity-70">The message enters the channel as if it had been emailed in.</p>
             </div>
-            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 <form hx-post="/ui/compose" hx-target="#detail-pane" hx-swap="outerHTML" class="space-y-4">
                     <input type="hidden" name="company_id" value="{company_id}">
@@ -2033,12 +2207,12 @@ pub fn compose_pane(pane: &ComposePane<'_>) -> String {
 pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
     format!(
         r##"
-        <section id="detail-pane"{PANE_SKELETON} class="flex min-w-0 flex-1 flex-col bg-base-100">
-            <div class="border-b border-base-300 px-6 py-4">
+        <section id="detail-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">New message in {subject}</h2>
                 <p class="text-xs opacity-70">The message enters the channel as if it had been emailed in, continuing this thread.</p>
             </div>
-            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 <form hx-post="/ui/reply" hx-target="#detail-pane" hx-swap="outerHTML" class="space-y-4">
                     <input type="hidden" name="company_id" value="{company_id}">

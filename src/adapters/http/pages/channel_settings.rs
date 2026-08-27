@@ -161,6 +161,7 @@ pub struct ChannelDraft<'a> {
     pub persist_company_memory: bool,
     pub persist_agent_memory: bool,
     pub persist_user_memory: bool,
+    pub memory_persistence_mode: &'a str,
     pub memory_recall_mode: &'a str,
     pub memory_max_results: String,
 }
@@ -188,6 +189,7 @@ impl Default for ChannelDraft<'_> {
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
+            memory_persistence_mode: "audience_only",
             memory_recall_mode: "fast",
             memory_max_results: "5".into(),
         }
@@ -236,7 +238,7 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
     let company = page.list.company;
     let content = format!(
         r##"
-        <aside class="flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
+        <aside class="ui-pane-list flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
             {list_html}
             <div class="border-t border-base-300 p-2">
@@ -339,7 +341,7 @@ pub fn disabled_badge(channel: &Channel) -> &'static str {
 pub fn channel_settings_empty_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="channel-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="channel-pane"{PANE_SKELETON} data-pane-empty class="ui-pane-detail flex min-w-0 flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -363,19 +365,19 @@ pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: b
 
     format!(
         r##"
-        <section id="channel-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
-            <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
-                <div class="min-w-0">
+        <section id="channel-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-base-300 px-4 py-4 sm:px-6">
+                <div class="min-w-0 grow basis-48">
                     <h2 class="truncate text-xl font-bold">{name}</h2>
                     <p class="truncate font-mono text-xs opacity-60">{address}</p>
                     <p class="truncate text-xs opacity-50">{creator}</p>
                 </div>
-                <div class="flex shrink-0 items-center gap-2">
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
                     <a href="/ui?company_id={company_id}&channel_id={channel_id}" class="btn btn-ghost btn-sm">Open Mailbox</a>
                     <a href="/companies/{company_id}/channels/{channel_id}/simulate" class="btn btn-outline btn-sm">Simulator</a>
                 </div>
             </div>
-            <div class="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-6">
                 {error_html}
                 <form hx-put="/ui/channels/{channel_id}?company_id={company_id}" hx-target="#channel-pane" hx-swap="outerHTML" class="space-y-4">
                     <input type="hidden" name="form_mode" value="advanced">
@@ -439,12 +441,12 @@ pub fn channel_create_pane_with_memory(pane: &ChannelCreatePane<'_>, memory_read
 
     format!(
         r##"
-        <section id="channel-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
-            <div class="border-b border-base-300 px-6 py-4">
+        <section id="channel-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">New channel in {company_name}</h2>
                 <p class="text-xs opacity-70">A channel is an inbound address at <span class="font-mono">@{company_slug}.{app_domain_name}</span> plus the agents that answer it.</p>
             </div>
-            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 <div role="tablist" class="tabs tabs-box mb-4 w-fit">
                     <button type="button" role="tab" id="channel-tab-easy-btn" class="tab {easy_active}"
@@ -909,6 +911,7 @@ fn stored_draft<'a>(
         persist_company_memory: channel.persist_company_memory,
         persist_agent_memory: channel.persist_agent_memory,
         persist_user_memory: channel.persist_user_memory,
+        memory_persistence_mode: channel.memory_persistence_mode.as_str(),
         memory_recall_mode: channel.memory_recall_mode.as_str(),
         memory_max_results: channel.memory_max_results.to_string(),
     }
@@ -917,8 +920,15 @@ fn stored_draft<'a>(
 fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {
     let disabled = if memory_ready { "" } else { " disabled" };
     let checked = |value: bool| if value { " checked" } else { "" };
-    let selected = |value: &str| {
+    let recall_selected = |value: &str| {
         if draft.memory_recall_mode == value {
+            " selected"
+        } else {
+            ""
+        }
+    };
+    let persistence_selected = |value: &str| {
+        if draft.memory_persistence_mode == value {
             " selected"
         } else {
             ""
@@ -939,7 +949,13 @@ fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {
                             <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true" class="checkbox checkbox-sm"{persist_agent}{disabled}>
                             <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true" class="checkbox checkbox-sm"{persist_user}{disabled}>
                         </div>
-                        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <label class="form-control"><span class="mb-1 text-xs opacity-70">Persistence mode</span>
+                                <select name="memory_persistence_mode" class="select w-full"{disabled}>
+                                    <option value="audience_only"{audience_only_selected}>Audience only</option>
+                                    <option value="scope_specific_facts"{scope_specific_selected}>Scope-specific facts</option>
+                                </select>
+                            </label>
                             <label class="form-control"><span class="mb-1 text-xs opacity-70">Recall mode</span>
                                 <select name="memory_recall_mode" class="select w-full"{disabled}>
                                     <option value="fast"{fast_selected}>Fast</option>
@@ -957,8 +973,10 @@ fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {
         persist_company = checked(draft.persist_company_memory),
         persist_agent = checked(draft.persist_agent_memory),
         persist_user = checked(draft.persist_user_memory),
-        fast_selected = selected("fast"),
-        thinking_selected = selected("thinking"),
+        audience_only_selected = persistence_selected("audience_only"),
+        scope_specific_selected = persistence_selected("scope_specific_facts"),
+        fast_selected = recall_selected("fast"),
+        thinking_selected = recall_selected("thinking"),
         max_results = escape_html_text(&draft.memory_max_results),
     )
 }

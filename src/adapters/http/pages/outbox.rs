@@ -95,7 +95,7 @@ pub fn outbox_page(page: &OutboxPage<'_>) -> String {
     let company = page.list.company;
     let content = format!(
         r##"
-        <aside class="flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-200">
+        <aside class="ui-pane-list flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
             {filters}
             {list_html}
@@ -307,7 +307,7 @@ fn outbox_pager(list: &OutboxList<'_>) -> String {
 pub fn outbox_empty_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="outbox-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="outbox-pane"{PANE_SKELETON} data-pane-empty class="ui-pane-detail flex min-w-0 flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -322,23 +322,23 @@ pub fn outbox_detail_pane(pane: &OutboxDetailPane<'_>) -> String {
 
     format!(
         r##"
-        <section id="outbox-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
-            <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
-                <div class="min-w-0">
+        <section id="outbox-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-base-300 px-4 py-4 sm:px-6">
+                <div class="min-w-0 grow basis-48">
                     <h2 class="flex items-center gap-2 truncate text-xl font-bold">
                         <span class="badge {status_style}">{status_label}</span>
                         <span class="truncate">{subject}</span>
                     </h2>
                     <p class="truncate font-mono text-xs opacity-60">{entry_id}</p>
                 </div>
-                <div class="flex shrink-0 items-center gap-2">
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
                     {task_link}
                     <button type="button" class="btn btn-ghost btn-sm btn-square text-xl leading-none" title="Reload this email"
                         hx-get="/ui/outbox/{entry_id}?company_id={company_id}"
                         hx-target="#outbox-pane" hx-swap="outerHTML">{reload_glyph}</button>
                 </div>
             </div>
-            <div class="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+            <div class="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
                 {delivery}
                 {facts}
                 {task_summary}

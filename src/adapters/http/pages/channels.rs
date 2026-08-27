@@ -1002,6 +1002,10 @@ fn classic_memory_fields(memory_available: bool, channel: Option<&Channel>) -> S
     let persist_company = checked(channel.is_some_and(|c| c.persist_company_memory));
     let persist_agent = checked(channel.is_some_and(|c| c.persist_agent_memory));
     let persist_user = checked(channel.is_some_and(|c| c.persist_user_memory));
+    let scope_specific = channel.is_some_and(|c| {
+        c.memory_persistence_mode
+            == crate::entities::memory::MemoryPersistenceMode::ScopeSpecificFacts
+    });
     let thinking = channel.is_some_and(|c| {
         c.memory_recall_mode == crate::entities::memory::MemoryRecallMode::Thinking
     });
@@ -1021,7 +1025,11 @@ fn classic_memory_fields(memory_available: bool, channel: Option<&Channel>) -> S
                     <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true"{persist_agent}{disabled}>
                     <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true"{persist_user}{disabled}>
                 </div>
-                <div class="mt-3 grid grid-cols-2 gap-3">
+                <div class="mt-3 grid grid-cols-3 gap-3">
+                    <select aria-label="Memory persistence mode" name="memory_persistence_mode" class="px-3 py-2 bg-slate-800 border border-slate-700 rounded"{disabled}>
+                        <option value="audience_only"{audience_only_selected}>Audience only</option>
+                        <option value="scope_specific_facts"{scope_specific_selected}>Scope-specific facts</option>
+                    </select>
                     <select aria-label="Memory recall mode" name="memory_recall_mode" class="px-3 py-2 bg-slate-800 border border-slate-700 rounded"{disabled}>
                         <option value="fast"{fast_selected}>Fast</option>
                         <option value="thinking"{thinking_selected}>Thinking</option>
@@ -1031,5 +1039,7 @@ fn classic_memory_fields(memory_available: bool, channel: Option<&Channel>) -> S
             </fieldset>"##,
         fast_selected = if thinking { "" } else { " selected" },
         thinking_selected = if thinking { " selected" } else { "" },
+        audience_only_selected = if scope_specific { "" } else { " selected" },
+        scope_specific_selected = if scope_specific { " selected" } else { "" },
     )
 }
