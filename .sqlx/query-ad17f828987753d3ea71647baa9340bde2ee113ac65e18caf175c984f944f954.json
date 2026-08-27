@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO pending_account_changes\n                   (user_id, kind, new_email, new_password_hash, confirmation_code_hash, expires_at)\n               VALUES ($1, $2, $3, $4, $5, $6)\n               ON CONFLICT (user_id, kind) DO UPDATE SET\n                   new_email = EXCLUDED.new_email,\n                   new_password_hash = EXCLUDED.new_password_hash,\n                   confirmation_code_hash = EXCLUDED.confirmation_code_hash,\n                   expires_at = EXCLUDED.expires_at,\n                   created_at = CURRENT_TIMESTAMP",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        {
+          "Custom": {
+            "name": "citext",
+            "kind": "Simple"
+          }
+        },
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ad17f828987753d3ea71647baa9340bde2ee113ac65e18caf175c984f944f954"
+}

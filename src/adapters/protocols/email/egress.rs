@@ -7,7 +7,7 @@ use crate::{
     entities::{channel::ChannelType, message_contract::NormalizedOutboundMessage},
     infra::config::AppConfig,
     services::outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
-    use_cases::thread::BounceInfo,
+    use_cases::thread::{BounceInfo, format_bounce_email_body},
 };
 
 pub struct EmailEgressAdapter {
@@ -30,13 +30,13 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
         let recipient_to = message
             .recipients_to
             .first()
-            .map(|p| p.identity.clone())
+            .map(|p| p.identity.clone().into())
             .unwrap_or_default();
 
         let recipients_cc = message
             .recipients_cc
             .iter()
-            .map(|p| p.identity.clone())
+            .map(|p| p.identity.clone().into())
             .collect();
 
         let trigger_message_id = message.in_reply_to_ref.clone().unwrap_or_default();
@@ -44,8 +44,8 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
         let outbound = OutboundEmail {
             channel_id: message.channel_id,
             channel_name: "Channel".to_string(),
-            channel_slug: "channel".to_string(),
-            company_slug: "company".to_string(),
+            channel_slug: "channel".into(),
+            company_slug: "company".into(),
             trigger_message_id,
             thread_references: message.references.clone(),
             recipient_to,
@@ -61,35 +61,11 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
     }
 
     async fn dispatch_bounce(&self, bounce_info: &BounceInfo) -> AppResult<()> {
-        let mut bounce_body = format!(
-            "Your email to company '{}' could not be delivered because the requested channel address(es) were invalid:\n",
-            bounce_info.company_slug.as_deref().unwrap_or("unknown")
-        );
-
-        for invalid in &bounce_info.invalid_slugs {
-            bounce_body.push_str(&format!(" - Invalid: {}\n", invalid));
-        }
-
-        if !bounce_info.suggestions.is_empty() {
-            bounce_body.push_str("\nDid you mean one of the following valid channel addresses?\n");
-            for sug in &bounce_info.suggestions {
-                if !sug.suggestions.is_empty() {
-                    bounce_body.push_str(&format!(
-                        " - For '{}', suggested: {}\n",
-                        sug.invalid_slug,
-                        sug.suggestions.join(", ")
-                    ));
-                }
-            }
-        }
-
-        bounce_body.push_str("\nPlease check the recipient address and try again.");
-
         OutboundDispatcher::send_bounce(
             &self.config,
             &bounce_info.recipient_to,
             &bounce_info.original_subject,
-            &bounce_body,
+            &format_bounce_email_body(bounce_info, &self.config.app_domain_name),
         )
         .await?;
 

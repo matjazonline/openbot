@@ -1,15 +1,19 @@
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::Serialize;
-use sqlx::PgPool;
 use std::collections::HashSet;
 use uuid::Uuid;
 
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::channel::Channel,
-    use_cases::channel::ChannelPersistence,
+    entities::{
+        channel::Channel,
+        creation::CreationProvenance,
+        memory::MemoryRecallMode,
+        value_objects::{ChannelSlug, CompanySlug, EmailAddress},
+    },
+    use_cases::channel::{ChannelPersistence, ChannelWrite},
 };
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
@@ -17,36 +21,79 @@ pub struct ChannelDb {
     pub id: Uuid,
     pub company_id: Uuid,
     pub name: String,
+    pub description: Option<String>,
     pub slug: String,
+    pub alias_slugs: Vec<String>,
     pub api_key: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
     pub participant_emails: Option<Vec<String>>,
     pub agent_ids: Option<Vec<Uuid>>,
     pub channel_config: Option<serde_json::Value>,
-    pub created_at: NaiveDateTime,
+    pub enabled: bool,
+    pub add_3rd_party: bool,
+    pub retrieve_company_memory: bool,
+    pub retrieve_agent_memory: bool,
+    pub retrieve_user_memory: bool,
+    pub persist_company_memory: bool,
+    pub persist_agent_memory: bool,
+    pub persist_user_memory: bool,
+    pub memory_recall_mode: String,
+    pub memory_max_results: i16,
+    pub created_by: serde_json::Value,
+    pub created_at: DateTime<Utc>,
 }
 
-impl From<ChannelDb> for Channel {
-    fn from(db: ChannelDb) -> Self {
-        Channel {
+impl TryFrom<ChannelDb> for Channel {
+    type Error = AppError;
+
+    fn try_from(db: ChannelDb) -> AppResult<Self> {
+        Ok(Channel {
             id: db.id,
             company_id: db.company_id,
             name: db.name,
-            slug: db.slug,
+            description: db.description,
+            slug: ChannelSlug::from(db.slug),
+            alias_slugs: db.alias_slugs.into_iter().map(ChannelSlug::from).collect(),
             api_key: db.api_key,
             provider: db.provider,
             model: db.model,
-            participant_emails: db.participant_emails,
+            participant_emails: db
+                .participant_emails
+                .map(|emails| emails.into_iter().map(EmailAddress::from).collect()),
             agent_ids: db.agent_ids,
             channel_config: db.channel_config,
+            enabled: db.enabled,
+            add_3rd_party: db.add_3rd_party,
+            retrieve_company_memory: db.retrieve_company_memory,
+            retrieve_agent_memory: db.retrieve_agent_memory,
+            retrieve_user_memory: db.retrieve_user_memory,
+            persist_company_memory: db.persist_company_memory,
+            persist_agent_memory: db.persist_agent_memory,
+            persist_user_memory: db.persist_user_memory,
+            memory_recall_mode: if db.memory_recall_mode == "thinking" {
+                MemoryRecallMode::Thinking
+            } else {
+                MemoryRecallMode::Fast
+            },
+            memory_max_results: db.memory_max_results as u8,
+            created_by: serde_json::from_value(db.created_by).map_err(|err| {
+                AppError::Internal(format!("Invalid channels.created_by provenance: {err}"))
+            })?,
             created_at: db.created_at,
-        }
+        })
     }
 }
 
 const CHANNEL_SELECT: &str = r#"
-    SELECT ch.id, ch.company_id, ch.name, ch.slug::text AS slug,
+    SELECT ch.id, ch.company_id, ch.name, ch.description,
+           (SELECT cs.slug::text FROM channel_slugs cs
+            WHERE cs.channel_id = ch.id AND cs.is_primary) AS slug,
+           COALESCE(
+               (SELECT array_agg(cs.slug::text ORDER BY cs.slug::text)
+                FROM channel_slugs cs
+                WHERE cs.channel_id = ch.id AND NOT cs.is_primary),
+               ARRAY[]::text[]) AS alias_slugs,
            ch.api_key, ch.provider, ch.model,
            CASE ch.access_mode
                WHEN 'public' THEN ARRAY['@public']::text[] || COALESCE(
@@ -61,19 +108,69 @@ const CHANNEL_SELECT: &str = r#"
            END AS participant_emails,
            (SELECT array_agg(ca.agent_id ORDER BY ca.position)
             FROM channel_agents ca WHERE ca.channel_id = ch.id) AS agent_ids,
-           ch.channel_config, ch.created_at
+           ch.channel_config, ch.enabled, ch.add_3rd_party,
+           ch.retrieve_company_memory, ch.retrieve_agent_memory, ch.retrieve_user_memory,
+           ch.persist_company_memory, ch.persist_agent_memory, ch.persist_user_memory,
+           ch.memory_recall_mode, ch.memory_max_results, ch.created_by, ch.created_at
     FROM channels ch
 "#;
 
-async fn load_channel(pool: &PgPool, id: Uuid) -> AppResult<Option<Channel>> {
+async fn load_channel(persistence: &PostgresPersistence, id: Uuid) -> AppResult<Option<Channel>> {
     let query = format!("{CHANNEL_SELECT} WHERE ch.id = $1");
     let db = sqlx::query_as::<_, ChannelDb>(&query)
         .bind(id)
-        .fetch_optional(pool)
+        .fetch_optional(&persistence.pool)
         .await
         .map_err(AppError::from)?;
 
-    Ok(db.map(Into::into))
+    db.map(|mut db| {
+        db.api_key = persistence.decrypt_credential(db.api_key)?;
+        db.try_into()
+    })
+    .transpose()
+}
+
+/// Write a channel's canonical slug plus its aliases into the shared per-company slug namespace.
+///
+/// One statement per slug so a `UNIQUE (company_id, slug)` violation can name the address that
+/// actually collided; the caller's transaction rolls the partial write back.
+async fn insert_channel_slugs(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company_id: Uuid,
+    channel_id: Uuid,
+    slug: &str,
+    alias_slugs: &[String],
+) -> AppResult<()> {
+    for (candidate, is_primary) in
+        std::iter::once((slug, true)).chain(alias_slugs.iter().map(|alias| (alias.as_str(), false)))
+    {
+        sqlx::query(
+            r#"INSERT INTO channel_slugs (company_id, channel_id, slug, is_primary)
+               VALUES ($1, $2, $3, $4)"#,
+        )
+        .bind(company_id)
+        .bind(channel_id)
+        .bind(candidate)
+        .bind(is_primary)
+        .execute(&mut **tx)
+        .await
+        .map_err(|err| slug_conflict_error(err, candidate))?;
+    }
+
+    Ok(())
+}
+
+/// A taken address is routine user input, not a database fault, so it surfaces as a bad request
+/// with the offending slug rather than a raw driver message.
+fn slug_conflict_error(err: sqlx::Error, slug: &str) -> AppError {
+    if let sqlx::Error::Database(ref db_err) = err
+        && db_err.code().as_deref() == Some("23505")
+    {
+        return AppError::BadRequest(format!(
+            "Address '{slug}' is already in use by another channel in this company."
+        ));
+    }
+    AppError::from(err)
 }
 
 fn channel_access(participant_emails: Option<Vec<String>>) -> (&'static str, Vec<String>) {
@@ -106,39 +203,50 @@ fn channel_access(participant_emails: Option<Vec<String>>) -> (&'static str, Vec
 
 #[async_trait]
 impl ChannelPersistence for PostgresPersistence {
-    async fn create(
-        &self,
-        company_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        participant_emails: Option<Vec<String>>,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
-    ) -> AppResult<Channel> {
+    async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
         let uuid = Uuid::new_v4();
-        let (access_mode, participants) = channel_access(participant_emails);
+        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
+        let (access_mode, participants) = channel_access(write.participant_emails);
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
 
         sqlx::query(
             r#"INSERT INTO channels (
-                    id, company_id, name, slug, access_mode, api_key, provider, model, channel_config
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"#,
+                    id, company_id, name, description, access_mode, api_key, provider, model,
+                    channel_config, enabled, add_3rd_party, created_by,
+                    retrieve_company_memory, retrieve_agent_memory, retrieve_user_memory,
+                    persist_company_memory, persist_agent_memory, persist_user_memory,
+                    memory_recall_mode, memory_max_results
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                         $13, $14, $15, $16, $17, $18, $19, $20)"#,
         )
         .bind(uuid)
         .bind(company_id)
-        .bind(name)
-        .bind(slug)
+        .bind(write.name)
+        .bind(write.description)
         .bind(access_mode)
-        .bind(api_key)
-        .bind(provider)
-        .bind(model)
-        .bind(channel_config)
+        .bind(encrypted_api_key)
+        .bind(write.provider)
+        .bind(write.model)
+        .bind(write.channel_config)
+        .bind(write.enabled)
+        .bind(write.add_3rd_party)
+        .bind(
+            serde_json::to_value(write.created_by.unwrap_or_else(CreationProvenance::system))
+                .map_err(|e| AppError::Internal(e.to_string()))?,
+        )
+        .bind(write.retrieve_company_memory)
+        .bind(write.retrieve_agent_memory)
+        .bind(write.retrieve_user_memory)
+        .bind(write.persist_company_memory)
+        .bind(write.persist_agent_memory)
+        .bind(write.persist_user_memory)
+        .bind(write.memory_recall_mode.as_str())
+        .bind(i16::from(write.memory_max_results))
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
+
+        insert_channel_slugs(&mut tx, company_id, uuid, &write.slug, &write.alias_slugs).await?;
 
         for email in participants {
             sqlx::query("INSERT INTO channel_participants (channel_id, email) VALUES ($1, $2)")
@@ -149,7 +257,7 @@ impl ChannelPersistence for PostgresPersistence {
                 .map_err(AppError::from)?;
         }
 
-        for (position, agent_id) in agent_ids.unwrap_or_default().into_iter().enumerate() {
+        for (position, agent_id) in write.agent_ids.unwrap_or_default().into_iter().enumerate() {
             sqlx::query(
                 r#"INSERT INTO channel_agents (company_id, channel_id, agent_id, position)
                    VALUES ($1, $2, $3, $4)"#,
@@ -164,74 +272,87 @@ impl ChannelPersistence for PostgresPersistence {
         }
 
         tx.commit().await.map_err(AppError::from)?;
-        load_channel(&self.pool, uuid)
+        load_channel(self, uuid)
             .await?
             .ok_or_else(|| AppError::Internal("Created channel was not found".into()))
     }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>> {
-        load_channel(&self.pool, id).await
+        load_channel(self, id).await
     }
 
     async fn get_by_company_slug_and_channel_slug(
         &self,
-        company_slug: &str,
-        channel_slug: &str,
+        company_slug: &CompanySlug,
+        channel_slug: &ChannelSlug,
     ) -> AppResult<Option<Channel>> {
         let query = format!(
             "{CHANNEL_SELECT} JOIN companies c ON c.id = ch.company_id \
-             WHERE c.slug = $1 AND ch.slug = $2"
+             JOIN channel_slugs cs_lookup ON cs_lookup.channel_id = ch.id \
+             WHERE c.slug = $1 AND cs_lookup.slug = $2"
         );
         let db = sqlx::query_as::<_, ChannelDb>(&query)
-            .bind(company_slug)
-            .bind(channel_slug)
+            .bind(company_slug.as_str())
+            .bind(channel_slug.as_str())
             .fetch_optional(&self.pool)
             .await
             .map_err(AppError::from)?;
 
-        Ok(db.map(Into::into))
+        db.map(|mut db| {
+            db.api_key = self.decrypt_credential(db.api_key)?;
+            db.try_into()
+        })
+        .transpose()
     }
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
-        let query = format!(
-            "{CHANNEL_SELECT} WHERE ch.company_id = $1 ORDER BY ch.created_at DESC, ch.id DESC"
+        let select = CHANNEL_SELECT.replace(
+            "ch.api_key, ch.provider, ch.model",
+            "NULL::text AS api_key, ch.provider, ch.model",
         );
+        let query =
+            format!("{select} WHERE ch.company_id = $1 ORDER BY ch.created_at DESC, ch.id DESC");
         let db_list = sqlx::query_as::<_, ChannelDb>(&query)
             .bind(company_id)
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?;
 
-        Ok(db_list.into_iter().map(Into::into).collect())
+        db_list.into_iter().map(TryInto::try_into).collect()
     }
 
-    async fn update(
-        &self,
-        id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        participant_emails: Option<Vec<String>>,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
-    ) -> AppResult<Channel> {
-        let (access_mode, participants) = channel_access(participant_emails);
+    async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
+        let (access_mode, participants) = channel_access(write.participant_emails);
+        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let result = sqlx::query(
             r#"UPDATE channels
-               SET name = $1, slug = $2, access_mode = $3, api_key = $4,
-                   provider = $5, model = $6, channel_config = $7
-               WHERE id = $8"#,
+               SET name = $1, description = $2, access_mode = $3, api_key = $4,
+                   provider = $5, model = $6, channel_config = $7, enabled = $8,
+                   add_3rd_party = $9, retrieve_company_memory = $10,
+                   retrieve_agent_memory = $11, retrieve_user_memory = $12,
+                   persist_company_memory = $13, persist_agent_memory = $14,
+                   persist_user_memory = $15, memory_recall_mode = $16,
+                   memory_max_results = $17
+               WHERE id = $18"#,
         )
-        .bind(name)
-        .bind(slug)
+        .bind(write.name)
+        .bind(write.description)
         .bind(access_mode)
-        .bind(api_key)
-        .bind(provider)
-        .bind(model)
-        .bind(channel_config)
+        .bind(encrypted_api_key)
+        .bind(write.provider)
+        .bind(write.model)
+        .bind(write.channel_config)
+        .bind(write.enabled)
+        .bind(write.add_3rd_party)
+        .bind(write.retrieve_company_memory)
+        .bind(write.retrieve_agent_memory)
+        .bind(write.retrieve_user_memory)
+        .bind(write.persist_company_memory)
+        .bind(write.persist_agent_memory)
+        .bind(write.persist_user_memory)
+        .bind(write.memory_recall_mode.as_str())
+        .bind(i16::from(write.memory_max_results))
         .bind(id)
         .execute(&mut *tx)
         .await
@@ -251,6 +372,18 @@ impl ChannelPersistence for PostgresPersistence {
             .execute(&mut *tx)
             .await
             .map_err(AppError::from)?;
+        sqlx::query("DELETE FROM channel_slugs WHERE channel_id = $1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+
+        let company_id: Uuid = sqlx::query_scalar("SELECT company_id FROM channels WHERE id = $1")
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+        insert_channel_slugs(&mut tx, company_id, id, &write.slug, &write.alias_slugs).await?;
 
         for email in participants {
             sqlx::query("INSERT INTO channel_participants (channel_id, email) VALUES ($1, $2)")
@@ -261,7 +394,7 @@ impl ChannelPersistence for PostgresPersistence {
                 .map_err(AppError::from)?;
         }
 
-        for (position, agent_id) in agent_ids.unwrap_or_default().into_iter().enumerate() {
+        for (position, agent_id) in write.agent_ids.unwrap_or_default().into_iter().enumerate() {
             sqlx::query(
                 r#"INSERT INTO channel_agents (company_id, channel_id, agent_id, position)
                    SELECT company_id, id, $2, $3 FROM channels WHERE id = $1"#,
@@ -275,7 +408,7 @@ impl ChannelPersistence for PostgresPersistence {
         }
 
         tx.commit().await.map_err(AppError::from)?;
-        load_channel(&self.pool, id)
+        load_channel(self, id)
             .await?
             .ok_or_else(|| AppError::Internal("Updated channel was not found".into()))
     }
@@ -294,28 +427,26 @@ impl ChannelPersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::test_support::test_pool;
     use crate::use_cases::agent::AgentPersistence;
-    use crate::use_cases::company::CompanyPersistence;
+    use crate::use_cases::agent::AgentWrite;
+    use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
     use crate::use_cases::user::UserPersistence;
     use serde_json::json;
 
     #[tokio::test]
     async fn postgres_channel_persistence_works() {
-        let database_url = match std::env::var("DATABASE_URL") {
-            Ok(url) => url,
-            Err(_) => return, // Skip test if DATABASE_URL is not set
-        };
-
-        let pool = match sqlx::PgPool::connect(&database_url).await {
-            Ok(p) => p,
-            Err(_) => return,
+        let Some(pool) = test_pool().await else {
+            return;
         };
 
         let persistence = PostgresPersistence::new(pool);
 
-        // Create owner & company
-        let owner_username = format!("owner_{}", Uuid::new_v4().simple());
-        let owner_email = format!("{}@example.com", owner_username);
+        // Create owner & company. The company slug is unique database-wide, so it carries the same
+        // per-run suffix as the owner — a fixed slug collides with any concurrent run of this test.
+        let suffix = Uuid::new_v4().simple().to_string();
+        let owner_username = format!("owner_{suffix}");
+        let owner_email = format!("{owner_username}@example.com");
         let _ = persistence
             .create_user(&owner_username, &owner_email, "hash")
             .await;
@@ -328,12 +459,11 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Channel Corp",
-            "ch-corp",
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Channel Corp".to_string(),
+                slug: format!("ch-corp-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -345,26 +475,22 @@ mod tests {
         let agent1 = AgentPersistence::create(
             &persistence,
             company.id,
-            "Primary Agent",
-            "primary-agent",
-            None,
-            None,
-            None,
-            None,
-            None,
+            AgentWrite {
+                name: "Primary Agent".to_string(),
+                slug: "primary-agent".to_string(),
+                ..AgentWrite::default()
+            },
         )
         .await
         .unwrap();
         let agent2 = AgentPersistence::create(
             &persistence,
             company.id,
-            "Secondary Agent",
-            "secondary-agent",
-            None,
-            None,
-            None,
-            None,
-            None,
+            AgentWrite {
+                name: "Secondary Agent".to_string(),
+                slug: "secondary-agent".to_string(),
+                ..AgentWrite::default()
+            },
         )
         .await
         .unwrap();
@@ -373,26 +499,57 @@ mod tests {
         let channel = ChannelPersistence::create(
             &persistence,
             company.id,
-            "Inbound Email",
-            "inbound-email",
-            Some("ch_key_123"),
-            Some("openai"),
-            Some("gpt-4o"),
-            Some(emails.clone()),
-            Some(agent_ids.clone()),
-            Some(config.clone()),
+            ChannelWrite {
+                name: "Inbound Email".into(),
+                description: Some("Takes support mail from the website form.".into()),
+                slug: "inbound-email".into(),
+                alias_slugs: Vec::new(),
+                api_key: Some("ch_key_123".into()),
+                provider: Some("openai".into()),
+                model: Some("gpt-4o".into()),
+                participant_emails: Some(emails.clone()),
+                agent_ids: Some(agent_ids.clone()),
+                channel_config: Some(config.clone()),
+                enabled: true,
+                // Deliberately the opposite of `enabled`, so a swapped pair of same-typed binds
+                // cannot pass this test.
+                add_3rd_party: false,
+                retrieve_company_memory: false,
+                retrieve_agent_memory: false,
+                retrieve_user_memory: false,
+                persist_company_memory: false,
+                persist_agent_memory: false,
+                persist_user_memory: false,
+                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+                memory_max_results: 5,
+                created_by: None,
+            },
         )
         .await
         .unwrap();
 
         assert_eq!(channel.name, "Inbound Email");
+        assert_eq!(
+            channel.description.as_deref(),
+            Some("Takes support mail from the website form.")
+        );
         assert_eq!(channel.slug, "inbound-email");
         assert_eq!(channel.api_key.as_deref(), Some("ch_key_123"));
         assert_eq!(channel.provider.as_deref(), Some("openai"));
         assert_eq!(channel.model.as_deref(), Some("gpt-4o"));
-        assert_eq!(channel.participant_emails, Some(emails));
+        assert_eq!(
+            channel.participant_emails,
+            Some(
+                emails
+                    .into_iter()
+                    .map(EmailAddress::from)
+                    .collect::<Vec<_>>()
+            )
+        );
         assert_eq!(channel.agent_ids, Some(agent_ids));
         assert_eq!(channel.channel_config, Some(config));
+        assert!(channel.enabled);
+        assert!(!channel.add_3rd_party);
 
         // 2. Get by ID
         let fetched = ChannelPersistence::get_by_id(&persistence, channel.id)
@@ -411,20 +568,50 @@ mod tests {
         let updated = ChannelPersistence::update(
             &persistence,
             channel.id,
-            "Inbound Email V2",
-            "inbound-email-v2",
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            ChannelWrite {
+                name: "Inbound Email V2".into(),
+                description: Some("Now also handles refund requests.".into()),
+                slug: "inbound-email-v2".into(),
+                enabled: false,
+                add_3rd_party: true,
+                retrieve_company_memory: false,
+                retrieve_agent_memory: false,
+                retrieve_user_memory: false,
+                persist_company_memory: false,
+                persist_agent_memory: false,
+                persist_user_memory: false,
+                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+                memory_max_results: 5,
+                created_by: None,
+                ..ChannelWrite::default()
+            },
         )
         .await
         .unwrap();
         assert_eq!(updated.name, "Inbound Email V2");
+        assert_eq!(
+            updated.description.as_deref(),
+            Some("Now also handles refund requests."),
+            "an edited description must survive a round trip"
+        );
         assert_eq!(updated.api_key, None);
         assert_eq!(updated.participant_emails, None);
+        assert!(!updated.enabled, "the off switch must survive a round trip");
+        assert!(
+            updated.add_3rd_party,
+            "the third-party switch must survive a round trip"
+        );
+
+        let reread = ChannelPersistence::get_by_id(&persistence, channel.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!reread.enabled);
+        assert!(reread.add_3rd_party);
+        assert_eq!(
+            reread.description.as_deref(),
+            Some("Now also handles refund requests.")
+        );
 
         // 5. Delete
         ChannelPersistence::delete(&persistence, channel.id)
@@ -437,5 +624,119 @@ mod tests {
 
         // Cleanup
         let _ = CompanyPersistence::delete(&persistence, company.id).await;
+    }
+
+    /// Aliases and canonical slugs share one namespace per company, enforced by the database.
+    #[tokio::test]
+    async fn alias_slugs_are_unique_within_a_company_and_free_across_companies() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+
+        let owner_username = format!("owner_{}", Uuid::new_v4().simple());
+        let owner_email = format!("{owner_username}@example.com");
+        let _ = persistence
+            .create_user(&owner_username, &owner_email, "hash")
+            .await;
+        let owner = persistence
+            .get_by_email(&owner_email)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let company_slug = format!("alias-co-{}", Uuid::new_v4().simple());
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Alias Corp".to_string(),
+                slug: company_slug.to_string(),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let other_slug = format!("other-co-{}", Uuid::new_v4().simple());
+        let other_company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Other Corp".to_string(),
+                slug: other_slug.to_string(),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let write = |slug: &str, aliases: &[&str]| ChannelWrite {
+            name: "Support".into(),
+            slug: slug.into(),
+            alias_slugs: aliases.iter().map(|a| (*a).to_string()).collect(),
+            enabled: true,
+            ..ChannelWrite::default()
+        };
+
+        let support = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            write("support", &["sales", "help"]),
+        )
+        .await
+        .unwrap();
+        assert_eq!(support.slug, "support");
+        assert_eq!(support.alias_slugs, ["help", "sales"]);
+
+        // An alias is a real address: looking it up finds the channel that owns it.
+        let by_alias = ChannelPersistence::get_by_company_slug_and_channel_slug(
+            &persistence,
+            &CompanySlug::from(company_slug.clone()),
+            &ChannelSlug::from("sales"),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(by_alias.id, support.id);
+
+        // A second channel may not claim a taken alias, nor collide with it via its own slug.
+        let alias_conflict =
+            ChannelPersistence::create(&persistence, company.id, write("billing", &["sales"]))
+                .await;
+        assert!(
+            matches!(alias_conflict, Err(AppError::BadRequest(ref m)) if m.contains("sales")),
+            "expected a named conflict, got {alias_conflict:?}"
+        );
+        let slug_conflict =
+            ChannelPersistence::create(&persistence, company.id, write("help", &[])).await;
+        assert!(
+            matches!(slug_conflict, Err(AppError::BadRequest(ref m)) if m.contains("help")),
+            "expected a named conflict, got {slug_conflict:?}"
+        );
+
+        // The failed writes rolled back whole, so neither left a partial channel behind.
+        let channels = ChannelPersistence::list_by_company_id(&persistence, company.id)
+            .await
+            .unwrap();
+        assert_eq!(channels.len(), 1);
+
+        // The namespace is per company, so another company may use the same names.
+        ChannelPersistence::create(&persistence, other_company.id, write("sales", &["support"]))
+            .await
+            .unwrap();
+
+        // An update replaces the alias set wholesale, freeing the names it drops.
+        let updated =
+            ChannelPersistence::update(&persistence, support.id, write("support", &["contact"]))
+                .await
+                .unwrap();
+        assert_eq!(updated.alias_slugs, ["contact"]);
+        ChannelPersistence::create(&persistence, company.id, write("sales", &[]))
+            .await
+            .expect("a released alias is available again");
+
+        let _ = CompanyPersistence::delete(&persistence, company.id).await;
+        let _ = CompanyPersistence::delete(&persistence, other_company.id).await;
     }
 }

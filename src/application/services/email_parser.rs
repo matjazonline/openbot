@@ -3,12 +3,18 @@ use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::entities::message::AttachmentMetadata;
+use crate::entities::{auth::AuthVerdict, message::AttachmentMetadata, value_objects::ObjectKey};
 
 use serde::{Deserialize, Serialize};
 
 pub const MAX_CHANNEL_HOPS: u32 = 5;
+/// Maximum untouched RFC 5322 message accepted by every public mail ingress.
+pub const MAX_INBOUND_MESSAGE_BYTES: usize = 20 * 1024 * 1024;
 pub const RESERVED_CONTEXT_SUFFIXES: &[&str] = &["noagent", "quiet", "message", "msg", "na"];
+
+/// Inline images below this size are treated as signature/decoration rather than content, and are
+/// left out of the agent prompt.
+pub const SMALL_INLINE_IMAGE_BYTES: usize = 10_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedEmail {
@@ -30,14 +36,14 @@ pub struct ParsedEmail {
     pub channel_id_header: Option<Uuid>,
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,
-    pub spf_status: Option<String>,
-    pub dkim_status: Option<String>,
-    pub dmarc_status: Option<String>,
+    pub spf_status: AuthVerdict,
+    pub dkim_status: AuthVerdict,
+    pub dmarc_status: AuthVerdict,
     pub spam_score: Option<f64>,
     pub is_context_only: bool,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RawInboundPayload {
     pub to: String,
     pub from: String,
@@ -46,11 +52,41 @@ pub struct RawInboundPayload {
     pub text: Option<String>,
     pub html: Option<String>,
     pub headers: Option<String>,
-    pub spf: Option<String>,
-    pub dkim: Option<String>,
-    pub dmarc: Option<String>,
+    pub spf: AuthVerdict,
+    pub dkim: AuthVerdict,
+    pub dmarc: AuthVerdict,
     pub spam_score: Option<f64>,
     pub attachments_data: Vec<RawAttachmentData>,
+}
+
+impl Default for RawInboundPayload {
+    fn default() -> Self {
+        Self {
+            to: String::new(),
+            from: String::new(),
+            cc: None,
+            subject: None,
+            text: None,
+            html: None,
+            headers: None,
+            spf: default_test_auth_verdict(),
+            dkim: default_test_auth_verdict(),
+            dmarc: default_test_auth_verdict(),
+            spam_score: None,
+            attachments_data: Vec::new(),
+        }
+    }
+}
+
+#[cfg(not(test))]
+fn default_test_auth_verdict() -> AuthVerdict {
+    AuthVerdict::Unknown
+}
+
+/// Existing unit fixtures represent mail that has already crossed the verifier boundary.
+#[cfg(test)]
+fn default_test_auth_verdict() -> AuthVerdict {
+    AuthVerdict::Pass
 }
 
 #[derive(Debug, Clone)]
@@ -58,6 +94,9 @@ pub struct RawAttachmentData {
     pub filename: String,
     pub content_type: String,
     pub content: Vec<u8>,
+    /// Where the bytes were put, once they have been; see
+    /// [`crate::services::attachment_store::store_inbound_attachments`].
+    pub stored_key: Option<ObjectKey>,
 }
 
 pub struct EmailParser;
@@ -172,7 +211,7 @@ impl EmailParser {
                 content_type: att.content_type.clone(),
                 sha256_hash: hash_hex.clone(),
                 size_bytes: size,
-                storage_url: None,
+                storage_key: att.stored_key.clone(),
             };
 
             attachments.push(meta.clone());

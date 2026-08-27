@@ -14,6 +14,8 @@ use crate::{
     use_cases::{approval::ApprovalUseCases, company::CompanyUseCases},
 };
 
+use super::company_load_error;
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/approvals/{token}", get(approval_link_handler))
@@ -63,14 +65,8 @@ async fn list_channel_approvals_handler(
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
 ) -> impl IntoResponse {
-    let is_owner = company_use_cases
-        .get_company(company_id)
-        .await
-        .ok()
-        .flatten()
-        .is_some_and(|company| company.user_id == user.id);
-    if !is_owner {
-        return Html(pages::error_alert("Company not found."));
+    if let Err(error) = company_use_cases.owned_company(user.id, company_id).await {
+        return Html(pages::error_alert(&company_load_error(&error)));
     }
 
     match approval_use_cases

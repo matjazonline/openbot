@@ -1,28 +1,57 @@
 use std::sync::Arc;
 
 use axum::extract::FromRef;
+use sqlx::PgPool;
 
 use crate::{
+    adapters::{
+        http::session::SessionAuthority, persistence::dashboard::DashboardPersistence,
+        storage::FileStorage,
+    },
     domain::monitoring::MonitoringService,
-    infra::config::AppConfig,
+    entities::runtime_metrics::MachineIdentity,
+    infra::{config::AppConfig, events::MailboxEvents},
+    services::{memory_worker::MemoryWorker, runtime_metrics::RuntimeMetricPersistence},
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
-        company::CompanyUseCases, company_invite::CompanyInviteUseCases, thread::ThreadUseCases,
-        user::UserUseCases,
+        company::CompanyUseCases, company_invite::CompanyInviteUseCases, memory::MemoryUseCases,
+        schedule::ScheduleUseCases, thread::ThreadUseCases, user::UserUseCases,
     },
 };
 
 #[derive(Clone)]
 pub struct AppState {
+    pub db: PgPool,
     pub config: Arc<AppConfig>,
     pub monitoring: Arc<dyn MonitoringService>,
     pub user_use_cases: Arc<UserUseCases>,
     pub company_use_cases: Arc<CompanyUseCases>,
     pub company_invite_use_cases: Arc<CompanyInviteUseCases>,
     pub channel_use_cases: Arc<ChannelUseCases>,
+    pub schedule_use_cases: Arc<ScheduleUseCases>,
     pub agent_use_cases: Arc<AgentUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
     pub approval_use_cases: Arc<ApprovalUseCases>,
+    pub memory_use_cases: Arc<MemoryUseCases>,
+    pub memory_worker: Arc<MemoryWorker>,
+    /// Read-only aggregates behind `/ui/dashboard`.
+    pub dashboard_persistence: Arc<dyn DashboardPersistence>,
+    /// Deployment-wide runtime history; handlers must authorize operators before reading it.
+    pub runtime_metrics: Arc<dyn RuntimeMetricPersistence>,
+    pub runtime_identity: MachineIdentity,
+    /// Issues and verifies sessions; the only thing that decides who a request is.
+    pub sessions: Arc<SessionAuthority>,
+    /// Where a picked file is stored; `None` when no bucket is configured, which is what the
+    /// avatar pickers report instead of failing at upload time.
+    pub file_storage: Option<Arc<dyn FileStorage>>,
+    /// Committed messages, for the mailbox's live message stream.
+    pub events: MailboxEvents,
+}
+
+impl FromRef<AppState> for PgPool {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.db.clone()
+    }
 }
 
 impl FromRef<AppState> for Arc<AppConfig> {
@@ -61,6 +90,12 @@ impl FromRef<AppState> for Arc<ChannelUseCases> {
     }
 }
 
+impl FromRef<AppState> for Arc<ScheduleUseCases> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.schedule_use_cases.clone()
+    }
+}
+
 impl FromRef<AppState> for Arc<AgentUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.agent_use_cases.clone()
@@ -76,5 +111,35 @@ impl FromRef<AppState> for Arc<ThreadUseCases> {
 impl FromRef<AppState> for Arc<ApprovalUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.approval_use_cases.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<MemoryUseCases> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.memory_use_cases.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn DashboardPersistence> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.dashboard_persistence.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<SessionAuthority> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.sessions.clone()
+    }
+}
+
+impl FromRef<AppState> for Option<Arc<dyn FileStorage>> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.file_storage.clone()
+    }
+}
+
+impl FromRef<AppState> for MailboxEvents {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.events.clone()
     }
 }

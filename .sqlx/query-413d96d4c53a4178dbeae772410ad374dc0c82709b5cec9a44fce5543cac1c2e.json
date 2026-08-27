@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT LOWER(u.email) as \"email!\"\n               FROM (\n                   SELECT u.email FROM companies c JOIN users u ON c.user_id = u.id WHERE c.id = $1\n                   UNION ALL\n                   SELECT u.email FROM company_members m JOIN users u ON m.user_id = u.id WHERE m.company_id = $1\n               ) u",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "413d96d4c53a4178dbeae772410ad374dc0c82709b5cec9a44fce5543cac1c2e"
+}

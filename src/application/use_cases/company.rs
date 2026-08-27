@@ -1,75 +1,188 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::company::Company,
+    entities::{
+        company::{Company, CompanyAccess},
+        company_member::CompanyMembership,
+        memory::MemoryProviderKind,
+        value_objects::AvatarUrl,
+    },
 };
+
+/// Everything one company write sets, so create and update cannot drift apart and so a caller
+/// cannot transpose two same-typed arguments in a seven-parameter list.
+///
+/// Values reach persistence already normalized — see [`CompanyWrite::normalize`]. Mirrors
+/// [`crate::use_cases::agent::AgentWrite`].
+#[derive(Debug, Clone, Default)]
+pub struct CompanyWrite {
+    pub name: String,
+    pub slug: String,
+    pub api_key: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub enable_llm_spam_guardrail: Option<bool>,
+    pub memory_provider: Option<MemoryProviderKind>,
+    /// The company's picture, already parsed as a URL a page may render.
+    pub avatar_url: Option<AvatarUrl>,
+}
+
+impl CompanyWrite {
+    /// Trim the fields that have canonical forms and drop the blanks. Runs once, in the use case,
+    /// so create and update store the same shape.
+    fn normalize(&mut self) -> AppResult<()> {
+        self.name = self.name.trim().to_string();
+        self.slug = self.slug.trim().to_lowercase().replace(' ', "-");
+
+        if self.name.is_empty() || self.slug.is_empty() {
+            return Err(AppError::Internal(
+                "Company name and slug cannot be empty.".into(),
+            ));
+        }
+
+        for field in [&mut self.api_key, &mut self.provider, &mut self.model] {
+            if let Some(value) = field.as_mut() {
+                *value = value.trim().to_string();
+                if value.is_empty() {
+                    *field = None;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
 
 #[async_trait]
 pub trait CompanyPersistence: Send + Sync {
-    async fn create(
-        &self,
-        user_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        enable_llm_spam_guardrail: Option<bool>,
-    ) -> AppResult<Company>;
+    async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company>;
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>>;
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>>;
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>>;
-    async fn update(
-        &self,
-        id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        enable_llm_spam_guardrail: Option<bool>,
-    ) -> AppResult<Company>;
+    async fn update(&self, id: Uuid, write: CompanyWrite) -> AppResult<Company>;
     async fn delete(&self, id: Uuid) -> AppResult<()>;
     async fn update_for_user(
         &self,
         user_id: Uuid,
         id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        enable_llm_spam_guardrail: Option<bool>,
+        write: CompanyWrite,
     ) -> AppResult<Company> {
         match self.get_by_id(id).await? {
-            Some(company) if company.user_id == user_id => {
-                self.update(
-                    id,
-                    name,
-                    slug,
-                    api_key,
-                    provider,
-                    model,
-                    enable_llm_spam_guardrail,
-                )
-                .await
-            }
-            _ => Err(AppError::Internal("Company not found.".into())),
+            Some(company) if company.user_id == user_id => self.update(id, write).await,
+            _ => Err(company_not_found()),
         }
     }
     async fn delete_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
         match self.get_by_id(id).await? {
             Some(company) if company.user_id == user_id => self.delete(id).await,
-            _ => Err(AppError::Internal("Company not found.".into())),
+            _ => Err(company_not_found()),
         }
     }
-    async fn is_company_team_member(&self, company_id: Uuid, email: &str) -> AppResult<bool>;
+    /// Every company the user may *read*: the ones they own, plus the ones they were invited to.
+    ///
+    /// Separate from [`CompanyPersistence::list_by_user_id`], which stays ownership-only because
+    /// it scopes the pages that administer a company. The default answers with owned companies
+    /// alone -- the conservative half of the truth -- so a persistence that has not implemented
+    /// this grants nobody anything they would not already have had.
+    async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
+        Ok(self
+            .list_by_user_id(user_id)
+            .await?
+            .into_iter()
+            .map(|company| CompanyAccess {
+                company,
+                membership: CompanyMembership::Owner,
+            })
+            .collect())
+    }
+    /// What the user is to one company, or `None` if they are nothing to it.
+    async fn company_access(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<Option<CompanyAccess>> {
+        Ok(self
+            .list_accessible_by_user_id(user_id)
+            .await?
+            .into_iter()
+            .find(|access| access.company.id == company_id))
+    }
+    /// What the account behind an *address* is to this company.
+    ///
+    /// The by-email counterpart of [`CompanyPersistence::company_access`], for the inbound path,
+    /// which knows a sender only by the address they wrote from. `Channel::participant_access`
+    /// asks it about every sender, and needs the owner told apart from the rest of the team --
+    /// a restricted channel takes its own owner's mail whether or not they are on its list.
+    async fn membership_for_email(
+        &self,
+        company_id: Uuid,
+        email: &str,
+    ) -> AppResult<CompanyMembership>;
     async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>>;
+}
+
+/// Resolve a company the caller owns.
+///
+/// A company that does not exist and a company owned by somebody else are reported *identically*,
+/// on purpose: telling the two apart would let anyone probe ids to enumerate other tenants'
+/// companies. Nothing in the product shows a non-owner a company — `list_by_user_id` returns only
+/// owned rows — so there is no "visible but forbidden" case that would deserve a 403 instead.
+///
+/// The denied attempt is logged, so the signal an operator needs survives even though the caller
+/// is told nothing.
+pub async fn owned_company(
+    persistence: &dyn CompanyPersistence,
+    user_id: Uuid,
+    company_id: Uuid,
+) -> AppResult<Company> {
+    match persistence.get_by_id(company_id).await? {
+        Some(company) if company.user_id == user_id => Ok(company),
+        Some(_) => {
+            warn!("User {user_id} is not the owner of company {company_id}");
+            Err(company_not_found())
+        }
+        None => Err(company_not_found()),
+    }
+}
+
+/// Resolve a company whose operational workspaces and automation the caller may manage.
+///
+/// Ownership still outranks the stored membership row. Otherwise the caller must be an accepted
+/// company admin; an ordinary member and a stranger receive the same not-found response so this
+/// guard does not become a tenant-id probe.
+pub async fn managed_company(
+    persistence: &dyn CompanyPersistence,
+    user_id: Uuid,
+    company_id: Uuid,
+) -> AppResult<Company> {
+    let company = persistence
+        .get_by_id(company_id)
+        .await?
+        .ok_or_else(company_not_found)?;
+
+    if company.user_id == user_id {
+        return Ok(company);
+    }
+
+    let may_manage = persistence
+        .company_access(user_id, company_id)
+        .await?
+        .is_some_and(|access| access.membership.manages_company_operations());
+    if may_manage {
+        return Ok(company);
+    }
+
+    warn!("User {user_id} may not manage operations for company {company_id}");
+    Err(company_not_found())
+}
+
+pub fn company_not_found() -> AppError {
+    AppError::NotFound("Company not found, or you do not have permission.".into())
 }
 
 #[derive(Clone)]
@@ -82,49 +195,70 @@ impl CompanyUseCases {
         Self { persistence }
     }
 
+    /// The company, only when the caller owns it.
+    ///
+    /// The method exists because route handlers hold an `Arc<CompanyUseCases>` and cannot reach
+    /// the persistence behind it. See [`owned_company`] for why a company owned by somebody else
+    /// is reported exactly like one that does not exist.
+    pub async fn owned_company(&self, user_id: Uuid, company_id: Uuid) -> AppResult<Company> {
+        owned_company(self.persistence.as_ref(), user_id, company_id).await
+    }
+
+    /// The company, only when the caller owns it or is one of its admins.
+    pub async fn managed_company(&self, user_id: Uuid, company_id: Uuid) -> AppResult<Company> {
+        managed_company(self.persistence.as_ref(), user_id, company_id).await
+    }
+
     #[instrument(skip(self))]
     pub async fn create_company(
         &self,
         user_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        enable_llm_spam_guardrail: Option<bool>,
+        mut write: CompanyWrite,
     ) -> AppResult<Company> {
-        let name_trimmed = name.trim();
-        let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
-        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
-
-        if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::Internal(
-                "Company name and slug cannot be empty.".into(),
-            ));
-        }
+        write.normalize()?;
 
         info!(
             "Creating company: {} ({}) for user {}",
-            name_trimmed, slug_clean, user_id
+            write.name, write.slug, user_id
         );
-        self.persistence
-            .create(
-                user_id,
-                name_trimmed,
-                &slug_clean,
-                api_key_clean,
-                provider_clean,
-                model_clean,
-                enable_llm_spam_guardrail,
-            )
-            .await
+        self.persistence.create(user_id, write).await
     }
 
     #[instrument(skip(self))]
     pub async fn list_user_companies(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         self.persistence.list_by_user_id(user_id).await
+    }
+
+    /// The companies a user may read, each with what they are to it.
+    ///
+    /// What the mailbox scopes by, where an invited member belongs. Administration pages apply a
+    /// narrower owner-or-admin filter with [`CompanyUseCases::list_managed_companies`].
+    #[instrument(skip(self))]
+    pub async fn list_accessible_companies(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
+        self.persistence.list_accessible_by_user_id(user_id).await
+    }
+
+    /// Companies whose operational workspaces and automation the caller may manage.
+    #[instrument(skip(self))]
+    pub async fn list_managed_companies(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
+        Ok(self
+            .persistence
+            .list_accessible_by_user_id(user_id)
+            .await?
+            .into_iter()
+            .filter(|access| access.membership.manages_company_operations())
+            .map(|access| access.company)
+            .collect())
+    }
+
+    /// What a user is to one company: its owner, an invited member, or nothing.
+    #[instrument(skip(self))]
+    pub async fn company_access(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<Option<CompanyAccess>> {
+        self.persistence.company_access(user_id, company_id).await
     }
 
     #[instrument(skip(self))]
@@ -138,40 +272,11 @@ impl CompanyUseCases {
     }
 
     #[instrument(skip(self))]
-    pub async fn update_company(
-        &self,
-        id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        enable_llm_spam_guardrail: Option<bool>,
-    ) -> AppResult<Company> {
-        let name_trimmed = name.trim();
-        let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
-        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
+    pub async fn update_company(&self, id: Uuid, mut write: CompanyWrite) -> AppResult<Company> {
+        write.normalize()?;
 
-        if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::Internal(
-                "Company name and slug cannot be empty.".into(),
-            ));
-        }
-
-        info!("Updating company {}: {} ({})", id, name_trimmed, slug_clean);
-        self.persistence
-            .update(
-                id,
-                name_trimmed,
-                &slug_clean,
-                api_key_clean,
-                provider_clean,
-                model_clean,
-                enable_llm_spam_guardrail,
-            )
-            .await
+        info!("Updating company {}: {} ({})", id, write.name, write.slug);
+        self.persistence.update(id, write).await
     }
 
     #[instrument(skip(self))]
@@ -184,32 +289,10 @@ impl CompanyUseCases {
         &self,
         user_id: Uuid,
         id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        enable_llm_spam_guardrail: Option<bool>,
+        mut write: CompanyWrite,
     ) -> AppResult<Company> {
-        let name = name.trim();
-        let slug = slug.trim().to_lowercase().replace(' ', "-");
-        if name.is_empty() || slug.is_empty() {
-            return Err(AppError::Internal(
-                "Company name and slug cannot be empty.".into(),
-            ));
-        }
-        self.persistence
-            .update_for_user(
-                user_id,
-                id,
-                name,
-                &slug,
-                api_key.map(str::trim).filter(|value| !value.is_empty()),
-                provider.map(str::trim).filter(|value| !value.is_empty()),
-                model.map(str::trim).filter(|value| !value.is_empty()),
-                enable_llm_spam_guardrail,
-            )
-            .await
+        write.normalize()?;
+        self.persistence.update_for_user(user_id, id, write).await
     }
 
     pub async fn delete_company_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
@@ -227,30 +310,24 @@ mod tests {
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
+        memberships: Mutex<Vec<(Uuid, Uuid, CompanyMembership)>>,
     }
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(
-            &self,
-            user_id: Uuid,
-            name: &str,
-            slug: &str,
-            api_key: Option<&str>,
-            provider: Option<&str>,
-            model: Option<&str>,
-            enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company> {
             let company = Company {
                 id: Uuid::new_v4(),
                 user_id,
-                name: name.to_string(),
-                slug: slug.to_string(),
-                api_key: api_key.map(|s| s.to_string()),
-                provider: provider.map(|s| s.to_string()),
-                model: model.map(|s| s.to_string()),
-                enable_llm_spam_guardrail,
-                created_at: Utc::now().naive_utc(),
+                name: write.name,
+                slug: write.slug.into(),
+                api_key: write.api_key,
+                provider: write.provider,
+                model: write.model,
+                enable_llm_spam_guardrail: write.enable_llm_spam_guardrail,
+                avatar_url: write.avatar_url,
+                memory_provider: None,
+                created_at: Utc::now(),
             };
             self.companies.lock().unwrap().push(company.clone());
             Ok(company)
@@ -287,28 +364,45 @@ mod tests {
                 .collect())
         }
 
-        async fn update(
-            &self,
-            id: Uuid,
-            name: &str,
-            slug: &str,
-            api_key: Option<&str>,
-            provider: Option<&str>,
-            model: Option<&str>,
-            enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
+            let companies = self.companies.lock().unwrap();
+            let memberships = self.memberships.lock().unwrap();
+            Ok(companies
+                .iter()
+                .filter_map(|company| {
+                    let membership = if company.user_id == user_id {
+                        CompanyMembership::Owner
+                    } else if let Some((_, _, membership)) =
+                        memberships.iter().find(|(member_id, company_id, _)| {
+                            *member_id == user_id && *company_id == company.id
+                        })
+                    {
+                        *membership
+                    } else {
+                        return None;
+                    };
+                    Some(CompanyAccess {
+                        company: company.clone(),
+                        membership,
+                    })
+                })
+                .collect())
+        }
+
+        async fn update(&self, id: Uuid, write: CompanyWrite) -> AppResult<Company> {
             let mut list = self.companies.lock().unwrap();
             let company = list
                 .iter_mut()
                 .find(|c| c.id == id)
                 .ok_or_else(|| AppError::Internal("Not found".into()))?;
 
-            company.name = name.to_string();
-            company.slug = slug.to_string();
-            company.api_key = api_key.map(|s| s.to_string());
-            company.provider = provider.map(|s| s.to_string());
-            company.model = model.map(|s| s.to_string());
-            company.enable_llm_spam_guardrail = enable_llm_spam_guardrail;
+            company.name = write.name;
+            company.slug = write.slug.into();
+            company.api_key = write.api_key;
+            company.provider = write.provider;
+            company.model = write.model;
+            company.enable_llm_spam_guardrail = write.enable_llm_spam_guardrail;
+            company.avatar_url = write.avatar_url;
             Ok(company.clone())
         }
 
@@ -317,8 +411,12 @@ mod tests {
             Ok(())
         }
 
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
-            Ok(true)
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
         }
 
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
@@ -330,6 +428,7 @@ mod tests {
     async fn company_crud_flow_works() {
         let persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(Vec::new()),
+            memberships: Mutex::new(Vec::new()),
         });
         let use_cases = CompanyUseCases::new(persistence);
         let user_id = Uuid::new_v4();
@@ -338,12 +437,16 @@ mod tests {
         let company = use_cases
             .create_company(
                 user_id,
-                "Acme Corp",
-                "acme-corp",
-                Some("key123"),
-                Some("google"),
-                Some("gemini-2.5-flash"),
-                Some(true),
+                CompanyWrite {
+                    name: "Acme Corp".to_string(),
+                    slug: "acme-corp".to_string(),
+                    api_key: Some("key123".to_string()),
+                    provider: Some("google".to_string()),
+                    model: Some("gemini-2.5-flash".to_string()),
+                    enable_llm_spam_guardrail: Some(true),
+                    memory_provider: None,
+                    avatar_url: Some(AvatarUrl::from("https://cdn.example.com/acme.png")),
+                },
             )
             .await
             .unwrap();
@@ -353,6 +456,10 @@ mod tests {
         assert_eq!(company.provider.as_deref(), Some("google"));
         assert_eq!(company.model.as_deref(), Some("gemini-2.5-flash"));
         assert_eq!(company.enable_llm_spam_guardrail, Some(true));
+        assert_eq!(
+            company.avatar_url,
+            Some(AvatarUrl::from("https://cdn.example.com/acme.png"))
+        );
 
         // List
         let list = use_cases.list_user_companies(user_id).await.unwrap();
@@ -362,21 +469,124 @@ mod tests {
         let updated = use_cases
             .update_company(
                 company.id,
-                "Acme Inc",
-                "acme-inc",
-                None,
-                None,
-                None,
-                Some(false),
+                CompanyWrite {
+                    name: "Acme Inc".to_string(),
+                    slug: "acme-inc".to_string(),
+                    enable_llm_spam_guardrail: Some(false),
+                    ..CompanyWrite::default()
+                },
             )
             .await
             .unwrap();
         assert_eq!(updated.name, "Acme Inc");
         assert_eq!(updated.enable_llm_spam_guardrail, Some(false));
+        // A write sets every column, so a save that carries no picture is a save that clears it.
+        assert_eq!(updated.avatar_url, None);
 
         // Delete
         use_cases.delete_company(company.id).await.unwrap();
         let list_after = use_cases.list_user_companies(user_id).await.unwrap();
         assert_eq!(list_after.len(), 0);
+    }
+
+    /// The security property, not just the status code: a stranger must not be able to tell a
+    /// company that exists from one that does not.
+    #[tokio::test]
+    async fn a_foreign_company_is_indistinguishable_from_a_missing_one() {
+        let owner = Uuid::new_v4();
+        let stranger = Uuid::new_v4();
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: owner,
+            name: "Acme".into(),
+            slug: "acme".into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: Utc::now(),
+        };
+        let persistence = MockCompanyPersistence {
+            companies: Mutex::new(vec![company.clone()]),
+            memberships: Mutex::new(Vec::new()),
+        };
+
+        owned_company(&persistence, owner, company.id)
+            .await
+            .expect("the owner gets their company");
+
+        let foreign = owned_company(&persistence, stranger, company.id)
+            .await
+            .unwrap_err();
+        let missing = owned_company(&persistence, stranger, Uuid::new_v4())
+            .await
+            .unwrap_err();
+
+        assert!(matches!(foreign, AppError::NotFound(_)), "{foreign:?}");
+        assert_eq!(
+            foreign.to_string(),
+            missing.to_string(),
+            "a differing message would let an id probe enumerate other tenants"
+        );
+    }
+
+    #[tokio::test]
+    async fn only_owners_and_admins_receive_company_management_access() {
+        let owner = Uuid::new_v4();
+        let admin = Uuid::new_v4();
+        let member = Uuid::new_v4();
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: owner,
+            name: "Acme".into(),
+            slug: "acme".into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: Utc::now(),
+        };
+        let persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![company.clone()]),
+            memberships: Mutex::new(vec![
+                (admin, company.id, CompanyMembership::Admin),
+                (member, company.id, CompanyMembership::Member),
+            ]),
+        });
+        let use_cases = CompanyUseCases::new(persistence);
+
+        assert_eq!(
+            use_cases
+                .list_managed_companies(owner)
+                .await
+                .expect("owner management list"),
+            vec![company.clone()]
+        );
+        assert_eq!(
+            use_cases
+                .list_managed_companies(admin)
+                .await
+                .expect("admin management list"),
+            vec![company.clone()]
+        );
+        assert!(
+            use_cases
+                .list_managed_companies(member)
+                .await
+                .expect("member management list")
+                .is_empty()
+        );
+        assert_eq!(
+            use_cases
+                .managed_company(admin, company.id)
+                .await
+                .expect("admin management access"),
+            company
+        );
+        assert!(use_cases.managed_company(member, company.id).await.is_err());
     }
 }

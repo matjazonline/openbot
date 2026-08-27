@@ -1,0 +1,72 @@
+app = "mail-agents-server"
+primary_region = "fra"
+
+# A mailbox send holds its request open until the agent answers, up to the 15s inline wait before
+# the run is detached. The 5s default would SIGKILL the machine mid-request on every deploy.
+kill_timeout = "30s"
+
+[build]
+
+[env]
+  RUST_LOG = "mail_agents=info,tower_http=info,sqlx=warn"
+  # Must match the MX domain you point at this app.
+  APP_DOMAIN_NAME = "example.com"
+  # Comma-separated; credentials are enabled so no wildcard is possible.
+  CORS_ALLOWED_ORIGINS = "https://app.example.com"
+  INCOMING_SMTP_ENABLED = "true"
+  INCOMING_SMTP_HOST = "0.0.0.0"
+  INCOMING_SMTP_PORT = "2525"
+  ENABLE_HEURISTIC_SCANNER = "true"
+  ENABLE_SPAM_SCANNER = "false"
+  ENABLE_LLM_SPAM_GUARDRAIL = "false"
+  # API-bound agent executions; four is conservative for one shared CPU.
+  TASK_WORKER_CONCURRENCY = "4"
+  INCOMING_SMTP_DNSBL_ENABLED = "true"
+  REFRESH_TOKEN_TTL_DAYS = "30"
+  # Comma-separated addresses that see /ui/dashboard across every company rather than
+  # scoped to one. Unset means nobody does; a company `admin` is not an operator.
+  OPERATOR_EMAILS = ""
+  # The public bucket picked avatars are stored in. Its key is a secret:
+  # `fly secrets set GCS_SERVICE_ACCOUNT_JSON_BASE64=...`. Both or neither — naming one
+  # without the other fails the boot. See docs/deploy.md.
+  GCS_AVATAR_BUCKET_PUBLIC = ""
+  # Mail attachments go in a separate bucket with no public access; served only through the app,
+  # to whoever the channel's participant rules allow. See docs/deploy.md.
+  GCS_ATTACHMENTS_BUCKET_PRIVATE = ""
+
+# axum API
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_start_machines = true
+  # The task worker poller and the SMTP listener must keep running even with
+  # no HTTP traffic, so the machine must never be suspended.
+  auto_stop_machines = false
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+# inbound SMTP — needs a dedicated IPv4; shared IPs only forward 80/443
+[[services]]
+  protocol = "tcp"
+  internal_port = 2525
+  auto_start_machines = true
+  auto_stop_machines = false
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 25
+
+  [[services.tcp_checks]]
+    grace_period = "20s"
+    interval = "30s"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

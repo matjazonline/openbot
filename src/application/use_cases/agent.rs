@@ -7,23 +7,83 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::agent::Agent,
-    use_cases::{channel::validate_slug, company::CompanyPersistence},
+    entities::{
+        agent::Agent, creation::CreationProvenance, user::Viewer, value_objects::AvatarUrl,
+    },
+    use_cases::{
+        channel::{SlugKind, validate_slug},
+        company::{CompanyPersistence, managed_company},
+    },
 };
+
+/// An agent belonging to another company is reported exactly like a missing one, so an id probe
+/// cannot tell a foreign agent from a nonexistent one. See [`managed_company`].
+pub fn agent_not_found() -> AppError {
+    AppError::NotFound("Agent not found in this company.".into())
+}
+
+/// Everything one agent write sets, so create and update cannot drift apart and so a caller
+/// cannot transpose two same-typed arguments in a nine-parameter list.
+///
+/// Values reach persistence already normalized — see [`AgentWrite::normalize`]. Mirrors
+/// [`crate::use_cases::channel::ChannelWrite`].
+#[derive(Debug, Clone, Default)]
+pub struct AgentWrite {
+    pub name: String,
+    pub slug: String,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub api_key: Option<String>,
+    pub system_prompt: Option<String>,
+    /// Short statement of what the agent is for, read by the agent directory tool.
+    pub description: Option<String>,
+    pub config_json: Option<serde_json::Value>,
+    pub avatar_url: Option<AvatarUrl>,
+    pub created_by: Option<CreationProvenance>,
+}
+
+impl AgentWrite {
+    /// Trim the fields that have canonical forms and drop the blanks. Runs once, in the use case,
+    /// so create and update store the same shape.
+    pub(crate) fn normalize(&mut self) -> AppResult<()> {
+        self.name = self.name.trim().to_string();
+        self.slug = self.slug.trim().to_lowercase().replace(' ', "-");
+
+        if self.name.is_empty() || self.slug.is_empty() {
+            return Err(AppError::BadRequest(
+                "The agent name and slug cannot be empty.".into(),
+            ));
+        }
+        validate_slug(&self.slug, SlugKind::AgentSlug)?;
+
+        for field in [
+            &mut self.provider,
+            &mut self.model,
+            &mut self.api_key,
+            &mut self.system_prompt,
+            &mut self.description,
+        ] {
+            if let Some(value) = field.as_mut() {
+                *value = value.trim().to_string();
+                if value.is_empty() {
+                    *field = None;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
 
 #[async_trait]
 pub trait AgentPersistence: Send + Sync {
-    async fn create(
-        &self,
-        company_id: Uuid,
-        name: &str,
-        slug: &str,
-        provider: Option<&str>,
-        model: Option<&str>,
-        api_key: Option<&str>,
-        system_prompt: Option<&str>,
-        config_json: Option<serde_json::Value>,
-    ) -> AppResult<Agent>;
+    async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent>;
+
+    async fn create_library(&self, _write: AgentWrite) -> AppResult<Agent> {
+        Err(AppError::Internal(
+            "Agent library persistence is unavailable.".into(),
+        ))
+    }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>>;
 
@@ -35,19 +95,19 @@ pub trait AgentPersistence: Send + Sync {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>>;
 
-    async fn update(
-        &self,
-        id: Uuid,
-        name: &str,
-        slug: &str,
-        provider: Option<&str>,
-        model: Option<&str>,
-        api_key: Option<&str>,
-        system_prompt: Option<&str>,
-        config_json: Option<serde_json::Value>,
-    ) -> AppResult<Agent>;
+    async fn list_library(&self) -> AppResult<Vec<Agent>> {
+        Ok(Vec::new())
+    }
+
+    async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent>;
 
     async fn delete(&self, id: Uuid) -> AppResult<()>;
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SelectableAgents {
+    pub company_agents: Vec<Agent>,
+    pub library_agents: Vec<Agent>,
 }
 
 #[derive(Clone)]
@@ -67,19 +127,8 @@ impl AgentUseCases {
         }
     }
 
-    async fn verify_company_owner(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        let company = self
-            .company_persistence
-            .get_by_id(company_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
-
-        if company.user_id != user_id {
-            return Err(AppError::Internal(
-                "Unauthorized: only the company owner can manage agents.".into(),
-            ));
-        }
-
+    async fn verify_company_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
+        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         Ok(())
     }
 
@@ -88,49 +137,18 @@ impl AgentUseCases {
         &self,
         user_id: Uuid,
         company_id: Uuid,
-        name: &str,
-        slug: &str,
-        provider: Option<&str>,
-        model: Option<&str>,
-        api_key: Option<&str>,
-        system_prompt: Option<&str>,
-        config_json: Option<serde_json::Value>,
+        mut write: AgentWrite,
     ) -> AppResult<Agent> {
-        self.verify_company_owner(user_id, company_id).await?;
-
-        let name_trimmed = name.trim();
-        let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
-
-        if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::Internal(
-                "Agent name and slug cannot be empty.".into(),
-            ));
-        }
-
-        validate_slug(&slug_clean)?;
-
-        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let system_prompt_clean = system_prompt.map(|s| s.trim()).filter(|s| !s.is_empty());
+        self.verify_company_manager(user_id, company_id).await?;
+        write.created_by = Some(CreationProvenance::user(user_id));
+        write.normalize()?;
 
         info!(
             "Creating agent '{}' ({}) for company {}",
-            name_trimmed, slug_clean, company_id
+            write.name, write.slug, company_id
         );
 
-        self.agent_persistence
-            .create(
-                company_id,
-                name_trimmed,
-                &slug_clean,
-                provider_clean,
-                model_clean,
-                api_key_clean,
-                system_prompt_clean,
-                config_json,
-            )
-            .await
+        self.agent_persistence.create(company_id, write).await
     }
 
     #[instrument(skip(self))]
@@ -139,8 +157,74 @@ impl AgentUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<Agent>> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
         self.agent_persistence.list_by_company_id(company_id).await
+    }
+
+    /// Definitions a company owner or admin may assign to a channel, grouped by ownership.
+    pub async fn list_selectable_agents(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<SelectableAgents> {
+        self.verify_company_manager(user_id, company_id).await?;
+        Ok(SelectableAgents {
+            company_agents: self
+                .agent_persistence
+                .list_by_company_id(company_id)
+                .await?,
+            library_agents: self.agent_persistence.list_library().await?,
+        })
+    }
+
+    pub async fn list_assignable_agents(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<Vec<Agent>> {
+        let selectable = self.list_selectable_agents(user_id, company_id).await?;
+        Ok(selectable
+            .library_agents
+            .into_iter()
+            .chain(selectable.company_agents)
+            .collect())
+    }
+
+    pub async fn list_library_agents(&self) -> AppResult<Vec<Agent>> {
+        self.agent_persistence.list_library().await
+    }
+
+    pub async fn get_library_agent(&self, agent_id: Uuid) -> AppResult<Option<Agent>> {
+        Ok(self
+            .agent_persistence
+            .get_by_id(agent_id)
+            .await?
+            .filter(Agent::is_library))
+    }
+
+    pub async fn create_library_agent(&self, mut write: AgentWrite) -> AppResult<Agent> {
+        write.created_by = Some(CreationProvenance::system());
+        write.normalize()?;
+        self.agent_persistence.create_library(write).await
+    }
+
+    pub async fn update_library_agent(
+        &self,
+        agent_id: Uuid,
+        mut write: AgentWrite,
+    ) -> AppResult<Agent> {
+        self.get_library_agent(agent_id)
+            .await?
+            .ok_or_else(agent_not_found)?;
+        write.normalize()?;
+        self.agent_persistence.update(agent_id, write).await
+    }
+
+    pub async fn delete_library_agent(&self, agent_id: Uuid) -> AppResult<()> {
+        self.get_library_agent(agent_id)
+            .await?
+            .ok_or_else(agent_not_found)?;
+        self.agent_persistence.delete(agent_id).await
     }
 
     #[instrument(skip(self))]
@@ -150,14 +234,43 @@ impl AgentUseCases {
         company_id: Uuid,
         agent_id: Uuid,
     ) -> AppResult<Option<Agent>> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
         let agent = self.agent_persistence.get_by_id(agent_id).await?;
         if let Some(ref ag) = agent {
-            if ag.company_id != company_id {
+            if ag.company_id != Some(company_id) {
                 return Ok(None);
             }
         }
         Ok(agent)
+    }
+
+    /// One agent, if this viewer is on the company's team.
+    ///
+    /// The read counterpart of [`AgentUseCases::get_company_agent`]: that one is for the pages
+    /// that *configure* agents and stays owner-or-admin, this one is what a rendered thread names as
+    /// its responder, and an invited member reads that just as the owner does. Which channels the
+    /// member may read at all is `Channel::viewer_access`'s question, asked before this one.
+    #[instrument(skip(self))]
+    pub async fn get_readable_agent(
+        &self,
+        viewer: &Viewer,
+        company_id: Uuid,
+        agent_id: Uuid,
+    ) -> AppResult<Option<Agent>> {
+        let is_team = self
+            .company_persistence
+            .company_access(viewer.user_id, company_id)
+            .await?
+            .is_some_and(|access| access.membership.is_team());
+        if !is_team {
+            return Ok(None);
+        }
+
+        Ok(self
+            .agent_persistence
+            .get_by_id(agent_id)
+            .await?
+            .filter(|agent| agent.company_id.is_none() || agent.company_id == Some(company_id)))
     }
 
     #[instrument(skip(self))]
@@ -166,61 +279,28 @@ impl AgentUseCases {
         user_id: Uuid,
         company_id: Uuid,
         agent_id: Uuid,
-        name: &str,
-        slug: &str,
-        provider: Option<&str>,
-        model: Option<&str>,
-        api_key: Option<&str>,
-        system_prompt: Option<&str>,
-        config_json: Option<serde_json::Value>,
+        mut write: AgentWrite,
     ) -> AppResult<Agent> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
 
         let agent = self
             .agent_persistence
             .get_by_id(agent_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Agent not found.".into()))?;
+            .ok_or_else(agent_not_found)?;
 
-        if agent.company_id != company_id {
-            return Err(AppError::Internal(
-                "Agent does not belong to this company.".into(),
-            ));
+        if agent.company_id != Some(company_id) {
+            return Err(agent_not_found());
         }
 
-        let name_trimmed = name.trim();
-        let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
-
-        if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::Internal(
-                "Agent name and slug cannot be empty.".into(),
-            ));
-        }
-
-        validate_slug(&slug_clean)?;
-
-        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let system_prompt_clean = system_prompt.map(|s| s.trim()).filter(|s| !s.is_empty());
+        write.normalize()?;
 
         info!(
             "Updating agent {} for company {}: {} ({})",
-            agent_id, company_id, name_trimmed, slug_clean
+            agent_id, company_id, write.name, write.slug
         );
 
-        self.agent_persistence
-            .update(
-                agent_id,
-                name_trimmed,
-                &slug_clean,
-                provider_clean,
-                model_clean,
-                api_key_clean,
-                system_prompt_clean,
-                config_json,
-            )
-            .await
+        self.agent_persistence.update(agent_id, write).await
     }
 
     #[instrument(skip(self))]
@@ -230,18 +310,16 @@ impl AgentUseCases {
         company_id: Uuid,
         agent_id: Uuid,
     ) -> AppResult<()> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
 
         let agent = self
             .agent_persistence
             .get_by_id(agent_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Agent not found.".into()))?;
+            .ok_or_else(agent_not_found)?;
 
-        if agent.company_id != company_id {
-            return Err(AppError::Internal(
-                "Agent does not belong to this company.".into(),
-            ));
+        if agent.company_id != Some(company_id) {
+            return Err(agent_not_found());
         }
 
         info!("Deleting agent {} for company {}", agent_id, company_id);
@@ -249,6 +327,8 @@ impl AgentUseCases {
     }
 
     #[instrument(skip(self))]
+    /// Expand a plain-language description of an agent into a full system prompt, using the
+    /// company's own LLM credentials.
     pub async fn generate_system_prompt(
         &self,
         user_id: Uuid,
@@ -258,7 +338,7 @@ impl AgentUseCases {
         model_override: Option<&str>,
         api_key_override: Option<&str>,
     ) -> AppResult<String> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
 
         let company = self
             .company_persistence
@@ -266,86 +346,52 @@ impl AgentUseCases {
             .await?
             .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
 
-        let provider_opt = provider_override
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .or_else(|| {
-                company
-                    .provider
-                    .as_deref()
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            });
+        let llm = PromptGeneratorLlm::resolve(
+            &company,
+            provider_override,
+            model_override,
+            api_key_override,
+        )?;
 
-        let provider = provider_opt.map(|s| s.to_lowercase()).unwrap_or_else(|| {
-            if std::env::var("OPENAI_API_KEY")
-                .ok()
-                .filter(|s| !s.trim().is_empty())
-                .is_some()
-            {
-                "openai".to_string()
-            } else if std::env::var("ANTHROPIC_API_KEY")
-                .ok()
-                .filter(|s| !s.trim().is_empty())
-                .is_some()
-            {
-                "anthropic".to_string()
-            } else if std::env::var("GROQ_API_KEY")
-                .ok()
-                .filter(|s| !s.trim().is_empty())
-                .is_some()
-            {
-                "groq".to_string()
-            } else {
-                "google".to_string()
-            }
-        });
+        generate_prompt_with(llm, instructions).await
+    }
 
-        let default_model = match provider.as_str() {
-            "google" | "gemini" => "gemini-2.5-flash",
-            "openai" => "gpt-4o",
-            "anthropic" => "claude-3-5-sonnet-20241022",
-            "groq" => "llama-3.3-70b-versatile",
-            _ => "gemini-2.5-flash",
-        };
+    /// Generate a library prompt from explicit operator settings (falling back to environment
+    /// credentials), since a global definition has no company settings to inherit from.
+    pub async fn generate_library_system_prompt(
+        &self,
+        instructions: &str,
+        provider: Option<&str>,
+        model: Option<&str>,
+        api_key: Option<&str>,
+    ) -> AppResult<String> {
+        let llm = PromptGeneratorLlm::resolve_global(provider, model, api_key)?;
+        generate_prompt_with(llm, instructions).await
+    }
+}
 
-        let model = model_override
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .or_else(|| {
-                company
-                    .model
-                    .as_deref()
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            })
-            .unwrap_or(default_model)
-            .to_string();
+async fn generate_prompt_with(llm: PromptGeneratorLlm, instructions: &str) -> AppResult<String> {
+    let agent = llm.build_agent()?;
+    info!(
+        "Calling generate_system_prompt AI model | provider: '{}', model: '{}'",
+        llm.provider, llm.model
+    );
+    let response = agent
+        .chat(instructions)
+        .await
+        .map_err(|e| AppError::Internal(format!("AI generation call failed: {e}")))?;
 
-        let env_key = match provider.as_str() {
-            "google" | "gemini" => std::env::var("GEMINI_API_KEY")
-                .ok()
-                .or_else(|| std::env::var("GOOGLE_API_KEY").ok()),
-            "openai" => std::env::var("OPENAI_API_KEY").ok(),
-            "anthropic" => std::env::var("ANTHROPIC_API_KEY").ok(),
-            "groq" => std::env::var("GROQ_API_KEY").ok(),
-            _ => std::env::var("LLM_API_KEY")
-                .ok()
-                .or_else(|| std::env::var("API_KEY").ok()),
-        };
+    // Models like to wrap the prompt in a code fence despite being told not to.
+    Ok(response
+        .content
+        .trim()
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim()
+        .to_string())
+}
 
-        let api_key = api_key_override
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .or_else(|| company.api_key.as_deref().map(|s| s.trim()).filter(|s| !s.is_empty()))
-            .or_else(|| env_key.as_deref().map(|s| s.trim()).filter(|s| !s.is_empty()))
-            .ok_or_else(|| AppError::Internal(format!(
-                "API key is missing for provider '{}'. Please configure an API key in company settings or in the form.",
-                provider
-            )))?
-            .to_string();
-
-        let prepared_system_prompt = "\
+const PROMPT_GENERATOR_SYSTEM_PROMPT: &str = "\
 You are an expert AI prompt engineer specializing in crafting system prompts for autonomous AI agents.
 Your task is to generate a comprehensive, clear, structured, and production-ready system prompt based on the user's instructions.
 
@@ -355,7 +401,83 @@ Guidelines:
 - Keep the prompt structured, concise, and unambiguous.
 - Output ONLY the system prompt text itself. Do NOT include any intro/outro explanations, conversational filler, or markdown code blocks (```).";
 
-        let indented_system_prompt = prepared_system_prompt
+/// The model that writes system prompts, resolved from explicit operator input or company-owned
+/// settings. Deployment credentials are never shared with a company.
+struct PromptGeneratorLlm {
+    provider: String,
+    model: String,
+    api_key: String,
+}
+
+impl PromptGeneratorLlm {
+    fn resolve_global(
+        provider_override: Option<&str>,
+        model_override: Option<&str>,
+        api_key_override: Option<&str>,
+    ) -> AppResult<Self> {
+        let provider = non_empty(provider_override)
+            .map(str::to_lowercase)
+            .ok_or_else(|| {
+                AppError::BadRequest(
+                    "A provider is required to generate a global library prompt.".into(),
+                )
+            })?;
+        let model = non_empty(model_override)
+            .unwrap_or_else(|| default_model_for(&provider))
+            .to_string();
+        let api_key = non_empty(api_key_override)
+            .ok_or_else(|| {
+                AppError::BadRequest(format!(
+                    "An API key is required to generate a prompt with provider '{provider}'."
+                ))
+            })?
+            .to_string();
+        Ok(Self {
+            provider,
+            model,
+            api_key,
+        })
+    }
+
+    fn resolve(
+        company: &crate::entities::company::Company,
+        provider_override: Option<&str>,
+        model_override: Option<&str>,
+        api_key_override: Option<&str>,
+    ) -> AppResult<Self> {
+        let provider = non_empty(provider_override)
+            .or_else(|| non_empty(company.provider.as_deref()))
+            .map(|provider| provider.to_lowercase())
+            .ok_or_else(|| {
+                AppError::Internal(
+                    "LLM provider is missing. Please configure one in company settings or in the form."
+                        .into(),
+                )
+            })?;
+
+        let model = non_empty(model_override)
+            .or_else(|| non_empty(company.model.as_deref()))
+            .unwrap_or_else(|| default_model_for(&provider))
+            .to_string();
+
+        let api_key = non_empty(api_key_override)
+            .or_else(|| non_empty(company.api_key.as_deref()))
+            .ok_or_else(|| AppError::Internal(format!(
+                "API key is missing for provider '{}'. Please configure an API key in company settings or in the form.",
+                provider
+            )))?
+            .to_string();
+
+        Ok(Self {
+            provider,
+            model,
+            api_key,
+        })
+    }
+
+    fn build_agent(&self) -> AppResult<ai_agents::RuntimeAgent> {
+        // The system prompt goes in as a YAML block scalar, so every line needs indenting.
+        let indented_system_prompt = PROMPT_GENERATOR_SYSTEM_PROMPT
             .lines()
             .map(|line| {
                 if line.is_empty() {
@@ -366,81 +488,70 @@ Guidelines:
             })
             .collect::<Vec<_>>()
             .join("\n");
-
         let config_yaml = format!(
             "name: prompt_generator\nsystem_prompt: |\n{}\nllm:\n  provider: {}\n  model: {}\n  api_key: {}",
-            indented_system_prompt, provider, model, api_key
+            indented_system_prompt, self.provider, self.model, self.api_key
         );
 
-        let mut builder = ai_agents::AgentBuilder::from_yaml(&config_yaml).map_err(|e| {
+        let builder = ai_agents::AgentBuilder::from_yaml(&config_yaml).map_err(|e| {
             AppError::Internal(format!("Failed to parse agent builder config: {e}"))
         })?;
 
-        if let Ok(provider_type) = std::str::FromStr::from_str(&provider) {
-            let unified_provider = ai_agents::UnifiedLLMProvider::new(
-                provider_type,
-                model.clone(),
-                Some(api_key.clone()),
-                None,
-            )
-            .map_err(|e| AppError::Internal(format!("Failed to initialize LLM provider: {e}")))?;
-            builder = builder.llm(Arc::new(unified_provider));
-        } else {
-            builder = builder
-                .auto_configure_llms()
-                .map_err(|e| AppError::Internal(format!("Failed to configure LLMs: {e}")))?;
-        }
+        let provider_type = std::str::FromStr::from_str(&self.provider).map_err(|_| {
+            AppError::BadRequest(format!("Unsupported LLM provider '{}'.", self.provider))
+        })?;
+        let provider = ai_agents::UnifiedLLMProvider::new(
+            provider_type,
+            self.model.clone(),
+            Some(self.api_key.clone()),
+            None,
+        )
+        .map_err(|e| AppError::Internal(format!("Failed to initialize LLM provider: {e}")))?;
+        let builder = builder.llm(Arc::new(provider));
 
-        let agent = builder
+        builder
             .build()
-            .map_err(|e| AppError::Internal(format!("Failed to build AI agent: {e}")))?;
+            .map_err(|e| AppError::Internal(format!("Failed to build AI agent: {e}")))
+    }
+}
 
-        info!(
-            "Calling generate_system_prompt AI model | provider: '{}', model: '{}'",
-            provider, model
-        );
+fn non_empty(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|value| !value.is_empty())
+}
 
-        let response = agent
-            .chat(instructions)
-            .await
-            .map_err(|e| AppError::Internal(format!("AI generation call failed: {e}")))?;
-
-        let generated = response
-            .content
-            .trim()
-            .trim_start_matches("```")
-            .trim_end_matches("```")
-            .trim()
-            .to_string();
-
-        Ok(generated)
+fn default_model_for(provider: &str) -> &'static str {
+    match provider {
+        "openai" => "gpt-4o",
+        "anthropic" => "claude-3-5-sonnet-20241022",
+        "groq" => "llama-3.3-70b-versatile",
+        // Providers without a tailored default use the Google model default; unsupported
+        // providers are rejected when the prompt generator is built.
+        _ => "gemini-2.5-flash",
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::company::Company;
+    use crate::entities::{
+        company::{Company, CompanyAccess},
+        company_member::CompanyMembership,
+        value_objects::EmailAddress,
+    };
+    use crate::use_cases::company::CompanyWrite;
     use chrono::Utc;
     use serde_json::json;
     use std::sync::Mutex;
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
+        /// Accepted memberships, as `(user_id, company_id, access)`.
+        members: Mutex<Vec<(Uuid, Uuid, CompanyMembership)>>,
     }
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(
-            &self,
-            _user_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -464,20 +575,43 @@ mod tests {
                 .cloned())
         }
 
-        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
-            unimplemented!()
+        async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
+            Ok(self
+                .companies
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|c| c.user_id == user_id)
+                .cloned()
+                .collect())
         }
 
-        async fn update(
-            &self,
-            _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
+            let companies = self.companies.lock().unwrap();
+            let members = self.members.lock().unwrap();
+            Ok(companies
+                .iter()
+                .filter_map(|company| {
+                    let membership = if company.user_id == user_id {
+                        CompanyMembership::Owner
+                    } else if let Some((_, _, membership)) =
+                        members.iter().find(|(member_id, company_id, _)| {
+                            *member_id == user_id && *company_id == company.id
+                        })
+                    {
+                        *membership
+                    } else {
+                        return None;
+                    };
+                    Some(CompanyAccess {
+                        company: company.clone(),
+                        membership,
+                    })
+                })
+                .collect())
+        }
+
+        async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -485,8 +619,12 @@ mod tests {
             unimplemented!()
         }
 
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
-            Ok(true)
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
         }
 
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
@@ -500,28 +638,21 @@ mod tests {
 
     #[async_trait]
     impl AgentPersistence for MockAgentPersistence {
-        async fn create(
-            &self,
-            company_id: Uuid,
-            name: &str,
-            slug: &str,
-            provider: Option<&str>,
-            model: Option<&str>,
-            api_key: Option<&str>,
-            system_prompt: Option<&str>,
-            config_json: Option<serde_json::Value>,
-        ) -> AppResult<Agent> {
+        async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
             let agent = Agent {
                 id: Uuid::new_v4(),
-                company_id,
-                name: name.to_string(),
-                slug: slug.to_string(),
-                provider: provider.map(|s| s.to_string()),
-                model: model.map(|s| s.to_string()),
-                api_key: api_key.map(|s| s.to_string()),
-                system_prompt: system_prompt.map(|s| s.to_string()),
-                config_json,
-                created_at: Utc::now().naive_utc(),
+                company_id: Some(company_id),
+                name: write.name,
+                slug: write.slug,
+                provider: write.provider,
+                model: write.model,
+                api_key: write.api_key,
+                system_prompt: write.system_prompt,
+                description: write.description,
+                config_json: write.config_json,
+                avatar_url: write.avatar_url,
+                created_by: crate::entities::creation::CreationProvenance::system(),
+                created_at: Utc::now(),
             };
             self.agents.lock().unwrap().push(agent.clone());
             Ok(agent)
@@ -557,35 +688,27 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .filter(|a| a.company_id == company_id)
+                .filter(|a| a.company_id == Some(company_id))
                 .cloned()
                 .collect())
         }
 
-        async fn update(
-            &self,
-            id: Uuid,
-            name: &str,
-            slug: &str,
-            provider: Option<&str>,
-            model: Option<&str>,
-            api_key: Option<&str>,
-            system_prompt: Option<&str>,
-            config_json: Option<serde_json::Value>,
-        ) -> AppResult<Agent> {
+        async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
             let mut list = self.agents.lock().unwrap();
             let agent = list
                 .iter_mut()
                 .find(|a| a.id == id)
                 .ok_or_else(|| AppError::Internal("Not found".into()))?;
 
-            agent.name = name.to_string();
-            agent.slug = slug.to_string();
-            agent.provider = provider.map(|s| s.to_string());
-            agent.model = model.map(|s| s.to_string());
-            agent.api_key = api_key.map(|s| s.to_string());
-            agent.system_prompt = system_prompt.map(|s| s.to_string());
-            agent.config_json = config_json;
+            agent.name = write.name;
+            agent.slug = write.slug;
+            agent.provider = write.provider;
+            agent.model = write.model;
+            agent.api_key = write.api_key;
+            agent.system_prompt = write.system_prompt;
+            agent.description = write.description;
+            agent.config_json = write.config_json;
+            agent.avatar_url = write.avatar_url;
             Ok(agent.clone())
         }
 
@@ -601,16 +724,19 @@ mod tests {
         let company_id = Uuid::new_v4();
 
         let company_persistence = Arc::new(MockCompanyPersistence {
+            members: Mutex::new(Vec::new()),
             companies: Mutex::new(vec![Company {
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                avatar_url: None,
+                memory_provider: None,
+                created_at: Utc::now(),
             }]),
         });
 
@@ -625,13 +751,11 @@ mod tests {
             .create_agent(
                 owner_id,
                 company_id,
-                "Quiet Bot",
-                "quiet",
-                None,
-                None,
-                None,
-                None,
-                None,
+                AgentWrite {
+                    name: "Quiet Bot".to_string(),
+                    slug: "quiet".to_string(),
+                    ..AgentWrite::default()
+                },
             )
             .await;
         assert!(invalid_res.is_err());
@@ -643,13 +767,16 @@ mod tests {
             .create_agent(
                 owner_id,
                 company_id,
-                "Support Bot",
-                "support-bot",
-                Some("openai"),
-                Some("gpt-4o"),
-                Some("key_123"),
-                Some("Prompt"),
-                Some(config.clone()),
+                AgentWrite {
+                    name: "Support Bot".to_string(),
+                    slug: "support-bot".to_string(),
+                    provider: Some("openai".to_string()),
+                    model: Some("gpt-4o".to_string()),
+                    api_key: Some("key_123".to_string()),
+                    system_prompt: Some("Prompt".to_string()),
+                    config_json: Some(config.clone()),
+                    ..AgentWrite::default()
+                },
             )
             .await
             .unwrap();
@@ -668,13 +795,11 @@ mod tests {
             .create_agent(
                 non_owner_id,
                 company_id,
-                "Hacker Bot",
-                "hacker-bot",
-                None,
-                None,
-                None,
-                None,
-                None,
+                AgentWrite {
+                    name: "Hacker Bot".to_string(),
+                    slug: "hacker-bot".to_string(),
+                    ..AgentWrite::default()
+                },
             )
             .await;
         assert!(err.is_err());
@@ -693,13 +818,14 @@ mod tests {
                 owner_id,
                 company_id,
                 agent.id,
-                "Updated Bot",
-                "updated-bot",
-                Some("anthropic"),
-                Some("claude-3-5-sonnet"),
-                None,
-                None,
-                Some(updated_config.clone()),
+                AgentWrite {
+                    name: "Updated Bot".to_string(),
+                    slug: "updated-bot".to_string(),
+                    provider: Some("anthropic".to_string()),
+                    model: Some("claude-3-5-sonnet".to_string()),
+                    config_json: Some(updated_config.clone()),
+                    ..AgentWrite::default()
+                },
             )
             .await
             .unwrap();
@@ -752,5 +878,196 @@ Guidelines:
         );
 
         assert!(ai_agents::AgentBuilder::from_yaml(&config_yaml).is_ok());
+    }
+
+    #[test]
+    fn prompt_generation_requires_explicitly_owned_credentials() {
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".into(),
+            api_key: None,
+            provider: Some("openai".to_string()),
+            model: None,
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: Utc::now(),
+        };
+
+        let company_error = PromptGeneratorLlm::resolve(&company, None, None, None)
+            .err()
+            .expect("a company without its own key must be rejected");
+        assert!(company_error.to_string().contains("API key is missing"));
+
+        let global_provider_error = PromptGeneratorLlm::resolve_global(None, None, Some("key"))
+            .err()
+            .expect("a global prompt must name its provider");
+        assert!(
+            global_provider_error
+                .to_string()
+                .contains("provider is required")
+        );
+
+        let global_key_error = PromptGeneratorLlm::resolve_global(Some("openai"), None, None)
+            .err()
+            .expect("a global prompt must supply its own key");
+        assert!(global_key_error.to_string().contains("API key is required"));
+    }
+
+    /// Members may read agents used by their inbox, while only owners and admins may configure
+    /// them. Both paths must still stop at the company's edge.
+    #[tokio::test]
+    async fn members_read_agents_and_admins_manage_them() {
+        let owner_id = Uuid::new_v4();
+        let admin_id = Uuid::new_v4();
+        let member_id = Uuid::new_v4();
+        let stranger_id = Uuid::new_v4();
+        let company_id = Uuid::new_v4();
+        let other_company_id = Uuid::new_v4();
+
+        let company = |id: Uuid, user_id: Uuid, slug: &str| Company {
+            id,
+            user_id,
+            name: "Acme Corp".to_string(),
+            slug: slug.into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: Utc::now(),
+        };
+
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![
+                company(company_id, owner_id, "acme"),
+                company(other_company_id, Uuid::new_v4(), "other"),
+            ]),
+            members: Mutex::new(vec![
+                (admin_id, company_id, CompanyMembership::Admin),
+                (member_id, company_id, CompanyMembership::Member),
+            ]),
+        });
+        let agent_persistence = Arc::new(MockAgentPersistence {
+            agents: Mutex::new(Vec::new()),
+        });
+        let use_cases = AgentUseCases::new(company_persistence, agent_persistence);
+
+        let agent = use_cases
+            .create_agent(
+                owner_id,
+                company_id,
+                AgentWrite {
+                    name: "Support Bot".to_string(),
+                    slug: "support-bot".to_string(),
+                    ..AgentWrite::default()
+                },
+            )
+            .await
+            .expect("the owner creates the agent");
+
+        let viewer = |user_id: Uuid, email: &str| Viewer {
+            user_id,
+            email: EmailAddress::from(email),
+        };
+
+        // The member reads it, exactly as the owner does.
+        assert_eq!(
+            use_cases
+                .get_readable_agent(
+                    &viewer(member_id, "member@example.com"),
+                    company_id,
+                    agent.id
+                )
+                .await
+                .expect("a lookup")
+                .map(|found| found.id),
+            Some(agent.id)
+        );
+        assert_eq!(
+            use_cases
+                .get_readable_agent(&viewer(owner_id, "owner@example.com"), company_id, agent.id)
+                .await
+                .expect("a lookup")
+                .map(|found| found.id),
+            Some(agent.id)
+        );
+
+        // A stranger to the company does not.
+        assert!(
+            use_cases
+                .get_readable_agent(
+                    &viewer(stranger_id, "stranger@example.com"),
+                    company_id,
+                    agent.id
+                )
+                .await
+                .expect("a lookup")
+                .is_none()
+        );
+
+        // Nor does the member reach it through a company they are nothing to.
+        assert!(
+            use_cases
+                .get_readable_agent(
+                    &viewer(member_id, "member@example.com"),
+                    other_company_id,
+                    agent.id
+                )
+                .await
+                .expect("a lookup")
+                .is_none()
+        );
+
+        // Reading is all an ordinary membership grants.
+        assert!(
+            use_cases
+                .list_company_agents(member_id, company_id)
+                .await
+                .is_err()
+        );
+
+        // An admin can list, create, update and delete company agents.
+        assert_eq!(
+            use_cases
+                .list_company_agents(admin_id, company_id)
+                .await
+                .expect("an admin lists agents")
+                .len(),
+            1
+        );
+        let managed = use_cases
+            .create_agent(
+                admin_id,
+                company_id,
+                AgentWrite {
+                    name: "Admin Bot".into(),
+                    slug: "admin-bot".into(),
+                    ..AgentWrite::default()
+                },
+            )
+            .await
+            .expect("an admin creates an agent");
+        let managed = use_cases
+            .update_agent(
+                admin_id,
+                company_id,
+                managed.id,
+                AgentWrite {
+                    name: "Managed Bot".into(),
+                    slug: "managed-bot".into(),
+                    ..AgentWrite::default()
+                },
+            )
+            .await
+            .expect("an admin updates an agent");
+        assert_eq!(managed.name, "Managed Bot");
+        use_cases
+            .delete_agent(admin_id, company_id, managed.id)
+            .await
+            .expect("an admin deletes an agent");
     }
 }

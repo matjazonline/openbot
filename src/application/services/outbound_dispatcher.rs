@@ -2,17 +2,25 @@ use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message as LettreMessage, Tokio1Executor,
     message::{
         Mailbox,
-        header::{ContentType, Header, HeaderName, HeaderValue, InReplyTo, MessageId, References},
+        header::{
+            ContentType, Header, HeaderName, HeaderValue, InReplyTo, MessageId as LettreMessageId,
+            References,
+        },
     },
     transport::smtp::authentication::Credentials,
 };
 use sha2::{Digest, Sha256};
+use std::time::Duration;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use std::sync::Arc;
+
 use crate::{
     app_error::{AppError, AppResult},
+    entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId},
     infra::config::AppConfig,
+    use_cases::user::ConfirmationCodeSender,
 };
 
 #[derive(Clone, Debug)]
@@ -39,27 +47,41 @@ impl Header for CustomHeader {
 pub struct OutboundEmail {
     pub channel_id: Uuid,
     pub channel_name: String,
-    pub channel_slug: String,
-    pub company_slug: String,
-    pub trigger_message_id: String,
-    pub thread_references: Vec<String>,
-    pub recipient_to: String,
-    pub recipients_cc: Vec<String>,
+    pub channel_slug: ChannelSlug,
+    pub company_slug: CompanySlug,
+    pub trigger_message_id: MessageId,
+    pub thread_references: Vec<MessageId>,
+    pub recipient_to: EmailAddress,
+    pub recipients_cc: Vec<EmailAddress>,
     pub subject: String,
     pub body_text: String,
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,
 }
 
+/// One server-generated message: a bounce, or a reply from a reserved `_` address.
+///
+/// A struct rather than positional arguments because `from_name`, `subject` and `body` are three
+/// adjacent strings, and a transposed pair would compile and mail the wrong thing.
+struct SystemMail<'a> {
+    message_id: MessageId,
+    from: EmailAddress,
+    from_name: &'a str,
+    to: &'a EmailAddress,
+    subject: String,
+    body: &'a str,
+    in_reply_to: Option<MessageId>,
+}
+
 #[derive(Debug, Clone)]
 pub struct SentEmailResult {
-    pub outbound_message_id: String,
-    pub in_reply_to: String,
-    pub references: Vec<String>,
-    pub from_address: String,
+    pub outbound_message_id: MessageId,
+    pub in_reply_to: MessageId,
+    pub references: Vec<MessageId>,
+    pub from_address: EmailAddress,
     pub from_name: Option<String>,
-    pub recipients_to: Vec<String>,
-    pub recipients_cc: Vec<String>,
+    pub recipients_to: Vec<EmailAddress>,
+    pub recipients_cc: Vec<EmailAddress>,
     pub subject: String,
     pub body_text: String,
     pub source_channel_id: Option<Uuid>,
@@ -67,9 +89,127 @@ pub struct SentEmailResult {
     pub trace_channels: Vec<Uuid>,
 }
 
+/// Wrap an agent's answer in the shared plain-text email template.
+///
+/// Keep this at the delivery boundary so the thread and API retain the agent's original answer.
+pub fn agent_response_email_body(response: &str) -> String {
+    format!("{response}\n\nDone by busybots.net")
+}
+
+/// Mails confirmation codes over this deployment's SMTP relay.
+///
+/// It exists so [`crate::use_cases::user::UserUseCases`] depends on the *act* of sending a code
+/// rather than on SMTP: a test can then hand it a sender that keeps the code, which is the only
+/// way to exercise a confirmation flow end to end without a mailbox.
+pub struct SmtpConfirmationSender {
+    config: Arc<AppConfig>,
+}
+
+impl SmtpConfirmationSender {
+    pub fn new(config: Arc<AppConfig>) -> Self {
+        Self { config }
+    }
+}
+
+#[async_trait::async_trait]
+impl ConfirmationCodeSender for SmtpConfirmationSender {
+    async fn send_code(
+        &self,
+        recipient: &EmailAddress,
+        code: &str,
+        purpose: ConfirmationPurpose,
+    ) -> AppResult<()> {
+        OutboundDispatcher::send_confirmation_code(&self.config, recipient, code, purpose).await
+    }
+}
+
+/// What a mailed confirmation code proves, and so what its mail should say.
+///
+/// It changes the wording and nothing else. The distinction that matters is *where* each code is
+/// sent, and that is the caller's -- see `EmailConfirmation::request`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfirmationPurpose {
+    Registration,
+    EmailChange,
+    PasswordChange,
+}
+
+impl ConfirmationPurpose {
+    fn subject(self) -> &'static str {
+        match self {
+            ConfirmationPurpose::Registration => "Confirm your BusyBots email",
+            ConfirmationPurpose::EmailChange => "Confirm your new BusyBots email",
+            ConfirmationPurpose::PasswordChange => "Confirm your BusyBots password change",
+        }
+    }
+
+    fn lead(self) -> &'static str {
+        match self {
+            ConfirmationPurpose::Registration => "Your BusyBots confirmation code is",
+            ConfirmationPurpose::EmailChange => {
+                "To use this address for your BusyBots account, enter the code"
+            }
+            ConfirmationPurpose::PasswordChange => {
+                "To finish changing your BusyBots password, enter the code"
+            }
+        }
+    }
+
+    /// What to do if the code was not asked for. A registration code reaching a stranger is a
+    /// typo; a code about an account that already exists may be somebody else at its controls, so
+    /// those two say to change the password rather than to ignore it.
+    fn footer(self) -> &'static str {
+        match self {
+            ConfirmationPurpose::Registration => {
+                "If you did not sign up for BusyBots, you can ignore this email."
+            }
+            ConfirmationPurpose::EmailChange | ConfirmationPurpose::PasswordChange => {
+                "If you did not ask for this, change your BusyBots password -- somebody else may be signed in to your account."
+            }
+        }
+    }
+}
+
 pub struct OutboundDispatcher;
 
 impl OutboundDispatcher {
+    /// Mails one confirmation code.
+    ///
+    /// Every code this app sends goes out through here, so the subject and the sentence above the
+    /// code are the only thing [`ConfirmationPurpose`] changes -- what a code *proves* differs,
+    /// how it is delivered does not.
+    async fn send_confirmation_code(
+        config: &AppConfig,
+        recipient: &EmailAddress,
+        code: &str,
+        purpose: ConfirmationPurpose,
+    ) -> AppResult<()> {
+        let from = config
+            .smtp_from_address
+            .parse::<Mailbox>()
+            .map_err(|e| AppError::Internal(format!("Invalid SMTP_FROM_ADDRESS: {e}")))?;
+        let to = recipient
+            .parse::<Mailbox>()
+            .map_err(|e| AppError::BadRequest(format!("Invalid email address: {e}")))?;
+        let message = LettreMessage::builder()
+            .from(from)
+            .to(to)
+            .subject(purpose.subject())
+            .header(ContentType::TEXT_PLAIN)
+            .body(format!(
+                "{lead} {code}.\n\nThis code expires in 15 minutes.\n\n{footer}",
+                lead = purpose.lead(),
+                footer = purpose.footer(),
+            ))
+            .map_err(|e| AppError::Internal(format!("Failed to build confirmation email: {e}")))?;
+
+        smtp_transport(config)?
+            .send(message)
+            .await
+            .map_err(|e| AppError::Internal(format!("SMTP dispatch failed: {e}")))?;
+        Ok(())
+    }
+
     pub fn prepare(config: &AppConfig, email: OutboundEmail) -> AppResult<SentEmailResult> {
         Self::prepare_with_message_id(config, email, None)
     }
@@ -108,13 +248,15 @@ impl OutboundDispatcher {
         email: OutboundEmail,
         outbound_message_id: Option<String>,
     ) -> AppResult<SentEmailResult> {
-        let outbound_message_id = outbound_message_id
-            .unwrap_or_else(|| format!("<{}@{}>", Uuid::new_v4(), config.app_domain_name));
+        let outbound_message_id: MessageId = outbound_message_id
+            .unwrap_or_else(|| format!("<{}@{}>", Uuid::new_v4(), config.app_domain_name))
+            .into();
 
-        let from_email = format!(
+        let from_email: EmailAddress = format!(
             "{}@{}.{}",
             email.channel_slug, email.company_slug, config.app_domain_name
-        );
+        )
+        .into();
         let in_reply_to = email.trigger_message_id.clone();
 
         let mut references = email.thread_references.clone();
@@ -172,7 +314,7 @@ impl OutboundDispatcher {
             prepared
                 .recipients_to
                 .first()
-                .map(String::as_str)
+                .map(|e| e.as_str())
                 .unwrap_or_default()
         );
 
@@ -180,7 +322,7 @@ impl OutboundDispatcher {
             .from_name
             .as_ref()
             .map(|name| format!("\"{name}\" <{}>", prepared.from_address))
-            .unwrap_or_else(|| prepared.from_address.clone());
+            .unwrap_or_else(|| prepared.from_address.to_string());
         let from_mailbox = from_header
             .parse::<Mailbox>()
             .map_err(|e| AppError::Internal(format!("Invalid From address mailbox: {}", e)))?;
@@ -201,9 +343,18 @@ impl OutboundDispatcher {
                 builder = builder.cc(cc_mb);
             }
         }
-        builder = builder.header(MessageId::from(prepared.outbound_message_id.clone()));
-        builder = builder.header(InReplyTo::from(prepared.in_reply_to.clone()));
-        builder = builder.header(References::from(prepared.references.join(" ")));
+        builder = builder.header(LettreMessageId::from(
+            prepared.outbound_message_id.to_string(),
+        ));
+        builder = builder.header(InReplyTo::from(prepared.in_reply_to.to_string()));
+        builder = builder.header(References::from(
+            prepared
+                .references
+                .iter()
+                .map(MessageId::as_str)
+                .collect::<Vec<_>>()
+                .join(" "),
+        ));
         builder = builder.header(CustomHeader {
             name: HeaderName::new_from_ascii_str("Auto-Submitted"),
             value: "auto-replied".to_string(),
@@ -238,19 +389,7 @@ impl OutboundDispatcher {
 
         // If SMTP credentials/host configured, dispatch via SMTP; otherwise log
         if !config.smtp_host.is_empty() && config.smtp_host != "localhost" {
-            let mut transport_builder =
-                AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_host)
-                    .map_err(|e| AppError::Internal(format!("Invalid SMTP host: {}", e)))?
-                    .port(config.smtp_port);
-
-            if !config.smtp_username.is_empty() {
-                transport_builder = transport_builder.credentials(Credentials::new(
-                    config.smtp_username.clone(),
-                    config.smtp_password.clone(),
-                ));
-            }
-
-            let transport = transport_builder.build();
+            let transport = smtp_transport(config)?;
             match transport.send(lettre_msg).await {
                 Ok(_) => {
                     info!("Successfully dispatched outbound SMTP email for thread");
@@ -272,72 +411,137 @@ impl OutboundDispatcher {
 
     pub async fn send_bounce(
         config: &AppConfig,
-        recipient_to: &str,
+        recipient_to: &EmailAddress,
         subject: &str,
         bounce_body: &str,
     ) -> AppResult<SentEmailResult> {
-        let outbound_uuid = Uuid::new_v4();
-        let outbound_message_id = format!("<bounce-{}@{}>", outbound_uuid, config.app_domain_name);
-
-        let from_email = format!("mailer-daemon@{}", config.app_domain_name);
-        let from_header_value = format!("\"Mail Agents Server\" <{}>", from_email);
-
         let formatted_subject = if subject.to_lowercase().starts_with("[undeliverable]") {
             subject.to_string()
         } else {
             format!("[Undeliverable] {}", subject)
         };
 
+        Self::send_system_mail(
+            config,
+            SystemMail {
+                message_id: format!("<bounce-{}@{}>", Uuid::new_v4(), config.app_domain_name)
+                    .into(),
+                from: format!("mailer-daemon@{}", config.app_domain_name).into(),
+                from_name: "Mail Agents Server",
+                to: recipient_to,
+                subject: formatted_subject,
+                body: bounce_body,
+                in_reply_to: None,
+            },
+        )
+        .await
+    }
+
+    /// The answer a reserved `_`-prefixed address sends back.
+    ///
+    /// Unlike a channel reply this carries no `X-MailAgents-*` headers and never joins the
+    /// inter-channel trace: it comes from the server, not from an agent.
+    pub async fn send_system_reply(
+        config: &AppConfig,
+        company_slug: &CompanySlug,
+        system_local_part: &str,
+        recipient_to: &EmailAddress,
+        subject: &str,
+        in_reply_to: Option<MessageId>,
+        body: &str,
+    ) -> AppResult<SentEmailResult> {
+        let trimmed = subject.trim();
+        let formatted_subject = if trimmed.is_empty() {
+            "Mail Agents Help".to_string()
+        } else if trimmed.to_lowercase().starts_with("re:") {
+            trimmed.to_string()
+        } else {
+            format!("Re: {trimmed}")
+        };
+
+        let from: EmailAddress = format!(
+            "{system_local_part}@{company_slug}.{}",
+            config.app_domain_name
+        )
+        .into();
+
+        Self::send_system_mail(
+            config,
+            SystemMail {
+                message_id: format!("<system-{}@{}>", Uuid::new_v4(), config.app_domain_name)
+                    .into(),
+                from,
+                from_name: "Mail Agents",
+                to: recipient_to,
+                subject: formatted_subject,
+                body,
+                in_reply_to,
+            },
+        )
+        .await
+    }
+
+    /// Build and post one server-generated message.
+    ///
+    /// Shared by the bounce and the system reply so the headers that make an auto-message safe --
+    /// `Auto-Submitted: auto-replied`, which `check_inbound_guards` refuses on the way back in --
+    /// are set in exactly one place.
+    async fn send_system_mail(
+        config: &AppConfig,
+        mail: SystemMail<'_>,
+    ) -> AppResult<SentEmailResult> {
+        let from_header_value = format!("\"{}\" <{}>", mail.from_name, mail.from);
         let from_mailbox = from_header_value
             .parse::<Mailbox>()
             .map_err(|e| AppError::Internal(format!("Invalid From address mailbox: {}", e)))?;
 
-        let to_mailbox = recipient_to
+        let to_mailbox = mail
+            .to
             .parse::<Mailbox>()
             .map_err(|e| AppError::Internal(format!("Invalid To address mailbox: {}", e)))?;
 
-        let builder = LettreMessage::builder()
+        let mut builder = LettreMessage::builder()
             .from(from_mailbox)
             .to(to_mailbox)
-            .subject(&formatted_subject)
+            .subject(&mail.subject)
             .header(ContentType::TEXT_PLAIN)
             .header(CustomHeader {
                 name: HeaderName::new_from_ascii_str("Auto-Submitted"),
                 value: "auto-replied".to_string(),
             });
 
-        let email_msg = builder.body(bounce_body.to_string()).map_err(|e| {
-            AppError::Internal(format!("Failed to build bounce email message: {}", e))
+        if let Some(ref parent) = mail.in_reply_to
+            && !parent.is_empty()
+        {
+            builder = builder.header(CustomHeader {
+                name: HeaderName::new_from_ascii_str("In-Reply-To"),
+                value: parent.to_string(),
+            });
+        }
+
+        let email_msg = builder.body(mail.body.to_string()).map_err(|e| {
+            AppError::Internal(format!("Failed to build system email message: {}", e))
         })?;
 
-        if !config.smtp_host.is_empty() {
-            let mut mailer_builder =
-                AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&config.smtp_host)
-                    .port(config.smtp_port);
-
-            if !config.smtp_username.is_empty() {
-                mailer_builder = mailer_builder.credentials(Credentials::new(
-                    config.smtp_username.clone(),
-                    config.smtp_password.clone(),
-                ));
-            }
-
-            let mailer = mailer_builder.build();
-            if let Err(err) = mailer.send(email_msg).await {
-                warn!("Failed to dispatch bounce email via SMTP: {err}");
-            }
+        if !config.smtp_host.is_empty() && config.smtp_host != "localhost" {
+            smtp_transport(config)?
+                .send(email_msg)
+                .await
+                .map_err(|err| {
+                    AppError::Internal(format!("Failed to dispatch system email via SMTP: {err}"))
+                })?;
         }
 
         Ok(SentEmailResult {
-            outbound_message_id,
-            in_reply_to: String::new(),
+            outbound_message_id: mail.message_id,
+            in_reply_to: mail.in_reply_to.unwrap_or_default(),
             references: vec![],
-            from_address: from_email,
-            from_name: Some("Mail Agents Server".to_string()),
-            recipients_to: vec![recipient_to.to_string()],
+            from_address: mail.from,
+            from_name: Some(mail.from_name.to_string()),
+            recipients_to: vec![mail.to.clone()],
             recipients_cc: vec![],
-            subject: formatted_subject,
-            body_text: bounce_body.to_string(),
+            subject: mail.subject,
+            body_text: mail.body.to_string(),
             source_channel_id: None,
             hop_count: 0,
             trace_channels: Vec::new(),
@@ -345,17 +549,32 @@ impl OutboundDispatcher {
     }
 }
 
+fn smtp_transport(config: &AppConfig) -> AppResult<AsyncSmtpTransport<Tokio1Executor>> {
+    let mut builder = AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_host)
+        .map_err(|error| AppError::Internal(format!("Invalid SMTP host: {error}")))?
+        .port(config.smtp_port)
+        .timeout(Some(Duration::from_secs(30)));
+    if !config.smtp_username.is_empty() {
+        builder = builder.credentials(Credentials::new(
+            config.smtp_username.clone(),
+            config.smtp_password.clone(),
+        ));
+    }
+    Ok(builder.build())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_outbound_dispatcher_constructs_valid_headers() {
-        let config = AppConfig {
+    fn test_config() -> AppConfig {
+        AppConfig {
             jwt_secret: "secret".into(),
-            access_token_ttl: time::Duration::days(1),
+            sendgrid_inbound: None,
+            hydradb: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".into(),
+            cors_allowed_origins: vec![],
             smtp_host: "localhost".into(),
             smtp_port: 1025,
             smtp_username: "".into(),
@@ -374,9 +593,14 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
-        };
+            secure_cookies: false,
+            gcs: None,
+            operator_emails: Vec::new(),
+        }
+    }
 
-        let outbound_email = OutboundEmail {
+    fn test_email() -> OutboundEmail {
+        OutboundEmail {
             channel_id: Uuid::new_v4(),
             channel_name: "Support Bot".into(),
             channel_slug: "support".into(),
@@ -389,9 +613,21 @@ mod tests {
             body_text: "Hello! I am your AI assistant.".into(),
             hop_count: 0,
             trace_channels: Vec::new(),
-        };
+        }
+    }
 
-        let result = OutboundDispatcher::send(&config, outbound_email)
+    #[test]
+    fn agent_response_email_template_adds_busy_bots_footer() {
+        assert_eq!(
+            agent_response_email_body("The report is ready."),
+            "The report is ready.\n\nDone by busybots.net"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_outbound_dispatcher_constructs_valid_headers() {
+        let config = test_config();
+        let result = OutboundDispatcher::send(&config, test_email())
             .await
             .unwrap();
 
@@ -405,5 +641,28 @@ mod tests {
         assert_eq!(result.from_address, "support@acme.mailagents.com");
         assert_eq!(result.recipients_to, vec!["user@example.com"]);
         assert_eq!(result.recipients_cc, vec!["manager@example.com"]);
+    }
+
+    /// The queue-then-deliver split rests on this: whoever queues an email derives its Message-ID
+    /// from the idempotency key and persists it *before* the poller sends, so both sides must
+    /// arrive at the same Message-ID from the same key. If this drifts, the message recorded in the
+    /// thread and the mail actually delivered stop matching, and replies stop threading.
+    #[test]
+    fn prepared_message_id_is_a_pure_function_of_the_idempotency_key() {
+        let config = test_config();
+        let key = "task:1b7f0f9e-0000-4000-8000-000000000000:agent-reply";
+
+        let queued = OutboundDispatcher::prepare_idempotent(&config, test_email(), key).unwrap();
+        let delivered = OutboundDispatcher::prepare_idempotent(&config, test_email(), key).unwrap();
+
+        assert_eq!(queued.outbound_message_id, delivered.outbound_message_id);
+
+        let other =
+            OutboundDispatcher::prepare_idempotent(&config, test_email(), "task:other:agent-reply")
+                .unwrap();
+        assert_ne!(
+            queued.outbound_message_id, other.outbound_message_id,
+            "a different send must not collide onto the same Message-ID"
+        );
     }
 }

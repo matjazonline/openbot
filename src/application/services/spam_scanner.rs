@@ -344,9 +344,11 @@ mod tests {
     async fn test_spam_scanner_service_composite() {
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
-            access_token_ttl: time::Duration::days(1),
+            sendgrid_inbound: None,
+            hydradb: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
+            cors_allowed_origins: vec![],
             smtp_host: "localhost".to_string(),
             smtp_port: 1025,
             smtp_username: "".to_string(),
@@ -365,6 +367,9 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            secure_cookies: false,
+            gcs: None,
+            operator_emails: Vec::new(),
         });
 
         let service = SpamScannerService::new(config);

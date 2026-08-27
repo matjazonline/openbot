@@ -1,7 +1,9 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
+
+use crate::entities::value_objects::EmailAddress;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -52,7 +54,7 @@ pub struct OutreachProgress {
     pub target_count: usize,
     pub response_count: usize,
     pub required_response_count: usize,
-    pub expires_at: NaiveDateTime,
+    pub expires_at: DateTime<Utc>,
     pub suspended: bool,
 }
 
@@ -68,7 +70,7 @@ impl OutreachProgress {
 
 #[derive(Debug, Clone)]
 pub struct OutreachTargetRequest {
-    pub email: String,
+    pub email: EmailAddress,
     pub outbox_id: Uuid,
     pub outbox_payload: serde_json::Value,
 }
@@ -78,10 +80,12 @@ pub struct CreateOutreachRequest {
     pub id: Uuid,
     pub task_id: Uuid,
     pub company_id: Uuid,
+    /// The channel every target email goes out as.
+    pub channel_id: Uuid,
     pub worker_id: Uuid,
     pub outreach_key: String,
     pub required_threshold_percent: f64,
-    pub expires_at: NaiveDateTime,
+    pub expires_at: DateTime<Utc>,
     pub subject: String,
     pub body: String,
     pub targets: Vec<OutreachTargetRequest>,
@@ -91,7 +95,7 @@ pub struct CreateOutreachRequest {
 pub struct OutreachReplyMatch {
     pub outreach_id: Uuid,
     pub task_id: Uuid,
-    pub target_email: String,
+    pub target_email: EmailAddress,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -104,5 +108,5 @@ pub struct DueOutreach {
     pub required_threshold_percent: f64,
     pub target_count: usize,
     pub response_count: usize,
-    pub expires_at: NaiveDateTime,
+    pub expires_at: DateTime<Utc>,
 }

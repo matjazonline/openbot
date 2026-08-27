@@ -1,0 +1,34 @@
+# Self-hosted Postgres on its own Fly machine.
+# Deploy with:  fly deploy -c deploy/postgres/fly.toml
+#
+# This app deliberately has NO public IP and NO [http_service]/[[services]]
+# blocks. It is reachable only over the org's private 6PN network, as
+# `mail-agents-db.internal:5432`.
+
+app = "mail-agents-db"
+primary_region = "fra"
+
+[build]
+  image = "postgres:18.6-bookworm"
+
+[env]
+  # The volume is mounted at /var/lib/postgresql/data, and initdb refuses to
+  # run in a non-empty directory (the volume ships with lost+found), so PGDATA
+  # points at a subdirectory the entrypoint creates itself.
+  PGDATA = "/var/lib/postgresql/data/pgdata"
+  POSTGRES_USER = "mail_agents"
+  POSTGRES_DB = "mail_agents"
+  # POSTGRES_PASSWORD is set via `fly secrets set` — never here.
+
+[mounts]
+  source = "pgdata"
+  destination = "/var/lib/postgresql/data"
+
+# Listen on :: as well as 0.0.0.0 so the 6PN address is bound; tune memory for
+# the 512mb VM below (roughly 25% shared_buffers, 75% effective_cache_size).
+[processes]
+  app = "postgres -c listen_addresses=* -c max_connections=100 -c shared_buffers=128MB -c effective_cache_size=384MB"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

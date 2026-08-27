@@ -51,7 +51,7 @@ pub struct HumanApproval {
     pub payload: serde_json::Value,
     pub token: String,
     pub status: ApprovalStatus,
-    pub expires_at: chrono::NaiveDateTime,
-    pub created_at: chrono::NaiveDateTime,
-    pub updated_at: chrono::NaiveDateTime,
+    pub expires_at: chrono::DateTime<chrono::Utc>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
 }

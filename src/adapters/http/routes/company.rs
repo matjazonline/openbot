@@ -13,9 +13,12 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
-    app_error::AppResult,
-    entities::company::Company,
-    use_cases::company::CompanyUseCases,
+    app_error::{AppError, AppResult},
+    entities::{company::Company, memory::MemoryConnection, value_objects::AvatarUrl},
+    use_cases::{
+        company::{CompanyUseCases, CompanyWrite},
+        memory::MemoryUseCases,
+    },
 };
 
 pub fn router() -> Router<AppState> {
@@ -35,6 +38,10 @@ pub fn router() -> Router<AppState> {
             "/api/companies/{id}",
             put(update_company_json).delete(delete_company_json),
         )
+        .route(
+            "/api/companies/{id}/memory",
+            get(memory_status_json).post(retry_memory_json),
+        )
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -45,12 +52,87 @@ pub struct CompanyForm {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub enable_llm_spam_guardrail: Option<bool>,
+    /// The company's picture. A save carries what it was sent, so the edit form keeps the stored
+    /// URL in a hidden field rather than dropping the picture on every rename.
+    pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub memory_provider: Option<String>,
+}
+
+impl CompanyForm {
+    /// The submitted company as a write, with the avatar parsed rather than taken as typed --
+    /// it ends up in an `<img src>` on every page that shows the company.
+    fn write(&self) -> AppResult<CompanyWrite> {
+        Ok(CompanyWrite {
+            name: self.name.clone(),
+            slug: self.slug.clone(),
+            api_key: self.api_key.clone(),
+            provider: self.provider.clone(),
+            model: self.model.clone(),
+            enable_llm_spam_guardrail: self.enable_llm_spam_guardrail,
+            memory_provider: None,
+            avatar_url: parsed_avatar(self.avatar_url.as_deref())?,
+        })
+    }
+}
+
+/// A submitted avatar field, refused rather than stored when it is not a URL a page may render.
+fn parsed_avatar(submitted: Option<&str>) -> AppResult<Option<AvatarUrl>> {
+    match submitted {
+        Some(value) => AvatarUrl::parse(value).map_err(AppError::BadRequest),
+        None => Ok(None),
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CompanyResponse {
     pub success: bool,
     pub company: Company,
+    pub memory: Option<MemoryStatusResponse>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MemoryStatusResponse {
+    pub provider: String,
+    pub readiness: String,
+    pub last_error: Option<String>,
+}
+
+impl From<MemoryConnection> for MemoryStatusResponse {
+    fn from(connection: MemoryConnection) -> Self {
+        Self {
+            provider: connection.provider.as_str().into(),
+            readiness: connection.readiness.as_str().into(),
+            last_error: connection.last_error,
+        }
+    }
+}
+
+fn validate_memory_provider(value: Option<&str>, hydradb_configured: bool) -> AppResult<()> {
+    match value.map(str::trim) {
+        None | Some("") | Some("none") => Ok(()),
+        Some("hydradb") if hydradb_configured => Ok(()),
+        Some("hydradb") => Err(AppError::BadRequest(
+            "HydraDB is not configured for this deployment.".into(),
+        )),
+        Some(_) => Err(AppError::BadRequest("Unsupported memory provider.".into())),
+    }
+}
+
+async fn apply_memory_provider(
+    memory: &MemoryUseCases,
+    user_id: Uuid,
+    company_id: Uuid,
+    value: Option<&str>,
+) -> AppResult<Option<MemoryConnection>> {
+    validate_memory_provider(value, memory.hydradb_configured())?;
+    match value.map(str::trim) {
+        Some("hydradb") => memory.select_hydradb(user_id, company_id).await.map(Some),
+        _ => {
+            memory.disable(user_id, company_id).await?;
+            Ok(None)
+        }
+    }
 }
 
 /// GET /companies - Full HTML page listing all user companies (Protected).
@@ -68,25 +150,37 @@ async fn list_companies(
 }
 
 /// POST /companies - HTMX create company form submission (Protected).
-#[instrument(skip(company_use_cases, user, form))]
+#[instrument(skip(company_use_cases, memory_use_cases, user, form))]
 async fn create_company(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
     user: AuthenticatedUser,
     Form(form): Form<CompanyForm>,
 ) -> impl IntoResponse {
-    match company_use_cases
-        .create_company(
-            user.id,
-            &form.name,
-            &form.slug,
-            form.api_key.as_deref(),
-            form.provider.as_deref(),
-            form.model.as_deref(),
-            form.enable_llm_spam_guardrail,
-        )
-        .await
+    let created = match validate_memory_provider(
+        form.memory_provider.as_deref(),
+        memory_use_cases.hydradb_configured(),
+    )
+    .and_then(|()| form.write())
     {
-        Ok(_) => {
+        Ok(write) => company_use_cases.create_company(user.id, write).await,
+        Err(err) => Err(err),
+    };
+
+    match created {
+        Ok(company) => {
+            if let Err(err) = apply_memory_provider(
+                &memory_use_cases,
+                user.id,
+                company.id,
+                form.memory_provider.as_deref(),
+            )
+            .await
+            {
+                return Html(pages::error_alert(&format!(
+                    "Company created, but memory setup failed: {err}"
+                )));
+            }
             let companies = company_use_cases
                 .list_user_companies(user.id)
                 .await
@@ -141,27 +235,40 @@ async fn cancel_company_edit(
 }
 
 /// PUT /companies/{id} - Handles HTMX company update form submission (Protected).
-#[instrument(skip(company_use_cases, _user, form))]
+#[instrument(skip(company_use_cases, memory_use_cases, _user, form))]
 async fn update_company(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
     _user: AuthenticatedUser,
     Path(id): Path<Uuid>,
     Form(form): Form<CompanyForm>,
 ) -> impl IntoResponse {
-    match company_use_cases
-        .update_company_for_user(
+    let saved = match validate_memory_provider(
+        form.memory_provider.as_deref(),
+        memory_use_cases.hydradb_configured(),
+    )
+    .and_then(|()| form.write())
+    {
+        Ok(write) => {
+            company_use_cases
+                .update_company_for_user(_user.id, id, write)
+                .await
+        }
+        Err(err) => Err(err),
+    };
+
+    match saved {
+        Ok(company) => match apply_memory_provider(
+            &memory_use_cases,
             _user.id,
-            id,
-            &form.name,
-            &form.slug,
-            form.api_key.as_deref(),
-            form.provider.as_deref(),
-            form.model.as_deref(),
-            form.enable_llm_spam_guardrail,
+            company.id,
+            form.memory_provider.as_deref(),
         )
         .await
-    {
-        Ok(company) => Html(pages::company_row_fragment(&company)),
+        {
+            Ok(_) => Html(pages::company_row_fragment(&company)),
+            Err(err) => Html(pages::error_alert(&format!("Memory update failed: {err}"))),
+        },
         Err(err) => Html(pages::error_alert(&format!("Update failed: {err}"))),
     }
 }
@@ -191,25 +298,31 @@ async fn list_companies_json(
 /// JSON API: Create company (Protected).
 async fn create_company_json(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
     user: AuthenticatedUser,
     Json(payload): Json<CompanyForm>,
 ) -> AppResult<impl IntoResponse> {
+    validate_memory_provider(
+        payload.memory_provider.as_deref(),
+        memory_use_cases.hydradb_configured(),
+    )?;
     let company = company_use_cases
-        .create_company(
-            user.id,
-            &payload.name,
-            &payload.slug,
-            payload.api_key.as_deref(),
-            payload.provider.as_deref(),
-            payload.model.as_deref(),
-            payload.enable_llm_spam_guardrail,
-        )
+        .create_company(user.id, payload.write()?)
         .await?;
+    let memory = apply_memory_provider(
+        &memory_use_cases,
+        user.id,
+        company.id,
+        payload.memory_provider.as_deref(),
+    )
+    .await?
+    .map(Into::into);
     Ok((
         StatusCode::CREATED,
         Json(CompanyResponse {
             success: true,
             company,
+            memory,
         }),
     ))
 }
@@ -217,29 +330,53 @@ async fn create_company_json(
 /// JSON API: Update company (Protected).
 async fn update_company_json(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
     _user: AuthenticatedUser,
     Path(id): Path<Uuid>,
     Json(payload): Json<CompanyForm>,
 ) -> AppResult<impl IntoResponse> {
+    validate_memory_provider(
+        payload.memory_provider.as_deref(),
+        memory_use_cases.hydradb_configured(),
+    )?;
     let company = company_use_cases
-        .update_company_for_user(
-            _user.id,
-            id,
-            &payload.name,
-            &payload.slug,
-            payload.api_key.as_deref(),
-            payload.provider.as_deref(),
-            payload.model.as_deref(),
-            payload.enable_llm_spam_guardrail,
-        )
+        .update_company_for_user(_user.id, id, payload.write()?)
         .await?;
+    let memory = apply_memory_provider(
+        &memory_use_cases,
+        _user.id,
+        company.id,
+        payload.memory_provider.as_deref(),
+    )
+    .await?
+    .map(Into::into);
     Ok((
         StatusCode::OK,
         Json(CompanyResponse {
             success: true,
             company,
+            memory,
         }),
     ))
+}
+
+async fn memory_status_json(
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
+    user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<Option<MemoryStatusResponse>>> {
+    Ok(Json(
+        memory_use_cases.status(user.id, id).await?.map(Into::into),
+    ))
+}
+
+async fn retry_memory_json(
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
+    user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    memory_use_cases.retry(user.id, id).await?;
+    Ok(StatusCode::ACCEPTED)
 }
 
 /// JSON API: Delete company (Protected).
@@ -266,12 +403,14 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test Corp".to_string(),
-            slug: "test-corp".to_string(),
+            slug: "test-corp".into(),
             api_key: None,
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: Utc::now(),
         };
 
         let page_html = pages::companies_page(&[company.clone()]);
@@ -287,7 +426,7 @@ mod tests {
         assert!(page_html.contains(">Account</summary>"));
         assert!(page_html.find(">Account</summary>") < page_html.find(">Companies</a>"));
         assert!(page_html.find(">Companies</a>") < page_html.find(">My Invites</a>"));
-        assert!(page_html.contains("href=\"/invites\""));
+        assert!(page_html.contains("href=\"/ui/invites\""));
         assert!(page_html.contains("action=\"/logout\""));
         assert!(page_html.contains("selectCompany"));
 
@@ -297,18 +436,67 @@ mod tests {
     }
 
     #[test]
+    fn a_classic_save_carries_the_picture_it_was_sent_and_refuses_one_no_page_could_render() {
+        let form = |avatar_url: Option<&str>| CompanyForm {
+            name: "Test Corp".to_string(),
+            slug: "test-corp".to_string(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            avatar_url: avatar_url.map(str::to_string),
+            memory_provider: None,
+        };
+
+        let kept = form(Some("https://cdn.example.com/acme.png"))
+            .write()
+            .expect("an http URL is a picture a page may show");
+        assert_eq!(
+            kept.avatar_url,
+            Some(AvatarUrl::from("https://cdn.example.com/acme.png"))
+        );
+
+        // The page this form lives on has no picker, so it sends the stored URL in a hidden
+        // field -- and a company saved from a form that carries none has no picture.
+        assert_eq!(form(None).write().expect("no picture").avatar_url, None);
+        assert_eq!(form(Some("")).write().expect("no picture").avatar_url, None);
+
+        // A tampered field is refused rather than stored: it ends up in an `<img src>`.
+        assert!(form(Some("javascript:alert(1)")).write().is_err());
+
+        let company = Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Test Corp".to_string(),
+            slug: "test-corp".into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            avatar_url: Some(AvatarUrl::from("https://cdn.example.com/acme.png")),
+            memory_provider: None,
+            created_at: Utc::now(),
+        };
+        assert!(pages::company_edit_fragment(&company).contains(
+            r#"<input type="hidden" name="avatar_url" value="https://cdn.example.com/acme.png">"#
+        ));
+    }
+
+    #[test]
     fn cached_company_client_nav_and_row_rendering() {
         let cid = Uuid::new_v4();
         let company = Company {
             id: cid,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme-corp".to_string(),
+            slug: "acme-corp".into(),
             api_key: None,
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: Utc::now(),
         };
 
         let row_html = pages::company_row_fragment(&company);
@@ -320,7 +508,10 @@ mod tests {
         assert!(base_html.contains("action=\"/logout\""));
         assert!(!base_html.contains(">Sign In</a>"));
         assert!(!base_html.contains(">Sign Up</a>"));
-        assert!(base_html.contains("localStorage.getItem('cached_company_id')"));
-        assert!(base_html.contains("autoDetectAndSyncCompany"));
+        assert!(base_html.contains("/assets/app.js"));
+
+        let script = pages::application_javascript();
+        assert!(script.contains("localStorage.getItem('cached_company_id')"));
+        assert!(script.contains("autoDetectAndSyncCompany"));
     }
 }

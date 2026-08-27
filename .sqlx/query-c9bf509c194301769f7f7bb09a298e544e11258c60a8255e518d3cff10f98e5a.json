@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n                SELECT 1\n                FROM companies AS company\n                JOIN users AS account ON company.user_id = account.id\n                WHERE company.id = $1 AND LOWER(account.email) = $2\n            ) as \"exists!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c9bf509c194301769f7f7bb09a298e544e11258c60a8255e518d3cff10f98e5a"
+}

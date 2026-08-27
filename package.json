@@ -1,0 +1,29 @@
+{
+  "name": "mail-agents-server",
+  "version": "1.0.0",
+  "description": "An email agent automation platform built in Rust.",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -i assets/app.css.in -o assets/app.css --minify",
+    "check:css": "npm run build:css && git diff --exit-code -- assets/app.css"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matjazonline/mail-agents.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "private": true,
+  "bugs": {
+    "url": "https://github.com/matjazonline/mail-agents/issues"
+  },
+  "homepage": "https://github.com/matjazonline/mail-agents#readme",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.12",
+    "daisyui": "^5.0.50",
+    "tailwindcss": "^4.1.12"
+  }
+}

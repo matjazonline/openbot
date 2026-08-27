@@ -12,13 +12,15 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
-    entities::task::TaskStatus,
+    entities::task::{TaskFilter, TaskStatus},
     services::task_worker::TaskWorker,
     use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
 };
 
-const DEFAULT_TASK_PAGE_SIZE: usize = 50;
-const MAX_TASK_PAGE_SIZE: usize = 100;
+use super::company_load_error;
+
+const DEFAULT_TASK_PAGE_SIZE: usize = TaskFilter::DEFAULT_PAGE_SIZE;
+const MAX_TASK_PAGE_SIZE: usize = TaskFilter::MAX_PAGE_SIZE;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -34,7 +36,9 @@ pub fn router() -> Router<AppState> {
         )
 }
 
-fn deserialize_empty_string_as_none<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+pub(super) fn deserialize_empty_string_as_none<'de, D, T>(
+    deserializer: D,
+) -> Result<Option<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
     T: FromStr,
@@ -81,9 +85,12 @@ async fn list_company_tasks_page(
     Path(company_id): Path<Uuid>,
     Query(query): Query<TaskFilterQuery>,
 ) -> impl IntoResponse {
-    let company = match company_use_cases.get_company(company_id).await {
-        Ok(Some(c)) if c.user_id == _user.id => c,
-        _ => return Html(pages::error_alert("Company not found.")),
+    let company = match company_use_cases
+        .managed_company(_user.id, company_id)
+        .await
+    {
+        Ok(company) => company,
+        Err(error) => return Html(pages::error_alert(&company_load_error(&error))),
     };
 
     let channels = channel_use_cases
@@ -220,16 +227,13 @@ async fn filter_company_tasks(
     Path(company_id): Path<Uuid>,
     Query(query): Query<TaskFilterQuery>,
 ) -> impl IntoResponse {
-    let is_owner = company_use_cases
-        .get_company(company_id)
+    if let Err(error) = company_use_cases
+        .managed_company(_user.id, company_id)
         .await
-        .ok()
-        .flatten()
-        .is_some_and(|company| company.user_id == _user.id);
-    if !is_owner {
+    {
         return (
             [("HX-Push-Url", format!("/companies/{company_id}/tasks"))],
-            Html(pages::error_alert("Company not found.")),
+            Html(pages::error_alert(&company_load_error(&error))),
         );
     }
 
@@ -288,14 +292,11 @@ async fn stop_company_task(
     _user: AuthenticatedUser,
     Path((company_id, task_id)): Path<(Uuid, Uuid)>,
 ) -> impl IntoResponse {
-    let is_owner = company_use_cases
-        .get_company(company_id)
+    if let Err(error) = company_use_cases
+        .managed_company(_user.id, company_id)
         .await
-        .ok()
-        .flatten()
-        .is_some_and(|company| company.user_id == _user.id);
-    if !is_owner {
-        return Html(pages::error_alert("Company not found."));
+    {
+        return Html(pages::error_alert(&company_load_error(&error)));
     }
     let task_persistence = thread_use_cases.get_task_persistence().await;
     if !matches!(task_persistence.get_task_by_id(task_id).await, Ok(Some(task)) if task.company_id == company_id)
@@ -323,14 +324,11 @@ async fn resume_company_task(
     _user: AuthenticatedUser,
     Path((company_id, task_id)): Path<(Uuid, Uuid)>,
 ) -> impl IntoResponse {
-    let is_owner = company_use_cases
-        .get_company(company_id)
+    if let Err(error) = company_use_cases
+        .managed_company(_user.id, company_id)
         .await
-        .ok()
-        .flatten()
-        .is_some_and(|company| company.user_id == _user.id);
-    if !is_owner {
-        return Html(pages::error_alert("Company not found."));
+    {
+        return Html(pages::error_alert(&company_load_error(&error)));
     }
     let task_persistence = thread_use_cases.get_task_persistence().await;
     if !matches!(task_persistence.get_task_by_id(task_id).await, Ok(Some(task)) if task.company_id == company_id)
@@ -423,9 +421,9 @@ mod tests {
             worker_id: None,
             locked_at: None,
             lock_expires_at: None,
-            run_at: chrono::Utc::now().naive_utc(),
-            created_at: chrono::Utc::now().naive_utc(),
-            updated_at: chrono::Utc::now().naive_utc(),
+            run_at: chrono::Utc::now(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
         };
 
         let html = pages::task_row_fragment(company_id, &task);
@@ -465,9 +463,9 @@ mod tests {
             worker_id: None,
             locked_at: None,
             lock_expires_at: None,
-            run_at: chrono::Utc::now().naive_utc(),
-            created_at: chrono::Utc::now().naive_utc(),
-            updated_at: chrono::Utc::now().naive_utc(),
+            run_at: chrono::Utc::now(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
         };
 
         let html = pages::task_row_fragment(company_id, &task);
@@ -548,26 +546,41 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Test Co".to_string(),
-            slug: "test-co".to_string(),
+            slug: "test-co".into(),
             api_key: None,
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
 
         let channel = crate::entities::channel::Channel {
+            enabled: true,
+            add_3rd_party: true,
             id: channel_id,
             company_id,
             name: "Test WF".to_string(),
-            slug: "test-wf".to_string(),
+            description: None,
+            slug: "test-wf".into(),
+            alias_slugs: Vec::new(),
             provider: None,
             model: None,
             api_key: None,
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
         };
 
         let html = pages::channel_row_fragment(&company, "example.com", &channel, &[]);
@@ -586,12 +599,14 @@ mod tests {
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Token Test Co".to_string(),
-            slug: "token-co".to_string(),
+            slug: "token-co".into(),
             api_key: None,
             provider: None,
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
 
         let task = BackgroundTask {
@@ -618,9 +633,9 @@ mod tests {
             worker_id: None,
             locked_at: None,
             lock_expires_at: None,
-            run_at: chrono::Utc::now().naive_utc(),
-            created_at: chrono::Utc::now().naive_utc(),
-            updated_at: chrono::Utc::now().naive_utc(),
+            run_at: chrono::Utc::now(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
         };
 
         assert_eq!(

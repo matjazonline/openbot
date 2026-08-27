@@ -2,18 +2,21 @@ use std::sync::Arc;
 
 use axum::{
     Form, Json, Router,
+    body::to_bytes,
     extract::{FromRequest, Multipart, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::post,
 };
+use base64::Engine;
+use p256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
 use serde::{Deserialize, Serialize};
 use tracing::{instrument, warn};
 
 use crate::{
     adapters::http::app_state::AppState,
     adapters::protocols::email::EmailIngressAdapter,
-    services::email_parser::{RawAttachmentData, RawInboundPayload},
+    services::email_parser::{MAX_INBOUND_MESSAGE_BYTES, RawAttachmentData, RawInboundPayload},
     use_cases::thread::ThreadUseCases,
 };
 
@@ -48,6 +51,17 @@ async fn sendgrid_inbound_webhook(
     headers: HeaderMap,
     req: axum::extract::Request,
 ) -> Result<impl IntoResponse, StatusCode> {
+    let config = thread_use_cases.config();
+    let Some(sendgrid_config) = config.sendgrid_inbound.as_ref() else {
+        return Err(StatusCode::NOT_FOUND);
+    };
+    let (parts, body) = req.into_parts();
+    let body = to_bytes(body, 21 * 1024 * 1024)
+        .await
+        .map_err(|_| StatusCode::PAYLOAD_TOO_LARGE)?;
+    verify_sendgrid_signature(&headers, &body, sendgrid_config).map_err(|status| status)?;
+    let req = axum::extract::Request::from_parts(parts, axum::body::Body::from(body));
+
     let content_type = headers
         .get("content-type")
         .and_then(|v| v.to_str().ok())
@@ -55,6 +69,8 @@ async fn sendgrid_inbound_webhook(
         .to_lowercase();
 
     let mut raw_payload = RawInboundPayload::default();
+    let mut raw_mime = None;
+    let mut sender_ip = None;
 
     if content_type.contains("multipart/form-data") {
         if let Ok(mut multipart) = Multipart::from_request(req, &State(())).await {
@@ -63,6 +79,15 @@ async fn sendgrid_inbound_webhook(
                 let file_name = field.file_name().map(|f| f.to_string());
                 let field_content_type = field.content_type().map(|c| c.to_string());
 
+                if name == "email" {
+                    raw_mime = field.bytes().await.ok().map(|bytes| bytes.to_vec());
+                    continue;
+                }
+                if name == "sender_ip" {
+                    sender_ip = field.text().await.ok().and_then(|value| value.parse().ok());
+                    continue;
+                }
+
                 if let Some(filename) = file_name {
                     if let Ok(bytes) = field.bytes().await {
                         raw_payload.attachments_data.push(RawAttachmentData {
@@ -70,6 +95,7 @@ async fn sendgrid_inbound_webhook(
                             content_type: field_content_type
                                 .unwrap_or_else(|| "application/octet-stream".into()),
                             content: bytes.to_vec(),
+                            stored_key: None,
                         });
                     }
                 } else if let Ok(value) = field.text().await {
@@ -89,8 +115,8 @@ async fn sendgrid_inbound_webhook(
                         "text" => raw_payload.text = Some(value),
                         "html" => raw_payload.html = Some(value),
                         "headers" => raw_payload.headers = Some(value),
-                        "spf" => raw_payload.spf = Some(value),
-                        "dkim" => raw_payload.dkim = Some(value),
+                        // Provider-supplied authentication verdicts are deliberately ignored.
+                        "spf" | "dkim" | "dmarc" => {}
                         "spam_score" => raw_payload.spam_score = value.parse().ok(),
                         "envelope" => {
                             if let Ok(env) = serde_json::from_str::<SendGridEnvelope>(&value) {
@@ -119,8 +145,36 @@ async fn sendgrid_inbound_webhook(
         }
     }
 
+    let raw_mime = raw_mime.ok_or(StatusCode::UNPROCESSABLE_ENTITY)?;
+    if raw_mime.len() > MAX_INBOUND_MESSAGE_BYTES {
+        return Err(StatusCode::PAYLOAD_TOO_LARGE);
+    }
+    let sender_ip = sender_ip.ok_or(StatusCode::UNPROCESSABLE_ENTITY)?;
+    let envelope_from = raw_payload.from.clone();
+    let envelope_to = raw_payload.to.clone();
+    let auth = crate::adapters::smtp::server::verify_email_authentication(
+        &raw_mime,
+        Some(&envelope_from),
+        sender_ip,
+    )
+    .await;
+    raw_payload = crate::adapters::smtp::server::parse_raw_mime_to_payload(
+        &raw_mime,
+        Some(&envelope_from),
+        Some(&envelope_to),
+        &[envelope_to.clone()],
+        auth.spf,
+        auth.dkim,
+        auth.dmarc,
+    );
+
     // Synchronous Ingestion: Parse MIME into normalized message, resolve thread, verify ACL, and save inbound message
-    let norm_payload = EmailIngressAdapter::parse(raw_payload, &thread_use_cases.config());
+    let norm_payload = EmailIngressAdapter::parse_and_store(
+        raw_payload,
+        &thread_use_cases.config(),
+        thread_use_cases.file_storage(),
+    )
+    .await;
     let ingest = thread_use_cases
         .ingest_normalized_message(norm_payload)
         .await
@@ -154,8 +208,6 @@ fn extract_from_payload(payload: SendGridPayload, raw: &mut RawInboundPayload) {
     raw.html = payload.html;
     raw.headers = payload.headers;
     raw.cc = payload.cc;
-    raw.spf = payload.spf;
-    raw.dkim = payload.dkim;
     raw.spam_score = payload.spam_score;
 
     if let Some(ref env_str) = payload.envelope {
@@ -184,24 +236,115 @@ fn extract_from_payload(payload: SendGridPayload, raw: &mut RawInboundPayload) {
     }
 }
 
+fn verify_sendgrid_signature(
+    headers: &HeaderMap,
+    body: &[u8],
+    config: &crate::infra::config::SendGridInboundConfig,
+) -> Result<(), StatusCode> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?
+        .as_secs();
+    verify_sendgrid_signature_at(
+        headers,
+        body,
+        &config.verifying_key,
+        config.webhook_max_age_secs,
+        now,
+    )
+}
+
+fn verify_sendgrid_signature_at(
+    headers: &HeaderMap,
+    body: &[u8],
+    verifying_key: &VerifyingKey,
+    max_age_secs: u64,
+    now: u64,
+) -> Result<(), StatusCode> {
+    const SIGNATURE: &str = "x-twilio-email-event-webhook-signature";
+    const TIMESTAMP: &str = "x-twilio-email-event-webhook-timestamp";
+    let timestamp = headers
+        .get(TIMESTAMP)
+        .and_then(|value| value.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let timestamp_secs: u64 = timestamp.parse().map_err(|_| StatusCode::UNAUTHORIZED)?;
+    if timestamp_secs > now || now - timestamp_secs > max_age_secs {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    let signature = headers
+        .get(SIGNATURE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| base64::engine::general_purpose::STANDARD.decode(value).ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let signature = Signature::from_der(&signature)
+        .or_else(|_| Signature::from_slice(&signature))
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let mut signed = timestamp.as_bytes().to_vec();
+    signed.extend_from_slice(body);
+    verifying_key
+        .verify(&signed, &signature)
+        .map_err(|_| StatusCode::UNAUTHORIZED)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::company_member::CompanyMembership;
     use async_trait::async_trait;
     use axum::body::Body;
     use axum::http::Request;
     use chrono::Utc;
+    use p256::ecdsa::{SigningKey, signature::Signer};
     use std::sync::Mutex;
     use tower::ServiceExt;
     use uuid::Uuid;
 
+    #[test]
+    fn signature_covers_timestamp_and_untouched_body_and_expires() {
+        let signing_key = SigningKey::from_bytes((&[7_u8; 32]).into()).unwrap();
+        let verifying_key = signing_key.verifying_key();
+        let body = b"multipart bytes must stay exactly like this\r\n";
+        let timestamp = "1000";
+        let mut signed = timestamp.as_bytes().to_vec();
+        signed.extend_from_slice(body);
+        let signature: Signature = signing_key.sign(&signed);
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-twilio-email-event-webhook-timestamp",
+            timestamp.parse().unwrap(),
+        );
+        headers.insert(
+            "x-twilio-email-event-webhook-signature",
+            base64::engine::general_purpose::STANDARD
+                .encode(signature.to_der().as_bytes())
+                .parse()
+                .unwrap(),
+        );
+
+        assert!(verify_sendgrid_signature_at(&headers, body, verifying_key, 300, 1100).is_ok());
+        assert_eq!(
+            verify_sendgrid_signature_at(&headers, b"changed", verifying_key, 300, 1100),
+            Err(StatusCode::UNAUTHORIZED)
+        );
+        assert_eq!(
+            verify_sendgrid_signature_at(&headers, body, verifying_key, 300, 1301),
+            Err(StatusCode::UNAUTHORIZED)
+        );
+    }
+
     use crate::{
         app_error::AppResult,
-        entities::{channel::Channel, company::Company, message::Message, thread::Thread},
+        entities::{
+            channel::Channel,
+            company::Company,
+            cursor::{MessageCursor, ThreadCursor},
+            message::Message,
+            thread::Thread,
+        },
         infra::config::AppConfig,
         use_cases::{
-            channel::{ChannelPersistence, ChannelUseCases},
-            company::CompanyPersistence,
+            channel::{ChannelPersistence, ChannelUseCases, ChannelWrite},
+            company::{CompanyPersistence, CompanyWrite},
             company_invite::CompanyInvitePersistence,
             thread::ThreadPersistence,
             user::UserPersistence,
@@ -214,16 +357,7 @@ mod tests {
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(
-            &self,
-            _user_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
         }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> {
@@ -241,23 +375,18 @@ mod tests {
         async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
             unimplemented!()
         }
-        async fn update(
-            &self,
-            _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
         }
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
-            Ok(true)
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
         }
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
@@ -270,18 +399,7 @@ mod tests {
 
     #[async_trait]
     impl ChannelPersistence for MockChannelPersistence {
-        async fn create(
-            &self,
-            _company_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _participant_emails: Option<Vec<String>>,
-            _agent_ids: Option<Vec<Uuid>>,
-            _channel_config: Option<serde_json::Value>,
-        ) -> AppResult<Channel> {
+        async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
             unimplemented!()
         }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
@@ -289,38 +407,29 @@ mod tests {
         }
         async fn get_by_company_slug_and_channel_slug(
             &self,
-            _company_slug: &str,
-            channel_slug: &str,
+            _company_slug: &crate::entities::value_objects::CompanySlug,
+            channel_slug: &crate::entities::value_objects::ChannelSlug,
         ) -> AppResult<Option<Channel>> {
             Ok(self
                 .channels
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|w| w.slug == channel_slug)
+                .find(|w| w.matches_slug(channel_slug))
                 .cloned())
         }
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(self.channels.lock().unwrap().clone())
         }
-        async fn update(
-            &self,
-            _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _participant_emails: Option<Vec<String>>,
-            _agent_ids: Option<Vec<Uuid>>,
-            _channel_config: Option<serde_json::Value>,
-        ) -> AppResult<Channel> {
+        async fn update(&self, _id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
         }
     }
+
+    use crate::use_cases::agent::AgentWrite;
 
     struct MockAgentPersistence;
 
@@ -329,13 +438,7 @@ mod tests {
         async fn create(
             &self,
             _company_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _api_key: Option<&str>,
-            _system_prompt: Option<&str>,
-            _config_json: Option<serde_json::Value>,
+            _write: AgentWrite,
         ) -> AppResult<crate::entities::agent::Agent> {
             unimplemented!()
         }
@@ -358,13 +461,7 @@ mod tests {
         async fn update(
             &self,
             _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _api_key: Option<&str>,
-            _system_prompt: Option<&str>,
-            _config_json: Option<serde_json::Value>,
+            _write: AgentWrite,
         ) -> AppResult<crate::entities::agent::Agent> {
             unimplemented!()
         }
@@ -384,15 +481,15 @@ mod tests {
             &self,
             channel_id: Uuid,
             subject: &str,
-            participant_emails: &[String],
+            participant_emails: &[crate::entities::value_objects::EmailAddress],
         ) -> AppResult<Thread> {
             let thread = Thread {
                 id: Uuid::new_v4(),
                 channel_id,
                 subject: subject.to_string(),
                 participant_emails: participant_emails.to_vec(),
-                created_at: Utc::now().naive_utc(),
-                updated_at: Utc::now().naive_utc(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             };
             self.threads.lock().unwrap().push(thread.clone());
             Ok(thread)
@@ -411,16 +508,36 @@ mod tests {
         async fn list_threads_by_channel_id(
             &self,
             _channel_id: Uuid,
-            _before: Option<(chrono::NaiveDateTime, Uuid)>,
+            _before: Option<ThreadCursor>,
             _limit: usize,
         ) -> AppResult<Vec<Thread>> {
             unimplemented!()
         }
 
+        async fn list_threads_updated_after(
+            &self,
+            channel_id: Uuid,
+            after: Option<ThreadCursor>,
+            limit: usize,
+        ) -> AppResult<Vec<Thread>> {
+            let mut threads: Vec<Thread> = self
+                .threads
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|t| t.channel_id == channel_id)
+                .filter(|t| after.is_none_or(|cursor| t.cursor() > cursor))
+                .cloned()
+                .collect();
+            threads.sort_by_key(|t| t.cursor());
+            threads.truncate(limit);
+            Ok(threads)
+        }
+
         async fn update_thread_participants(
             &self,
             id: Uuid,
-            participant_emails: &[String],
+            participant_emails: &[crate::entities::value_objects::EmailAddress],
         ) -> AppResult<Thread> {
             let mut list = self.threads.lock().unwrap();
             let thread = list.iter_mut().find(|t| t.id == id).unwrap();
@@ -431,7 +548,7 @@ mod tests {
         async fn find_thread_by_message_ids(
             &self,
             _channel_id: Uuid,
-            message_ids: &[String],
+            message_ids: &[crate::entities::value_objects::MessageId],
         ) -> AppResult<Option<Thread>> {
             let thread_id = {
                 let msgs = self.messages.lock().unwrap();
@@ -448,7 +565,7 @@ mod tests {
         async fn find_thread_by_thread_index(
             &self,
             _channel_id: Uuid,
-            thread_index_prefix: &str,
+            thread_index_prefix: &crate::entities::value_objects::ThreadIndex,
         ) -> AppResult<Option<Thread>> {
             let thread_id = {
                 let msgs = self.messages.lock().unwrap();
@@ -457,7 +574,7 @@ mod tests {
                         m.thread_index
                             .as_deref()
                             .unwrap_or_default()
-                            .starts_with(thread_index_prefix)
+                            .starts_with(thread_index_prefix.as_str())
                     })
                     .map(|m| m.thread_id)
             };
@@ -484,21 +601,21 @@ mod tests {
         async fn get_message_by_message_id(
             &self,
             _company_id: Uuid,
-            message_id: &str,
+            message_id: &crate::entities::value_objects::MessageId,
         ) -> AppResult<Option<Message>> {
             Ok(self
                 .messages
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|m| m.message_id == message_id)
+                .find(|m| &m.message_id == message_id)
                 .cloned())
         }
 
         async fn find_outbound_reply(
             &self,
             thread_id: Uuid,
-            in_reply_to: &str,
+            in_reply_to: &crate::entities::value_objects::MessageId,
         ) -> AppResult<Option<Message>> {
             Ok(self
                 .messages
@@ -508,7 +625,7 @@ mod tests {
                 .find(|message| {
                     message.thread_id == thread_id
                         && message.direction == crate::entities::message::MessageDirection::Outbound
-                        && message.in_reply_to.as_deref() == Some(in_reply_to)
+                        && message.in_reply_to.as_ref() == Some(in_reply_to)
                 })
                 .cloned())
         }
@@ -522,6 +639,26 @@ mod tests {
                 .filter(|m| m.thread_id == thread_id)
                 .cloned()
                 .collect())
+        }
+
+        async fn list_messages_after(
+            &self,
+            thread_id: Uuid,
+            after: Option<MessageCursor>,
+            limit: usize,
+        ) -> AppResult<Vec<Message>> {
+            let mut messages: Vec<Message> = self
+                .messages
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m| m.thread_id == thread_id)
+                .filter(|m| after.is_none_or(|cursor| m.cursor() > cursor))
+                .cloned()
+                .collect();
+            messages.sort_by_key(|m| m.cursor());
+            messages.truncate(limit);
+            Ok(messages)
         }
     }
 
@@ -553,9 +690,9 @@ mod tests {
                 worker_id: None,
                 locked_at: None,
                 lock_expires_at: None,
-                run_at: Utc::now().naive_utc(),
-                created_at: Utc::now().naive_utc(),
-                updated_at: Utc::now().naive_utc(),
+                run_at: Utc::now(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             };
             self.tasks.lock().unwrap().push(task.clone());
             Ok(task)
@@ -585,10 +722,10 @@ mod tests {
         async fn claim_pending_tasks(
             &self,
             worker_id: Uuid,
-            lock_expires_at: chrono::NaiveDateTime,
+            lock_expires_at: chrono::DateTime<chrono::Utc>,
             limit: i64,
         ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
             let mut tasks = self.tasks.lock().unwrap();
             let mut claimed = Vec::new();
             for task in tasks
@@ -614,10 +751,10 @@ mod tests {
             &self,
             id: Uuid,
             worker_id: Uuid,
-            lock_expires_at: chrono::NaiveDateTime,
+            lock_expires_at: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
                 t.id == id
                     && t.status == crate::entities::task::TaskStatus::Pending
@@ -635,7 +772,7 @@ mod tests {
 
         async fn mark_task_completed(&self, id: Uuid, worker_id: Uuid) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
                 t.id == id
                     && t.status == crate::entities::task::TaskStatus::Processing
@@ -657,11 +794,11 @@ mod tests {
             id: Uuid,
             worker_id: Uuid,
             error_msg: &str,
-            next_run_at: chrono::NaiveDateTime,
+            next_run_at: chrono::DateTime<chrono::Utc>,
             is_dead_letter: bool,
         ) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
                 t.id == id
                     && t.status == crate::entities::task::TaskStatus::Processing
@@ -736,7 +873,7 @@ mod tests {
             _username: &str,
             _email: &str,
             _password_hash: &str,
-        ) -> AppResult<()> {
+        ) -> AppResult<crate::entities::user::User> {
             unimplemented!()
         }
         async fn get_by_email(
@@ -754,6 +891,27 @@ mod tests {
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<crate::entities::user::User>> {
             unimplemented!()
         }
+        async fn update_avatar_url(
+            &self,
+            _id: Uuid,
+            _avatar_url: Option<&crate::entities::value_objects::AvatarUrl>,
+        ) -> AppResult<Option<crate::entities::user::User>> {
+            unimplemented!()
+        }
+        async fn update_profile(
+            &self,
+            _id: Uuid,
+            _profile: crate::use_cases::user::ProfileUpdate<'_>,
+        ) -> AppResult<Option<crate::entities::user::User>> {
+            unimplemented!()
+        }
+        async fn update_password_hash(
+            &self,
+            _id: Uuid,
+            _password_hash: &str,
+        ) -> AppResult<Option<crate::entities::user::User>> {
+            unimplemented!()
+        }
     }
 
     struct MockCompanyInvitePersistence;
@@ -763,6 +921,7 @@ mod tests {
             &self,
             _company_id: Uuid,
             _email: &str,
+            _role: crate::entities::company_member::CompanyAccessRole,
         ) -> AppResult<crate::entities::company_invite::CompanyInvite> {
             unimplemented!()
         }
@@ -778,10 +937,11 @@ mod tests {
         ) -> AppResult<Vec<crate::entities::company_invite::CompanyInvite>> {
             unimplemented!()
         }
-        async fn update_invite_email(
+        async fn update_invite(
             &self,
             _id: Uuid,
             _new_email: &str,
+            _role: crate::entities::company_member::CompanyAccessRole,
         ) -> AppResult<crate::entities::company_invite::CompanyInvite> {
             unimplemented!()
         }
@@ -815,6 +975,14 @@ mod tests {
         ) -> AppResult<Vec<crate::entities::company_member::CompanyMember>> {
             unimplemented!()
         }
+        async fn update_member_role(
+            &self,
+            _company_id: Uuid,
+            _user_id: Uuid,
+            _role: crate::entities::company_member::CompanyAccessRole,
+        ) -> AppResult<Option<crate::entities::company_member::CompanyMember>> {
+            unimplemented!()
+        }
         async fn remove_member(&self, _company_id: Uuid, _user_id: Uuid) -> AppResult<()> {
             unimplemented!()
         }
@@ -837,7 +1005,7 @@ mod tests {
             _payload: serde_json::Value,
             _notification: serde_json::Value,
             _token: &str,
-            _expires_at: chrono::NaiveDateTime,
+            _expires_at: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<(crate::entities::approval::HumanApproval, bool)> {
             unimplemented!()
         }
@@ -860,14 +1028,14 @@ mod tests {
             &self,
             _token: &str,
             _status: crate::entities::approval::ApprovalStatus,
-            _now: chrono::NaiveDateTime,
+            _now: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<Option<crate::entities::approval::HumanApproval>> {
             unimplemented!()
         }
         async fn expire_pending_approval(
             &self,
             _token: &str,
-            _now: chrono::NaiveDateTime,
+            _now: chrono::DateTime<chrono::Utc>,
         ) -> AppResult<Option<crate::entities::approval::HumanApproval>> {
             unimplemented!()
         }
@@ -880,36 +1048,155 @@ mod tests {
         }
     }
 
+    struct MockSchedulePersistence;
+    #[async_trait]
+    impl crate::adapters::persistence::schedule::SchedulePersistence for MockSchedulePersistence {
+        async fn create(
+            &self,
+            _company_id: Uuid,
+            _channel_id: Uuid,
+            _write: crate::entities::schedule::ScheduleWrite,
+        ) -> AppResult<crate::entities::schedule::ChannelSchedule> {
+            unimplemented!()
+        }
+        async fn get_by_id(
+            &self,
+            _id: Uuid,
+        ) -> AppResult<Option<crate::entities::schedule::ChannelSchedule>> {
+            Ok(None)
+        }
+        async fn list_by_channel_id(
+            &self,
+            _company_id: Uuid,
+            _channel_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::schedule::ChannelSchedule>> {
+            Ok(vec![])
+        }
+        async fn list_by_company_id(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::schedule::ChannelSchedule>> {
+            Ok(vec![])
+        }
+        async fn update(
+            &self,
+            _existing: &crate::entities::schedule::ChannelSchedule,
+            _channel_id: Uuid,
+            _write: crate::entities::schedule::ScheduleWrite,
+        ) -> AppResult<crate::entities::schedule::ChannelSchedule> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            Ok(())
+        }
+        async fn set_enabled(&self, _id: Uuid, _enabled: bool) -> AppResult<bool> {
+            Ok(true)
+        }
+        async fn claim_and_advance_due_schedules(
+            &self,
+            _worker_id: Uuid,
+            _lock_expires_at: chrono::DateTime<chrono::Utc>,
+            _limit: i64,
+        ) -> AppResult<Vec<crate::entities::schedule::ClaimedScheduleRun>> {
+            Ok(vec![])
+        }
+        async fn record_run_task(
+            &self,
+            _run_id: Uuid,
+            _worker_id: Uuid,
+            _generation: Uuid,
+            _task_id: Uuid,
+        ) -> AppResult<bool> {
+            Ok(true)
+        }
+        async fn record_run_error(
+            &self,
+            _run_id: Uuid,
+            _worker_id: Uuid,
+            _generation: Uuid,
+            _error: &str,
+        ) -> AppResult<bool> {
+            Ok(true)
+        }
+        async fn record_manual_run(
+            &self,
+            _id: Uuid,
+        ) -> AppResult<Option<crate::entities::schedule::ChannelSchedule>> {
+            Ok(None)
+        }
+        async fn release_failed_claim(
+            &self,
+            _schedule: &crate::entities::schedule::ChannelSchedule,
+            _error: &str,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn clear_last_error(&self, _id: Uuid) -> AppResult<()> {
+            Ok(())
+        }
+        async fn list_schedule_runs(
+            &self,
+            _schedule_id: Uuid,
+            _offset: i64,
+            _limit: i64,
+        ) -> AppResult<Vec<crate::entities::schedule::ScheduleRun>> {
+            Ok(vec![])
+        }
+        async fn schedule_run_contains_thread(
+            &self,
+            _company_id: Uuid,
+            _schedule_id: Uuid,
+            _thread_id: Uuid,
+        ) -> AppResult<bool> {
+            Ok(false)
+        }
+    }
+
     #[tokio::test]
-    async fn sendgrid_webhook_processes_email_creates_thread_and_dispatches() {
+    async fn sendgrid_webhook_is_absent_when_disabled() {
         let company_id = Uuid::new_v4();
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![Company {
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                avatar_url: None,
+                memory_provider: None,
+                created_at: Utc::now(),
             }]),
         });
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
+                enabled: true,
+                add_3rd_party: true,
                 id: Uuid::new_v4(),
                 company_id,
                 name: "Inbound Flow".to_string(),
-                slug: "inbound".to_string(),
+                description: None,
+                slug: "inbound".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: Utc::now().naive_utc(),
+                retrieve_company_memory: false,
+                retrieve_agent_memory: false,
+                retrieve_user_memory: false,
+                persist_company_memory: false,
+                persist_agent_memory: false,
+                persist_user_memory: false,
+                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+                memory_max_results: 5,
+                created_by: crate::entities::creation::CreationProvenance::system(),
+                created_at: Utc::now(),
             }]),
         });
 
@@ -920,9 +1207,11 @@ mod tests {
 
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
-            access_token_ttl: time::Duration::days(1),
+            sendgrid_inbound: None,
+            hydradb: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
+            cors_allowed_origins: vec![],
             smtp_host: "localhost".to_string(),
             smtp_port: 1025,
             smtp_username: "".to_string(),
@@ -941,6 +1230,9 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            secure_cookies: false,
+            gcs: None,
+            operator_emails: Vec::new(),
         });
 
         let task_persistence = Arc::new(MockTaskPersistence {
@@ -964,12 +1256,42 @@ mod tests {
 
         let channel_use_cases = Arc::new(ChannelUseCases::new(
             company_persistence.clone(),
-            channel_persistence,
+            channel_persistence.clone(),
             config.clone(),
         ));
+        let memory_persistence = Arc::new(crate::adapters::persistence::PostgresPersistence::new(
+            sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                .expect("valid lazy pool url"),
+        ));
+        let memory_providers =
+            Arc::new(crate::services::memory_provider::MemoryProviderRegistry::default());
+        let monitoring = Arc::new(crate::adapters::monitoring::InMemoryMonitor::new());
         let app_state = AppState {
+            // Lazy: this test drives mocked persistence and never opens a connection.
+            db: sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                .expect("valid lazy pool url"),
             config: config.clone(),
-            monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+            monitoring: monitoring.clone(),
+            sessions: Arc::new(crate::adapters::http::session::SessionAuthority::new(
+                &config,
+            )),
+            // Inbound mail never uploads anything.
+            file_storage: None,
+            // Same lazy pool: this test never renders a dashboard, so it never connects.
+            dashboard_persistence: Arc::new(
+                crate::adapters::persistence::PostgresPersistence::new(
+                    sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                        .expect("valid lazy pool url"),
+                ),
+            ),
+            runtime_metrics: Arc::new(crate::adapters::persistence::PostgresPersistence::new(
+                sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                    .expect("valid lazy pool url"),
+            )),
+            runtime_identity: crate::entities::runtime_metrics::MachineIdentity {
+                id: crate::entities::runtime_metrics::MachineId::new("webhook-test"),
+                region: None,
+            },
             user_use_cases: Arc::new(crate::use_cases::user::UserUseCases::new(
                 Arc::new(crate::infra::argon2_password_hasher()),
                 Arc::new(MockUserPersistence {}),
@@ -987,13 +1309,33 @@ mod tests {
                     Arc::new(MockCompanyInvitePersistence {}),
                 ),
             ),
-            channel_use_cases,
+            channel_use_cases: channel_use_cases.clone(),
+            schedule_use_cases: Arc::new(crate::use_cases::schedule::ScheduleUseCases::new(
+                Arc::new(MockSchedulePersistence),
+                company_persistence.clone(),
+                channel_persistence.clone(),
+                thread_persistence.clone(),
+                task_persistence.clone(),
+                config.clone(),
+            )),
             agent_use_cases: Arc::new(crate::use_cases::agent::AgentUseCases::new(
-                company_persistence,
+                company_persistence.clone(),
                 Arc::new(MockAgentPersistence),
             )),
             thread_use_cases,
             approval_use_cases,
+            memory_use_cases: Arc::new(crate::use_cases::memory::MemoryUseCases::new(
+                company_persistence.clone(),
+                memory_persistence.clone(),
+                memory_persistence.clone(),
+                false,
+            )),
+            memory_worker: Arc::new(crate::services::memory_worker::MemoryWorker::new(
+                memory_persistence,
+                memory_providers,
+                monitoring,
+            )),
+            events: crate::infra::events::MailboxEvents::new(),
         };
 
         let app = router().with_state(app_state);
@@ -1018,30 +1360,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-        assert!(body_str.contains("\"processed\":true"));
-        assert!(body_str.contains("\"inbound_message_id\":\"<MSG123@external.com>\""));
-
-        // Ingestion persists the inbound message; the durable worker sends the reply.
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
         let threads = thread_persistence.threads.lock().unwrap();
-        assert_eq!(threads.len(), 1);
-        assert_eq!(threads[0].subject, "Help Needed");
-
+        assert!(threads.is_empty());
         let messages = thread_persistence.messages.lock().unwrap();
-        assert_eq!(messages.len(), 1);
-
-        assert_eq!(
-            messages[0].role,
-            crate::entities::message::MessageRole::Human
-        );
-        assert_eq!(
-            messages[0].direction,
-            crate::entities::message::MessageDirection::Inbound
-        );
+        assert!(messages.is_empty());
     }
 }

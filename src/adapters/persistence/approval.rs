@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 use std::str::FromStr;
 use uuid::Uuid;
@@ -25,10 +25,14 @@ pub struct HumanApprovalDb {
     pub payload: Value,
     pub token: Uuid,
     pub status: String,
-    pub expires_at: NaiveDateTime,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub expires_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
+
+const APPROVAL_COLUMNS: &str = r#"id, company_id, channel_id, thread_id, task_id,
+    step_key, approver_email, action_type, action_title, action_summary, payload, token,
+    status, expires_at, created_at, updated_at"#;
 
 impl TryFrom<HumanApprovalDb> for HumanApproval {
     type Error = AppError;
@@ -74,7 +78,7 @@ pub trait ApprovalPersistence: Send + Sync {
         payload: Value,
         notification: Value,
         token: &str,
-        expires_at: NaiveDateTime,
+        expires_at: DateTime<Utc>,
     ) -> AppResult<(HumanApproval, bool)>;
 
     async fn find_approval_by_step_key(
@@ -91,14 +95,14 @@ pub trait ApprovalPersistence: Send + Sync {
         &self,
         token: &str,
         status: ApprovalStatus,
-        now: NaiveDateTime,
+        now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>>;
 
     async fn consume_quorum_timeout_action(
         &self,
         _token: &str,
         _action: &str,
-        _now: NaiveDateTime,
+        _now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>> {
         Err(AppError::Internal(
             "Atomic quorum approval persistence is not configured".into(),
@@ -108,7 +112,7 @@ pub trait ApprovalPersistence: Send + Sync {
     async fn expire_pending_approval(
         &self,
         token: &str,
-        now: NaiveDateTime,
+        now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>>;
 
     async fn list_approvals_by_channel(
@@ -134,13 +138,13 @@ impl ApprovalPersistence for PostgresPersistence {
         payload: Value,
         notification: Value,
         token: &str,
-        expires_at: NaiveDateTime,
+        expires_at: DateTime<Utc>,
     ) -> AppResult<(HumanApproval, bool)> {
         let id = Uuid::new_v4();
         let token = Uuid::parse_str(token)
             .map_err(|e| AppError::Internal(format!("Invalid approval token: {}", e)))?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let db = sqlx::query_as::<_, HumanApprovalDb>(
+        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
             INSERT INTO human_approvals (
                 id, company_id, channel_id, thread_id, task_id,
@@ -170,9 +174,9 @@ impl ApprovalPersistence for PostgresPersistence {
                     THEN EXCLUDED.expires_at ELSE human_approvals.expires_at END,
                 updated_at = CASE WHEN human_approvals.status = 'expired'
                     THEN CURRENT_TIMESTAMP ELSE human_approvals.updated_at END
-            RETURNING *
+            RETURNING {APPROVAL_COLUMNS}
             "#,
-        )
+        ))
         .bind(id)
         .bind(company_id)
         .bind(channel_id)
@@ -215,11 +219,12 @@ impl ApprovalPersistence for PostgresPersistence {
 
             sqlx::query(
                 r#"INSERT INTO email_outbox (
-                        id, company_id, task_id, idempotency_key, payload
-                   ) VALUES ($1, $2, $3, $4, $5)"#,
+                        id, company_id, channel_id, task_id, idempotency_key, payload
+                   ) VALUES ($1, $2, $3, $4, $5, $6)"#,
             )
             .bind(Uuid::new_v4())
             .bind(company_id)
+            .bind(channel_id)
             .bind(task_id)
             .bind(format!("approval:{}", db.id))
             .bind(notification)
@@ -238,16 +243,16 @@ impl ApprovalPersistence for PostgresPersistence {
         thread_id: Option<Uuid>,
         step_key: &str,
     ) -> AppResult<Option<HumanApproval>> {
-        let db = sqlx::query_as::<_, HumanApprovalDb>(
+        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
-            SELECT * FROM human_approvals
+            SELECT {APPROVAL_COLUMNS} FROM human_approvals
             WHERE company_id = $1 AND channel_id = $2
               AND (thread_id = $3 OR ($3 IS NULL AND thread_id IS NULL))
               AND step_key = $4
             ORDER BY created_at DESC, id DESC
             LIMIT 1
             "#,
-        )
+        ))
         .bind(company_id)
         .bind(channel_id)
         .bind(thread_id)
@@ -263,12 +268,12 @@ impl ApprovalPersistence for PostgresPersistence {
         let Ok(token) = Uuid::parse_str(token) else {
             return Ok(None);
         };
-        let db = sqlx::query_as::<_, HumanApprovalDb>(
+        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
-            SELECT * FROM human_approvals
+            SELECT {APPROVAL_COLUMNS} FROM human_approvals
             WHERE token = $1
             "#,
-        )
+        ))
         .bind(token)
         .fetch_optional(&self.pool)
         .await
@@ -281,21 +286,21 @@ impl ApprovalPersistence for PostgresPersistence {
         &self,
         token: &str,
         status: ApprovalStatus,
-        now: NaiveDateTime,
+        now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>> {
         let Ok(token) = Uuid::parse_str(token) else {
             return Ok(None);
         };
-        let db = sqlx::query_as::<_, HumanApprovalDb>(
+        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
             UPDATE human_approvals
             SET status = $2, updated_at = CURRENT_TIMESTAMP
             WHERE token = $1
               AND status = 'pending'
               AND expires_at >= $3
-            RETURNING *
+            RETURNING {APPROVAL_COLUMNS}
             "#,
-        )
+        ))
         .bind(token)
         .bind(status.as_str())
         .bind(now)
@@ -310,18 +315,18 @@ impl ApprovalPersistence for PostgresPersistence {
         &self,
         token: &str,
         action: &str,
-        now: NaiveDateTime,
+        now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>> {
         let Ok(token) = Uuid::parse_str(token) else {
             return Ok(None);
         };
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let approval = sqlx::query_as::<_, HumanApprovalDb>(
-            r#"SELECT * FROM human_approvals
+        let approval = sqlx::query_as::<_, HumanApprovalDb>(&format!(
+            r#"SELECT {APPROVAL_COLUMNS} FROM human_approvals
                WHERE token = $1 AND status = 'pending' AND expires_at >= $2
                  AND action_type = 'quorum_timeout'
-               FOR UPDATE"#,
-        )
+               FOR UPDATE"#
+        ))
         .bind(token)
         .bind(now)
         .fetch_optional(&mut *tx)
@@ -426,10 +431,10 @@ impl ApprovalPersistence for PostgresPersistence {
         } else {
             ApprovalStatus::Approved
         };
-        let updated = sqlx::query_as::<_, HumanApprovalDb>(
+        let updated = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"UPDATE human_approvals SET status = $2, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $1 AND status = 'pending' RETURNING *"#,
-        )
+               WHERE id = $1 AND status = 'pending' RETURNING {APPROVAL_COLUMNS}"#
+        ))
         .bind(approval.id)
         .bind(status.as_str())
         .fetch_one(&mut *tx)
@@ -442,21 +447,21 @@ impl ApprovalPersistence for PostgresPersistence {
     async fn expire_pending_approval(
         &self,
         token: &str,
-        now: NaiveDateTime,
+        now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>> {
         let Ok(token) = Uuid::parse_str(token) else {
             return Ok(None);
         };
-        let db = sqlx::query_as::<_, HumanApprovalDb>(
+        let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
             UPDATE human_approvals
             SET status = 'expired', updated_at = CURRENT_TIMESTAMP
             WHERE token = $1
               AND status = 'pending'
               AND expires_at < $2
-            RETURNING *
+            RETURNING {APPROVAL_COLUMNS}
             "#,
-        )
+        ))
         .bind(token)
         .bind(now)
         .fetch_optional(&self.pool)
@@ -471,14 +476,14 @@ impl ApprovalPersistence for PostgresPersistence {
         company_id: Uuid,
         channel_id: Uuid,
     ) -> AppResult<Vec<HumanApproval>> {
-        let list = sqlx::query_as::<_, HumanApprovalDb>(
+        let list = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
-            SELECT * FROM human_approvals
+            SELECT {APPROVAL_COLUMNS} FROM human_approvals
             WHERE company_id = $1 AND channel_id = $2
             ORDER BY created_at DESC, id DESC
             LIMIT 200
             "#,
-        )
+        ))
         .bind(company_id)
         .bind(channel_id)
         .fetch_all(&self.pool)
@@ -492,17 +497,17 @@ impl ApprovalPersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::test_support::test_pool;
     use crate::use_cases::{
-        channel::ChannelPersistence, company::CompanyPersistence, thread::ThreadPersistence,
+        channel::{ChannelPersistence, ChannelWrite},
+        company::{CompanyPersistence, CompanyWrite},
+        thread::ThreadPersistence,
         user::UserPersistence,
     };
 
     #[tokio::test]
     async fn approval_lookup_is_scoped_and_token_is_consumed_once() {
-        let Ok(database_url) = std::env::var("DATABASE_URL") else {
-            return;
-        };
-        let Ok(pool) = sqlx::PgPool::connect(&database_url).await else {
+        let Some(pool) = test_pool().await else {
             return;
         };
         let persistence = PostgresPersistence::new(pool);
@@ -520,31 +525,29 @@ mod tests {
         let company = CompanyPersistence::create(
             &persistence,
             owner.id,
-            "Approval Test",
-            &format!("approval-test-{suffix}"),
-            None,
-            None,
-            None,
-            None,
+            CompanyWrite {
+                name: "Approval Test".to_string(),
+                slug: format!("approval-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
         )
         .await
         .unwrap();
         let channel = ChannelPersistence::create(
             &persistence,
             company.id,
-            "Approval",
-            "approval",
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            ChannelWrite {
+                name: "Approval".into(),
+                slug: "approval".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
         )
         .await
         .unwrap();
+        let email_addr = crate::entities::value_objects::EmailAddress::from(email.clone());
         let thread = persistence
-            .create_thread(channel.id, "Approval", std::slice::from_ref(&email))
+            .create_thread(channel.id, "Approval", std::slice::from_ref(&email_addr))
             .await
             .unwrap();
         let token = Uuid::new_v4().to_string();
@@ -562,18 +565,22 @@ mod tests {
                 serde_json::json!({}),
                 serde_json::json!({}),
                 &token,
-                chrono::Utc::now().naive_utc() + chrono::Duration::hours(1),
+                chrono::Utc::now() + chrono::Duration::hours(1),
             )
             .await
             .unwrap();
         assert!(created);
-        let queued_notifications: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM email_outbox WHERE idempotency_key = $1 AND status = 'pending'",
-        )
-        .bind(format!("approval:{}", approval.id))
-        .fetch_one(&persistence.pool)
-        .await
-        .unwrap();
+
+        // Counted by key alone, with no `status` filter. What is under test is that creating an
+        // approval queues exactly one notification; whether a poller has since claimed it is the
+        // poller's business, and asserting it is still 'pending' would be asserting that no
+        // unscoped claim ran in between — which is not a property this code has.
+        let queued_notifications: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM email_outbox WHERE idempotency_key = $1")
+                .bind(format!("approval:{}", approval.id))
+                .fetch_one(&persistence.pool)
+                .await
+                .unwrap();
         assert_eq!(queued_notifications, 1);
         assert_eq!(
             persistence
@@ -585,7 +592,7 @@ mod tests {
             approval.id
         );
 
-        let now = chrono::Utc::now().naive_utc();
+        let now = chrono::Utc::now();
         let (first, second) = tokio::join!(
             persistence.consume_pending_approval(&token, ApprovalStatus::Approved, now),
             persistence.consume_pending_approval(&token, ApprovalStatus::Approved, now)

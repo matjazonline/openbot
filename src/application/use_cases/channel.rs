@@ -6,49 +6,190 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::{channel::Channel, company::Company},
+    entities::{
+        channel::{Channel, PUBLIC_PARTICIPANT},
+        company::{Company, CompanyAccess},
+        creation::CreationProvenance,
+        memory::{MemoryRecallMode, default_memory_max_results},
+        user::Viewer,
+        value_objects::{ChannelSlug, CompanySlug},
+    },
     infra::config::AppConfig,
-    use_cases::company::CompanyPersistence,
+    use_cases::company::{CompanyPersistence, managed_company},
+    use_cases::memory::{ActiveMemoryBinding, MemoryBindingPersistence},
 };
 use serde::{Deserialize, Serialize};
 
+/// Everything one channel write sets, so create and update cannot drift apart and so a caller
+/// cannot transpose two same-typed arguments in a nine-parameter list.
+///
+/// Values reach persistence already normalized — see [`ChannelWrite::normalize`].
+#[derive(Debug, Clone)]
+pub struct ChannelWrite {
+    pub name: String,
+    /// What the channel is for, in one line. `None` and a blank string mean the same thing, so
+    /// every form boundary normalizes blank to `None` before building the write.
+    pub description: Option<String>,
+    pub slug: String,
+    /// Extra local parts the channel also answers on. Replaced wholesale by every write.
+    pub alias_slugs: Vec<String>,
+    pub api_key: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub participant_emails: Option<Vec<String>>,
+    pub agent_ids: Option<Vec<Uuid>>,
+    pub channel_config: Option<serde_json::Value>,
+    pub enabled: bool,
+    /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
+    pub add_3rd_party: bool,
+    pub retrieve_company_memory: bool,
+    pub retrieve_agent_memory: bool,
+    pub retrieve_user_memory: bool,
+    pub persist_company_memory: bool,
+    pub persist_agent_memory: bool,
+    pub persist_user_memory: bool,
+    pub memory_recall_mode: MemoryRecallMode,
+    pub memory_max_results: u8,
+    pub created_by: Option<CreationProvenance>,
+}
+
+impl Default for ChannelWrite {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            description: None,
+            slug: String::new(),
+            alias_slugs: Vec::new(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: None,
+            channel_config: None,
+            enabled: false,
+            add_3rd_party: false,
+            created_by: None,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: MemoryRecallMode::Fast,
+            memory_max_results: default_memory_max_results(),
+        }
+    }
+}
+
+impl ChannelWrite {
+    /// Trim and lower-case the fields that have canonical forms, and drop the blanks. Runs once,
+    /// in the use case, so every entry point stores the same shape.
+    pub(crate) fn normalize(&mut self) -> AppResult<()> {
+        self.name = self.name.trim().to_string();
+        self.slug = self.slug.trim().to_lowercase().replace(' ', "-");
+
+        if self.name.is_empty() {
+            return Err(AppError::BadRequest(
+                "The channel name cannot be empty.".into(),
+            ));
+        }
+        if self.slug.is_empty() {
+            return Err(AppError::BadRequest(
+                "The channel address cannot be empty.".into(),
+            ));
+        }
+        validate_slug(&self.slug, SlugKind::ChannelAddress)?;
+        self.normalize_alias_slugs()?;
+
+        blank_to_none(&mut self.api_key);
+        blank_to_none(&mut self.provider);
+        blank_to_none(&mut self.model);
+
+        if let Some(emails) = self.participant_emails.as_mut() {
+            emails.retain_mut(|email| {
+                *email = email.trim().to_lowercase();
+                !email.is_empty() && email.contains('@')
+            });
+        }
+
+        if !(1..=20).contains(&self.memory_max_results) {
+            return Err(AppError::BadRequest(
+                "Memory result limit must be between 1 and 20.".into(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Aliases go through the same canonicalization and reserved-suffix rules as the primary
+    /// slug, then lose blanks, duplicates and any repeat of the primary slug — the database
+    /// would reject that last one as a self-collision.
+    fn normalize_alias_slugs(&mut self) -> AppResult<()> {
+        let mut seen = std::collections::HashSet::new();
+        let mut aliases = Vec::with_capacity(self.alias_slugs.len());
+
+        for alias in std::mem::take(&mut self.alias_slugs) {
+            let alias = alias.trim().to_lowercase().replace(' ', "-");
+            if alias.is_empty() || alias == self.slug {
+                continue;
+            }
+            validate_slug(&alias, SlugKind::ChannelAlias)?;
+            if seen.insert(alias.clone()) {
+                aliases.push(alias);
+            }
+        }
+
+        self.alias_slugs = aliases;
+        Ok(())
+    }
+
+    /// Whether the participant list opens this channel to anyone — the only case the spam
+    /// interlock applies to.
+    fn is_public(&self) -> bool {
+        self.participant_emails
+            .as_ref()
+            .is_some_and(|emails| emails.iter().any(|e| e == PUBLIC_PARTICIPANT))
+    }
+}
+
+impl ChannelWrite {
+    pub fn memory_defaults(mut self) -> Self {
+        self.memory_recall_mode = MemoryRecallMode::Fast;
+        self.memory_max_results = default_memory_max_results();
+        self
+    }
+}
+
+fn blank_to_none(value: &mut Option<String>) {
+    if let Some(inner) = value.as_mut() {
+        *inner = inner.trim().to_string();
+        if inner.is_empty() {
+            *value = None;
+        }
+    }
+}
+
+/// A channel belonging to another company is reported exactly like a missing one, so an id probe
+/// cannot tell a foreign channel from a nonexistent one. See [`managed_company`].
+pub fn channel_not_found() -> AppError {
+    AppError::NotFound("Channel not found in this company.".into())
+}
+
 #[async_trait]
 pub trait ChannelPersistence: Send + Sync {
-    async fn create(
-        &self,
-        company_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        participant_emails: Option<Vec<String>>,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
-    ) -> AppResult<Channel>;
+    async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel>;
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>>;
 
     async fn get_by_company_slug_and_channel_slug(
         &self,
-        company_slug: &str,
-        channel_slug: &str,
+        company_slug: &CompanySlug,
+        channel_slug: &ChannelSlug,
     ) -> AppResult<Option<Channel>>;
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>>;
 
-    async fn update(
-        &self,
-        id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        participant_emails: Option<Vec<String>>,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
-    ) -> AppResult<Channel>;
+    async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel>;
 
     async fn delete(&self, id: Uuid) -> AppResult<()>;
 }
@@ -58,6 +199,7 @@ pub struct ChannelUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
     channel_persistence: Arc<dyn ChannelPersistence>,
     config: Arc<AppConfig>,
+    memory_persistence: Option<Arc<dyn MemoryBindingPersistence>>,
 }
 
 impl ChannelUseCases {
@@ -70,22 +212,20 @@ impl ChannelUseCases {
             company_persistence,
             channel_persistence,
             config,
+            memory_persistence: None,
         }
     }
 
-    async fn verify_company_owner(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        let company = self
-            .company_persistence
-            .get_by_id(company_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
+    pub fn with_memory_persistence(
+        mut self,
+        persistence: Arc<dyn MemoryBindingPersistence>,
+    ) -> Self {
+        self.memory_persistence = Some(persistence);
+        self
+    }
 
-        if company.user_id != user_id {
-            return Err(AppError::Internal(
-                "Unauthorized: only the company owner can manage channels.".into(),
-            ));
-        }
-
+    async fn verify_company_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
+        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         Ok(())
     }
 
@@ -94,70 +234,89 @@ impl ChannelUseCases {
         &self,
         user_id: Uuid,
         company_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        participant_emails: Option<Vec<String>>,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
+        mut write: ChannelWrite,
         confirm_spam_disabled: bool,
     ) -> AppResult<Channel> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
+        write.created_by = Some(CreationProvenance::user(user_id));
 
-        let name_trimmed = name.trim();
-        let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
-
-        if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::Internal(
-                "Channel name and slug cannot be empty.".into(),
-            ));
-        }
-
-        validate_slug(&slug_clean)?;
-
-        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
-
-        let cleaned_emails = participant_emails.map(|emails| {
-            emails
-                .into_iter()
-                .map(|e| e.trim().to_lowercase())
-                .filter(|e| !e.is_empty() && e.contains('@'))
-                .collect::<Vec<_>>()
-        });
-
-        let is_public = cleaned_emails
-            .as_ref()
-            .map(|emails| emails.iter().any(|e| e == "@public"))
-            .unwrap_or(false);
-
-        if is_public && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
-            return Err(AppError::Internal(
-                "Spam scanning is disabled in server configuration. Saving a public channel (@public) requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
-            ));
-        }
+        write.normalize()?;
+        self.check_spam_interlock(&write, confirm_spam_disabled)?;
+        self.check_memory_interlock(user_id, company_id, &write)
+            .await?;
 
         info!(
             "Creating channel '{}' ({}) for company {}",
-            name_trimmed, slug_clean, company_id
+            write.name, write.slug, company_id
         );
 
-        self.channel_persistence
-            .create(
-                company_id,
-                name_trimmed,
-                &slug_clean,
-                api_key_clean,
-                provider_clean,
-                model_clean,
-                cleaned_emails,
-                agent_ids,
-                channel_config,
-            )
-            .await
+        self.channel_persistence.create(company_id, write).await
+    }
+
+    /// A channel open to `@public` must not be saved while the server has no spam scanning at all,
+    /// unless the caller explicitly says it knows.
+    fn check_spam_interlock(
+        &self,
+        write: &ChannelWrite,
+        confirm_spam_disabled: bool,
+    ) -> AppResult<()> {
+        if write.is_public() && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
+            return Err(AppError::BadRequest(
+                "Spam scanning is disabled in server configuration. Saving a public channel (@public) requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    async fn check_memory_interlock(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        write: &ChannelWrite,
+    ) -> AppResult<()> {
+        let enabled = write.retrieve_company_memory
+            || write.retrieve_agent_memory
+            || write.retrieve_user_memory
+            || write.persist_company_memory
+            || write.persist_agent_memory
+            || write.persist_user_memory;
+        if !enabled {
+            return Ok(());
+        }
+        self.verify_company_manager(user_id, company_id).await?;
+        let persistence = self.memory_persistence.as_ref().ok_or_else(|| {
+            AppError::BadRequest("Memory is not configured for this deployment.".into())
+        })?;
+        let binding = persistence.active_binding(company_id).await?;
+        if self.config.hydradb.is_none() {
+            return Err(AppError::BadRequest(
+                "Memory is not configured for this deployment.".into(),
+            ));
+        }
+        match binding {
+            ActiveMemoryBinding::Ready(_) => Ok(()),
+            ActiveMemoryBinding::Disabled => Err(AppError::BadRequest(
+                "Select a memory provider before enabling memory.".into(),
+            )),
+            ActiveMemoryBinding::NotReady(_) => Err(AppError::BadRequest(
+                "Memory controls require a ready provider.".into(),
+            )),
+            ActiveMemoryBinding::Misconfigured => Err(AppError::BadRequest(
+                "The selected memory provider is misconfigured.".into(),
+            )),
+        }
+    }
+
+    pub async fn memory_ready(&self, user_id: Uuid, company_id: Uuid) -> AppResult<bool> {
+        self.verify_company_manager(user_id, company_id).await?;
+        let Some(persistence) = self.memory_persistence.as_ref() else {
+            return Ok(false);
+        };
+        let binding = persistence.active_binding(company_id).await?;
+        if self.config.hydradb.is_none() {
+            return Ok(false);
+        }
+        Ok(matches!(binding, ActiveMemoryBinding::Ready(_)))
     }
 
     #[instrument(skip(self))]
@@ -166,9 +325,67 @@ impl ChannelUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<Channel>> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
         self.channel_persistence
             .list_by_company_id(company_id)
+            .await
+    }
+
+    /// Every channel of `company_id` this viewer may read.
+    ///
+    /// The read counterpart of [`ChannelUseCases::list_company_channels`]: that one is for the
+    /// pages that *configure* channels and stays owner-or-admin, this one is what the mailbox lists,
+    /// and a restricted channel simply is not in it for a colleague who is not a participant.
+    #[instrument(skip(self))]
+    pub async fn list_readable_channels(
+        &self,
+        viewer: &Viewer,
+        company_id: Uuid,
+    ) -> AppResult<Vec<Channel>> {
+        let Some(access) = self.viewer_access(viewer, company_id).await? else {
+            return Ok(Vec::new());
+        };
+
+        Ok(self
+            .channel_persistence
+            .list_by_company_id(company_id)
+            .await?
+            .into_iter()
+            .filter(|channel| channel.viewer_access(&viewer.email, access.membership))
+            .collect())
+    }
+
+    /// One channel, if this viewer may read it.
+    ///
+    /// Answers `None` for "no such channel", "not your company" and "not yours to read" alike:
+    /// telling them apart would let anyone probe ids to learn which channels a company runs.
+    #[instrument(skip(self))]
+    pub async fn get_readable_channel(
+        &self,
+        viewer: &Viewer,
+        company_id: Uuid,
+        channel_id: Uuid,
+    ) -> AppResult<Option<Channel>> {
+        let Some(access) = self.viewer_access(viewer, company_id).await? else {
+            return Ok(None);
+        };
+
+        let channel = self.channel_persistence.get_by_id(channel_id).await?;
+
+        Ok(channel.filter(|channel| {
+            channel.company_id == company_id
+                && channel.viewer_access(&viewer.email, access.membership)
+        }))
+    }
+
+    /// What the viewer is to a company, or `None` if they are nothing to it.
+    async fn viewer_access(
+        &self,
+        viewer: &Viewer,
+        company_id: Uuid,
+    ) -> AppResult<Option<CompanyAccess>> {
+        self.company_persistence
+            .company_access(viewer.user_id, company_id)
             .await
     }
 
@@ -179,7 +396,7 @@ impl ChannelUseCases {
         company_id: Uuid,
         channel_id: Uuid,
     ) -> AppResult<Option<Channel>> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
         let channel = self.channel_persistence.get_by_id(channel_id).await?;
         if let Some(ref ch) = channel {
             if ch.company_id != company_id {
@@ -199,82 +416,32 @@ impl ChannelUseCases {
         user_id: Uuid,
         company_id: Uuid,
         channel_id: Uuid,
-        name: &str,
-        slug: &str,
-        api_key: Option<&str>,
-        provider: Option<&str>,
-        model: Option<&str>,
-        participant_emails: Option<Vec<String>>,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
+        mut write: ChannelWrite,
         confirm_spam_disabled: bool,
     ) -> AppResult<Channel> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
 
         let channel = self
             .channel_persistence
             .get_by_id(channel_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Channel not found.".into()))?;
+            .ok_or_else(channel_not_found)?;
 
         if channel.company_id != company_id {
-            return Err(AppError::Internal(
-                "Channel does not belong to this company.".into(),
-            ));
+            return Err(channel_not_found());
         }
 
-        let name_trimmed = name.trim();
-        let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
-
-        if name_trimmed.is_empty() || slug_clean.is_empty() {
-            return Err(AppError::Internal(
-                "Channel name and slug cannot be empty.".into(),
-            ));
-        }
-
-        validate_slug(&slug_clean)?;
-
-        let api_key_clean = api_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let provider_clean = provider.map(|s| s.trim()).filter(|s| !s.is_empty());
-        let model_clean = model.map(|s| s.trim()).filter(|s| !s.is_empty());
-
-        let cleaned_emails = participant_emails.map(|emails| {
-            emails
-                .into_iter()
-                .map(|e| e.trim().to_lowercase())
-                .filter(|e| !e.is_empty() && e.contains('@'))
-                .collect::<Vec<_>>()
-        });
-
-        let is_public = cleaned_emails
-            .as_ref()
-            .map(|emails| emails.iter().any(|e| e == "@public"))
-            .unwrap_or(false);
-
-        if is_public && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
-            return Err(AppError::Internal(
-                "Spam scanning is disabled in server configuration. Saving a public channel (@public) requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
-            ));
-        }
+        write.normalize()?;
+        self.check_spam_interlock(&write, confirm_spam_disabled)?;
+        self.check_memory_interlock(user_id, company_id, &write)
+            .await?;
 
         info!(
-            "Updating channel {} for company {}: {} ({})",
-            channel_id, company_id, name_trimmed, slug_clean
+            "Updating channel {} for company {}: {} ({}), enabled={}",
+            channel_id, company_id, write.name, write.slug, write.enabled
         );
 
-        self.channel_persistence
-            .update(
-                channel_id,
-                name_trimmed,
-                &slug_clean,
-                api_key_clean,
-                provider_clean,
-                model_clean,
-                cleaned_emails,
-                agent_ids,
-                channel_config,
-            )
-            .await
+        self.channel_persistence.update(channel_id, write).await
     }
 
     #[instrument(skip(self))]
@@ -284,18 +451,16 @@ impl ChannelUseCases {
         company_id: Uuid,
         channel_id: Uuid,
     ) -> AppResult<()> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.verify_company_manager(user_id, company_id).await?;
 
         let channel = self
             .channel_persistence
             .get_by_id(channel_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Channel not found.".into()))?;
+            .ok_or_else(channel_not_found)?;
 
         if channel.company_id != company_id {
-            return Err(AppError::Internal(
-                "Channel does not belong to this company.".into(),
-            ));
+            return Err(channel_not_found());
         }
 
         info!("Deleting channel {} for company {}", channel_id, company_id);
@@ -330,28 +495,18 @@ impl ChannelUseCases {
 
                 let sender_email = extract_email_address(&email.from);
 
-                let sender_authorized =
-                    if let (Some(comp), Some(ch)) = (company.as_ref(), channel.as_ref()) {
-                        match &ch.participant_emails {
-                            Some(allowed_emails) if !allowed_emails.is_empty() => {
-                                let is_public = allowed_emails
-                                    .iter()
-                                    .any(|e| e.trim().eq_ignore_ascii_case("@public"));
-                                let explicitly_listed = allowed_emails.iter().any(|e| {
-                                    !e.trim().eq_ignore_ascii_case("@public")
-                                        && e.eq_ignore_ascii_case(&sender_email)
-                                });
-                                is_public || explicitly_listed
-                            }
-                            _ => self
-                                .company_persistence
-                                .is_company_team_member(comp.id, &sender_email)
-                                .await
-                                .unwrap_or(false),
-                        }
-                    } else {
-                        false
-                    };
+                // The same verdict the real inbound path reaches, from the same method: a preview
+                // that re-implemented the participant rule would drift out of sync with it.
+                let sender_authorized = match (company.as_ref(), channel.as_ref()) {
+                    (Some(comp), Some(ch)) => {
+                        let membership = self
+                            .company_persistence
+                            .membership_for_email(comp.id, &sender_email)
+                            .await?;
+                        ch.participant_access(&sender_email, membership).authorized
+                    }
+                    _ => false,
+                };
 
                 let resolved = company.is_some() && channel.is_some() && sender_authorized;
 
@@ -412,8 +567,8 @@ pub struct InboundEmail {
 pub struct InboundEmailResult {
     pub resolved: bool,
     pub sender_authorized: bool,
-    pub company_slug: Option<String>,
-    pub channel_slug: Option<String>,
+    pub company_slug: Option<CompanySlug>,
+    pub channel_slug: Option<ChannelSlug>,
     pub company: Option<Company>,
     pub channel: Option<Channel>,
     pub email: InboundEmail,
@@ -432,10 +587,35 @@ pub fn extract_email_address(input: &str) -> String {
     email_addr.trim().to_lowercase()
 }
 
-pub fn validate_slug(slug: &str) -> AppResult<()> {
+/// Which field a slug came from, so a rejection can name the input the user has to fix instead of
+/// saying "slug" for three different form fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SlugKind {
+    ChannelAddress,
+    ChannelAlias,
+    AgentSlug,
+}
+
+impl SlugKind {
+    fn noun(self) -> &'static str {
+        match self {
+            SlugKind::ChannelAddress => "channel address",
+            SlugKind::ChannelAlias => "channel alias",
+            SlugKind::AgentSlug => "agent slug",
+        }
+    }
+}
+
+/// A malformed slug is user input, not a server fault, so every rejection here is a
+/// [`AppError::BadRequest`] — `Internal` renders as a bare "Internal error" with the message
+/// dropped, which is exactly what the person filling in the form needs to see.
+pub fn validate_slug(slug: &str, kind: SlugKind) -> AppResult<()> {
     let slug_clean = slug.trim().to_lowercase().replace(' ', "-");
     if slug_clean.is_empty() {
-        return Err(AppError::Internal("Slug cannot be empty.".into()));
+        return Err(AppError::BadRequest(format!(
+            "The {} cannot be empty.",
+            kind.noun()
+        )));
     }
 
     for suffix in crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES {
@@ -450,9 +630,13 @@ pub fn validate_slug(slug: &str) -> AppResult<()> {
             || slug_clean.ends_with(&dash_s)
             || slug_clean.ends_with(&underscore_s)
         {
-            return Err(AppError::Internal(format!(
-                "Invalid slug '{}': Slugs cannot equal or end with reserved context-only mode suffixes (noagent, quiet, message, msg, na).",
-                slug_clean
+            return Err(AppError::BadRequest(format!(
+                "Invalid {} '{}': it cannot be, or end with, one of the reserved suffixes {} \
+                 (optionally preceded by '.', '+', '-' or '_'). Those mark an address as \
+                 context-only, so a channel named after one could never be replied to.",
+                kind.noun(),
+                slug_clean,
+                crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES.join(", ")
             )));
         }
     }
@@ -495,10 +679,31 @@ pub fn strip_context_suffix_from_slug(raw_slug: &str) -> (String, bool) {
     (raw_slug.trim().to_lowercase(), false)
 }
 
-pub fn parse_recipient_address_pipeline(
+/// Whether a bare domain belongs to this platform at all — the application domain itself, or any
+/// company subdomain of it.
+///
+/// Deliberately broader than [`parse_platform_address`]: `resolve_internal_target` has to treat
+/// `someone@{app_domain}` as *ours but malformed* rather than as a stranger, because classifying a
+/// platform address as external would mail the outside world under a policy meant for colleagues.
+pub fn is_platform_domain(domain: &str, app_domain_name: &str) -> bool {
+    let domain = domain.trim();
+    let app_domain_lower = app_domain_name.trim().to_lowercase();
+    domain.eq_ignore_ascii_case(&app_domain_lower)
+        || domain
+            .to_lowercase()
+            .ends_with(&format!(".{app_domain_lower}"))
+}
+
+/// Split `{local}@{company}.{app_domain}` into its company and its raw local part.
+///
+/// The local part comes back lowercased but otherwise **untouched** — no pipeline split, no
+/// context-suffix stripping — because callers disagree about what it means. Channel routing expands
+/// it; [`SystemAddress::parse`] must see it whole, before `strip_context_suffix_from_slug` could
+/// eat a name like `_msg`.
+pub fn parse_platform_address(
     to_str: &str,
     app_domain_name: &str,
-) -> Option<(String, Vec<String>, bool)> {
+) -> Option<(CompanySlug, String)> {
     let email_addr = if let (Some(start), Some(end)) = (to_str.find('<'), to_str.rfind('>')) {
         if start < end {
             &to_str[start + 1..end]
@@ -515,28 +720,63 @@ pub fn parse_recipient_address_pipeline(
         return None;
     }
 
-    let channel_part = parts[0].trim();
+    let local_part = parts[0].trim();
     let domain_part = parts[1].trim();
 
-    if channel_part.is_empty() || domain_part.is_empty() {
+    if local_part.is_empty() || domain_part.is_empty() {
         return None;
     }
 
-    let domain_lower = app_domain_name.trim().to_lowercase();
-    let expected_suffix = format!(".{}", domain_lower);
-
-    let company_slug = if domain_part.ends_with(&expected_suffix) {
-        &domain_part[..domain_part.len() - expected_suffix.len()]
-    } else {
-        return None;
-    };
-
+    let expected_suffix = format!(".{}", app_domain_name.trim().to_lowercase());
+    let company_slug = domain_part.strip_suffix(&expected_suffix)?;
     if company_slug.is_empty() {
         return None;
     }
 
+    Some((CompanySlug::new(company_slug), local_part.to_string()))
+}
+
+/// A local part the server answers itself instead of routing to a channel.
+///
+/// The leading underscore is what makes this namespace safe to reserve: `channel_slugs_format` and
+/// `companies_slug_format` both constrain slugs to `^[a-z0-9]...`, so no customer can create a
+/// channel or company that shadows one of these names. Adding a variant needs no blocklist and no
+/// migration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SystemAddress {
+    /// `_help@{company}.{app_domain}` — replies with the sender's channels and the address syntax.
+    Help,
+}
+
+impl SystemAddress {
+    /// Every reserved local part, so tests can assert the whole set at once.
+    pub const ALL: &'static [SystemAddress] = &[SystemAddress::Help];
+
+    pub fn local_part(self) -> &'static str {
+        match self {
+            SystemAddress::Help => "_help",
+        }
+    }
+
+    /// Match a raw local part, exactly. Must be given the address *before* any pipeline or
+    /// context-suffix handling; see [`parse_platform_address`].
+    pub fn parse(local_part: &str) -> Option<Self> {
+        let candidate = local_part.trim().to_lowercase();
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|system| system.local_part() == candidate)
+    }
+}
+
+pub fn parse_recipient_address_pipeline(
+    to_str: &str,
+    app_domain_name: &str,
+) -> Option<(CompanySlug, Vec<ChannelSlug>, bool)> {
+    let (company_slug, channel_part) = parse_platform_address(to_str, app_domain_name)?;
+
     let mut is_context_only = false;
-    let mut channel_slugs = Vec::new();
+    let mut channel_slugs: Vec<String> = Vec::new();
 
     for part in channel_part.split('+') {
         let (clean_slug, is_context) = strip_context_suffix_from_slug(part);
@@ -552,12 +792,137 @@ pub fn parse_recipient_address_pipeline(
         return None;
     }
 
-    Some((company_slug.to_string(), channel_slugs, is_context_only))
+    Some((
+        company_slug,
+        channel_slugs.into_iter().map(ChannelSlug::new).collect(),
+        is_context_only,
+    ))
 }
 
-pub fn parse_recipient_address(to_str: &str, app_domain_name: &str) -> Option<(String, String)> {
+pub fn parse_recipient_address(
+    to_str: &str,
+    app_domain_name: &str,
+) -> Option<(CompanySlug, ChannelSlug)> {
     parse_recipient_address_pipeline(to_str, app_domain_name)
         .map(|(company, channels, _)| (company, channels[0].clone()))
+}
+
+/// Why a same-company channel cannot be called by another channel's agent.
+///
+/// Every variant is a rule the internal transport enforces anyway; naming them lets the caller
+/// explain the refusal instead of returning a bare `false`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InternalTargetRejection {
+    CrossCompany,
+    SelfCall,
+    Disabled,
+    NoAgent,
+}
+
+impl InternalTargetRejection {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::CrossCompany => "Cross-company channel calls are not allowed",
+            Self::SelfCall => "A channel cannot call itself",
+            Self::Disabled => "Target channel is disabled",
+            Self::NoAgent => "Target channel has no configured agent",
+        }
+    }
+}
+
+impl std::fmt::Display for InternalTargetRejection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// Whether `target` may receive an internal channel call from the caller's channel.
+///
+/// One decision, one place: the outreach tool's send path and the agent directory both consult
+/// this, so the directory can never advertise a channel the send path would refuse.
+///
+/// Address-shape rules (direct address, no `+` pipeline, no context-only suffix) are *not* checked
+/// here — those belong to the address parser, and a resolved [`Channel`] no longer carries them.
+pub fn check_internal_target(
+    target: &Channel,
+    caller_company_id: Uuid,
+    caller_channel_id: Uuid,
+) -> Result<(), InternalTargetRejection> {
+    if target.company_id != caller_company_id {
+        return Err(InternalTargetRejection::CrossCompany);
+    }
+    if target.id == caller_channel_id {
+        return Err(InternalTargetRejection::SelfCall);
+    }
+    if !target.enabled {
+        return Err(InternalTargetRejection::Disabled);
+    }
+    if target.agent_ids.as_ref().is_none_or(Vec::is_empty) {
+        return Err(InternalTargetRejection::NoAgent);
+    }
+    Ok(())
+}
+
+/// What one outreach recipient turns out to be.
+#[derive(Debug, Clone)]
+pub enum InternalTargetOutcome {
+    /// Not an address under the application domain — an ordinary third-party recipient.
+    External,
+    /// A same-company channel the caller is allowed to call.
+    Callable(Box<Channel>),
+    /// An address under the application domain that cannot be called, and why.
+    Rejected(String),
+}
+
+/// Classify one recipient address as external, callable internal channel, or refused.
+///
+/// Shared by the outreach send path and the approval policy so that "is this a colleague or a
+/// stranger?" is answered the same way in both. Persistence errors propagate rather than
+/// degrading into `External` — misclassifying a channel as a stranger would mail the outside
+/// world under a policy meant for internal traffic.
+pub async fn resolve_internal_target(
+    email: &str,
+    app_domain_name: &str,
+    caller_company_id: Uuid,
+    caller_channel_id: Uuid,
+    channel_persistence: &dyn ChannelPersistence,
+) -> AppResult<InternalTargetOutcome> {
+    let domain = match email.rsplit_once('@') {
+        Some((_, domain)) => domain,
+        None => return Ok(InternalTargetOutcome::External),
+    };
+    if !is_platform_domain(domain, app_domain_name) {
+        return Ok(InternalTargetOutcome::External);
+    }
+
+    let Some((company_slug, channel_slugs, is_context_only)) =
+        parse_recipient_address_pipeline(email, app_domain_name)
+    else {
+        return Ok(InternalTargetOutcome::Rejected(format!(
+            "Invalid platform channel address: {email}"
+        )));
+    };
+    if is_context_only || channel_slugs.len() != 1 {
+        return Ok(InternalTargetOutcome::Rejected(format!(
+            "Internal outreach requires one direct channel address without pipeline or context-only suffix: {email}"
+        )));
+    }
+
+    let Some(channel) = channel_persistence
+        .get_by_company_slug_and_channel_slug(&company_slug, &channel_slugs[0])
+        .await?
+    else {
+        return Ok(InternalTargetOutcome::Rejected(format!(
+            "Platform channel does not exist: {email}"
+        )));
+    };
+
+    match check_internal_target(&channel, caller_company_id, caller_channel_id) {
+        Ok(()) => Ok(InternalTargetOutcome::Callable(Box::new(channel))),
+        Err(rejection) => Ok(InternalTargetOutcome::Rejected(format!(
+            "{rejection}: {email}"
+        ))),
+    }
 }
 
 pub fn levenshtein_distance(a: &str, b: &str) -> usize {
@@ -591,15 +956,15 @@ pub fn levenshtein_distance(a: &str, b: &str) -> usize {
     dp[m][n]
 }
 
-pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<String> {
+pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<ChannelSlug> {
     let target_clean = target.trim().to_lowercase();
-    let mut matches: Vec<(usize, String)> = Vec::new();
+    let mut matches: Vec<(usize, ChannelSlug)> = Vec::new();
 
-    for ch in available {
-        let dist = levenshtein_distance(&target_clean, &ch.slug.to_lowercase());
-        let max_dist = (ch.slug.len() / 2).max(2);
+    for slug in available.iter().flat_map(Channel::slugs) {
+        let dist = levenshtein_distance(&target_clean, &slug.to_lowercase());
+        let max_dist = (slug.len() / 2).max(2);
         if dist <= max_dist && dist > 0 {
-            matches.push((dist, ch.slug.clone()));
+            matches.push((dist, slug.clone()));
         }
     }
 
@@ -610,27 +975,22 @@ pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<St
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::company::Company;
+    use crate::entities::company::{Company, CompanyAccess};
+    use crate::entities::company_member::CompanyMembership;
+    use crate::entities::value_objects::EmailAddress;
+    use crate::use_cases::company::CompanyWrite;
     use chrono::Utc;
     use serde_json::json;
     use std::sync::Mutex;
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
+        memberships: Mutex<Vec<(Uuid, Uuid, CompanyMembership)>>,
     }
 
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(
-            &self,
-            _user_id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -658,16 +1018,32 @@ mod tests {
             unimplemented!()
         }
 
-        async fn update(
-            &self,
-            _id: Uuid,
-            _name: &str,
-            _slug: &str,
-            _api_key: Option<&str>,
-            _provider: Option<&str>,
-            _model: Option<&str>,
-            _enable_llm_spam_guardrail: Option<bool>,
-        ) -> AppResult<Company> {
+        async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
+            let companies = self.companies.lock().unwrap();
+            let memberships = self.memberships.lock().unwrap();
+            Ok(companies
+                .iter()
+                .filter_map(|company| {
+                    let membership = if company.user_id == user_id {
+                        CompanyMembership::Owner
+                    } else if let Some((_, _, membership)) =
+                        memberships.iter().find(|(member_id, company_id, _)| {
+                            *member_id == user_id && *company_id == company.id
+                        })
+                    {
+                        *membership
+                    } else {
+                        return None;
+                    };
+                    Some(CompanyAccess {
+                        company: company.clone(),
+                        membership,
+                    })
+                })
+                .collect())
+        }
+
+        async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
             unimplemented!()
         }
 
@@ -675,8 +1051,12 @@ mod tests {
             unimplemented!()
         }
 
-        async fn is_company_team_member(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
-            Ok(true)
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
         }
 
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
@@ -690,31 +1070,8 @@ mod tests {
 
     #[async_trait]
     impl ChannelPersistence for MockChannelPersistence {
-        async fn create(
-            &self,
-            company_id: Uuid,
-            name: &str,
-            slug: &str,
-            api_key: Option<&str>,
-            provider: Option<&str>,
-            model: Option<&str>,
-            participant_emails: Option<Vec<String>>,
-            agent_ids: Option<Vec<Uuid>>,
-            channel_config: Option<serde_json::Value>,
-        ) -> AppResult<Channel> {
-            let channel = Channel {
-                id: Uuid::new_v4(),
-                company_id,
-                name: name.to_string(),
-                slug: slug.to_string(),
-                api_key: api_key.map(|s| s.to_string()),
-                provider: provider.map(|s| s.to_string()),
-                model: model.map(|s| s.to_string()),
-                participant_emails,
-                agent_ids,
-                channel_config,
-                created_at: Utc::now().naive_utc(),
-            };
+        async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
+            let channel = channel_from_write(Uuid::new_v4(), company_id, write);
             self.channels.lock().unwrap().push(channel.clone());
             Ok(channel)
         }
@@ -731,8 +1088,8 @@ mod tests {
 
         async fn get_by_company_slug_and_channel_slug(
             &self,
-            _company_slug: &str,
-            channel_slug: &str,
+            _company_slug: &CompanySlug,
+            channel_slug: &ChannelSlug,
         ) -> AppResult<Option<Channel>> {
             Ok(self
                 .channels
@@ -754,33 +1111,18 @@ mod tests {
                 .collect())
         }
 
-        async fn update(
-            &self,
-            id: Uuid,
-            name: &str,
-            slug: &str,
-            api_key: Option<&str>,
-            provider: Option<&str>,
-            model: Option<&str>,
-            participant_emails: Option<Vec<String>>,
-            agent_ids: Option<Vec<Uuid>>,
-            channel_config: Option<serde_json::Value>,
-        ) -> AppResult<Channel> {
+        async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
             let mut list = self.channels.lock().unwrap();
-            let channel = list
+            let existing = list
                 .iter_mut()
                 .find(|w| w.id == id)
                 .ok_or_else(|| AppError::Internal("Not found".into()))?;
 
-            channel.name = name.to_string();
-            channel.slug = slug.to_string();
-            channel.api_key = api_key.map(|s| s.to_string());
-            channel.provider = provider.map(|s| s.to_string());
-            channel.model = model.map(|s| s.to_string());
-            channel.participant_emails = participant_emails;
-            channel.agent_ids = agent_ids;
-            channel.channel_config = channel_config;
-            Ok(channel.clone())
+            *existing = Channel {
+                created_at: existing.created_at,
+                ..channel_from_write(id, existing.company_id, write)
+            };
+            Ok(existing.clone())
         }
 
         async fn delete(&self, id: Uuid) -> AppResult<()> {
@@ -789,12 +1131,45 @@ mod tests {
         }
     }
 
+    fn channel_from_write(id: Uuid, company_id: Uuid, write: ChannelWrite) -> Channel {
+        Channel {
+            id,
+            company_id,
+            name: write.name,
+            description: None,
+            slug: write.slug.into(),
+            alias_slugs: Vec::new(),
+            api_key: write.api_key,
+            provider: write.provider,
+            model: write.model,
+            participant_emails: write
+                .participant_emails
+                .map(|emails| emails.into_iter().map(EmailAddress::from).collect()),
+            agent_ids: write.agent_ids,
+            channel_config: write.channel_config,
+            enabled: write.enabled,
+            add_3rd_party: write.add_3rd_party,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
+            created_by: write.created_by.unwrap_or_else(CreationProvenance::system),
+            created_at: Utc::now(),
+        }
+    }
+
     fn test_config(spam_enabled: bool) -> Arc<AppConfig> {
         Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
-            access_token_ttl: time::Duration::days(1),
+            sendgrid_inbound: None,
+            hydradb: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
+            cors_allowed_origins: vec![],
             smtp_host: "localhost".to_string(),
             smtp_port: 1025,
             smtp_username: "".to_string(),
@@ -813,7 +1188,213 @@ mod tests {
             spam_scanner_type: "rspamd".to_string(),
             spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
             enable_llm_spam_guardrail: false,
+            secure_cookies: false,
+            gcs: None,
+            operator_emails: Vec::new(),
         })
+    }
+
+    /// `GET` and `PUT` on the same channel must agree, and neither may reveal whether an id it
+    /// refuses belongs to another company or to nothing at all.
+    #[tokio::test]
+    async fn reads_and_writes_refuse_a_foreign_channel_exactly_like_a_missing_one() {
+        let owner_id = Uuid::new_v4();
+        let company_id = Uuid::new_v4();
+        let other_company_id = Uuid::new_v4();
+
+        let company = |id| Company {
+            id,
+            user_id: owner_id,
+            name: "Acme Corp".to_string(),
+            slug: "acme".into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: Utc::now(),
+        };
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![company(company_id), company(other_company_id)]),
+            memberships: Mutex::new(Vec::new()),
+        });
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(Vec::new()),
+        });
+        let use_cases =
+            ChannelUseCases::new(company_persistence, channel_persistence, test_config(true));
+
+        // The owner owns both companies, so this is a cross-tenant id, not an authorization miss.
+        let foreign = use_cases
+            .create_channel(
+                owner_id,
+                other_company_id,
+                ChannelWrite {
+                    name: "Elsewhere".into(),
+                    slug: "elsewhere".into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
+                false,
+            )
+            .await
+            .unwrap();
+        let missing = Uuid::new_v4();
+
+        // Reads collapse both to `None`, which the route layer renders as one 404.
+        assert!(
+            use_cases
+                .get_company_channel(owner_id, company_id, foreign.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            use_cases
+                .get_company_channel(owner_id, company_id, missing)
+                .await
+                .unwrap()
+                .is_none()
+        );
+
+        let write = || ChannelWrite {
+            name: "Hijack".into(),
+            slug: "hijack".into(),
+            enabled: true,
+            ..ChannelWrite::default()
+        };
+        let foreign_err = use_cases
+            .update_channel(owner_id, company_id, foreign.id, write(), false)
+            .await
+            .unwrap_err();
+        let missing_err = use_cases
+            .update_channel(owner_id, company_id, missing, write(), false)
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(foreign_err, AppError::NotFound(_)),
+            "{foreign_err:?}"
+        );
+        assert_eq!(
+            foreign_err.to_string(),
+            missing_err.to_string(),
+            "a differing message would let an id probe map another company's channels"
+        );
+        assert_eq!(
+            foreign_err.to_string(),
+            channel_not_found().to_string(),
+            "the write path must speak with the same voice as the read path"
+        );
+
+        // The foreign channel is untouched by the refused write.
+        assert_eq!(
+            use_cases
+                .get_company_channel(owner_id, other_company_id, foreign.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .name,
+            "Elsewhere"
+        );
+    }
+
+    #[tokio::test]
+    async fn admins_manage_channels_while_members_cannot() {
+        let owner_id = Uuid::new_v4();
+        let admin_id = Uuid::new_v4();
+        let member_id = Uuid::new_v4();
+        let company_id = Uuid::new_v4();
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![Company {
+                id: company_id,
+                user_id: owner_id,
+                name: "Acme Corp".into(),
+                slug: "acme".into(),
+                api_key: None,
+                provider: None,
+                model: None,
+                enable_llm_spam_guardrail: None,
+                avatar_url: None,
+                memory_provider: None,
+                created_at: Utc::now(),
+            }]),
+            memberships: Mutex::new(vec![
+                (admin_id, company_id, CompanyMembership::Admin),
+                (member_id, company_id, CompanyMembership::Member),
+            ]),
+        });
+        let channel_persistence = Arc::new(MockChannelPersistence {
+            channels: Mutex::new(Vec::new()),
+        });
+        let use_cases =
+            ChannelUseCases::new(company_persistence, channel_persistence, test_config(true));
+
+        assert!(
+            use_cases
+                .create_channel(
+                    member_id,
+                    company_id,
+                    ChannelWrite {
+                        name: "Member Channel".into(),
+                        slug: "member-channel".into(),
+                        ..ChannelWrite::default()
+                    },
+                    false,
+                )
+                .await
+                .is_err()
+        );
+        assert!(
+            use_cases
+                .list_company_channels(member_id, company_id)
+                .await
+                .is_err()
+        );
+
+        let channel = use_cases
+            .create_channel(
+                admin_id,
+                company_id,
+                ChannelWrite {
+                    name: "Admin Channel".into(),
+                    slug: "admin-channel".into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
+                false,
+            )
+            .await
+            .expect("an admin creates a channel");
+        assert_eq!(
+            use_cases
+                .list_company_channels(admin_id, company_id)
+                .await
+                .expect("an admin lists channels")
+                .len(),
+            1
+        );
+        let channel = use_cases
+            .update_channel(
+                admin_id,
+                company_id,
+                channel.id,
+                ChannelWrite {
+                    name: "Managed Channel".into(),
+                    slug: "managed-channel".into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
+                false,
+            )
+            .await
+            .expect("an admin updates a channel");
+        assert_eq!(channel.name, "Managed Channel");
+        use_cases
+            .delete_channel(admin_id, company_id, channel.id)
+            .await
+            .expect("an admin deletes a channel");
     }
 
     #[tokio::test]
@@ -826,13 +1407,16 @@ mod tests {
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                avatar_url: None,
+                memory_provider: None,
+                created_at: Utc::now(),
             }]),
+            memberships: Mutex::new(Vec::new()),
         });
 
         let channel_persistence = Arc::new(MockChannelPersistence {
@@ -857,14 +1441,18 @@ mod tests {
             .create_channel(
                 owner_id,
                 company_id,
-                "Support Flow",
-                "support-flow",
-                Some("key_123"),
-                Some("openai"),
-                Some("gpt-4o"),
-                Some(emails.clone()),
-                Some(agent_ids.clone()),
-                Some(config.clone()),
+                ChannelWrite {
+                    name: "Support Flow".into(),
+                    slug: "support-flow".into(),
+                    api_key: Some("key_123".into()),
+                    provider: Some("openai".into()),
+                    model: Some("gpt-4o".into()),
+                    participant_emails: Some(emails.clone()),
+                    agent_ids: Some(agent_ids.clone()),
+                    channel_config: Some(config.clone()),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await
@@ -875,7 +1463,15 @@ mod tests {
         assert_eq!(channel.api_key.as_deref(), Some("key_123"));
         assert_eq!(channel.provider.as_deref(), Some("openai"));
         assert_eq!(channel.model.as_deref(), Some("gpt-4o"));
-        assert_eq!(channel.participant_emails, Some(emails));
+        assert_eq!(
+            channel.participant_emails,
+            Some(
+                emails
+                    .into_iter()
+                    .map(EmailAddress::from)
+                    .collect::<Vec<_>>()
+            )
+        );
         assert_eq!(channel.agent_ids, Some(agent_ids));
         assert_eq!(channel.channel_config, Some(config));
 
@@ -885,14 +1481,12 @@ mod tests {
             .create_channel(
                 non_owner_id,
                 company_id,
-                "Hacker Flow",
-                "hacker-flow",
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
+                ChannelWrite {
+                    name: "Hacker Flow".into(),
+                    slug: "hacker-flow".into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await;
@@ -912,14 +1506,13 @@ mod tests {
                 owner_id,
                 company_id,
                 channel.id,
-                "Updated Flow",
-                "updated-flow",
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some(updated_config.clone()),
+                ChannelWrite {
+                    name: "Updated Flow".into(),
+                    slug: "updated-flow".into(),
+                    channel_config: Some(updated_config.clone()),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await
@@ -1000,16 +1593,87 @@ mod tests {
     }
 
     #[test]
-    fn test_slug_validation_reserved_suffixes() {
-        assert!(validate_slug("support").is_ok());
-        assert!(validate_slug("tech-help").is_ok());
+    fn normalize_canonicalizes_and_dedupes_alias_slugs() {
+        let mut write = ChannelWrite {
+            name: "Support".into(),
+            slug: "support".into(),
+            alias_slugs: vec![
+                "  Sales  ".into(),
+                "Customer Care".into(),
+                "sales".into(),
+                "support".into(),
+                "   ".into(),
+            ],
+            enabled: true,
+            ..ChannelWrite::default()
+        };
 
-        assert!(validate_slug("quiet").is_err());
-        assert!(validate_slug("noagent").is_err());
-        assert!(validate_slug("support.quiet").is_err());
-        assert!(validate_slug("support-noagent").is_err());
-        assert!(validate_slug("sales_message").is_err());
-        assert!(validate_slug("bot+na").is_err());
+        write.normalize().unwrap();
+
+        // Lower-cased and space-hyphenated, blanks and duplicates dropped, and the alias that
+        // repeats the canonical slug removed — the database would reject that as a self-collision.
+        assert_eq!(write.alias_slugs, vec!["sales", "customer-care"]);
+    }
+
+    #[test]
+    fn normalize_rejects_an_alias_ending_in_a_reserved_suffix() {
+        let mut write = ChannelWrite {
+            name: "Support".into(),
+            slug: "support".into(),
+            alias_slugs: vec!["sales-quiet".into()],
+            enabled: true,
+            ..ChannelWrite::default()
+        };
+
+        let err = write.normalize().unwrap_err().to_string();
+        assert!(err.contains("sales-quiet"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn test_slug_validation_reserved_suffixes() {
+        let check = |slug| validate_slug(slug, SlugKind::ChannelAddress);
+
+        assert!(check("support").is_ok());
+        assert!(check("tech-help").is_ok());
+
+        assert!(check("quiet").is_err());
+        assert!(check("noagent").is_err());
+        assert!(check("support.quiet").is_err());
+        assert!(check("support-noagent").is_err());
+        assert!(check("sales_message").is_err());
+        assert!(check("bot+na").is_err());
+    }
+
+    /// A rejected slug is user input: the message must survive to the client, name the field the
+    /// user typed into, and say which values are reserved.
+    #[test]
+    fn rejected_slugs_are_bad_requests_that_name_the_field_and_the_reason() {
+        let alias_err = validate_slug("ops-quiet", SlugKind::ChannelAlias).unwrap_err();
+        assert!(
+            matches!(alias_err, AppError::BadRequest(_)),
+            "Internal drops the message on the way out: {alias_err:?}"
+        );
+        let message = alias_err.to_string();
+        assert!(message.contains("channel alias"), "{message}");
+        assert!(message.contains("ops-quiet"), "{message}");
+        assert!(
+            message.contains("noagent, quiet, message, msg, na"),
+            "{message}"
+        );
+
+        // The same value from the address field names that field instead.
+        let address_message = validate_slug("ops-quiet", SlugKind::ChannelAddress)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            address_message.contains("channel address"),
+            "{address_message}"
+        );
+
+        let empty_message = validate_slug("  ", SlugKind::AgentSlug)
+            .unwrap_err()
+            .to_string();
+        assert!(empty_message.contains("agent slug"), "{empty_message}");
     }
 
     #[test]
@@ -1020,30 +1684,56 @@ mod tests {
         let company_id = uuid::Uuid::new_v4();
         let available = vec![
             Channel {
+                enabled: true,
+                add_3rd_party: true,
                 id: uuid::Uuid::new_v4(),
                 company_id,
                 name: "Support".to_string(),
-                slug: "support".to_string(),
+                description: None,
+                slug: "support".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: chrono::Utc::now().naive_utc(),
+                retrieve_company_memory: false,
+                retrieve_agent_memory: false,
+                retrieve_user_memory: false,
+                persist_company_memory: false,
+                persist_agent_memory: false,
+                persist_user_memory: false,
+                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+                memory_max_results: 5,
+                created_by: crate::entities::creation::CreationProvenance::system(),
+                created_at: chrono::Utc::now(),
             },
             Channel {
+                enabled: true,
+                add_3rd_party: true,
                 id: uuid::Uuid::new_v4(),
                 company_id,
                 name: "Billing".to_string(),
-                slug: "billing".to_string(),
+                description: None,
+                slug: "billing".into(),
+                alias_slugs: Vec::new(),
                 api_key: None,
                 provider: None,
                 model: None,
                 participant_emails: None,
                 agent_ids: None,
                 channel_config: None,
-                created_at: chrono::Utc::now().naive_utc(),
+                retrieve_company_memory: false,
+                retrieve_agent_memory: false,
+                retrieve_user_memory: false,
+                persist_company_memory: false,
+                persist_agent_memory: false,
+                persist_user_memory: false,
+                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+                memory_max_results: 5,
+                created_by: crate::entities::creation::CreationProvenance::system(),
+                created_at: chrono::Utc::now(),
             },
         ];
 
@@ -1064,13 +1754,16 @@ mod tests {
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                avatar_url: None,
+                memory_provider: None,
+                created_at: Utc::now(),
             }]),
+            memberships: Mutex::new(Vec::new()),
         });
 
         let channel_persistence = Arc::new(MockChannelPersistence {
@@ -1084,14 +1777,12 @@ mod tests {
             .create_channel(
                 owner_id,
                 company_id,
-                "Support Flow",
-                "support",
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
+                ChannelWrite {
+                    name: "Support Flow".into(),
+                    slug: "support".into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await
@@ -1123,14 +1814,13 @@ mod tests {
             .create_channel(
                 owner_id,
                 company_id,
-                "Restricted Flow",
-                "restricted",
-                None,
-                None,
-                None,
-                Some(vec!["agent@example.com".to_string()]),
-                None,
-                None,
+                ChannelWrite {
+                    name: "Restricted Flow".into(),
+                    slug: "restricted".into(),
+                    participant_emails: Some(vec!["agent@example.com".to_string()]),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await
@@ -1183,13 +1873,16 @@ mod tests {
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
-                slug: "acme".to_string(),
+                slug: "acme".into(),
                 api_key: None,
                 provider: None,
                 model: None,
                 enable_llm_spam_guardrail: None,
-                created_at: Utc::now().naive_utc(),
+                avatar_url: None,
+                memory_provider: None,
+                created_at: Utc::now(),
             }]),
+            memberships: Mutex::new(Vec::new()),
         });
 
         let channel_persistence = Arc::new(MockChannelPersistence {
@@ -1205,14 +1898,13 @@ mod tests {
             .create_channel(
                 owner_id,
                 company_id,
-                "Public Flow",
-                "public",
-                None,
-                None,
-                None,
-                Some(vec!["@public".to_string()]),
-                None,
-                None,
+                ChannelWrite {
+                    name: "Public Flow".into(),
+                    slug: "public".into(),
+                    participant_emails: Some(vec!["@public".to_string()]),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await;
@@ -1228,14 +1920,13 @@ mod tests {
             .create_channel(
                 owner_id,
                 company_id,
-                "Public Flow",
-                "public",
-                None,
-                None,
-                None,
-                Some(vec!["@public".to_string()]),
-                None,
-                None,
+                ChannelWrite {
+                    name: "Public Flow".into(),
+                    slug: "public".into(),
+                    participant_emails: Some(vec!["@public".to_string()]),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 true,
             )
             .await;
@@ -1246,17 +1937,92 @@ mod tests {
             .create_channel(
                 owner_id,
                 company_id,
-                "Restricted Flow",
-                "restricted",
-                None,
-                None,
-                None,
-                Some(vec!["allowed@example.com".to_string()]),
-                None,
-                None,
+                ChannelWrite {
+                    name: "Restricted Flow".into(),
+                    slug: "restricted".into(),
+                    participant_emails: Some(vec!["allowed@example.com".to_string()]),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
                 false,
             )
             .await;
         assert!(res_participants.is_ok());
+    }
+
+    #[test]
+    fn a_platform_address_splits_into_its_company_and_untouched_local_part() {
+        let domain = "mailagents.com";
+
+        let (company, local) =
+            parse_platform_address("_help@acme.mailagents.com", domain).expect("ours");
+        assert_eq!(company, "acme");
+        assert_eq!(
+            local, "_help",
+            "the local part must survive whole -- no pipeline split, no suffix stripping"
+        );
+
+        let (_, piped) =
+            parse_platform_address("Support Desk <SUPPORT+Billing@acme.mailagents.com>", domain)
+                .expect("ours");
+        assert_eq!(
+            piped, "support+billing",
+            "a display name is stripped and the address lowercased, but nothing is expanded"
+        );
+
+        assert!(parse_platform_address("someone@elsewhere.com", domain).is_none());
+        assert!(
+            parse_platform_address("someone@mailagents.com", domain).is_none(),
+            "the bare application domain names no company"
+        );
+        assert!(parse_platform_address("not-an-address", domain).is_none());
+    }
+
+    #[test]
+    fn the_platform_domain_test_is_wider_than_the_address_parser() {
+        // `resolve_internal_target` relies on this gap: `someone@mailagents.com` is ours but
+        // malformed, and must not be classified as an external stranger.
+        assert!(is_platform_domain("mailagents.com", "mailagents.com"));
+        assert!(is_platform_domain("acme.mailagents.com", "mailagents.com"));
+        assert!(!is_platform_domain("elsewhere.com", "mailagents.com"));
+        assert!(!is_platform_domain("notmailagents.com", "mailagents.com"));
+    }
+
+    #[test]
+    fn only_an_exact_underscore_prefixed_name_is_a_system_address() {
+        assert_eq!(SystemAddress::parse("_help"), Some(SystemAddress::Help));
+        assert_eq!(SystemAddress::parse("_HELP"), Some(SystemAddress::Help));
+        assert_eq!(
+            SystemAddress::parse("help"),
+            None,
+            "without the underscore it is a slug a customer may own"
+        );
+        assert_eq!(SystemAddress::parse("_helpdesk"), None);
+        assert_eq!(SystemAddress::parse("support"), None);
+    }
+
+    #[test]
+    fn no_system_address_can_be_shadowed_by_a_channel_or_a_context_suffix() {
+        for system in SystemAddress::ALL {
+            let local = system.local_part();
+
+            assert!(
+                local.starts_with('_'),
+                "'{local}' is only safe to reserve because channel_slugs_format forbids a leading \
+                 underscore"
+            );
+            assert!(
+                validate_slug(local, SlugKind::ChannelAddress).is_ok(),
+                "if validate_slug ever rejects '{local}', the reason must not be a reserved \
+                 context suffix -- see the assertion below"
+            );
+
+            let (stripped, is_context) = strip_context_suffix_from_slug(local);
+            assert!(
+                !is_context && stripped == local,
+                "'{local}' collides with a reserved context suffix: it parses to ({stripped:?}, \
+                 {is_context}) and would be eaten before SystemAddress::parse ever saw it"
+            );
+        }
     }
 }

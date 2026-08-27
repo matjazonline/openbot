@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+use crate::entities::cursor::MessageCursor;
+use crate::entities::value_objects::{EmailAddress, MessageId, ObjectKey, ThreadIndex};
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum MessageRole {
     Human,
@@ -67,19 +70,25 @@ pub struct AttachmentMetadata {
     pub content_type: String,
     pub sha256_hash: String,
     pub size_bytes: usize,
-    pub storage_url: Option<String>,
+    /// Where the bytes are kept, as a key inside the private bucket -- never a URL.
+    ///
+    /// A URL here would be a URL somewhere, and what arrives in the mail is not for anyone
+    /// holding a link: it is served by the app, to whoever the channel's rules allow.
+    /// `None` is mail that arrived before there was anywhere to put it, or whose upload failed.
+    #[serde(default, alias = "storage_url")]
+    pub storage_key: Option<ObjectKey>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Message {
     pub id: Uuid,
     pub thread_id: Uuid,
-    pub message_id: String,
-    pub in_reply_to: Option<String>,
-    pub references_list: Vec<String>,
-    pub sender: String,
-    pub recipients_to: Vec<String>,
-    pub recipients_cc: Vec<String>,
+    pub message_id: MessageId,
+    pub in_reply_to: Option<MessageId>,
+    pub references_list: Vec<MessageId>,
+    pub sender: EmailAddress,
+    pub recipients_to: Vec<EmailAddress>,
+    pub recipients_cc: Vec<EmailAddress>,
     pub subject: String,
     pub clean_text_body: String,
     pub raw_text_body: Option<String>,
@@ -87,6 +96,16 @@ pub struct Message {
     pub attachments: Option<Vec<AttachmentMetadata>>,
     pub direction: MessageDirection,
     pub role: MessageRole,
-    pub thread_index: Option<String>,
-    pub created_at: chrono::NaiveDateTime,
+    pub thread_index: Option<ThreadIndex>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl Message {
+    /// This message's position in its thread — what a reader resumes a live stream from.
+    pub fn cursor(&self) -> MessageCursor {
+        MessageCursor {
+            created_at: self.created_at,
+            id: self.id,
+        }
+    }
 }

@@ -6,9 +6,20 @@ use crate::entities::channel::Channel;
 use crate::entities::company::Company;
 use crate::entities::message::{Message, MessageRole};
 use crate::entities::task::TokenUsage;
-use crate::services::outreach_tool::{OutreachAndAwaitQuorumTool, OutreachToolContext};
+use crate::entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress};
+use crate::services::agent_channel_tool::{
+    AgentChannelProvisioning, AgentChannelToolContext, CreateAgentChannelTool,
+};
+use crate::services::agent_directory_tool::{AgentDirectoryContext, ListCompanyAgentsTool};
+use crate::services::outreach_tool::{
+    OUTREACH_TOOL_ID, OutreachAndAwaitQuorumTool, OutreachToolContext,
+};
 use crate::use_cases::approval::ApprovalUseCases;
-use crate::use_cases::{channel::ChannelPersistence, thread::RecipientRole};
+use crate::use_cases::{
+    agent::AgentPersistence,
+    channel::{ChannelPersistence, InternalTargetOutcome, resolve_internal_target},
+    thread::RecipientRole,
+};
 use ai_agents::{Agent, AgentBuilder};
 use regex::Regex;
 use sha2::{Digest, Sha256};
@@ -16,7 +27,7 @@ use std::sync::{
     Arc, LazyLock,
     atomic::{AtomicBool, Ordering},
 };
-use tracing::info;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 static URL_KEY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
@@ -165,6 +176,10 @@ fn base_agent_config_with_observability(observability_enabled: bool) -> serde_js
             "default_timeout_seconds": 86400,
             "on_timeout": "reject",
             "tools": {
+                "create_agent_channel": {
+                    "require_approval": true,
+                    "approval_context": ["name", "slug", "description"]
+                },
                 "outreach_and_await_quorum": {
                     "require_approval": true,
                     "approval_context": [
@@ -178,13 +193,26 @@ fn base_agent_config_with_observability(observability_enabled: bool) -> serde_js
         },
         "tool_security": {
             "tools": {
+                "create_agent_channel": {
+                    "timeout_ms": 10000,
+                    "max_output_chars": 2000
+                },
                 "outreach_and_await_quorum": {
                     "timeout_ms": 10000,
                     "max_output_chars": 4000,
                     "config": {
                         "max_targets": 50,
+                        "default_timeout_hours": 96,
                         "max_timeout_hours": 720,
-                        "allowed_target_scope": "external_only"
+                        "allowed_target_scope": "external_only",
+                        "internal_requires_approval": true
+                    }
+                },
+                "list_company_agents": {
+                    "timeout_ms": 5000,
+                    "max_output_chars": 4000,
+                    "config": {
+                        "max_results": 50
                     }
                 }
             }
@@ -549,17 +577,104 @@ pub struct ApprovalContext {
     pub company_id: Uuid,
     pub channel_id: Uuid,
     pub channel_name: String,
-    pub channel_slug: String,
-    pub company_slug: String,
+    pub channel_slug: ChannelSlug,
+    pub company_slug: CompanySlug,
     pub thread_id: Option<Uuid>,
     pub task_id: Option<Uuid>,
-    pub approver_email: String,
+    pub approver_email: EmailAddress,
+}
+
+/// Everything needed to decide whether one outreach call is purely internal, and whether that
+/// earns it a pass on human approval.
+///
+/// Approval is keyed by tool ID, so the outreach tool alone cannot distinguish "ask a colleague"
+/// from "mail a stranger". This carries the resolved answer instead: the recipients are classified
+/// against the channel directory, not taken on the model's word.
+#[derive(Clone)]
+pub struct InternalDelegationPolicy {
+    pub channel_persistence: Arc<dyn ChannelPersistence>,
+    pub app_domain_name: String,
+    pub company_id: Uuid,
+    pub source_channel_id: Uuid,
+    /// When false, a call whose recipients are *all* same-company agent channels skips the human.
+    /// Defaults to true, so behaviour is unchanged until an operator opts in.
+    pub requires_approval: bool,
+}
+
+/// Read `tool_security.tools.outreach_and_await_quorum.config.internal_requires_approval`.
+///
+/// Absent, malformed, or non-boolean all mean `true`: this gates outbound mail, so anything other
+/// than an explicit `false` fails closed.
+fn internal_requires_approval(config: &serde_json::Value) -> bool {
+    config
+        .get("tool_security")
+        .and_then(|v| v.get("tools"))
+        .and_then(|v| v.get(OUTREACH_TOOL_ID))
+        .and_then(|v| v.get("config"))
+        .and_then(|v| v.get("internal_requires_approval"))
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(true)
 }
 
 pub struct AgentApprovalHandler {
     pub approval_use_cases: Arc<ApprovalUseCases>,
     pub context: ApprovalContext,
     pub suspended: Arc<AtomicBool>,
+    /// `None` when the run has no outreach tool, so nothing can be auto-approved.
+    pub delegation: Option<InternalDelegationPolicy>,
+}
+
+impl InternalDelegationPolicy {
+    /// Whether this trigger is an outreach call whose every recipient is a callable same-company
+    /// agent channel, and policy lets such a call skip the human.
+    ///
+    /// Every uncertain case answers `false`. An unresolvable recipient, a lookup failure, or a
+    /// recipient that is not a channel all fall through to the human rather than past the gate.
+    async fn approves_without_human(&self, trigger: &ai_agents::hitl::ApprovalTrigger) -> bool {
+        if self.requires_approval {
+            return false;
+        }
+        let ai_agents::hitl::ApprovalTrigger::Tool { name, args } = trigger else {
+            return false;
+        };
+        if name != OUTREACH_TOOL_ID {
+            return false;
+        }
+        let Some(targets) = args.get("target_emails").and_then(|v| v.as_array()) else {
+            return false;
+        };
+        // An empty list is not "all internal"; it is a malformed call.
+        if targets.is_empty() {
+            return false;
+        }
+
+        for target in targets {
+            let Some(email) = target.as_str() else {
+                return false;
+            };
+            let outcome = resolve_internal_target(
+                &email.trim().to_lowercase(),
+                &self.app_domain_name,
+                self.company_id,
+                self.source_channel_id,
+                self.channel_persistence.as_ref(),
+            )
+            .await;
+            match outcome {
+                Ok(InternalTargetOutcome::Callable(_)) => {}
+                Ok(_) => return false,
+                Err(error) => {
+                    warn!(
+                        "Could not classify outreach recipient while deciding approval, \
+                         falling back to human approval: {}",
+                        error
+                    );
+                    return false;
+                }
+            }
+        }
+        true
+    }
 }
 
 #[async_trait::async_trait]
@@ -568,6 +683,15 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
         &self,
         req: ai_agents::hitl::ApprovalRequest,
     ) -> ai_agents::hitl::ApprovalResult {
+        // Ahead of the approver check on purpose: delegating to a colleague needs no approver, and
+        // a coordinator channel with no configured participant must still be able to do it.
+        if let Some(policy) = self.delegation.as_ref()
+            && policy.approves_without_human(&req.trigger).await
+        {
+            info!("Outreach targets only same-company agent channels; approval not required");
+            return ai_agents::hitl::ApprovalResult::Approved;
+        }
+
         if self.context.approver_email.trim().is_empty() {
             return ai_agents::hitl::ApprovalResult::rejected_with_reason(
                 "No channel participant or company team member is configured to approve this action.",
@@ -700,7 +824,9 @@ pub struct AgentRunner<'a> {
     upstream_pipeline_context: Option<String>,
     task_persistence: Option<Arc<dyn TaskPersistence>>,
     channel_persistence: Option<Arc<dyn ChannelPersistence>>,
+    agent_persistence: Option<Arc<dyn AgentPersistence>>,
     outreach_context: Option<OutreachToolContext>,
+    agent_channel_tool: Option<(Arc<dyn AgentChannelProvisioning>, AgentChannelToolContext)>,
 }
 
 impl<'a> AgentRunner<'a> {
@@ -722,7 +848,9 @@ impl<'a> AgentRunner<'a> {
             upstream_pipeline_context: None,
             task_persistence: None,
             channel_persistence: None,
+            agent_persistence: None,
             outreach_context: None,
+            agent_channel_tool: None,
         }
     }
 
@@ -800,6 +928,24 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
+    /// Let the agent discover which sibling channels it may call.
+    ///
+    /// Separate from [`AgentRunner::outreach_tool`] because the directory is a read, not a send:
+    /// an agent can be given the address book without being given the ability to write to it.
+    pub fn agent_directory(mut self, agent_persistence: Arc<dyn AgentPersistence>) -> Self {
+        self.agent_persistence = Some(agent_persistence);
+        self
+    }
+
+    pub fn agent_channel_tool(
+        mut self,
+        persistence: Arc<dyn AgentChannelProvisioning>,
+        context: AgentChannelToolContext,
+    ) -> Self {
+        self.agent_channel_tool = Some((persistence, context));
+        self
+    }
+
     pub async fn execute(self) -> anyhow::Result<AgentExecutionOutput> {
         let start_time = std::time::Instant::now();
         let history_message_count = self.history.len();
@@ -809,6 +955,113 @@ impl<'a> AgentRunner<'a> {
             self.history.len()
         );
 
+        let raw_full_prompt = self.compose_prompt();
+        let key = &self.params.api_key;
+
+        // Stage 3: Optional LLM Spam & Guardrail Evaluation (skipped for trusted participants)
+        if !self.skip_spam_guardrail
+            && let Some(ref cfg) = self.app_config
+        {
+            crate::services::llm_guardrail::LlmSpamGuardrail::evaluate(
+                cfg,
+                self.company.as_ref(),
+                self.monitoring.as_ref(),
+                &raw_full_prompt,
+                &self.params.provider,
+                &self.params.model,
+                key,
+            )
+            .await?;
+        }
+
+        let mut config = self.params.config.clone();
+        ensure_config_fields(
+            &mut config,
+            &self.params.provider,
+            &self.params.model,
+            key,
+            None,
+            None,
+        );
+        let config_yaml = serde_yaml::to_string(&config).unwrap_or_default();
+        let (provider_config, base_url, tool_choice) = provider_config_from_agent_config(&config)?;
+
+        let full_prompt = sanitize_text(&raw_full_prompt, Some(key));
+        info!("Full prompt context length: {}", full_prompt.len());
+        if !config_yaml.is_empty() {
+            info!(
+                "Running agent with channel config YAML:\n{}",
+                sanitize_text(&config_yaml, Some(key))
+            );
+        }
+
+        let task = AgentTask {
+            config_yaml,
+            provider_name: self.params.provider.clone(),
+            model_name: self.params.model.clone(),
+            api_key: key.clone(),
+            provider_config,
+            base_url,
+            tool_choice,
+            approval: self
+                .approval_use_cases
+                .clone()
+                .zip(self.approval_context.clone()),
+            outreach: self
+                .task_persistence
+                .clone()
+                .zip(self.channel_persistence.clone())
+                .zip(self.outreach_context.clone())
+                .map(|((tasks, channels), context)| (tasks, channels, context)),
+            agent_persistence: self.agent_persistence.clone(),
+            agent_channel_tool: self.agent_channel_tool.clone(),
+            recipient_role: self.recipient_role,
+            full_prompt,
+            history_message_count,
+            internal_requires_approval: internal_requires_approval(&config),
+            suspended: Arc::new(AtomicBool::new(false)),
+        };
+
+        // Run on its own task: provider futures are deep, and this keeps the caller's stack shallow.
+        let task_result = tokio::spawn(task.run()).await;
+        let duration_ms = start_time.elapsed().as_millis() as u64;
+
+        match task_result {
+            Ok(Ok(mut output)) => {
+                // Wall-clock time is only known here, after the task has been awaited.
+                if let Some(diagnostics) = output
+                    .metadata
+                    .as_mut()
+                    .and_then(|meta| meta.get_mut("execution_diagnostics"))
+                    .and_then(|value| value.as_object_mut())
+                {
+                    diagnostics.insert("duration_ms".to_string(), serde_json::json!(duration_ms));
+                }
+                self.record_execution(duration_ms, Some(&output.token_usage), None);
+                Ok(output)
+            }
+            Ok(Err(err)) => {
+                let err_msg = sanitize_text(&err.to_string(), Some(key));
+                tracing::warn!("AI Agent execution failed ({err_msg})");
+                self.record_execution(duration_ms, None, Some(err_msg.clone()));
+                Err(anyhow::anyhow!("{err_msg}"))
+            }
+            Err(join_err) => {
+                let err_msg = sanitize_text(&join_err.to_string(), Some(key));
+                tracing::warn!("AI Agent task panicked or was cancelled ({err_msg})");
+                self.record_execution(
+                    duration_ms,
+                    None,
+                    Some(format!("Panicked or cancelled: {}", err_msg)),
+                );
+                Err(anyhow::anyhow!("Task failed: {err_msg}"))
+            }
+        }
+    }
+
+    /// Assemble what the model sees: delivery context, upstream pipeline output, conversation
+    /// history, then the message itself.
+    fn compose_prompt(&self) -> String {
         let delivery_ctx = match self.recipient_role {
             Some(RecipientRole::To) => {
                 "[Delivery Context: Email received via TO field (Primary Target)]\n"
@@ -819,18 +1072,15 @@ impl<'a> AgentRunner<'a> {
             None => "",
         };
 
-        let pipeline_ctx_str = if let Some(ref upstream) = self.upstream_pipeline_context {
-            if !upstream.trim().is_empty() {
-                format!(
-                    "[Upstream Pipeline Context from Prior Step Agents]:\n{}\n\n",
-                    upstream.trim()
-                )
-            } else {
-                String::new()
-            }
-        } else {
-            String::new()
-        };
+        let pipeline_ctx = self
+            .upstream_pipeline_context
+            .as_deref()
+            .map(str::trim)
+            .filter(|upstream| !upstream.is_empty())
+            .map(|upstream| {
+                format!("[Upstream Pipeline Context from Prior Step Agents]:\n{upstream}\n\n")
+            })
+            .unwrap_or_default();
 
         let mut history_str = String::new();
         if !self.history.is_empty() {
@@ -849,306 +1099,286 @@ impl<'a> AgentRunner<'a> {
             history_str.push_str("\nLatest Inbound Message:\n");
         }
 
-        let raw_full_prompt = format!(
+        format!(
             "{}{}{}{}",
-            delivery_ctx, pipeline_ctx_str, history_str, self.prompt
+            delivery_ctx, pipeline_ctx, history_str, self.prompt
+        )
+    }
+
+    fn record_execution(
+        &self,
+        duration_ms: u64,
+        token_usage: Option<&TokenUsage>,
+        error_type: Option<String>,
+    ) {
+        let Some(ref monitoring) = self.monitoring else {
+            return;
+        };
+        monitoring.record_ai_execution(&AiExecutionMetrics {
+            company_id: self.company_id,
+            channel_id: self.channel_id,
+            agent_id: self.agent_id,
+            provider: self.params.provider.clone(),
+            model: self.params.model.clone(),
+            prompt_tokens: token_usage.map_or(0, |t| t.prompt_tokens as usize),
+            completion_tokens: token_usage.map_or(0, |t| t.completion_tokens as usize),
+            total_tokens: token_usage.map_or(0, |t| t.total_tokens as usize),
+            duration_ms,
+            success: error_type.is_none(),
+            error_type,
+        });
+    }
+}
+
+/// A configured agent run, owned by the spawned task.
+struct AgentTask {
+    config_yaml: String,
+    provider_name: String,
+    model_name: String,
+    api_key: String,
+    provider_config: ai_agents::llm::LLMConfig,
+    base_url: Option<String>,
+    tool_choice: Option<ai_agents::ToolChoice>,
+    approval: Option<(Arc<ApprovalUseCases>, ApprovalContext)>,
+    outreach: Option<(
+        Arc<dyn TaskPersistence>,
+        Arc<dyn ChannelPersistence>,
+        OutreachToolContext,
+    )>,
+    /// Present when the run may list its sibling agent channels.
+    agent_persistence: Option<Arc<dyn AgentPersistence>>,
+    agent_channel_tool: Option<(Arc<dyn AgentChannelProvisioning>, AgentChannelToolContext)>,
+    recipient_role: Option<RecipientRole>,
+    full_prompt: String,
+    history_message_count: usize,
+    /// Tool policy for internal delegation, read from the merged agent config.
+    internal_requires_approval: bool,
+    /// Set by the approval handler or outreach tool when the run parks awaiting a human/other agent.
+    suspended: Arc<AtomicBool>,
+}
+
+impl AgentTask {
+    async fn run(self) -> anyhow::Result<AgentExecutionOutput> {
+        let agent = self.build_agent().await?;
+
+        let safe_prompt_log = sanitize_text(&self.full_prompt, Some(&self.api_key));
+        info!(
+            "Calling agent.chat | provider: '{}', model: '{}', api key set: '{}', prompt: '{}'",
+            self.provider_name,
+            self.model_name,
+            !self.api_key.is_empty(),
+            safe_prompt_log
         );
 
-        let provider_name = &self.params.provider;
-        let model_name = &self.params.model;
-        let key = &self.params.api_key;
+        let response = agent.chat(&self.full_prompt).await?;
+        info!(
+            "{}",
+            sanitize_text(&format!("{:?}", response), Some(&self.api_key))
+        );
 
-        // Stage 3: Optional LLM Spam & Guardrail Evaluation (skipped for trusted participants)
-        if !self.skip_spam_guardrail {
-            if let Some(ref cfg) = self.app_config {
-                crate::services::llm_guardrail::LlmSpamGuardrail::evaluate(
-                    cfg,
-                    self.company.as_ref(),
-                    self.monitoring.as_ref(),
-                    &raw_full_prompt,
-                    provider_name,
-                    model_name,
-                    key,
-                )
-                .await?;
-            }
-        }
+        let clean_content = sanitize_text(&response.content, Some(&self.api_key));
+        let counted = count_tokens(
+            response.metadata.as_ref(),
+            &self.full_prompt,
+            &clean_content,
+        );
 
-        let mut config = self.params.config.clone();
-        ensure_config_fields(&mut config, provider_name, model_name, key, None, None);
+        let clean_meta = response.metadata.as_ref().and_then(|meta| {
+            let val = serde_json::to_value(meta).ok()?;
+            let sanitized = sanitize_text(&val.to_string(), Some(&self.api_key));
+            serde_json::from_str(&sanitized).ok().or(Some(val))
+        });
+        let observability_report = agent
+            .observability()
+            .map(|manager| serde_json::to_value(manager.generate_report()))
+            .transpose()?;
 
-        let config_yaml = serde_yaml::to_string(&config).unwrap_or_default();
-        let (provider_config, base_url, tool_choice) = provider_config_from_agent_config(&config)?;
+        let tool_names: Vec<String> = response
+            .tool_calls
+            .as_ref()
+            .map(|calls| calls.iter().map(|call| call.name.clone()).collect())
+            .unwrap_or_default();
+        let diagnostics = AgentExecutionDiagnostics {
+            // Filled in by the caller, which owns the clock.
+            duration_ms: 0,
+            prompt_characters: self.full_prompt.chars().count(),
+            response_characters: clean_content.chars().count(),
+            history_message_count: self.history_message_count,
+            token_usage_source: counted.source().to_string(),
+            tool_call_count: tool_names.len(),
+            tool_names,
+        };
 
-        let full_prompt = sanitize_text(&raw_full_prompt, Some(key));
-        info!("Full prompt context length: {}", full_prompt.len());
+        let metadata = attach_execution_diagnostics(clean_meta, &diagnostics);
+        let metadata = match observability_report {
+            Some(report) => attach_observability_report(metadata, report),
+            None => metadata,
+        };
 
-        if !config_yaml.is_empty() {
-            info!(
-                "Running agent with channel config YAML:\n{}",
-                sanitize_text(&config_yaml, Some(key))
-            );
-        }
-
-        // Spawn on a separate Tokio task to prevent stack frame overflow on the caller thread
-        let key_for_task = key.clone();
-        let provider_name = provider_name.to_string();
-        let model_name = model_name.to_string();
-        let approval_use_cases = self.approval_use_cases.clone();
-        let approval_context = self.approval_context.clone();
-        let recipient_role = self.recipient_role;
-        let task_persistence = self.task_persistence.clone();
-        let channel_persistence = self.channel_persistence.clone();
-        let outreach_context = self.outreach_context.clone();
-        let suspended = Arc::new(AtomicBool::new(false));
-        let suspended_for_task = suspended.clone();
-
-        let task_result = tokio::spawn(async move {
-            let mut builder = AgentBuilder::from_yaml(&config_yaml)?;
-
-            if let (Some(use_cases), Some(ctx)) = (approval_use_cases, approval_context) {
-                let handler = Arc::new(AgentApprovalHandler {
-                    approval_use_cases: use_cases,
-                    context: ctx,
-                    suspended: suspended_for_task.clone(),
-                });
-                builder = builder.approval_handler(handler);
-            }
-
-            if let Ok(provider_type) = std::str::FromStr::from_str(&provider_name) {
-                let mut provider = ai_agents::UnifiedLLMProvider::from_spec_config(
-                    provider_type,
-                    &model_name,
-                    Some(key_for_task.clone()),
-                    base_url,
-                    provider_config,
-                )?;
-                if let Some(choice) = tool_choice {
-                    provider = provider.with_tool_choice(choice);
-                }
-                builder = builder.llm(std::sync::Arc::new(provider));
+        Ok(AgentExecutionOutput {
+            content: clean_content,
+            token_usage: TokenUsage::new(counted.prompt_tokens, counted.completion_tokens),
+            disposition: if self.suspended.load(Ordering::SeqCst) {
+                AgentExecutionDisposition::Suspended
             } else {
-                builder = builder.auto_configure_llms()?;
-            }
+                AgentExecutionDisposition::Completed
+            },
+            metadata,
+        })
+    }
 
-            let mut builder = builder
-                .auto_configure_features()?
-                .auto_configure_mcp()
-                .await?
-                .auto_configure_spawner()
-                .await?;
-            if let (Some(persistence), Some(channel_persistence), Some(context)) =
-                (task_persistence, channel_persistence, outreach_context)
-            {
-                builder = builder.tool(Arc::new(OutreachAndAwaitQuorumTool::new(
-                    persistence,
-                    channel_persistence,
-                    context,
-                    suspended_for_task.clone(),
+    async fn build_agent(&self) -> anyhow::Result<ai_agents::RuntimeAgent> {
+        let mut builder = AgentBuilder::from_yaml(&self.config_yaml)?;
+
+        if let Some((use_cases, context)) = self.approval.clone() {
+            let delegation =
+                self.outreach
+                    .as_ref()
+                    .map(|(_, channels, outreach)| InternalDelegationPolicy {
+                        channel_persistence: channels.clone(),
+                        app_domain_name: outreach.app_domain_name.clone(),
+                        company_id: outreach.company_id,
+                        source_channel_id: outreach.channel_id,
+                        requires_approval: self.internal_requires_approval,
+                    });
+            builder = builder.approval_handler(Arc::new(AgentApprovalHandler {
+                approval_use_cases: use_cases,
+                context,
+                suspended: self.suspended.clone(),
+                delegation,
+            }));
+        }
+
+        let provider_type = std::str::FromStr::from_str(&self.provider_name)
+            .map_err(|_| anyhow::anyhow!("Unsupported LLM provider '{}'.", self.provider_name))?;
+        let mut provider = ai_agents::UnifiedLLMProvider::from_spec_config(
+            provider_type,
+            &self.model_name,
+            Some(self.api_key.clone()),
+            self.base_url.clone(),
+            self.provider_config.clone(),
+        )?;
+        if let Some(choice) = self.tool_choice.clone() {
+            provider = provider.with_tool_choice(choice);
+        }
+        builder = builder.llm(std::sync::Arc::new(provider));
+
+        let mut builder = builder
+            .auto_configure_features()?
+            .auto_configure_mcp()
+            .await?
+            .auto_configure_spawner()
+            .await?;
+        if let Some((task_persistence, channel_persistence, context)) = self.outreach.clone() {
+            if let Some(agent_persistence) = self.agent_persistence.clone() {
+                builder = builder.tool(Arc::new(ListCompanyAgentsTool::new(
+                    channel_persistence.clone(),
+                    agent_persistence,
+                    AgentDirectoryContext {
+                        company_id: context.company_id,
+                        company_slug: context.company_slug.clone(),
+                        source_channel_id: context.channel_id,
+                        app_domain_name: context.app_domain_name.clone(),
+                    },
                 )));
             }
-            let agent = builder.build()?;
-
-            let role_str = recipient_role.map(|r| r.as_str()).unwrap_or("to");
-            let is_to = role_str == "to";
-            let is_cc = role_str == "cc";
-
-            agent.set_context("recipient_role", serde_json::json!(role_str))?;
-            agent.set_context("is_to", serde_json::json!(is_to))?;
-            agent.set_context("is_cc", serde_json::json!(is_cc))?;
-
-            let safe_prompt_log = sanitize_text(&full_prompt, Some(&key_for_task));
-            info!(
-                "Calling agent.chat | provider: '{}', model: '{}', api key set: '{}', prompt: '{}'",
-                provider_name,
-                model_name,
-                !key_for_task.is_empty(),
-                safe_prompt_log
-            );
-
-            let response = agent.chat(&full_prompt).await?;
-            let safe_response_log = sanitize_text(&format!("{:?}", response), Some(&key_for_task));
-            info!("{}", safe_response_log);
-
-            let clean_content = sanitize_text(&response.content, Some(&key_for_task));
-
-            let mut prompt_tokens = 0;
-            let mut completion_tokens = 0;
-
-            if let Some(ref meta) = response.metadata {
-                let parse_val = |v: &serde_json::Value| -> Option<usize> {
-                    v.as_u64()
-                        .map(|n| n as usize)
-                        .or_else(|| v.as_str().and_then(|s| s.parse::<usize>().ok()))
-                };
-
-                if let Some(p) = meta
-                    .get("prompt_tokens")
-                    .or_else(|| meta.get("input_tokens"))
-                    .and_then(parse_val)
-                {
-                    prompt_tokens = p;
-                }
-                if let Some(c) = meta
-                    .get("completion_tokens")
-                    .or_else(|| meta.get("output_tokens"))
-                    .and_then(parse_val)
-                {
-                    completion_tokens = c;
-                }
-
-                if prompt_tokens == 0 && completion_tokens == 0 {
-                    if let Some(usage) = meta.get("usage") {
-                        if let Some(p) = usage
-                            .get("prompt_tokens")
-                            .or_else(|| usage.get("input_tokens"))
-                            .and_then(parse_val)
-                        {
-                            prompt_tokens = p;
-                        }
-                        if let Some(c) = usage
-                            .get("completion_tokens")
-                            .or_else(|| usage.get("output_tokens"))
-                            .and_then(parse_val)
-                        {
-                            completion_tokens = c;
-                        }
-                    }
-                }
-            }
-
-            let prompt_tokens_estimated = prompt_tokens == 0;
-            let completion_tokens_estimated = completion_tokens == 0;
-            if prompt_tokens_estimated {
-                prompt_tokens = estimate_tokens(&full_prompt);
-            }
-            if completion_tokens_estimated {
-                completion_tokens = estimate_tokens(&clean_content);
-            }
-
-            let token_usage = TokenUsage::new(prompt_tokens, completion_tokens);
-
-            let clean_meta = response.metadata.as_ref().and_then(|meta| {
-                let val = serde_json::to_value(meta).ok()?;
-                let s = val.to_string();
-                let sanitized = sanitize_text(&s, Some(&key_for_task));
-                serde_json::from_str(&sanitized).ok().or(Some(val))
-            });
-
-            let observability_report = agent
-                .observability()
-                .map(|manager| serde_json::to_value(manager.generate_report()))
-                .transpose()?;
-
-            let tool_names = response
-                .tool_calls
-                .as_ref()
-                .map(|calls| calls.iter().map(|call| call.name.clone()).collect())
-                .unwrap_or_else(Vec::new);
-            let token_usage_source = match (prompt_tokens_estimated, completion_tokens_estimated) {
-                (false, false) => "provider",
-                (true, true) => "estimated",
-                _ => "mixed",
-            };
-            let diagnostics = AgentExecutionDiagnostics {
-                duration_ms: 0,
-                prompt_characters: full_prompt.chars().count(),
-                response_characters: clean_content.chars().count(),
-                history_message_count,
-                token_usage_source: token_usage_source.to_string(),
-                tool_call_count: tool_names.len(),
-                tool_names,
-            };
-
-            let metadata = attach_execution_diagnostics(clean_meta, &diagnostics);
-            let metadata = match observability_report {
-                Some(report) => attach_observability_report(metadata, report),
-                None => metadata,
-            };
-
-            Ok::<AgentExecutionOutput, anyhow::Error>(AgentExecutionOutput {
-                content: clean_content,
-                token_usage,
-                disposition: if suspended_for_task.load(Ordering::SeqCst) {
-                    AgentExecutionDisposition::Suspended
-                } else {
-                    AgentExecutionDisposition::Completed
-                },
-                metadata,
-            })
-        })
-        .await;
-
-        let duration_ms = start_time.elapsed().as_millis() as u64;
-
-        match task_result {
-            Ok(Ok(mut output)) => {
-                if let Some(diagnostics) = output
-                    .metadata
-                    .as_mut()
-                    .and_then(|meta| meta.get_mut("execution_diagnostics"))
-                    .and_then(|value| value.as_object_mut())
-                {
-                    diagnostics.insert("duration_ms".to_string(), serde_json::json!(duration_ms));
-                }
-                if let Some(ref m) = self.monitoring {
-                    m.record_ai_execution(&AiExecutionMetrics {
-                        company_id: self.company_id,
-                        channel_id: self.channel_id,
-                        agent_id: self.agent_id,
-                        provider: self.params.provider.clone(),
-                        model: self.params.model.clone(),
-                        prompt_tokens: output.token_usage.prompt_tokens as usize,
-                        completion_tokens: output.token_usage.completion_tokens as usize,
-                        total_tokens: output.token_usage.total_tokens as usize,
-                        duration_ms,
-                        success: true,
-                        error_type: None,
-                    });
-                }
-                Ok(output)
-            }
-            Ok(Err(err)) => {
-                let err_msg = sanitize_text(&err.to_string(), Some(&key));
-                tracing::warn!("AI Agent execution failed ({err_msg})");
-                if let Some(ref m) = self.monitoring {
-                    m.record_ai_execution(&AiExecutionMetrics {
-                        company_id: self.company_id,
-                        channel_id: self.channel_id,
-                        agent_id: self.agent_id,
-                        provider: self.params.provider.clone(),
-                        model: self.params.model.clone(),
-                        prompt_tokens: 0,
-                        completion_tokens: 0,
-                        total_tokens: 0,
-                        duration_ms,
-                        success: false,
-                        error_type: Some(err_msg.clone()),
-                    });
-                }
-                Err(anyhow::anyhow!("{err_msg}"))
-            }
-            Err(join_err) => {
-                let err_msg = sanitize_text(&join_err.to_string(), Some(&key));
-                tracing::warn!("AI Agent task panicked or was cancelled ({err_msg})");
-                if let Some(ref m) = self.monitoring {
-                    m.record_ai_execution(&AiExecutionMetrics {
-                        company_id: self.company_id,
-                        channel_id: self.channel_id,
-                        agent_id: self.agent_id,
-                        provider: self.params.provider.clone(),
-                        model: self.params.model.clone(),
-                        prompt_tokens: 0,
-                        completion_tokens: 0,
-                        total_tokens: 0,
-                        duration_ms,
-                        success: false,
-                        error_type: Some(format!("Panicked or cancelled: {}", err_msg)),
-                    });
-                }
-                Err(anyhow::anyhow!("Task failed: {err_msg}"))
-            }
+            builder = builder.tool(Arc::new(OutreachAndAwaitQuorumTool::new(
+                task_persistence,
+                channel_persistence,
+                context,
+                self.suspended.clone(),
+            )));
         }
+        if let Some((persistence, context)) = self.agent_channel_tool.clone() {
+            builder = builder.tool(Arc::new(CreateAgentChannelTool::new(persistence, context)));
+        }
+
+        let agent = builder.build()?;
+
+        let role_str = self.recipient_role.map(|r| r.as_str()).unwrap_or("to");
+        agent.set_context("recipient_role", serde_json::json!(role_str))?;
+        agent.set_context("is_to", serde_json::json!(role_str == "to"))?;
+        agent.set_context("is_cc", serde_json::json!(role_str == "cc"))?;
+        Ok(agent)
+    }
+}
+
+/// Token counts for one exchange, and whether they came from the provider or from estimation.
+struct CountedTokens {
+    prompt_tokens: usize,
+    completion_tokens: usize,
+    prompt_estimated: bool,
+    completion_estimated: bool,
+}
+
+impl CountedTokens {
+    fn source(&self) -> &'static str {
+        match (self.prompt_estimated, self.completion_estimated) {
+            (false, false) => "provider",
+            (true, true) => "estimated",
+            _ => "mixed",
+        }
+    }
+}
+
+/// Read the provider's token accounting, falling back to a character-based estimate per side.
+///
+/// Providers disagree on where the numbers live (`prompt_tokens`/`input_tokens`, top level or
+/// nested under `usage`), so every shape is probed before giving up on a side.
+fn count_tokens(
+    metadata: Option<&impl serde::Serialize>,
+    prompt: &str,
+    content: &str,
+) -> CountedTokens {
+    let parse_val = |v: &serde_json::Value| -> Option<usize> {
+        v.as_u64()
+            .map(|n| n as usize)
+            .or_else(|| v.as_str().and_then(|s| s.parse::<usize>().ok()))
+    };
+    let read_pair = |value: &serde_json::Value| -> (Option<usize>, Option<usize>) {
+        (
+            value
+                .get("prompt_tokens")
+                .or_else(|| value.get("input_tokens"))
+                .and_then(parse_val),
+            value
+                .get("completion_tokens")
+                .or_else(|| value.get("output_tokens"))
+                .and_then(parse_val),
+        )
+    };
+
+    let meta = metadata.and_then(|meta| serde_json::to_value(meta).ok());
+    let mut prompt_tokens = 0usize;
+    let mut completion_tokens = 0usize;
+    if let Some(ref meta) = meta {
+        let (p, c) = read_pair(meta);
+        prompt_tokens = p.unwrap_or(0);
+        completion_tokens = c.unwrap_or(0);
+        if prompt_tokens == 0
+            && completion_tokens == 0
+            && let Some(usage) = meta.get("usage")
+        {
+            let (p, c) = read_pair(usage);
+            prompt_tokens = p.unwrap_or(prompt_tokens);
+            completion_tokens = c.unwrap_or(completion_tokens);
+        }
+    }
+
+    let prompt_estimated = prompt_tokens == 0;
+    let completion_estimated = completion_tokens == 0;
+    if prompt_estimated {
+        prompt_tokens = estimate_tokens(prompt);
+    }
+    if completion_estimated {
+        completion_tokens = estimate_tokens(content);
+    }
+
+    CountedTokens {
+        prompt_tokens,
+        completion_tokens,
+        prompt_estimated,
+        completion_estimated,
     }
 }
 
@@ -1172,12 +1402,14 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
-            slug: "test".to_string(),
+            slug: "test".into(),
             api_key: Some("key".to_string()),
             provider: Some("google".to_string()),
             model: None,
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
         let result = ResolvedAgentParams::new(Some(&company), None, None);
         assert!(result.is_err());
@@ -1192,12 +1424,14 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
-            slug: "test".to_string(),
+            slug: "test".into(),
             api_key: None,
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
         let result = ResolvedAgentParams::new(Some(&company), None, None);
         assert!(result.is_err());
@@ -1218,17 +1452,30 @@ mod tests {
             }
         });
         let channel = Channel {
+            description: None,
+            enabled: true,
+            add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
             name: "Test".to_string(),
-            slug: "test".to_string(),
+            slug: "test".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
             participant_emails: None,
             agent_ids: None,
             channel_config: Some(custom_config),
-            created_at: chrono::Utc::now().naive_utc(),
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
         };
         let params = ResolvedAgentParams::new(None, Some(&channel), None)?;
 
@@ -1243,12 +1490,14 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
-            slug: "test".to_string(),
+            slug: "test".into(),
             api_key: Some("runtime_key".to_string()),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
         let params = ResolvedAgentParams::new(Some(&company), None, None)?;
         let result = AgentRunner::new("Hello world", &params).execute().await;
@@ -1262,12 +1511,14 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
-            slug: "test".to_string(),
+            slug: "test".into(),
             api_key: Some("fake_key_123".to_string()),
             provider: Some("google".to_string()),
             model: Some("invalid-custom-model-xyz".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
         let params = ResolvedAgentParams::new(Some(&company), None, None)?;
         let result = AgentRunner::new("Hello world", &params).execute().await;
@@ -1318,12 +1569,14 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: Some("company-api-key".to_string()),
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
 
         let resolved = ResolvedAgentParams::new(Some(&company), None, None).unwrap();
@@ -1355,19 +1608,33 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: Some("company-api-key".to_string()),
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
+            description: None,
+            enabled: true,
+            add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
-            slug: "support".to_string(),
+            slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: Some("channel-api-key".to_string()),
             provider: Some("openai".to_string()),
             model: None, // Should keep company's model
@@ -1377,7 +1644,8 @@ mod tests {
                 "system_prompt": "Channel prompt",
                 "temperature": 0.2
             })),
-            created_at: chrono::Utc::now().naive_utc(),
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
         };
 
         let resolved = ResolvedAgentParams::new(Some(&company), Some(&channel), None).unwrap();
@@ -1408,19 +1676,33 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: Some("company-api-key".to_string()),
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
+            description: None,
+            enabled: true,
+            add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
-            slug: "support".to_string(),
+            slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: Some("channel-api-key".to_string()),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
@@ -1431,23 +1713,27 @@ mod tests {
                 "temperature": 0.2,
                 "channel_only_field": true
             })),
-            created_at: chrono::Utc::now().naive_utc(),
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
         };
 
         let agent = AgentEntity {
             id: Uuid::new_v4(),
-            company_id: company.id,
+            company_id: Some(company.id),
             name: "Tech Agent".to_string(),
             slug: "tech-agent".to_string(),
             provider: Some("anthropic".to_string()),
             model: Some("claude-3-5-sonnet".to_string()),
             api_key: Some("agent-api-key".to_string()),
             system_prompt: None,
+            description: None,
             config_json: Some(serde_json::json!({
                 "system_prompt": "Agent prompt",
                 "temperature": 0.7
             })),
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
         };
 
         let resolved =
@@ -1486,26 +1772,41 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: Some("  ".to_string()),
             provider: Some("google".to_string()),
             model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
+            description: None,
+            enabled: true,
+            add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
-            slug: "support".to_string(),
+            slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: Some("".to_string()),
             provider: Some("   ".to_string()),
             model: Some("".to_string()),
             participant_emails: None,
             agent_ids: None,
             channel_config: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
         };
 
         let resolved = ResolvedAgentParams::new(Some(&company), Some(&channel), None);
@@ -1524,12 +1825,14 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: Some("company-key".to_string()),
             provider: Some("unsupported_provider".to_string()),
             model: Some("some-model".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
 
         let err = ResolvedAgentParams::new(Some(&company), None, None).unwrap_err();
@@ -1552,19 +1855,33 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: Some("company-key".to_string()),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
 
         let channel = Channel {
+            description: None,
+            enabled: true,
+            add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: company.id,
             name: "Support Channel".to_string(),
-            slug: "support".to_string(),
+            slug: "support".into(),
+            alias_slugs: Vec::new(),
             api_key: None,
             provider: None,
             model: None,
@@ -1576,7 +1893,8 @@ mod tests {
                     // model and api_key missing in llm block
                 }
             })),
-            created_at: chrono::Utc::now().naive_utc(),
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
         };
 
         let resolved = ResolvedAgentParams::new(Some(&company), Some(&channel), None).unwrap();
@@ -1592,25 +1910,30 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: Some("company-key".to_string()),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
 
         let agent = AgentEntity {
             id: Uuid::new_v4(),
-            company_id: company.id,
+            company_id: Some(company.id),
             name: "Support Agent".to_string(),
             slug: "support-agent".to_string(),
             provider: None,
             model: None,
             api_key: None,
             system_prompt: Some("You are a helpful triage assistant.".to_string()),
+            description: None,
             config_json: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
         };
 
         let resolved = ResolvedAgentParams::new(Some(&company), None, Some(&agent)).unwrap();
@@ -1627,12 +1950,14 @@ mod tests {
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
-            slug: "acme".to_string(),
+            slug: "acme".into(),
             api_key: Some("company-key".to_string()),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
-            created_at: chrono::Utc::now().naive_utc(),
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
         };
 
         let resolved = ResolvedAgentParams::new(Some(&company), None, None).unwrap();
@@ -1884,5 +2209,213 @@ system_prompt: Hello
             assert_eq!(is_to, expected_to);
             assert_eq!(is_cc, expected_cc);
         }
+    }
+
+    // --- internal delegation approval policy -------------------------------------------------
+
+    struct DirectoryStub {
+        channels: Vec<Channel>,
+    }
+
+    #[async_trait::async_trait]
+    impl ChannelPersistence for DirectoryStub {
+        async fn create(
+            &self,
+            _company_id: Uuid,
+            _write: crate::use_cases::channel::ChannelWrite,
+        ) -> crate::app_error::AppResult<Channel> {
+            unimplemented!()
+        }
+        async fn get_by_id(&self, _id: Uuid) -> crate::app_error::AppResult<Option<Channel>> {
+            unimplemented!()
+        }
+        async fn get_by_company_slug_and_channel_slug(
+            &self,
+            _company_slug: &CompanySlug,
+            channel_slug: &ChannelSlug,
+        ) -> crate::app_error::AppResult<Option<Channel>> {
+            Ok(self
+                .channels
+                .iter()
+                .find(|c| &c.slug == channel_slug)
+                .cloned())
+        }
+        async fn list_by_company_id(
+            &self,
+            _company_id: Uuid,
+        ) -> crate::app_error::AppResult<Vec<Channel>> {
+            Ok(self.channels.clone())
+        }
+        async fn update(
+            &self,
+            _id: Uuid,
+            _write: crate::use_cases::channel::ChannelWrite,
+        ) -> crate::app_error::AppResult<Channel> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> crate::app_error::AppResult<()> {
+            unimplemented!()
+        }
+    }
+
+    fn agent_channel(company_id: Uuid, slug: &str) -> Channel {
+        Channel {
+            id: Uuid::new_v4(),
+            company_id,
+            name: slug.to_string(),
+            description: None,
+            slug: slug.into(),
+            alias_slugs: Vec::new(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: Some(vec![Uuid::new_v4()]),
+            channel_config: None,
+            enabled: true,
+            add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    fn policy(
+        channels: Vec<Channel>,
+        company_id: Uuid,
+        requires_approval: bool,
+    ) -> InternalDelegationPolicy {
+        InternalDelegationPolicy {
+            channel_persistence: Arc::new(DirectoryStub { channels }),
+            app_domain_name: "mailagents.example".to_string(),
+            company_id,
+            source_channel_id: Uuid::new_v4(),
+            requires_approval,
+        }
+    }
+
+    fn outreach_trigger(targets: &[&str]) -> ai_agents::hitl::ApprovalTrigger {
+        ai_agents::hitl::ApprovalTrigger::Tool {
+            name: OUTREACH_TOOL_ID.to_string(),
+            args: serde_json::json!({ "target_emails": targets }),
+        }
+    }
+
+    #[tokio::test]
+    async fn an_all_internal_call_skips_the_human_when_policy_allows() {
+        let company_id = Uuid::new_v4();
+        let policy = policy(
+            vec![agent_channel(company_id, "billing")],
+            company_id,
+            false,
+        );
+        assert!(
+            policy
+                .approves_without_human(&outreach_trigger(&["billing@acme.mailagents.example"]))
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn an_external_recipient_still_requires_the_human() {
+        let company_id = Uuid::new_v4();
+        let policy = policy(
+            vec![agent_channel(company_id, "billing")],
+            company_id,
+            false,
+        );
+        assert!(
+            !policy
+                .approves_without_human(&outreach_trigger(&["stranger@supplier.example"]))
+                .await
+        );
+    }
+
+    /// The case that justifies deciding per call instead of per tool: one stranger in the list
+    /// must pull the whole call back under approval.
+    #[tokio::test]
+    async fn a_mixed_call_requires_the_human() {
+        let company_id = Uuid::new_v4();
+        let policy = policy(
+            vec![agent_channel(company_id, "billing")],
+            company_id,
+            false,
+        );
+        assert!(
+            !policy
+                .approves_without_human(&outreach_trigger(&[
+                    "billing@acme.mailagents.example",
+                    "stranger@supplier.example",
+                ]))
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn a_platform_address_with_no_such_channel_requires_the_human() {
+        let company_id = Uuid::new_v4();
+        let policy = policy(
+            vec![agent_channel(company_id, "billing")],
+            company_id,
+            false,
+        );
+        assert!(
+            !policy
+                .approves_without_human(&outreach_trigger(&["ghost@acme.mailagents.example"]))
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn the_default_policy_never_skips_the_human() {
+        let company_id = Uuid::new_v4();
+        let policy = policy(vec![agent_channel(company_id, "billing")], company_id, true);
+        assert!(
+            !policy
+                .approves_without_human(&outreach_trigger(&["billing@acme.mailagents.example"]))
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn an_empty_or_malformed_target_list_requires_the_human() {
+        let company_id = Uuid::new_v4();
+        let policy = policy(
+            vec![agent_channel(company_id, "billing")],
+            company_id,
+            false,
+        );
+        assert!(!policy.approves_without_human(&outreach_trigger(&[])).await);
+        assert!(
+            !policy
+                .approves_without_human(&ai_agents::hitl::ApprovalTrigger::Tool {
+                    name: OUTREACH_TOOL_ID.to_string(),
+                    args: serde_json::json!({}),
+                })
+                .await
+        );
+    }
+
+    #[test]
+    fn the_approval_flag_fails_closed_unless_explicitly_false() {
+        let explicit = serde_json::json!({
+            "tool_security": { "tools": { OUTREACH_TOOL_ID: {
+                "config": { "internal_requires_approval": false } } } }
+        });
+        assert!(!internal_requires_approval(&explicit));
+
+        assert!(internal_requires_approval(&serde_json::json!({})));
+        let wrong_type = serde_json::json!({
+            "tool_security": { "tools": { OUTREACH_TOOL_ID: {
+                "config": { "internal_requires_approval": "false" } } } }
+        });
+        assert!(internal_requires_approval(&wrong_type));
     }
 }

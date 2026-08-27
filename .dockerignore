@@ -1,0 +1,15 @@
+target
+.git
+.env
+.env.test
+*.log
+.claude
+.opencode
+plan
+docs
+deploy
+README.md
+scripts
+fly.toml
+Dockerfile
+.dockerignore

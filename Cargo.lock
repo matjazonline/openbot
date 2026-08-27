@@ -53,7 +53,7 @@ dependencies = [
 [[package]]
 name = "ai-agents"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-context",
  "ai-agents-core",
@@ -82,7 +82,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-context"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "async-trait",
@@ -99,7 +99,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-core"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "async-trait",
  "chrono",
@@ -114,7 +114,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-disambiguation"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -127,7 +127,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-eval"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-facts",
@@ -160,7 +160,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-facts"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -178,7 +178,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-hitl"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -193,7 +193,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-hooks"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-hitl",
@@ -211,7 +211,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-llm"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "async-stream",
@@ -229,7 +229,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-memory"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -245,7 +245,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-observability"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-hitl",
@@ -268,7 +268,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-persona"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-context",
  "ai-agents-core",
@@ -285,7 +285,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-process"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -301,7 +301,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-reasoning"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "chrono",
  "serde",
@@ -312,7 +312,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-recovery"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -328,7 +328,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-relationships"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "async-trait",
@@ -344,7 +344,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-runtime"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-context",
  "ai-agents-core",
@@ -386,7 +386,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-skills"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-disambiguation",
@@ -406,7 +406,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-state"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-disambiguation",
@@ -424,7 +424,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-storage"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "async-trait",
@@ -440,7 +440,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-template"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "minijinja",
@@ -454,7 +454,7 @@ dependencies = [
 [[package]]
 name = "ai-agents-tools"
 version = "1.0.4"
-source = "git+https://github.com/geminik23/ai-agents.git#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
+source = "git+https://github.com/geminik23/ai-agents.git?rev=9ea972e3e3a5b777496c6d6b1b471cac4513a1e4#9ea972e3e3a5b777496c6d6b1b471cac4513a1e4"
 dependencies = [
  "ai-agents-core",
  "ai-agents-llm",
@@ -687,6 +687,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "base16ct"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
+
+[[package]]
 name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -813,6 +819,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "chrono-tz"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6139a8597ed92cf816dfb33f5dd6cf0bb93a6adc938f11039f371bc5bcd26c3"
+dependencies = [
+ "chrono",
+ "phf 0.12.1",
+]
+
+[[package]]
 name = "cipher"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -929,6 +945,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
+name = "crypto-bigint"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0dc92fb57ca44df6db8059111ab3af99a63d5d0f8375d9972e319a379c6bab76"
+dependencies = [
+ "generic-array",
+ "rand_core",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "crypto-common"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -974,12 +1002,9 @@ dependencies = [
 
 [[package]]
 name = "deranged"
-version = "0.4.0"
+version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c9e6a11ca8224451684bc0d7d5a7adbf8f2fd6887261a1cfc3c0432f9d4068e"
-dependencies = [
- "powerfmt",
-]
+checksum = "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
 
 [[package]]
 name = "derive_arbitrary"
@@ -1064,12 +1089,46 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
+name = "ecdsa"
+version = "0.16.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee27f32b5c5292967d2d4a9d7f1e0b0aed2c15daded5a60300e4abb9d8020bca"
+dependencies = [
+ "der",
+ "digest",
+ "elliptic-curve",
+ "rfc6979",
+ "signature",
+ "spki",
+]
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "elliptic-curve"
+version = "0.13.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5e6043086bf7973472e0c7dff2142ea0b680d30e18d9cc40f267efbf222bd47"
+dependencies = [
+ "base16ct",
+ "crypto-bigint",
+ "digest",
+ "ff",
+ "generic-array",
+ "group",
+ "pem-rfc7468",
+ "pkcs8",
+ "rand_core",
+ "sec1",
+ "subtle",
+ "zeroize",
 ]
 
 [[package]]
@@ -1158,6 +1217,16 @@ name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
+
+[[package]]
+name = "ff"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0b50bfb653653f9ca9095b427bed08ab8d75a137839d9ad64eb11810d5b6393"
+dependencies = [
+ "rand_core",
+ "subtle",
+]
 
 [[package]]
 name = "flate2"
@@ -1334,6 +1403,7 @@ checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
 dependencies = [
  "typenum",
  "version_check",
+ "zeroize",
 ]
 
 [[package]]
@@ -1362,8 +1432,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "335ff9f135e4384c8150d6f27c6daed433577f86b4750418338c01a1a2528592"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi 0.11.1+wasi-snapshot-preview1",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1396,6 +1468,17 @@ name = "gimli"
 version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
+
+[[package]]
+name = "group"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0f9ef7462f7c099f518d754361858f86d8a07af53ba9af0fe635bbccb151a63"
+dependencies = [
+ "ff",
+ "rand_core",
+ "subtle",
+]
 
 [[package]]
 name = "h2"
@@ -1918,6 +2001,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonwebtoken"
+version = "9.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a87cc7a48537badeae96744432de36f4be2b4a34a05a5ef32e9dd8a1c169dde"
+dependencies = [
+ "base64 0.22.1",
+ "js-sys",
+ "pem",
+ "ring",
+ "serde",
+ "serde_json",
+ "simple_asn1",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2136,18 +2234,25 @@ dependencies = [
  "ammonia",
  "anyhow",
  "argon2",
+ "async-stream",
  "async-trait",
  "axum",
  "axum-extra",
+ "base64 0.22.1",
  "chrono",
+ "chrono-tz",
  "dotenvy",
+ "futures",
  "htmd",
+ "jsonwebtoken",
  "lettre",
  "mail-auth",
  "mail-parser 0.9.4",
+ "p256",
  "pulldown-cmark",
  "regex",
  "reqwest 0.12.28",
+ "ring",
  "schemars",
  "secrecy",
  "serde",
@@ -2158,10 +2263,12 @@ dependencies = [
  "thiserror 2.0.16",
  "time",
  "tokio",
+ "tokio-stream",
  "tower",
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "url",
  "uuid",
 ]
 
@@ -2364,6 +2471,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-bigint"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c89e69e7e0f03bea5ef08013795c25018e101932225a656383bd384495ecc367"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "num-bigint-dig"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2382,9 +2499,9 @@ dependencies = [
 
 [[package]]
 name = "num-conv"
-version = "0.1.0"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
+checksum = "521739c6d2bac4aa25192232afe6841231376b2b26d4d9fae5ecf8ca5772e441"
 
 [[package]]
 name = "num-integer"
@@ -2487,6 +2604,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
+name = "p256"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9863ad85fa8f4460f9c48cb909d38a0d689dba1f6f6988a5e3e0d31071bcd4b"
+dependencies = [
+ "ecdsa",
+ "elliptic-curve",
+ "primeorder",
+ "sha2",
+]
+
+[[package]]
 name = "parking"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2537,6 +2666,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pem"
+version = "3.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d30c53c26bc5b31a98cd02d20f25a7c8567146caf63ed593a9d87b2775291be"
+dependencies = [
+ "base64 0.22.1",
+ "serde_core",
+]
+
+[[package]]
 name = "pem-rfc7468"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2558,6 +2697,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd6780a80ae0c52cc120a26a1a42c1ae51b247a253e4e06113d23d2c2edd078"
 dependencies = [
  "phf_shared 0.11.3",
+]
+
+[[package]]
+name = "phf"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "913273894cec178f401a31ec4b656318d95473527be05c0752cc41cdc32be8b7"
+dependencies = [
+ "phf_shared 0.12.1",
 ]
 
 [[package]]
@@ -2615,6 +2763,15 @@ name = "phf_shared"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5"
+dependencies = [
+ "siphasher",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06005508882fb681fd97892ecff4b7fd0fee13ef1aa569f8695dae7ab9099981"
 dependencies = [
  "siphasher",
 ]
@@ -2696,6 +2853,15 @@ name = "precomputed-hash"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
+
+[[package]]
+name = "primeorder"
+version = "0.13.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "353e1ca18966c16d9deb1c69278edbc5f194139612772bd9537af60ac231e1e6"
+dependencies = [
+ "elliptic-curve",
+]
 
 [[package]]
 name = "proc-macro2"
@@ -2986,6 +3152,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e061d1b48cb8d38042de4ae0a7a6401009d6143dc80d2e2d6f31f0bdd6470c7"
 
 [[package]]
+name = "rfc6979"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
+dependencies = [
+ "hmac",
+ "subtle",
+]
+
+[[package]]
 name = "ring"
 version = "0.17.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3199,6 +3375,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sec1"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3e97a565f76233a6003f9f5c54be1d9c5bdfa3eccfb189469f11ec4901c47dc"
+dependencies = [
+ "base16ct",
+ "der",
+ "generic-array",
+ "pkcs8",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "secrecy"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3409,6 +3599,18 @@ name = "simd-adler32"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
+
+[[package]]
+name = "simple_asn1"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d585997b0ac10be3c5ee635f1bab02d512760d14b7c468801ac8a01d9ae5f1d"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "thiserror 2.0.16",
+ "time",
+]
 
 [[package]]
 name = "siphasher"
@@ -3890,30 +4092,29 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.41"
+version = "0.3.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a7619e19bc266e0f9c5e6686659d394bc57973859340060a69221e57dbc0c40"
+checksum = "cdb87b95ec50ddfa440816d227a17b2ccbdda963a316a727fda0fc4334f7d134"
 dependencies = [
  "deranged",
- "itoa",
  "num-conv",
  "powerfmt",
- "serde",
+ "serde_core",
  "time-core",
  "time-macros",
 ]
 
 [[package]]
 name = "time-core"
-version = "0.1.4"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9e9a38711f559d9e3ce1cdb06dd7c5b8ea546bc90052da6d06bb76da74bb07c"
+checksum = "9e1c906769ad99c88eaa54e728060edef082f8e358ff32030cb7c7d315e81109"
 
 [[package]]
 name = "time-macros"
-version = "0.2.22"
+version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3526739392ec93fd8b359c8e98514cb3e8e021beb4e5f597b00a0221f8ed8a49"
+checksum = "7e689342a48d2ea927c87ea50cabf8594854bf940e9310208848d680d668ed85"
 dependencies = [
  "num-conv",
  "time-core",
@@ -4014,6 +4215,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]

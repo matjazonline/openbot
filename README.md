@@ -59,9 +59,9 @@ Email clients append the entire historical thread below newly typed text. Feedin
 
 ### 3.4 Background Task Queue & Worker
 - **Durable Task Store (`background_tasks`):** Ingests inbound emails synchronously and enqueues background processing tasks, allowing the webhook to return `HTTP 200 OK` in < 100ms.
-- **Task Worker Poller (`TaskWorker`):** Every 3 seconds, processes up to 10 outbox emails, checks quorum timeouts, and claims at most one task. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
+- **Task Worker Poller (`TaskWorker`):** Independent loops keep long agent runs from holding up mail delivery. The task loop continuously fills up to `TASK_WORKER_CONCURRENCY` execution slots (default 4), polling an empty queue every 500ms and refilling a slot immediately when a task finishes. The outbox loop claims and sends up to 10 emails every 500ms; a maintenance loop reaps expired delivery leases and checks quorum timeouts every 30 seconds. A failed poll backs off for 5 seconds. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
 - **Leased Execution:** Claims use `FOR UPDATE SKIP LOCKED` and a 15-minute lease. Background executions renew the lease every 5 minutes, and an expired lease can be reclaimed by another worker.
-- **Shutdown:** `Ctrl+C` broadcasts a shutdown signal to the worker and SMTP listener. The loops exit when control returns to their outer `select`; spawned worker and SMTP tasks are not explicitly awaited before runtime shutdown.
+- **Shutdown:** `Ctrl+C` broadcasts a shutdown signal to the worker and SMTP listener. The task loop stops claiming and drains its active execution slots; the process-level worker and SMTP tasks are not explicitly awaited beyond the runtime's bounded shutdown window.
 
 #### Task Execution Flow
 
@@ -99,13 +99,18 @@ flowchart TD
 
     ENQUEUE --> PENDING
 
-    subgraph Worker[TaskWorker iteration every 3 seconds]
-        TICK[Poll iteration]
+    subgraph Worker[TaskWorker poll loops]
+        TASK_TICK[Task loop<br/>every 500ms]
+        CLAIM[Atomically claim tasks for free worker slots<br/>FOR UPDATE SKIP LOCKED]
+        OUTBOX_TICK[Outbox loop<br/>every 500ms]
         OUTBOX_STEP[Claim and send up to 10 outbox emails]
+        MAINT_TICK[Maintenance loop<br/>every 30s]
+        REAP[Reap expired delivery leases]
         QUORUM[Check up to 100 due quorum waits]
-        CLAIM[Atomically claim one due task<br/>FOR UPDATE SKIP LOCKED]
 
-        TICK --> OUTBOX_STEP --> QUORUM --> CLAIM
+        TASK_TICK --> CLAIM
+        OUTBOX_TICK --> OUTBOX_STEP
+        MAINT_TICK --> REAP --> QUORUM
     end
 
     PENDING -->|due| CLAIM
@@ -214,7 +219,7 @@ flowchart TD
 - **Stage 3 (LLM Spam Guardrail - Option C):** Pre-execution AI security check before main agent execution controlled per `Company` entity (`Company.enable_llm_spam_guardrail`) with system default fallback (`ENABLE_LLM_SPAM_GUARDRAIL=true`). Scans the prompt context using static pattern matchers and low-cost LLM classification to detect prompt injection attempts or malicious intent (runs for public workflows).
 
 ### 3.7 Multi-Agent & Multi-Recipient Handling (`To`, `CC`, and `+` Pipeline Chaining)
-- **Multi-Workflow Ingestion:** When an email includes multiple recipient addresses across `To` and `CC` (e.g., `support@acme.mailagents.com` in `To` and `billing@acme.mailagents.com` in `CC`), the system resolves all matching workflows and executes each matching agent.
+- **Multi-Workflow Ingestion:** Channel addresses in `To` execute normally. Channel addresses in `CC` are persisted to their thread history without executing by default; a CC'd channel executes only when the newly written body mentions its email address or a plain `@slug` matching the channel, an alias, or its assigned agent. Explicit quiet/context-only triggers still suppress execution.
 - **Sequential Pipeline Chaining (`+` Syntax):** Sending to a `+`-chained recipient address (e.g., `support+billing+legal@acme.mailagents.com`) triggers sequential pipeline execution (`support` $\rightarrow$ `billing` $\rightarrow$ `legal`).
 - **Cumulative Upstream Context Sharing:** In a `+` pipeline, each subsequent step agent receives the user's prompt **plus** the accumulated outputs of all prior step agents (`[Upstream Pipeline Context from Prior Step Agents]`). For example, Step 3 (`legal`) receives the outputs from both Step 1 (`support`) and Step 2 (`billing`).
 - **Strict Validation, Bounce Notifications & Fuzzy Suggestions:** If an address or pipeline step is misspelled (e.g., `suppport@...` or `support+biling@...`), strict validation halts execution and the server dispatches an automated bounce reply email (`[Undeliverable] Re: ...`) to the sender containing fuzzy suggestions calculated via Levenshtein distance matching (e.g., *"Did you mean: `support@acme.mailagents.com`?"*).
@@ -301,6 +306,11 @@ Inbound Email (SMTP / Webhook)
 - **Trigger Suffixes & Body Commands:** Supported via recipient address subaddressing/suffixes (`channel.quiet@...`, `channel.noagent@...`, `channel.message@...`, `channel.msg@...`, `channel.na@...`, `channel+quiet@...`) or email body prefix triggers (`[[quiet]]`, `[quiet]`, `[[noagent]]`, `[noagent]`, `[[message]]`, `[msg]`, `[na]`).
 - **Reserved Slug Validation:** Agent and Channel/Workflow slug creation and updates strictly validate against reserved mode keywords (`quiet`, `noagent`, `message`, `msg`, `na`) to prevent route ambiguity.
 - **Thread History Integration:** Messages ingested in context-only mode are saved to database thread history. Subsequent normal messages sent to the channel trigger the agent, which reads the full thread context including all quiet notes.
+
+### 3.9 Mailbox UI (`/ui`)
+- **Three-Column Reader (daisyUI + HTMX):** `/ui` renders the company's channels as a mail-style sidebar, the selected channel's threads in the middle column (keyset pagination, "Load older threads"), and the selected thread's messages as chat bubbles on the right. Each column is swapped independently over HTMX and the selection is reflected in the URL (`/ui?company_id=…&channel_id=…&thread_id=…`), so a refresh or a shared link restores the same view.
+- **Compose (New Thread):** Enabled only once a channel is selected. The composed message is fed through the normal inbound path addressed to `channel-slug@company-slug.domain` as the signed-in user, so participant rules, spam checks and agents apply unchanged. The "deliver agent reply by email" toggle selects `SimulationMode::Run` (real dispatch) over the default `RunTest` (in-app only); a rejected message re-renders the form with the channel's rejection reason.
+- **Coexistence:** All existing pages (channels, agents, tasks, simulator) are untouched and reachable from the icon rail; the mailbox is an additional read/compose surface over the same use cases.
 
 ## Development Setup
 
