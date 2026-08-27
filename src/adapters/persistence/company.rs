@@ -9,7 +9,7 @@ use crate::{
     entities::{
         company::{Company, CompanyAccess},
         company_member::CompanyMembership,
-        memory::MemoryProviderKind,
+        memory::{MEMORY_DELETION_QUIESCENCE_SECONDS, MemoryProviderKind},
         value_objects::{AvatarUrl, CompanySlug},
     },
     use_cases::company::{CompanyPersistence, CompanyWrite},
@@ -108,24 +108,52 @@ async fn delete_company_with_cleanup(
     if !company_exists {
         return Ok(false);
     }
+    // Keep the lock order used by memory workers: execution row before lifecycle row. This also
+    // prevents the cascade below from deleting a job while deletion is deriving its fence.
+    sqlx::query("SELECT id FROM memory_provisioning_jobs WHERE company_id = $1 FOR UPDATE")
+        .bind(id)
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
     let remote_database_ids = sqlx::query_scalar::<_, String>(
         r#"SELECT remote_database_id
-           FROM memory_provider_connections
-           WHERE company_id = $1 AND provider = 'hydradb'"#,
+           FROM memory_remote_resource_lifecycles
+           WHERE company_id = $1 AND provider = 'hydradb'
+           FOR UPDATE"#,
     )
     .bind(id)
     .fetch_all(&mut *transaction)
     .await
     .map_err(AppError::from)?;
+    let quiesce_until = Utc::now() + chrono::Duration::seconds(MEMORY_DELETION_QUIESCENCE_SECONDS);
     for remote_database_id in remote_database_ids {
         sqlx::query(
+            r#"UPDATE memory_remote_resource_lifecycles
+               SET company_id = NULL, desired_state = 'absent',
+                   quiesce_until = GREATEST(quiesce_until, $3),
+                   last_error = NULL, updated_at = CURRENT_TIMESTAMP
+               WHERE provider = $1 AND remote_database_id = $2"#,
+        )
+        .bind(MemoryProviderKind::Hydradb.as_str())
+        .bind(&remote_database_id)
+        .bind(quiesce_until)
+        .execute(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        sqlx::query(
             r#"INSERT INTO memory_cleanup_jobs
-                   (id, provider, remote_database_id)
-               VALUES ($1, 'hydradb', $2)
-               ON CONFLICT (provider, remote_database_id) DO NOTHING"#,
+                   (id, provider, remote_database_id, available_at)
+               VALUES ($1, 'hydradb', $2, $3)
+               ON CONFLICT (provider, remote_database_id) DO UPDATE
+               SET status = 'pending', attempts = 0, available_at = EXCLUDED.available_at,
+                   lease_token = NULL, lease_expires_at = NULL,
+                   operation_generation = NULL, last_error = NULL,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE memory_cleanup_jobs.status <> 'leased'"#,
         )
         .bind(Uuid::new_v4())
         .bind(remote_database_id)
+        .bind(quiesce_until)
         .execute(&mut *transaction)
         .await
         .map_err(AppError::from)?;

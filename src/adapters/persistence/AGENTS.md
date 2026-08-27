@@ -56,6 +56,11 @@ LOCKED`, deterministic ordering, and a bounded limit. Queue claims are intention
 than tenant-scoped. Do not add tenant filtering to worker claims unless the worker architecture is
 being deliberately redesigned.
 
+For remote resources, the execution fence must survive deletion of its owning row. Transactionally
+set durable desired state to `absent`, detach the lifecycle row, and enqueue reconciliation before
+deleting the owner. Provisioning completion must match the current generation and desired state;
+cleanup may accept `404` only after the bounded provider-operation quiescence deadline has passed.
+
 # Encode queue state machines as constraints
 
 Status and lease columns are one state machine. Add database checks that make incoherent states

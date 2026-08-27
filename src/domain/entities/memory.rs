@@ -8,6 +8,8 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 pub const MAX_MEMORY_CONTEXT_CHARS: usize = 16_000;
+pub const MAX_MEMORY_PROVIDER_OPERATION_SECONDS: u64 = 120;
+pub const MEMORY_DELETION_QUIESCENCE_SECONDS: i64 = 180;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -74,6 +76,7 @@ pub struct LeasedMemoryJob {
     pub remote_database_id: String,
     pub attempts: i32,
     pub lease_token: Uuid,
+    pub operation_generation: i64,
 }
 
 /// A provider-safe error. Messages deliberately contain no request bodies or credentials.
