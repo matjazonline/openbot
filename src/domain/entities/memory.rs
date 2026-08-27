@@ -6,10 +6,48 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 pub const MAX_MEMORY_CONTEXT_CHARS: usize = 16_000;
+pub const MAX_MEMORY_RECALL_QUERY_CHARS: usize = 16_000;
+pub const MAX_MEMORY_PERSIST_USER_CONTEXT_CHARS: usize = 32_000;
+pub const MAX_MEMORY_PERSIST_ASSISTANT_ANSWER_CHARS: usize = 32_000;
+pub const MAX_MEMORY_ADDITIONAL_CONTEXT_CHARS: usize = 512;
+pub const MAX_MEMORY_UPSTREAM_CONTEXT_CHARS: usize = 24_000;
+pub const MAX_MEMORY_TARGET_COLLECTIONS: usize = 3;
+pub const MAX_MEMORY_PROVIDER_REQUEST_BYTES: usize = 384 * 1024;
+pub const MAX_MEMORY_PROVIDER_REQUEST_OVERHEAD_BYTES: usize = 8 * 1024;
+pub const MAX_MEMORY_PROVIDER_REQUEST_BODY_BYTES: usize =
+    MAX_MEMORY_PROVIDER_REQUEST_BYTES - MAX_MEMORY_PROVIDER_REQUEST_OVERHEAD_BYTES;
+pub const MAX_MEMORY_PROVIDER_RESPONSE_BYTES: usize = 512 * 1024;
+pub const MAX_MEMORY_RETURNED_ROWS: usize = 20;
+pub const MAX_MEMORY_CHUNK_CHARS: usize = 16_000;
+pub const MAX_MEMORY_PROVIDER_IDENTIFIER_BYTES: usize = 256;
+pub const MAX_MEMORY_PROVIDER_BASE_URL_BYTES: usize = 2_048;
+pub const MAX_MEMORY_PROVIDER_CREDENTIAL_BYTES: usize = 4_096;
+pub const MAX_MEMORY_PROVIDER_CONNECT_SECONDS: u64 = 10;
+pub const MAX_MEMORY_PROVIDER_REQUEST_SECONDS: u64 = 110;
 pub const MAX_MEMORY_PROVIDER_OPERATION_SECONDS: u64 = 120;
 pub const MEMORY_DELETION_QUIESCENCE_SECONDS: i64 = 180;
 pub const MEMORY_READINESS_WINDOW_SECONDS: i64 = 15 * 60;
 pub const MEMORY_READINESS_TIMEOUT_ERROR: &str = "memory provider readiness deadline was exceeded";
+pub const MEMORY_TRUNCATION_MARKER: &str = "\n...[truncated]";
+
+/// Truncate free text at a Unicode scalar boundary while keeping the marker inside the limit.
+pub fn truncate_memory_text(value: &str, max_chars: usize) -> (String, bool) {
+    let mut chars = value.chars();
+    if chars.by_ref().take(max_chars.saturating_add(1)).count() <= max_chars {
+        return (value.to_owned(), false);
+    }
+
+    let marker_chars = MEMORY_TRUNCATION_MARKER.chars().count();
+    let content_chars = max_chars.saturating_sub(marker_chars);
+    let mut truncated: String = value.chars().take(content_chars).collect();
+    truncated.push_str(
+        &MEMORY_TRUNCATION_MARKER
+            .chars()
+            .take(max_chars)
+            .collect::<String>(),
+    );
+    (truncated, true)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -125,6 +163,14 @@ pub enum MemoryProviderError {
     RejectedItem,
     #[error("memory provider workspace does not exist")]
     NotFound,
+    #[error("memory provider request exceeded its size bound")]
+    RequestTooLarge,
+    #[error("memory provider response exceeded its size bound")]
+    ResponseTooLarge,
+    #[error("memory provider returned more rows than requested")]
+    TooManyResults,
+    #[error("memory provider operation exceeded its target collection bound")]
+    TooManyTargets,
 }
 
 impl MemoryProviderError {
@@ -133,6 +179,16 @@ impl MemoryProviderError {
             self,
             Self::RateLimited | Self::Timeout | Self::NotReady | Self::Unavailable
         )
+    }
+
+    pub fn bound_label(&self) -> Option<&'static str> {
+        match self {
+            Self::RequestTooLarge => Some("request_bytes"),
+            Self::ResponseTooLarge => Some("response_bytes"),
+            Self::TooManyResults => Some("result_rows"),
+            Self::TooManyTargets => Some("target_collections"),
+            _ => None,
+        }
     }
 }
 
@@ -312,6 +368,9 @@ pub fn deduplicate_chunks(chunks: impl IntoIterator<Item = MemoryChunk>) -> Vec<
     let mut total = 0usize;
     let mut result = Vec::new();
     for mut chunk in chunks {
+        let (content, truncated) = truncate_memory_text(&chunk.content, MAX_MEMORY_CHUNK_CHARS);
+        chunk.content = content;
+        chunk.truncated |= truncated;
         let normalized = chunk
             .content
             .split_whitespace()
@@ -327,10 +386,9 @@ pub fn deduplicate_chunks(chunks: impl IntoIterator<Item = MemoryChunk>) -> Vec<
             continue;
         }
         let remaining = MAX_MEMORY_CONTEXT_CHARS - total;
-        let char_count = chunk.content.chars().count();
-        if char_count > remaining {
-            chunk.content = chunk.content.chars().take(remaining).collect();
-        }
+        let (content, truncated) = truncate_memory_text(&chunk.content, remaining);
+        chunk.content = content;
+        chunk.truncated |= truncated;
         total += chunk.content.chars().count();
         result.push(chunk);
     }
@@ -342,6 +400,7 @@ pub struct MemoryChunk {
     pub source_chunk_id: Option<String>,
     pub content: String,
     pub source_scope: MemoryScope,
+    pub truncated: bool,
 }
 
 #[cfg(test)]
@@ -467,16 +526,19 @@ mod tests {
                 source_chunk_id: Some("source-1".into()),
                 content: "Same   CONTENT".into(),
                 source_scope: MemoryScope::Company,
+                truncated: false,
             },
             MemoryChunk {
                 source_chunk_id: None,
                 content: "same content".into(),
                 source_scope: MemoryScope::User,
+                truncated: false,
             },
             MemoryChunk {
                 source_chunk_id: Some("source-2".into()),
                 content: "different".into(),
                 source_scope: MemoryScope::Agent(Uuid::nil()),
+                truncated: false,
             },
         ]);
         assert_eq!(chunks.len(), 2);
@@ -490,7 +552,25 @@ mod tests {
             source_chunk_id: None,
             content,
             source_scope: MemoryScope::Company,
+            truncated: false,
         }]);
         assert_eq!(chunks[0].content.chars().count(), MAX_MEMORY_CONTEXT_CHARS);
+        assert!(chunks[0].content.ends_with(MEMORY_TRUNCATION_MARKER));
+        assert!(chunks[0].truncated);
+    }
+
+    #[test]
+    fn truncation_boundary_and_unicode_marker_are_exact() {
+        let exact = "é".repeat(MAX_MEMORY_RECALL_QUERY_CHARS);
+        assert_eq!(
+            truncate_memory_text(&exact, MAX_MEMORY_RECALL_QUERY_CHARS),
+            (exact, false)
+        );
+
+        let over = "é".repeat(MAX_MEMORY_RECALL_QUERY_CHARS + 1);
+        let (bounded, truncated) = truncate_memory_text(&over, MAX_MEMORY_RECALL_QUERY_CHARS);
+        assert!(truncated);
+        assert_eq!(bounded.chars().count(), MAX_MEMORY_RECALL_QUERY_CHARS);
+        assert!(bounded.ends_with(MEMORY_TRUNCATION_MARKER));
     }
 }

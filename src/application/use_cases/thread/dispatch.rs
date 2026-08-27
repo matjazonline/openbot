@@ -21,6 +21,7 @@ use crate::{
         agent::Agent,
         channel::{ChannelType, PUBLIC_PARTICIPANT, ParticipantIdentity},
         company_member::CompanyMembership,
+        memory::{MAX_MEMORY_UPSTREAM_CONTEXT_CHARS, truncate_memory_text},
         message::{Message, MessageDirection, MessageRole},
         message_contract::NormalizedOutboundMessage,
         task::TokenUsage,
@@ -446,22 +447,37 @@ impl ThreadUseCases {
         task_id: Option<Uuid>,
     ) -> AppResult<Option<String>> {
         let mut context = String::new();
+        let mut truncated = false;
         for output in previous {
-            context.push_str(&format!(
-                "--- Step {step}: {name} ({slug}) ---\n{content}\n\n",
+            let header = format!(
+                "--- Step {step}: {name} ({slug}) ---\n",
                 step = output.channel_match.step_index + 1,
                 name = output.channel_match.channel.name,
                 slug = output.channel_match.channel.slug,
-                content = output.content,
-            ));
+            );
+            if !append_bounded_upstream(&mut context, &header)
+                || !append_bounded_upstream(&mut context, &output.content)
+                || !append_bounded_upstream(&mut context, "\n\n")
+            {
+                truncated = true;
+                break;
+            }
         }
-        if let Some(task_id) = task_id
+        if !truncated
+            && let Some(task_id) = task_id
             && let Some(outreach_context) =
                 self.task_persistence.get_outreach_context(task_id).await?
         {
-            context.push_str("--- Outreach Progress ---\n");
-            context.push_str(&outreach_context);
-            context.push_str("\n\n");
+            truncated = !append_bounded_upstream(&mut context, "--- Outreach Progress ---\n")
+                || !append_bounded_upstream(&mut context, &outreach_context)
+                || !append_bounded_upstream(&mut context, "\n\n");
+        }
+        if truncated && let Some(monitoring) = self.monitoring.as_ref() {
+            monitoring.increment_counter(
+                "memory_truncations_total",
+                1,
+                &[("operation", "persist"), ("field", "upstream_context")],
+            );
         }
         Ok((!context.is_empty()).then_some(context))
     }
@@ -900,6 +916,17 @@ impl ThreadUseCases {
     }
 }
 
+fn append_bounded_upstream(context: &mut String, value: &str) -> bool {
+    let used = context.chars().count();
+    let remaining = MAX_MEMORY_UPSTREAM_CONTEXT_CHARS.saturating_sub(used);
+    if remaining == 0 {
+        return value.is_empty();
+    }
+    let (bounded, truncated) = truncate_memory_text(value, remaining);
+    context.push_str(&bounded);
+    !truncated
+}
+
 fn context_only_message_id(ingest: &InboundIngestResult) -> Option<&str> {
     if let Some(parsed) = ingest.parsed_email.as_ref()
         && parsed.is_context_only
@@ -955,4 +982,28 @@ fn combine_metadata(outputs: &[AgentOutput<'_>]) -> Option<serde_json::Value> {
         })
         .collect();
     (!map.is_empty()).then_some(serde_json::Value::Object(map))
+}
+
+#[cfg(test)]
+mod memory_bound_tests {
+    use super::*;
+    use crate::entities::memory::MEMORY_TRUNCATION_MARKER;
+
+    #[test]
+    fn upstream_context_is_unicode_safe_at_and_over_the_limit() {
+        let mut exact = String::new();
+        assert!(append_bounded_upstream(
+            &mut exact,
+            &"🦀".repeat(MAX_MEMORY_UPSTREAM_CONTEXT_CHARS)
+        ));
+        assert_eq!(exact.chars().count(), MAX_MEMORY_UPSTREAM_CONTEXT_CHARS);
+
+        let mut over = String::new();
+        assert!(!append_bounded_upstream(
+            &mut over,
+            &"🦀".repeat(MAX_MEMORY_UPSTREAM_CONTEXT_CHARS + 1)
+        ));
+        assert_eq!(over.chars().count(), MAX_MEMORY_UPSTREAM_CONTEXT_CHARS);
+        assert!(over.ends_with(MEMORY_TRUNCATION_MARKER));
+    }
 }

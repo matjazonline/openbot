@@ -6,12 +6,14 @@ use time::Duration;
 
 use crate::{
     adapters::http::session::MIN_SECRET_BYTES,
-    entities::{memory::MAX_MEMORY_PROVIDER_OPERATION_SECONDS, value_objects::EmailAddress},
+    entities::{
+        memory::{
+            MAX_MEMORY_PROVIDER_BASE_URL_BYTES, MAX_MEMORY_PROVIDER_CREDENTIAL_BYTES,
+            MAX_MEMORY_PROVIDER_REQUEST_SECONDS,
+        },
+        value_objects::EmailAddress,
+    },
 };
-
-/// Leaves ten seconds between an HTTP request timeout and the memory worker's absolute operation
-/// deadline, while both remain below the 180-second recoverability lease.
-const MAX_HYDRA_DB_REQUEST_TIMEOUT_SECONDS: u64 = MAX_MEMORY_PROVIDER_OPERATION_SECONDS - 10;
 
 pub const DEFAULT_TASK_WORKER_CONCURRENCY: usize = 4;
 pub const MAX_TASK_WORKER_CONCURRENCY: usize = 64;
@@ -117,6 +119,14 @@ impl HydraDbConfig {
             "HYDRA_DB_API_KEY, HYDRA_DB_BASE_URL, HYDRA_DB_FAST_TIMEOUT_SECS and \
              HYDRA_DB_THINKING_TIMEOUT_SECS must either all be set or all be absent",
         );
+        assert!(
+            api_key.len() <= MAX_MEMORY_PROVIDER_CREDENTIAL_BYTES,
+            "HYDRA_DB_API_KEY exceeds the maximum supported credential length"
+        );
+        assert!(
+            base_url.len() <= MAX_MEMORY_PROVIDER_BASE_URL_BYTES,
+            "HYDRA_DB_BASE_URL exceeds the maximum supported URL length"
+        );
         let fast_timeout = parse_positive_seconds(
             "HYDRA_DB_FAST_TIMEOUT_SECS",
             fast_timeout.expect(
@@ -132,12 +142,12 @@ impl HydraDbConfig {
             ),
         );
         assert!(
-            fast_timeout.as_secs() <= MAX_HYDRA_DB_REQUEST_TIMEOUT_SECONDS,
-            "HYDRA_DB_FAST_TIMEOUT_SECS must be at most {MAX_HYDRA_DB_REQUEST_TIMEOUT_SECONDS}"
+            fast_timeout.as_secs() <= MAX_MEMORY_PROVIDER_REQUEST_SECONDS,
+            "HYDRA_DB_FAST_TIMEOUT_SECS must be at most {MAX_MEMORY_PROVIDER_REQUEST_SECONDS}"
         );
         assert!(
-            thinking_timeout.as_secs() <= MAX_HYDRA_DB_REQUEST_TIMEOUT_SECONDS,
-            "HYDRA_DB_THINKING_TIMEOUT_SECS must be at most {MAX_HYDRA_DB_REQUEST_TIMEOUT_SECONDS}"
+            thinking_timeout.as_secs() <= MAX_MEMORY_PROVIDER_REQUEST_SECONDS,
+            "HYDRA_DB_THINKING_TIMEOUT_SECS must be at most {MAX_MEMORY_PROVIDER_REQUEST_SECONDS}"
         );
         let parsed_url = url::Url::parse(&base_url)
             .expect("HYDRA_DB_BASE_URL must be an absolute http or https URL");
@@ -639,14 +649,14 @@ mod tests {
         let config = HydraDbConfig::from_values(
             Some("secret".into()),
             Some("https://hydra.example/v2".into()),
-            Some(MAX_HYDRA_DB_REQUEST_TIMEOUT_SECONDS.to_string()),
-            Some(MAX_HYDRA_DB_REQUEST_TIMEOUT_SECONDS.to_string()),
+            Some(MAX_MEMORY_PROVIDER_REQUEST_SECONDS.to_string()),
+            Some(MAX_MEMORY_PROVIDER_REQUEST_SECONDS.to_string()),
         )
         .expect("bounded HydraDB config");
 
         assert_eq!(
             config.thinking_timeout,
-            StdDuration::from_secs(MAX_HYDRA_DB_REQUEST_TIMEOUT_SECONDS)
+            StdDuration::from_secs(MAX_MEMORY_PROVIDER_REQUEST_SECONDS)
         );
     }
 
@@ -658,6 +668,17 @@ mod tests {
             Some("https://hydra.example/v2".into()),
             Some("110".into()),
             Some("111".into()),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "HYDRA_DB_API_KEY exceeds the maximum supported credential length")]
+    fn hydradb_rejects_oversized_credentials_without_echoing_them() {
+        HydraDbConfig::from_values(
+            Some("x".repeat(MAX_MEMORY_PROVIDER_CREDENTIAL_BYTES + 1)),
+            Some("https://hydra.example/v2".into()),
+            Some("10".into()),
+            Some("60".into()),
         );
     }
 }
