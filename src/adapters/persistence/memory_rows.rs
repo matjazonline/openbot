@@ -1,10 +1,11 @@
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
     entities::memory::{
-        LeasedMemoryJob, MemoryConnection, MemoryConnectionReadiness, MemoryJobKind,
-        MemoryProviderKind,
+        LeasedCleanupJob, LeasedProvisioningJob, MemoryConnection, MemoryConnectionReadiness,
+        MemoryProviderKind, MemoryProvisioningPhase,
     },
 };
 
@@ -15,15 +16,30 @@ pub(super) struct MemoryConnectionDb {
     remote_database_id: String,
     readiness: String,
     last_error: Option<String>,
+    provisioning_phase: Option<String>,
+    failure_attempts: i32,
+    readiness_deadline: Option<DateTime<Utc>>,
 }
 
 #[derive(sqlx::FromRow)]
-pub(super) struct MemoryJobDb {
+pub(super) struct ProvisioningJobDb {
     pub(super) id: Uuid,
-    pub(super) company_id: Option<Uuid>,
+    pub(super) company_id: Uuid,
     pub(super) provider: String,
     pub(super) remote_database_id: String,
-    pub(super) attempts: i32,
+    pub(super) phase: String,
+    pub(super) failure_attempts: i32,
+    pub(super) readiness_deadline: Option<DateTime<Utc>>,
+    pub(super) lease_token: Uuid,
+    pub(super) operation_generation: i64,
+}
+
+#[derive(sqlx::FromRow)]
+pub(super) struct CleanupJobDb {
+    pub(super) id: Uuid,
+    pub(super) provider: String,
+    pub(super) remote_database_id: String,
+    pub(super) failure_attempts: i32,
     pub(super) lease_token: Uuid,
     pub(super) operation_generation: i64,
 }
@@ -49,6 +65,18 @@ fn readiness(value: &str) -> AppResult<MemoryConnectionReadiness> {
     }
 }
 
+fn provisioning_phase(value: &str) -> AppResult<MemoryProvisioningPhase> {
+    match value {
+        "create_pending" => Ok(MemoryProvisioningPhase::CreatePending),
+        "waiting_ready" => Ok(MemoryProvisioningPhase::WaitingReady),
+        "ready" => Ok(MemoryProvisioningPhase::Ready),
+        "failed" => Ok(MemoryProvisioningPhase::Failed),
+        _ => Err(AppError::Internal(
+            "Stored memory provisioning phase is not supported.".into(),
+        )),
+    }
+}
+
 impl TryFrom<MemoryConnectionDb> for MemoryConnection {
     type Error = AppError;
 
@@ -59,22 +87,42 @@ impl TryFrom<MemoryConnectionDb> for MemoryConnection {
             remote_database_id: db.remote_database_id,
             readiness: readiness(&db.readiness)?,
             last_error: db.last_error,
+            provisioning_phase: db
+                .provisioning_phase
+                .as_deref()
+                .map(provisioning_phase)
+                .transpose()?,
+            failure_attempts: db.failure_attempts,
+            readiness_deadline: db.readiness_deadline,
         })
     }
 }
 
-pub(super) fn leased_job(db: MemoryJobDb, kind: MemoryJobKind) -> AppResult<LeasedMemoryJob> {
-    Ok(LeasedMemoryJob {
+pub(super) fn leased_provisioning_job(db: ProvisioningJobDb) -> AppResult<LeasedProvisioningJob> {
+    Ok(LeasedProvisioningJob {
         id: db.id,
-        kind,
         company_id: db.company_id,
         provider: provider(&db.provider)?,
         remote_database_id: db.remote_database_id,
-        attempts: db.attempts,
+        phase: provisioning_phase(&db.phase)?,
+        failure_attempts: db.failure_attempts,
+        readiness_deadline: db.readiness_deadline,
         lease_token: db.lease_token,
         operation_generation: db.operation_generation,
     })
 }
 
-pub(super) const CONNECTION_COLUMNS: &str =
-    "company_id, provider, remote_database_id, readiness, last_error";
+pub(super) fn leased_cleanup_job(db: CleanupJobDb) -> AppResult<LeasedCleanupJob> {
+    Ok(LeasedCleanupJob {
+        id: db.id,
+        provider: provider(&db.provider)?,
+        remote_database_id: db.remote_database_id,
+        failure_attempts: db.failure_attempts,
+        lease_token: db.lease_token,
+        operation_generation: db.operation_generation,
+    })
+}
+
+pub(super) const CONNECTION_COLUMNS: &str = "connection.company_id, connection.provider, connection.remote_database_id, \
+     connection.readiness, connection.last_error, job.phase AS provisioning_phase, \
+     COALESCE(job.failure_attempts, 0) AS failure_attempts, job.readiness_deadline";

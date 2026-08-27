@@ -11,7 +11,8 @@ use uuid::Uuid;
 use crate::{
     domain::monitoring::MonitoringService,
     entities::memory::{
-        LeasedMemoryJob, MAX_MEMORY_PROVIDER_OPERATION_SECONDS, MemoryProviderError,
+        LeasedProvisioningJob, MAX_MEMORY_PROVIDER_OPERATION_SECONDS,
+        MEMORY_READINESS_TIMEOUT_ERROR, MemoryProviderError, MemoryProvisioningPhase,
     },
     services::memory_provider::MemoryProviderRegistry,
     use_cases::memory::MemoryConnectionPersistence,
@@ -20,7 +21,14 @@ use crate::{
 const POLL_INTERVAL: Duration = Duration::from_secs(1);
 const ERROR_BACKOFF: Duration = Duration::from_secs(5);
 const LEASE_SECONDS: i64 = 180;
-const MAX_ATTEMPTS: i32 = 8;
+const MAX_PROVIDER_FAILURE_ATTEMPTS: i32 = 8;
+// HydraDB creation is asynchronous. Keep the total initialization window independent from each
+// request's timeout and comfortably above the provider's normal startup time.
+const READINESS_DEADLINE_SECONDS: i64 = 15 * 60;
+// Polling stays bounded while jitter prevents workers on multiple instances from synchronizing.
+const MIN_POLL_SECONDS: i64 = 2;
+const MAX_POLL_SECONDS: i64 = 5;
+const FAILURE_BUDGET_ERROR: &str = "memory provider failure budget was exhausted";
 
 pub struct MemoryWorker {
     persistence: Arc<dyn MemoryConnectionPersistence>,
@@ -100,27 +108,37 @@ impl MemoryWorker {
         {
             return Ok(true);
         }
+        if job.failure_attempts >= MAX_PROVIDER_FAILURE_ATTEMPTS {
+            self.fail_provisioning_terminal(&job, FAILURE_BUDGET_ERROR, "failure_budget_exhausted")
+                .await?;
+            return Ok(true);
+        }
+        match job.phase {
+            MemoryProvisioningPhase::CreatePending => self.create_database(&job).await?,
+            MemoryProvisioningPhase::WaitingReady => self.poll_readiness(&job).await?,
+            MemoryProvisioningPhase::Ready | MemoryProvisioningPhase::Failed => {
+                return Err("A terminal memory provisioning job was claimed.".into());
+            }
+        }
+        Ok(true)
+    }
+
+    async fn create_database(&self, job: &LeasedProvisioningJob) -> Result<(), String> {
         let outcome = match self.providers.get(job.provider) {
             Some(provider) => {
                 let operation_deadline = provider_operation_deadline();
                 if !self
                     .persistence
-                    .renew_provisioning_job(job.id, token, lease_expiry())
+                    .renew_provisioning_job(job.id, job.lease_token, lease_expiry())
                     .await
                     .map_err(|error| error.to_string())?
                 {
-                    return Ok(true);
+                    return Ok(());
                 }
-                timeout_at(operation_deadline, async {
-                    match provider.provision(&job.remote_database_id).await {
-                        Ok(()) => match provider.is_ready(&job.remote_database_id).await {
-                            Ok(true) => Ok(()),
-                            Ok(false) => Err(MemoryProviderError::NotReady),
-                            Err(error) => Err(error),
-                        },
-                        Err(error) => Err(error),
-                    }
-                })
+                timeout_at(
+                    operation_deadline,
+                    provider.provision(&job.remote_database_id),
+                )
                 .await
                 .unwrap_or(Err(MemoryProviderError::Timeout))
             }
@@ -128,15 +146,20 @@ impl MemoryWorker {
         };
         match outcome {
             Ok(()) => {
-                let completed = self
+                let accepted = self
                     .persistence
-                    .complete_provisioning(job.id, token)
+                    .begin_readiness_polling(
+                        job.id,
+                        job.lease_token,
+                        Utc::now() + chrono::Duration::seconds(READINESS_DEADLINE_SECONDS),
+                        next_poll_at(),
+                    )
                     .await
                     .map_err(|error| error.to_string())?;
                 self.record_job(
                     "provision",
-                    if completed {
-                        "completed"
+                    if accepted {
+                        "create_accepted"
                     } else {
                         "stale_suppressed"
                     },
@@ -147,23 +170,123 @@ impl MemoryWorker {
                     "provision",
                     if error.retryable() { "retry" } else { "failed" },
                 );
-                self.fail_provisioning(&job, error).await?;
+                self.fail_provisioning(job, error).await?;
             }
         }
-        Ok(true)
+        Ok(())
+    }
+
+    async fn poll_readiness(&self, job: &LeasedProvisioningJob) -> Result<(), String> {
+        let deadline = job
+            .readiness_deadline
+            .ok_or_else(|| "A readiness polling job has no deadline.".to_string())?;
+        if Utc::now() >= deadline {
+            self.timeout_provisioning(job).await?;
+            return Ok(());
+        }
+        let outcome = match self.providers.get(job.provider) {
+            Some(provider) => {
+                if !self
+                    .persistence
+                    .renew_provisioning_job(job.id, job.lease_token, lease_expiry())
+                    .await
+                    .map_err(|error| error.to_string())?
+                {
+                    return Ok(());
+                }
+                timeout_at(
+                    provider_operation_deadline(),
+                    provider.is_ready(&job.remote_database_id),
+                )
+                .await
+                .unwrap_or(Err(MemoryProviderError::Timeout))
+            }
+            None => Err(MemoryProviderError::Authentication),
+        };
+        match outcome {
+            Ok(true) => {
+                let completed = self
+                    .persistence
+                    .complete_provisioning(job.id, job.lease_token)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                self.record_job(
+                    "provision",
+                    if completed {
+                        "ready"
+                    } else {
+                        "stale_suppressed"
+                    },
+                );
+            }
+            Ok(false) if Utc::now() >= deadline => self.timeout_provisioning(job).await?,
+            Ok(false) => {
+                let scheduled = self
+                    .persistence
+                    .schedule_readiness_poll(job.id, job.lease_token, next_poll_at().min(deadline))
+                    .await
+                    .map_err(|error| error.to_string())?;
+                self.record_job(
+                    "provision",
+                    if scheduled {
+                        "waiting_ready"
+                    } else {
+                        "stale_suppressed"
+                    },
+                );
+            }
+            Err(error) => {
+                self.record_job(
+                    "provision",
+                    if error.retryable() { "retry" } else { "failed" },
+                );
+                self.fail_provisioning(job, error).await?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn timeout_provisioning(&self, job: &LeasedProvisioningJob) -> Result<(), String> {
+        self.fail_provisioning_terminal(job, MEMORY_READINESS_TIMEOUT_ERROR, "readiness_timed_out")
+            .await
+    }
+
+    async fn fail_provisioning_terminal(
+        &self,
+        job: &LeasedProvisioningJob,
+        safe_error: &str,
+        outcome: &str,
+    ) -> Result<(), String> {
+        let failed = self
+            .persistence
+            .fail_provisioning_job(job.id, job.lease_token, safe_error)
+            .await
+            .map_err(|error| error.to_string())?;
+        self.record_job(
+            "provision",
+            if failed { outcome } else { "stale_suppressed" },
+        );
+        Ok(())
     }
 
     async fn fail_provisioning(
         &self,
-        job: &LeasedMemoryJob,
+        job: &LeasedProvisioningJob,
         error: MemoryProviderError,
     ) -> Result<(), String> {
-        let terminal = !error.retryable() || job.attempts >= MAX_ATTEMPTS;
+        let terminal =
+            !error.retryable() || job.failure_attempts + 1 >= MAX_PROVIDER_FAILURE_ATTEMPTS;
+        let mut retry_at = retry_at(job.failure_attempts + 1);
+        if job.phase == MemoryProvisioningPhase::WaitingReady {
+            if let Some(deadline) = job.readiness_deadline {
+                retry_at = retry_at.min(deadline);
+            }
+        }
         self.persistence
             .retry_provisioning_job(
                 job.id,
                 job.lease_token,
-                retry_at(job.attempts, &error),
+                retry_at,
                 &error.to_string(),
                 terminal,
             )
@@ -220,7 +343,8 @@ impl MemoryWorker {
                     "cleanup",
                     if error.retryable() { "retry" } else { "failed" },
                 );
-                let terminal = !error.retryable() || job.attempts >= MAX_ATTEMPTS;
+                let terminal =
+                    !error.retryable() || job.failure_attempts >= MAX_PROVIDER_FAILURE_ATTEMPTS;
                 if terminal {
                     self.record_job("cleanup", "exhausted");
                 }
@@ -228,7 +352,7 @@ impl MemoryWorker {
                     .retry_cleanup_job(
                         job.id,
                         token,
-                        retry_at(job.attempts, &error),
+                        retry_at(job.failure_attempts),
                         &error.to_string(),
                         terminal,
                     )
@@ -256,18 +380,32 @@ fn provider_operation_deadline() -> Instant {
     Instant::now() + Duration::from_secs(MAX_MEMORY_PROVIDER_OPERATION_SECONDS)
 }
 
-fn retry_at(attempts: i32, error: &MemoryProviderError) -> DateTime<Utc> {
-    let seconds = if *error == MemoryProviderError::NotReady {
-        2
-    } else {
-        (5_i64 * 2_i64.pow(attempts.clamp(0, 6) as u32)).min(300)
-    };
+fn retry_at(failure_attempts: i32) -> DateTime<Utc> {
+    let base_seconds = (5_i64 * 2_i64.pow(failure_attempts.clamp(0, 6) as u32)).min(300);
+    let seconds = jittered_seconds(base_seconds, 80, 120).clamp(4, 300);
     Utc::now() + chrono::Duration::seconds(seconds)
+}
+
+fn next_poll_at() -> DateTime<Utc> {
+    Utc::now()
+        + chrono::Duration::seconds(jittered_seconds(
+            MIN_POLL_SECONDS,
+            100,
+            MAX_POLL_SECONDS * 100 / MIN_POLL_SECONDS,
+        ))
+}
+
+fn jittered_seconds(base: i64, minimum_percent: i64, maximum_percent: i64) -> i64 {
+    let bytes = Uuid::new_v4().into_bytes();
+    let sample = u64::from_le_bytes(bytes[..8].try_into().expect("UUID prefix is eight bytes"));
+    let percent =
+        minimum_percent + (sample % (maximum_percent - minimum_percent + 1) as u64) as i64;
+    (base * percent / 100).max(1)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     use async_trait::async_trait;
     use tokio::sync::Semaphore;
@@ -296,6 +434,66 @@ mod tests {
         provision_started: Semaphore,
         release_provision: Semaphore,
         present: AtomicBool,
+    }
+
+    struct CountingReadinessProvider {
+        provision_calls: AtomicUsize,
+        readiness_calls: AtomicUsize,
+        status_failures: usize,
+        non_ready_polls: usize,
+    }
+
+    impl CountingReadinessProvider {
+        fn new(status_failures: usize, non_ready_polls: usize) -> Self {
+            Self {
+                provision_calls: AtomicUsize::new(0),
+                readiness_calls: AtomicUsize::new(0),
+                status_failures,
+                non_ready_polls,
+            }
+        }
+    }
+
+    #[async_trait]
+    impl MemoryProvider for CountingReadinessProvider {
+        async fn provision(&self, _database_id: &str) -> Result<(), MemoryProviderError> {
+            self.provision_calls.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+
+        async fn is_ready(&self, _database_id: &str) -> Result<bool, MemoryProviderError> {
+            let call = self.readiness_calls.fetch_add(1, Ordering::SeqCst) + 1;
+            if call <= self.status_failures {
+                Err(MemoryProviderError::Unavailable)
+            } else {
+                Ok(call > self.status_failures + self.non_ready_polls)
+            }
+        }
+
+        async fn recall(
+            &self,
+            _database_id: &str,
+            _query: &str,
+            _scopes: &[ResolvedMemoryScope],
+            _mode: MemoryRecallMode,
+            _max_results: u8,
+            _additional_context: Option<&str>,
+        ) -> Result<Vec<MemoryChunk>, MemoryProviderError> {
+            Ok(Vec::new())
+        }
+
+        async fn persist(
+            &self,
+            _database_id: &str,
+            _collections: &[String],
+            _conversation: &MemoryConversation,
+        ) -> Vec<Result<(), MemoryProviderError>> {
+            Vec::new()
+        }
+
+        async fn delete(&self, _database_id: &str) -> Result<(), MemoryProviderError> {
+            Ok(())
+        }
     }
 
     impl PausingProvider {
@@ -356,12 +554,201 @@ mod tests {
     }
 
     #[test]
-    fn retry_backoff_is_bounded_and_not_ready_polls_quickly() {
+    fn retry_and_poll_schedules_are_bounded_and_jittered() {
         let now = Utc::now();
-        assert!(
-            retry_at(99, &MemoryProviderError::Unavailable) <= now + chrono::Duration::seconds(301)
+        assert!(retry_at(99) <= now + chrono::Duration::seconds(301));
+        let poll = next_poll_at();
+        assert!(poll >= now + chrono::Duration::seconds(MIN_POLL_SECONDS));
+        assert!(poll <= now + chrono::Duration::seconds(MAX_POLL_SECONDS + 1));
+    }
+
+    #[tokio::test]
+    async fn healthy_slow_readiness_does_not_retry_create_or_spend_failure_budget() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let persistence = Arc::new(PostgresPersistence::new(pool.clone()));
+        let suffix = Uuid::new_v4().simple().to_string();
+        let user = persistence
+            .create_user(
+                &format!("memory-slow-{suffix}"),
+                &format!("memory-slow-{suffix}@example.com"),
+                "hash",
+            )
+            .await
+            .expect("slow readiness user");
+        let company = persistence
+            .create(
+                user.id,
+                CompanyWrite {
+                    name: "Slow memory readiness".into(),
+                    slug: format!("memory-slow-{suffix}"),
+                    ..CompanyWrite::default()
+                },
+            )
+            .await
+            .expect("slow readiness company");
+        let connection = persistence
+            .select_provider(company.id, MemoryProviderKind::Hydradb)
+            .await
+            .expect("select provider");
+        let provider = Arc::new(CountingReadinessProvider::new(0, 10));
+        let providers = Arc::new(
+            MemoryProviderRegistry::default()
+                .register(MemoryProviderKind::Hydradb, provider.clone()),
         );
-        assert!(retry_at(1, &MemoryProviderError::NotReady) <= now + chrono::Duration::seconds(3));
+        let monitor = Arc::new(InMemoryMonitor::new());
+
+        MemoryWorker::new(persistence.clone(), providers.clone(), monitor.clone())
+            .process_one_provisioning()
+            .await
+            .expect("create phase");
+        let original_deadline: DateTime<Utc> = sqlx::query_scalar(
+            "SELECT readiness_deadline FROM memory_provisioning_jobs WHERE company_id = $1",
+        )
+        .bind(company.id)
+        .fetch_one(&pool)
+        .await
+        .expect("readiness deadline");
+
+        for _ in 0..=10 {
+            sqlx::query(
+                "UPDATE memory_provisioning_jobs SET next_poll_at = CURRENT_TIMESTAMP \
+                 WHERE company_id = $1 AND status = 'pending'",
+            )
+            .bind(company.id)
+            .execute(&pool)
+            .await
+            .expect("make readiness poll due");
+            // Constructing a fresh worker exercises restart behavior: the deadline comes from the row.
+            MemoryWorker::new(persistence.clone(), providers.clone(), monitor.clone())
+                .process_one_provisioning()
+                .await
+                .expect("readiness poll");
+        }
+
+        let job: (String, String, i32, Option<DateTime<Utc>>) = sqlx::query_as(
+            "SELECT status, phase, failure_attempts, readiness_deadline \
+             FROM memory_provisioning_jobs WHERE company_id = $1",
+        )
+        .bind(company.id)
+        .fetch_one(&pool)
+        .await
+        .expect("completed provisioning job");
+        assert_eq!(job.0, "completed");
+        assert_eq!(job.1, "ready");
+        assert_eq!(job.2, 0);
+        assert_eq!(job.3, Some(original_deadline));
+        assert_eq!(provider.provision_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(provider.readiness_calls.load(Ordering::SeqCst), 11);
+        assert_eq!(
+            persistence
+                .connection(company.id)
+                .await
+                .expect("load connection")
+                .expect("connection")
+                .remote_database_id,
+            connection.remote_database_id
+        );
+    }
+
+    #[tokio::test]
+    async fn transient_status_failure_spends_failure_budget_and_preserves_create_phase() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let persistence = Arc::new(PostgresPersistence::new(pool.clone()));
+        let suffix = Uuid::new_v4().simple().to_string();
+        let user = persistence
+            .create_user(
+                &format!("memory-transient-{suffix}"),
+                &format!("memory-transient-{suffix}@example.com"),
+                "hash",
+            )
+            .await
+            .expect("transient status user");
+        let company = persistence
+            .create(
+                user.id,
+                CompanyWrite {
+                    name: "Transient memory status".into(),
+                    slug: format!("memory-transient-{suffix}"),
+                    ..CompanyWrite::default()
+                },
+            )
+            .await
+            .expect("transient status company");
+        persistence
+            .select_provider(company.id, MemoryProviderKind::Hydradb)
+            .await
+            .expect("select provider");
+        let provider = Arc::new(CountingReadinessProvider::new(1, 0));
+        let providers = Arc::new(
+            MemoryProviderRegistry::default()
+                .register(MemoryProviderKind::Hydradb, provider.clone()),
+        );
+        let worker = MemoryWorker::new(
+            persistence.clone(),
+            providers,
+            Arc::new(InMemoryMonitor::new()),
+        );
+        worker
+            .process_one_provisioning()
+            .await
+            .expect("create phase");
+        sqlx::query(
+            "UPDATE memory_provisioning_jobs SET next_poll_at = CURRENT_TIMESTAMP \
+             WHERE company_id = $1",
+        )
+        .bind(company.id)
+        .execute(&pool)
+        .await
+        .expect("make failing poll due");
+        let before_failure = Utc::now();
+        worker
+            .process_one_provisioning()
+            .await
+            .expect("transient failing poll");
+
+        let retry: (String, i32, DateTime<Utc>, DateTime<Utc>) = sqlx::query_as(
+            "SELECT phase, failure_attempts, next_poll_at, readiness_deadline \
+             FROM memory_provisioning_jobs WHERE company_id = $1",
+        )
+        .bind(company.id)
+        .fetch_one(&pool)
+        .await
+        .expect("retry state");
+        assert_eq!(retry.0, "waiting_ready");
+        assert_eq!(retry.1, 1);
+        assert!(retry.2 >= before_failure + chrono::Duration::seconds(7));
+        assert!(retry.2 <= before_failure + chrono::Duration::seconds(13));
+        assert!(retry.3 > retry.2);
+        assert_eq!(provider.provision_calls.load(Ordering::SeqCst), 1);
+
+        sqlx::query(
+            "UPDATE memory_provisioning_jobs SET next_poll_at = CURRENT_TIMESTAMP \
+             WHERE company_id = $1",
+        )
+        .bind(company.id)
+        .execute(&pool)
+        .await
+        .expect("make successful poll due");
+        worker
+            .process_one_provisioning()
+            .await
+            .expect("successful readiness poll");
+        assert_eq!(provider.provision_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(provider.readiness_calls.load(Ordering::SeqCst), 2);
+        let completed: (String, i32) = sqlx::query_as(
+            "SELECT status, failure_attempts FROM memory_provisioning_jobs WHERE company_id = $1",
+        )
+        .bind(company.id)
+        .fetch_one(&pool)
+        .await
+        .expect("completed retry state");
+        assert_eq!(completed, ("completed".into(), 1));
     }
 
     #[tokio::test]

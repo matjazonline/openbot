@@ -3,6 +3,7 @@ use std::{
     fmt,
 };
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -10,6 +11,7 @@ use uuid::Uuid;
 pub const MAX_MEMORY_CONTEXT_CHARS: usize = 16_000;
 pub const MAX_MEMORY_PROVIDER_OPERATION_SECONDS: u64 = 120;
 pub const MEMORY_DELETION_QUIESCENCE_SECONDS: i64 = 180;
+pub const MEMORY_READINESS_TIMEOUT_ERROR: &str = "memory provider readiness deadline was exceeded";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -59,22 +61,49 @@ pub struct MemoryConnection {
     pub remote_database_id: String,
     pub readiness: MemoryConnectionReadiness,
     pub last_error: Option<String>,
+    pub provisioning_phase: Option<MemoryProvisioningPhase>,
+    pub failure_attempts: i32,
+    pub readiness_deadline: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MemoryJobKind {
-    Provision,
-    Cleanup,
+pub enum MemoryProvisioningPhase {
+    CreatePending,
+    WaitingReady,
+    Ready,
+    Failed,
+}
+
+impl MemoryProvisioningPhase {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::CreatePending => "create_pending",
+            Self::WaitingReady => "waiting_ready",
+            Self::Ready => "ready",
+            Self::Failed => "failed",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LeasedMemoryJob {
+pub struct LeasedProvisioningJob {
     pub id: Uuid,
-    pub kind: MemoryJobKind,
-    pub company_id: Option<Uuid>,
+    pub company_id: Uuid,
     pub provider: MemoryProviderKind,
     pub remote_database_id: String,
-    pub attempts: i32,
+    pub phase: MemoryProvisioningPhase,
+    pub failure_attempts: i32,
+    pub readiness_deadline: Option<DateTime<Utc>>,
+    pub lease_token: Uuid,
+    pub operation_generation: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LeasedCleanupJob {
+    pub id: Uuid,
+    pub provider: MemoryProviderKind,
+    pub remote_database_id: String,
+    pub failure_attempts: i32,
     pub lease_token: Uuid,
     pub operation_generation: i64,
 }

@@ -564,7 +564,19 @@ fn memory_status(
             escape_html_text(detail),
         );
     };
-    let readiness = memory.readiness.as_str();
+    let readiness = match (
+        memory.readiness,
+        memory.provisioning_phase,
+        memory.last_error.as_deref(),
+    ) {
+        (MemoryConnectionReadiness::Ready, _, _) => "ready",
+        (MemoryConnectionReadiness::Failed, _, Some(MEMORY_READINESS_TIMEOUT_ERROR)) => "timed out",
+        (MemoryConnectionReadiness::Failed, _, _) => "provider failed",
+        (_, _, Some(_)) => "retrying a provider error",
+        (_, Some(MemoryProvisioningPhase::CreatePending), _) => "creating",
+        (_, Some(MemoryProvisioningPhase::WaitingReady), _) => "waiting for readiness",
+        _ => memory.readiness.as_str(),
+    };
     let retry = if memory.readiness == MemoryConnectionReadiness::Failed && hydradb_configured {
         format!(
             r##"<button type="button" class="btn btn-sm" hx-post="/ui/companies/{company_id}/memory/retry" hx-target="#company-pane" hx-swap="outerHTML" hx-disabled-elt="this"><span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>Retry provisioning</button>"##

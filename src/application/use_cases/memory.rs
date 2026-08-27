@@ -6,7 +6,9 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::memory::{LeasedMemoryJob, MemoryConnection, MemoryProviderKind},
+    entities::memory::{
+        LeasedCleanupJob, LeasedProvisioningJob, MemoryConnection, MemoryProviderKind,
+    },
     use_cases::company::{CompanyPersistence, owned_company},
 };
 
@@ -25,13 +27,26 @@ pub trait MemoryConnectionPersistence: Send + Sync {
         &self,
         lease_token: Uuid,
         lease_expires_at: DateTime<Utc>,
-    ) -> AppResult<Option<LeasedMemoryJob>>;
+    ) -> AppResult<Option<LeasedProvisioningJob>>;
     async fn mark_provisioning(&self, job_id: Uuid, lease_token: Uuid) -> AppResult<bool>;
     async fn renew_provisioning_job(
         &self,
         job_id: Uuid,
         lease_token: Uuid,
         lease_expires_at: DateTime<Utc>,
+    ) -> AppResult<bool>;
+    async fn begin_readiness_polling(
+        &self,
+        job_id: Uuid,
+        lease_token: Uuid,
+        readiness_deadline: DateTime<Utc>,
+        next_poll_at: DateTime<Utc>,
+    ) -> AppResult<bool>;
+    async fn schedule_readiness_poll(
+        &self,
+        job_id: Uuid,
+        lease_token: Uuid,
+        next_poll_at: DateTime<Utc>,
     ) -> AppResult<bool>;
     async fn complete_provisioning(&self, job_id: Uuid, lease_token: Uuid) -> AppResult<bool>;
     async fn retry_provisioning_job(
@@ -42,12 +57,18 @@ pub trait MemoryConnectionPersistence: Send + Sync {
         safe_error: &str,
         terminal: bool,
     ) -> AppResult<bool>;
+    async fn fail_provisioning_job(
+        &self,
+        job_id: Uuid,
+        lease_token: Uuid,
+        safe_error: &str,
+    ) -> AppResult<bool>;
 
     async fn claim_cleanup_job(
         &self,
         lease_token: Uuid,
         lease_expires_at: DateTime<Utc>,
-    ) -> AppResult<Option<LeasedMemoryJob>>;
+    ) -> AppResult<Option<LeasedCleanupJob>>;
     async fn complete_cleanup(&self, job_id: Uuid, lease_token: Uuid) -> AppResult<bool>;
     async fn renew_cleanup_job(
         &self,

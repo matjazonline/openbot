@@ -6,7 +6,7 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::memory::{
-        LeasedMemoryJob, MemoryConnection, MemoryJobKind, MemoryProviderKind,
+        LeasedCleanupJob, LeasedProvisioningJob, MemoryConnection, MemoryProviderKind,
         remote_memory_database_id,
     },
     use_cases::memory::MemoryConnectionPersistence,
@@ -15,14 +15,19 @@ use crate::{
 #[path = "memory_rows.rs"]
 mod rows;
 
-use rows::{CONNECTION_COLUMNS, MemoryConnectionDb, MemoryJobDb, leased_job};
+use rows::{
+    CONNECTION_COLUMNS, CleanupJobDb, MemoryConnectionDb, ProvisioningJobDb, leased_cleanup_job,
+    leased_provisioning_job,
+};
 
 #[async_trait]
 impl MemoryConnectionPersistence for PostgresPersistence {
     async fn connection(&self, company_id: Uuid) -> AppResult<Option<MemoryConnection>> {
         let query = format!(
-            "SELECT {CONNECTION_COLUMNS} FROM memory_provider_connections \
-             WHERE company_id = $1 AND provider = 'hydradb'"
+            "SELECT {CONNECTION_COLUMNS} FROM memory_provider_connections AS connection \
+             LEFT JOIN memory_provisioning_jobs AS job \
+               ON job.company_id = connection.company_id AND job.provider = connection.provider \
+             WHERE connection.company_id = $1 AND connection.provider = 'hydradb'"
         );
         sqlx::query_as::<_, MemoryConnectionDb>(&query)
             .bind(company_id)
@@ -95,9 +100,10 @@ impl MemoryConnectionPersistence for PostgresPersistence {
                        (id, company_id, provider, remote_database_id)
                    VALUES ($1, $2, $3, $4)
                    ON CONFLICT (company_id, provider) DO UPDATE
-                   SET status = 'pending', attempts = 0,
+                   SET status = 'pending', phase = 'create_pending', failure_attempts = 0,
                        available_at = CURRENT_TIMESTAMP, lease_token = NULL,
-                       lease_expires_at = NULL, last_error = NULL,
+                       lease_expires_at = NULL, operation_generation = NULL,
+                       readiness_deadline = NULL, next_poll_at = NULL, last_error = NULL,
                        updated_at = CURRENT_TIMESTAMP
                    WHERE memory_provisioning_jobs.status <> 'leased'"#,
             )
@@ -160,8 +166,10 @@ impl MemoryConnectionPersistence for PostgresPersistence {
                    (id, company_id, provider, remote_database_id)
                VALUES ($1, $2, $3, $4)
                ON CONFLICT (company_id, provider) DO UPDATE
-               SET status = 'pending', attempts = 0, available_at = CURRENT_TIMESTAMP,
-                   lease_token = NULL, lease_expires_at = NULL, last_error = NULL,
+               SET status = 'pending', phase = 'create_pending', failure_attempts = 0,
+                   available_at = CURRENT_TIMESTAMP, lease_token = NULL,
+                   lease_expires_at = NULL, operation_generation = NULL,
+                   readiness_deadline = NULL, next_poll_at = NULL, last_error = NULL,
                    updated_at = CURRENT_TIMESTAMP
                WHERE memory_provisioning_jobs.status <> 'leased'"#,
         )
@@ -169,6 +177,16 @@ impl MemoryConnectionPersistence for PostgresPersistence {
         .bind(company_id)
         .bind(connection.provider.as_str())
         .bind(connection.remote_database_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        sqlx::query(
+            r#"UPDATE memory_provider_connections
+               SET readiness = 'pending', last_error = NULL, updated_at = CURRENT_TIMESTAMP
+               WHERE company_id = $1 AND provider = $2"#,
+        )
+        .bind(company_id)
+        .bind(connection.provider.as_str())
         .execute(&mut *transaction)
         .await
         .map_err(AppError::from)?;
@@ -180,8 +198,8 @@ impl MemoryConnectionPersistence for PostgresPersistence {
         &self,
         lease_token: Uuid,
         lease_expires_at: DateTime<Utc>,
-    ) -> AppResult<Option<LeasedMemoryJob>> {
-        let row = sqlx::query_as::<_, MemoryJobDb>(
+    ) -> AppResult<Option<LeasedProvisioningJob>> {
+        let row = sqlx::query_as::<_, ProvisioningJobDb>(
             r#"WITH candidate AS (
                    SELECT job.id, lifecycle.provider, lifecycle.remote_database_id
                    FROM memory_provisioning_jobs AS job
@@ -189,7 +207,11 @@ impl MemoryConnectionPersistence for PostgresPersistence {
                      ON lifecycle.provider = job.provider
                     AND lifecycle.remote_database_id = job.remote_database_id
                    WHERE (
-                           (job.status = 'pending' AND job.available_at <= CURRENT_TIMESTAMP)
+                           (job.status = 'pending' AND
+                               CASE job.phase
+                                   WHEN 'waiting_ready' THEN job.next_poll_at
+                                   ELSE job.available_at
+                               END <= CURRENT_TIMESTAMP)
                            OR
                            (job.status = 'leased' AND job.lease_expires_at <= CURRENT_TIMESTAMP)
                          )
@@ -199,7 +221,11 @@ impl MemoryConnectionPersistence for PostgresPersistence {
                            lifecycle.operation_lease_expires_at IS NULL
                            OR lifecycle.operation_lease_expires_at <= CURRENT_TIMESTAMP
                          )
-                   ORDER BY job.available_at, job.created_at, job.id
+                   ORDER BY CASE job.phase
+                                WHEN 'waiting_ready' THEN job.next_poll_at
+                                ELSE job.available_at
+                            END,
+                            job.created_at, job.id
                    FOR UPDATE OF job, lifecycle SKIP LOCKED
                    LIMIT 1
                ), claimed_lifecycle AS (
@@ -214,7 +240,9 @@ impl MemoryConnectionPersistence for PostgresPersistence {
                              lifecycle.operation_generation
                )
                UPDATE memory_provisioning_jobs AS job
-               SET status = 'leased', attempts = job.attempts + 1,
+               SET status = 'leased',
+                   failure_attempts = job.failure_attempts
+                       + CASE WHEN job.status = 'leased' THEN 1 ELSE 0 END,
                    lease_token = $1, lease_expires_at = $2,
                    operation_generation = claimed_lifecycle.operation_generation,
                    updated_at = CURRENT_TIMESTAMP
@@ -224,15 +252,15 @@ impl MemoryConnectionPersistence for PostgresPersistence {
                 AND claimed_lifecycle.remote_database_id = candidate.remote_database_id
                WHERE job.id = candidate.id
                RETURNING job.id, job.company_id, job.provider, job.remote_database_id,
-                         job.attempts, job.lease_token, job.operation_generation"#,
+                         job.phase, job.failure_attempts, job.readiness_deadline,
+                         job.lease_token, job.operation_generation"#,
         )
         .bind(lease_token)
         .bind(lease_expires_at)
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
-        row.map(|row| leased_job(row, MemoryJobKind::Provision))
-            .transpose()
+        row.map(leased_provisioning_job).transpose()
     }
 
     async fn mark_provisioning(&self, job_id: Uuid, lease_token: Uuid) -> AppResult<bool> {
@@ -280,6 +308,43 @@ impl MemoryConnectionPersistence for PostgresPersistence {
         .await
     }
 
+    async fn begin_readiness_polling(
+        &self,
+        job_id: Uuid,
+        lease_token: Uuid,
+        readiness_deadline: DateTime<Utc>,
+        next_poll_at: DateTime<Utc>,
+    ) -> AppResult<bool> {
+        transition_provisioning_job(
+            self,
+            job_id,
+            lease_token,
+            ProvisioningTransition::Waiting {
+                readiness_deadline: Some(readiness_deadline),
+                next_poll_at,
+            },
+        )
+        .await
+    }
+
+    async fn schedule_readiness_poll(
+        &self,
+        job_id: Uuid,
+        lease_token: Uuid,
+        next_poll_at: DateTime<Utc>,
+    ) -> AppResult<bool> {
+        transition_provisioning_job(
+            self,
+            job_id,
+            lease_token,
+            ProvisioningTransition::Waiting {
+                readiness_deadline: None,
+                next_poll_at,
+            },
+        )
+        .await
+    }
+
     async fn complete_provisioning(&self, job_id: Uuid, lease_token: Uuid) -> AppResult<bool> {
         let company_id = sqlx::query_scalar::<_, Uuid>(
             r#"WITH current_job AS (
@@ -287,6 +352,7 @@ impl MemoryConnectionPersistence for PostgresPersistence {
                           job.operation_generation
                    FROM memory_provisioning_jobs AS job
                    WHERE job.id = $1 AND job.status = 'leased' AND job.lease_token = $2
+                     AND job.phase = 'waiting_ready'
                      AND job.lease_expires_at > CURRENT_TIMESTAMP
                      AND EXISTS (
                          SELECT 1 FROM memory_remote_resource_lifecycles AS lifecycle
@@ -301,7 +367,8 @@ impl MemoryConnectionPersistence for PostgresPersistence {
                    FOR UPDATE
                ), completed_job AS (
                    UPDATE memory_provisioning_jobs AS job
-                   SET status = 'completed', lease_token = NULL, lease_expires_at = NULL,
+                   SET status = 'completed', phase = 'ready',
+                       lease_token = NULL, lease_expires_at = NULL,
                        operation_generation = NULL, last_error = NULL,
                        updated_at = CURRENT_TIMESTAMP
                    FROM current_job
@@ -366,7 +433,14 @@ impl MemoryConnectionPersistence for PostgresPersistence {
                    FOR UPDATE
                ), retried_job AS (
                    UPDATE memory_provisioning_jobs AS job
-                   SET status = $3, available_at = $4, lease_token = NULL,
+                   SET status = $3,
+                       phase = CASE WHEN $3 = 'failed' THEN 'failed' ELSE job.phase END,
+                       failure_attempts = job.failure_attempts + 1,
+                       available_at = CASE WHEN job.phase = 'create_pending'
+                                           THEN $4 ELSE job.available_at END,
+                       next_poll_at = CASE WHEN job.phase = 'waiting_ready'
+                                           THEN $4 ELSE job.next_poll_at END,
+                       lease_token = NULL,
                        lease_expires_at = NULL, operation_generation = NULL,
                        last_error = $5, updated_at = CURRENT_TIMESTAMP
                    FROM current_job
@@ -406,12 +480,27 @@ impl MemoryConnectionPersistence for PostgresPersistence {
         Ok(company_id.is_some())
     }
 
+    async fn fail_provisioning_job(
+        &self,
+        job_id: Uuid,
+        lease_token: Uuid,
+        safe_error: &str,
+    ) -> AppResult<bool> {
+        transition_provisioning_job(
+            self,
+            job_id,
+            lease_token,
+            ProvisioningTransition::Failed { safe_error },
+        )
+        .await
+    }
+
     async fn claim_cleanup_job(
         &self,
         lease_token: Uuid,
         lease_expires_at: DateTime<Utc>,
-    ) -> AppResult<Option<LeasedMemoryJob>> {
-        let row = sqlx::query_as::<_, MemoryJobDb>(
+    ) -> AppResult<Option<LeasedCleanupJob>> {
+        let row = sqlx::query_as::<_, CleanupJobDb>(
             r#"WITH candidate AS (
                    SELECT job.id, lifecycle.provider, lifecycle.remote_database_id
                    FROM memory_cleanup_jobs AS job
@@ -453,8 +542,8 @@ impl MemoryConnectionPersistence for PostgresPersistence {
                  ON claimed_lifecycle.provider = candidate.provider
                 AND claimed_lifecycle.remote_database_id = candidate.remote_database_id
                WHERE job.id = candidate.id
-               RETURNING job.id, NULL::uuid AS company_id, job.provider,
-                         job.remote_database_id, job.attempts, job.lease_token,
+               RETURNING job.id, job.provider,
+                         job.remote_database_id, job.attempts AS failure_attempts, job.lease_token,
                          job.operation_generation"#,
         )
         .bind(lease_token)
@@ -462,8 +551,7 @@ impl MemoryConnectionPersistence for PostgresPersistence {
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
-        row.map(|row| leased_job(row, MemoryJobKind::Cleanup))
-            .transpose()
+        row.map(leased_cleanup_job).transpose()
     }
 
     async fn complete_cleanup(&self, job_id: Uuid, lease_token: Uuid) -> AppResult<bool> {
@@ -589,6 +677,144 @@ impl MemoryConnectionPersistence for PostgresPersistence {
     }
 }
 
+enum ProvisioningTransition<'a> {
+    Waiting {
+        readiness_deadline: Option<DateTime<Utc>>,
+        next_poll_at: DateTime<Utc>,
+    },
+    Failed {
+        safe_error: &'a str,
+    },
+}
+
+async fn transition_provisioning_job(
+    persistence: &PostgresPersistence,
+    job_id: Uuid,
+    lease_token: Uuid,
+    transition: ProvisioningTransition<'_>,
+) -> AppResult<bool> {
+    let company_id = match transition {
+        ProvisioningTransition::Waiting {
+            readiness_deadline,
+            next_poll_at,
+        } => sqlx::query_scalar::<_, Uuid>(
+            r#"WITH current_job AS (
+                       SELECT job.id, job.company_id, job.provider, job.remote_database_id,
+                              job.operation_generation
+                       FROM memory_provisioning_jobs AS job
+                       WHERE job.id = $1 AND job.status = 'leased' AND job.lease_token = $2
+                         AND job.lease_expires_at > CURRENT_TIMESTAMP
+                         AND job.phase = CASE WHEN $3::timestamptz IS NULL
+                                              THEN 'waiting_ready' ELSE 'create_pending' END
+                         AND EXISTS (
+                             SELECT 1 FROM memory_remote_resource_lifecycles AS lifecycle
+                             WHERE lifecycle.provider = job.provider
+                               AND lifecycle.remote_database_id = job.remote_database_id
+                               AND lifecycle.company_id = job.company_id
+                               AND lifecycle.desired_state = 'present'
+                               AND lifecycle.operation_generation = job.operation_generation
+                               AND lifecycle.operation_lease_token = job.lease_token
+                               AND lifecycle.operation_lease_expires_at > CURRENT_TIMESTAMP
+                         )
+                       FOR UPDATE
+                   ), updated_job AS (
+                       UPDATE memory_provisioning_jobs AS job
+                       SET status = 'pending', phase = 'waiting_ready',
+                           readiness_deadline = COALESCE($3, job.readiness_deadline),
+                           next_poll_at = $4, lease_token = NULL, lease_expires_at = NULL,
+                           operation_generation = NULL, last_error = NULL,
+                           updated_at = CURRENT_TIMESTAMP
+                       FROM current_job
+                       WHERE job.id = current_job.id
+                       RETURNING current_job.company_id, current_job.provider,
+                                 current_job.remote_database_id,
+                                 current_job.operation_generation
+                   ), released_lifecycle AS (
+                       UPDATE memory_remote_resource_lifecycles AS lifecycle
+                       SET operation_lease_token = NULL, operation_lease_expires_at = NULL,
+                           last_error = NULL, updated_at = CURRENT_TIMESTAMP
+                       FROM updated_job
+                       WHERE lifecycle.provider = updated_job.provider
+                         AND lifecycle.remote_database_id = updated_job.remote_database_id
+                         AND lifecycle.company_id = updated_job.company_id
+                         AND lifecycle.desired_state = 'present'
+                         AND lifecycle.operation_generation = updated_job.operation_generation
+                         AND lifecycle.operation_lease_token = $2
+                       RETURNING lifecycle.company_id
+                   )
+                   UPDATE memory_provider_connections AS connection
+                   SET readiness = 'provisioning', last_error = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                   FROM released_lifecycle
+                   WHERE connection.company_id = released_lifecycle.company_id
+                     AND connection.provider = 'hydradb'
+                   RETURNING connection.company_id"#,
+        )
+        .bind(job_id)
+        .bind(lease_token)
+        .bind(readiness_deadline)
+        .bind(next_poll_at)
+        .fetch_optional(&persistence.pool)
+        .await
+        .map_err(AppError::from)?,
+        ProvisioningTransition::Failed { safe_error } => sqlx::query_scalar::<_, Uuid>(
+            r#"WITH current_job AS (
+                       SELECT job.id, job.company_id, job.provider, job.remote_database_id,
+                              job.operation_generation
+                       FROM memory_provisioning_jobs AS job
+                       WHERE job.id = $1 AND job.status = 'leased' AND job.lease_token = $2
+                         AND job.lease_expires_at > CURRENT_TIMESTAMP
+                         AND EXISTS (
+                             SELECT 1 FROM memory_remote_resource_lifecycles AS lifecycle
+                             WHERE lifecycle.provider = job.provider
+                               AND lifecycle.remote_database_id = job.remote_database_id
+                               AND lifecycle.company_id = job.company_id
+                               AND lifecycle.desired_state = 'present'
+                               AND lifecycle.operation_generation = job.operation_generation
+                               AND lifecycle.operation_lease_token = job.lease_token
+                               AND lifecycle.operation_lease_expires_at > CURRENT_TIMESTAMP
+                         )
+                       FOR UPDATE
+                   ), failed_job AS (
+                       UPDATE memory_provisioning_jobs AS job
+                       SET status = 'failed', phase = 'failed', lease_token = NULL,
+                           lease_expires_at = NULL, operation_generation = NULL,
+                           last_error = $3, updated_at = CURRENT_TIMESTAMP
+                       FROM current_job
+                       WHERE job.id = current_job.id
+                       RETURNING current_job.company_id, current_job.provider,
+                                 current_job.remote_database_id,
+                                 current_job.operation_generation
+                   ), released_lifecycle AS (
+                       UPDATE memory_remote_resource_lifecycles AS lifecycle
+                       SET operation_lease_token = NULL, operation_lease_expires_at = NULL,
+                           last_error = $3, updated_at = CURRENT_TIMESTAMP
+                       FROM failed_job
+                       WHERE lifecycle.provider = failed_job.provider
+                         AND lifecycle.remote_database_id = failed_job.remote_database_id
+                         AND lifecycle.company_id = failed_job.company_id
+                         AND lifecycle.desired_state = 'present'
+                         AND lifecycle.operation_generation = failed_job.operation_generation
+                         AND lifecycle.operation_lease_token = $2
+                       RETURNING lifecycle.company_id
+                   )
+                   UPDATE memory_provider_connections AS connection
+                   SET readiness = 'failed', last_error = $3, updated_at = CURRENT_TIMESTAMP
+                   FROM released_lifecycle
+                   WHERE connection.company_id = released_lifecycle.company_id
+                     AND connection.provider = 'hydradb'
+                   RETURNING connection.company_id"#,
+        )
+        .bind(job_id)
+        .bind(lease_token)
+        .bind(safe_error)
+        .fetch_optional(&persistence.pool)
+        .await
+        .map_err(AppError::from)?,
+    };
+    Ok(company_id.is_some())
+}
+
 async fn renew_job_lease(
     persistence: &PostgresPersistence,
     table: &'static str,
@@ -707,9 +933,170 @@ mod tests {
         let claimed = [left.expect("left claimant"), right.expect("right claimant")]
             .into_iter()
             .flatten()
-            .filter(|job| job.company_id == Some(company_id))
+            .filter(|job| job.company_id == company_id)
             .count();
         assert_eq!(claimed, 1, "a provisioning job is leased to one worker");
+    }
+
+    #[tokio::test]
+    async fn readiness_claim_is_exclusive_and_timeout_retry_resets_the_same_job() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let persistence = PostgresPersistence::new(pool.clone());
+        let company_id = memory_company(&persistence).await;
+        persistence
+            .select_provider(company_id, MemoryProviderKind::Hydradb)
+            .await
+            .expect("provider selection");
+        let create_token = Uuid::new_v4();
+        let create = persistence
+            .claim_provisioning_job(create_token, Utc::now() + chrono::Duration::minutes(2))
+            .await
+            .expect("create claim")
+            .expect("create job");
+        let original_job_id = create.id;
+        assert!(
+            persistence
+                .begin_readiness_polling(
+                    create.id,
+                    create_token,
+                    Utc::now() - chrono::Duration::seconds(1),
+                    Utc::now(),
+                )
+                .await
+                .expect("begin polling")
+        );
+
+        let expires = Utc::now() + chrono::Duration::minutes(2);
+        let left_token = Uuid::new_v4();
+        let right_token = Uuid::new_v4();
+        let (left, right) = tokio::join!(
+            persistence.claim_provisioning_job(left_token, expires),
+            persistence.claim_provisioning_job(right_token, expires),
+        );
+        let claims: Vec<_> = [left.expect("left claim"), right.expect("right claim")]
+            .into_iter()
+            .flatten()
+            .filter(|job| job.company_id == company_id)
+            .collect();
+        assert_eq!(claims.len(), 1, "only one claimant polls this generation");
+        let claimed = &claims[0];
+        assert_eq!(
+            claimed.phase,
+            crate::entities::memory::MemoryProvisioningPhase::WaitingReady
+        );
+        assert!(
+            persistence
+                .fail_provisioning_job(claimed.id, claimed.lease_token, "readiness timed out")
+                .await
+                .expect("terminal timeout")
+        );
+        assert!(
+            !persistence
+                .fail_provisioning_job(claimed.id, claimed.lease_token, "readiness timed out")
+                .await
+                .expect("duplicate timeout is suppressed")
+        );
+
+        persistence
+            .retry_provisioning(company_id)
+            .await
+            .expect("manual retry");
+        let reset: (
+            Uuid,
+            String,
+            String,
+            i32,
+            Option<DateTime<Utc>>,
+            Option<DateTime<Utc>>,
+        ) = sqlx::query_as(
+            "SELECT id, status, phase, failure_attempts, readiness_deadline, next_poll_at \
+                 FROM memory_provisioning_jobs WHERE company_id = $1",
+        )
+        .bind(company_id)
+        .fetch_one(&pool)
+        .await
+        .expect("reset job");
+        assert_eq!(
+            reset.0, original_job_id,
+            "manual retry reuses the durable job"
+        );
+        assert_eq!(
+            (reset.1.as_str(), reset.2.as_str(), reset.3),
+            ("pending", "create_pending", 0)
+        );
+        assert_eq!((reset.4, reset.5), (None, None));
+        let connection = persistence
+            .connection(company_id)
+            .await
+            .expect("connection query")
+            .expect("connection");
+        assert_eq!(
+            connection.readiness,
+            crate::entities::memory::MemoryConnectionReadiness::Pending
+        );
+        assert!(connection.last_error.is_none());
+
+        let provider_failure_token = Uuid::new_v4();
+        let provider_failure = persistence
+            .claim_provisioning_job(
+                provider_failure_token,
+                Utc::now() + chrono::Duration::minutes(2),
+            )
+            .await
+            .expect("provider failure claim")
+            .expect("provider failure job");
+        assert!(
+            persistence
+                .retry_provisioning_job(
+                    provider_failure.id,
+                    provider_failure_token,
+                    Utc::now(),
+                    "memory provider authentication failed",
+                    true,
+                )
+                .await
+                .expect("terminal provider failure")
+        );
+        persistence
+            .retry_provisioning(company_id)
+            .await
+            .expect("manual retry after provider failure");
+        let provider_reset: (Uuid, String, i32) = sqlx::query_as(
+            "SELECT id, phase, failure_attempts FROM memory_provisioning_jobs \
+             WHERE company_id = $1",
+        )
+        .bind(company_id)
+        .fetch_one(&pool)
+        .await
+        .expect("provider failure reset");
+        assert_eq!(
+            provider_reset,
+            (original_job_id, "create_pending".into(), 0)
+        );
+
+        // Do not leave a globally claimable row behind for another queue test.
+        let cleanup_token = Uuid::new_v4();
+        let cleanup = persistence
+            .claim_provisioning_job(cleanup_token, Utc::now() + chrono::Duration::minutes(2))
+            .await
+            .expect("test cleanup claim")
+            .expect("test cleanup job");
+        assert_eq!(cleanup.id, original_job_id);
+        assert!(
+            persistence
+                .retry_provisioning_job(
+                    cleanup.id,
+                    cleanup_token,
+                    Utc::now(),
+                    "test cleanup",
+                    true,
+                )
+                .await
+                .expect("terminal test cleanup")
+        );
     }
 
     #[tokio::test]
@@ -833,7 +1220,7 @@ mod tests {
             .await
             .expect("old claim")
             .expect("old job");
-        assert_eq!(old.company_id, Some(company_id));
+        assert_eq!(old.company_id, company_id);
 
         sqlx::query(
             r#"UPDATE memory_provisioning_jobs
@@ -869,7 +1256,24 @@ mod tests {
         );
         assert!(
             persistence
-                .complete_provisioning(replacement.id, replacement_token)
+                .begin_readiness_polling(
+                    replacement.id,
+                    replacement_token,
+                    Utc::now() + chrono::Duration::minutes(15),
+                    Utc::now(),
+                )
+                .await
+                .expect("replacement enters readiness polling")
+        );
+        let ready_token = Uuid::new_v4();
+        let ready = persistence
+            .claim_provisioning_job(ready_token, Utc::now() + chrono::Duration::minutes(2))
+            .await
+            .expect("readiness claim")
+            .expect("readiness job");
+        assert!(
+            persistence
+                .complete_provisioning(ready.id, ready_token)
                 .await
                 .expect("replacement completion")
         );
