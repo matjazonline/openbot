@@ -1056,6 +1056,7 @@ impl TaskWorker {
         }
 
         let output = AgentRunner::new(&prompt, &params)
+            .subject(Some(&payload.subject))
             .history(&history)
             .monitoring(self.monitoring.clone())
             .config(Some(self.config.clone()))

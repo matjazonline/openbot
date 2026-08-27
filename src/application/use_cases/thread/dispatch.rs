@@ -235,6 +235,7 @@ impl ThreadUseCases {
             let result = match &params {
                 Ok(params) => {
                     let mut runner = AgentRunner::new(&agent_prompt, params)
+                        .subject(Some(&parsed.subject))
                         .history(&history)
                         .approval_use_cases(self.approval_use_cases.clone())
                         .approval_context(Some(
