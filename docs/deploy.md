@@ -142,6 +142,18 @@ a deployment, runtime memory degrades to the same safe no-memory behavior and em
 state metrics. Deleting a company is different: it queues remote cleanup before the company row is
 removed, and cleanup jobs deliberately survive the company cascade.
 
+Each channel's Company, Agent, and User recall and persistence choices are independent. Missing
+agent or sender identities skip only the unavailable scope; they never fall back to Company.
+Company recall is available only to company members and system runs, while selected Agent and User
+recall can still serve external channel participants. User collections use a stable digest of the
+normalized sender address rather than embedding the address in collection names or logs.
+
+The default `audience_only` persistence mode sends the same conversation to each selected target
+for normal provider inference. The optional `scope_specific_facts` mode supplies fixed extraction
+instructions per target: durable user-attributable facts for User, reusable agent/workflow lessons
+for Agent, and durable organization-wide policies and processes for Company. Empty extraction is a
+successful no-op.
+
 ### Picture uploads
 
 Avatars are picked from disk and stored in a Google Cloud Storage bucket, so two

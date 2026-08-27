@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::entities::company_member::CompanyMembership;
 use crate::entities::{
     creation::CreationProvenance,
-    memory::{MemoryRecallMode, default_memory_max_results},
+    memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
     value_objects::{ChannelSlug, CompanySlug, EmailAddress},
 };
 
@@ -115,6 +115,8 @@ pub struct Channel {
     pub persist_agent_memory: bool,
     #[serde(default)]
     pub persist_user_memory: bool,
+    #[serde(default)]
+    pub memory_persistence_mode: MemoryPersistenceMode,
     #[serde(default)]
     pub memory_recall_mode: MemoryRecallMode,
     #[serde(default = "default_memory_max_results")]
@@ -454,6 +456,7 @@ mod tests {
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
+            memory_persistence_mode: MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
             memory_max_results: 5,
             created_by: CreationProvenance::system(),

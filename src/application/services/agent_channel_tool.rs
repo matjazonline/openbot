@@ -118,6 +118,7 @@ impl CreateAgentChannelTool {
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
+            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
             memory_max_results: 5,
             created_by: Some(provenance),

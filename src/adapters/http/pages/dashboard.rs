@@ -127,7 +127,7 @@ pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
             </div>"##
     });
     let sidebar = format!(
-        r##"<aside class="flex w-72 shrink-0 flex-col border-r border-base-300 bg-base-200">
+        r##"<aside class="ui-pane-stacked flex w-72 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
             {operator_actions}
             {range}
@@ -147,7 +147,7 @@ pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
     let content = format!(
         r##"
         {sidebar}
-        <section class="flex flex-1 flex-col overflow-y-auto bg-base-100" hx-ext="sse"
+        <section class="flex min-w-0 flex-1 flex-col overflow-y-auto bg-base-100" hx-ext="sse"
             sse-connect="/ui/dashboard/events{query}">
             <div id="{panels_id}"{PANELS_SKELETON} sse-swap="{event}" hx-swap="innerHTML"
                 hx-get="/ui/dashboard/panels{query}" hx-trigger="load">{placeholder}</div>

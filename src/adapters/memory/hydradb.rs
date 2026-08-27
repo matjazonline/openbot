@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 
 use crate::{
     entities::memory::{MemoryChunk, MemoryProviderError, MemoryRecallMode, ResolvedMemoryScope},
-    services::memory_provider::{MemoryConversation, MemoryProvider},
+    services::memory_provider::{MemoryConversation, MemoryPersistenceTarget, MemoryProvider},
 };
 
 pub struct HydraDbProvider {
@@ -63,7 +63,7 @@ impl HydraDbProvider {
     async fn persist_collection(
         &self,
         database_id: &str,
-        collection: &str,
+        target: &MemoryPersistenceTarget,
         conversation: &MemoryConversation,
     ) -> Result<(), MemoryProviderError> {
         let item = json!({
@@ -77,8 +77,12 @@ impl HydraDbProvider {
             serde_json::to_string(&[item]).map_err(|_| MemoryProviderError::MalformedResponse)?;
         let form = multipart::Form::new()
             .text("database_id", database_id.to_owned())
-            .text("collection", collection.to_owned())
+            .text("collection", target.collection.clone())
             .text("items", items);
+        let form = match target.custom_instructions {
+            Some(instructions) => form.text("custom_instructions", instructions),
+            None => form,
+        };
         let response = self
             .request(reqwest::Method::POST, "/context/ingest")
             .timeout(self.fast_timeout)
@@ -203,6 +207,15 @@ impl MemoryProvider for HydraDbProvider {
             .ok_or(MemoryProviderError::MalformedResponse)?;
         rows.iter()
             .map(|row| {
+                let collection = row
+                    .get("collection")
+                    .and_then(Value::as_str)
+                    .ok_or(MemoryProviderError::MalformedResponse)?;
+                let source_scope = scopes
+                    .iter()
+                    .find(|scope| scope.collection == collection)
+                    .map(|scope| scope.scope)
+                    .ok_or(MemoryProviderError::MalformedResponse)?;
                 let content = row
                     .get("content")
                     .and_then(Value::as_str)
@@ -214,6 +227,7 @@ impl MemoryProvider for HydraDbProvider {
                         .and_then(Value::as_str)
                         .map(str::to_owned),
                     content: content.to_owned(),
+                    source_scope,
                 })
             })
             .collect()
@@ -222,13 +236,13 @@ impl MemoryProvider for HydraDbProvider {
     async fn persist(
         &self,
         database_id: &str,
-        collections: &[String],
+        targets: &[MemoryPersistenceTarget],
         conversation: &MemoryConversation,
     ) -> Vec<Result<(), MemoryProviderError>> {
         join_all(
-            collections
+            targets
                 .iter()
-                .map(|collection| self.persist_collection(database_id, collection, conversation)),
+                .map(|target| self.persist_collection(database_id, target, conversation)),
         )
         .await
     }
@@ -332,7 +346,11 @@ mod tests {
         let results = provider
             .persist(
                 "company-memory",
-                &["company".into()],
+                &[MemoryPersistenceTarget {
+                    scope: crate::entities::memory::MemoryScope::Company,
+                    collection: "company".into(),
+                    custom_instructions: None,
+                }],
                 &MemoryConversation {
                     id: "stable-id".into(),
                     user: "hello".into(),
@@ -341,6 +359,98 @@ mod tests {
             )
             .await;
         assert_eq!(results, vec![Err(MemoryProviderError::RejectedItem)]);
+    }
+
+    #[tokio::test]
+    async fn persist_sends_scope_instructions_and_accepts_empty_extraction() {
+        let (base_url, request) = mock_server(200, r#"{"results":[{"success":true}]}"#).await;
+        let provider = HydraDbProvider::new(
+            base_url,
+            SecretString::from("test-key"),
+            Duration::from_secs(2),
+            Duration::from_secs(3),
+        )
+        .unwrap();
+        let instructions = crate::entities::memory::MemoryScope::User.extraction_instructions();
+        let results = provider
+            .persist(
+                "company-memory",
+                &[MemoryPersistenceTarget {
+                    scope: crate::entities::memory::MemoryScope::User,
+                    collection: "user_hash".into(),
+                    custom_instructions: Some(instructions),
+                }],
+                &MemoryConversation {
+                    id: "stable-id".into(),
+                    user: "transient request".into(),
+                    assistant: "no durable fact".into(),
+                },
+            )
+            .await;
+
+        assert_eq!(results, vec![Ok(())]);
+        let request = request.await.unwrap();
+        assert!(request.contains("name=\"custom_instructions\""));
+        assert!(request.contains(instructions));
+    }
+
+    #[tokio::test]
+    async fn recall_requires_expected_collection_attribution() {
+        let scope = ResolvedMemoryScope {
+            scope: crate::entities::memory::MemoryScope::Company,
+            collection: "company".into(),
+            weight: 1.0,
+        };
+        let (base_url, _) = mock_server(
+            200,
+            r#"{"results":[{"chunk_id":"one","content":"policy","collection":"company"}]}"#,
+        )
+        .await;
+        let provider = HydraDbProvider::new(
+            base_url,
+            SecretString::from("test-key"),
+            Duration::from_secs(2),
+            Duration::from_secs(3),
+        )
+        .unwrap();
+        let chunks = provider
+            .recall(
+                "company-memory",
+                "query",
+                std::slice::from_ref(&scope),
+                MemoryRecallMode::Fast,
+                5,
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(chunks[0].source_scope, scope.scope);
+
+        let (base_url, _) = mock_server(
+            200,
+            r#"{"results":[{"chunk_id":"one","content":"policy"}]}"#,
+        )
+        .await;
+        let provider = HydraDbProvider::new(
+            base_url,
+            SecretString::from("test-key"),
+            Duration::from_secs(2),
+            Duration::from_secs(3),
+        )
+        .unwrap();
+        assert_eq!(
+            provider
+                .recall(
+                    "company-memory",
+                    "query",
+                    &[scope],
+                    MemoryRecallMode::Fast,
+                    5,
+                    None,
+                )
+                .await,
+            Err(MemoryProviderError::MalformedResponse)
+        );
     }
 
     #[tokio::test]

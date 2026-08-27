@@ -670,6 +670,11 @@ impl SubmittedChannel {
             persist_company_memory: self.form.persist_company_memory.is_some(),
             persist_agent_memory: self.form.persist_agent_memory.is_some(),
             persist_user_memory: self.form.persist_user_memory.is_some(),
+            memory_persistence_mode: self
+                .form
+                .memory_persistence_mode
+                .as_deref()
+                .unwrap_or("audience_only"),
             memory_recall_mode: self.form.memory_recall_mode.as_deref().unwrap_or("fast"),
             memory_max_results: self
                 .form
@@ -706,6 +711,7 @@ impl SubmittedChannel {
             persist_company_memory: memory.persist_company,
             persist_agent_memory: memory.persist_agent,
             persist_user_memory: memory.persist_user,
+            memory_persistence_mode: memory.persistence_mode,
             memory_recall_mode: memory.recall_mode,
             memory_max_results: memory.max_results,
             created_by: None,

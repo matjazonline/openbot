@@ -104,19 +104,19 @@ failed readiness interlocks, mode/limit validation, and create/edit/rejection UI
 
 ## 6. Introduce a provider-neutral `MemoryCoordinator`
 
-- Place scope resolution, readiness checks, fallback warnings, recall formatting, and persistence
+- Place scope resolution, readiness checks, skipped-scope diagnostics, recall formatting, and persistence
   fan-out behind one coordinator used by both inbound and scheduled runs.
 - Inputs are application concepts: company, channel, optional agent, optional normalized sender,
   task/channel/agent IDs, latest prompt, local history, delivery/upstream context, and final answer.
-- Resolve checked scopes independently for recall and persist. Missing agent/user falls back to
-  company, retains the highest requested weight, deduplicates targets, and emits structured
-  monitoring labels containing IDs, operation, and missing scope—but no sender or message content.
+- Resolve checked scopes independently for recall and persist. Missing agent/user identities skip
+  only those scopes and never widen to company. Emit structured monitoring labels containing IDs,
+  operation, and missing scope—but no sender or message content.
 - Recall formatting must be a clearly delimited, explicitly untrusted historical-context section.
 - Persistence construction must exclude recalled chunks, system prompts, credentials, tool
   internals, suspended output, and partial output. Reuse one stable task/channel/agent-derived memory
   ID for every target collection.
 
-Tests: all 64 flag combinations per operation, weights 3/2/1, fallback precedence, warnings,
+Tests: all 64 flag combinations per operation, weights 3/2/1, unavailable-scope handling, warnings,
 normalization, stable IDs, delimiter safety, and persistence exclusion rules.
 
 ## 7. Wire recall before inbound and scheduled agent execution
@@ -130,13 +130,14 @@ normalization, stable IDs, delimiter safety, and persistence exclusion rules.
   4. pass only channel/agent names as short `additional_context`;
   5. deduplicate/cap chunks and append the delimited memory section;
   6. run the existing prompt-injection guardrail over this final assembled prompt.
-- Scheduled runs have no sender, so user scope falls back to company with a warning.
+- Scheduled runs have no sender, so selected user scope is skipped; selected company and agent
+  scopes remain available.
 - Empty recall succeeds. Every provider/readiness/malformed/timeout failure returns from the task so
   existing attempt, retry, lease, and dead-letter handling remains authoritative.
 - Never store recalled chunks in durable task payloads.
 
 Tests: one query for three scopes, exact weights/envelope, empty success, missing-agent and scheduled-
-user fallback, guardrail ordering, retry/dead-letter behavior, and no LLM call after failed recall.
+user skipping, guardrail ordering, retry/dead-letter behavior, and no LLM call after failed recall.
 
 ## 8. Wire best-effort persistence after completed runs
 
@@ -147,9 +148,9 @@ user fallback, guardrail ordering, retry/dead-letter behavior, and no LLM call a
   for indexing.
 - Persistence failures never change completed task/result state, retract the saved response, or
   prevent outbound delivery. Failed, partial, retryable, or suspended runs write nothing.
-- Apply identical behavior to scheduled runs, including user-to-company fallback.
+- Apply identical behavior to scheduled runs, including skipping user persistence without a sender.
 
-Tests: three scopes produce three writes with one ID; fallback produces one company write; partial
+Tests: three scopes produce three writes with one ID; unavailable scopes produce no widened write; partial
 and total provider failure leave response/task successful; retries reuse IDs; suspended/failed runs
 do not persist.
 

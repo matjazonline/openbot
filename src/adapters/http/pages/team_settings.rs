@@ -202,8 +202,8 @@ pub fn team_tab(list: &TeamSettingsList<'_>, pane_html: &str) -> String {
 
     format!(
         r##"
-            <div class="flex min-h-0 flex-1">
-                <div class="flex min-h-0 w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
+            <div class="ui-split flex min-h-0 flex-1">
+                <div class="ui-pane-stacked flex min-h-0 w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
                     {list_html}
                     {invite_button}
                 </div>
@@ -359,7 +359,7 @@ fn member_name(member: &CompanyMember) -> &str {
 pub fn team_settings_empty_pane(message: &str, swap: FragmentSwap) -> String {
     format!(
         r##"
-        <section id="team-pane"{PANE_SKELETON} class="flex flex-1 items-center justify-center bg-base-100 p-8"{oob}>
+        <section id="team-pane"{PANE_SKELETON} class="flex min-w-0 flex-1 items-center justify-center bg-base-100 p-8"{oob}>
             <p class="text-center text-sm opacity-60">{message}</p>
         </section>
         "##,
@@ -398,9 +398,9 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
 
     format!(
         r##"
-        <section id="team-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
-            <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
-                <div class="flex min-w-0 items-center gap-3">
+        <section id="team-pane"{PANE_SKELETON} class="flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-base-300 px-4 py-4 sm:px-6">
+                <div class="flex min-w-0 grow basis-48 items-center gap-3">
                     {avatar}
                     <div class="min-w-0">
                         <h2 class="truncate text-xl font-bold">{username}</h2>
@@ -409,7 +409,7 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
                 </div>
                 <span class="badge badge-primary shrink-0">{role}</span>
             </div>
-            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 {avatar_form}
                 {access_role_form}
@@ -627,15 +627,15 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
 
     format!(
         r##"
-        <section id="team-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
-            <div class="flex items-start justify-between gap-3 border-b border-base-300 px-6 py-4">
-                <div class="min-w-0">
+        <section id="team-pane"{PANE_SKELETON} class="flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-base-300 px-4 py-4 sm:px-6">
+                <div class="min-w-0 grow basis-48">
                     <h2 class="truncate font-mono text-xl font-bold">{stored_email}</h2>
                     <p class="text-xs opacity-60">Invited {created_at} as {access_role}</p>
                 </div>
                 <span class="badge {badge} shrink-0">{label}</span>
             </div>
-            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 {body}
             </div>
@@ -653,12 +653,12 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
 pub fn invite_create_pane(pane: &InviteCreatePane<'_>) -> String {
     format!(
         r##"
-        <section id="team-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
-            <div class="border-b border-base-300 px-6 py-4">
+        <section id="team-pane"{PANE_SKELETON} class="flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">Invite someone to {company_name}</h2>
                 <p class="text-xs opacity-70">They join by accepting the invite from their own account, and are then trusted by every channel with no participant list of its own.</p>
             </div>
-            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 <form class="space-y-4" hx-post="{invites_endpoint}" hx-target="#team-pane" hx-swap="outerHTML"
                     hx-disabled-elt="find button[type='submit']">

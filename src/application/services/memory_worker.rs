@@ -562,7 +562,7 @@ mod tests {
         entities::memory::{
             MemoryChunk, MemoryProviderKind, MemoryRecallMode, ResolvedMemoryScope,
         },
-        services::memory_provider::{MemoryConversation, MemoryProvider},
+        services::memory_provider::{MemoryConversation, MemoryPersistenceTarget, MemoryProvider},
         use_cases::{
             company::{CompanyPersistence, CompanyWrite},
             memory::{MemoryBindingPersistence, MemoryConnectionPersistence},
@@ -625,7 +625,7 @@ mod tests {
         async fn persist(
             &self,
             _database_id: &str,
-            _collections: &[String],
+            _targets: &[MemoryPersistenceTarget],
             _conversation: &MemoryConversation,
         ) -> Vec<Result<(), MemoryProviderError>> {
             Vec::new()
@@ -678,7 +678,7 @@ mod tests {
         async fn persist(
             &self,
             _database_id: &str,
-            _collections: &[String],
+            _targets: &[MemoryPersistenceTarget],
             _conversation: &MemoryConversation,
         ) -> Vec<Result<(), MemoryProviderError>> {
             Vec::new()
