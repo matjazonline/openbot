@@ -1327,6 +1327,7 @@ mod tests {
             memory_use_cases: Arc::new(crate::use_cases::memory::MemoryUseCases::new(
                 company_persistence.clone(),
                 memory_persistence.clone(),
+                memory_persistence.clone(),
                 false,
             )),
             memory_worker: Arc::new(crate::services::memory_worker::MemoryWorker::new(

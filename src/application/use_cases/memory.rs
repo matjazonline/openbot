@@ -12,9 +12,41 @@ use crate::{
     use_cases::company::{CompanyPersistence, owned_company},
 };
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActiveMemoryBinding {
+    Disabled,
+    NotReady(MemoryConnection),
+    Ready(MemoryConnection),
+    Misconfigured,
+}
+
+impl ActiveMemoryBinding {
+    pub fn connection(self) -> Option<MemoryConnection> {
+        match self {
+            Self::NotReady(connection) | Self::Ready(connection) => Some(connection),
+            Self::Disabled | Self::Misconfigured => None,
+        }
+    }
+
+    pub fn state_name(&self) -> &'static str {
+        match self {
+            Self::Disabled => "disabled",
+            Self::NotReady(_) => "not_ready",
+            Self::Ready(_) => "ready",
+            Self::Misconfigured => "misconfigured",
+        }
+    }
+}
+
+/// The current runtime binding. Implementations must derive this from current company selection,
+/// never from a company value serialized into queued work.
+#[async_trait]
+pub trait MemoryBindingPersistence: Send + Sync {
+    async fn active_binding(&self, company_id: Uuid) -> AppResult<ActiveMemoryBinding>;
+}
+
 #[async_trait]
 pub trait MemoryConnectionPersistence: Send + Sync {
-    async fn connection(&self, company_id: Uuid) -> AppResult<Option<MemoryConnection>>;
     async fn select_provider(
         &self,
         company_id: Uuid,
@@ -90,6 +122,7 @@ pub trait MemoryConnectionPersistence: Send + Sync {
 pub struct MemoryUseCases {
     companies: Arc<dyn CompanyPersistence>,
     persistence: Arc<dyn MemoryConnectionPersistence>,
+    bindings: Arc<dyn MemoryBindingPersistence>,
     hydradb_configured: bool,
 }
 
@@ -97,11 +130,13 @@ impl MemoryUseCases {
     pub fn new(
         companies: Arc<dyn CompanyPersistence>,
         persistence: Arc<dyn MemoryConnectionPersistence>,
+        bindings: Arc<dyn MemoryBindingPersistence>,
         hydradb_configured: bool,
     ) -> Self {
         Self {
             companies,
             persistence,
+            bindings,
             hydradb_configured,
         }
     }
@@ -115,11 +150,12 @@ impl MemoryUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Option<MemoryConnection>> {
-        let company = owned_company(self.companies.as_ref(), user_id, company_id).await?;
-        if company.memory_provider.is_none() {
+        owned_company(self.companies.as_ref(), user_id, company_id).await?;
+        let binding = self.bindings.active_binding(company_id).await?;
+        if !self.hydradb_configured {
             return Ok(None);
         }
-        self.persistence.connection(company_id).await
+        Ok(binding.connection())
     }
 
     pub async fn select_hydradb(

@@ -135,8 +135,12 @@ memory controls remain unavailable until that connection reports `ready`.
 | `HYDRA_DB_THINKING_TIMEOUT_SECS` | Positive request timeout for thinking recall; at least the fast timeout |
 
 Provider selection, provisioning state, retry attempts, and cleanup jobs are durable. Disabling
-memory preserves the connection so re-enabling is idempotent. Deleting a company queues remote
-cleanup before the company row is removed; cleanup jobs deliberately survive the company cascade.
+memory is suspension: runtime recall returns no memory, persistence is skipped immediately, and
+the connection plus channel memory choices are retained. Re-enabling a previously ready connection
+queues a readiness check before runtime memory resumes. If provider configuration disappears from
+a deployment, runtime memory degrades to the same safe no-memory behavior and emits structured
+state metrics. Deleting a company is different: it queues remote cleanup before the company row is
+removed, and cleanup jobs deliberately survive the company cascade.
 
 ### Picture uploads
 

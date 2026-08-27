@@ -12,7 +12,8 @@ use crate::{
     domain::monitoring::MonitoringService,
     entities::memory::{
         LeasedProvisioningJob, MAX_MEMORY_PROVIDER_OPERATION_SECONDS,
-        MEMORY_READINESS_TIMEOUT_ERROR, MemoryProviderError, MemoryProvisioningPhase,
+        MEMORY_READINESS_TIMEOUT_ERROR, MEMORY_READINESS_WINDOW_SECONDS, MemoryProviderError,
+        MemoryProvisioningPhase,
     },
     services::memory_provider::MemoryProviderRegistry,
     use_cases::memory::MemoryConnectionPersistence,
@@ -24,7 +25,6 @@ const LEASE_SECONDS: i64 = 180;
 const MAX_PROVIDER_FAILURE_ATTEMPTS: i32 = 8;
 // HydraDB creation is asynchronous. Keep the total initialization window independent from each
 // request's timeout and comfortably above the provider's normal startup time.
-const READINESS_DEADLINE_SECONDS: i64 = 15 * 60;
 // Polling stays bounded while jitter prevents workers on multiple instances from synchronizing.
 const MIN_POLL_SECONDS: i64 = 2;
 const MAX_POLL_SECONDS: i64 = 5;
@@ -151,7 +151,7 @@ impl MemoryWorker {
                     .begin_readiness_polling(
                         job.id,
                         job.lease_token,
-                        Utc::now() + chrono::Duration::seconds(READINESS_DEADLINE_SECONDS),
+                        Utc::now() + chrono::Duration::seconds(MEMORY_READINESS_WINDOW_SECONDS),
                         next_poll_at(),
                     )
                     .await
@@ -425,7 +425,7 @@ mod tests {
         services::memory_provider::{MemoryConversation, MemoryProvider},
         use_cases::{
             company::{CompanyPersistence, CompanyWrite},
-            memory::MemoryConnectionPersistence,
+            memory::{MemoryBindingPersistence, MemoryConnectionPersistence},
             user::UserPersistence,
         },
     };
@@ -644,9 +644,10 @@ mod tests {
         assert_eq!(provider.readiness_calls.load(Ordering::SeqCst), 11);
         assert_eq!(
             persistence
-                .connection(company.id)
+                .active_binding(company.id)
                 .await
-                .expect("load connection")
+                .expect("load binding")
+                .connection()
                 .expect("connection")
                 .remote_database_id,
             connection.remote_database_id

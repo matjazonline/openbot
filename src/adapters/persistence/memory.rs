@@ -6,23 +6,55 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::memory::{
-        LeasedCleanupJob, LeasedProvisioningJob, MemoryConnection, MemoryProviderKind,
-        remote_memory_database_id,
+        LeasedCleanupJob, LeasedProvisioningJob, MEMORY_READINESS_WINDOW_SECONDS, MemoryConnection,
+        MemoryProviderKind, remote_memory_database_id,
     },
-    use_cases::memory::MemoryConnectionPersistence,
+    use_cases::memory::{
+        ActiveMemoryBinding, MemoryBindingPersistence, MemoryConnectionPersistence,
+    },
 };
 
 #[path = "memory_rows.rs"]
 mod rows;
 
 use rows::{
-    CONNECTION_COLUMNS, CleanupJobDb, MemoryConnectionDb, ProvisioningJobDb, leased_cleanup_job,
-    leased_provisioning_job,
+    ActiveMemoryBindingDb, CONNECTION_COLUMNS, CleanupJobDb, MemoryConnectionDb, ProvisioningJobDb,
+    leased_cleanup_job, leased_provisioning_job,
 };
 
 #[async_trait]
-impl MemoryConnectionPersistence for PostgresPersistence {
-    async fn connection(&self, company_id: Uuid) -> AppResult<Option<MemoryConnection>> {
+impl MemoryBindingPersistence for PostgresPersistence {
+    async fn active_binding(&self, company_id: Uuid) -> AppResult<ActiveMemoryBinding> {
+        let row = sqlx::query_as::<_, ActiveMemoryBindingDb>(
+            r#"SELECT company.memory_provider AS selected_provider,
+                      company.id AS company_id,
+                      connection.provider,
+                      connection.remote_database_id,
+                      connection.readiness,
+                      connection.last_error,
+                      job.phase AS provisioning_phase,
+                      COALESCE(job.failure_attempts, 0) AS failure_attempts,
+                      job.readiness_deadline
+               FROM companies AS company
+               LEFT JOIN memory_provider_connections AS connection
+                 ON connection.company_id = company.id
+                AND connection.provider = company.memory_provider
+               LEFT JOIN memory_provisioning_jobs AS job
+                 ON job.company_id = connection.company_id
+                AND job.provider = connection.provider
+               WHERE company.id = $1"#,
+        )
+        .bind(company_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?
+        .ok_or_else(|| AppError::NotFound("Company not found.".into()))?;
+        Ok(row.into_binding())
+    }
+}
+
+impl PostgresPersistence {
+    async fn memory_connection(&self, company_id: Uuid) -> AppResult<Option<MemoryConnection>> {
         let query = format!(
             "SELECT {CONNECTION_COLUMNS} FROM memory_provider_connections AS connection \
              LEFT JOIN memory_provisioning_jobs AS job \
@@ -37,7 +69,10 @@ impl MemoryConnectionPersistence for PostgresPersistence {
             .map(TryInto::try_into)
             .transpose()
     }
+}
 
+#[async_trait]
+impl MemoryConnectionPersistence for PostgresPersistence {
     async fn select_provider(
         &self,
         company_id: Uuid,
@@ -45,15 +80,20 @@ impl MemoryConnectionPersistence for PostgresPersistence {
     ) -> AppResult<MemoryConnection> {
         let remote_database_id = remote_memory_database_id(company_id);
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
-        let updated = sqlx::query("UPDATE companies SET memory_provider = $2 WHERE id = $1")
+        let previous_provider = sqlx::query_scalar::<_, Option<String>>(
+            "SELECT memory_provider FROM companies WHERE id = $1 FOR UPDATE",
+        )
+        .bind(company_id)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(AppError::from)?
+        .ok_or_else(|| AppError::NotFound("Company not found.".into()))?;
+        sqlx::query("UPDATE companies SET memory_provider = $2 WHERE id = $1")
             .bind(company_id)
             .bind(selected_provider.as_str())
             .execute(&mut *transaction)
             .await
             .map_err(AppError::from)?;
-        if updated.rows_affected() != 1 {
-            return Err(AppError::NotFound("Company not found.".into()));
-        }
 
         sqlx::query(
             r#"INSERT INTO memory_provider_connections
@@ -94,7 +134,49 @@ impl MemoryConnectionPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        if current_readiness != "ready" {
+        let reenable_ready_connection = current_readiness == "ready"
+            && previous_provider.as_deref() != Some(selected_provider.as_str());
+        if reenable_ready_connection {
+            let readiness_deadline =
+                Utc::now() + chrono::Duration::seconds(MEMORY_READINESS_WINDOW_SECONDS);
+            let queued = sqlx::query(
+                r#"INSERT INTO memory_provisioning_jobs
+                       (id, company_id, provider, remote_database_id, phase,
+                        readiness_deadline, next_poll_at)
+                   VALUES ($1, $2, $3, $4, 'waiting_ready', $5, CURRENT_TIMESTAMP)
+                   ON CONFLICT (company_id, provider) DO UPDATE
+                   SET status = 'pending', phase = 'waiting_ready', failure_attempts = 0,
+                       available_at = CURRENT_TIMESTAMP, lease_token = NULL,
+                       lease_expires_at = NULL, operation_generation = NULL,
+                       readiness_deadline = EXCLUDED.readiness_deadline,
+                       next_poll_at = CURRENT_TIMESTAMP, last_error = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE memory_provisioning_jobs.status <> 'leased'"#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(company_id)
+            .bind(selected_provider.as_str())
+            .bind(&remote_database_id)
+            .bind(readiness_deadline)
+            .execute(&mut *transaction)
+            .await
+            .map_err(AppError::from)?;
+            if queued.rows_affected() == 1 {
+                sqlx::query(
+                    r#"UPDATE memory_provider_connections
+                       SET readiness = 'pending', last_error = NULL,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE company_id = $1 AND provider = $2"#,
+                )
+                .bind(company_id)
+                .bind(selected_provider.as_str())
+                .execute(&mut *transaction)
+                .await
+                .map_err(AppError::from)?;
+            }
+        } else if current_readiness != "ready"
+            && previous_provider.as_deref() != Some(selected_provider.as_str())
+        {
             sqlx::query(
                 r#"INSERT INTO memory_provisioning_jobs
                        (id, company_id, provider, remote_database_id)
@@ -116,7 +198,7 @@ impl MemoryConnectionPersistence for PostgresPersistence {
             .map_err(AppError::from)?;
         }
         transaction.commit().await.map_err(AppError::from)?;
-        self.connection(company_id)
+        self.memory_connection(company_id)
             .await?
             .ok_or_else(|| AppError::Internal("Memory connection was not created.".into()))
     }
@@ -136,7 +218,7 @@ impl MemoryConnectionPersistence for PostgresPersistence {
 
     async fn retry_provisioning(&self, company_id: Uuid) -> AppResult<()> {
         let connection = self
-            .connection(company_id)
+            .memory_connection(company_id)
             .await?
             .ok_or_else(|| AppError::BadRequest("HydraDB has not been selected.".into()))?;
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
@@ -1029,9 +1111,10 @@ mod tests {
         );
         assert_eq!((reset.4, reset.5), (None, None));
         let connection = persistence
-            .connection(company_id)
+            .active_binding(company_id)
             .await
-            .expect("connection query")
+            .expect("binding query")
+            .connection()
             .expect("connection");
         assert_eq!(
             connection.readiness,
@@ -1379,7 +1462,17 @@ mod tests {
             .disable_provider(company_id)
             .await
             .expect("disable");
-        assert!(persistence.connection(company_id).await.unwrap().is_some());
+        assert_eq!(
+            persistence.active_binding(company_id).await.unwrap(),
+            ActiveMemoryBinding::Disabled
+        );
+        assert!(
+            persistence
+                .memory_connection(company_id)
+                .await
+                .unwrap()
+                .is_some()
+        );
 
         persistence
             .delete(company_id)
@@ -1393,5 +1486,107 @@ mod tests {
         .await
         .expect("cleanup lookup");
         assert_eq!(cleanup.as_deref(), Some("pending"));
+    }
+
+    #[tokio::test]
+    async fn active_binding_reports_misconfigured_when_selection_has_no_connection() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let company_id = memory_company(&persistence).await;
+        sqlx::query("UPDATE companies SET memory_provider = 'hydradb' WHERE id = $1")
+            .bind(company_id)
+            .execute(&pool)
+            .await
+            .expect("orphan provider selection");
+
+        assert_eq!(
+            persistence.active_binding(company_id).await.unwrap(),
+            ActiveMemoryBinding::Misconfigured
+        );
+    }
+
+    #[tokio::test]
+    async fn reenable_reuses_ready_connection_and_queues_only_readiness_reconciliation() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let persistence = PostgresPersistence::new(pool.clone());
+        let company_id = memory_company(&persistence).await;
+        let original = persistence
+            .select_provider(company_id, MemoryProviderKind::Hydradb)
+            .await
+            .expect("selection");
+        sqlx::query(
+            "UPDATE memory_provider_connections SET readiness = 'ready' WHERE company_id = $1",
+        )
+        .bind(company_id)
+        .execute(&pool)
+        .await
+        .expect("ready connection");
+
+        persistence
+            .disable_provider(company_id)
+            .await
+            .expect("disable");
+        let reenabled = persistence
+            .select_provider(company_id, MemoryProviderKind::Hydradb)
+            .await
+            .expect("reenable");
+        assert_eq!(reenabled.remote_database_id, original.remote_database_id);
+        assert_eq!(
+            reenabled.readiness,
+            crate::entities::memory::MemoryConnectionReadiness::Pending
+        );
+        let job: (String, String) = sqlx::query_as(
+            "SELECT status, phase FROM memory_provisioning_jobs WHERE company_id = $1",
+        )
+        .bind(company_id)
+        .fetch_one(&pool)
+        .await
+        .expect("readiness reconciliation");
+        assert_eq!(job, ("pending".into(), "waiting_ready".into()));
+
+        persistence
+            .select_provider(company_id, MemoryProviderKind::Hydradb)
+            .await
+            .expect("idempotent repeated selection");
+        let phase: String =
+            sqlx::query_scalar("SELECT phase FROM memory_provisioning_jobs WHERE company_id = $1")
+                .bind(company_id)
+                .fetch_one(&pool)
+                .await
+                .expect("unchanged reconciliation");
+        assert_eq!(phase, "waiting_ready");
+
+        let lease_token = Uuid::new_v4();
+        let job = persistence
+            .claim_provisioning_job(lease_token, Utc::now() + chrono::Duration::minutes(2))
+            .await
+            .expect("claim readiness reconciliation")
+            .expect("reconciliation job");
+        assert!(
+            persistence
+                .mark_provisioning(job.id, lease_token)
+                .await
+                .expect("mark reconciliation")
+        );
+        persistence
+            .disable_provider(company_id)
+            .await
+            .expect("disable during reconciliation");
+        assert!(
+            persistence
+                .complete_provisioning(job.id, lease_token)
+                .await
+                .expect("finish stale reconciliation")
+        );
+        assert_eq!(
+            persistence.active_binding(company_id).await.unwrap(),
+            ActiveMemoryBinding::Disabled,
+            "stale readiness work must not restore provider selection"
+        );
     }
 }

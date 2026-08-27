@@ -10,10 +10,10 @@ use crate::{
         agent::Agent,
         channel::Channel,
         company::Company,
-        memory::{MemoryConnectionReadiness, deduplicate_chunks, resolve_scopes, stable_memory_id},
+        memory::{deduplicate_chunks, resolve_scopes, stable_memory_id},
     },
     services::memory_provider::{MemoryConversation, MemoryProviderRegistry},
-    use_cases::memory::MemoryConnectionPersistence,
+    use_cases::memory::{ActiveMemoryBinding, MemoryBindingPersistence},
 };
 
 const MEMORY_START: &str = "<untrusted_historical_memory>";
@@ -43,17 +43,18 @@ pub struct MemoryPersistInput<'a> {
 pub struct MemoryPersistReport {
     pub succeeded: usize,
     pub failed: usize,
+    pub skipped: usize,
 }
 
 pub struct MemoryCoordinator {
-    persistence: Arc<dyn MemoryConnectionPersistence>,
+    persistence: Arc<dyn MemoryBindingPersistence>,
     providers: Arc<MemoryProviderRegistry>,
     monitoring: Arc<dyn MonitoringService>,
 }
 
 impl MemoryCoordinator {
     pub fn new(
-        persistence: Arc<dyn MemoryConnectionPersistence>,
+        persistence: Arc<dyn MemoryBindingPersistence>,
         providers: Arc<MemoryProviderRegistry>,
         monitoring: Arc<dyn MonitoringService>,
     ) -> Self {
@@ -72,7 +73,11 @@ impl MemoryCoordinator {
         {
             return Ok(None);
         }
-        let (provider, database_id) = self.ready_provider(input.company).await?;
+        let Some((provider, provider_kind, database_id)) =
+            self.ready_provider(input.company.id, "recall").await?
+        else {
+            return Ok(None);
+        };
         let (scopes, warnings) = resolve_scopes(
             channel.retrieve_company_memory,
             channel.retrieve_agent_memory,
@@ -110,7 +115,7 @@ impl MemoryCoordinator {
         self.monitoring.record_histogram(
             "memory_recall_duration_ms",
             started.elapsed().as_secs_f64() * 1_000.0,
-            &[("provider", input.company.memory_provider.unwrap().as_str())],
+            &[("provider", provider_kind.as_str())],
         );
         let chunks = match recalled {
             Ok(chunks) => {
@@ -147,23 +152,31 @@ impl MemoryCoordinator {
         {
             return MemoryPersistReport::default();
         }
-        let (provider, database_id) = match self.ready_provider(input.company).await {
-            Ok(ready) => ready,
-            Err(error) => {
-                warn!(
-                    company_id = %input.company.id,
-                    channel_id = %channel.id,
-                    task_id = %input.task_id,
-                    operation = "persist",
-                    error = %error,
-                    "Memory persistence skipped"
-                );
-                return MemoryPersistReport {
-                    succeeded: 0,
-                    failed: 1,
-                };
-            }
-        };
+        let (provider, provider_kind, database_id) =
+            match self.ready_provider(input.company.id, "persist").await {
+                Ok(Some(ready)) => ready,
+                Ok(None) => {
+                    return MemoryPersistReport {
+                        skipped: 1,
+                        ..MemoryPersistReport::default()
+                    };
+                }
+                Err(error) => {
+                    warn!(
+                        company_id = %input.company.id,
+                        channel_id = %channel.id,
+                        task_id = %input.task_id,
+                        operation = "persist",
+                        error = %error,
+                        "Memory persistence skipped"
+                    );
+                    return MemoryPersistReport {
+                        succeeded: 0,
+                        failed: 1,
+                        skipped: 0,
+                    };
+                }
+            };
         let (scopes, warnings) = resolve_scopes(
             channel.persist_company_memory,
             channel.persist_agent_memory,
@@ -194,7 +207,7 @@ impl MemoryCoordinator {
         self.monitoring.record_histogram(
             "memory_persist_duration_ms",
             started.elapsed().as_secs_f64() * 1_000.0,
-            &[("provider", input.company.memory_provider.unwrap().as_str())],
+            &[("provider", provider_kind.as_str())],
         );
         let mut report = MemoryPersistReport::default();
         for (collection, result) in collections.iter().zip(results) {
@@ -237,30 +250,53 @@ impl MemoryCoordinator {
         report
     }
 
+    /// Runtime policy: disabled, provisioning, failed, or deployment-misconfigured bindings
+    /// degrade to no memory. A database read failure still propagates because the current state is
+    /// then unknown rather than known to be safely inactive.
     async fn ready_provider(
         &self,
-        company: &Company,
-    ) -> AppResult<(
-        &Arc<dyn crate::services::memory_provider::MemoryProvider>,
-        String,
-    )> {
-        let kind = company.memory_provider.ok_or_else(|| {
-            AppError::BadRequest("Memory is enabled but the company provider is disabled.".into())
-        })?;
-        let connection = self
-            .persistence
-            .connection(company.id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Memory connection is missing.".into()))?;
-        if connection.provider != kind || connection.readiness != MemoryConnectionReadiness::Ready {
-            return Err(AppError::Internal(
-                "Memory provider is not ready for this company.".into(),
-            ));
-        }
-        let provider = self.providers.get(kind).ok_or_else(|| {
-            AppError::Internal("Memory provider is not configured for this deployment.".into())
-        })?;
-        Ok((provider, connection.remote_database_id))
+        company_id: Uuid,
+        operation: &'static str,
+    ) -> AppResult<
+        Option<(
+            &Arc<dyn crate::services::memory_provider::MemoryProvider>,
+            crate::entities::memory::MemoryProviderKind,
+            String,
+        )>,
+    > {
+        let binding = self.persistence.active_binding(company_id).await?;
+        let state = binding.state_name();
+        let ActiveMemoryBinding::Ready(connection) = binding else {
+            self.monitoring.increment_counter(
+                "memory_runtime_binding_total",
+                1,
+                &[("operation", operation), ("state", state)],
+            );
+            info!(company_id = %company_id, operation, binding_state = state, "Memory operation skipped");
+            return Ok(None);
+        };
+        let kind = connection.provider;
+        let Some(provider) = self.providers.get(kind) else {
+            self.monitoring.increment_counter(
+                "memory_runtime_binding_total",
+                1,
+                &[("operation", operation), ("state", "misconfigured")],
+            );
+            warn!(
+                company_id = %company_id,
+                operation,
+                provider = kind.as_str(),
+                binding_state = "misconfigured",
+                "Memory provider is absent from this deployment; operation skipped"
+            );
+            return Ok(None);
+        };
+        self.monitoring.increment_counter(
+            "memory_runtime_binding_total",
+            1,
+            &[("operation", operation), ("state", "ready")],
+        );
+        Ok(Some((provider, kind, connection.remote_database_id)))
     }
 }
 
@@ -286,7 +322,120 @@ fn format_memory_context(chunks: &[crate::entities::memory::MemoryChunk]) -> Str
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::memory::MemoryChunk;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use crate::{
+        adapters::monitoring::InMemoryMonitor,
+        entities::{
+            channel::Channel,
+            company::Company,
+            creation::CreationProvenance,
+            memory::{
+                MemoryChunk, MemoryConnection, MemoryConnectionReadiness, MemoryProviderError,
+                MemoryProviderKind, MemoryRecallMode, ResolvedMemoryScope,
+            },
+        },
+        services::memory_provider::{MemoryConversation, MemoryProvider},
+        use_cases::memory::ActiveMemoryBinding,
+    };
+
+    struct StaticBinding(ActiveMemoryBinding);
+
+    #[async_trait::async_trait]
+    impl MemoryBindingPersistence for StaticBinding {
+        async fn active_binding(&self, _company_id: Uuid) -> AppResult<ActiveMemoryBinding> {
+            Ok(self.0.clone())
+        }
+    }
+
+    #[derive(Default)]
+    struct CountingProvider {
+        recalls: AtomicUsize,
+        persists: AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl MemoryProvider for CountingProvider {
+        async fn provision(&self, _database_id: &str) -> Result<(), MemoryProviderError> {
+            Ok(())
+        }
+
+        async fn is_ready(&self, _database_id: &str) -> Result<bool, MemoryProviderError> {
+            Ok(true)
+        }
+
+        async fn recall(
+            &self,
+            _database_id: &str,
+            _query: &str,
+            _scopes: &[ResolvedMemoryScope],
+            _mode: MemoryRecallMode,
+            _max_results: u8,
+            _additional_context: Option<&str>,
+        ) -> Result<Vec<MemoryChunk>, MemoryProviderError> {
+            self.recalls.fetch_add(1, Ordering::SeqCst);
+            Ok(Vec::new())
+        }
+
+        async fn persist(
+            &self,
+            _database_id: &str,
+            collections: &[String],
+            _conversation: &MemoryConversation,
+        ) -> Vec<Result<(), MemoryProviderError>> {
+            self.persists.fetch_add(1, Ordering::SeqCst);
+            collections.iter().map(|_| Ok(())).collect()
+        }
+
+        async fn delete(&self, _database_id: &str) -> Result<(), MemoryProviderError> {
+            Ok(())
+        }
+    }
+
+    fn stale_company(company_id: Uuid) -> Company {
+        Company {
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Stale queued company".into(),
+            slug: "stale-company".into(),
+            api_key: None,
+            provider: None,
+            model: None,
+            enable_llm_spam_guardrail: None,
+            memory_provider: Some(MemoryProviderKind::Hydradb),
+            avatar_url: None,
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    fn memory_channel(company_id: Uuid) -> Channel {
+        Channel {
+            id: Uuid::new_v4(),
+            company_id,
+            name: "Memory channel".into(),
+            description: None,
+            slug: "memory".into(),
+            alias_slugs: Vec::new(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: None,
+            channel_config: None,
+            enabled: true,
+            add_3rd_party: false,
+            retrieve_company_memory: true,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: true,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_recall_mode: MemoryRecallMode::Fast,
+            memory_max_results: 5,
+            created_by: CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
+        }
+    }
 
     #[test]
     fn context_is_delimited_and_cannot_close_its_own_section() {
@@ -296,5 +445,87 @@ mod tests {
         }]);
         assert_eq!(context.matches(MEMORY_END).count(), 1);
         assert!(context.contains("untrusted historical context"));
+    }
+
+    #[tokio::test]
+    async fn current_disabled_state_overrides_a_queued_company_snapshot() {
+        let company_id = Uuid::new_v4();
+        let company = stale_company(company_id);
+        let channel = memory_channel(company_id);
+        let provider = Arc::new(CountingProvider::default());
+        let providers = Arc::new(
+            MemoryProviderRegistry::default()
+                .register(MemoryProviderKind::Hydradb, provider.clone()),
+        );
+        let coordinator = MemoryCoordinator::new(
+            Arc::new(StaticBinding(ActiveMemoryBinding::Disabled)),
+            providers,
+            Arc::new(InMemoryMonitor::new()),
+        );
+
+        let recalled = coordinator
+            .recall(MemoryRecallInput {
+                company: &company,
+                channel: &channel,
+                agent: None,
+                sender: Some("sender@example.com"),
+                task_id: Uuid::new_v4(),
+                latest_prompt: "hello",
+            })
+            .await
+            .expect("disabled recall degrades safely");
+        let report = coordinator
+            .persist(MemoryPersistInput {
+                company: &company,
+                channel: &channel,
+                agent: None,
+                sender: Some("sender@example.com"),
+                task_id: Uuid::new_v4(),
+                user_context: "hello",
+                final_answer: "hi",
+            })
+            .await;
+
+        assert_eq!(recalled, None);
+        assert_eq!(report.skipped, 1);
+        assert_eq!(provider.recalls.load(Ordering::SeqCst), 0);
+        assert_eq!(provider.persists.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn missing_deployment_provider_degrades_a_ready_binding_safely() {
+        let company_id = Uuid::new_v4();
+        let company = stale_company(company_id);
+        let channel = memory_channel(company_id);
+        let connection = MemoryConnection {
+            company_id,
+            provider: MemoryProviderKind::Hydradb,
+            remote_database_id: "retained-database".into(),
+            readiness: MemoryConnectionReadiness::Ready,
+            last_error: None,
+            provisioning_phase: None,
+            failure_attempts: 0,
+            readiness_deadline: None,
+        };
+        let coordinator = MemoryCoordinator::new(
+            Arc::new(StaticBinding(ActiveMemoryBinding::Ready(connection))),
+            Arc::new(MemoryProviderRegistry::default()),
+            Arc::new(InMemoryMonitor::new()),
+        );
+
+        assert_eq!(
+            coordinator
+                .recall(MemoryRecallInput {
+                    company: &company,
+                    channel: &channel,
+                    agent: None,
+                    sender: None,
+                    task_id: Uuid::new_v4(),
+                    latest_prompt: "hello",
+                })
+                .await
+                .expect("missing deployment provider degrades safely"),
+            None
+        );
     }
 }

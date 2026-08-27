@@ -7,7 +7,21 @@ use crate::{
         LeasedCleanupJob, LeasedProvisioningJob, MemoryConnection, MemoryConnectionReadiness,
         MemoryProviderKind, MemoryProvisioningPhase,
     },
+    use_cases::memory::ActiveMemoryBinding,
 };
+
+#[derive(sqlx::FromRow)]
+pub(super) struct ActiveMemoryBindingDb {
+    selected_provider: Option<String>,
+    company_id: Uuid,
+    provider: Option<String>,
+    remote_database_id: Option<String>,
+    readiness: Option<String>,
+    last_error: Option<String>,
+    provisioning_phase: Option<String>,
+    failure_attempts: Option<i32>,
+    readiness_deadline: Option<DateTime<Utc>>,
+}
 
 #[derive(sqlx::FromRow)]
 pub(super) struct MemoryConnectionDb {
@@ -95,6 +109,55 @@ impl TryFrom<MemoryConnectionDb> for MemoryConnection {
             failure_attempts: db.failure_attempts,
             readiness_deadline: db.readiness_deadline,
         })
+    }
+}
+
+impl ActiveMemoryBindingDb {
+    pub(super) fn into_binding(self) -> ActiveMemoryBinding {
+        let Some(selected_provider) = self.selected_provider.as_deref() else {
+            return ActiveMemoryBinding::Disabled;
+        };
+        let (Some(stored_provider), Some(remote_database_id), Some(stored_readiness)) = (
+            self.provider.as_deref(),
+            self.remote_database_id,
+            self.readiness.as_deref(),
+        ) else {
+            return ActiveMemoryBinding::Misconfigured;
+        };
+        let (Ok(selected_provider), Ok(stored_provider), Ok(readiness)) = (
+            provider(selected_provider),
+            provider(stored_provider),
+            readiness(stored_readiness),
+        ) else {
+            return ActiveMemoryBinding::Misconfigured;
+        };
+        if selected_provider != stored_provider {
+            return ActiveMemoryBinding::Misconfigured;
+        }
+        let provisioning_phase = match self
+            .provisioning_phase
+            .as_deref()
+            .map(provisioning_phase)
+            .transpose()
+        {
+            Ok(phase) => phase,
+            Err(_) => return ActiveMemoryBinding::Misconfigured,
+        };
+        let connection = MemoryConnection {
+            company_id: self.company_id,
+            provider: stored_provider,
+            remote_database_id,
+            readiness,
+            last_error: self.last_error,
+            provisioning_phase,
+            failure_attempts: self.failure_attempts.unwrap_or_default(),
+            readiness_deadline: self.readiness_deadline,
+        };
+        if readiness == MemoryConnectionReadiness::Ready {
+            ActiveMemoryBinding::Ready(connection)
+        } else {
+            ActiveMemoryBinding::NotReady(connection)
+        }
     }
 }
 

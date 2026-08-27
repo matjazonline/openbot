@@ -512,7 +512,7 @@ fn company_fields(draft: &CompanyDraft<'_>, hydradb_configured: bool) -> String 
                             <option value="" {memory_disabled_selected}>Disabled</option>
                             <option value="hydradb" {memory_hydradb_selected} {memory_hydradb_disabled}>HydraDB</option>
                         </select>
-                        <div class="label"><span class="text-[11px] opacity-60">HydraDB is provisioned asynchronously after this company is saved.</span></div>
+                        <div class="label"><span class="text-[11px] opacity-60">Disabling suspends memory immediately but retains the HydraDB connection and channel memory choices. Company deletion removes the remote memory database.</span></div>
                     </label>
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
                         <summary class="collapse-title text-sm font-medium">Default model &amp; key</summary>

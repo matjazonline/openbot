@@ -70,6 +70,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     let memory_use_cases = Arc::new(MemoryUseCases::new(
         postgres_arc.clone(),
         postgres_arc.clone(),
+        postgres_arc.clone(),
         config.hydradb.is_some(),
     ));
     let memory_worker = Arc::new(MemoryWorker::new(

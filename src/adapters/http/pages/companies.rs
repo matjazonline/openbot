@@ -70,6 +70,7 @@ pub fn companies_page(companies: &[Company]) -> String {
                         <option value="">Disabled</option>
                         <option value="hydradb">HydraDB</option>
                     </select>
+                    <p class="mt-1 text-[11px] text-slate-500">Disabling suspends memory but retains the connection and channel choices. Deleting the company removes its remote memory.</p>
                 </div>
                 <div class="flex justify-end">
                     <button type="submit"
@@ -215,6 +216,7 @@ pub fn company_edit_fragment(company: &Company) -> String {
                     <option value="" {memory_disabled_selected}>Disabled</option>
                     <option value="hydradb" {memory_hydradb_selected}>HydraDB</option>
                 </select>
+                <p class="mt-1 text-[11px] text-slate-500">Disabling suspends memory but retains the connection and channel choices. Deleting the company removes its remote memory.</p>
             </div>
             <div class="flex items-center justify-end gap-2">
                 <button type="button" hx-get="/companies/{id}/cancel" hx-target="#company-{id}" hx-swap="outerHTML"

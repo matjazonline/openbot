@@ -307,6 +307,11 @@ one — so a new DB-backed test has to be written to tolerate that:
   `only_one_worker_queues_an_outbound_send` runs two concurrent claims, so the second is guaranteed
   to — release it back to `pending` with its worker and lease cleared. A test that leaves a
   five-minute lease on someone else's row makes *their* test fail, several files away.
+- **Leave no claimable residue.** A test that creates a globally claimable queue row must complete
+  it, delete its owner when safe, or move it beyond the claim horizon before releasing the test
+  guard. A passing assertion is insufficient if the test leaves due work that another test can
+  claim. Deterministically sort the test row first, verify its stable identifier after claiming,
+  and return any accidentally claimed foreign row to its prior claimable state.
 
 If a test still cannot be isolated, run just that test rather than reaching for `--test-threads=1`
 for the whole suite — serialising everything hides the next isolation bug instead of surfacing it.

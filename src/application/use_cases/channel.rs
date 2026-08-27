@@ -16,7 +16,7 @@ use crate::{
     },
     infra::config::AppConfig,
     use_cases::company::{CompanyPersistence, managed_company},
-    use_cases::memory::MemoryConnectionPersistence,
+    use_cases::memory::{ActiveMemoryBinding, MemoryBindingPersistence},
 };
 use serde::{Deserialize, Serialize};
 
@@ -199,7 +199,7 @@ pub struct ChannelUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
     channel_persistence: Arc<dyn ChannelPersistence>,
     config: Arc<AppConfig>,
-    memory_persistence: Option<Arc<dyn MemoryConnectionPersistence>>,
+    memory_persistence: Option<Arc<dyn MemoryBindingPersistence>>,
 }
 
 impl ChannelUseCases {
@@ -218,7 +218,7 @@ impl ChannelUseCases {
 
     pub fn with_memory_persistence(
         mut self,
-        persistence: Arc<dyn MemoryConnectionPersistence>,
+        persistence: Arc<dyn MemoryBindingPersistence>,
     ) -> Self {
         self.memory_persistence = Some(persistence);
         self
@@ -283,34 +283,28 @@ impl ChannelUseCases {
         if !enabled {
             return Ok(());
         }
-        let company = self
-            .company_persistence
-            .get_by_id(company_id)
-            .await?
-            .ok_or_else(crate::use_cases::company::company_not_found)?;
-        if company.user_id != user_id {
-            return Err(AppError::NotFound(
-                "Company not found, or you do not have permission.".into(),
-            ));
-        }
-        let selected = company.memory_provider.ok_or_else(|| {
-            AppError::BadRequest("Select a memory provider before enabling memory.".into())
-        })?;
+        self.verify_company_manager(user_id, company_id).await?;
         let persistence = self.memory_persistence.as_ref().ok_or_else(|| {
             AppError::BadRequest("Memory is not configured for this deployment.".into())
         })?;
-        let connection = persistence
-            .connection(company_id)
-            .await?
-            .ok_or_else(|| AppError::BadRequest("Memory provider is not provisioned.".into()))?;
-        if connection.provider != selected
-            || connection.readiness != crate::entities::memory::MemoryConnectionReadiness::Ready
-        {
+        let binding = persistence.active_binding(company_id).await?;
+        if self.config.hydradb.is_none() {
             return Err(AppError::BadRequest(
-                "Memory controls require a ready provider.".into(),
+                "Memory is not configured for this deployment.".into(),
             ));
         }
-        Ok(())
+        match binding {
+            ActiveMemoryBinding::Ready(_) => Ok(()),
+            ActiveMemoryBinding::Disabled => Err(AppError::BadRequest(
+                "Select a memory provider before enabling memory.".into(),
+            )),
+            ActiveMemoryBinding::NotReady(_) => Err(AppError::BadRequest(
+                "Memory controls require a ready provider.".into(),
+            )),
+            ActiveMemoryBinding::Misconfigured => Err(AppError::BadRequest(
+                "The selected memory provider is misconfigured.".into(),
+            )),
+        }
     }
 
     pub async fn memory_ready(&self, user_id: Uuid, company_id: Uuid) -> AppResult<bool> {
@@ -318,12 +312,11 @@ impl ChannelUseCases {
         let Some(persistence) = self.memory_persistence.as_ref() else {
             return Ok(false);
         };
-        Ok(persistence
-            .connection(company_id)
-            .await?
-            .is_some_and(|connection| {
-                connection.readiness == crate::entities::memory::MemoryConnectionReadiness::Ready
-            }))
+        let binding = persistence.active_binding(company_id).await?;
+        if self.config.hydradb.is_none() {
+            return Ok(false);
+        }
+        Ok(matches!(binding, ActiveMemoryBinding::Ready(_)))
     }
 
     #[instrument(skip(self))]

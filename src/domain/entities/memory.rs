@@ -11,6 +11,7 @@ use uuid::Uuid;
 pub const MAX_MEMORY_CONTEXT_CHARS: usize = 16_000;
 pub const MAX_MEMORY_PROVIDER_OPERATION_SECONDS: u64 = 120;
 pub const MEMORY_DELETION_QUIESCENCE_SECONDS: i64 = 180;
+pub const MEMORY_READINESS_WINDOW_SECONDS: i64 = 15 * 60;
 pub const MEMORY_READINESS_TIMEOUT_ERROR: &str = "memory provider readiness deadline was exceeded";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
