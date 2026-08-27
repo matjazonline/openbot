@@ -11,7 +11,10 @@ use crate::{
     domain::monitoring::MonitoringService,
     entities::runtime_metrics::MachineIdentity,
     infra::{config::AppConfig, events::MailboxEvents},
-    services::{memory_worker::MemoryWorker, runtime_metrics::RuntimeMetricPersistence},
+    services::{
+        memory_worker::MemoryWorker,
+        runtime_metrics::{HydraDbActivity, RuntimeMetricPersistence},
+    },
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
         company::CompanyUseCases, company_invite::CompanyInviteUseCases, memory::MemoryUseCases,
@@ -39,6 +42,8 @@ pub struct AppState {
     /// Deployment-wide runtime history; handlers must authorize operators before reading it.
     pub runtime_metrics: Arc<dyn RuntimeMetricPersistence>,
     pub runtime_identity: MachineIdentity,
+    /// Tally the memory provider writes into and the runtime sampler drains each ten seconds.
+    pub hydradb_activity: HydraDbActivity,
     /// Issues and verifies sessions; the only thing that decides who a request is.
     pub sessions: Arc<SessionAuthority>,
     /// Where a picked file is stored; `None` when no bucket is configured, which is what the

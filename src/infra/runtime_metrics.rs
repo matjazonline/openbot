@@ -4,7 +4,7 @@ use chrono::Utc;
 
 use crate::{
     entities::runtime_metrics::{MachineIdentity, RuntimeMetricObservation},
-    services::runtime_metrics::{ActiveTaskExecutions, RuntimeMetricSource},
+    services::runtime_metrics::{ActiveTaskExecutions, HydraDbActivity, RuntimeMetricSource},
 };
 
 const PROC_STATUS: &str = "/proc/self/status";
@@ -49,6 +49,7 @@ pub struct LinuxRuntimeMetricSource {
     previous_throttle: Option<(u64, Instant)>,
     active_task_executions: ActiveTaskExecutions,
     task_worker_concurrency_limit: i32,
+    hydradb: HydraDbActivity,
 }
 
 impl LinuxRuntimeMetricSource {
@@ -56,6 +57,7 @@ impl LinuxRuntimeMetricSource {
         identity: MachineIdentity,
         active_task_executions: ActiveTaskExecutions,
         task_worker_concurrency_limit: usize,
+        hydradb: HydraDbActivity,
     ) -> Self {
         Self {
             identity,
@@ -63,6 +65,7 @@ impl LinuxRuntimeMetricSource {
             previous_cpu: None,
             previous_throttle: None,
             active_task_executions,
+            hydradb,
             task_worker_concurrency_limit: i32::try_from(task_worker_concurrency_limit)
                 .expect("task worker concurrency fits an i32"),
         }
@@ -109,6 +112,7 @@ impl RuntimeMetricSource for LinuxRuntimeMetricSource {
                 .unwrap_or(self.task_worker_concurrency_limit)
                 .min(self.task_worker_concurrency_limit),
             task_worker_concurrency_limit: self.task_worker_concurrency_limit,
+            hydradb: self.hydradb.drain(),
         }
     }
 }
@@ -286,6 +290,7 @@ mod tests {
             previous_throttle: None,
             active_task_executions: ActiveTaskExecutions::default(),
             task_worker_concurrency_limit: 4,
+            hydradb: HydraDbActivity::default(),
         };
 
         let gauge = source.active_task_executions.clone();
@@ -297,6 +302,7 @@ mod tests {
         assert_eq!(observation.cpu_throttle_percent, None);
         assert_eq!(observation.active_task_executions, 1);
         assert_eq!(observation.task_worker_concurrency_limit, 4);
+        assert_eq!(observation.hydradb, Default::default());
 
         fs::remove_dir(missing).unwrap();
     }

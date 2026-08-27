@@ -1267,6 +1267,7 @@ mod tests {
             Arc::new(crate::services::memory_provider::MemoryProviderRegistry::default());
         let monitoring = Arc::new(crate::adapters::monitoring::InMemoryMonitor::new());
         let app_state = AppState {
+            hydradb_activity: Default::default(),
             // Lazy: this test drives mocked persistence and never opens a connection.
             db: sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
                 .expect("valid lazy pool url"),

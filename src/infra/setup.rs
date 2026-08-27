@@ -14,6 +14,7 @@ use crate::{
     services::{
         memory_coordinator::MemoryCoordinator, memory_provider::MemoryProviderRegistry,
         memory_worker::MemoryWorker, outbound_dispatcher::SmtpConfirmationSender,
+        runtime_metrics::HydraDbActivity,
     },
     use_cases::{
         agent::AgentUseCases,
@@ -48,6 +49,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     };
 
     let postgres_arc = Arc::new(postgres_persistence().await?);
+    let hydradb_activity = HydraDbActivity::default();
     let mut memory_providers = MemoryProviderRegistry::default();
     if let Some(hydradb) = config.hydradb.as_ref() {
         let provider = HydraDbProvider::new(
@@ -55,7 +57,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             hydradb.api_key.clone(),
             hydradb.fast_timeout,
             hydradb.thinking_timeout,
-        )?;
+        )?
+        .with_activity(hydradb_activity.clone());
         memory_providers = memory_providers.register(
             crate::entities::memory::MemoryProviderKind::Hydradb,
             Arc::new(provider),
@@ -150,6 +153,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         dashboard_persistence: postgres_arc.clone(),
         runtime_metrics: postgres_arc.clone(),
         runtime_identity,
+        hydradb_activity,
         sessions,
         file_storage,
         events: MailboxEvents::new(),

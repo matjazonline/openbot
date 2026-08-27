@@ -10,7 +10,7 @@ use crate::{
     entities::{
         dashboard::DashboardWindow,
         runtime_metrics::{
-            MachineId, MachineIdentity, MachineRegion, RuntimeMetricBucket,
+            HydraDbInterval, MachineId, MachineIdentity, MachineRegion, RuntimeMetricBucket,
             RuntimeMetricObservation, RuntimeMetricSample, RuntimeMetricSnapshot,
             TASK_WORKER_RECOMMENDATION_POLICY, TaskWorkerConcurrencyRecommendation,
         },
@@ -33,7 +33,10 @@ const CURRENT_SQL: &str = r#"
            database_acquire_succeeded,
            pool_size,
            pool_idle,
-           pool_active
+           pool_active,
+           hydradb_calls,
+           hydradb_failures,
+           hydradb_duration_ms
       FROM runtime_metric_samples
      WHERE machine_id = $1
      ORDER BY sampled_at DESC
@@ -131,7 +134,11 @@ const BUCKETS_SQL: &str = r#"
                ) AS database_acquire_p50_ms,
                percentile_disc(0.95) WITHIN GROUP (
                    ORDER BY database_acquire_duration_ms
-               ) AS database_acquire_p95_ms
+               ) AS database_acquire_p95_ms,
+               SUM(hydradb_calls)::bigint AS hydradb_calls,
+               SUM(hydradb_failures)::bigint AS hydradb_failures,
+               (SUM(hydradb_duration_ms) / NULLIF(SUM(hydradb_calls), 0))::double precision
+                   AS hydradb_mean_ms
           FROM runtime_metric_samples
          WHERE machine_id = $1
            AND sampled_at >= CURRENT_TIMESTAMP - make_interval(mins => $3)
@@ -142,7 +149,10 @@ const BUCKETS_SQL: &str = r#"
            measured.cpu_steal_percent,
            measured.cpu_throttle_percent,
            measured.database_acquire_p50_ms,
-           measured.database_acquire_p95_ms
+           measured.database_acquire_p95_ms,
+           measured.hydradb_calls,
+           measured.hydradb_failures,
+           measured.hydradb_mean_ms
       FROM slots
       LEFT JOIN measured ON measured.bucket = slots.bucket
      ORDER BY slots.bucket"#;
@@ -175,6 +185,7 @@ fn completed_sample(
         pool_size,
         pool_idle,
         pool_active,
+        hydradb: observation.hydradb,
     }
 }
 
@@ -187,7 +198,7 @@ async fn insert_samples(
          process_rss_bytes, memory_limit_bytes, cpu_utilization_percent, cpu_steal_percent, \
          cpu_throttle_percent, active_task_executions, task_worker_concurrency_limit, \
          database_acquire_duration_ms, database_acquire_succeeded, pool_size, pool_idle, \
-         pool_active) ",
+         pool_active, hydradb_calls, hydradb_failures, hydradb_duration_ms) ",
     );
     query.push_values(samples, |mut row, sample| {
         row.push_bind(sample.identity.id.as_str())
@@ -204,7 +215,10 @@ async fn insert_samples(
             .push_bind(sample.database_acquire_succeeded)
             .push_bind(sample.pool_size)
             .push_bind(sample.pool_idle)
-            .push_bind(sample.pool_active);
+            .push_bind(sample.pool_active)
+            .push_bind(sample.hydradb.calls)
+            .push_bind(sample.hydradb.failures)
+            .push_bind(sample.hydradb.total_duration_ms);
     });
     query.push(
         " ON CONFLICT (machine_id, sampled_at) DO UPDATE SET \
@@ -219,7 +233,9 @@ async fn insert_samples(
          database_acquire_duration_ms = EXCLUDED.database_acquire_duration_ms, \
          database_acquire_succeeded = EXCLUDED.database_acquire_succeeded, \
          pool_size = EXCLUDED.pool_size, pool_idle = EXCLUDED.pool_idle, \
-         pool_active = EXCLUDED.pool_active",
+         pool_active = EXCLUDED.pool_active, hydradb_calls = EXCLUDED.hydradb_calls, \
+         hydradb_failures = EXCLUDED.hydradb_failures, \
+         hydradb_duration_ms = EXCLUDED.hydradb_duration_ms",
     );
     query.build().execute(connection).await?;
     Ok(())
@@ -262,6 +278,11 @@ fn sample_from_row(row: &sqlx::postgres::PgRow) -> AppResult<RuntimeMetricSample
         pool_size: row.try_get("pool_size").map_err(AppError::from)?,
         pool_idle: row.try_get("pool_idle").map_err(AppError::from)?,
         pool_active: row.try_get("pool_active").map_err(AppError::from)?,
+        hydradb: HydraDbInterval {
+            calls: row.try_get("hydradb_calls").map_err(AppError::from)?,
+            failures: row.try_get("hydradb_failures").map_err(AppError::from)?,
+            total_duration_ms: row.try_get("hydradb_duration_ms").map_err(AppError::from)?,
+        },
     })
 }
 
@@ -361,6 +382,9 @@ impl RuntimeMetricPersistence for PostgresPersistence {
                     database_acquire_p95_ms: row
                         .try_get("database_acquire_p95_ms")
                         .map_err(AppError::from)?,
+                    hydradb_calls: row.try_get("hydradb_calls").map_err(AppError::from)?,
+                    hydradb_failures: row.try_get("hydradb_failures").map_err(AppError::from)?,
+                    hydradb_mean_ms: row.try_get("hydradb_mean_ms").map_err(AppError::from)?,
                 })
             })
             .collect::<AppResult<Vec<_>>>()?;
@@ -405,6 +429,11 @@ mod tests {
             cpu_throttle_percent: Some(1.25),
             active_task_executions: 2,
             task_worker_concurrency_limit: 4,
+            hydradb: HydraDbInterval {
+                calls: 4,
+                failures: 1,
+                total_duration_ms: 500.0,
+            },
         }
     }
 
@@ -439,6 +468,9 @@ mod tests {
         assert!(current.database_acquire_succeeded);
         assert_eq!(current.active_task_executions, 2);
         assert_eq!(current.task_worker_concurrency_limit, 4);
+        assert_eq!(current.hydradb.calls, 4);
+        assert_eq!(current.hydradb.failures, 1);
+        assert_eq!(current.hydradb.mean_duration_ms(), Some(125.0));
         assert_eq!(snapshot.peak_rss_bytes, Some(64 * 1024 * 1024));
         assert_eq!(snapshot.suggested_task_worker_concurrency, None);
         assert_eq!(
@@ -447,6 +479,11 @@ mod tests {
         );
         assert!(snapshot.buckets.iter().any(|bucket| {
             bucket.cpu_utilization_percent == Some(37.5) && bucket.database_acquire_p50_ms.is_some()
+        }));
+        assert!(snapshot.buckets.iter().any(|bucket| {
+            bucket.hydradb_calls == Some(4)
+                && bucket.hydradb_failures == Some(1)
+                && bucket.hydradb_mean_ms == Some(125.0)
         }));
         for window in [
             DashboardWindow::last_six_hours(),

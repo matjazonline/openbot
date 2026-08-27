@@ -1,4 +1,7 @@
-use std::time::Duration;
+use std::{
+    future::Future,
+    time::{Duration, Instant},
+};
 
 use async_trait::async_trait;
 use futures::future::join_all;
@@ -8,7 +11,10 @@ use serde_json::{Value, json};
 
 use crate::{
     entities::memory::{MemoryChunk, MemoryProviderError, MemoryRecallMode, ResolvedMemoryScope},
-    services::memory_provider::{MemoryConversation, MemoryProvider},
+    services::{
+        memory_provider::{MemoryConversation, MemoryProvider},
+        runtime_metrics::HydraDbActivity,
+    },
 };
 
 pub struct HydraDbProvider {
@@ -17,6 +23,7 @@ pub struct HydraDbProvider {
     api_key: SecretString,
     fast_timeout: Duration,
     thinking_timeout: Duration,
+    activity: HydraDbActivity,
 }
 
 impl HydraDbProvider {
@@ -39,7 +46,26 @@ impl HydraDbProvider {
             api_key,
             fast_timeout,
             thinking_timeout,
+            activity: HydraDbActivity::default(),
         })
+    }
+
+    /// Report every call into the runtime metric sample this machine writes each ten seconds.
+    pub fn with_activity(mut self, activity: HydraDbActivity) -> Self {
+        self.activity = activity;
+        self
+    }
+
+    /// Time one provider call and tally its outcome. Wraps the whole exchange — connect, transfer
+    /// and decode — because that is the latency the caller waits for.
+    async fn measured<T>(
+        &self,
+        call: impl Future<Output = Result<T, MemoryProviderError>>,
+    ) -> Result<T, MemoryProviderError> {
+        let started = Instant::now();
+        let outcome = call.await;
+        self.activity.record(started.elapsed(), outcome.is_ok());
+        outcome
     }
 
     fn request(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
@@ -66,50 +92,53 @@ impl HydraDbProvider {
         collection: &str,
         conversation: &MemoryConversation,
     ) -> Result<(), MemoryProviderError> {
-        let item = json!({
-            "id": conversation.id,
-            "type": "user_assistant_pairs",
-            "infer": true,
-            "user": conversation.user,
-            "assistant": conversation.assistant,
-        });
-        let items =
-            serde_json::to_string(&[item]).map_err(|_| MemoryProviderError::MalformedResponse)?;
-        let form = multipart::Form::new()
-            .text("database_id", database_id.to_owned())
-            .text("collection", collection.to_owned())
-            .text("items", items);
-        let response = self
-            .request(reqwest::Method::POST, "/context/ingest")
-            .timeout(self.fast_timeout)
-            .multipart(form)
-            .send()
-            .await
-            .map_err(classify_transport)?;
-        let body = Self::json_response(response).await?;
-        let results = body
-            .get("results")
-            .and_then(Value::as_array)
-            .ok_or(MemoryProviderError::MalformedResponse)?;
-        if results.len() != 1 {
-            return Err(MemoryProviderError::MalformedResponse);
-        }
-        let rejected = results[0]
-            .get("error")
-            .is_some_and(|value| !value.is_null())
-            || results[0]
-                .get("success")
-                .and_then(Value::as_bool)
-                .is_some_and(|success| !success)
-            || results[0]
-                .get("status")
-                .and_then(Value::as_str)
-                .is_some_and(|status| matches!(status, "failed" | "rejected"));
-        if rejected {
-            Err(MemoryProviderError::RejectedItem)
-        } else {
-            Ok(())
-        }
+        self.measured(async {
+            let item = json!({
+                "id": conversation.id,
+                "type": "user_assistant_pairs",
+                "infer": true,
+                "user": conversation.user,
+                "assistant": conversation.assistant,
+            });
+            let items = serde_json::to_string(&[item])
+                .map_err(|_| MemoryProviderError::MalformedResponse)?;
+            let form = multipart::Form::new()
+                .text("database_id", database_id.to_owned())
+                .text("collection", collection.to_owned())
+                .text("items", items);
+            let response = self
+                .request(reqwest::Method::POST, "/context/ingest")
+                .timeout(self.fast_timeout)
+                .multipart(form)
+                .send()
+                .await
+                .map_err(classify_transport)?;
+            let body = Self::json_response(response).await?;
+            let results = body
+                .get("results")
+                .and_then(Value::as_array)
+                .ok_or(MemoryProviderError::MalformedResponse)?;
+            if results.len() != 1 {
+                return Err(MemoryProviderError::MalformedResponse);
+            }
+            let rejected = results[0]
+                .get("error")
+                .is_some_and(|value| !value.is_null())
+                || results[0]
+                    .get("success")
+                    .and_then(Value::as_bool)
+                    .is_some_and(|success| !success)
+                || results[0]
+                    .get("status")
+                    .and_then(Value::as_str)
+                    .is_some_and(|status| matches!(status, "failed" | "rejected"));
+            if rejected {
+                Err(MemoryProviderError::RejectedItem)
+            } else {
+                Ok(())
+            }
+        })
+        .await
     }
 }
 
@@ -135,32 +164,38 @@ fn classify_transport(error: reqwest::Error) -> MemoryProviderError {
 #[async_trait]
 impl MemoryProvider for HydraDbProvider {
     async fn provision(&self, database_id: &str) -> Result<(), MemoryProviderError> {
-        let response = self
-            .request(reqwest::Method::POST, "/databases")
-            .timeout(self.fast_timeout)
-            .json(&json!({"database_id": database_id, "name": database_id}))
-            .send()
-            .await
-            .map_err(classify_transport)?;
-        if response.status() == StatusCode::CONFLICT {
-            return Ok(());
-        }
-        Self::json_response(response).await.map(|_| ())
+        self.measured(async {
+            let response = self
+                .request(reqwest::Method::POST, "/databases")
+                .timeout(self.fast_timeout)
+                .json(&json!({"database_id": database_id, "name": database_id}))
+                .send()
+                .await
+                .map_err(classify_transport)?;
+            if response.status() == StatusCode::CONFLICT {
+                return Ok(());
+            }
+            Self::json_response(response).await.map(|_| ())
+        })
+        .await
     }
 
     async fn is_ready(&self, database_id: &str) -> Result<bool, MemoryProviderError> {
-        let response = self
-            .request(reqwest::Method::GET, "/databases/status")
-            .timeout(self.fast_timeout)
-            .query(&[("database_id", database_id)])
-            .send()
-            .await
-            .map_err(classify_transport)?;
-        if response.status() == StatusCode::NOT_FOUND {
-            return Ok(false);
-        }
-        let body = Self::json_response(response).await?;
-        Ok(body.pointer("/status").and_then(Value::as_str) == Some("ready_for_ingestion"))
+        self.measured(async {
+            let response = self
+                .request(reqwest::Method::GET, "/databases/status")
+                .timeout(self.fast_timeout)
+                .query(&[("database_id", database_id)])
+                .send()
+                .await
+                .map_err(classify_transport)?;
+            if response.status() == StatusCode::NOT_FOUND {
+                return Ok(false);
+            }
+            let body = Self::json_response(response).await?;
+            Ok(body.pointer("/status").and_then(Value::as_str) == Some("ready_for_ingestion"))
+        })
+        .await
     }
 
     async fn recall(
@@ -172,51 +207,54 @@ impl MemoryProvider for HydraDbProvider {
         max_results: u8,
         additional_context: Option<&str>,
     ) -> Result<Vec<MemoryChunk>, MemoryProviderError> {
-        let collections: serde_json::Map<String, Value> = scopes
-            .iter()
-            .map(|scope| (scope.collection.clone(), json!(scope.weight)))
-            .collect();
-        let timeout = match mode {
-            MemoryRecallMode::Fast => self.fast_timeout,
-            MemoryRecallMode::Thinking => self.thinking_timeout,
-        };
-        let response = self
-            .request(reqwest::Method::POST, "/query")
-            .timeout(timeout)
-            .json(&json!({
-                "database_id": database_id,
-                "type": "memory",
-                "query": query,
-                "query_by": "hybrid",
-                "collections": collections,
-                "mode": mode.as_str(),
-                "max_results": max_results,
-                "additional_context": additional_context,
-            }))
-            .send()
-            .await
-            .map_err(classify_transport)?;
-        let body = Self::json_response(response).await?;
-        let rows = body
-            .get("results")
-            .and_then(Value::as_array)
-            .ok_or(MemoryProviderError::MalformedResponse)?;
-        rows.iter()
-            .map(|row| {
-                let content = row
-                    .get("content")
-                    .and_then(Value::as_str)
-                    .ok_or(MemoryProviderError::MalformedResponse)?;
-                Ok(MemoryChunk {
-                    source_chunk_id: row
-                        .get("chunk_id")
-                        .or_else(|| row.get("id"))
+        self.measured(async {
+            let collections: serde_json::Map<String, Value> = scopes
+                .iter()
+                .map(|scope| (scope.collection.clone(), json!(scope.weight)))
+                .collect();
+            let timeout = match mode {
+                MemoryRecallMode::Fast => self.fast_timeout,
+                MemoryRecallMode::Thinking => self.thinking_timeout,
+            };
+            let response = self
+                .request(reqwest::Method::POST, "/query")
+                .timeout(timeout)
+                .json(&json!({
+                    "database_id": database_id,
+                    "type": "memory",
+                    "query": query,
+                    "query_by": "hybrid",
+                    "collections": collections,
+                    "mode": mode.as_str(),
+                    "max_results": max_results,
+                    "additional_context": additional_context,
+                }))
+                .send()
+                .await
+                .map_err(classify_transport)?;
+            let body = Self::json_response(response).await?;
+            let rows = body
+                .get("results")
+                .and_then(Value::as_array)
+                .ok_or(MemoryProviderError::MalformedResponse)?;
+            rows.iter()
+                .map(|row| {
+                    let content = row
+                        .get("content")
                         .and_then(Value::as_str)
-                        .map(str::to_owned),
-                    content: content.to_owned(),
+                        .ok_or(MemoryProviderError::MalformedResponse)?;
+                    Ok(MemoryChunk {
+                        source_chunk_id: row
+                            .get("chunk_id")
+                            .or_else(|| row.get("id"))
+                            .and_then(Value::as_str)
+                            .map(str::to_owned),
+                        content: content.to_owned(),
+                    })
                 })
-            })
-            .collect()
+                .collect()
+        })
+        .await
     }
 
     async fn persist(
@@ -234,17 +272,20 @@ impl MemoryProvider for HydraDbProvider {
     }
 
     async fn delete(&self, database_id: &str) -> Result<(), MemoryProviderError> {
-        let response = self
-            .request(reqwest::Method::DELETE, "/databases")
-            .timeout(self.fast_timeout)
-            .json(&json!({"database_id": database_id}))
-            .send()
-            .await
-            .map_err(classify_transport)?;
-        if response.status() == StatusCode::NOT_FOUND {
-            return Ok(());
-        }
-        Self::json_response(response).await.map(|_| ())
+        self.measured(async {
+            let response = self
+                .request(reqwest::Method::DELETE, "/databases")
+                .timeout(self.fast_timeout)
+                .json(&json!({"database_id": database_id}))
+                .send()
+                .await
+                .map_err(classify_transport)?;
+            if response.status() == StatusCode::NOT_FOUND {
+                return Ok(());
+            }
+            Self::json_response(response).await.map(|_| ())
+        })
+        .await
     }
 }
 

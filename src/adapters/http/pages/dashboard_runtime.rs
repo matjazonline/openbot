@@ -8,7 +8,9 @@ use super::{
 };
 use crate::entities::{
     dashboard::DashboardWindow,
-    runtime_metrics::{RuntimeMetricSnapshot, TASK_WORKER_RECOMMENDATION_POLICY},
+    runtime_metrics::{
+        RuntimeMetricBucket, RuntimeMetricSnapshot, TASK_WORKER_RECOMMENDATION_POLICY,
+    },
 };
 
 /// Deployment-wide information is rendered only when the route supplied an operator-authorized
@@ -46,6 +48,7 @@ pub(super) fn machine_section(page: &DashboardPage<'_>) -> String {
                 {task_workers}
                 {cpu}
                 {database}
+                {hydradb}
                 {process}
             </div>
         </div>"##,
@@ -82,6 +85,7 @@ pub(super) fn machine_section(page: &DashboardPage<'_>) -> String {
         task_workers = task_worker_capacity(runtime),
         cpu = runtime_cpu_panel(runtime, page.window),
         database = runtime_database_panel(runtime, page.window),
+        hydradb = hydradb_panel(runtime, page.window),
     )
 }
 
@@ -292,6 +296,98 @@ fn runtime_database_panel(runtime: &RuntimeMetricSnapshot, window: DashboardWind
     )
 }
 
+/// Calls, failures and total time across the rendered range, summed from the same buckets the
+/// chart draws so the figures and the line can never disagree.
+#[derive(Default)]
+struct HydraDbRange {
+    calls: i64,
+    failures: i64,
+    total_ms: f64,
+}
+
+impl HydraDbRange {
+    fn summed(buckets: &[RuntimeMetricBucket]) -> Self {
+        buckets.iter().fold(Self::default(), |range, bucket| {
+            let calls = bucket.hydradb_calls.unwrap_or_default();
+            Self {
+                calls: range.calls + calls,
+                failures: range.failures + bucket.hydradb_failures.unwrap_or_default(),
+                total_ms: range.total_ms
+                    + bucket.hydradb_mean_ms.unwrap_or_default() * calls as f64,
+            }
+        })
+    }
+
+    fn mean_ms(&self) -> Option<f64> {
+        (self.calls > 0).then(|| self.total_ms / self.calls as f64)
+    }
+}
+
+/// Memory provider health as the application experienced it. Every provision, readiness check,
+/// recall and ingestion is counted where it completes, so this is call latency rather than a
+/// synthetic probe, and a range with no calls says so instead of showing a zero.
+fn hydradb_panel(runtime: &RuntimeMetricSnapshot, window: DashboardWindow) -> String {
+    let range = HydraDbRange::summed(&runtime.buckets);
+    if range.calls == 0 {
+        return panel(
+            "HydraDB memory calls",
+            r##"<div class="px-4 py-6 text-sm opacity-60">— No HydraDB calls were made in this range.</div>"##,
+        );
+    }
+
+    let failure_caption = format!(
+        "{:.1}% of calls",
+        range.failures as f64 * 100.0 / range.calls as f64
+    );
+    let mean = range
+        .mean_ms()
+        .map_or_else(|| "—".to_string(), |mean| format!("{mean:.0} ms"));
+    let summary = stat_row(
+        "HydraDB memory calls",
+        &format!(
+            "{calls}{failures}{latency}",
+            calls = stat(Stat::new("Calls", &range.calls.to_string(), window.label())),
+            failures = stat(Stat::new(
+                "Failed",
+                &range.failures.to_string(),
+                &failure_caption,
+            )),
+            latency = stat(Stat::new("Mean latency", &mean, "per call, end to end")),
+        ),
+    );
+
+    let series = [Series {
+        label: "mean",
+        color: "var(--color-primary)",
+        values: runtime
+            .buckets
+            .iter()
+            .map(|bucket| bucket.hydradb_mean_ms)
+            .collect(),
+    }];
+    let buckets: Vec<_> = runtime.buckets.iter().map(|bucket| bucket.bucket).collect();
+    format!(
+        "{summary}{}",
+        panel(
+            "HydraDB call latency",
+            &format!(
+                "{chart}{footer}",
+                chart = chart::time_chart(&TimeChart {
+                    buckets: &buckets,
+                    series: &series,
+                    kind: ChartKind::Line,
+                    unit: YUnit::Millis,
+                    tick_format: window.tick_format(),
+                }),
+                footer = chart_footer(
+                    "Recall, ingestion, provisioning and readiness calls made by this machine; \
+                     an empty segment is a period with no memory traffic",
+                ),
+            ),
+        )
+    )
+}
+
 fn bytes(value: Option<i64>) -> String {
     let Some(value) = value else {
         return "—".to_string();
@@ -309,9 +405,67 @@ fn bytes(value: Option<i64>) -> String {
 mod tests {
     use super::*;
     use crate::entities::runtime_metrics::{
-        MachineId, MachineIdentity, RuntimeMetricSample, TaskWorkerConcurrencyRecommendation,
+        HydraDbInterval, MachineId, MachineIdentity, RuntimeMetricSample,
+        TaskWorkerConcurrencyRecommendation,
     };
     use chrono::Utc;
+
+    fn bucket(
+        calls: Option<i64>,
+        failures: Option<i64>,
+        mean_ms: Option<f64>,
+    ) -> RuntimeMetricBucket {
+        RuntimeMetricBucket {
+            bucket: Utc::now(),
+            cpu_utilization_percent: None,
+            cpu_steal_percent: None,
+            cpu_throttle_percent: None,
+            database_acquire_p50_ms: None,
+            database_acquire_p95_ms: None,
+            hydradb_calls: calls,
+            hydradb_failures: failures,
+            hydradb_mean_ms: mean_ms,
+        }
+    }
+
+    #[test]
+    fn hydradb_panel_weights_latency_by_the_calls_each_bucket_carries() {
+        let snapshot = RuntimeMetricSnapshot {
+            buckets: vec![
+                bucket(Some(1), Some(0), Some(100.0)),
+                bucket(None, None, None),
+                bucket(Some(3), Some(1), Some(200.0)),
+            ],
+            ..RuntimeMetricSnapshot::default()
+        };
+
+        let html = hydradb_panel(&snapshot, DashboardWindow::last_hour());
+        assert!(
+            html.contains(">4<"),
+            "every call in the range is counted: {html}"
+        );
+        assert!(html.contains(">1<"), "failures are counted: {html}");
+        assert!(
+            html.contains("25.0% of calls"),
+            "the failure rate is per call, not per bucket: {html}"
+        );
+        assert!(
+            html.contains(">175 ms<"),
+            "latency is weighted by calls, not a mean of bucket means: {html}"
+        );
+    }
+
+    #[test]
+    fn hydradb_panel_distinguishes_an_idle_range_from_a_zero() {
+        let snapshot = RuntimeMetricSnapshot {
+            buckets: vec![bucket(Some(0), Some(0), None), bucket(None, None, None)],
+            ..RuntimeMetricSnapshot::default()
+        };
+
+        let html = hydradb_panel(&snapshot, DashboardWindow::last_hour());
+        assert!(html.contains("No HydraDB calls"), "{html}");
+        assert!(!html.contains("Mean latency"), "{html}");
+    }
 
     #[test]
     fn worker_capacity_outputs_the_configured_and_safe_observed_maximum() {
@@ -334,6 +488,7 @@ mod tests {
                 pool_size: 10,
                 pool_idle: 7,
                 pool_active: 3,
+                hydradb: HydraDbInterval::default(),
             }),
             suggested_task_worker_concurrency: Some(TaskWorkerConcurrencyRecommendation {
                 maximum: 3,
