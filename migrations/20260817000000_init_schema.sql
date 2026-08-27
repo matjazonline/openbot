@@ -20,6 +20,110 @@ CREATE TABLE users (
         CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://')
 );
 
+-- A registration waiting on a code mailed to the address it claims. An account only exists in
+-- `users` once that code comes back, so an unconfirmed address is never one anyone can sign in as.
+CREATE TABLE pending_user_registrations (
+    email CITEXT PRIMARY KEY,
+    username CITEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    confirmation_code_hash TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pending_user_registrations_username_not_blank CHECK (btrim(username::text) <> ''),
+    CONSTRAINT pending_user_registrations_email_not_blank CHECK (btrim(email::text) <> '')
+);
+
+CREATE UNIQUE INDEX pending_user_registrations_username_key
+    ON pending_user_registrations (username);
+
+-- A change to an account that is waiting on a code mailed out to prove it was really asked for.
+--
+-- The two kinds prove different things and so mail the code to different places: an email change
+-- sends it to the *new* address (proving the account owner can read it), a password change sends
+-- it to the address the account already has. That is why the new address lives here rather than
+-- being written to `users` and confirmed in place -- an unconfirmed address must never be one the
+-- account can sign in or receive mail as.
+CREATE TABLE pending_account_changes (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    -- Set for a 'email' change and null for a 'password' one, and vice versa: the CHECK below is
+    -- what keeps a row from claiming to be one kind while carrying the other's payload.
+    new_email CITEXT,
+    new_password_hash TEXT,
+    confirmation_code_hash TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- One pending change of each kind per account. Asking again replaces the earlier request, so
+    -- an abandoned code cannot still be confirmed after a second one was sent.
+    PRIMARY KEY (user_id, kind),
+    CONSTRAINT pending_account_changes_kind_check CHECK (kind IN ('email', 'password')),
+    CONSTRAINT pending_account_changes_payload_matches_kind CHECK (
+        (kind = 'email' AND new_email IS NOT NULL AND new_password_hash IS NULL)
+        OR (kind = 'password' AND new_password_hash IS NOT NULL AND new_email IS NULL)
+    ),
+    CONSTRAINT pending_account_changes_email_not_blank
+        CHECK (new_email IS NULL OR btrim(new_email::text) <> '')
+);
+
+-- Authentication methods are explicit: finding the same email through another provider must not
+-- silently turn that provider into a way into the account.
+CREATE TABLE user_login_methods (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    provider_subject TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, provider),
+    CONSTRAINT user_login_methods_provider_check
+        CHECK (provider IN ('password', 'google', 'apple')),
+    CONSTRAINT user_login_methods_subject_check CHECK (
+        (provider = 'password' AND provider_subject IS NULL)
+        OR (provider IN ('google', 'apple')
+            AND provider_subject IS NOT NULL
+            AND btrim(provider_subject) <> '')
+    )
+);
+
+CREATE UNIQUE INDEX user_login_methods_provider_subject_key
+    ON user_login_methods (provider, provider_subject)
+    WHERE provider_subject IS NOT NULL;
+
+-- The shape every `created_by` column carries. Written once as a function rather than repeated as
+-- a CHECK body per table, so "what provenance looks like" has one definition: an actor kind, the
+-- id that kind implies (a system actor has none, an agent additionally carries the channel and
+-- task it acted from), a non-blank name, and no keys beyond those.
+CREATE FUNCTION valid_creation_provenance(provenance JSONB) RETURNS BOOLEAN
+LANGUAGE SQL
+IMMUTABLE
+RETURN
+    jsonb_typeof(provenance) = 'object'
+    AND (provenance - ARRAY[
+        'actor_type', 'actor_id', 'actor_name', 'source_channel_id', 'source_task_id'
+    ]::TEXT[]) = '{}'::JSONB
+    AND jsonb_typeof(provenance->'actor_type') = 'string'
+    AND provenance->>'actor_type' IN ('user', 'agent', 'system')
+    AND jsonb_typeof(provenance->'actor_name') = 'string'
+    AND btrim(provenance->>'actor_name') <> ''
+    AND CASE provenance->>'actor_type'
+        WHEN 'system' THEN
+            provenance ? 'actor_id'
+            AND provenance->'actor_id' = 'null'::JSONB
+            AND COALESCE(provenance->'source_channel_id' = 'null'::JSONB, true)
+            AND COALESCE(provenance->'source_task_id' = 'null'::JSONB, true)
+        WHEN 'user' THEN
+            jsonb_typeof(provenance->'actor_id') = 'string'
+            AND provenance->>'actor_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            AND COALESCE(provenance->'source_channel_id' = 'null'::JSONB, true)
+            AND COALESCE(provenance->'source_task_id' = 'null'::JSONB, true)
+        WHEN 'agent' THEN
+            jsonb_typeof(provenance->'actor_id') = 'string'
+            AND provenance->>'actor_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            AND jsonb_typeof(provenance->'source_channel_id') = 'string'
+            AND provenance->>'source_channel_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            AND jsonb_typeof(provenance->'source_task_id') = 'string'
+            AND provenance->>'source_task_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        ELSE false
+    END;
+
 CREATE TABLE companies (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -30,11 +134,22 @@ CREATE TABLE companies (
     model TEXT,
     enable_llm_spam_guardrail BOOLEAN,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- A company gets a picture of its own, on the same terms as a user's or an agent's: an
+    -- http(s) URL or nothing, so what a page renders into an `<img src>` can never be an active
+    -- scheme.
+    avatar_url TEXT,
+    -- NULL means the company keeps no memory at all. There is no 'none' sentinel: two ways to
+    -- write "off" is one way for a query to miss half the companies that have it off.
+    memory_provider TEXT,
     CONSTRAINT companies_name_not_blank CHECK (btrim(name) <> ''),
     CONSTRAINT companies_slug_format CHECK (
         slug::text = lower(slug::text)
         AND slug::text ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$'
-    )
+    ),
+    CONSTRAINT companies_avatar_url_scheme_check
+        CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://'),
+    CONSTRAINT companies_memory_provider_check
+        CHECK (memory_provider IS NULL OR memory_provider = 'hydradb')
 );
 
 CREATE INDEX companies_user_created_idx
@@ -46,9 +161,13 @@ CREATE TABLE company_invites (
     email CITEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- The role the invite grants on acceptance, so an admin invite does not have to be re-granted
+    -- as a second step after the member row exists.
+    role TEXT NOT NULL DEFAULT 'member',
     CONSTRAINT company_invites_company_email_key UNIQUE (company_id, email),
     CONSTRAINT company_invites_status_check
-        CHECK (status IN ('pending', 'accepted', 'declined'))
+        CHECK (status IN ('pending', 'accepted', 'declined')),
+    CONSTRAINT company_invites_role_check CHECK (role IN ('member', 'admin'))
 );
 
 CREATE INDEX company_invites_company_created_idx
@@ -70,9 +189,11 @@ CREATE INDEX company_members_user_company_idx ON company_members (user_id, compa
 CREATE INDEX company_members_company_created_idx
     ON company_members (company_id, created_at, id);
 
+-- A NULL `company_id` is an operator-managed global library agent: visible to every company,
+-- owned by none.
 CREATE TABLE agents (
     id UUID PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     slug CITEXT NOT NULL,
     provider TEXT,
@@ -97,11 +218,35 @@ CREATE TABLE agents (
         config_json IS NULL OR jsonb_typeof(config_json) = 'object'
     ),
     CONSTRAINT agents_avatar_url_scheme_check
-        CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://')
+        CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://'),
+    CONSTRAINT agents_created_by_shape_check CHECK (valid_creation_provenance(created_by))
 );
 
 CREATE INDEX agents_company_created_idx
     ON agents (company_id, created_at DESC, id DESC);
+
+-- `agents_company_slug_key` does not constrain library agents: UNIQUE treats every NULL
+-- `company_id` as distinct, so the library needs its own uniqueness over slug alone.
+CREATE UNIQUE INDEX agents_library_slug_key
+    ON agents (slug) WHERE company_id IS NULL;
+
+-- Deleting a company still cascades through its channels and its own agents. Only global library
+-- definitions need an in-use deletion guard, since nothing cascades them away.
+CREATE FUNCTION prevent_assigned_library_agent_delete() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.company_id IS NULL
+       AND EXISTS (SELECT 1 FROM channel_agents WHERE agent_id = OLD.id) THEN
+        RAISE EXCEPTION 'library agent is assigned to one or more channels'
+            USING ERRCODE = '23503';
+    END IF;
+    RETURN OLD;
+END;
+$$;
+
+CREATE TRIGGER library_agent_delete_guard
+BEFORE DELETE ON agents
+FOR EACH ROW EXECUTE FUNCTION prevent_assigned_library_agent_delete();
 
 -- A channel's addresses live in `channel_slugs`, not here; see that table.
 CREATE TABLE channels (
@@ -121,13 +266,32 @@ CREATE TABLE channels (
     -- channel is internal: outsiders never join a thread and never appear on an agent reply's Cc.
     add_3rd_party BOOLEAN NOT NULL DEFAULT TRUE,
     created_by JSONB NOT NULL,
+    -- Memory is opt-in per scope and per direction: reading someone's memory into a prompt and
+    -- writing a turn back out to it are separate grants, so a channel can recall without
+    -- recording.
+    retrieve_company_memory BOOLEAN NOT NULL DEFAULT FALSE,
+    retrieve_agent_memory BOOLEAN NOT NULL DEFAULT FALSE,
+    retrieve_user_memory BOOLEAN NOT NULL DEFAULT FALSE,
+    persist_company_memory BOOLEAN NOT NULL DEFAULT FALSE,
+    persist_agent_memory BOOLEAN NOT NULL DEFAULT FALSE,
+    persist_user_memory BOOLEAN NOT NULL DEFAULT FALSE,
+    memory_recall_mode TEXT NOT NULL DEFAULT 'fast'
+        CHECK (memory_recall_mode IN ('fast', 'thinking')),
+    memory_max_results SMALLINT NOT NULL DEFAULT 5
+        CHECK (memory_max_results BETWEEN 1 AND 20),
+    -- What this channel is for, in one line. Read back to a teammate who mails an address that
+    -- does not exist, so they can find the channel they meant without asking anyone.
+    description TEXT,
+    memory_persistence_mode TEXT NOT NULL DEFAULT 'audience_only'
+        CHECK (memory_persistence_mode IN ('audience_only', 'scope_specific_facts')),
     CONSTRAINT channels_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT channels_name_not_blank CHECK (btrim(name) <> ''),
     CONSTRAINT channels_access_mode_check
         CHECK (access_mode IN ('team', 'allowlist', 'public')),
     CONSTRAINT channels_config_object_check CHECK (
         channel_config IS NULL OR jsonb_typeof(channel_config) = 'object'
-    )
+    ),
+    CONSTRAINT channels_created_by_shape_check CHECK (valid_creation_provenance(created_by))
 );
 
 CREATE INDEX channels_company_created_idx
@@ -156,6 +320,9 @@ CREATE TABLE channel_slugs (
 -- Exactly one canonical slug per channel; aliases are unlimited.
 CREATE UNIQUE INDEX channel_slugs_primary_idx ON channel_slugs (channel_id) WHERE is_primary;
 
+-- The agent FK is on `agent_id` alone, not the compound (company_id, agent_id), because a library
+-- agent has no company to match. `channel_agents_scope_check` below is what replaces the tenancy
+-- the compound key used to carry.
 CREATE TABLE channel_agents (
     company_id UUID NOT NULL,
     channel_id UUID NOT NULL,
@@ -168,11 +335,29 @@ CREATE TABLE channel_agents (
         FOREIGN KEY (company_id, channel_id)
         REFERENCES channels(company_id, id) ON DELETE CASCADE,
     CONSTRAINT channel_agents_agent_fk
-        FOREIGN KEY (company_id, agent_id)
-        REFERENCES agents(company_id, id) ON DELETE CASCADE
+        FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
 );
 
 CREATE INDEX channel_agents_agent_idx ON channel_agents (agent_id, channel_id);
+
+CREATE FUNCTION enforce_channel_agent_scope() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM agents AS agent
+        WHERE agent.id = NEW.agent_id
+          AND (agent.company_id IS NULL OR agent.company_id = NEW.company_id)
+    ) THEN
+        RAISE EXCEPTION 'agent must belong to the channel company or the global library'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER channel_agents_scope_check
+BEFORE INSERT OR UPDATE ON channel_agents
+FOR EACH ROW EXECUTE FUNCTION enforce_channel_agent_scope();
 
 CREATE TABLE channel_participants (
     channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
@@ -250,9 +435,11 @@ CREATE TABLE thread_messages (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT thread_messages_thread_email_key UNIQUE (thread_id, email_message_id),
     CONSTRAINT thread_messages_channel_email_key UNIQUE (channel_id, email_message_id),
+    -- All three tenancy columns are in the key, so a message cannot name a thread that belongs to
+    -- another company or another channel than the one it recorded.
     CONSTRAINT thread_messages_thread_fk
-        FOREIGN KEY (channel_id, thread_id)
-        REFERENCES threads(channel_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (company_id, channel_id, thread_id)
+        REFERENCES threads(company_id, channel_id, id) ON DELETE CASCADE,
     CONSTRAINT thread_messages_email_fk
         FOREIGN KEY (company_id, email_message_id)
         REFERENCES email_messages(company_id, id) ON DELETE CASCADE,
@@ -470,6 +657,10 @@ CREATE TABLE task_attempts (
     result JSONB,
     started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     finished_at TIMESTAMPTZ,
+    -- Which run of the task this attempt belongs to. A task that is stopped and started again
+    -- keeps counting `attempt_number` from where it left off, so the generation is what separates
+    -- one execution's attempts from the next's.
+    execution_generation UUID NOT NULL,
     CONSTRAINT task_attempts_task_attempt_key UNIQUE (task_id, attempt_number),
     CONSTRAINT task_attempts_status_check CHECK (status IN ('processing', 'completed', 'failed')),
     CONSTRAINT task_attempts_token_check CHECK (
@@ -551,7 +742,22 @@ CREATE TABLE email_outbox (
         FOREIGN KEY (company_id, channel_id)
         REFERENCES channels(company_id, id) ON DELETE SET NULL (channel_id),
     CONSTRAINT email_outbox_retry_check CHECK (retry_count >= 0),
-    CONSTRAINT email_outbox_payload_object_check CHECK (jsonb_typeof(payload) = 'object')
+    CONSTRAINT email_outbox_payload_object_check CHECK (jsonb_typeof(payload) = 'object'),
+    -- Lease metadata belongs to 'sending' and to nothing else. Without the second arm a row that
+    -- failed or was sent keeps the worker id that last touched it, and a stale lease on a
+    -- terminal row reads as an in-flight delivery to anything sweeping for expired ones.
+    CONSTRAINT email_outbox_lease_check CHECK (
+        (status = 'sending'
+         AND worker_id IS NOT NULL
+         AND locked_at IS NOT NULL
+         AND lock_expires_at IS NOT NULL
+         AND lock_expires_at > locked_at)
+        OR
+        (status <> 'sending'
+         AND worker_id IS NULL
+         AND locked_at IS NULL
+         AND lock_expires_at IS NULL)
+    )
 );
 
 CREATE INDEX email_outbox_pending_idx
@@ -624,7 +830,7 @@ CREATE UNIQUE INDEX task_outreach_targets_outbox_idx
 CREATE TABLE channel_schedules (
     id UUID PRIMARY KEY,
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+    channel_id UUID NOT NULL,
     name TEXT NOT NULL,
     schedule_type TEXT NOT NULL,
     interval_seconds BIGINT,
@@ -650,7 +856,11 @@ CREATE TABLE channel_schedules (
     ),
     -- A schedule renders its templates and counts its days in this zone, so an unknown name has to
     -- be refused at write time: the claim query would otherwise fail on every tick.
-    CONSTRAINT channel_schedules_timezone_check CHECK (now() AT TIME ZONE timezone IS NOT NULL)
+    CONSTRAINT channel_schedules_timezone_check CHECK (now() AT TIME ZONE timezone IS NOT NULL),
+    -- Compound so the schedule's company and its channel's company cannot drift apart.
+    CONSTRAINT channel_schedules_channel_fk
+        FOREIGN KEY (company_id, channel_id)
+        REFERENCES channels(company_id, id) ON DELETE CASCADE
 );
 
 CREATE INDEX channel_schedules_due_idx
@@ -662,3 +872,381 @@ CREATE INDEX channel_schedules_company_idx
 
 CREATE INDEX channel_schedules_channel_idx
     ON channel_schedules (channel_id, created_at DESC, id DESC);
+
+-- One row per slot a schedule was due for, written before any work is attempted. The slot's UNIQUE
+-- key is what makes a tick idempotent: a second scheduler that wakes for the same slot collides
+-- rather than running the agent twice.
+--
+-- `schedule_snapshot` freezes the templates and delivery settings as they were when the slot came
+-- due, so editing a schedule does not retroactively change a run that is still materializing.
+CREATE TABLE schedule_runs (
+    id UUID PRIMARY KEY,
+    schedule_id UUID NOT NULL REFERENCES channel_schedules(id) ON DELETE CASCADE,
+    scheduled_for TIMESTAMPTZ NOT NULL,
+    schedule_snapshot JSONB NOT NULL,
+    thread_id UUID REFERENCES threads(id) ON DELETE SET NULL,
+    task_id UUID REFERENCES background_tasks(id) ON DELETE SET NULL,
+    last_error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Turning a due slot into a thread and a task is itself leased durable work: the run is the
+    -- queue row, and `materialization_status` is its state machine.
+    materialization_status TEXT NOT NULL DEFAULT 'pending',
+    materialization_attempts INTEGER NOT NULL DEFAULT 0,
+    materialization_available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    materialization_worker_id UUID,
+    materialization_generation UUID,
+    materialization_locked_at TIMESTAMPTZ,
+    materialization_lock_expires_at TIMESTAMPTZ,
+    CONSTRAINT schedule_runs_schedule_slot_key UNIQUE (schedule_id, scheduled_for),
+    CONSTRAINT schedule_runs_snapshot_object_check
+        CHECK (jsonb_typeof(schedule_snapshot) = 'object'),
+    CONSTRAINT schedule_runs_task_requires_thread_check
+        CHECK (task_id IS NULL OR thread_id IS NOT NULL),
+    CONSTRAINT schedule_runs_materialization_attempts_check
+        CHECK (materialization_attempts >= 0 AND materialization_attempts <= 5),
+    -- Each status names exactly which of the lease columns may be set, so a lost worker cannot
+    -- leave a row that looks both claimed and free, and 'failed' is reachable only once the
+    -- attempt budget is spent.
+    CONSTRAINT schedule_runs_materialization_state_check CHECK (
+        (materialization_status = 'pending'
+         AND task_id IS NULL
+         AND materialization_attempts < 5
+         AND materialization_worker_id IS NULL
+         AND materialization_generation IS NULL
+         AND materialization_locked_at IS NULL
+         AND materialization_lock_expires_at IS NULL)
+        OR
+        (materialization_status = 'materializing'
+         AND task_id IS NULL
+         AND materialization_attempts BETWEEN 1 AND 5
+         AND materialization_worker_id IS NOT NULL
+         AND materialization_generation IS NOT NULL
+         AND materialization_locked_at IS NOT NULL
+         AND materialization_lock_expires_at IS NOT NULL
+         AND materialization_lock_expires_at > materialization_locked_at)
+        OR
+        (materialization_status = 'materialized'
+         AND task_id IS NOT NULL
+         AND materialization_worker_id IS NULL
+         AND materialization_generation IS NULL
+         AND materialization_locked_at IS NULL
+         AND materialization_lock_expires_at IS NULL)
+        OR
+        (materialization_status = 'failed'
+         AND task_id IS NULL
+         AND materialization_attempts = 5
+         AND materialization_worker_id IS NULL
+         AND materialization_generation IS NULL
+         AND materialization_locked_at IS NULL
+         AND materialization_lock_expires_at IS NULL)
+    )
+);
+
+CREATE INDEX schedule_runs_schedule_created_idx
+    ON schedule_runs (schedule_id, created_at DESC, id DESC);
+CREATE INDEX schedule_runs_materialization_ready_idx
+    ON schedule_runs (materialization_available_at, created_at, id)
+    WHERE materialization_status = 'pending';
+CREATE INDEX schedule_runs_materialization_expired_idx
+    ON schedule_runs (materialization_lock_expires_at, created_at, id)
+    WHERE materialization_status = 'materializing';
+
+-- Declared before `memory_remote_resource_lifecycles` on purpose, and the order is load-bearing.
+-- Both tables carry a `company_id` FK to `companies`, and Postgres runs a delete's referential
+-- actions in the order those constraints were created. This table's ON DELETE CASCADE has to run
+-- first, because deleting the connection is what fires
+-- `memory_connection_lifecycle_compatibility_delete` and flips the lifecycle row to 'absent'.
+-- Declare the lifecycle table first and its ON DELETE SET NULL runs while `desired_state` is still
+-- 'present', which its own CHECK rejects. Nothing in a schema dump records this; moving these two
+-- definitions past each other breaks company deletion.
+CREATE TABLE memory_provider_connections (
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL CHECK (provider IN ('hydradb')),
+    remote_database_id TEXT NOT NULL,
+    readiness TEXT NOT NULL DEFAULT 'pending'
+        CHECK (readiness IN ('pending', 'provisioning', 'ready', 'failed')),
+    last_error TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (company_id, provider),
+    UNIQUE (provider, remote_database_id)
+);
+
+-- What the provider is meant to be holding for a company, kept after the company row is gone.
+--
+-- Deleting a company must not lose the fact that a remote database still exists and has to be torn
+-- down, so `company_id` is nullable and the intent lives here rather than on the connection.
+-- `operation_generation` fences the workers: an operation leased under an older generation cannot
+-- apply its result over a newer decision.
+CREATE TABLE memory_remote_resource_lifecycles (
+    provider TEXT NOT NULL CHECK (provider = 'hydradb'),
+    remote_database_id TEXT NOT NULL,
+    company_id UUID NULL REFERENCES companies(id) ON DELETE SET NULL,
+    desired_state TEXT NOT NULL CHECK (desired_state IN ('present', 'absent')),
+    operation_generation BIGINT NOT NULL DEFAULT 0 CHECK (operation_generation >= 0),
+    operation_lease_token UUID NULL,
+    operation_lease_expires_at TIMESTAMPTZ NULL,
+    quiesce_until TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_error TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (provider, remote_database_id),
+    UNIQUE (company_id, provider),
+    CHECK (
+        (operation_lease_token IS NULL AND operation_lease_expires_at IS NULL)
+        OR
+        (operation_lease_token IS NOT NULL AND operation_lease_expires_at IS NOT NULL)
+    ),
+    CHECK (desired_state = 'absent' OR company_id IS NOT NULL)
+);
+
+-- Creating the remote database and waiting for it to come up are separate durable phases, hence
+-- `phase` alongside `status`: `status` is the queue state a worker leases on, `phase` is where the
+-- provisioning itself has got to. `attempts` counts leases, `failure_attempts` counts only
+-- classified provider failures, so polling a slow-but-healthy database never exhausts the budget.
+CREATE TABLE memory_provisioning_jobs (
+    id UUID PRIMARY KEY,
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL CHECK (provider = 'hydradb'),
+    remote_database_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'leased', 'completed', 'failed')),
+    attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    lease_token UUID NULL,
+    lease_expires_at TIMESTAMPTZ NULL,
+    last_error TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    operation_generation BIGINT NULL,
+    phase TEXT NOT NULL DEFAULT 'create_pending',
+    failure_attempts INTEGER NOT NULL DEFAULT 0,
+    readiness_deadline TIMESTAMPTZ NULL,
+    next_poll_at TIMESTAMPTZ NULL,
+    UNIQUE (company_id, provider),
+    UNIQUE (provider, remote_database_id),
+    CHECK (
+        (status = 'leased' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL)
+        OR
+        (status <> 'leased' AND lease_token IS NULL AND lease_expires_at IS NULL)
+    ),
+    CONSTRAINT memory_provisioning_jobs_generation_state_check CHECK (
+        (status = 'leased' AND operation_generation IS NOT NULL)
+        OR
+        (status <> 'leased' AND operation_generation IS NULL)
+    ),
+    CONSTRAINT memory_provisioning_jobs_lifecycle_fkey
+        FOREIGN KEY (provider, remote_database_id)
+        REFERENCES memory_remote_resource_lifecycles(provider, remote_database_id),
+    CONSTRAINT memory_provisioning_jobs_phase_check
+        CHECK (phase IN ('create_pending', 'waiting_ready', 'ready', 'failed')),
+    CONSTRAINT memory_provisioning_jobs_failure_attempts_check
+        CHECK (failure_attempts >= 0),
+    CONSTRAINT memory_provisioning_jobs_phase_state_check CHECK (
+        (status IN ('pending', 'leased') AND phase IN ('create_pending', 'waiting_ready'))
+        OR (status = 'completed' AND phase = 'ready')
+        OR (status = 'failed' AND phase = 'failed')
+    ),
+    CONSTRAINT memory_provisioning_jobs_readiness_window_check CHECK (
+        (phase = 'create_pending' AND readiness_deadline IS NULL AND next_poll_at IS NULL)
+        OR
+        (phase = 'waiting_ready' AND readiness_deadline IS NOT NULL AND next_poll_at IS NOT NULL)
+        OR phase IN ('ready', 'failed')
+    )
+);
+
+-- A waiting_ready job is due at its next poll, everything else at its backoff. One index over the
+-- CASE keeps both phases on the same claim query.
+CREATE INDEX memory_provisioning_jobs_due_idx
+    ON memory_provisioning_jobs (
+        (CASE phase WHEN 'waiting_ready' THEN next_poll_at ELSE available_at END),
+        created_at,
+        id
+    )
+    WHERE status = 'pending';
+
+CREATE TABLE memory_cleanup_jobs (
+    id UUID PRIMARY KEY,
+    provider TEXT NOT NULL CHECK (provider IN ('hydradb')),
+    remote_database_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'leased', 'completed', 'failed')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    lease_expires_at TIMESTAMPTZ NULL,
+    last_error TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    lease_token UUID NULL,
+    operation_generation BIGINT NULL,
+    UNIQUE (provider, remote_database_id),
+    CONSTRAINT memory_cleanup_jobs_lease_state_check CHECK (
+        (status = 'leased' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL)
+        OR
+        (status <> 'leased' AND lease_token IS NULL AND lease_expires_at IS NULL)
+    ),
+    CONSTRAINT memory_cleanup_jobs_generation_state_check CHECK (
+        (status = 'leased' AND operation_generation IS NOT NULL)
+        OR
+        (status <> 'leased' AND operation_generation IS NULL)
+    ),
+    CONSTRAINT memory_cleanup_jobs_lifecycle_fkey
+        FOREIGN KEY (provider, remote_database_id)
+        REFERENCES memory_remote_resource_lifecycles(provider, remote_database_id)
+);
+
+CREATE INDEX memory_cleanup_jobs_due_idx
+    ON memory_cleanup_jobs (available_at, created_at, id)
+    WHERE status = 'pending';
+
+-- Keep lifecycle intent coherent while an older application version is still serving traffic.
+-- The explicit application writes remain authoritative; these triggers cover only legacy writes.
+CREATE FUNCTION create_memory_lifecycle_for_legacy_connection() RETURNS trigger AS $$
+BEGIN
+    INSERT INTO memory_remote_resource_lifecycles
+        (provider, remote_database_id, company_id, desired_state)
+    VALUES (NEW.provider, NEW.remote_database_id, NEW.company_id, 'present')
+    ON CONFLICT (provider, remote_database_id) DO UPDATE
+    SET company_id = EXCLUDED.company_id,
+        desired_state = 'present',
+        quiesce_until = CURRENT_TIMESTAMP,
+        last_error = NULL,
+        updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER memory_connection_lifecycle_compatibility_insert
+AFTER INSERT ON memory_provider_connections
+FOR EACH ROW EXECUTE FUNCTION create_memory_lifecycle_for_legacy_connection();
+
+CREATE FUNCTION retire_memory_lifecycle_for_legacy_connection() RETURNS trigger AS $$
+DECLARE
+    cleanup_available_at TIMESTAMPTZ;
+BEGIN
+    UPDATE memory_remote_resource_lifecycles
+    SET company_id = NULL,
+        desired_state = 'absent',
+        quiesce_until = GREATEST(
+            quiesce_until,
+            CURRENT_TIMESTAMP + INTERVAL '180 seconds'
+        ),
+        last_error = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE provider = OLD.provider
+      AND remote_database_id = OLD.remote_database_id
+      AND (desired_state <> 'absent' OR company_id IS NOT NULL)
+    RETURNING quiesce_until INTO cleanup_available_at;
+
+    IF FOUND THEN
+        INSERT INTO memory_cleanup_jobs
+            (id, provider, remote_database_id, available_at)
+        VALUES (
+            md5(OLD.provider || ':' || OLD.remote_database_id)::uuid,
+            OLD.provider,
+            OLD.remote_database_id,
+            cleanup_available_at
+        )
+        ON CONFLICT (provider, remote_database_id) DO UPDATE
+        SET status = 'pending',
+            attempts = 0,
+            available_at = EXCLUDED.available_at,
+            lease_token = NULL,
+            lease_expires_at = NULL,
+            operation_generation = NULL,
+            last_error = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE memory_cleanup_jobs.status <> 'leased';
+    END IF;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER memory_connection_lifecycle_compatibility_delete
+BEFORE DELETE ON memory_provider_connections
+FOR EACH ROW EXECUTE FUNCTION retire_memory_lifecycle_for_legacy_connection();
+
+-- Keep the phase constraint compatible with workers from a preceding application release during a
+-- rolling deploy. New workers write phase explicitly; this trigger fills only legacy status-only
+-- transitions.
+CREATE FUNCTION synchronize_legacy_memory_provisioning_phase() RETURNS trigger AS $$
+BEGIN
+    IF NEW.status = 'completed' AND NEW.phase NOT IN ('ready', 'failed') THEN
+        NEW.phase = 'ready';
+    ELSIF NEW.status = 'failed' AND NEW.phase <> 'failed' THEN
+        NEW.phase = 'failed';
+    ELSIF NEW.status = 'pending' AND OLD.status IN ('completed', 'failed')
+            AND NEW.phase IN ('ready', 'failed') THEN
+        NEW.phase = 'create_pending';
+        NEW.failure_attempts = 0;
+        NEW.readiness_deadline = NULL;
+        NEW.next_poll_at = NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER memory_provisioning_phase_compatibility_update
+BEFORE UPDATE ON memory_provisioning_jobs
+FOR EACH ROW EXECUTE FUNCTION synchronize_legacy_memory_provisioning_phase();
+
+CREATE TABLE runtime_metric_samples (
+    machine_id TEXT NOT NULL,
+    machine_region TEXT,
+    sampled_at TIMESTAMPTZ NOT NULL,
+    process_rss_bytes BIGINT,
+    memory_limit_bytes BIGINT,
+    cpu_utilization_percent DOUBLE PRECISION,
+    cpu_steal_percent DOUBLE PRECISION,
+    cpu_throttle_percent DOUBLE PRECISION,
+    database_acquire_duration_ms DOUBLE PRECISION NOT NULL,
+    database_acquire_succeeded BOOLEAN NOT NULL,
+    pool_size INTEGER NOT NULL,
+    pool_idle INTEGER NOT NULL,
+    pool_active INTEGER NOT NULL,
+    active_task_executions INTEGER NOT NULL DEFAULT 0,
+    task_worker_concurrency_limit INTEGER NOT NULL DEFAULT 1,
+    -- HydraDB calls counted per ten-second sample rather than probed, so the figures are the
+    -- latency and failures memory recall and ingestion actually paid, and an idle machine polls
+    -- nobody.
+    hydradb_calls INTEGER NOT NULL DEFAULT 0,
+    hydradb_failures INTEGER NOT NULL DEFAULT 0,
+    hydradb_duration_ms DOUBLE PRECISION NOT NULL DEFAULT 0,
+    PRIMARY KEY (machine_id, sampled_at),
+    CONSTRAINT runtime_metric_samples_rss_nonnegative
+        CHECK (process_rss_bytes IS NULL OR process_rss_bytes >= 0),
+    CONSTRAINT runtime_metric_samples_memory_limit_nonnegative
+        CHECK (memory_limit_bytes IS NULL OR memory_limit_bytes >= 0),
+    CONSTRAINT runtime_metric_samples_cpu_utilization_nonnegative
+        CHECK (cpu_utilization_percent IS NULL OR cpu_utilization_percent >= 0),
+    CONSTRAINT runtime_metric_samples_cpu_steal_nonnegative
+        CHECK (cpu_steal_percent IS NULL OR cpu_steal_percent >= 0),
+    CONSTRAINT runtime_metric_samples_cpu_throttle_nonnegative
+        CHECK (cpu_throttle_percent IS NULL OR cpu_throttle_percent >= 0),
+    CONSTRAINT runtime_metric_samples_acquire_duration_nonnegative
+        CHECK (database_acquire_duration_ms >= 0),
+    CONSTRAINT runtime_metric_samples_pool_size_nonnegative CHECK (pool_size >= 0),
+    CONSTRAINT runtime_metric_samples_pool_idle_nonnegative CHECK (pool_idle >= 0),
+    CONSTRAINT runtime_metric_samples_pool_active_nonnegative CHECK (pool_active >= 0),
+    CONSTRAINT runtime_metric_samples_pool_parts_fit
+        CHECK (pool_idle + pool_active = pool_size),
+    CONSTRAINT runtime_metric_samples_active_tasks_nonnegative
+        CHECK (active_task_executions >= 0),
+    CONSTRAINT runtime_metric_samples_worker_limit_positive
+        CHECK (task_worker_concurrency_limit > 0),
+    CONSTRAINT runtime_metric_samples_active_tasks_within_limit
+        CHECK (active_task_executions <= task_worker_concurrency_limit),
+    CONSTRAINT runtime_metric_samples_hydradb_calls_nonnegative
+        CHECK (hydradb_calls >= 0),
+    CONSTRAINT runtime_metric_samples_hydradb_failures_within_calls
+        CHECK (hydradb_failures >= 0 AND hydradb_failures <= hydradb_calls),
+    CONSTRAINT runtime_metric_samples_hydradb_duration_nonnegative
+        CHECK (hydradb_duration_ms >= 0),
+    CONSTRAINT runtime_metric_samples_hydradb_duration_needs_calls
+        CHECK (hydradb_calls > 0 OR hydradb_duration_ms = 0)
+);
+
+-- The primary key is also the covering B-tree for reads and pruning by machine and sample time.
+COMMENT ON CONSTRAINT runtime_metric_samples_pkey ON runtime_metric_samples IS
+    'Supports runtime history reads on (machine_id, sampled_at)';
