@@ -131,8 +131,8 @@ memory controls remain unavailable until that connection reports `ready`.
 | --- | --- |
 | `HYDRA_DB_API_KEY` | Secret bearer credential; never stored in PostgreSQL or logged |
 | `HYDRA_DB_BASE_URL` | Absolute `http` or `https` API base URL |
-| `HYDRA_DB_FAST_TIMEOUT_SECS` | Positive request timeout for fast recall |
-| `HYDRA_DB_THINKING_TIMEOUT_SECS` | Positive request timeout for thinking recall; at least the fast timeout |
+| `HYDRA_DB_FAST_TIMEOUT_SECS` | Request timeout for fast calls; 1–110 seconds |
+| `HYDRA_DB_THINKING_TIMEOUT_SECS` | Request timeout for thinking calls; 1–110 seconds and at least the fast timeout |
 
 Provider selection, provisioning state, retry attempts, and cleanup jobs are durable. Disabling
 memory is suspension: runtime recall returns no memory, persistence is skipped immediately, and

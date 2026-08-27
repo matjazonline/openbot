@@ -1333,9 +1333,31 @@ mod tests {
         assert!(replacement.operation_generation > old.operation_generation);
         assert!(
             !persistence
+                .renew_provisioning_job(
+                    old.id,
+                    old_token,
+                    Utc::now() + chrono::Duration::minutes(2),
+                )
+                .await
+                .expect("stale renewal")
+        );
+        assert!(
+            !persistence
                 .complete_provisioning(old.id, old_token)
                 .await
                 .expect("stale completion")
+        );
+        assert!(
+            !persistence
+                .retry_provisioning_job(old.id, old_token, Utc::now(), "stale retry", false,)
+                .await
+                .expect("stale retry")
+        );
+        assert!(
+            !persistence
+                .fail_provisioning_job(old.id, old_token, "stale failure")
+                .await
+                .expect("stale failure")
         );
         assert!(
             persistence

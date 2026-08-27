@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use chrono::{DateTime, Utc};
 use tokio::{
     sync::broadcast,
-    time::{Instant, sleep, timeout_at},
+    time::{Instant, sleep},
 };
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -12,23 +12,36 @@ use crate::{
     domain::monitoring::MonitoringService,
     entities::memory::{
         LeasedProvisioningJob, MAX_MEMORY_PROVIDER_OPERATION_SECONDS,
-        MEMORY_READINESS_TIMEOUT_ERROR, MEMORY_READINESS_WINDOW_SECONDS, MemoryProviderError,
-        MemoryProvisioningPhase,
+        MEMORY_DELETION_QUIESCENCE_SECONDS, MEMORY_READINESS_TIMEOUT_ERROR,
+        MEMORY_READINESS_WINDOW_SECONDS, MemoryProviderError, MemoryProvisioningPhase,
     },
-    services::memory_provider::MemoryProviderRegistry,
+    services::{
+        memory_job_lease::{MemoryJobLease, MemoryLeaseOutcome, supervise_memory_job_lease},
+        memory_job_schedule::{next_poll_at, retry_at},
+        memory_provider::MemoryProviderRegistry,
+    },
     use_cases::memory::MemoryConnectionPersistence,
 };
 
 const POLL_INTERVAL: Duration = Duration::from_secs(1);
 const ERROR_BACKOFF: Duration = Duration::from_secs(5);
-const LEASE_SECONDS: i64 = 180;
+const LEASE_SECONDS: i64 = MEMORY_DELETION_QUIESCENCE_SECONDS;
+const LEASE_DURATION: Duration = Duration::from_secs(LEASE_SECONDS as u64);
+const _: () = assert!(MAX_MEMORY_PROVIDER_OPERATION_SECONDS < LEASE_SECONDS as u64);
 const MAX_PROVIDER_FAILURE_ATTEMPTS: i32 = 8;
-// HydraDB creation is asynchronous. Keep the total initialization window independent from each
-// request's timeout and comfortably above the provider's normal startup time.
-// Polling stays bounded while jitter prevents workers on multiple instances from synchronizing.
-const MIN_POLL_SECONDS: i64 = 2;
-const MAX_POLL_SECONDS: i64 = 5;
 const FAILURE_BUDGET_ERROR: &str = "memory provider failure budget was exhausted";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WorkCycle {
+    Processed,
+    Idle,
+    Shutdown,
+}
+
+enum SupervisedProvider<T> {
+    Outcome(T),
+    Interrupted(WorkCycle),
+}
 
 pub struct MemoryWorker {
     persistence: Arc<dyn MemoryConnectionPersistence>,
@@ -58,9 +71,15 @@ impl MemoryWorker {
 
     async fn run_provisioning(self: Arc<Self>, mut shutdown: broadcast::Receiver<()>) {
         loop {
-            let pause = match self.process_one_provisioning().await {
-                Ok(true) => Duration::ZERO,
-                Ok(false) => POLL_INTERVAL,
+            let pause = match self
+                .process_one_provisioning_until(async {
+                    let _ = shutdown.recv().await;
+                })
+                .await
+            {
+                Ok(WorkCycle::Processed) => Duration::ZERO,
+                Ok(WorkCycle::Idle) => POLL_INTERVAL,
+                Ok(WorkCycle::Shutdown) => return,
                 Err(error) => {
                     warn!(error = %error, "Memory provisioning poll failed");
                     ERROR_BACKOFF
@@ -75,9 +94,15 @@ impl MemoryWorker {
 
     async fn run_cleanup(self: Arc<Self>, mut shutdown: broadcast::Receiver<()>) {
         loop {
-            let pause = match self.process_one_cleanup().await {
-                Ok(true) => Duration::ZERO,
-                Ok(false) => POLL_INTERVAL,
+            let pause = match self
+                .process_one_cleanup_until(async {
+                    let _ = shutdown.recv().await;
+                })
+                .await
+            {
+                Ok(WorkCycle::Processed) => Duration::ZERO,
+                Ok(WorkCycle::Idle) => POLL_INTERVAL,
+                Ok(WorkCycle::Shutdown) => return,
                 Err(error) => {
                     warn!(error = %error, "Memory cleanup poll failed");
                     ERROR_BACKOFF
@@ -90,15 +115,31 @@ impl MemoryWorker {
         }
     }
 
+    #[cfg(test)]
     async fn process_one_provisioning(&self) -> Result<bool, String> {
+        Ok(matches!(
+            self.process_one_provisioning_until(std::future::pending())
+                .await?,
+            WorkCycle::Processed
+        ))
+    }
+
+    async fn process_one_provisioning_until<Shutdown>(
+        &self,
+        shutdown: Shutdown,
+    ) -> Result<WorkCycle, String>
+    where
+        Shutdown: std::future::Future<Output = ()>,
+    {
         let token = Uuid::new_v4();
+        let initial_expiry = lease_expiry();
         let Some(job) = self
             .persistence
-            .claim_provisioning_job(token, lease_expiry())
+            .claim_provisioning_job(token, initial_expiry)
             .await
             .map_err(|error| error.to_string())?
         else {
-            return Ok(false);
+            return Ok(WorkCycle::Idle);
         };
         if !self
             .persistence
@@ -106,43 +147,60 @@ impl MemoryWorker {
             .await
             .map_err(|error| error.to_string())?
         {
-            return Ok(true);
+            self.record_job("provision", "stale_transition");
+            return Ok(WorkCycle::Processed);
         }
         if job.failure_attempts >= MAX_PROVIDER_FAILURE_ATTEMPTS {
-            self.fail_provisioning_terminal(&job, FAILURE_BUDGET_ERROR, "failure_budget_exhausted")
+            self.fail_provisioning_terminal(&job, FAILURE_BUDGET_ERROR, "terminal")
                 .await?;
-            return Ok(true);
+            return Ok(WorkCycle::Processed);
         }
-        match job.phase {
-            MemoryProvisioningPhase::CreatePending => self.create_database(&job).await?,
-            MemoryProvisioningPhase::WaitingReady => self.poll_readiness(&job).await?,
+        let cycle = match job.phase {
+            MemoryProvisioningPhase::CreatePending => {
+                self.create_database(&job, initial_expiry, shutdown).await?
+            }
+            MemoryProvisioningPhase::WaitingReady => {
+                self.poll_readiness(&job, initial_expiry, shutdown).await?
+            }
             MemoryProvisioningPhase::Ready | MemoryProvisioningPhase::Failed => {
                 return Err("A terminal memory provisioning job was claimed.".into());
             }
-        }
-        Ok(true)
+        };
+        Ok(cycle)
     }
 
-    async fn create_database(&self, job: &LeasedProvisioningJob) -> Result<(), String> {
+    async fn create_database<Shutdown>(
+        &self,
+        job: &LeasedProvisioningJob,
+        initial_expiry: DateTime<Utc>,
+        shutdown: Shutdown,
+    ) -> Result<WorkCycle, String>
+    where
+        Shutdown: std::future::Future<Output = ()>,
+    {
         let outcome = match self.providers.get(job.provider) {
             Some(provider) => {
-                let operation_deadline = provider_operation_deadline();
-                if !self
-                    .persistence
-                    .renew_provisioning_job(job.id, job.lease_token, lease_expiry())
-                    .await
-                    .map_err(|error| error.to_string())?
-                {
-                    return Ok(());
-                }
-                timeout_at(
-                    operation_deadline,
+                let mut lease = memory_job_lease(job, initial_expiry);
+                supervise_memory_job_lease(
+                    &mut lease,
+                    LEASE_DURATION,
+                    provider_operation_deadline(),
+                    |expires_at| async move {
+                        self.persistence
+                            .renew_provisioning_job(job.id, job.lease_token, expires_at)
+                            .await
+                            .map_err(|error| error.to_string())
+                    },
                     provider.provision(&job.remote_database_id),
+                    shutdown,
                 )
                 .await
-                .unwrap_or(Err(MemoryProviderError::Timeout))
             }
-            None => Err(MemoryProviderError::Authentication),
+            None => MemoryLeaseOutcome::Completed(Err(MemoryProviderError::Authentication)),
+        };
+        let outcome = match self.provider_outcome("provision", outcome)? {
+            SupervisedProvider::Outcome(outcome) => outcome,
+            SupervisedProvider::Interrupted(cycle) => return Ok(cycle),
         };
         match outcome {
             Ok(()) => {
@@ -159,49 +217,67 @@ impl MemoryWorker {
                 self.record_job(
                     "provision",
                     if accepted {
-                        "create_accepted"
+                        "completed"
                     } else {
-                        "stale_suppressed"
+                        "stale_transition"
                     },
                 );
             }
             Err(error) => {
+                let outcome = provisioning_failure_outcome(job, &error);
+                let accepted = self.fail_provisioning(job, error).await?;
                 self.record_job(
                     "provision",
-                    if error.retryable() { "retry" } else { "failed" },
+                    if accepted {
+                        outcome
+                    } else {
+                        "stale_transition"
+                    },
                 );
-                self.fail_provisioning(job, error).await?;
             }
         }
-        Ok(())
+        Ok(WorkCycle::Processed)
     }
 
-    async fn poll_readiness(&self, job: &LeasedProvisioningJob) -> Result<(), String> {
+    async fn poll_readiness<Shutdown>(
+        &self,
+        job: &LeasedProvisioningJob,
+        initial_expiry: DateTime<Utc>,
+        shutdown: Shutdown,
+    ) -> Result<WorkCycle, String>
+    where
+        Shutdown: std::future::Future<Output = ()>,
+    {
         let deadline = job
             .readiness_deadline
             .ok_or_else(|| "A readiness polling job has no deadline.".to_string())?;
         if Utc::now() >= deadline {
             self.timeout_provisioning(job).await?;
-            return Ok(());
+            return Ok(WorkCycle::Processed);
         }
         let outcome = match self.providers.get(job.provider) {
             Some(provider) => {
-                if !self
-                    .persistence
-                    .renew_provisioning_job(job.id, job.lease_token, lease_expiry())
-                    .await
-                    .map_err(|error| error.to_string())?
-                {
-                    return Ok(());
-                }
-                timeout_at(
+                let mut lease = memory_job_lease(job, initial_expiry);
+                supervise_memory_job_lease(
+                    &mut lease,
+                    LEASE_DURATION,
                     provider_operation_deadline(),
+                    |expires_at| async move {
+                        self.persistence
+                            .renew_provisioning_job(job.id, job.lease_token, expires_at)
+                            .await
+                            .map_err(|error| error.to_string())
+                    },
                     provider.is_ready(&job.remote_database_id),
+                    shutdown,
                 )
                 .await
-                .unwrap_or(Err(MemoryProviderError::Timeout))
             }
-            None => Err(MemoryProviderError::Authentication),
+            None => MemoryLeaseOutcome::Completed(Err(MemoryProviderError::Authentication)),
+        };
+        let outcome = match self.provider_outcome("provision", outcome)? {
+            SupervisedProvider::Outcome(outcome) => outcome,
+            SupervisedProvider::Interrupted(cycle) => return Ok(cycle),
         };
         match outcome {
             Ok(true) => {
@@ -213,9 +289,9 @@ impl MemoryWorker {
                 self.record_job(
                     "provision",
                     if completed {
-                        "ready"
+                        "completed"
                     } else {
-                        "stale_suppressed"
+                        "stale_transition"
                     },
                 );
             }
@@ -231,23 +307,29 @@ impl MemoryWorker {
                     if scheduled {
                         "waiting_ready"
                     } else {
-                        "stale_suppressed"
+                        "stale_transition"
                     },
                 );
             }
             Err(error) => {
+                let outcome = provisioning_failure_outcome(job, &error);
+                let accepted = self.fail_provisioning(job, error).await?;
                 self.record_job(
                     "provision",
-                    if error.retryable() { "retry" } else { "failed" },
+                    if accepted {
+                        outcome
+                    } else {
+                        "stale_transition"
+                    },
                 );
-                self.fail_provisioning(job, error).await?;
             }
         }
-        Ok(())
+        Ok(WorkCycle::Processed)
     }
 
     async fn timeout_provisioning(&self, job: &LeasedProvisioningJob) -> Result<(), String> {
-        self.fail_provisioning_terminal(job, MEMORY_READINESS_TIMEOUT_ERROR, "readiness_timed_out")
+        self.record_job("provision", "timeout");
+        self.fail_provisioning_terminal(job, MEMORY_READINESS_TIMEOUT_ERROR, "terminal")
             .await
     }
 
@@ -264,7 +346,7 @@ impl MemoryWorker {
             .map_err(|error| error.to_string())?;
         self.record_job(
             "provision",
-            if failed { outcome } else { "stale_suppressed" },
+            if failed { outcome } else { "stale_transition" },
         );
         Ok(())
     }
@@ -273,7 +355,7 @@ impl MemoryWorker {
         &self,
         job: &LeasedProvisioningJob,
         error: MemoryProviderError,
-    ) -> Result<(), String> {
+    ) -> Result<bool, String> {
         let terminal =
             !error.retryable() || job.failure_attempts + 1 >= MAX_PROVIDER_FAILURE_ATTEMPTS;
         let mut retry_at = retry_at(job.failure_attempts + 1);
@@ -282,7 +364,8 @@ impl MemoryWorker {
                 retry_at = retry_at.min(deadline);
             }
         }
-        self.persistence
+        let accepted = self
+            .persistence
             .retry_provisioning_job(
                 job.id,
                 job.lease_token,
@@ -292,35 +375,63 @@ impl MemoryWorker {
             )
             .await
             .map_err(|failure| failure.to_string())?;
-        Ok(())
+        Ok(accepted)
     }
 
+    #[cfg(test)]
     async fn process_one_cleanup(&self) -> Result<bool, String> {
+        Ok(matches!(
+            self.process_one_cleanup_until(std::future::pending())
+                .await?,
+            WorkCycle::Processed
+        ))
+    }
+
+    async fn process_one_cleanup_until<Shutdown>(
+        &self,
+        shutdown: Shutdown,
+    ) -> Result<WorkCycle, String>
+    where
+        Shutdown: std::future::Future<Output = ()>,
+    {
         let token = Uuid::new_v4();
+        let initial_expiry = lease_expiry();
         let Some(job) = self
             .persistence
-            .claim_cleanup_job(token, lease_expiry())
+            .claim_cleanup_job(token, initial_expiry)
             .await
             .map_err(|error| error.to_string())?
         else {
-            return Ok(false);
+            return Ok(WorkCycle::Idle);
         };
         let outcome = match self.providers.get(job.provider) {
             Some(provider) => {
-                let operation_deadline = provider_operation_deadline();
-                if !self
-                    .persistence
-                    .renew_cleanup_job(job.id, token, lease_expiry())
-                    .await
-                    .map_err(|error| error.to_string())?
-                {
-                    return Ok(true);
-                }
-                timeout_at(operation_deadline, provider.delete(&job.remote_database_id))
-                    .await
-                    .unwrap_or(Err(MemoryProviderError::Timeout))
+                let mut lease = MemoryJobLease {
+                    job_id: job.id,
+                    operation_generation: job.operation_generation,
+                    token: job.lease_token,
+                    expires_at: initial_expiry,
+                };
+                supervise_memory_job_lease(
+                    &mut lease,
+                    LEASE_DURATION,
+                    provider_operation_deadline(),
+                    |expires_at| async move {
+                        self.persistence
+                            .renew_cleanup_job(job.id, job.lease_token, expires_at)
+                            .await
+                            .map_err(|error| error.to_string())
+                    },
+                    provider.delete(&job.remote_database_id),
+                    shutdown,
+                )
+                .await
             }
-            None => Err(MemoryProviderError::Authentication),
+            None => MemoryLeaseOutcome::Completed(Err(MemoryProviderError::Authentication)),
+        };
+        let outcome = match self.provider_outcome("cleanup", outcome)? {
+            SupervisedProvider::Outcome(outcome) => outcome,
+            SupervisedProvider::Interrupted(cycle) => return Ok(cycle),
         };
         match outcome {
             Ok(()) | Err(MemoryProviderError::NotFound) => {
@@ -332,23 +443,17 @@ impl MemoryWorker {
                 self.record_job(
                     "cleanup",
                     if completed {
-                        "confirmed"
+                        "completed"
                     } else {
-                        "stale_suppressed"
+                        "stale_transition"
                     },
                 );
             }
             Err(error) => {
-                self.record_job(
-                    "cleanup",
-                    if error.retryable() { "retry" } else { "failed" },
-                );
                 let terminal =
                     !error.retryable() || job.failure_attempts >= MAX_PROVIDER_FAILURE_ATTEMPTS;
-                if terminal {
-                    self.record_job("cleanup", "exhausted");
-                }
-                self.persistence
+                let accepted = self
+                    .persistence
                     .retry_cleanup_job(
                         job.id,
                         token,
@@ -358,9 +463,47 @@ impl MemoryWorker {
                     )
                     .await
                     .map_err(|failure| failure.to_string())?;
+                self.record_job(
+                    "cleanup",
+                    if !accepted {
+                        "stale_transition"
+                    } else if terminal {
+                        "terminal"
+                    } else {
+                        "retry"
+                    },
+                );
             }
         }
-        Ok(true)
+        Ok(WorkCycle::Processed)
+    }
+
+    fn provider_outcome<T>(
+        &self,
+        operation: &str,
+        outcome: MemoryLeaseOutcome<Result<T, MemoryProviderError>>,
+    ) -> Result<SupervisedProvider<Result<T, MemoryProviderError>>, String> {
+        match outcome {
+            MemoryLeaseOutcome::Completed(result) => Ok(SupervisedProvider::Outcome(result)),
+            MemoryLeaseOutcome::DeadlineExceeded => {
+                self.record_job(operation, "timeout");
+                Ok(SupervisedProvider::Outcome(Err(
+                    MemoryProviderError::Timeout,
+                )))
+            }
+            MemoryLeaseOutcome::Shutdown => {
+                self.record_job(operation, "shutdown_interruption");
+                Ok(SupervisedProvider::Interrupted(WorkCycle::Shutdown))
+            }
+            MemoryLeaseOutcome::Lost => {
+                self.record_job(operation, "lease_loss");
+                Ok(SupervisedProvider::Interrupted(WorkCycle::Processed))
+            }
+            MemoryLeaseOutcome::RenewalFailed(error) => {
+                self.record_job(operation, "lease_loss");
+                Err(format!("Memory job lease renewal failed: {error}"))
+            }
+        }
     }
 
     fn record_job(&self, operation: &str, outcome: &str) {
@@ -372,6 +515,15 @@ impl MemoryWorker {
     }
 }
 
+fn memory_job_lease(job: &LeasedProvisioningJob, initial_expiry: DateTime<Utc>) -> MemoryJobLease {
+    MemoryJobLease {
+        job_id: job.id,
+        operation_generation: job.operation_generation,
+        token: job.lease_token,
+        expires_at: initial_expiry,
+    }
+}
+
 fn lease_expiry() -> DateTime<Utc> {
     Utc::now() + chrono::Duration::seconds(LEASE_SECONDS)
 }
@@ -380,27 +532,15 @@ fn provider_operation_deadline() -> Instant {
     Instant::now() + Duration::from_secs(MAX_MEMORY_PROVIDER_OPERATION_SECONDS)
 }
 
-fn retry_at(failure_attempts: i32) -> DateTime<Utc> {
-    let base_seconds = (5_i64 * 2_i64.pow(failure_attempts.clamp(0, 6) as u32)).min(300);
-    let seconds = jittered_seconds(base_seconds, 80, 120).clamp(4, 300);
-    Utc::now() + chrono::Duration::seconds(seconds)
-}
-
-fn next_poll_at() -> DateTime<Utc> {
-    Utc::now()
-        + chrono::Duration::seconds(jittered_seconds(
-            MIN_POLL_SECONDS,
-            100,
-            MAX_POLL_SECONDS * 100 / MIN_POLL_SECONDS,
-        ))
-}
-
-fn jittered_seconds(base: i64, minimum_percent: i64, maximum_percent: i64) -> i64 {
-    let bytes = Uuid::new_v4().into_bytes();
-    let sample = u64::from_le_bytes(bytes[..8].try_into().expect("UUID prefix is eight bytes"));
-    let percent =
-        minimum_percent + (sample % (maximum_percent - minimum_percent + 1) as u64) as i64;
-    (base * percent / 100).max(1)
+fn provisioning_failure_outcome(
+    job: &LeasedProvisioningJob,
+    error: &MemoryProviderError,
+) -> &'static str {
+    if !error.retryable() || job.failure_attempts + 1 >= MAX_PROVIDER_FAILURE_ATTEMPTS {
+        "terminal"
+    } else {
+        "retry"
+    }
 }
 
 #[cfg(test)]
@@ -551,15 +691,6 @@ mod tests {
                 Err(MemoryProviderError::NotFound)
             }
         }
-    }
-
-    #[test]
-    fn retry_and_poll_schedules_are_bounded_and_jittered() {
-        let now = Utc::now();
-        assert!(retry_at(99) <= now + chrono::Duration::seconds(301));
-        let poll = next_poll_at();
-        assert!(poll >= now + chrono::Duration::seconds(MIN_POLL_SECONDS));
-        assert!(poll <= now + chrono::Duration::seconds(MAX_POLL_SECONDS + 1));
     }
 
     #[tokio::test]

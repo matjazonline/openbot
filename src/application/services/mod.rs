@@ -5,6 +5,8 @@ pub mod attachment_store;
 pub mod email_parser;
 pub mod llm_guardrail;
 pub mod memory_coordinator;
+pub mod memory_job_lease;
+mod memory_job_schedule;
 pub mod memory_provider;
 pub mod memory_worker;
 pub mod outbound_dispatcher;
