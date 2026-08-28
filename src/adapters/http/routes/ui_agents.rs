@@ -175,9 +175,12 @@ async fn agents_page(
 
     let view = workspace.view(&company);
     let agents = view.agents().await?;
+    // Landing on `/ui/agents` with no `agent_id` opens the first agent rather than an empty pane,
+    // so the workspace is never a blank screen when there is something to show.
     let selected = query
         .agent_id
-        .and_then(|id| agents.iter().find(|agent| agent.id == id));
+        .and_then(|id| agents.iter().find(|agent| agent.id == id))
+        .or_else(|| agents.first());
 
     let creating = matches!(query.new.as_deref(), Some("1") | Some("true"));
     let pane_html = match (creating, selected) {

@@ -26,6 +26,38 @@ Before adding a composite foreign key:
 Keep tenant identifiers in writes even when they appear derivable. They make scoping explicit and
 support composite constraints; derivability alone is not a reason to drop them.
 
+# Carry the discriminator; never re-assert it as a literal
+
+The same rule one column over. The memory tables are keyed on a discriminator plus an id:
+`(company_id, provider)` on `memory_provider_connections`, `(provider, remote_database_id)` on
+`memory_remote_resource_lifecycles` and `memory_cleanup_jobs`. A query that already has the
+discriminator in scope — returned by a CTE, read off the job row, held in
+`companies.memory_provider` — and then filters on the literal `'hydradb'` instead compiles, passes
+every test, and is wrong the moment a second value exists.
+
+Three shapes, all found in one sweep:
+
+- **The wrong row is updated.** `complete_provisioning` matched the lifecycle on
+  `completed_job.provider`, dropped it from `RETURNING`, then updated `... AND connection.provider
+  = 'hydradb'`. A second provider's job would flip the first provider's connection to `ready`.
+- **A no-op is misread as a lost lease.** That same predicate matching nothing returns no row,
+  which the worker reads as "another execution owns this" — so the job retries until its budget is
+  gone.
+- **Teardown is silently skipped.** `delete_company_with_cleanup` selected lifecycles `WHERE
+  provider = 'hydradb'`, so a company holding any other provider's remote data would be deleted
+  with no lifecycle retirement and no cleanup job. The remote data is orphaned and nothing left
+  behind records that it exists.
+
+A discriminator in a `WHERE`, a `RETURNING`, or a `.bind()` comes from the row you just read or
+from a parameter. A literal is acceptable only when you are deliberately scoping to one value, and
+then say why in a comment. When a CTE matches on a discriminator, return it and join the outer
+statement on it rather than restating the value.
+
+A single-variant enum makes all of this unverifiable. While `MemoryProviderKind` had only
+`Hydradb`, every one of these sites was a tautology and the suite was green. Treat "this enum has
+one variant today" as a reason for more care in the query, not less, and do not expect a test to
+catch you.
+
 # Multi-step work needs a durable unit of execution
 
 Advancing a cursor, disabling a one-off schedule, creating domain rows, and enqueueing work in
@@ -312,6 +344,14 @@ one — so a new DB-backed test has to be written to tolerate that:
   guard. A passing assertion is insufficient if the test leaves due work that another test can
   claim. Deterministically sort the test row first, verify its stable identifier after claiming,
   and return any accidentally claimed foreign row to its prior claimable state.
+- **Establish the baseline before calling a failure pre-existing.** Because the fixtures share one
+  database, a test that leaves residue fails *other* tests, in other files, on later runs. The
+  symptom — a different set failing each run, with the occasional clean one — is indistinguishable
+  from inherited flake, and "this suite is just flaky" is the wrong conclusion almost every time.
+  `git stash` and run the same filter three or four times before attributing anything to anyone.
+  A deterministic green baseline means the flake is yours, and the cause is usually the residue
+  rule above: a new test left one `pending` `memory_provisioning_jobs` row, `claim_provisioning_job`
+  is table-wide, and three unrelated tests failed intermittently because of it.
 
 If a test still cannot be isolated, run just that test rather than reaching for `--test-threads=1`
 for the whole suite — serialising everything hides the next isolation bug instead of surfacing it.

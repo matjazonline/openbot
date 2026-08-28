@@ -54,12 +54,19 @@ impl MemoryBindingPersistence for PostgresPersistence {
 }
 
 impl PostgresPersistence {
+    /// The connection for the provider the company currently *selects*, not merely one it has a
+    /// row for. Disabling memory retains the connection row on purpose, so the join against
+    /// `companies.memory_provider` is what keeps a retained row from being mistaken for a live
+    /// selection — the same rule `active_binding` applies.
     async fn memory_connection(&self, company_id: Uuid) -> AppResult<Option<MemoryConnection>> {
         let query = format!(
             "SELECT {CONNECTION_COLUMNS} FROM memory_provider_connections AS connection \
+             JOIN companies AS company \
+               ON company.id = connection.company_id \
+              AND company.memory_provider = connection.provider \
              LEFT JOIN memory_provisioning_jobs AS job \
                ON job.company_id = connection.company_id AND job.provider = connection.provider \
-             WHERE connection.company_id = $1 AND connection.provider = 'hydradb'"
+             WHERE connection.company_id = $1"
         );
         sqlx::query_as::<_, MemoryConnectionDb>(&query)
             .bind(company_id)
@@ -94,6 +101,32 @@ impl MemoryConnectionPersistence for PostgresPersistence {
             .execute(&mut *transaction)
             .await
             .map_err(AppError::from)?;
+
+        // Switching providers has to retire the one being left, or its remote database is never
+        // torn down and the company keeps paying for orphaned data. Deleting the connection is
+        // the whole teardown: `memory_connection_lifecycle_compatibility_delete` flips the
+        // lifecycle to 'absent', sets the quiescence window and enqueues the cleanup job.
+        sqlx::query(
+            "DELETE FROM memory_provider_connections WHERE company_id = $1 AND provider <> $2",
+        )
+        .bind(company_id)
+        .bind(selected_provider.as_str())
+        .execute(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+
+        // A queued create for the abandoned provider must not run. A leased one is left alone on
+        // purpose: `operation_generation` and the lifecycle's `desired_state` already fence the
+        // worker, and pulling the row out from under a live lease is what that fencing prevents.
+        sqlx::query(
+            r#"DELETE FROM memory_provisioning_jobs
+               WHERE company_id = $1 AND provider <> $2 AND status <> 'leased'"#,
+        )
+        .bind(company_id)
+        .bind(selected_provider.as_str())
+        .execute(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
 
         sqlx::query(
             r#"INSERT INTO memory_provider_connections
@@ -220,7 +253,7 @@ impl MemoryConnectionPersistence for PostgresPersistence {
         let connection = self
             .memory_connection(company_id)
             .await?
-            .ok_or_else(|| AppError::BadRequest("HydraDB has not been selected.".into()))?;
+            .ok_or_else(|| AppError::BadRequest("No memory provider is selected.".into()))?;
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         let desired = sqlx::query(
             r#"UPDATE memory_remote_resource_lifecycles AS lifecycle
@@ -240,7 +273,7 @@ impl MemoryConnectionPersistence for PostgresPersistence {
         .map_err(AppError::from)?;
         if desired.rows_affected() != 1 {
             return Err(AppError::BadRequest(
-                "HydraDB is no longer selected for this company.".into(),
+                "That memory provider is no longer selected for this company.".into(),
             ));
         }
         sqlx::query(
@@ -469,13 +502,13 @@ impl MemoryConnectionPersistence for PostgresPersistence {
                      AND lifecycle.company_id = completed_job.company_id
                      AND lifecycle.operation_generation = completed_job.operation_generation
                      AND lifecycle.operation_lease_token = $2
-                   RETURNING lifecycle.company_id
+                   RETURNING lifecycle.company_id, lifecycle.provider
                )
                UPDATE memory_provider_connections AS connection
                SET readiness = 'ready', last_error = NULL, updated_at = CURRENT_TIMESTAMP
                FROM released_lifecycle
                WHERE connection.company_id = released_lifecycle.company_id
-                 AND connection.provider = 'hydradb'
+                 AND connection.provider = released_lifecycle.provider
                RETURNING connection.company_id"#,
         )
         .bind(job_id)
@@ -541,13 +574,13 @@ impl MemoryConnectionPersistence for PostgresPersistence {
                      AND lifecycle.company_id = retried_job.company_id
                      AND lifecycle.operation_generation = retried_job.operation_generation
                      AND lifecycle.operation_lease_token = $2
-                   RETURNING lifecycle.company_id
+                   RETURNING lifecycle.company_id, lifecycle.provider
                )
                UPDATE memory_provider_connections AS connection
                SET readiness = $6, last_error = $5, updated_at = CURRENT_TIMESTAMP
                FROM released_lifecycle
                WHERE connection.company_id = released_lifecycle.company_id
-                 AND connection.provider = 'hydradb'
+                 AND connection.provider = released_lifecycle.provider
                RETURNING connection.company_id"#,
         )
         .bind(job_id)
@@ -822,14 +855,14 @@ async fn transition_provisioning_job(
                          AND lifecycle.desired_state = 'present'
                          AND lifecycle.operation_generation = updated_job.operation_generation
                          AND lifecycle.operation_lease_token = $2
-                       RETURNING lifecycle.company_id
+                       RETURNING lifecycle.company_id, lifecycle.provider
                    )
                    UPDATE memory_provider_connections AS connection
                    SET readiness = 'provisioning', last_error = NULL,
                        updated_at = CURRENT_TIMESTAMP
                    FROM released_lifecycle
                    WHERE connection.company_id = released_lifecycle.company_id
-                     AND connection.provider = 'hydradb'
+                     AND connection.provider = released_lifecycle.provider
                    RETURNING connection.company_id"#,
         )
         .bind(job_id)
@@ -878,13 +911,13 @@ async fn transition_provisioning_job(
                          AND lifecycle.desired_state = 'present'
                          AND lifecycle.operation_generation = failed_job.operation_generation
                          AND lifecycle.operation_lease_token = $2
-                       RETURNING lifecycle.company_id
+                       RETURNING lifecycle.company_id, lifecycle.provider
                    )
                    UPDATE memory_provider_connections AS connection
                    SET readiness = 'failed', last_error = $3, updated_at = CURRENT_TIMESTAMP
                    FROM released_lifecycle
                    WHERE connection.company_id = released_lifecycle.company_id
-                     AND connection.provider = 'hydradb'
+                     AND connection.provider = released_lifecycle.provider
                    RETURNING connection.company_id"#,
         )
         .bind(job_id)
@@ -1488,12 +1521,22 @@ mod tests {
             persistence.active_binding(company_id).await.unwrap(),
             ActiveMemoryBinding::Disabled
         );
+        // The row survives so re-enabling can reuse a ready connection, but it is no longer the
+        // company's *selected* connection, so `memory_connection` must not hand it back.
+        let retained: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM memory_provider_connections WHERE company_id = $1",
+        )
+        .bind(company_id)
+        .fetch_one(&pool)
+        .await
+        .expect("retained connection");
+        assert_eq!(retained, 1);
         assert!(
             persistence
                 .memory_connection(company_id)
                 .await
                 .unwrap()
-                .is_some()
+                .is_none()
         );
 
         persistence
@@ -1508,6 +1551,56 @@ mod tests {
         .await
         .expect("cleanup lookup");
         assert_eq!(cleanup.as_deref(), Some("pending"));
+    }
+
+    #[tokio::test]
+    async fn retry_is_refused_against_a_retained_connection_once_memory_is_disabled() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let persistence = PostgresPersistence::new(pool.clone());
+        let company_id = memory_company(&persistence).await;
+        persistence
+            .select_provider(company_id, MemoryProviderKind::Hydradb)
+            .await
+            .expect("selection");
+        sqlx::query(
+            "UPDATE memory_provider_connections SET readiness = 'ready' WHERE company_id = $1",
+        )
+        .bind(company_id)
+        .execute(&pool)
+        .await
+        .expect("ready connection");
+        persistence
+            .disable_provider(company_id)
+            .await
+            .expect("disable");
+
+        // The connection row is still there, so a retry that resolved the provider by literal
+        // rather than by selection would requeue provisioning for memory nobody asked for — and
+        // reset a ready connection to 'pending' on the way.
+        let error = persistence
+            .retry_provisioning(company_id)
+            .await
+            .expect_err("retry must not run against a deselected provider");
+        assert!(matches!(error, AppError::BadRequest(_)), "{error:?}");
+
+        let readiness: String = sqlx::query_scalar(
+            "SELECT readiness FROM memory_provider_connections WHERE company_id = $1",
+        )
+        .bind(company_id)
+        .fetch_one(&pool)
+        .await
+        .expect("retained readiness");
+        assert_eq!(readiness, "ready");
+
+        // `claim_provisioning_job` is table-wide, so leaving this company's still-pending create
+        // job behind would let it be claimed out from under an unrelated test.
+        persistence
+            .delete(company_id)
+            .await
+            .expect("company deletion");
     }
 
     #[tokio::test]

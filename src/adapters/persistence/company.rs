@@ -115,10 +115,12 @@ async fn delete_company_with_cleanup(
         .fetch_all(&mut *transaction)
         .await
         .map_err(AppError::from)?;
-    let remote_database_ids = sqlx::query_scalar::<_, String>(
-        r#"SELECT remote_database_id
+    // Every provider this company holds remote data for, not just one of them: a lifecycle left
+    // behind here is remote data nothing remembers exists.
+    let remote_resources = sqlx::query_as::<_, (String, String)>(
+        r#"SELECT provider, remote_database_id
            FROM memory_remote_resource_lifecycles
-           WHERE company_id = $1 AND provider = 'hydradb'
+           WHERE company_id = $1
            FOR UPDATE"#,
     )
     .bind(id)
@@ -126,7 +128,7 @@ async fn delete_company_with_cleanup(
     .await
     .map_err(AppError::from)?;
     let quiesce_until = Utc::now() + chrono::Duration::seconds(MEMORY_DELETION_QUIESCENCE_SECONDS);
-    for remote_database_id in remote_database_ids {
+    for (provider, remote_database_id) in remote_resources {
         sqlx::query(
             r#"UPDATE memory_remote_resource_lifecycles
                SET company_id = NULL, desired_state = 'absent',
@@ -134,7 +136,7 @@ async fn delete_company_with_cleanup(
                    last_error = NULL, updated_at = CURRENT_TIMESTAMP
                WHERE provider = $1 AND remote_database_id = $2"#,
         )
-        .bind(MemoryProviderKind::Hydradb.as_str())
+        .bind(&provider)
         .bind(&remote_database_id)
         .bind(quiesce_until)
         .execute(&mut *transaction)
@@ -143,7 +145,7 @@ async fn delete_company_with_cleanup(
         sqlx::query(
             r#"INSERT INTO memory_cleanup_jobs
                    (id, provider, remote_database_id, available_at)
-               VALUES ($1, 'hydradb', $2, $3)
+               VALUES ($1, $4, $2, $3)
                ON CONFLICT (provider, remote_database_id) DO UPDATE
                SET status = 'pending', attempts = 0, available_at = EXCLUDED.available_at,
                    lease_token = NULL, lease_expires_at = NULL,
@@ -154,6 +156,7 @@ async fn delete_company_with_cleanup(
         .bind(Uuid::new_v4())
         .bind(remote_database_id)
         .bind(quiesce_until)
+        .bind(provider)
         .execute(&mut *transaction)
         .await
         .map_err(AppError::from)?;

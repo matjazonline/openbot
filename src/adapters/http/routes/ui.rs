@@ -379,9 +379,12 @@ async fn mailbox_page(
     let channels = channel_use_cases
         .list_readable_channels(&viewer, company.id)
         .await?;
+    // Landing on `/ui` with no `channel_id` opens the first channel and, below, its newest thread,
+    // the way the schedules workspace opens its first schedule and newest run.
     let selected_channel = query
         .channel_id
-        .and_then(|id| channels.iter().find(|channel| channel.id == id));
+        .and_then(|id| channels.iter().find(|channel| channel.id == id))
+        .or_else(|| channels.first());
 
     let thread_page = match selected_channel {
         Some(channel) => {
@@ -394,7 +397,8 @@ async fn mailbox_page(
         (Some(channel), Some(thread_id)) => {
             load_channel_thread(&thread_use_cases, channel.id, thread_id).await?
         }
-        _ => None,
+        (Some(_), None) => thread_page.threads.first().cloned(),
+        (None, _) => None,
     };
 
     let detail_html = match (selected_channel, &selected_thread) {

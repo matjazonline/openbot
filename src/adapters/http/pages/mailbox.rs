@@ -1653,7 +1653,7 @@ fn channel_menu_item(
 pub fn empty_thread_column() -> String {
     format!(
         r##"
-        <section id="thread-column"{THREAD_COLUMN_SKELETON} class="flex w-full min-w-0 flex-col border-r border-base-300 bg-base-100">
+        <section id="thread-column"{THREAD_COLUMN_SKELETON} class="flex min-h-0 w-full min-w-0 flex-1 flex-col border-r border-base-300 bg-base-100">
             <div class="flex items-center justify-between border-b border-base-300 px-4 py-3">
                 <h2 class="text-lg font-bold">Threads</h2>
             </div>
@@ -1665,6 +1665,13 @@ pub fn empty_thread_column() -> String {
     )
 }
 
+/// The channel's threads, newest first, in the column beside the sidebar.
+///
+/// `min-h-0 flex-1` on the section is what makes `#thread-list` scroll. The section is a flex item
+/// in the column-direction `.ui-pane-list`, where `min-height: auto` keeps an item at its content
+/// height: without those two utilities the section grows past the pane, the list's `flex-1` is
+/// measured against an unbounded height, and its `overflow-y-auto` never has anything to scroll --
+/// the rows below the fold are simply clipped by the shell's `overflow-hidden` body.
 pub fn thread_column(column: &ThreadColumn<'_>) -> String {
     // Where the live column resumes from: the *newest* thread on the page. The column is sorted
     // newest-first, so that is the first row, not the last one.
@@ -1676,7 +1683,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
 
     format!(
         r##"
-        <section id="thread-column"{THREAD_COLUMN_SKELETON} class="flex w-full min-w-0 flex-col border-r border-base-300 bg-base-100"
+        <section id="thread-column"{THREAD_COLUMN_SKELETON} class="flex min-h-0 w-full min-w-0 flex-1 flex-col border-r border-base-300 bg-base-100"
             hx-ext="sse"
             sse-connect="/ui/threads/events?company_id={company_id}&channel_id={channel_id}{after}">
             <div class="flex items-center justify-between gap-2 border-b border-base-300 px-4 py-3">

@@ -203,9 +203,12 @@ async fn channels_page(
     let view = workspace.view(&company).await?;
     let channels = view.channels().await?;
     let agents = view.agents().await?;
+    // Landing on `/ui/channels` with no `channel_id` opens the first channel rather than an empty
+    // pane, so the workspace is never a blank screen when there is something to show.
     let selected = query
         .channel_id
-        .and_then(|id| channels.iter().find(|channel| channel.id == id));
+        .and_then(|id| channels.iter().find(|channel| channel.id == id))
+        .or_else(|| channels.first());
 
     let selected_schedules = match selected {
         Some(channel) => view.schedules(channel.id).await?,
