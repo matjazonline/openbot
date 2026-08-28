@@ -452,8 +452,13 @@ mod tests {
         assert!(channel_page.contains(&format!("value=\"{}\"", library_agent.id)));
         assert!(channel_page.contains("Scheduler"));
         assert!(channel_page.contains("Each agent gets a channel with the same name"));
-        assert!(channel_page.contains("this.setAttribute('aria-busy', 'true')"));
-        assert!(channel_page.contains("loading loading-spinner loading-sm hidden"));
+        assert!(channel_page.contains(r##"data-submit="busy-once""##));
+        // The spinner is Tailwind's `animate-spin` on an inline SVG, not daisyUI's
+        // `loading-spinner` -- see `busy_submit_button` for why.
+        assert!(
+            channel_page
+                .contains(r##"<svg data-progress class="hidden size-4 shrink-0 animate-spin""##)
+        );
         assert!(channel_page.contains("Creating email agents…"));
 
         let complete_page =

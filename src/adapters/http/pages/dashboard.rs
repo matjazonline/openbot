@@ -165,7 +165,6 @@ pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
         company: shell.selected_company,
         section: UiSection::Dashboard,
         content: &content,
-        script: "",
     })
 }
 

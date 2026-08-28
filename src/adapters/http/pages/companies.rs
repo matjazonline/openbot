@@ -13,7 +13,7 @@ pub fn companies_page(companies: &[Company]) -> String {
                 <p class="text-slate-400 text-sm mt-1">Manage your organization profiles and indexed slugs</p>
             </div>
             <button id="company-form-toggle" type="button" aria-controls="company-form-card" aria-expanded="false"
-                onclick="const card = document.getElementById('company-form-card'); const opening = card.classList.contains('hidden'); card.classList.toggle('hidden'); this.setAttribute('aria-expanded', opening);"
+                data-action="toggle-form-card" data-card="company-form-card"
                 class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/30 transition cursor-pointer">
                 Add Company
             </button>
@@ -27,12 +27,12 @@ pub fn companies_page(companies: &[Company]) -> String {
                 <span class="text-indigo-400">+</span> Add New Company
             </h3>
             <form hx-post="/companies" hx-target="#company-list" hx-swap="innerHTML" class="space-y-4"
-                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('company-form-card').classList.add('hidden'); document.getElementById('company-form-toggle').setAttribute('aria-expanded', 'false'); }}">
+                data-after-request="reset-and-collapse" data-card="company-form-card" data-toggle="company-form-toggle">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label for="company_name" class="block text-xs font-medium text-slate-300 mb-1">Company Name</label>
                         <input type="text" id="company_name" name="name" required
-                            oninput="document.getElementById('company_slug').value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                            data-input="slugify" data-slug-target="company_slug"
                             class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             placeholder="Acme Corporation">
                     </div>
@@ -111,7 +111,7 @@ pub fn company_row_fragment(company: &Company) -> String {
     let created_at_str = super::format_date(company.created_at);
     format!(
         r##"
-        <div id="company-{id}" onclick="selectCompany('{id}')" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-slate-600 transition shadow-sm cursor-pointer">
+        <div id="company-{id}" data-action="select-company" data-company-id="{id}" class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 flex items-center justify-between hover:border-slate-600 transition shadow-sm cursor-pointer">
             <div>
                 <div class="flex items-center gap-3">
                     <h4 class="text-md font-semibold text-white">{name}</h4>
@@ -121,28 +121,28 @@ pub fn company_row_fragment(company: &Company) -> String {
                 <p class="text-xs text-slate-400 mt-1">Added {created_at_str}</p>
             </div>
             <div class="flex items-center gap-2">
-                <a href="/companies/{id}/tasks" onclick="selectCompany('{id}')"
+                <a href="/companies/{id}/tasks" data-action="select-company" data-company-id="{id}"
                     class="px-3 py-1.5 text-xs font-medium bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/50 rounded-lg transition">
                     Tasks
                 </a>
-                <a href="/companies/{id}/agents" onclick="selectCompany('{id}')"
+                <a href="/companies/{id}/agents" data-action="select-company" data-company-id="{id}"
                     class="px-3 py-1.5 text-xs font-medium bg-sky-900/80 hover:bg-sky-800 text-sky-200 border border-sky-700/50 rounded-lg transition">
                     Agents
                 </a>
-                <a href="/companies/{id}/channels" onclick="selectCompany('{id}')"
+                <a href="/companies/{id}/channels" data-action="select-company" data-company-id="{id}"
                     class="px-3 py-1.5 text-xs font-medium bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/50 rounded-lg transition">
                     Channels
                 </a>
-                <a href="/companies/{id}/invites" onclick="selectCompany('{id}')"
+                <a href="/companies/{id}/invites" data-action="select-company" data-company-id="{id}"
                     class="px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
                     Invites & Team
                 </a>
-                <button hx-get="/companies/{id}/edit" hx-target="#company-{id}" hx-swap="outerHTML" onclick="event.stopPropagation()"
+                <button hx-get="/companies/{id}/edit" hx-target="#company-{id}" hx-swap="outerHTML" data-action="isolate"
                     class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
                     Edit
                 </button>
-                <button hx-delete="/companies/{id}" hx-target="#company-{id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete '{name}'?" onclick="event.stopPropagation()"
-                    hx-on::after-request="if(event.detail.successful) clearCachedCompanyIfMatch('{id}');"
+                <button hx-delete="/companies/{id}" hx-target="#company-{id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete '{name}'?" data-action="isolate"
+                    data-after-request="clear-cached-company" data-company-id="{id}"
                     class="px-3 py-1.5 text-xs font-medium bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
                     Delete
                 </button>
@@ -181,7 +181,7 @@ pub fn company_edit_fragment(company: &Company) -> String {
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Company Name</label>
                     <input type="text" name="name" value="{name}" required
-                        oninput="this.form.slug.value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                        data-input="slugify"
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
                 <div>
@@ -268,7 +268,7 @@ pub fn company_invites_page(
                 <span class="text-indigo-400">+</span> Invite User by Email
             </h3>
             <form hx-post="/companies/{company_id}/invites" hx-target="#invite-list" hx-swap="innerHTML" class="flex gap-3"
-                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) this.reset();">
+                data-after-request="reset-form">
                 <input type="email" name="email" required placeholder="colleague@example.com"
                     class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <select name="role" class="px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">

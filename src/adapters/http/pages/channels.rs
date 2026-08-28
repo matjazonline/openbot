@@ -15,7 +15,6 @@ pub fn render_agents_selection(
 /// that the surrounding channel form actually submits.
 fn agent_radio_card(
     group_name: &str,
-    agents_selection_id: &str,
     value: &str,
     checked: bool,
     title_class: &str,
@@ -28,7 +27,7 @@ fn agent_radio_card(
         r#"
         <label class="flex items-center gap-2 p-2 bg-slate-800/80 border border-slate-700/80 rounded-lg cursor-pointer hover:bg-slate-700/60 transition">
             <input type="radio" name="{group_name}" value="{value}" {checked}
-                onchange="let parent = this.closest('#{agents_selection_id}'); if (parent) {{ let library = parent.querySelector('.library-agent-select'); if (library) library.value = ''; let target = parent.querySelector('input[name=agent_ids]'); if (target) target.value = this.value; }}"
+                data-action="pick-agent-radio"
                 class="border-slate-700 text-indigo-600 focus:ring-indigo-500">
             <div class="text-xs flex flex-col">
                 <span class="font-medium {title_class}">{title}</span>
@@ -82,7 +81,7 @@ fn inline_agent_form(
                     <div>
                         <label class="block text-[11px] font-medium text-slate-300 mb-0.5">Agent Name</label>
                         <input type="text" id="inline_agent_name_{container_id}" name="inline_agent_name"
-                            oninput="document.getElementById('inline_agent_slug_{container_id}').value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                            data-input="slugify" data-slug-target="inline_agent_slug_{container_id}"
                             class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                             placeholder="Support Specialist">
                     </div>
@@ -121,7 +120,7 @@ fn inline_agent_form(
                 </div>
                 <div class="flex justify-end gap-2 pt-1">
                     <button type="button"
-                        onclick="let el = document.getElementById('{inline_form_id}'); if (el) el.classList.add('hidden'); return false;"
+                        data-action="hide-element" data-target="{inline_form_id}"
                         class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium rounded transition cursor-pointer">
                         Cancel
                     </button>
@@ -159,7 +158,6 @@ pub fn render_agents_selection_full(
 
     let mut agent_cards = agent_radio_card(
         &group_name,
-        &agents_selection_id,
         "",
         initial_id.is_empty(),
         "text-slate-300",
@@ -189,13 +187,12 @@ pub fn render_agents_selection_full(
         agent_cards
             .push_str(r#"<p class="text-xs text-slate-500">No library agents available.</p>"#);
     } else {
-        agent_cards.push_str(&format!(r#"<select class="library-agent-select sm:col-span-2 md:col-span-3 bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm" onchange="let parent=this.closest('#{agents_selection_id}'); parent.querySelectorAll('input[type=radio]').forEach((radio)=>radio.checked=false); parent.querySelector('input[name=agent_ids]').value=this.value"><option value="">Choose a library agent…</option>{library_options}</select>"#));
+        agent_cards.push_str(&format!(r#"<select class="library-agent-select sm:col-span-2 md:col-span-3 bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm" data-action="pick-agent-library"><option value="">Choose a library agent…</option>{library_options}</select>"#));
     }
     agent_cards.push_str(r#"<div class="sm:col-span-2 md:col-span-3 mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">Custom company agents</div>"#);
     for agent in agents.iter().filter(|agent| !agent.is_library()) {
         agent_cards.push_str(&agent_radio_card(
             &group_name,
-            &agents_selection_id,
             &agent.id.to_string(),
             selected_ids.is_some_and(|ids| ids.contains(&agent.id)),
             "text-white",
@@ -219,7 +216,7 @@ pub fn render_agents_selection_full(
 
     format!(
         r#"
-        <div id="{agents_selection_id}" class="space-y-3">
+        <div id="{agents_selection_id}" data-agents-selection class="space-y-3">
             <input type="hidden" name="agent_ids" value="{initial_id}">
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-1">
                 {agent_cards}
@@ -227,7 +224,7 @@ pub fn render_agents_selection_full(
 
             <div>
                 <button type="button"
-                    onclick="let el = document.getElementById('{inline_form_id}'); if (el) el.classList.toggle('hidden'); return false;"
+                    data-action="toggle-element" data-target="{inline_form_id}"
                     class="text-xs text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer inline-flex items-center gap-1">
                     <span>+ Create New Agent Inline</span>
                 </button>
@@ -270,32 +267,12 @@ pub(crate) fn render_spam_disabled_warning(
     }
 }
 
-/// Tab switcher for the create-channel card. Lives outside the `format!` so its braces
-/// need no escaping.
-const CHANNEL_FORM_TABS_SCRIPT: &str = r##"            function showChannelFormTab(mode) {
-                const simpleForm = document.getElementById('simple-channel-form');
-                const advancedForm = document.getElementById('advanced-channel-form');
-                const simpleBtn = document.getElementById('tab-simple-btn');
-                const advancedBtn = document.getElementById('tab-advanced-btn');
-                if (mode === 'simple') {
-                    if (simpleForm) simpleForm.classList.remove('hidden');
-                    if (advancedForm) advancedForm.classList.add('hidden');
-                    if (simpleBtn) simpleBtn.className = 'px-3 py-1 rounded-md text-white bg-indigo-600 font-semibold transition cursor-pointer';
-                    if (advancedBtn) advancedBtn.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white transition cursor-pointer';
-                } else {
-                    if (simpleForm) simpleForm.classList.add('hidden');
-                    if (advancedForm) advancedForm.classList.remove('hidden');
-                    if (simpleBtn) simpleBtn.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white transition cursor-pointer';
-                    if (advancedBtn) advancedBtn.className = 'px-3 py-1 rounded-md text-white bg-indigo-600 font-semibold transition cursor-pointer';
-                }
-            }"##;
-
 /// "Simple" create-channel form: a name and plain-language instructions, from which the
 /// server generates the agent and its system prompt.
 fn simple_channel_form(company_id: Uuid) -> String {
     format!(
         r##"            <form id="simple-channel-form" hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']" class="space-y-4" data-company-id="{company_id}"
-                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('channel-form-card').classList.add('hidden'); document.getElementById('channel-form-toggle').setAttribute('aria-expanded', 'false'); }}">
+                data-after-request="reset-and-collapse" data-card="channel-form-card" data-toggle="channel-form-toggle">
                 <input type="hidden" name="form_mode" value="simple">
                 <input type="hidden" name="enabled" value="true">
                 <input type="hidden" name="add_3rd_party" value="true">
@@ -338,7 +315,7 @@ fn advanced_channel_form(
 ) -> String {
     format!(
         r##"            <form id="advanced-channel-form" hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" class="hidden space-y-4" data-company-id="{company_id}"
-                hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('channel-form-card').classList.add('hidden'); document.getElementById('channel-form-toggle').setAttribute('aria-expanded', 'false'); }}">
+                data-after-request="reset-and-collapse" data-card="channel-form-card" data-toggle="channel-form-toggle">
                 <input type="hidden" name="form_mode" value="advanced">
                 <input type="hidden" name="enabled" value="true">
                 <input type="hidden" name="add_3rd_party" value="true">
@@ -346,7 +323,7 @@ fn advanced_channel_form(
                     <div>
                         <label for="channel_name" class="block text-xs font-medium text-slate-300 mb-1">Channel Name</label>
                         <input type="text" id="channel_name" name="name" required
-                            oninput="document.getElementById('channel_slug').value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                            data-input="slugify" data-slug-target="channel_slug"
                             class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             placeholder="Inbound Email Handler">
                     </div>
@@ -373,13 +350,13 @@ fn advanced_channel_form(
 
                 <div>
                     <label for="participant_emails" class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Optional - Defaults to Company Team)</label>
-                    <input type="text" id="participant_emails" name="participant_emails" data-company-id="{company_id}" oninput="toggleSpamWarning(this)" autocomplete="off"
+                    <input type="text" id="participant_emails" name="participant_emails" data-company-id="{company_id}" data-input="spam-warning" autocomplete="off"
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder="Leave blank for Company Team, @public for open access, or comma-separated emails">
                     <p class="text-[11px] text-slate-400 mt-1">Leave blank for Company Team members. Use <code class="text-indigo-300">@public</code> to allow anyone, or specify email addresses.</p>
                 </div>
                 <div>
-                    <a href="#" onclick="let el = this.nextElementSibling; if (el) el.classList.toggle('hidden'); return false;"
+                    <a href="#" data-action="toggle-next"
                         class="text-xs text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer inline-flex items-center gap-1">
                         <span>Custom Channel Agent</span>
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -482,7 +459,7 @@ pub fn channels_page(page: &ChannelsPage<'_>) -> String {
                 <p class="text-slate-400 text-sm mt-0.5">Manage channels for <span class="font-mono text-indigo-300">@{slug}.{app_domain_name}</span></p>
             </div>
             <button id="channel-form-toggle" type="button" aria-controls="channel-form-card" aria-expanded="{card_expanded}"
-                onclick="const card = document.getElementById('channel-form-card'); const opening = card.classList.contains('hidden'); card.classList.toggle('hidden'); this.setAttribute('aria-expanded', opening);"
+                data-action="toggle-form-card" data-card="channel-form-card"
                 class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/30 transition cursor-pointer">
                 Add Channel
             </button>
@@ -497,11 +474,11 @@ pub fn channels_page(page: &ChannelsPage<'_>) -> String {
                     <span class="text-emerald-400">+</span> Add New Channel
                 </h3>
                 <div class="flex items-center bg-slate-800/80 p-1 rounded-lg border border-slate-700/50 text-xs font-medium">
-                    <button type="button" id="tab-simple-btn" onclick="showChannelFormTab('simple')"
+                    <button type="button" id="tab-simple-btn" data-action="show-channel-form-tab" data-tab="simple"
                         class="px-3 py-1 rounded-md text-white bg-indigo-600 font-semibold transition cursor-pointer">
                         Simple
                     </button>
-                    <button type="button" id="tab-advanced-btn" onclick="showChannelFormTab('advanced')"
+                    <button type="button" id="tab-advanced-btn" data-action="show-channel-form-tab" data-tab="advanced"
                         class="px-3 py-1 rounded-md text-slate-400 hover:text-white transition cursor-pointer">
                         Advanced
                     </button>
@@ -515,9 +492,6 @@ pub fn channels_page(page: &ChannelsPage<'_>) -> String {
 {advanced_form}
         </div>
 
-        <script>
-{CHANNEL_FORM_TABS_SCRIPT}
-        </script>
 
         <!-- Channels List Section -->
         <div>
@@ -877,7 +851,7 @@ pub fn channel_edit_fragment(
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Channel Name</label>
                     <input type="text" name="name" value="{name}" required
-                        oninput="this.form.slug.value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                        data-input="slugify"
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
                 <div>
@@ -902,13 +876,13 @@ pub fn channel_edit_fragment(
 
             <div>
                 <label class="block text-xs font-medium text-slate-300 mb-1">Participant Emails (Optional - Defaults to Company Team)</label>
-                <input type="text" name="participant_emails" value="{emails_str}" data-company-id="{company_id}" oninput="toggleSpamWarning(this)" autocomplete="off"
+                <input type="text" name="participant_emails" value="{emails_str}" data-company-id="{company_id}" data-input="spam-warning" autocomplete="off"
                     class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     placeholder="Leave blank for Company Team, @public for open access, or comma-separated emails">
                 <p class="text-[11px] text-slate-400 mt-1">Leave blank for Company Team members. Use <code class="text-indigo-300">@public</code> to allow anyone, or specify email addresses.</p>
             </div>
             <div>
-                <a href="#" onclick="let el = this.nextElementSibling; if (el) el.classList.toggle('hidden'); return false;"
+                <a href="#" data-action="toggle-next"
                     class="text-xs text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer inline-flex items-center gap-1">
                     <span>Custom Channel Agent</span>
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>

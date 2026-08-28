@@ -1,7 +1,9 @@
 use super::*;
+use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit, OutboundSend};
 use crate::entities::agent::Agent;
 use crate::entities::channel::Channel;
 use crate::entities::company_member::CompanyMembership;
+use crate::entities::task::TaskLeaseRef;
 use crate::services::email_parser::MAX_CHANNEL_HOPS;
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
@@ -392,8 +394,17 @@ impl ThreadPersistence for MockThreadPersistence {
     }
 }
 
+#[derive(Default)]
 struct MockTaskPersistence {
     tasks: Mutex<Vec<crate::entities::task::BackgroundTask>>,
+    /// Every send this double was asked to queue, whether on its own or as part of a dispatch
+    /// commit. A double that does not record cannot prove a send was *not* made -- which is
+    /// exactly what the failed-run tests assert.
+    outbox: Mutex<Vec<OutboundSend>>,
+    /// Reply messages committed through `commit_agent_dispatch`. They arrive here rather than at
+    /// the thread double because the dispatch commits them as one transaction with the outbox
+    /// row and the task payload.
+    committed_messages: Mutex<Vec<Message>>,
 }
 
 struct MockAgentPersistence {
@@ -433,6 +444,36 @@ impl AgentPersistence for MockAgentPersistence {
 
 #[async_trait]
 impl TaskPersistence for MockTaskPersistence {
+    async fn commit_agent_dispatch(
+        &self,
+        commit: AgentDispatchCommit<'_>,
+    ) -> AppResult<DispatchCommit> {
+        self.committed_messages
+            .lock()
+            .unwrap()
+            .extend(commit.messages.iter().cloned());
+        let outbox_id = commit.outbound.map(|send| {
+            self.outbox.lock().unwrap().push(send);
+            Uuid::new_v4()
+        });
+        Ok(DispatchCommit::Committed { outbox_id })
+    }
+
+    async fn renew_task_lease(
+        &self,
+        _lease: TaskLeaseRef,
+        _lock_expires_at: chrono::DateTime<chrono::Utc>,
+    ) -> AppResult<bool> {
+        Ok(true)
+    }
+
+    /// Records instead of accepting silently, so a test can assert nothing was queued.
+    async fn enqueue_outbound_send(&self, send: OutboundSend) -> AppResult<Option<Uuid>> {
+        let id = Uuid::new_v4();
+        self.outbox.lock().unwrap().push(send);
+        Ok(Some(id))
+    }
+
     async fn find_correlated_outreach_reply(
         &self,
         company_id: Uuid,
@@ -507,6 +548,7 @@ impl TaskPersistence for MockTaskPersistence {
             max_retries: 3,
             last_error: None,
             worker_id: None,
+            execution_generation: None,
             locked_at: None,
             lock_expires_at: None,
             run_at: Utc::now(),
@@ -586,13 +628,13 @@ impl TaskPersistence for MockTaskPersistence {
         }
     }
 
-    async fn mark_task_completed(&self, id: Uuid, worker_id: Uuid) -> AppResult<bool> {
+    async fn mark_task_completed(&self, lease: TaskLeaseRef) -> AppResult<bool> {
         let mut list = self.tasks.lock().unwrap();
         let now = Utc::now();
         if let Some(t) = list.iter_mut().find(|t| {
-            t.id == id
+            t.id == lease.task_id
                 && t.status == crate::entities::task::TaskStatus::Processing
-                && t.worker_id == Some(worker_id)
+                && t.worker_id == Some(lease.worker_id)
                 && t.lock_expires_at.is_some_and(|expires| expires > now)
         }) {
             t.status = crate::entities::task::TaskStatus::Completed;
@@ -607,8 +649,7 @@ impl TaskPersistence for MockTaskPersistence {
 
     async fn mark_task_failed(
         &self,
-        id: Uuid,
-        worker_id: Uuid,
+        lease: TaskLeaseRef,
         error_msg: &str,
         next_run_at: chrono::DateTime<chrono::Utc>,
         is_dead_letter: bool,
@@ -616,9 +657,9 @@ impl TaskPersistence for MockTaskPersistence {
         let mut list = self.tasks.lock().unwrap();
         let now = Utc::now();
         if let Some(t) = list.iter_mut().find(|t| {
-            t.id == id
+            t.id == lease.task_id
                 && t.status == crate::entities::task::TaskStatus::Processing
-                && t.worker_id == Some(worker_id)
+                && t.worker_id == Some(lease.worker_id)
                 && t.lock_expires_at.is_some_and(|expires| expires > now)
         }) {
             t.last_error = Some(error_msg.to_string());
@@ -678,40 +719,6 @@ impl TaskPersistence for MockTaskPersistence {
             .unwrap();
         t.status = crate::entities::task::TaskStatus::Pending;
         t.run_at = Utc::now();
-        t.worker_id = None;
-        t.locked_at = None;
-        t.lock_expires_at = None;
-        Ok(t.clone())
-    }
-
-    async fn update_task_status(
-        &self,
-        id: Uuid,
-        status: crate::entities::task::TaskStatus,
-    ) -> AppResult<crate::entities::task::BackgroundTask> {
-        let mut list = self.tasks.lock().unwrap();
-        let t = list
-            .iter_mut()
-            .find(|t| {
-                t.id == id
-                    && match status {
-                        crate::entities::task::TaskStatus::PendingApproval => matches!(
-                            t.status,
-                            crate::entities::task::TaskStatus::Processing
-                                | crate::entities::task::TaskStatus::WaitingForThirdPartyReply
-                        ),
-                        crate::entities::task::TaskStatus::WaitingForThirdPartyReply => {
-                            matches!(
-                                t.status,
-                                crate::entities::task::TaskStatus::Processing
-                                    | crate::entities::task::TaskStatus::PendingApproval
-                            )
-                        }
-                        _ => false,
-                    }
-            })
-            .unwrap();
-        t.status = status;
         t.worker_id = None;
         t.locked_at = None;
         t.lock_expires_at = None;
@@ -889,9 +896,7 @@ async fn test_inter_channel_hop_limit_rejection() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
@@ -1017,9 +1022,7 @@ async fn test_spf_authentication_failure_rejection() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
@@ -1135,9 +1138,7 @@ async fn test_high_spam_score_rejection() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
@@ -1251,9 +1252,7 @@ async fn test_dmarc_authentication_failure_rejection() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
@@ -1367,9 +1366,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
@@ -1484,9 +1481,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
@@ -1599,9 +1594,7 @@ async fn test_channel_in_cc_resolves_properly() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
@@ -1750,9 +1743,7 @@ async fn test_multi_channel_to_and_cc_execution() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
@@ -1940,9 +1931,7 @@ async fn test_pipeline_address_chaining_execution() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
@@ -2094,9 +2083,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
@@ -2238,9 +2225,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
@@ -2464,9 +2449,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
@@ -2633,9 +2616,7 @@ async fn test_sender_verification_and_delegation_target_check() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
@@ -2831,9 +2812,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
         threads: Mutex::new(Vec::new()),
         messages: Mutex::new(Vec::new()),
     });
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
         channel_persistence,
@@ -3051,9 +3030,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
         threads: Mutex::new(Vec::new()),
         messages: Mutex::new(Vec::new()),
     });
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::new(
         thread_persistence,
         channel_persistence,
@@ -3178,9 +3155,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
         threads: Mutex::new(Vec::new()),
         messages: Mutex::new(Vec::new()),
     });
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::new(
         thread_persistence,
         channel_persistence,
@@ -3310,9 +3285,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
@@ -3539,9 +3512,7 @@ async fn test_context_only_quiet_mode_ingestion() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence {
-        tasks: Mutex::new(Vec::new()),
-    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
@@ -3697,9 +3668,7 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
         }),
         channel_persistence,
         company_persistence,
-        Arc::new(MockTaskPersistence {
-            tasks: Mutex::new(Vec::new()),
-        }),
+        Arc::new(MockTaskPersistence::default()),
         internal_test_config(),
     );
 
@@ -4325,9 +4294,7 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
             channels: Mutex::new(channels),
         }),
         company_persistence,
-        Arc::new(MockTaskPersistence {
-            tasks: Mutex::new(Vec::new()),
-        }),
+        Arc::new(MockTaskPersistence::default()),
         internal_test_config(),
     )
     .with_agent_persistence(Arc::new(MockAgentPersistence { agents }))
@@ -4741,4 +4708,146 @@ async fn an_agent_cannot_use_help_to_enumerate_its_company() {
     // The reserved address is simply not seen on the internal path; whatever happens to this
     // message, it is never the help reply. Agents have `list_company_agents` for the directory.
     assert_ne!(result.reason.as_deref(), Some(SYSTEM_ADDRESS_ANSWERED));
+}
+
+/// A provider failure must leave no trace a customer could see.
+///
+/// This is the regression for the shape where `run_agents` turned an `Err` into an `AgentOutput`
+/// whose content was `"Agent execution failed: .."`. That string became the reply body, was
+/// written into every matched thread as an agent message, and was queued in the outbox for
+/// delivery -- and only afterwards was the failure reported to the worker for retry. So a
+/// transient provider blip both emailed the error to the customer and left a message the retry
+/// then had to reconcile with.
+#[tokio::test]
+async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
+    let company_id = Uuid::new_v4();
+    let channel_id = Uuid::new_v4();
+
+    // No provider anywhere -- not on the company, the channel, or an agent -- so resolving the
+    // run's parameters fails and stands in for any provider-side failure.
+    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        id: company_id,
+        user_id: Uuid::new_v4(),
+        name: "Acme Corp".to_string(),
+        slug: "acme".into(),
+        api_key: None,
+        provider: None,
+        model: None,
+        enable_llm_spam_guardrail: None,
+        avatar_url: None,
+        memory_provider: None,
+        created_at: Utc::now(),
+    }]));
+
+    let channel_persistence = Arc::new(MockChannelPersistence {
+        channels: Mutex::new(vec![Channel {
+            enabled: true,
+            add_3rd_party: true,
+            id: channel_id,
+            company_id,
+            name: "Support".to_string(),
+            description: None,
+            slug: "support".into(),
+            alias_slugs: Vec::new(),
+            api_key: None,
+            provider: None,
+            model: None,
+            participant_emails: None,
+            agent_ids: None,
+            channel_config: None,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: Utc::now(),
+        }]),
+    });
+
+    let thread_persistence = Arc::new(MockThreadPersistence {
+        threads: Mutex::new(Vec::new()),
+        messages: Mutex::new(Vec::new()),
+    });
+    let task_persistence = Arc::new(MockTaskPersistence::default());
+
+    let thread_use_cases = ThreadUseCases::new(
+        thread_persistence.clone(),
+        channel_persistence,
+        company_persistence,
+        task_persistence.clone(),
+        internal_test_config(),
+    );
+
+    let ingest = thread_use_cases
+        .ingest_and_save_inbound_message(RawInboundPayload {
+            to: "support@acme.mailagents.com".to_string(),
+            from: "customer@client.com".to_string(),
+            subject: Some("Help please".to_string()),
+            text: Some("My invoice is wrong.".to_string()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert!(ingest.accepted);
+    assert_eq!(ingest.channel_matches.len(), 1);
+
+    let inbound_messages = thread_persistence.messages.lock().unwrap().len();
+    drop(thread_persistence.messages.lock().unwrap());
+
+    let dispatched = thread_use_cases
+        .execute_claimed_agent_task_and_dispatch(
+            &ingest,
+            true,
+            TaskLeaseRef {
+                task_id: ingest.task_id.unwrap_or_else(Uuid::new_v4),
+                worker_id: Uuid::new_v4(),
+                execution_generation: Uuid::new_v4(),
+            },
+        )
+        .await;
+
+    // The worker is told it failed, so the task is retried rather than marked done.
+    let error = dispatched.expect_err("a run whose agent failed must report the failure");
+    assert!(
+        !error.to_string().is_empty(),
+        "the failure must carry a reason for the attempt ledger"
+    );
+
+    // Nothing was committed: no agent message in any thread, and nothing queued for delivery.
+    let messages = thread_persistence.messages.lock().unwrap();
+    assert_eq!(
+        messages.len(),
+        inbound_messages,
+        "a failed run must not add a message; found {:?}",
+        messages
+            .iter()
+            .skip(inbound_messages)
+            .map(|message| message.clean_text_body.clone())
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !messages
+            .iter()
+            .any(|message| message.direction == MessageDirection::Outbound),
+        "a failed run must not write an outbound reply into the thread"
+    );
+    drop(messages);
+
+    assert!(
+        task_persistence
+            .committed_messages
+            .lock()
+            .unwrap()
+            .is_empty(),
+        "a failed run must commit no reply through the dispatch commit either"
+    );
+    assert!(
+        task_persistence.outbox.lock().unwrap().is_empty(),
+        "a failed run must queue no email"
+    );
 }

@@ -93,7 +93,6 @@ pub fn schedules_page(page: &SchedulesPage<'_>) -> String {
         company: Some(company),
         section: UiSection::Schedules,
         content: &content,
-        script: SCHEDULES_SCRIPT,
     })
 }
 
@@ -415,7 +414,7 @@ pub fn schedule_thread_pane(props: &ScheduleThreadPaneProps<'_>) -> String {
                     <textarea name="reply_text" rows="1" required
                         placeholder="Reply to agent in this run thread (Enter to send, Shift+Enter for new line)..."
                         class="textarea textarea-sm flex-1 font-mono text-xs max-h-40"
-                        onkeydown="composerKeydown(event)" oninput="autoGrowComposer(this)"></textarea>
+                        data-keydown="composer" data-input="auto-grow-composer"></textarea>
                     <button type="submit" class="btn btn-primary btn-sm">Reply</button>
                 </form>
             </div>

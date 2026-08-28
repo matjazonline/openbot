@@ -63,6 +63,7 @@ fn test_find_task_for_message_multi_task_matching() {
         max_retries: 3,
         last_error: None,
         worker_id: None,
+        execution_generation: None,
         locked_at: None,
         lock_expires_at: None,
         run_at: Utc::now(),
@@ -90,6 +91,7 @@ fn test_find_task_for_message_multi_task_matching() {
         max_retries: 3,
         last_error: None,
         worker_id: None,
+        execution_generation: None,
         locked_at: None,
         lock_expires_at: None,
         run_at: Utc::now(),
@@ -747,7 +749,6 @@ fn the_top_bar_names_the_selected_company_between_the_brand_and_the_account() {
         company: Some(&company),
         section: UiSection::Mailbox,
         content: "",
-        script: "",
     });
     assert!(bar.contains(r##"id="topbar-company""##));
     assert!(bar.contains("Acme Logistics"));
@@ -760,7 +761,6 @@ fn the_top_bar_names_the_selected_company_between_the_brand_and_the_account() {
         company: None,
         section: UiSection::Mailbox,
         content: "",
-        script: "",
     });
     assert!(!bare.contains(r##"id="topbar-company""##));
 
@@ -780,7 +780,6 @@ fn the_ui_shell_reports_live_update_interruptions_without_replacing_sse_retries(
         company: None,
         section: UiSection::Mailbox,
         content: "",
-        script: "",
     });
 
     assert!(html.contains(r#"id="live-update-status" role="status" aria-live="polite""#));
@@ -890,7 +889,6 @@ fn the_icon_rail_only_advertises_company_workspaces_the_role_can_open() {
             company: Some(&company),
             section: UiSection::Mailbox,
             content: "",
-            script: "",
         })
     };
     let link = |path: &str| format!(r#"href="{path}?company_id={}""#, company.id);
@@ -1358,7 +1356,7 @@ fn library_agents_are_picked_from_a_modal_of_cards() {
 
     // The button names the current pick and opens the modal; the choice itself rides a hidden
     // field, since a card is a button and cannot be submitted.
-    assert!(html.contains("showModal()"));
+    assert!(html.contains(r##"data-action="open-dialog""##));
     assert!(html.contains(&format!(
         "<input type=\"hidden\" class=\"channel-library-agent-field\" value=\"{}\">",
         scheduler.id
@@ -1502,7 +1500,7 @@ fn spam_confirmation_is_inert_until_the_channel_is_public() {
     assert!(public.contains("class=\"checkbox checkbox-sm\">"));
 
     // The participants field is what drives the toggle from there on.
-    assert!(public.contains(r##"oninput="toggleChannelSpamConfirm(this)""##));
+    assert!(public.contains(r##"data-input="channel-spam-confirm""##));
 }
 
 #[test]
@@ -2426,6 +2424,7 @@ fn monitored_task(company_id: Uuid, channel_id: Uuid, status: TaskStatus) -> Bac
         max_retries: 3,
         last_error: None,
         worker_id: None,
+        execution_generation: None,
         locked_at: None,
         lock_expires_at: None,
         run_at: Utc::now(),
@@ -4268,4 +4267,148 @@ fn the_channel_form_offers_a_description_and_escapes_what_was_typed_into_it() {
     );
     assert!(html.contains("Answers &lt;supplier&gt; capacity questions."));
     assert!(!html.contains("<supplier>"));
+}
+
+/// Every handler the browser runs must come from `/assets/app.js`, because the response headers
+/// set `script-src 'self'` with no `'unsafe-inline'` (see `adapters::http::security`). An inline
+/// `onclick`, an `hx-on` expression, or an inline `<script>` block is therefore not merely untidy
+/// — it is dead on arrival, silently. This walks the HTTP adapter's own source so a page added
+/// later is covered without anyone remembering to list it here.
+#[test]
+fn rendered_markup_carries_no_inline_javascript() {
+    fn collect(dir: &std::path::Path, into: &mut Vec<std::path::PathBuf>) {
+        for entry in std::fs::read_dir(dir).expect("readable source directory") {
+            let path = entry.expect("readable entry").path();
+            if path.is_dir() {
+                collect(&path, into);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                into.push(path);
+            }
+        }
+    }
+
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/adapters/http");
+    let mut sources = Vec::new();
+    collect(&root, &mut sources);
+    assert!(
+        sources.len() > 20,
+        "expected to walk the HTTP adapter, found {} files",
+        sources.len()
+    );
+
+    let mut offenders = Vec::new();
+    for path in sources {
+        // This file deliberately holds hostile markup as test input.
+        if path.ends_with("tests.rs") {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).expect("readable source file");
+        for (index, line) in source.lines().enumerate() {
+            // Prose about these constructs is not an emission of them.
+            if line.trim_start().starts_with("//") {
+                continue;
+            }
+            let mut found = Vec::new();
+            if inline_event_attribute(line) {
+                found.push("inline event attribute");
+            }
+            if line.contains("hx-on") {
+                found.push("hx-on expression");
+            }
+            // `<script src=...>` is fine; a `<script>` that carries a body is not. A `<script>`
+            // that closes a Rust string literal right after the tag is hostile test input.
+            if line.contains("<script>") && !line.contains("<script>\"") {
+                found.push("inline <script> block");
+            }
+            for what in found {
+                offenders.push(format!("{}:{}: {what}", path.display(), index + 1));
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "inline JavaScript is blocked by the page CSP and will never run:\n{}",
+        offenders.join("\n")
+    );
+}
+
+/// True when the line carries an HTML event-handler attribute such as ` onclick="`.
+fn inline_event_attribute(line: &str) -> bool {
+    line.match_indices(" on").any(|(at, _)| {
+        let rest = &line[at + 3..];
+        let name: String = rest
+            .chars()
+            .take_while(|c| c.is_ascii_lowercase())
+            .collect();
+        !name.is_empty() && rest[name.len()..].starts_with("=\"")
+    })
+}
+
+/// The delegated dispatch is the other half of the same contract: every `data-action`,
+/// `data-input`, `data-keydown`, `data-submit` and `data-after-request` value the pages emit has
+/// to have a branch in the bundle, or the control is inert in exactly the way the CSP made the
+/// inline handlers inert.
+#[test]
+fn every_delegated_action_has_a_branch_in_the_bundle() {
+    let bundle = application_javascript();
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/adapters/http");
+
+    let mut missing = Vec::new();
+    let mut stack = vec![root];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).expect("readable source directory") {
+            let path = entry.expect("readable entry").path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if path.extension().is_none_or(|ext| ext != "rs") || path.ends_with("tests.rs") {
+                continue;
+            }
+            let source = std::fs::read_to_string(&path).expect("readable source file");
+            for attribute in [
+                "data-action=\"",
+                "data-input=\"",
+                "data-keydown=\"",
+                "data-submit=\"",
+                "data-after-request=\"",
+                "data-after-swap=\"",
+            ] {
+                for (at, _) in source.match_indices(attribute) {
+                    let rest = &source[at + attribute.len()..];
+                    let Some(value) = rest.split('"').next() else {
+                        continue;
+                    };
+                    // Values built at runtime cannot be checked statically.
+                    if value.is_empty() || value.contains('{') {
+                        continue;
+                    }
+                    if !bundle.contains(&format!("'{value}'"))
+                        && !bundle.contains(&format!("\"{value}\""))
+                    {
+                        missing.push(format!("{}: {attribute}{value}\"", path.display()));
+                    }
+                }
+            }
+        }
+    }
+
+    missing.sort();
+    missing.dedup();
+    assert!(
+        missing.is_empty(),
+        "these delegated actions have no branch in /assets/app.js:\n{}",
+        missing.join("\n")
+    );
+}
+
+#[test]
+#[ignore = "developer aid: dumps /assets/app.js so it can be syntax-checked with node"]
+fn dump_application_javascript() {
+    std::fs::write(
+        std::env::var("APP_JS_OUT").expect("APP_JS_OUT"),
+        application_javascript(),
+    )
+    .expect("write bundle");
 }

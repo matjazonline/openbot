@@ -114,7 +114,6 @@ pub fn outbox_page(page: &OutboxPage<'_>) -> String {
         company: Some(company),
         section: UiSection::Outbox,
         content: &content,
-        script: "",
     })
 }
 

@@ -516,6 +516,11 @@ CREATE TABLE background_tasks (
     max_retries INTEGER NOT NULL DEFAULT 3,
     last_error TEXT,
     worker_id UUID,
+    -- Fences one execution against the next. `worker_id` alone cannot: a worker whose lease
+    -- lapsed and which then re-claims the same task would match its own stale guard. The
+    -- generation is minted afresh at every claim, so a write from a superseded run matches
+    -- nothing. `schedule_runs.materialization_generation` does the same job for that queue.
+    execution_generation UUID,
     locked_at TIMESTAMPTZ,
     lock_expires_at TIMESTAMPTZ,
     wait_expires_at TIMESTAMPTZ,
@@ -538,10 +543,23 @@ CREATE TABLE background_tasks (
     CONSTRAINT background_tasks_retry_count_check CHECK (retry_count >= 0),
     CONSTRAINT background_tasks_max_retries_check CHECK (max_retries > 0),
     CONSTRAINT background_tasks_payload_object_check CHECK (jsonb_typeof(payload) = 'object'),
+    -- Only a processing row may hold a lease, and it must hold all of it. Previously this said
+    -- merely "all four set or all four null", which let a completed or suspended row keep the
+    -- worker that last touched it and made "is this task claimed?" ambiguous. Clearing was left
+    -- to each UPDATE getting it right; now the database refuses the alternative.
     CONSTRAINT background_tasks_lease_check CHECK (
-        (worker_id IS NULL AND locked_at IS NULL AND lock_expires_at IS NULL)
-        OR (worker_id IS NOT NULL AND locked_at IS NOT NULL AND lock_expires_at IS NOT NULL
-            AND lock_expires_at > locked_at)
+        (status = 'processing'
+         AND worker_id IS NOT NULL
+         AND execution_generation IS NOT NULL
+         AND locked_at IS NOT NULL
+         AND lock_expires_at IS NOT NULL
+         AND lock_expires_at > locked_at)
+        OR
+        (status <> 'processing'
+         AND worker_id IS NULL
+         AND execution_generation IS NULL
+         AND locked_at IS NULL
+         AND lock_expires_at IS NULL)
     )
 );
 

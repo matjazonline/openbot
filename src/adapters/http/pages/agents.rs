@@ -19,7 +19,7 @@ pub fn render_ai_prompt_generator(
         <div class="flex items-center justify-between mb-1">
             <label for="{sys_prompt_id}" class="block text-xs font-medium text-slate-300">System Prompt</label>
             <button type="button"
-                onclick="let el = document.getElementById('{gen_box_id}'); if (el) {{ el.classList.toggle('hidden'); if (!el.classList.contains('hidden')) {{ const inp = document.getElementById('{gen_input_id}'); if (inp) inp.focus(); }} }} return false;"
+                data-action="toggle-prompt-generator" data-box="{gen_box_id}" data-focus="{gen_input_id}"
                 class="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition cursor-pointer inline-flex items-center gap-1">
                 <span class="inline-flex items-center gap-1">{sparkle} Generate with AI</span>
             </button>
@@ -31,7 +31,7 @@ pub fn render_ai_prompt_generator(
                     {sparkle}
                     <span>Generate System Prompt with AI</span>
                 </span>
-                <button type="button" onclick="document.getElementById('{gen_box_id}').classList.add('hidden')" class="text-slate-400 hover:text-white transition cursor-pointer">&times;</button>
+                <button type="button" data-action="hide-element" data-target="{gen_box_id}" class="text-slate-400 hover:text-white transition cursor-pointer">&times;</button>
             </div>
             <p class="text-[11px] text-slate-400">Describe what you want this agent to do (e.g. role, responsibilities, rules, tone):</p>
             <textarea id="{gen_input_id}" name="user_instructions" rows="2"
@@ -41,7 +41,7 @@ pub fn render_ai_prompt_generator(
             <div id="{gen_status_id}" class="text-xs"></div>
 
             <div class="flex items-center justify-end gap-2 pt-0.5">
-                <button type="button" onclick="document.getElementById('{gen_box_id}').classList.add('hidden')"
+                <button type="button" data-action="hide-element" data-target="{gen_box_id}"
                     class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium rounded transition cursor-pointer">
                     Cancel
                 </button>
@@ -120,7 +120,7 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                         &larr; Back to Companies
                     </a>
                     <button id="agent-form-toggle" type="button" aria-controls="agent-form-card" aria-expanded="false"
-                        onclick="const card = document.getElementById('agent-form-card'); const opening = card.classList.contains('hidden'); card.classList.toggle('hidden'); this.setAttribute('aria-expanded', opening);"
+                        data-action="toggle-form-card" data-card="agent-form-card"
                         class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/30 transition cursor-pointer">
                         Add Agent
                     </button>
@@ -134,13 +134,13 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                 </h3>
                 <form hx-post="/companies/{company_id}/agents" hx-target="#agent-list" hx-swap="innerHTML" class="space-y-4"
                       hx-params="not avatar_file"
-                      hx-on::after-request="if(event.detail.successful && event.detail.elt === this) {{ this.reset(); document.getElementById('agent-form-card').classList.add('hidden'); document.getElementById('agent-form-toggle').setAttribute('aria-expanded', 'false'); }}"
-                      onkeydown="if(event.key==='Enter' && event.target.tagName!=='TEXTAREA') event.preventDefault()">
+                      data-after-request="reset-and-collapse" data-card="agent-form-card" data-toggle="agent-form-toggle"
+                      data-keydown="block-enter">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label for="agent_name" class="block text-xs font-medium text-slate-300 mb-1">Agent Name</label>
                             <input type="text" id="agent_name" name="name" required
-                                oninput="document.getElementById('agent_slug').value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                                data-input="slugify" data-slug-target="agent_slug"
                                 placeholder="e.g. Triage Bot" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
                         </div>
                         <div>

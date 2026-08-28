@@ -731,31 +731,20 @@ pub async fn generate_agent_prompt_handler(
         .await
     {
         Ok(generated_prompt) => {
-            let escaped_prompt = serde_json::to_string(&generated_prompt).unwrap_or_default();
+            // The prompt and both element ids travel as escaped attribute data, not as an inline
+            // `<script>`: `script-src 'self'` blocks inline scripts, and `target_id`/`gen_box_id`
+            // arrive from the submitted form. `applyGeneratedPrompt` picks this up on htmx swap.
             let html = format!(
                 r#"
                 <div class="p-2 my-1 bg-emerald-500/10 border border-emerald-500/30 rounded text-emerald-300 text-xs flex items-center justify-between font-medium">
                     <span class="inline-flex items-center gap-1.5">{check} System prompt generated successfully!</span>
                 </div>
-                <script>
-                    (function() {{
-                        const target = document.getElementById("{target_id}");
-                        if (target) {{
-                            target.value = {escaped_prompt};
-                            target.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                            target.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                        }}
-                        const genBox = document.getElementById("{gen_box_id}");
-                        if (genBox) {{
-                            setTimeout(function() {{ genBox.classList.add('hidden'); }}, 1000);
-                        }}
-                    }})();
-                </script>
+                <div data-after-swap="apply-generated-prompt" data-target-id="{target_id}" data-gen-box="{gen_box_id}" data-generated-prompt="{prompt}"></div>
                 "#,
                 check = pages::icon(pages::Icon::Check, pages::BUTTON_ICON),
-                target_id = target_id,
-                escaped_prompt = escaped_prompt,
-                gen_box_id = gen_box_id
+                target_id = pages::escape_html_text(&target_id),
+                gen_box_id = pages::escape_html_text(&gen_box_id),
+                prompt = pages::escape_html_text(&generated_prompt),
             );
             Ok(Html(html).into_response())
         }

@@ -1293,8 +1293,26 @@ mod tests {
 
     struct MockTaskPersistence;
 
+    use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
+    use crate::entities::task::TaskLeaseRef;
+
     #[async_trait]
     impl crate::adapters::persistence::task::TaskPersistence for MockTaskPersistence {
+        async fn commit_agent_dispatch(
+            &self,
+            commit: AgentDispatchCommit<'_>,
+        ) -> AppResult<DispatchCommit> {
+            let _ = commit;
+            Ok(DispatchCommit::Committed { outbox_id: None })
+        }
+
+        async fn renew_task_lease(
+            &self,
+            _lease: TaskLeaseRef,
+            _lock_expires_at: chrono::DateTime<chrono::Utc>,
+        ) -> AppResult<bool> {
+            Ok(true)
+        }
         async fn enqueue_task(
             &self,
             company_id: Uuid,
@@ -1315,6 +1333,7 @@ mod tests {
                 max_retries: 3,
                 last_error: None,
                 worker_id: None,
+                execution_generation: None,
                 locked_at: None,
                 lock_expires_at: None,
                 run_at: Utc::now(),
@@ -1351,13 +1370,12 @@ mod tests {
         ) -> AppResult<bool> {
             Ok(true)
         }
-        async fn mark_task_completed(&self, _id: Uuid, _worker_id: Uuid) -> AppResult<bool> {
+        async fn mark_task_completed(&self, _lease: TaskLeaseRef) -> AppResult<bool> {
             Ok(true)
         }
         async fn mark_task_failed(
             &self,
-            _id: Uuid,
-            _worker_id: Uuid,
+            _lease: TaskLeaseRef,
             _error_msg: &str,
             _next_run_at: chrono::DateTime<chrono::Utc>,
             _is_dead_letter: bool,
@@ -1368,13 +1386,6 @@ mod tests {
             unimplemented!()
         }
         async fn resume_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
-            unimplemented!()
-        }
-        async fn update_task_status(
-            &self,
-            _id: Uuid,
-            _status: crate::entities::task::TaskStatus,
-        ) -> AppResult<crate::entities::task::BackgroundTask> {
             unimplemented!()
         }
         async fn list_company_tasks(

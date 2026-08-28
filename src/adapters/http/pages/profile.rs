@@ -108,7 +108,6 @@ pub fn profile_page(page: &ProfilePage<'_>) -> String {
         company: page.company,
         section: UiSection::Profile,
         content: &content,
-        script: "",
     })
 }
 

@@ -2,6 +2,17 @@
 
 use super::*;
 
+/// The agent-library workspace's own behaviour. It is bundled into `/assets/app.js` rather than
+/// shipped with the page: the strict `script-src 'self'` CSP blocks inline scripts, and the
+/// per-page `script` hook that used to carry it was silently discarded by the shell.
+pub(crate) const AGENT_LIBRARY_SCRIPT: &str = r#"
+function libraryPayload(form){const data=new FormData(form);let config=null;try{config=data.get('config_json')?JSON.parse(data.get('config_json')):null}catch(e){alert('Config must be valid JSON');throw e}return {name:data.get('name'),slug:data.get('slug'),provider:data.get('provider')||null,model:data.get('model')||null,api_key:data.get('api_key')||null,system_prompt:data.get('system_prompt')||null,description:data.get('description')||null,config_json:config,avatar_url:data.get('avatar_url')||null}}
+async function libraryRequest(url,method,body){const response=await fetch(url,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):undefined});if(!response.ok)throw new Error(await response.text());return response.status===204?null:response.json()}
+async function createLibraryAgent(event){event.preventDefault();try{await libraryRequest('/api/agent-library','POST',libraryPayload(event.target));location.reload()}catch(e){alert(e.message)}}
+async function saveLibraryAgent(event,id){event.preventDefault();try{await libraryRequest('/api/agent-library/'+id,'PUT',libraryPayload(event.target));location.reload()}catch(e){alert(e.message)}}
+async function deleteLibraryAgent(id){if(!confirm('Delete this library agent?'))return;try{await libraryRequest('/api/agent-library/'+id,'DELETE');location.reload()}catch(e){alert(e.message)}}
+"#;
+
 /// A self-contained library picker. Checkboxes are presentation controls; the hidden input is the
 /// stable, comma-separated value submitted by ordinary URL-encoded forms.
 pub fn agent_library_multi_select(agents: &[Agent], selected: &[Uuid], input_name: &str) -> String {

@@ -536,6 +536,8 @@ impl ScheduleUseCases {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
+    use crate::entities::task::TaskLeaseRef;
     use crate::entities::{
         channel::Channel,
         company::{Company, CompanyAccess},
@@ -1029,6 +1031,22 @@ mod tests {
 
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        async fn commit_agent_dispatch(
+            &self,
+            commit: AgentDispatchCommit<'_>,
+        ) -> AppResult<DispatchCommit> {
+            let _ = commit;
+            Ok(DispatchCommit::Committed { outbox_id: None })
+        }
+
+        async fn renew_task_lease(
+            &self,
+            _lease: TaskLeaseRef,
+            _lock_expires_at: chrono::DateTime<chrono::Utc>,
+        ) -> AppResult<bool> {
+            Ok(true)
+        }
+
         async fn enqueue_task(
             &self,
             company_id: Uuid,
@@ -1049,6 +1067,7 @@ mod tests {
                 max_retries: 3,
                 last_error: None,
                 worker_id: None,
+                execution_generation: None,
                 locked_at: None,
                 lock_expires_at: None,
                 run_at: Utc::now(),
@@ -1084,13 +1103,12 @@ mod tests {
         ) -> AppResult<bool> {
             unimplemented!()
         }
-        async fn mark_task_completed(&self, _id: Uuid, _worker_id: Uuid) -> AppResult<bool> {
+        async fn mark_task_completed(&self, _lease: TaskLeaseRef) -> AppResult<bool> {
             unimplemented!()
         }
         async fn mark_task_failed(
             &self,
-            _id: Uuid,
-            _worker_id: Uuid,
+            _lease: TaskLeaseRef,
             _error_msg: &str,
             _next_run_at: chrono::DateTime<Utc>,
             _is_dead_letter: bool,
@@ -1101,13 +1119,6 @@ mod tests {
             unimplemented!()
         }
         async fn resume_task(&self, _id: Uuid) -> AppResult<BackgroundTask> {
-            unimplemented!()
-        }
-        async fn update_task_status(
-            &self,
-            _id: Uuid,
-            _status: TaskStatus,
-        ) -> AppResult<BackgroundTask> {
             unimplemented!()
         }
         async fn list_company_tasks(

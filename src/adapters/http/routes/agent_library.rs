@@ -275,7 +275,7 @@ async fn workspace(
                 advanced: true,
             };
             format!(
-                r#"<form class="card bg-base-200 p-4 space-y-4" onsubmit="saveLibraryAgent(event,'{id}')">{fields}<div class="flex gap-2"><button class="btn btn-primary btn-sm">Save</button><button type="button" class="btn btn-error btn-outline btn-sm" onclick="deleteLibraryAgent('{id}')">Delete</button></div></form>"#,
+                r#"<form class="card bg-base-200 p-4 space-y-4" data-submit="save-library-agent" data-agent-id="{id}">{fields}<div class="flex gap-2"><button class="btn btn-primary btn-sm">Save</button><button type="button" class="btn btn-error btn-outline btn-sm" data-action="delete-library-agent" data-agent-id="{id}">Delete</button></div></form>"#,
                 id = agent.id,
                 fields = pages::library_agent_fields(&draft, Some(agent.id)),
             )
@@ -290,7 +290,7 @@ async fn workspace(
     );
     let content = format!(
         r#"<main class="flex-1 overflow-auto p-8"><div class="mx-auto max-w-4xl"><h1 class="text-2xl font-bold">Agent library</h1><p class="mb-6 opacity-70">Live global definitions available to every company.</p>
-    <form class="card mb-6 bg-base-200 p-4 space-y-2" onsubmit="createLibraryAgent(event)">
+    <form class="card mb-6 bg-base-200 p-4 space-y-2" data-submit="create-library-agent">
       <h2 class="font-bold">New library agent</h2>
       {create_fields}
       <div><button class="btn btn-primary btn-sm">Create</button></div>
@@ -303,19 +303,11 @@ async fn workspace(
         },
         create_fields = create_fields,
     );
-    let script = r#"
-function libraryPayload(form){const data=new FormData(form);let config=null;try{config=data.get('config_json')?JSON.parse(data.get('config_json')):null}catch(e){alert('Config must be valid JSON');throw e}return {name:data.get('name'),slug:data.get('slug'),provider:data.get('provider')||null,model:data.get('model')||null,api_key:data.get('api_key')||null,system_prompt:data.get('system_prompt')||null,description:data.get('description')||null,config_json:config,avatar_url:data.get('avatar_url')||null}}
-async function libraryRequest(url,method,body){const response=await fetch(url,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):undefined});if(!response.ok)throw new Error(await response.text());return response.status===204?null:response.json()}
-async function createLibraryAgent(event){event.preventDefault();try{await libraryRequest('/api/agent-library','POST',libraryPayload(event.target));location.reload()}catch(e){alert(e.message)}}
-async function saveLibraryAgent(event,id){event.preventDefault();try{await libraryRequest('/api/agent-library/'+id,'PUT',libraryPayload(event.target));location.reload()}catch(e){alert(e.message)}}
-async function deleteLibraryAgent(id){if(!confirm('Delete this library agent?'))return;try{await libraryRequest('/api/agent-library/'+id,'DELETE');location.reload()}catch(e){alert(e.message)}}
-"#;
     Ok(Html(pages::ui_shell(&pages::UiShell {
         title: "Agent library",
         user: &workspace_user,
         company: None,
         section: pages::UiSection::Dashboard,
         content: &content,
-        script: &format!("{}\n{}", pages::AGENT_SETTINGS_SCRIPT, script),
     })))
 }

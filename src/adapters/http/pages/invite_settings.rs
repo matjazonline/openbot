@@ -31,7 +31,6 @@ pub fn invite_settings_page(page: &InviteSettingsPage<'_>) -> String {
         company: page.company,
         section: UiSection::Invites,
         content: &content,
-        script: "",
     })
 }
 

@@ -199,7 +199,7 @@ impl ApprovalPersistence for PostgresPersistence {
             if let Some(task_id) = task_id {
                 let paused = sqlx::query(
                     r#"UPDATE background_tasks
-                       SET status = 'pending_approval', worker_id = NULL, locked_at = NULL,
+                       SET status = 'pending_approval', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                            lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
                        WHERE id = $1 AND company_id = $2
                          AND status IN ('processing', 'waiting_for_third_party_reply',
@@ -408,7 +408,7 @@ impl ApprovalPersistence for PostgresPersistence {
                 .map_err(AppError::from)?;
                 let task = sqlx::query(
                     r#"UPDATE background_tasks SET status = 'stopped', wait_expires_at = NULL,
-                           worker_id = NULL, locked_at = NULL, lock_expires_at = NULL,
+                           worker_id = NULL, execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
                            updated_at = CURRENT_TIMESTAMP
                        WHERE id = $1 AND status = 'pending_approval'"#,
                 )

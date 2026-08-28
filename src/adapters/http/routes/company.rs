@@ -428,7 +428,7 @@ mod tests {
         assert!(page_html.find(">Companies</a>") < page_html.find(">My Invites</a>"));
         assert!(page_html.contains("href=\"/ui/invites\""));
         assert!(page_html.contains("action=\"/logout\""));
-        assert!(page_html.contains("selectCompany"));
+        assert!(page_html.contains(r##"data-action="select-company""##));
 
         let edit_fragment = pages::company_edit_fragment(&company);
         assert!(edit_fragment.contains("hx-put="));
@@ -500,7 +500,9 @@ mod tests {
         };
 
         let row_html = pages::company_row_fragment(&company);
-        assert!(row_html.contains(&format!("selectCompany('{}')", cid)));
+        assert!(row_html.contains(&format!(
+            r##"data-action="select-company" data-company-id="{cid}""##
+        )));
         assert!(row_html.contains(&format!("selected-badge-{}", cid)));
 
         let base_html = pages::base_layout("Test Title", "<p>Test Content</p>");

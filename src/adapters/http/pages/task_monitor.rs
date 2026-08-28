@@ -116,7 +116,6 @@ pub fn task_monitor_page(page: &TaskMonitorPage<'_>) -> String {
         company: Some(company),
         section: UiSection::Tasks,
         content: &content,
-        script: "",
     })
 }
 

@@ -164,6 +164,105 @@ fn normalized_participants(participants: &[EmailAddress]) -> Vec<String> {
         .collect()
 }
 
+/// Insert one message and attach it to its thread, on a caller-supplied connection.
+///
+/// Extracted so that a caller which must land this write together with others -- the agent
+/// dispatch commits its reply, its outbox row and its task payload as one transaction -- can
+/// reuse exactly this SQL rather than keep a second copy of it in step with this one.
+///
+/// Returns the `thread_messages` row id.
+pub(crate) async fn insert_message_on(
+    conn: &mut sqlx::PgConnection,
+    message: &Message,
+) -> AppResult<Uuid> {
+    let attachments = message
+        .attachments
+        .as_ref()
+        .map(serde_json::to_value)
+        .transpose()
+        .map_err(|e| AppError::Internal(format!("Failed to serialize attachments: {e}")))?;
+    let email_message_id = Uuid::new_v4();
+    let content_hash = canonical_message_hash(message, attachments.as_ref());
+
+    let references_list: Vec<&str> = message
+        .references_list
+        .iter()
+        .map(MessageId::as_str)
+        .collect();
+    let recipients_to: Vec<&str> = message
+        .recipients_to
+        .iter()
+        .map(EmailAddress::as_str)
+        .collect();
+    let recipients_cc: Vec<&str> = message
+        .recipients_cc
+        .iter()
+        .map(EmailAddress::as_str)
+        .collect();
+
+    let canonical_id: Uuid = sqlx::query_scalar(
+        r#"INSERT INTO email_messages (
+                    id, company_id, message_id, content_hash, in_reply_to, references_list, sender,
+                    recipients_to, recipients_cc, subject, raw_text_body,
+                    raw_html_body, attachments, thread_index
+               )
+               SELECT $1, company_id, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+               FROM threads WHERE id = $2
+               ON CONFLICT (company_id, message_id)
+               DO UPDATE SET message_id = EXCLUDED.message_id
+               WHERE email_messages.content_hash = EXCLUDED.content_hash
+               RETURNING id"#,
+    )
+    .bind(email_message_id)
+    .bind(message.thread_id)
+    .bind(message.message_id.as_str())
+    .bind(content_hash)
+    .bind(message.in_reply_to.as_deref())
+    .bind(&references_list)
+    .bind(message.sender.as_str())
+    .bind(&recipients_to)
+    .bind(&recipients_cc)
+    .bind(&message.subject)
+    .bind(message.raw_text_body.as_deref())
+    .bind(message.raw_html_body.as_deref())
+    .bind(attachments)
+    .bind(message.thread_index.as_deref())
+    .fetch_one(&mut *conn)
+    .await
+    .map_err(AppError::from)?;
+
+    let association_id: Uuid = sqlx::query_scalar(
+        r#"INSERT INTO thread_messages (
+                    id, company_id, channel_id, thread_id, email_message_id,
+                    clean_text_body, direction, role
+               )
+               SELECT $1, company_id, channel_id, id, $3, $4, $5, $6
+               FROM threads WHERE id = $2
+               ON CONFLICT (channel_id, email_message_id) DO UPDATE SET
+                   clean_text_body = EXCLUDED.clean_text_body,
+                   direction = EXCLUDED.direction,
+                   role = EXCLUDED.role
+               WHERE thread_messages.thread_id = EXCLUDED.thread_id
+               RETURNING id"#,
+    )
+    .bind(message.id)
+    .bind(message.thread_id)
+    .bind(canonical_id)
+    .bind(&message.clean_text_body)
+    .bind(message.direction.as_str())
+    .bind(message.role.as_str())
+    .fetch_one(&mut *conn)
+    .await
+    .map_err(AppError::from)?;
+
+    sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
+        .bind(message.thread_id)
+        .execute(&mut *conn)
+        .await
+        .map_err(AppError::from)?;
+    Ok(association_id)
+}
+
 #[async_trait]
 impl ThreadPersistence for PostgresPersistence {
     async fn create_thread(
@@ -471,92 +570,8 @@ impl ThreadPersistence for PostgresPersistence {
     }
 
     async fn create_message(&self, message: &Message) -> AppResult<Message> {
-        let attachments = message
-            .attachments
-            .as_ref()
-            .map(serde_json::to_value)
-            .transpose()
-            .map_err(|e| AppError::Internal(format!("Failed to serialize attachments: {e}")))?;
-        let email_message_id = Uuid::new_v4();
-        let content_hash = canonical_message_hash(message, attachments.as_ref());
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-
-        let references_list: Vec<&str> = message
-            .references_list
-            .iter()
-            .map(MessageId::as_str)
-            .collect();
-        let recipients_to: Vec<&str> = message
-            .recipients_to
-            .iter()
-            .map(EmailAddress::as_str)
-            .collect();
-        let recipients_cc: Vec<&str> = message
-            .recipients_cc
-            .iter()
-            .map(EmailAddress::as_str)
-            .collect();
-
-        let canonical_id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO email_messages (
-                    id, company_id, message_id, content_hash, in_reply_to, references_list, sender,
-                    recipients_to, recipients_cc, subject, raw_text_body,
-                    raw_html_body, attachments, thread_index
-               )
-               SELECT $1, company_id, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
-               FROM threads WHERE id = $2
-               ON CONFLICT (company_id, message_id)
-               DO UPDATE SET message_id = EXCLUDED.message_id
-               WHERE email_messages.content_hash = EXCLUDED.content_hash
-               RETURNING id"#,
-        )
-        .bind(email_message_id)
-        .bind(message.thread_id)
-        .bind(message.message_id.as_str())
-        .bind(content_hash)
-        .bind(message.in_reply_to.as_deref())
-        .bind(&references_list)
-        .bind(message.sender.as_str())
-        .bind(&recipients_to)
-        .bind(&recipients_cc)
-        .bind(&message.subject)
-        .bind(message.raw_text_body.as_deref())
-        .bind(message.raw_html_body.as_deref())
-        .bind(attachments)
-        .bind(message.thread_index.as_deref())
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-
-        let association_id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO thread_messages (
-                    id, company_id, channel_id, thread_id, email_message_id,
-                    clean_text_body, direction, role
-               )
-               SELECT $1, company_id, channel_id, id, $3, $4, $5, $6
-               FROM threads WHERE id = $2
-               ON CONFLICT (channel_id, email_message_id) DO UPDATE SET
-                   clean_text_body = EXCLUDED.clean_text_body,
-                   direction = EXCLUDED.direction,
-                   role = EXCLUDED.role
-               WHERE thread_messages.thread_id = EXCLUDED.thread_id
-               RETURNING id"#,
-        )
-        .bind(message.id)
-        .bind(message.thread_id)
-        .bind(canonical_id)
-        .bind(&message.clean_text_body)
-        .bind(message.direction.as_str())
-        .bind(message.role.as_str())
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-
-        sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
-            .bind(message.thread_id)
-            .execute(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
+        let association_id = insert_message_on(&mut tx, message).await?;
         tx.commit().await.map_err(AppError::from)?;
 
         let query = format!("{MESSAGE_SELECT} WHERE tm.id = $1");

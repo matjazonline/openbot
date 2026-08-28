@@ -360,6 +360,120 @@ pub(crate) const APP_SCRIPT: &str = r##"        function getCachedCompanyId() {
         document.addEventListener('DOMContentLoaded', initTeamAutocomplete);
         document.addEventListener('htmx:afterSettle', initTeamAutocomplete);"##;
 
+/// Helpers for the legacy (non-`/ui`) page shell. These used to live in inline `onclick` /
+/// `oninput` attributes and one inline `<script>`; the strict `script-src 'self'` CSP blocks
+/// both, so they are served from `/assets/app.js` and reached through the delegated
+/// `data-action` / `data-input` / `data-keydown` dispatch in `EVENT_DELEGATION_SCRIPT`.
+pub(crate) const LEGACY_FORMS_SCRIPT: &str = r##"        function slugifyValue(value) {
+            return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        }
+
+        // Mirror a typed name into its slug field: an explicit target id when one is named,
+        // otherwise the sibling `slug` field of the same form.
+        function syncSlugField(input) {
+            var slug = input.dataset.slugTarget
+                ? document.getElementById(input.dataset.slugTarget)
+                : (input.form ? input.form.slug : null);
+            if (slug) slug.value = slugifyValue(input.value);
+        }
+
+        function toggleFormCard(button) {
+            var card = document.getElementById(button.dataset.card);
+            if (!card) return;
+            var opening = card.classList.contains('hidden');
+            card.classList.toggle('hidden');
+            button.setAttribute('aria-expanded', opening);
+        }
+
+        // Collapse a create-form card after htmx reports a successful submit.
+        function resetAndCollapseForm(form) {
+            form.reset();
+            var card = document.getElementById(form.dataset.card);
+            if (card) card.classList.add('hidden');
+            var toggle = document.getElementById(form.dataset.toggle);
+            if (toggle) {
+                toggle.classList.remove('hidden');
+                toggle.setAttribute('aria-expanded', 'false');
+            }
+        }
+
+        function showChannelFormTab(mode) {
+            var simpleForm = document.getElementById('simple-channel-form');
+            var advancedForm = document.getElementById('advanced-channel-form');
+            var simpleBtn = document.getElementById('tab-simple-btn');
+            var advancedBtn = document.getElementById('tab-advanced-btn');
+            var active = 'px-3 py-1 rounded-md text-white bg-indigo-600 font-semibold transition cursor-pointer';
+            var idle = 'px-3 py-1 rounded-md text-slate-400 hover:text-white transition cursor-pointer';
+            var simple = mode === 'simple';
+            if (simpleForm) simpleForm.classList.toggle('hidden', !simple);
+            if (advancedForm) advancedForm.classList.toggle('hidden', simple);
+            if (simpleBtn) simpleBtn.className = simple ? active : idle;
+            if (advancedBtn) advancedBtn.className = simple ? idle : active;
+        }
+
+        // The agent-selection block lets the user pick either one radio or one library entry;
+        // choosing on either side clears the other and writes the hidden `agent_ids` field.
+        function selectAgentInSelection(control, clearRadios) {
+            var parent = control.closest('[data-agents-selection]');
+            if (!parent) return;
+            if (clearRadios) {
+                parent.querySelectorAll('input[type=radio]').forEach(function (radio) { radio.checked = false; });
+            } else {
+                var library = parent.querySelector('.library-agent-select');
+                if (library) library.value = '';
+            }
+            var target = parent.querySelector('input[name=agent_ids]');
+            if (target) target.value = control.value;
+        }
+
+        function togglePromptGenerator(button) {
+            var box = document.getElementById(button.dataset.box);
+            if (!box) return;
+            box.classList.toggle('hidden');
+            if (box.classList.contains('hidden')) return;
+            var input = document.getElementById(button.dataset.focus);
+            if (input) input.focus();
+        }
+
+        // Mark a form as in-flight so a double submit cannot fire a second request.
+        function markSubmitBusy(form) {
+            if (form.dataset.busy) return false;
+            form.dataset.busy = 'true';
+            form.setAttribute('aria-busy', 'true');
+            var button = form.querySelector('[type=submit]');
+            if (button) {
+                button.classList.add('pointer-events-none');
+                button.setAttribute('aria-disabled', 'true');
+                var progress = button.querySelector('[data-progress]');
+                if (progress) progress.classList.remove('hidden');
+                var label = button.querySelector('[data-label]');
+                if (label) label.textContent = form.dataset.pendingLabel || '';
+            }
+            return true;
+        }
+
+        function copyTextFrom(button) {
+            var source = document.getElementById(button.dataset.copyFrom);
+            if (!source) return;
+            navigator.clipboard.writeText(source.textContent);
+            button.textContent = button.dataset.copiedLabel || 'Copied';
+        }
+
+        // Applied to the htmx fragment that carries a freshly generated system prompt, which
+        // previously shipped as an inline `<script>` in the response body.
+        function applyGeneratedPrompt(holder) {
+            var target = document.getElementById(holder.dataset.targetId);
+            if (target) {
+                target.value = holder.dataset.generatedPrompt || '';
+                target.dispatchEvent(new Event('input', { bubbles: true }));
+                target.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            var genBox = document.getElementById(holder.dataset.genBox);
+            if (genBox) {
+                setTimeout(function () { genBox.classList.add('hidden'); }, 1000);
+            }
+        }"##;
+
 pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String {
     let home_href = if authenticated {
         "/companies"

@@ -263,7 +263,6 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
         company: Some(company),
         section: UiSection::Channels,
         content: &content,
-        script: CHANNEL_SETTINGS_SCRIPT,
     })
 }
 
@@ -592,7 +591,7 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                         <label class="form-control w-full">
                             <div class="label"><span class="text-xs opacity-70">Channel Name</span></div>
                             <input type="text" name="name" required value="{name}" placeholder="Inbound Email Handler"
-                                oninput="this.form.slug.value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                                data-input="slugify"
                                 class="input w-full">
                         </label>
                         <label class="form-control w-full">
@@ -622,7 +621,7 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Participant Emails</span></div>
                         <input type="text" name="participant_emails" value="{participant_emails}" autocomplete="off"
-                            oninput="toggleChannelSpamConfirm(this)"
+                            data-input="channel-spam-confirm"
                             placeholder="Leave blank for the company team, @public for anyone, or comma-separated emails"
                             class="input w-full">
                         <div class="label"><span class="text-[11px] opacity-60">Blank means the company team. Use <code class="font-mono">@public</code> to let anyone write in.</span></div>
@@ -786,7 +785,7 @@ fn library_agent_picker(library: &[&Agent], selected: &[Uuid], id_prefix: &str) 
         r##"<div class="mx-3 my-2">
                                     <input type="hidden" class="channel-library-agent-field" value="{picked_id}">
                                     <button type="button" class="btn btn-block justify-start font-normal"
-                                        onclick="document.getElementById('library-agents-{id_prefix}').showModal()">
+                                        data-action="open-dialog" data-dialog="library-agents-{id_prefix}">
                                         <span class="channel-library-agent-label truncate" data-placeholder="{PLACEHOLDER}">{label}</span>
                                     </button>
                                     <dialog id="library-agents-{id_prefix}" class="modal">
@@ -799,13 +798,13 @@ fn library_agent_picker(library: &[&Agent], selected: &[Uuid], id_prefix: &str) 
                                             <div class="modal-action">
                                                 <button type="button" class="btn btn-ghost btn-sm"
                                                     data-agent-id="" data-agent-name=""
-                                                    onclick="pickChannelLibraryAgent(this)">Clear</button>
+                                                    data-action="pick-channel-library-agent">Clear</button>
                                                 <button type="button" class="btn btn-sm"
-                                                    onclick="this.closest('dialog').close()">Close</button>
+                                                    data-action="close-dialog">Close</button>
                                             </div>
                                         </div>
                                         <button type="button" class="modal-backdrop"
-                                            onclick="this.closest('dialog').close()">close</button>
+                                            data-action="close-dialog">close</button>
                                     </dialog>
                                 </div>"##,
         picked_id = picked.map(|agent| agent.id.to_string()).unwrap_or_default(),
@@ -826,7 +825,7 @@ fn library_agent_card(agent: &Agent, picked: bool) -> String {
 
     format!(
         r##"<button type="button" data-agent-id="{id}" data-agent-name="{name}"
-                                                    onclick="pickChannelLibraryAgent(this)"
+                                                    data-action="pick-channel-library-agent"
                                                     class="channel-library-agent-card flex items-start gap-3 rounded-box border-2 {border} bg-base-200 p-3 text-left hover:border-primary">
                                                     {avatar}
                                                     <span class="flex min-w-0 flex-col gap-0.5">

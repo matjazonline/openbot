@@ -146,6 +146,33 @@ impl ThreadActivity {
     }
 }
 
+/// Proof that the caller still owns a task's lease, for the exact run it was granted to.
+///
+/// `worker_id` alone is not proof. A worker whose lease lapsed, whose task was reaped and which
+/// then re-claimed the same task, would satisfy a `worker_id = $me` guard from *either* run --
+/// so a write from the abandoned run could still land on top of the replacement's work. The
+/// generation is minted afresh at each claim, so only the current run matches.
+///
+/// Required by every write that changes a leased task's state or commits its effects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TaskLeaseRef {
+    pub task_id: Uuid,
+    pub worker_id: Uuid,
+    pub execution_generation: Uuid,
+}
+
+impl TaskLeaseRef {
+    /// The lease a claim just granted, or `None` if the row is not actually held -- which is the
+    /// only honest answer for a row that is not `processing`.
+    pub fn of(task: &BackgroundTask) -> Option<Self> {
+        Some(Self {
+            task_id: task.id,
+            worker_id: task.worker_id?,
+            execution_generation: task.execution_generation?,
+        })
+    }
+}
+
 /// Which numbered run at a task a ledger write is about.
 ///
 /// The number is derived from `retry_count`, so a task re-claimed after its lease lapsed reuses the
@@ -159,12 +186,48 @@ pub struct TaskAttemptRef {
 }
 
 impl TaskAttemptRef {
-    /// The attempt a task is about to make, given how many times it has already failed.
-    pub fn current(task: &BackgroundTask) -> Self {
+    /// The attempt this leased run is about to make, given how many times the task has failed.
+    ///
+    /// The generation comes from the lease rather than being minted here, so the ledger row and
+    /// the fence on every write of this run name the same execution.
+    pub fn of(task: &BackgroundTask, lease: TaskLeaseRef) -> Self {
         Self {
             task_id: task.id,
             attempt_number: task.retry_count + 1,
-            execution_generation: Uuid::new_v4(),
+            execution_generation: lease.execution_generation,
+        }
+    }
+}
+
+/// What one run of a task actually did.
+///
+/// The worker needs these apart to close the row out correctly, and returning them explicitly
+/// keeps a provider failure from being mistaken for an answer. Previously a run reported
+/// `Result<(), String>` and suspension had to be inferred by re-reading the row afterwards.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TaskExecutionOutcome {
+    /// The run finished its work and the task is done. Named for the common case -- an agent
+    /// replied -- but it also covers a run that correctly had nothing to do.
+    Replied,
+    /// An agent parked the task awaiting an approval or an outreach reply. The row keeps the
+    /// status the agent gave it and its attempt stays open, because the resume continues the
+    /// same numbered run rather than starting another.
+    Suspended,
+    /// Something transient failed. The attempt is consumed and the task is retried with backoff
+    /// until `max_retries`, at which point it dead-letters.
+    RetryableFailure(String),
+    /// The task cannot succeed however often it is retried -- an unparseable payload, a missing
+    /// field a retry cannot conjure. It dead-letters now instead of burning every attempt first.
+    TerminalFailure(String),
+}
+
+impl TaskExecutionOutcome {
+    /// The message to record against the attempt and the task row, if this run failed.
+    pub fn failure_message(&self) -> Option<&str> {
+        match self {
+            TaskExecutionOutcome::RetryableFailure(message)
+            | TaskExecutionOutcome::TerminalFailure(message) => Some(message),
+            TaskExecutionOutcome::Replied | TaskExecutionOutcome::Suspended => None,
         }
     }
 }
@@ -230,6 +293,9 @@ pub struct BackgroundTask {
     pub max_retries: i32,
     pub last_error: Option<String>,
     pub worker_id: Option<Uuid>,
+    /// Set only while the row is `processing`. Minted at claim time, it is what a write from a
+    /// superseded run fails to match -- see [`TaskLeaseRef`].
+    pub execution_generation: Option<Uuid>,
     pub locked_at: Option<chrono::DateTime<chrono::Utc>>,
     pub lock_expires_at: Option<chrono::DateTime<chrono::Utc>>,
     pub run_at: chrono::DateTime<chrono::Utc>,

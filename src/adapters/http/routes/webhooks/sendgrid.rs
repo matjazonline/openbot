@@ -289,7 +289,9 @@ fn verify_sendgrid_signature_at(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::company_member::CompanyMembership;
+    use crate::entities::task::TaskLeaseRef;
     use async_trait::async_trait;
     use axum::body::Body;
     use axum::http::Request;
@@ -668,6 +670,21 @@ mod tests {
 
     #[async_trait]
     impl crate::adapters::persistence::task::TaskPersistence for MockTaskPersistence {
+        async fn commit_agent_dispatch(
+            &self,
+            commit: AgentDispatchCommit<'_>,
+        ) -> AppResult<DispatchCommit> {
+            let _ = commit;
+            Ok(DispatchCommit::Committed { outbox_id: None })
+        }
+
+        async fn renew_task_lease(
+            &self,
+            _lease: TaskLeaseRef,
+            _lock_expires_at: chrono::DateTime<chrono::Utc>,
+        ) -> AppResult<bool> {
+            Ok(true)
+        }
         async fn enqueue_task(
             &self,
             company_id: Uuid,
@@ -688,6 +705,7 @@ mod tests {
                 max_retries: 3,
                 last_error: None,
                 worker_id: None,
+                execution_generation: None,
                 locked_at: None,
                 lock_expires_at: None,
                 run_at: Utc::now(),
@@ -770,13 +788,13 @@ mod tests {
             }
         }
 
-        async fn mark_task_completed(&self, id: Uuid, worker_id: Uuid) -> AppResult<bool> {
+        async fn mark_task_completed(&self, lease: TaskLeaseRef) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
             let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
-                t.id == id
+                t.id == lease.task_id
                     && t.status == crate::entities::task::TaskStatus::Processing
-                    && t.worker_id == Some(worker_id)
+                    && t.worker_id == Some(lease.worker_id)
                     && t.lock_expires_at.is_some_and(|expires| expires > now)
             }) {
                 t.status = crate::entities::task::TaskStatus::Completed;
@@ -791,8 +809,7 @@ mod tests {
 
         async fn mark_task_failed(
             &self,
-            id: Uuid,
-            worker_id: Uuid,
+            lease: TaskLeaseRef,
             error_msg: &str,
             next_run_at: chrono::DateTime<chrono::Utc>,
             is_dead_letter: bool,
@@ -800,9 +817,9 @@ mod tests {
             let mut list = self.tasks.lock().unwrap();
             let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
-                t.id == id
+                t.id == lease.task_id
                     && t.status == crate::entities::task::TaskStatus::Processing
-                    && t.worker_id == Some(worker_id)
+                    && t.worker_id == Some(lease.worker_id)
                     && t.lock_expires_at.is_some_and(|expires| expires > now)
             }) {
                 t.last_error = Some(error_msg.to_string());
@@ -833,17 +850,6 @@ mod tests {
             let mut list = self.tasks.lock().unwrap();
             let t = list.iter_mut().find(|t| t.id == id).unwrap();
             t.status = crate::entities::task::TaskStatus::Pending;
-            Ok(t.clone())
-        }
-
-        async fn update_task_status(
-            &self,
-            id: Uuid,
-            status: crate::entities::task::TaskStatus,
-        ) -> AppResult<crate::entities::task::BackgroundTask> {
-            let mut list = self.tasks.lock().unwrap();
-            let t = list.iter_mut().find(|t| t.id == id).unwrap();
-            t.status = status;
             Ok(t.clone())
         }
 

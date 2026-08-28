@@ -24,7 +24,6 @@ fn onboarding_shell(
         company,
         section: UiSection::Companies,
         content: &content,
-        script: "",
     })
 }
 
@@ -34,9 +33,7 @@ fn onboarding_shell(
 /// alpha, which makes the spinner and the pending label all but invisible. A flag on the form
 /// blocks the second submit instead, so a repeated click or Enter cannot post twice.
 fn busy_submit_handler(pending_label: &str) -> String {
-    format!(
-        r##"onsubmit="if (this.dataset.busy) return false; this.dataset.busy = 'true'; this.setAttribute('aria-busy', 'true'); const button = this.querySelector('[type=submit]'); button.classList.add('pointer-events-none'); button.setAttribute('aria-disabled', 'true'); button.querySelector('[data-progress]').classList.remove('hidden'); button.querySelector('[data-label]').textContent = '{pending_label}';""##
-    )
+    format!(r##"data-submit="busy-once" data-pending-label="{pending_label}""##)
 }
 
 /// The primary submit button [`busy_submit_handler`] drives: a hidden spinner and a swappable label.
@@ -69,7 +66,7 @@ pub fn onboarding_company_page(
         {error_html}
         <form method="post" action="/ui/onboarding/company" class="space-y-6" {busy_handler}>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <fieldset class="fieldset"><legend class="fieldset-legend">Company name</legend><input id="onboarding_company_name" name="name" type="text" required autofocus class="input w-full" oninput="document.getElementById('onboarding_company_slug').value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')" placeholder="Acme Corporation"></fieldset>
+                <fieldset class="fieldset"><legend class="fieldset-legend">Company name</legend><input id="onboarding_company_name" name="name" type="text" required autofocus class="input w-full" data-input="slugify" data-slug-target="onboarding_company_slug" placeholder="Acme Corporation"></fieldset>
                 <fieldset class="fieldset"><legend class="fieldset-legend">Email namespace</legend><label class="input w-full font-mono"><input id="onboarding_company_slug" name="slug" type="text" required class="grow font-mono" placeholder="acme-corporation"><span class="shrink-0 opacity-60">.{app_domain_name}</span></label><p class="label opacity-60">Used in the inbound email address.</p></fieldset>
             </div>
             <div class="rounded-box border border-base-300 bg-base-200/40 p-4"><h2 class="font-semibold">Model connection <span class="badge badge-ghost badge-sm ml-1">Optional</span></h2><p class="mb-4 mt-1 text-sm opacity-60">Leave these blank when the server provides model defaults.</p>
@@ -127,7 +124,7 @@ pub fn onboarding_complete_page(
     let email_address = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
     let pane = format!(
         r##"<div><div class="mb-3 inline-flex size-12 items-center justify-center rounded-full bg-success/15 text-success">{check}</div><h1 class="card-title text-2xl">Your email agent is ready</h1><p class="mt-2 opacity-70">Send work to <strong>{channel_name}</strong> from your regular inbox.</p></div>
-        <div class="alert alert-success items-center"><div class="min-w-0 flex-1"><div class="text-xs font-semibold uppercase tracking-wider opacity-70">Send or forward email to</div><code id="onboarding-email-address" class="mt-1 block break-all text-lg">{email_address}</code></div><button type="button" class="btn btn-success btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('onboarding-email-address').textContent); this.textContent = 'Copied'">Copy address</button></div>
+        <div class="alert alert-success items-center"><div class="min-w-0 flex-1"><div class="text-xs font-semibold uppercase tracking-wider opacity-70">Send or forward email to</div><code id="onboarding-email-address" class="mt-1 block break-all text-lg">{email_address}</code></div><button type="button" class="btn btn-success btn-sm" data-action="copy-text" data-copy-from="onboarding-email-address" data-copied-label="Copied">Copy address</button></div>
         <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
             <section class="rounded-box border border-base-300 p-4"><span class="badge badge-primary badge-outline">1 · New request</span><h2 class="mt-3 font-semibold">Send a new email</h2><p class="mt-2 text-sm opacity-70">Put the goal in the subject and include context, constraints, deadline, and desired output.</p></section>
             <section class="rounded-box border border-base-300 p-4"><span class="badge badge-warning badge-outline">2 · Existing work</span><h2 class="mt-3 font-semibold">Forward a message</h2><p class="mt-2 text-sm opacity-70">Forward any email and add your instruction at the top.</p></section>

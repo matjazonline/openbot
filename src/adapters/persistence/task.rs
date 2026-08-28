@@ -13,14 +13,15 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
+        message::Message,
         outbox::{OutboxEntry, OutboxStatus},
         outreach::{
             CreateOutreachRequest, DueOutreach, OutreachProgress, OutreachReplyMatch,
             OutreachStatus,
         },
         task::{
-            BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskStatus, ThreadActivity,
-            TokenUsage,
+            BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskLeaseRef, TaskStatus,
+            ThreadActivity, TokenUsage,
         },
         value_objects::MessageId,
     },
@@ -31,7 +32,8 @@ pub const TASK_LEASE_SECONDS: i64 = 15 * 60;
 /// Taking a task's lease. Only a task that is still pending and already due can be claimed, so two
 /// callers racing for the same row leave exactly one of them holding it.
 const CLAIM_TASK_SQL: &str = r#"UPDATE background_tasks
-   SET status = 'processing', worker_id = $2, locked_at = CURRENT_TIMESTAMP,
+   SET status = 'processing', worker_id = $2, execution_generation = gen_random_uuid(),
+       locked_at = CURRENT_TIMESTAMP,
        lock_expires_at = $3, updated_at = CURRENT_TIMESTAMP
    WHERE id = $1 AND status = 'pending' AND run_at <= CURRENT_TIMESTAMP"#;
 
@@ -77,19 +79,20 @@ pub fn report_outcome(subject: &str, id: Uuid, change: &str, outcome: AppResult<
 /// right at the instant it was made, and every renewal after that has to guess the interval again.
 #[derive(Clone, Copy, Debug)]
 pub struct TaskLease {
-    pub worker_id: Uuid,
+    /// Which task, held by which worker, for which run.
+    pub reference: TaskLeaseRef,
     ttl: chrono::Duration,
 }
 
 impl TaskLease {
     /// A worker's lease on a queued task: long, because the worker heartbeats it.
-    pub fn worker(worker_id: Uuid) -> Self {
-        Self::new(worker_id, TASK_LEASE_SECONDS)
+    pub fn worker(reference: TaskLeaseRef) -> Self {
+        Self::new(reference, TASK_LEASE_SECONDS)
     }
 
-    fn new(worker_id: Uuid, ttl_seconds: i64) -> Self {
+    fn new(reference: TaskLeaseRef, ttl_seconds: i64) -> Self {
         Self {
-            worker_id,
+            reference,
             ttl: chrono::Duration::seconds(ttl_seconds),
         }
     }
@@ -120,10 +123,10 @@ pub enum Leased<T> {
 /// inside a single lease term — a lapsed lease means a second run of the same agent.
 pub async fn while_leased<F: Future>(
     persistence: &dyn TaskPersistence,
-    task_id: Uuid,
     lease: &TaskLease,
     work: F,
 ) -> Leased<F::Output> {
+    let task_id = lease.reference.task_id;
     tokio::pin!(work);
     let mut heartbeat = tokio::time::interval(lease.heartbeat());
     // The first tick completes immediately; spend it here rather than renewing a lease just taken.
@@ -134,7 +137,7 @@ pub async fn while_leased<F: Future>(
             output = &mut work => return Leased::Finished(output),
             _ = heartbeat.tick() => {
                 match persistence
-                    .renew_task_lease(task_id, lease.worker_id, lease.expires_at())
+                    .renew_task_lease(lease.reference, lease.expires_at())
                     .await
                 {
                     Ok(true) => {}
@@ -162,6 +165,7 @@ pub struct BackgroundTaskDb {
     pub max_retries: i32,
     pub last_error: Option<String>,
     pub worker_id: Option<Uuid>,
+    pub execution_generation: Option<Uuid>,
     pub locked_at: Option<DateTime<Utc>>,
     pub lock_expires_at: Option<DateTime<Utc>>,
     pub run_at: DateTime<Utc>,
@@ -207,6 +211,7 @@ impl TryFrom<BackgroundTaskDb> for BackgroundTask {
             max_retries: db.max_retries,
             last_error: db.last_error,
             worker_id: db.worker_id,
+            execution_generation: db.execution_generation,
             locked_at: db.locked_at,
             lock_expires_at: db.lock_expires_at,
             run_at: db.run_at,
@@ -304,6 +309,35 @@ pub struct OutboundSend {
     pub idempotency_key: String,
     /// The `OutboundEmail` for the poller to deliver.
     pub payload: serde_json::Value,
+}
+
+/// Everything one agent dispatch makes durable, so it can land as a single transaction.
+///
+/// The reply message in each answered thread, the outbox row that delivers it, and the audit
+/// payload on the task are one result. Committed separately, a crash or a lost lease between
+/// them leaves the thread showing an answer that was never sent, or an email going out for a
+/// task whose payload says it never ran -- and the retry then has to reconcile the difference.
+pub struct AgentDispatchCommit<'a> {
+    /// Proof this run still owns the task. The whole transaction is fenced on it.
+    pub lease: TaskLeaseRef,
+    /// The reply, stored once per thread it answered.
+    pub messages: &'a [Message],
+    /// The email to hand to the outbox, or `None` for a simulated run that sends nothing.
+    pub outbound: Option<OutboundSend>,
+    /// The run's audit payload, written back onto the task.
+    pub payload: Value,
+    /// Whether this dispatch also closes the task's outreach.
+    pub complete_outreach: bool,
+}
+
+/// What [`TaskPersistence::commit_agent_dispatch`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DispatchCommit {
+    /// Everything landed. `outbox_id` is `None` when an equivalent send was already queued, which
+    /// is the idempotency key doing its job rather than a failure.
+    Committed { outbox_id: Option<Uuid> },
+    /// This run no longer owns the task, so nothing was written at all.
+    LeaseLost,
 }
 
 #[async_trait]
@@ -423,6 +457,19 @@ pub trait TaskPersistence: Send + Sync {
         Ok(0)
     }
 
+    /// Give back every task whose lease lapsed without the run reporting anything, charging each
+    /// one an attempt.
+    ///
+    /// Claims used to steal an expired `processing` row directly, which re-ran it with
+    /// `retry_count` untouched, left its open attempt sitting in the ledger and applied no
+    /// backoff -- so a task that reliably outlived its lease was retried for ever and never
+    /// dead-lettered. Reaping makes lease expiry cost exactly what a reported failure costs.
+    ///
+    /// Returns how many rows were reaped. Defaulted to a no-op for doubles that never lease.
+    async fn reap_expired_task_leases(&self) -> AppResult<u64> {
+        Ok(0)
+    }
+
     /// Every delivery this task handed to the transport, oldest first.
     ///
     /// Exists so the task view can show delivery state without the transport writing back into the
@@ -501,25 +548,24 @@ pub trait TaskPersistence: Send + Sync {
 
     async fn update_task_payload(&self, id: Uuid, payload: Value) -> AppResult<()>;
 
-    async fn update_claimed_task_payload(
+    /// Commit one dispatch's entire visible effect, or none of it.
+    ///
+    /// No default: a double that silently reported success would let the dispatch believe it had
+    /// delivered a reply it never queued.
+    async fn commit_agent_dispatch(
         &self,
-        id: Uuid,
-        worker_id: Uuid,
-        payload: Value,
-    ) -> AppResult<bool> {
-        self.update_task_payload(id, payload).await?;
-        let _ = worker_id;
-        Ok(true)
-    }
+        commit: AgentDispatchCommit<'_>,
+    ) -> AppResult<DispatchCommit>;
 
+    /// Extend this run's lease. `false` means the run no longer owns the task and must stop.
+    ///
+    /// No default, for the same reason: a double that always renews cannot exercise lease loss,
+    /// which is the behaviour every caller of this branches on.
     async fn renew_task_lease(
         &self,
-        _id: Uuid,
-        _worker_id: Uuid,
-        _lock_expires_at: DateTime<Utc>,
-    ) -> AppResult<bool> {
-        Ok(true)
-    }
+        lease: TaskLeaseRef,
+        lock_expires_at: DateTime<Utc>,
+    ) -> AppResult<bool>;
 
     /// Open a `task_attempts` row for a run that is starting, so its duration and token cost have
     /// somewhere to land.
@@ -553,12 +599,11 @@ pub trait TaskPersistence: Send + Sync {
         lock_expires_at: DateTime<Utc>,
     ) -> AppResult<bool>;
 
-    async fn mark_task_completed(&self, id: Uuid, worker_id: Uuid) -> AppResult<bool>;
+    async fn mark_task_completed(&self, lease: TaskLeaseRef) -> AppResult<bool>;
 
     async fn mark_task_failed(
         &self,
-        id: Uuid,
-        worker_id: Uuid,
+        lease: TaskLeaseRef,
         error_msg: &str,
         next_run_at: DateTime<Utc>,
         is_dead_letter: bool,
@@ -567,8 +612,6 @@ pub trait TaskPersistence: Send + Sync {
     async fn stop_task(&self, id: Uuid) -> AppResult<BackgroundTask>;
 
     async fn resume_task(&self, id: Uuid) -> AppResult<BackgroundTask>;
-
-    async fn update_task_status(&self, id: Uuid, status: TaskStatus) -> AppResult<BackgroundTask>;
 
     async fn list_company_tasks(
         &self,
@@ -737,7 +780,7 @@ impl TaskPersistence for PostgresPersistence {
             let paused = sqlx::query(
                 r#"UPDATE background_tasks
                    SET status = 'waiting_for_third_party_reply', wait_expires_at = $1,
-                       worker_id = NULL, locked_at = NULL, lock_expires_at = NULL,
+                       worker_id = NULL, execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
                        updated_at = CURRENT_TIMESTAMP
                    WHERE id = $2 AND company_id = $3
                      AND status = 'processing' AND worker_id = $4
@@ -882,7 +925,7 @@ impl TaskPersistence for PostgresPersistence {
             .map_err(AppError::from)?;
             sqlx::query(
                 r#"UPDATE background_tasks SET status = 'pending', run_at = CURRENT_TIMESTAMP,
-                       wait_expires_at = NULL, worker_id = NULL, locked_at = NULL,
+                       wait_expires_at = NULL, worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                        lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
                    WHERE id = $1 AND status IN (
                        'waiting_for_third_party_reply', 'pending_approval'
@@ -1002,7 +1045,7 @@ impl TaskPersistence for PostgresPersistence {
         let updated = sqlx::query(
             r#"UPDATE background_tasks
                SET status = 'pending_approval', wait_expires_at = NULL,
-                   worker_id = NULL, locked_at = NULL, lock_expires_at = NULL,
+                   worker_id = NULL, execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
                    updated_at = CURRENT_TIMESTAMP
                WHERE id = $1 AND status = 'waiting_for_third_party_reply'"#,
         )
@@ -1232,6 +1275,58 @@ impl TaskPersistence for PostgresPersistence {
         Ok(result.rows_affected() == 1)
     }
 
+    async fn reap_expired_task_leases(&self) -> AppResult<u64> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+
+        // Hits `background_tasks_processing_lease_idx`. No worker guard: the lease is expired, so
+        // by definition no run still holds it.
+        let reaped = sqlx::query_as::<_, (Uuid, i32)>(
+            r#"UPDATE background_tasks
+               SET retry_count = retry_count + 1,
+                   status = CASE
+                       WHEN retry_count + 1 >= max_retries THEN 'dead_letter'
+                       ELSE 'pending'
+                   END,
+                   last_error = 'Task lease expired without the run reporting a result',
+                   -- The same exponential backoff a reported failure gets, with the exponent
+                   -- capped so it cannot run away: 30s * 2^attempt.
+                   run_at = CURRENT_TIMESTAMP
+                       + (30 * POWER(2, LEAST(retry_count + 1, 10))) * INTERVAL '1 second',
+                   worker_id = NULL,
+                   execution_generation = NULL,
+                   locked_at = NULL,
+                   lock_expires_at = NULL,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE status = 'processing'
+                 AND (lock_expires_at IS NULL OR lock_expires_at <= CURRENT_TIMESTAMP)
+               RETURNING id, retry_count"#,
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+
+        // Close each reaped run's ledger row. `retry_count` was just incremented, and the attempt
+        // that vanished was numbered with the value it now holds -- attempt N is the run made
+        // after N-1 failures.
+        for (task_id, retry_count) in &reaped {
+            sqlx::query(
+                r#"UPDATE task_attempts
+                   SET status = 'failed',
+                       error = 'Task lease expired without the run reporting a result',
+                       finished_at = CURRENT_TIMESTAMP
+                   WHERE task_id = $1 AND attempt_number = $2 AND status = 'processing'"#,
+            )
+            .bind(task_id)
+            .bind(retry_count)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+        }
+
+        tx.commit().await.map_err(AppError::from)?;
+        Ok(reaped.len() as u64)
+    }
+
     async fn reap_expired_outbox_leases(&self) -> AppResult<u64> {
         // Hits `email_outbox_sending_lease_idx`. No worker guard: the lease is expired, so by
         // definition no worker still holds a claim on the row.
@@ -1317,7 +1412,7 @@ impl TaskPersistence for PostgresPersistence {
     async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<BackgroundTask>> {
         let db = sqlx::query_as::<_, BackgroundTaskDb>(
             r#"SELECT id, company_id, channel_id, thread_id, task_type, status, payload,
-                       retry_count, max_retries, last_error, worker_id, locked_at, lock_expires_at,
+                       retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
                        run_at, created_at, updated_at
                FROM background_tasks WHERE id = $1"#,
         )
@@ -1339,7 +1434,7 @@ impl TaskPersistence for PostgresPersistence {
     ) -> AppResult<Option<BackgroundTask>> {
         let db = sqlx::query_as::<_, BackgroundTaskDb>(
             r#"SELECT id, company_id, channel_id, thread_id, task_type, status, payload,
-                      retry_count, max_retries, last_error, worker_id, locked_at, lock_expires_at,
+                      retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
                       run_at, created_at, updated_at
                FROM background_tasks
                WHERE company_id = $1 AND source_message_id = $2"#,
@@ -1367,42 +1462,93 @@ impl TaskPersistence for PostgresPersistence {
         Ok(())
     }
 
-    async fn update_claimed_task_payload(
+    async fn commit_agent_dispatch(
         &self,
-        id: Uuid,
-        worker_id: Uuid,
-        payload: Value,
-    ) -> AppResult<bool> {
-        let result = sqlx::query(
+        commit: AgentDispatchCommit<'_>,
+    ) -> AppResult<DispatchCommit> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+
+        // The fence goes first. If this run no longer owns the task the transaction rolls back
+        // having written nothing, rather than queueing an email for work someone else has taken
+        // over. Every other write below is unguarded precisely because this one guards them all.
+        let fenced = sqlx::query(
             r#"UPDATE background_tasks
                SET payload = $1, updated_at = CURRENT_TIMESTAMP
                WHERE id = $2 AND status = 'processing' AND worker_id = $3
+                  AND execution_generation = $4
                   AND lock_expires_at > CURRENT_TIMESTAMP"#,
         )
-        .bind(payload)
-        .bind(id)
-        .bind(worker_id)
-        .execute(&self.pool)
+        .bind(commit.payload)
+        .bind(commit.lease.task_id)
+        .bind(commit.lease.worker_id)
+        .bind(commit.lease.execution_generation)
+        .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
-        Ok(result.rows_affected() == 1)
+        if fenced.rows_affected() != 1 {
+            return Ok(DispatchCommit::LeaseLost);
+        }
+
+        for message in commit.messages {
+            super::thread::insert_message_on(&mut tx, message).await?;
+        }
+
+        let outbox_id = match commit.outbound {
+            Some(send) => {
+                // The unique index on `idempotency_key` is the lock: whoever inserts first owns
+                // this send. `None` means an equivalent send is already queued.
+                let row: Option<(Uuid,)> = sqlx::query_as(
+                    r#"INSERT INTO email_outbox (
+                            id, company_id, channel_id, task_id, idempotency_key, payload
+                       ) VALUES ($1, $2, $3, $4, $5, $6)
+                       ON CONFLICT (idempotency_key) DO NOTHING
+                       RETURNING id"#,
+                )
+                .bind(Uuid::new_v4())
+                .bind(send.company_id)
+                .bind(send.channel_id)
+                .bind(send.task_id)
+                .bind(&send.idempotency_key)
+                .bind(&send.payload)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+                row.map(|(id,)| id)
+            }
+            None => None,
+        };
+
+        if commit.complete_outreach {
+            sqlx::query(
+                r#"UPDATE task_outreaches SET status = 'completed', updated_at = CURRENT_TIMESTAMP
+                   WHERE task_id = $1 AND status IN ('threshold_met', 'proceed_partial')"#,
+            )
+            .bind(commit.lease.task_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+        }
+
+        tx.commit().await.map_err(AppError::from)?;
+        Ok(DispatchCommit::Committed { outbox_id })
     }
 
     async fn renew_task_lease(
         &self,
-        id: Uuid,
-        worker_id: Uuid,
+        lease: TaskLeaseRef,
         lock_expires_at: DateTime<Utc>,
     ) -> AppResult<bool> {
         let result = sqlx::query(
             r#"UPDATE background_tasks
                SET lock_expires_at = $3, updated_at = CURRENT_TIMESTAMP
                WHERE id = $1 AND status = 'processing' AND worker_id = $2
+                 AND execution_generation = $4
                  AND lock_expires_at > CURRENT_TIMESTAMP"#,
         )
-        .bind(id)
-        .bind(worker_id)
+        .bind(lease.task_id)
+        .bind(lease.worker_id)
         .bind(lock_expires_at)
+        .bind(lease.execution_generation)
         .execute(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -1453,11 +1599,15 @@ impl TaskPersistence for PostgresPersistence {
         limit: i64,
     ) -> AppResult<Vec<BackgroundTask>> {
         let db_list = sqlx::query_as::<_, BackgroundTaskDb>(
+            // Pending rows only. An expired `processing` row used to be stolen right here, which
+            // re-ran it without spending an attempt, without closing the open attempt and
+            // without any backoff -- so a task that reliably outlived its lease looped for ever
+            // instead of dead-lettering. `reap_expired_task_leases` now turns those back into
+            // pending rows, paying an attempt each time.
             r#"WITH claimable AS (
                    SELECT id
                    FROM background_tasks
-                   WHERE (status = 'pending' AND run_at <= CURRENT_TIMESTAMP)
-                      OR (status = 'processing' AND (lock_expires_at IS NULL OR lock_expires_at <= CURRENT_TIMESTAMP))
+                   WHERE status = 'pending' AND run_at <= CURRENT_TIMESTAMP
                    ORDER BY run_at ASC, created_at ASC, id ASC
                    FOR UPDATE SKIP LOCKED
                    LIMIT $1
@@ -1465,6 +1615,7 @@ impl TaskPersistence for PostgresPersistence {
                UPDATE background_tasks AS task
                SET status = 'processing',
                    worker_id = $2,
+                   execution_generation = gen_random_uuid(),
                    locked_at = CURRENT_TIMESTAMP,
                    lock_expires_at = $3,
                    updated_at = CURRENT_TIMESTAMP
@@ -1472,7 +1623,7 @@ impl TaskPersistence for PostgresPersistence {
                WHERE task.id = claimable.id
                RETURNING task.id, task.company_id, task.channel_id, task.thread_id,
                          task.task_type, task.status, task.payload, task.retry_count,
-                         task.max_retries, task.last_error, task.worker_id, task.locked_at,
+                         task.max_retries, task.last_error, task.worker_id, task.execution_generation, task.locked_at,
                          task.lock_expires_at, task.run_at, task.created_at, task.updated_at"#,
         )
         .bind(limit)
@@ -1506,16 +1657,18 @@ impl TaskPersistence for PostgresPersistence {
         Ok(res.rows_affected() > 0)
     }
 
-    async fn mark_task_completed(&self, id: Uuid, worker_id: Uuid) -> AppResult<bool> {
+    async fn mark_task_completed(&self, lease: TaskLeaseRef) -> AppResult<bool> {
         let result = sqlx::query(
             r#"UPDATE background_tasks
-               SET status = 'completed', worker_id = NULL, locked_at = NULL,
+               SET status = 'completed', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                    lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
                WHERE id = $1 AND status = 'processing' AND worker_id = $2
+                 AND execution_generation = $3
                  AND lock_expires_at > CURRENT_TIMESTAMP"#,
         )
-        .bind(id)
-        .bind(worker_id)
+        .bind(lease.task_id)
+        .bind(lease.worker_id)
+        .bind(lease.execution_generation)
         .execute(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -1525,8 +1678,7 @@ impl TaskPersistence for PostgresPersistence {
 
     async fn mark_task_failed(
         &self,
-        id: Uuid,
-        worker_id: Uuid,
+        lease: TaskLeaseRef,
         error_msg: &str,
         next_run_at: DateTime<Utc>,
         is_dead_letter: bool,
@@ -1540,16 +1692,18 @@ impl TaskPersistence for PostgresPersistence {
         let result = sqlx::query(
             r#"UPDATE background_tasks
                SET status = $1, retry_count = retry_count + 1, last_error = $2,
-                   run_at = $3, worker_id = NULL, locked_at = NULL,
+                   run_at = $3, worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                    lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
                WHERE id = $4 AND status = 'processing' AND worker_id = $5
+                 AND execution_generation = $6
                  AND lock_expires_at > CURRENT_TIMESTAMP"#,
         )
         .bind(new_status)
         .bind(error_msg)
         .bind(next_run_at)
-        .bind(id)
-        .bind(worker_id)
+        .bind(lease.task_id)
+        .bind(lease.worker_id)
+        .bind(lease.execution_generation)
         .execute(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -1561,13 +1715,13 @@ impl TaskPersistence for PostgresPersistence {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let db = sqlx::query_as::<_, BackgroundTaskDb>(
             r#"UPDATE background_tasks
-               SET status = 'stopped', worker_id = NULL, locked_at = NULL,
+               SET status = 'stopped', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                    lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
                WHERE id = $1
                  AND status IN ('pending', 'processing', 'pending_approval',
                                 'waiting_for_third_party_reply', 'failed')
                RETURNING id, company_id, channel_id, thread_id, task_type, status, payload,
-                          retry_count, max_retries, last_error, worker_id, locked_at, lock_expires_at,
+                          retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
                           run_at, created_at, updated_at"#,
         )
         .bind(id)
@@ -1598,61 +1752,18 @@ impl TaskPersistence for PostgresPersistence {
     async fn resume_task(&self, id: Uuid) -> AppResult<BackgroundTask> {
         let db = sqlx::query_as::<_, BackgroundTaskDb>(
             r#"UPDATE background_tasks
-               SET status = 'pending', run_at = CURRENT_TIMESTAMP, worker_id = NULL,
+               SET status = 'pending', run_at = CURRENT_TIMESTAMP, worker_id = NULL, execution_generation = NULL,
                    locked_at = NULL, lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
                WHERE id = $1
                  AND status IN ('stopped', 'pending_approval',
                                 'waiting_for_third_party_reply', 'failed')
                RETURNING id, company_id, channel_id, thread_id, task_type, status, payload,
-                          retry_count, max_retries, last_error, worker_id, locked_at, lock_expires_at,
+                          retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
                           run_at, created_at, updated_at"#,
         )
         .bind(id)
         .fetch_one(&self.pool)
         .await
-        .map_err(AppError::from)?;
-
-        db.try_into()
-    }
-
-    async fn update_task_status(&self, id: Uuid, status: TaskStatus) -> AppResult<BackgroundTask> {
-        let db = match status {
-            TaskStatus::PendingApproval => {
-                sqlx::query_as::<_, BackgroundTaskDb>(
-                    r#"UPDATE background_tasks
-                   SET status = 'pending_approval', worker_id = NULL, locked_at = NULL,
-                       lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
-                   WHERE id = $1
-                     AND status IN ('processing', 'waiting_for_third_party_reply')
-                   RETURNING id, company_id, channel_id, thread_id, task_type, status, payload,
-                             retry_count, max_retries, last_error, worker_id, locked_at,
-                             lock_expires_at, run_at, created_at, updated_at"#,
-                )
-                .bind(id)
-                .fetch_one(&self.pool)
-                .await
-            }
-            TaskStatus::WaitingForThirdPartyReply => {
-                sqlx::query_as::<_, BackgroundTaskDb>(
-                    r#"UPDATE background_tasks
-                   SET status = 'waiting_for_third_party_reply', worker_id = NULL,
-                       locked_at = NULL, lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
-                   WHERE id = $1 AND status IN ('processing', 'pending_approval')
-                   RETURNING id, company_id, channel_id, thread_id, task_type, status, payload,
-                             retry_count, max_retries, last_error, worker_id, locked_at,
-                             lock_expires_at, run_at, created_at, updated_at"#,
-                )
-                .bind(id)
-                .fetch_one(&self.pool)
-                .await
-            }
-            _ => {
-                return Err(AppError::Internal(format!(
-                    "Unsupported task status transition target: {}",
-                    status.as_str()
-                )));
-            }
-        }
         .map_err(AppError::from)?;
 
         db.try_into()
@@ -1680,7 +1791,7 @@ impl TaskPersistence for PostgresPersistence {
     ) -> AppResult<Vec<BackgroundTask>> {
         let mut query = QueryBuilder::<Postgres>::new(
             r#"SELECT id, company_id, channel_id, thread_id, task_type, status, payload,
-                      retry_count, max_retries, last_error, worker_id, locked_at, lock_expires_at,
+                      retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
                       run_at, created_at, updated_at
                FROM background_tasks WHERE company_id = "#,
         );
@@ -1833,7 +1944,7 @@ async fn insert_task(
            ON CONFLICT (company_id, source_message_id)
            DO UPDATE SET source_message_id = EXCLUDED.source_message_id
            RETURNING id, company_id, channel_id, thread_id, task_type, status, payload,
-                      retry_count, max_retries, last_error, worker_id, locked_at, lock_expires_at,
+                      retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
                       run_at, created_at, updated_at"#,
     )
     .bind(id)
@@ -2030,14 +2141,16 @@ mod tests {
         let old = enqueue(threads[3].id).await;
         let current = enqueue(threads[3].id).await;
 
-        // `background_tasks_lease_check` requires the three lease columns to be all set or all
-        // null, so they move together here exactly as the worker moves them.
+        // `background_tasks_lease_check` gives the lease columns to `processing` rows and to no
+        // other status, so they move together here exactly as the worker moves them.
         let set_status = async |id: Uuid, status: &str, lease: Option<DateTime<Utc>>| {
             sqlx::query(
                 "UPDATE background_tasks
                  SET status = $2,
                      lock_expires_at = $3,
                      worker_id = CASE WHEN $3::timestamptz IS NULL THEN NULL ELSE gen_random_uuid() END,
+                     execution_generation =
+                         CASE WHEN $3::timestamptz IS NULL THEN NULL ELSE gen_random_uuid() END,
                      -- Derived from the lease, not from now: the check also demands
                      -- lock_expires_at > locked_at, and an expired lease is set in the past.
                      locked_at = $3::timestamptz - interval '10 minutes',
@@ -2116,6 +2229,528 @@ mod tests {
                 .unwrap()
                 .is_empty(),
             "an empty page must not hit the database"
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// An expired lease must cost an attempt, close its ledger row, and back the task off --
+    /// and eventually dead-letter it.
+    ///
+    /// Regression for the shape where `claim_pending_tasks` stole expired `processing` rows
+    /// directly. That re-ran the task with `retry_count` untouched, left the abandoned attempt
+    /// sitting in `task_attempts` as `processing` for ever, and applied no backoff, so a task
+    /// that reliably outlived its lease was retried in a tight loop and never dead-lettered.
+    #[tokio::test]
+    async fn an_expired_task_lease_costs_an_attempt_and_eventually_dead_letters() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("reaper_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Reaper Test".to_string(),
+                slug: format!("reaper-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Reaper".into(),
+                slug: "reaper".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let email_addr = crate::entities::value_objects::EmailAddress::from(email.clone());
+        let thread = persistence
+            .create_thread(channel.id, "Reaper", std::slice::from_ref(&email_addr))
+            .await
+            .unwrap();
+        let task = persistence
+            .enqueue_task(
+                company.id,
+                channel.id,
+                Some(thread.id),
+                "test",
+                serde_json::json!({}),
+            )
+            .await
+            .unwrap();
+
+        // Run the task up to its retry ceiling, losing the lease every time.
+        let max_retries = task.max_retries;
+        let mut generations = Vec::new();
+        for attempt in 1..=max_retries {
+            // Due now, whatever backoff the previous reap applied.
+            sqlx::query("UPDATE background_tasks SET run_at = CURRENT_TIMESTAMP WHERE id = $1")
+                .bind(task.id)
+                .execute(&pool)
+                .await
+                .unwrap();
+
+            // By id rather than a batch claim: the batch sweeps the whole queue, so tests
+            // running beside this one would fill it or take this row first.
+            assert!(
+                persistence
+                    .claim_task(
+                        task.id,
+                        Uuid::new_v4(),
+                        Utc::now() + chrono::Duration::minutes(5)
+                    )
+                    .await
+                    .unwrap(),
+                "the task is pending and due, so it must be claimable"
+            );
+            let claimed = persistence
+                .get_task_by_id(task.id)
+                .await
+                .unwrap()
+                .expect("the task still exists");
+            let lease = TaskLeaseRef::of(&claimed).expect("a claim records its lease");
+            generations.push(lease.execution_generation);
+            persistence
+                .begin_task_attempt(TaskAttemptRef::of(&claimed, lease))
+                .await
+                .unwrap();
+
+            // The run vanishes: its lease lapses with nothing reported.
+            sqlx::query(
+                "UPDATE background_tasks
+                 SET locked_at = CURRENT_TIMESTAMP - interval '20 minutes',
+                     lock_expires_at = CURRENT_TIMESTAMP - interval '1 second'
+                 WHERE id = $1",
+            )
+            .bind(task.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+            // The sweep is global, so a test running beside this one may reap this row first.
+            // What matters is the state the row ends in, not whose call got there.
+            persistence.reap_expired_task_leases().await.unwrap();
+
+            let after = persistence
+                .get_task_by_id(task.id)
+                .await
+                .unwrap()
+                .expect("the task still exists");
+            assert_eq!(
+                after.retry_count, attempt,
+                "each lapsed lease must spend exactly one attempt"
+            );
+            assert!(after.worker_id.is_none());
+            assert!(after.execution_generation.is_none());
+
+            if attempt < max_retries {
+                assert_eq!(after.status, TaskStatus::Pending);
+                assert!(
+                    after.run_at > Utc::now(),
+                    "a reaped task must wait out its backoff"
+                );
+            } else {
+                assert_eq!(
+                    after.status,
+                    TaskStatus::DeadLetter,
+                    "the attempt budget is spent, so the task must stop rather than loop"
+                );
+            }
+        }
+
+        // Every claim minted its own generation, which is what fences a superseded run.
+        let unique = generations.iter().collect::<std::collections::HashSet<_>>();
+        assert_eq!(
+            unique.len(),
+            generations.len(),
+            "each claim must mint a distinct execution generation"
+        );
+
+        // No attempt was left open: the reaper closed each one as it went.
+        let open: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM task_attempts WHERE task_id = $1 AND status = 'processing'",
+        )
+        .bind(task.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(open, 0, "a reaped run must not leave its ledger row open");
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// A run whose lease was reaped must not be able to write anything, even if the same worker
+    /// id re-claims the task. Only the generation can tell those two runs apart.
+    #[tokio::test]
+    async fn a_superseded_run_cannot_renew_write_or_close_the_task() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("fence_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Fence Test".to_string(),
+                slug: format!("fence-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Fence".into(),
+                slug: "fence".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let email_addr = crate::entities::value_objects::EmailAddress::from(email.clone());
+        let thread = persistence
+            .create_thread(channel.id, "Fence", std::slice::from_ref(&email_addr))
+            .await
+            .unwrap();
+        let task = persistence
+            .enqueue_task(
+                company.id,
+                channel.id,
+                Some(thread.id),
+                "test",
+                serde_json::json!({}),
+            )
+            .await
+            .unwrap();
+
+        // Deliberately the *same* worker both times, so only the generation differs. This is the
+        // case a `worker_id = $me` guard cannot catch.
+        let worker = Uuid::new_v4();
+
+        // By id rather than a batch claim: the batch sweeps the whole queue, so a test running
+        // beside this one could take this row first.
+        assert!(
+            persistence
+                .claim_task(task.id, worker, Utc::now() + chrono::Duration::minutes(5))
+                .await
+                .unwrap()
+        );
+        let first = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        let stale = TaskLeaseRef::of(&first).expect("a claim records its lease");
+
+        sqlx::query(
+            "UPDATE background_tasks
+             SET locked_at = CURRENT_TIMESTAMP - interval '20 minutes',
+                 lock_expires_at = CURRENT_TIMESTAMP - interval '1 second'
+             WHERE id = $1",
+        )
+        .bind(task.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        persistence.reap_expired_task_leases().await.unwrap();
+
+        sqlx::query("UPDATE background_tasks SET run_at = CURRENT_TIMESTAMP WHERE id = $1")
+            .bind(task.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(
+            persistence
+                .claim_task(task.id, worker, Utc::now() + chrono::Duration::minutes(5))
+                .await
+                .unwrap()
+        );
+        let second = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        let current = TaskLeaseRef::of(&second).expect("a claim records its lease");
+
+        assert_eq!(stale.worker_id, current.worker_id, "same worker both times");
+        assert_ne!(stale.execution_generation, current.execution_generation);
+
+        // Nothing the superseded run tries may land.
+        assert!(
+            !persistence
+                .renew_task_lease(stale, Utc::now() + chrono::Duration::minutes(5))
+                .await
+                .unwrap()
+        );
+        assert!(!persistence.mark_task_completed(stale).await.unwrap());
+        assert!(
+            !persistence
+                .mark_task_failed(stale, "stale", Utc::now(), false)
+                .await
+                .unwrap()
+        );
+
+        // The payload the superseded run tried to write never landed.
+        let after = persistence
+            .get_task_by_id(task.id)
+            .await
+            .unwrap()
+            .expect("the task still exists");
+        assert_eq!(after.status, TaskStatus::Processing);
+        assert!(after.payload.get("stale").is_none());
+
+        // The run that actually owns the task is unaffected.
+        assert!(persistence.mark_task_completed(current).await.unwrap());
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// One dispatch's reply, its outbox row and its task payload land together or not at all.
+    ///
+    /// They used to be three independent commits: the outbox row, then a `create_message` per
+    /// answered thread, then the payload. A crash or a lost lease part-way left a thread showing
+    /// an answer that was never sent, or an email going out for a task whose payload said it had
+    /// never run -- and the retry then had to reconcile the difference.
+    #[tokio::test]
+    async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_all() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("commit_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Commit Test".to_string(),
+                slug: format!("commit-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Commit".into(),
+                slug: "commit".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let email_addr = crate::entities::value_objects::EmailAddress::from(email.clone());
+        let thread = persistence
+            .create_thread(channel.id, "Commit", std::slice::from_ref(&email_addr))
+            .await
+            .unwrap();
+        let task = persistence
+            .enqueue_task(
+                company.id,
+                channel.id,
+                Some(thread.id),
+                "test",
+                serde_json::json!({}),
+            )
+            .await
+            .unwrap();
+
+        let worker = Uuid::new_v4();
+        assert!(
+            persistence
+                .claim_task(task.id, worker, Utc::now() + chrono::Duration::minutes(5))
+                .await
+                .unwrap()
+        );
+        let claimed = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        let lease = TaskLeaseRef::of(&claimed).expect("a claim records its lease");
+
+        let reply = |message_id: &str| Message {
+            id: Uuid::new_v4(),
+            thread_id: thread.id,
+            message_id: MessageId::from(message_id.to_string()),
+            in_reply_to: None,
+            references_list: Vec::new(),
+            sender: crate::entities::value_objects::EmailAddress::from("agent@example.com"),
+            recipients_to: vec![email_addr.clone()],
+            recipients_cc: Vec::new(),
+            subject: "Re: Commit".to_string(),
+            clean_text_body: "the answer".to_string(),
+            raw_text_body: None,
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Outbound,
+            role: MessageRole::Agent,
+            thread_index: None,
+            created_at: Utc::now(),
+        };
+        let send = |key: &str| OutboundSend {
+            company_id: company.id,
+            channel_id: channel.id,
+            task_id: Some(task.id),
+            idempotency_key: key.to_string(),
+            payload: serde_json::json!({"body": "the answer"}),
+        };
+
+        let outbound_rows = async || -> i64 {
+            sqlx::query_scalar("SELECT COUNT(*) FROM email_outbox WHERE task_id = $1")
+                .bind(task.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        };
+        let thread_rows = async || -> i64 {
+            sqlx::query_scalar(
+                "SELECT COUNT(*) FROM thread_messages WHERE thread_id = $1 AND direction = 'outbound'",
+            )
+            .bind(thread.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        };
+
+        // A superseded run: the same task and worker, a generation that is no longer current.
+        let stale = TaskLeaseRef {
+            execution_generation: Uuid::new_v4(),
+            ..lease
+        };
+        let outcome = persistence
+            .commit_agent_dispatch(AgentDispatchCommit {
+                lease: stale,
+                messages: &[reply("<stale@example.com>")],
+                outbound: Some(send("stale-key")),
+                payload: serde_json::json!({"stale": true}),
+                complete_outreach: false,
+            })
+            .await
+            .unwrap();
+        assert_eq!(outcome, DispatchCommit::LeaseLost);
+
+        // Not one of the three parts may have landed.
+        assert_eq!(thread_rows().await, 0, "no reply may be stored");
+        assert_eq!(outbound_rows().await, 0, "no email may be queued");
+        let after_stale = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        assert!(
+            after_stale.payload.get("stale").is_none(),
+            "no payload may be written"
+        );
+
+        // The run that actually owns the lease commits all three.
+        let outcome = persistence
+            .commit_agent_dispatch(AgentDispatchCommit {
+                lease,
+                messages: &[reply("<live@example.com>")],
+                outbound: Some(send("live-key")),
+                payload: serde_json::json!({"committed": true}),
+                complete_outreach: false,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(
+            outcome,
+            DispatchCommit::Committed { outbox_id: Some(_) }
+        ));
+        assert_eq!(thread_rows().await, 1);
+        assert_eq!(outbound_rows().await, 1);
+        let after = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        assert_eq!(
+            after.payload.get("committed"),
+            Some(&serde_json::json!(true))
+        );
+
+        // Re-queueing the same logical send is the idempotency key doing its job, not a failure,
+        // and it must not duplicate the outbox row.
+        let outcome = persistence
+            .commit_agent_dispatch(AgentDispatchCommit {
+                lease,
+                messages: &[],
+                outbound: Some(send("live-key")),
+                payload: serde_json::json!({"committed": true}),
+                complete_outreach: false,
+            })
+            .await
+            .unwrap();
+        assert_eq!(outcome, DispatchCommit::Committed { outbox_id: None });
+        assert_eq!(
+            outbound_rows().await,
+            1,
+            "the same send must not queue twice"
+        );
+
+        // A failure part-way must roll back what already succeeded in the same transaction. The
+        // payload write happens first, so a message that cannot be stored has to undo it: this is
+        // the case three separate commits could not handle at all.
+        let orphan = Message {
+            thread_id: Uuid::new_v4(),
+            ..reply("<orphan@example.com>")
+        };
+        let failed = persistence
+            .commit_agent_dispatch(AgentDispatchCommit {
+                lease,
+                messages: &[orphan],
+                outbound: Some(send("orphan-key")),
+                payload: serde_json::json!({"rolled_back": true}),
+                complete_outreach: false,
+            })
+            .await;
+        assert!(failed.is_err(), "a message with no thread cannot be stored");
+
+        let after_rollback = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        assert!(
+            after_rollback.payload.get("rolled_back").is_none(),
+            "the payload write must be rolled back when a later write fails"
+        );
+        assert_eq!(
+            after_rollback.payload.get("committed"),
+            Some(&serde_json::json!(true)),
+            "and the previously committed payload must survive untouched"
+        );
+        assert_eq!(
+            outbound_rows().await,
+            1,
+            "the failed dispatch must not leave an outbox row behind"
         );
 
         CompanyPersistence::delete(&persistence, company.id)
@@ -2221,7 +2856,7 @@ mod tests {
         if !borrowed.is_empty() {
             sqlx::query(
                 "UPDATE background_tasks
-                    SET status = 'pending', worker_id = NULL, locked_at = NULL,
+                    SET status = 'pending', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                         lock_expires_at = NULL
                   WHERE id = ANY($1)",
             )
@@ -2238,12 +2873,12 @@ mod tests {
             .iter()
             .find(|claim| claim.id == task.id)
             .expect("this task was claimed");
-        let claiming_worker = claimed_task.worker_id.expect("a claim records its worker");
+        let claimed_lease =
+            TaskLeaseRef::of(claimed_task).expect("a claimed task records its lease");
         assert!(
             persistence
                 .mark_task_failed(
-                    task.id,
-                    claiming_worker,
+                    claimed_lease,
                     "poison task",
                     Utc::now() + chrono::Duration::minutes(1),
                     false,
@@ -2269,7 +2904,7 @@ mod tests {
         if !immediate_borrowed.is_empty() {
             sqlx::query(
                 "UPDATE background_tasks
-                    SET status = 'pending', worker_id = NULL, locked_at = NULL,
+                    SET status = 'pending', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                         lock_expires_at = NULL
                   WHERE id = ANY($1) AND worker_id = $2",
             )

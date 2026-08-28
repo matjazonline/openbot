@@ -19,7 +19,10 @@ use crate::{
         message::{Message, MessageDirection, MessageRole},
         outreach::DueOutreach,
         schedule::ScheduledRunPayload,
-        task::{BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus},
+        task::{
+            BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus,
+            TaskExecutionOutcome, TaskLeaseRef,
+        },
         value_objects::{EmailAddress, MessageId},
     },
     infra::config::AppConfig,
@@ -31,7 +34,7 @@ use crate::{
     },
     use_cases::{
         schedule::{SCHEDULED_AGENT_RUN_TASK, ScheduleUseCases},
-        thread::{InboundIngestResult, ThreadUseCases},
+        thread::{DispatchOutcome, InboundIngestResult, ThreadUseCases},
     },
 };
 
@@ -221,6 +224,22 @@ fn reply_subject(subject: &str) -> String {
     }
 }
 
+/// Why one task run stopped, and whether running it again could ever end differently.
+///
+/// `From<String>` yields [`TaskFailure::Retryable`], so the many `?` sites that surface a
+/// stringly error keep the retry behaviour they already had; a terminal failure must be stated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TaskFailure {
+    Retryable(String),
+    Terminal(String),
+}
+
+impl From<String> for TaskFailure {
+    fn from(message: String) -> Self {
+        TaskFailure::Retryable(message)
+    }
+}
+
 /// Why one outbox delivery did not happen, and therefore whether trying again could help.
 enum DeliveryFailure {
     /// Transport or database trouble: costs an attempt, comes back after a backoff.
@@ -383,13 +402,25 @@ impl TaskWorker {
     }
 
     async fn process_claimed_task(&self, task: BackgroundTask) {
+        // A row this worker just claimed always carries its lease; the constraint on
+        // `background_tasks` makes a `processing` row without one unrepresentable. Bailing rather
+        // than asserting keeps a surprising row from taking the worker down with it.
+        let Some(lease) = TaskLeaseRef::of(&task) else {
+            warn!(
+                "Claimed task {} carries no lease and cannot be executed safely",
+                task.id
+            );
+            return;
+        };
         let _active_execution = self.active_task_executions.enter();
         info!("Processing task {} (type = '{}')", task.id, task.task_type);
         let start_time = std::time::Instant::now();
-        let attempt = TaskAttemptRef::current(&task);
-        let result = self.execute_single_task_with_lease(&task, attempt).await;
+        let attempt = TaskAttemptRef::of(&task, lease);
+        let outcome = self
+            .execute_single_task_with_lease(&task, lease, attempt)
+            .await;
         let duration_ms = start_time.elapsed().as_millis() as u64;
-        self.close_out_task(&task, attempt, result, duration_ms)
+        self.close_out_task(&task, lease, attempt, outcome, duration_ms)
             .await;
     }
 
@@ -417,6 +448,14 @@ impl TaskWorker {
             Err(error) => warn!("Failed to reap expired outbox leases: {}", error),
         }
 
+        // And the same for tasks whose run vanished mid-flight. Claims take pending rows only, so
+        // without this an expired `processing` row is never picked up again by anyone.
+        match self.task_persistence.reap_expired_task_leases().await {
+            Ok(0) => {}
+            Ok(reaped) => warn!("Reaped {} tasks whose lease had expired", reaped),
+            Err(error) => warn!("Failed to reap expired task leases: {}", error),
+        }
+
         self.check_quorum_timeouts().await?;
         Ok(Polled::Idle)
     }
@@ -426,8 +465,9 @@ impl TaskWorker {
     async fn close_out_task(
         &self,
         task: &BackgroundTask,
+        lease: TaskLeaseRef,
         attempt: TaskAttemptRef,
-        result: Result<(), String>,
+        outcome: TaskExecutionOutcome,
         duration_ms: u64,
     ) {
         let task_id = task.id;
@@ -441,8 +481,12 @@ impl TaskWorker {
             }
         };
 
-        let err_msg = match result {
-            Ok(()) => {
+        let (err_msg, dead_letter_now) = match outcome {
+            TaskExecutionOutcome::Suspended => {
+                info!("Background task {} suspended by its agent", task_id);
+                return;
+            }
+            TaskExecutionOutcome::Replied => {
                 // A task that parked itself keeps its own status; it is neither done nor failed.
                 // Its attempt stays open too — the resume runs under the same number.
                 let suspended = current
@@ -466,15 +510,13 @@ impl TaskWorker {
                     None,
                 )
                 .await;
-                let outcome = self
-                    .task_persistence
-                    .mark_task_completed(task_id, self.worker_id)
-                    .await;
+                let outcome = self.task_persistence.mark_task_completed(lease).await;
                 report_outcome("Task", task_id, "completion", outcome);
                 self.record_task_metric(task, duration_ms, TaskStatusMetric::Completed);
                 return;
             }
-            Err(err_msg) => err_msg,
+            TaskExecutionOutcome::RetryableFailure(message) => (message, false),
+            TaskExecutionOutcome::TerminalFailure(message) => (message, true),
         };
 
         warn!("Failed background task {}: {}", task_id, err_msg);
@@ -487,14 +529,14 @@ impl TaskWorker {
         )
         .await;
         let next_retry = task.retry_count + 1;
-        let is_dead_letter = next_retry >= task.max_retries;
+        let is_dead_letter = dead_letter_now || next_retry >= task.max_retries;
         // Exponential backoff: 30s * 2^retry, capped so the shift can't overflow.
         let backoff_secs = 30 * (1 << next_retry.min(10));
         let next_run = chrono::Utc::now() + chrono::Duration::seconds(backoff_secs);
 
         let outcome = self
             .task_persistence
-            .mark_task_failed(task_id, self.worker_id, &err_msg, next_run, is_dead_letter)
+            .mark_task_failed(lease, &err_msg, next_run, is_dead_letter)
             .await;
         report_outcome("Task", task_id, "failure", outcome);
         self.record_task_metric(task, duration_ms, TaskStatusMetric::Failed);
@@ -828,17 +870,22 @@ impl TaskWorker {
         approver.filter(|email| !email.is_empty())
     }
 
-    async fn execute_single_task(
+    /// One task's work, as `Result` so the `?` operator still carries the failures upward.
+    /// Anything that arrives as a bare `String` is treated as retryable; a failure that no retry
+    /// could fix has to say so.
+    async fn run_task(
         &self,
         task: &crate::entities::task::BackgroundTask,
-    ) -> Result<(), String> {
+        lease: TaskLeaseRef,
+    ) -> Result<TaskExecutionOutcome, TaskFailure> {
         if task.task_type == SCHEDULED_AGENT_RUN_TASK {
-            return self.execute_scheduled_task(task).await;
+            self.execute_scheduled_task(task).await?;
+            return Ok(TaskExecutionOutcome::Replied);
         }
 
-        // Parse payload
+        // A payload that will not parse will not parse on the next attempt either.
         let mut ingest: InboundIngestResult = serde_json::from_value(task.payload.clone())
-            .map_err(|e| format!("Invalid task payload JSON: {}", e))?;
+            .map_err(|e| TaskFailure::Terminal(format!("Invalid task payload JSON: {e}")))?;
 
         self.thread_use_cases
             .hydrate_ingest_configuration(&mut ingest)
@@ -846,13 +893,12 @@ impl TaskWorker {
             .map_err(|e| e.to_string())?;
 
         if !ingest.accepted {
-            return Ok(());
+            return Ok(TaskExecutionOutcome::Replied);
         }
 
-        let inbound_msg = ingest
-            .inbound_message
-            .as_ref()
-            .ok_or_else(|| "Missing inbound message in task payload".to_string())?;
+        let inbound_msg = ingest.inbound_message.as_ref().ok_or_else(|| {
+            TaskFailure::Terminal("Missing inbound message in task payload".to_string())
+        })?;
 
         // Idempotency Guard: Check if an outbound email for this triggering message was already sent
         let target_thread_ids: Vec<_> = if ingest.channel_matches.is_empty() {
@@ -889,22 +935,15 @@ impl TaskWorker {
                     .await
                     .map_err(|error| error.to_string())?;
             }
-            if outbound
-                .clean_text_body
-                .starts_with("Agent execution failed:")
-            {
-                info!(
-                    "Idempotency Guard: Agent execution previously failed for message {}, failing task",
-                    inbound_msg.message_id
-                );
-                return Err(outbound.clean_text_body.clone());
-            } else {
-                info!(
-                    "Idempotency Guard: Outbound reply already sent for message {}, completing task",
-                    inbound_msg.message_id
-                );
-                return Ok(());
-            }
+            // A stored outbound reply is proof the work was done. It used to be necessary to
+            // sniff the body for an error prefix here, because a failed run committed its error
+            // text as the reply; a failed run now commits nothing, so anything found is a real
+            // answer and the task is complete.
+            info!(
+                "Idempotency Guard: Outbound reply already sent for message {}, completing task",
+                inbound_msg.message_id
+            );
+            return Ok(TaskExecutionOutcome::Replied);
         }
 
         // Execute Agent and Dispatch Outbound Email
@@ -915,12 +954,16 @@ impl TaskWorker {
         // mailbox send can ask to stay in-app, and this worker is a different process from the one
         // that took the request.
         let deliver = ingest_exec.deliver;
-        self.thread_use_cases
-            .execute_claimed_agent_task_and_dispatch(&ingest_exec, deliver, self.worker_id)
+        let dispatch = self
+            .thread_use_cases
+            .execute_claimed_agent_task_and_dispatch(&ingest_exec, deliver, lease)
             .await
             .map_err(|e| e.to_string())?;
 
-        Ok(())
+        Ok(match dispatch {
+            DispatchOutcome::Suspended => TaskExecutionOutcome::Suspended,
+            DispatchOutcome::Skipped | DispatchOutcome::Replied(_) => TaskExecutionOutcome::Replied,
+        })
     }
 
     /// Run one `scheduled_agent_run` task: answer the schedule's prompt in its thread, and email
@@ -1068,7 +1111,7 @@ impl TaskWorker {
             )
             .execute()
             .await
-            .map_err(|e| format!("Agent execution failed: {e}"))?;
+            .map_err(|e| e.to_string())?;
 
         Ok(output.content)
     }
@@ -1206,8 +1249,9 @@ impl TaskWorker {
     async fn execute_single_task_with_lease(
         &self,
         task: &crate::entities::task::BackgroundTask,
+        lease: TaskLeaseRef,
         attempt: TaskAttemptRef,
-    ) -> Result<(), String> {
+    ) -> TaskExecutionOutcome {
         // Open the ledger row alongside the lease: both describe this one run, and both are wanted
         // even if it never reaches a terminal state. A failure to open it is logged, not fatal —
         // the run is the point, the bookkeeping is not.
@@ -1218,17 +1262,27 @@ impl TaskWorker {
             );
         }
 
-        let lease = TaskLease::worker(self.worker_id);
+        let lease = TaskLease::worker(lease);
         match while_leased(
             &*self.task_persistence,
-            task.id,
             &lease,
-            self.execute_single_task(task),
+            self.run_task(task, lease.reference),
         )
         .await
         {
-            Leased::Finished(result) => result,
-            Leased::Lost => Err("Task lease was lost during execution".to_string()),
+            Leased::Finished(Ok(outcome)) => outcome,
+            Leased::Finished(Err(TaskFailure::Retryable(message))) => {
+                TaskExecutionOutcome::RetryableFailure(message)
+            }
+            Leased::Finished(Err(TaskFailure::Terminal(message))) => {
+                TaskExecutionOutcome::TerminalFailure(message)
+            }
+            // This run is no longer the one of record, so it must not report a result. Reporting
+            // it as retryable is safe: every write it can still make is fenced on the worker id
+            // the replacement run does not share.
+            Leased::Lost => TaskExecutionOutcome::RetryableFailure(
+                "Task lease was lost during execution".into(),
+            ),
         }
     }
 
@@ -1306,7 +1360,9 @@ impl TaskWorker {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::company_member::CompanyMembership;
+    use crate::entities::task::TaskLeaseRef;
     use async_trait::async_trait;
     use chrono::Utc;
     use std::sync::{
@@ -1546,6 +1602,14 @@ mod tests {
 
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        async fn commit_agent_dispatch(
+            &self,
+            commit: AgentDispatchCommit<'_>,
+        ) -> AppResult<DispatchCommit> {
+            let _ = commit;
+            Ok(DispatchCommit::Committed { outbox_id: None })
+        }
+
         async fn enqueue_outbound_send(&self, send: OutboundSend) -> AppResult<Option<Uuid>> {
             let id = Uuid::new_v4();
             self.outbound_sends.lock().unwrap().push(send);
@@ -1554,8 +1618,7 @@ mod tests {
 
         async fn renew_task_lease(
             &self,
-            _id: Uuid,
-            _worker_id: Uuid,
+            _lease: TaskLeaseRef,
             _lock_expires_at: chrono::DateTime<Utc>,
         ) -> AppResult<bool> {
             let mut renewals = self.renewals.lock().unwrap();
@@ -1586,6 +1649,7 @@ mod tests {
                 max_retries: 3,
                 last_error: None,
                 worker_id: None,
+                execution_generation: None,
                 locked_at: None,
                 lock_expires_at: None,
                 run_at: Utc::now(),
@@ -1614,6 +1678,35 @@ mod tests {
             Ok(())
         }
 
+        /// Mirrors the real reaper: an expired lease costs an attempt and the row goes back to
+        /// pending, or dead-letters once the attempts are spent.
+        async fn reap_expired_task_leases(&self) -> AppResult<u64> {
+            let mut list = self.tasks.lock().unwrap();
+            let now = Utc::now();
+            let mut reaped = 0;
+            for task in list.iter_mut().filter(|task| {
+                task.status == TaskStatus::Processing
+                    && task.lock_expires_at.is_none_or(|expires| expires <= now)
+            }) {
+                task.retry_count += 1;
+                task.status = if task.retry_count >= task.max_retries {
+                    TaskStatus::DeadLetter
+                } else {
+                    TaskStatus::Pending
+                };
+                task.last_error =
+                    Some("Task lease expired without the run reporting a result".to_string());
+                task.run_at =
+                    now + chrono::Duration::seconds(30 * (1 << task.retry_count.min(10)) as i64);
+                task.worker_id = None;
+                task.execution_generation = None;
+                task.locked_at = None;
+                task.lock_expires_at = None;
+                reaped += 1;
+            }
+            Ok(reaped)
+        }
+
         async fn claim_pending_tasks(
             &self,
             worker_id: Uuid,
@@ -1625,15 +1718,12 @@ mod tests {
             let mut claimed = Vec::new();
             for task in list
                 .iter_mut()
-                .filter(|task| {
-                    (task.status == TaskStatus::Pending && task.run_at <= now)
-                        || (task.status == TaskStatus::Processing
-                            && task.lock_expires_at.is_none_or(|expires| expires <= now))
-                })
+                .filter(|task| task.status == TaskStatus::Pending && task.run_at <= now)
                 .take(limit as usize)
             {
                 task.status = TaskStatus::Processing;
                 task.worker_id = Some(worker_id);
+                task.execution_generation = Some(Uuid::new_v4());
                 task.locked_at = Some(now);
                 task.lock_expires_at = Some(lock_expires_at);
                 claimed.push(task.clone());
@@ -1663,13 +1753,13 @@ mod tests {
             }
         }
 
-        async fn mark_task_completed(&self, id: Uuid, worker_id: Uuid) -> AppResult<bool> {
+        async fn mark_task_completed(&self, lease: TaskLeaseRef) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
             let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
-                t.id == id
+                t.id == lease.task_id
                     && t.status == TaskStatus::Processing
-                    && t.worker_id == Some(worker_id)
+                    && t.worker_id == Some(lease.worker_id)
                     && t.lock_expires_at.is_some_and(|expires| expires > now)
             }) {
                 t.status = TaskStatus::Completed;
@@ -1684,8 +1774,7 @@ mod tests {
 
         async fn mark_task_failed(
             &self,
-            id: Uuid,
-            worker_id: Uuid,
+            lease: TaskLeaseRef,
             error_msg: &str,
             next_run_at: chrono::DateTime<chrono::Utc>,
             is_dead_letter: bool,
@@ -1693,9 +1782,9 @@ mod tests {
             let mut list = self.tasks.lock().unwrap();
             let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
-                t.id == id
+                t.id == lease.task_id
                     && t.status == TaskStatus::Processing
-                    && t.worker_id == Some(worker_id)
+                    && t.worker_id == Some(lease.worker_id)
                     && t.lock_expires_at.is_some_and(|expires| expires > now)
             }) {
                 t.last_error = Some(error_msg.to_string());
@@ -1755,36 +1844,6 @@ mod tests {
                 .unwrap();
             t.status = TaskStatus::Pending;
             t.run_at = Utc::now();
-            t.worker_id = None;
-            t.locked_at = None;
-            t.lock_expires_at = None;
-            Ok(t.clone())
-        }
-
-        async fn update_task_status(
-            &self,
-            id: Uuid,
-            status: TaskStatus,
-        ) -> AppResult<BackgroundTask> {
-            let mut list = self.tasks.lock().unwrap();
-            let t = list
-                .iter_mut()
-                .find(|t| {
-                    t.id == id
-                        && match status {
-                            TaskStatus::PendingApproval => matches!(
-                                t.status,
-                                TaskStatus::Processing | TaskStatus::WaitingForThirdPartyReply
-                            ),
-                            TaskStatus::WaitingForThirdPartyReply => matches!(
-                                t.status,
-                                TaskStatus::Processing | TaskStatus::PendingApproval
-                            ),
-                            _ => false,
-                        }
-                })
-                .unwrap();
-            t.status = status;
             t.worker_id = None;
             t.locked_at = None;
             t.lock_expires_at = None;
@@ -1997,12 +2056,15 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn work_outliving_its_lease_term_keeps_renewing() {
         let persistence = MockTaskPersistence::default();
-        let lease = TaskLease::worker(Uuid::new_v4());
+        let lease = TaskLease::worker(TaskLeaseRef {
+            task_id: Uuid::new_v4(),
+            worker_id: Uuid::new_v4(),
+            execution_generation: Uuid::new_v4(),
+        });
 
         // 1000s of work against a 900s lease: beats land at 300s, 600s and 900s.
         let outcome = while_leased(
             &persistence,
-            Uuid::new_v4(),
             &lease,
             tokio::time::sleep(Duration::from_secs(1000)),
         )
@@ -2020,11 +2082,15 @@ mod tests {
             renewals_before_loss: Some(1),
             ..Default::default()
         };
-        let lease = TaskLease::worker(Uuid::new_v4());
+        let lease = TaskLease::worker(TaskLeaseRef {
+            task_id: Uuid::new_v4(),
+            worker_id: Uuid::new_v4(),
+            execution_generation: Uuid::new_v4(),
+        });
         let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
         let ran = Arc::clone(&finished);
-        let outcome = while_leased(&persistence, Uuid::new_v4(), &lease, async move {
+        let outcome = while_leased(&persistence, &lease, async move {
             tokio::time::sleep(Duration::from_secs(6000)).await;
             ran.store(true, std::sync::atomic::Ordering::SeqCst);
         })
@@ -2040,7 +2106,7 @@ mod tests {
     #[tokio::test]
     async fn expired_lease_is_reclaimed_and_stale_worker_cannot_complete() {
         let persistence = MockTaskPersistence::default();
-        let task = persistence
+        let _task = persistence
             .enqueue_task(
                 Uuid::new_v4(),
                 Uuid::new_v4(),
@@ -2058,9 +2124,29 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(first_claim.len(), 1);
+        let first_lease = TaskLeaseRef::of(&first_claim[0]).expect("a claim records its lease");
 
+        // The first run's lease lapses and the reaper hands the task back.
         persistence.tasks.lock().unwrap()[0].lock_expires_at =
             Some(Utc::now() - chrono::Duration::seconds(1));
+        assert_eq!(persistence.reap_expired_task_leases().await.unwrap(), 1);
+
+        {
+            // Reaping costs an attempt and applies the backoff, which is the whole difference
+            // from the old behaviour of stealing the row and re-running it immediately.
+            let reaped = &persistence.tasks.lock().unwrap()[0];
+            assert_eq!(reaped.status, TaskStatus::Pending);
+            assert_eq!(reaped.retry_count, 1);
+            assert!(reaped.worker_id.is_none());
+            assert!(reaped.execution_generation.is_none());
+            assert!(
+                reaped.run_at > Utc::now(),
+                "an expired lease must back off rather than be retried at once"
+            );
+        }
+
+        // Let the backoff elapse.
+        persistence.tasks.lock().unwrap()[0].run_at = Utc::now() - chrono::Duration::seconds(1);
 
         let second_claim = persistence
             .claim_pending_tasks(second_worker, Utc::now() + chrono::Duration::minutes(1), 1)
@@ -2068,18 +2154,15 @@ mod tests {
             .unwrap();
         assert_eq!(second_claim.len(), 1);
         assert_eq!(second_claim[0].worker_id, Some(second_worker));
-        assert!(
-            !persistence
-                .mark_task_completed(task.id, first_worker)
-                .await
-                .unwrap()
+        let second_lease = TaskLeaseRef::of(&second_claim[0]).expect("a claim records its lease");
+        assert_ne!(
+            first_lease.execution_generation, second_lease.execution_generation,
+            "each claim must mint its own generation, or the fence cannot tell the runs apart"
         );
-        assert!(
-            persistence
-                .mark_task_completed(task.id, second_worker)
-                .await
-                .unwrap()
-        );
+
+        // The abandoned run cannot close out the task the replacement now owns.
+        assert!(!persistence.mark_task_completed(first_lease).await.unwrap());
+        assert!(persistence.mark_task_completed(second_lease).await.unwrap());
     }
 
     #[tokio::test]

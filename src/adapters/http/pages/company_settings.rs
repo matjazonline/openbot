@@ -203,7 +203,6 @@ pub fn company_settings_page(page: &CompanySettingsPage<'_>) -> String {
         company: page.rail_company,
         section: UiSection::Companies,
         content: &content,
-        script: "",
     })
 }
 
@@ -488,7 +487,7 @@ fn company_fields(draft: &CompanyDraft<'_>, hydradb_configured: bool) -> String 
                         <label class="form-control w-full">
                             <div class="label"><span class="text-xs opacity-70">Company Name</span></div>
                             <input type="text" name="name" required value="{name}" placeholder="Acme Corporation"
-                                oninput="this.form.slug.value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                                data-input="slugify"
                                 class="input w-full">
                         </label>
                         <label class="form-control w-full">

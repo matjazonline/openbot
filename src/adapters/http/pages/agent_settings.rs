@@ -121,7 +121,6 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
         company: Some(company),
         section: UiSection::Agents,
         content: &content,
-        script: AGENT_SETTINGS_SCRIPT,
     })
 }
 
@@ -412,7 +411,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                         <label class="form-control w-full">
                             <div class="label"><span class="text-xs opacity-70">Agent Name</span></div>
                             <input type="text" name="name" required value="{name}" placeholder="Support Triage"
-                                oninput="this.form.slug.value = this.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')"
+                                data-input="slugify"
                                 class="input w-full">
                         </label>
                         <label class="form-control w-full">

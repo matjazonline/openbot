@@ -108,8 +108,6 @@ pub struct UiShell<'a> {
     pub section: UiSection,
     /// Everything to the right of the icon rail: the sidebar and its panes.
     pub content: &'a str,
-    /// Workspace-specific JavaScript, appended after the shared [`MAILBOX_SCRIPT`].
-    pub script: &'a str,
 }
 
 /// The full HTML document for one `/ui` response.
@@ -136,7 +134,7 @@ pub fn ui_shell(shell: &UiShell<'_>) -> String {
         content = shell.content,
     );
 
-    ui_layout(shell.title, &body, shell.script)
+    ui_layout(shell.title, &body)
 }
 
 /// The whole mailbox shell for one request.
@@ -620,9 +618,7 @@ const THEME_INIT_SCRIPT: &str = r#"
         })();"#;
 
 /// The HTML shell for every `/ui` response: daisyUI over the Tailwind browser build, plus htmx.
-fn ui_layout(title: &str, body: &str, script: &str) -> String {
-    let _ = script;
-
+fn ui_layout(title: &str, body: &str) -> String {
     format!(
         r##"<!DOCTYPE html>
 <html lang="en" data-theme="dark" class="h-full">
@@ -646,17 +642,19 @@ fn ui_layout(title: &str, body: &str, script: &str) -> String {
 
 pub(crate) fn application_javascript() -> String {
     format!(
-        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{delegation}",
+        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{library}\n{delegation}",
         selected = icon(Icon::Check, BUTTON_ICON),
         add = icon(Icon::Plus, BUTTON_ICON),
         replied = icon(Icon::Check, BUTTON_ICON),
         app = super::layout::APP_SCRIPT,
+        legacy = super::layout::LEGACY_FORMS_SCRIPT,
         mailbox = MAILBOX_SCRIPT,
         local = LOCAL_TIME_SCRIPT,
         skeletons = skeleton_script(),
         schedules = super::schedules::SCHEDULES_SCRIPT,
         agents = super::agent_settings::AGENT_SETTINGS_SCRIPT,
         channels = super::channel_settings::CHANNEL_SETTINGS_SCRIPT,
+        library = super::agent_library_multi_select::AGENT_LIBRARY_SCRIPT,
         delegation = EVENT_DELEGATION_SCRIPT,
     )
 }
@@ -676,6 +674,41 @@ document.addEventListener('click', function (event) {
         case 'show-agent-tab': showAgentTab(control.dataset.advanced === 'true'); break;
         case 'toggle-agent-prompt': toggleAgentPromptGenerator(control.dataset.prefix); break;
         case 'show-channel-tab': showChannelTab(control.dataset.tab); break;
+        case 'hide-element': {
+            var hidden = document.getElementById(control.dataset.target);
+            if (hidden) hidden.classList.add('hidden');
+            break;
+        }
+        case 'toggle-element': {
+            var toggled = document.getElementById(control.dataset.target);
+            if (toggled) toggled.classList.toggle('hidden');
+            break;
+        }
+        case 'toggle-next': {
+            if (control.nextElementSibling) control.nextElementSibling.classList.toggle('hidden');
+            break;
+        }
+        case 'toggle-form-card': toggleFormCard(control); break;
+        case 'show-channel-form-tab': showChannelFormTab(control.dataset.tab); break;
+        case 'toggle-prompt-generator': togglePromptGenerator(control); break;
+        case 'select-company': selectCompany(control.dataset.companyId); break;
+        case 'open-dialog': {
+            var dialog = document.getElementById(control.dataset.dialog);
+            if (dialog) dialog.showModal();
+            break;
+        }
+        case 'close-dialog': {
+            var open = control.closest('dialog');
+            if (open) open.close();
+            break;
+        }
+        case 'pick-channel-library-agent': pickChannelLibraryAgent(control); break;
+        case 'copy-text': copyTextFrom(control); break;
+        case 'delete-library-agent': deleteLibraryAgent(control.dataset.agentId); break;
+        // 'isolate' carries no behaviour. It exists so that `closest('[data-action]')` stops
+        // here rather than resolving to a clickable ancestor -- the delegated stand-in for the
+        // `event.stopPropagation()` these controls used to carry inline.
+        case 'isolate': break;
     }
 });
 document.addEventListener('change', function (event) {
@@ -717,7 +750,54 @@ document.addEventListener('change', function (event) {
             break;
         }
         case 'model-select': control.nextElementSibling.value = control.value; break;
+        case 'pick-agent-radio': selectAgentInSelection(control, false); break;
+        case 'pick-agent-library': selectAgentInSelection(control, true); break;
     }
+});
+document.addEventListener('input', function (event) {
+    var control = event.target.closest('[data-input]');
+    if (!control) return;
+    switch (control.dataset.input) {
+        case 'slugify': syncSlugField(control); break;
+        case 'spam-warning': toggleSpamWarning(control); break;
+        case 'channel-spam-confirm': toggleChannelSpamConfirm(control); break;
+        case 'auto-grow-composer': autoGrowComposer(control); break;
+    }
+});
+document.addEventListener('keydown', function (event) {
+    var control = event.target.closest('[data-keydown]');
+    if (!control) return;
+    switch (control.dataset.keydown) {
+        // Enter submits the surrounding form by default, which throws away a part-filled
+        // multi-field form the moment someone presses it in a single-line input.
+        case 'block-enter':
+            if (event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') event.preventDefault();
+            break;
+        case 'composer': composerKeydown(event); break;
+    }
+});
+document.addEventListener('submit', function (event) {
+    var control = event.target.closest('[data-submit]');
+    if (!control) return;
+    switch (control.dataset.submit) {
+        case 'busy-once':
+            if (!markSubmitBusy(control)) event.preventDefault();
+            break;
+        case 'save-library-agent': saveLibraryAgent(event, control.dataset.agentId); break;
+        case 'create-library-agent': createLibraryAgent(event); break;
+    }
+});
+document.addEventListener('htmx:afterRequest', function (event) {
+    var control = event.target.closest('[data-after-request]');
+    if (!control || !event.detail.successful || event.detail.elt !== control) return;
+    switch (control.dataset.afterRequest) {
+        case 'reset-form': control.reset(); break;
+        case 'reset-and-collapse': resetAndCollapseForm(control); break;
+        case 'clear-cached-company': clearCachedCompanyIfMatch(control.dataset.companyId); break;
+    }
+});
+document.addEventListener('htmx:afterSwap', function (event) {
+    event.target.querySelectorAll('[data-after-swap="apply-generated-prompt"]').forEach(applyGeneratedPrompt);
 });
 "##;
 
@@ -751,7 +831,6 @@ pub fn mailbox_page(page: &MailboxPage<'_>) -> String {
         company: Some(page.company),
         section: UiSection::Mailbox,
         content: &content,
-        script: "",
     })
 }
 
@@ -777,7 +856,6 @@ pub fn mailbox_no_company_page(user: &MailboxUser<'_>) -> String {
         company: None,
         section: UiSection::Mailbox,
         content,
-        script: "",
     })
 }
 
@@ -1941,7 +2019,7 @@ fn thread_composer(pane: &MessagePane<'_>) -> String {
                         <textarea id="thread-composer" name="text_body" rows="1" required
                             placeholder="Write a message... (Enter to send, Shift+Enter for a new line)"
                             class="textarea block max-h-40 min-h-12 w-full resize-none text-sm"
-                            onkeydown="composerKeydown(event)" oninput="autoGrowComposer(this)"></textarea>
+                            data-keydown="composer" data-input="auto-grow-composer"></textarea>
                     </div>
                     <button type="submit" class="btn btn-primary" title="Send">
                         <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>

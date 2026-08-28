@@ -45,6 +45,7 @@ use crate::{
 };
 
 mod dispatch;
+pub use dispatch::DispatchOutcome;
 mod ingest;
 pub use ingest::{ReplyDelivery, SYSTEM_ADDRESS_ANSWERED};
 mod support;
