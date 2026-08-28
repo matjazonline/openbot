@@ -335,7 +335,7 @@ pub(crate) fn schedule_runs_column_fragment(props: &ScheduleRunsColumnProps<'_>)
                 {error_banner}
             </div>
 
-            <div id="schedule-runs-list" class="flex-1 overflow-y-auto">
+            <div id="schedule-runs-list" data-thread-list class="flex-1 overflow-y-auto">
                 {rows}
             </div>
 
@@ -771,40 +771,10 @@ pub(crate) const SCHEDULES_SCRIPT: &str = r##"        function toggleScheduleTyp
             if (customBox) customBox.classList.toggle('hidden', !isCustom);
         }
 
-        function selectSidebarItem(el) {
-            var menu = el.closest('ul');
-            if (!menu) return;
-            menu.querySelectorAll('a').forEach(function (item) {
-                item.classList.remove('menu-active');
-            });
-            el.classList.add('menu-active');
-        }
-
-        function selectThreadRow(el) {
-            document.querySelectorAll('#schedule-runs-list .thread-row').forEach(function (row) {
-                row.classList.remove('bg-base-300');
-            });
-            el.classList.add('bg-base-300');
-        }
-
         document.body.addEventListener('htmx:afterSettle', function (event) {
             if (!event.target || (event.target.id !== 'schedule-runs-column' && event.target.id !== 'schedule-runs-live' && event.target.id !== 'schedule-pane')) return;
             var pane = document.getElementById('schedule-pane');
             if (!pane || !pane.dataset.threadId) return;
             var selected = document.querySelector('#schedule-runs-list .thread-row[data-thread-id="' + pane.dataset.threadId + '"]');
             if (selected) selectThreadRow(selected);
-        });
-
-        function composerKeydown(event) {
-            if (event.key !== 'Enter' || event.shiftKey) return;
-            event.preventDefault();
-            if (event.target.value.trim() === '') return;
-            if (event.target.form) {
-                event.target.form.requestSubmit();
-            }
-        }
-
-        function autoGrowComposer(el) {
-            el.style.height = 'auto';
-            el.style.height = Math.min(el.scrollHeight, 160) + 'px';
-        }"##;
+        });"##;

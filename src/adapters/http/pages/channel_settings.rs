@@ -29,24 +29,6 @@ pub(crate) const CHANNEL_SETTINGS_SCRIPT: &str = r##"        function showChanne
             if (advancedBtn) advancedBtn.classList.toggle('tab-active', mode === 'advanced');
         }
 
-        function toggleScheduleType(select) {
-            var form = select.closest('form');
-            if (!form) return;
-            var isInterval = select.value === 'interval';
-            var intervalBox = form.querySelector('.schedule-interval-box');
-            var oneoffBox = form.querySelector('.schedule-oneoff-box');
-            if (intervalBox) intervalBox.classList.toggle('hidden', !isInterval);
-            if (oneoffBox) oneoffBox.classList.toggle('hidden', isInterval);
-        }
-
-        function toggleScheduleDelivery(select) {
-            var form = select.closest('form');
-            if (!form) return;
-            var isCustom = select.value === 'email_custom';
-            var customBox = form.querySelector('.schedule-custom-recipients-box');
-            if (customBox) customBox.classList.toggle('hidden', !isCustom);
-        }
-
         // The spam interlock only applies to a channel anyone can write to, so the confirmation
         // stays inert until the participants field actually names @public.
         function toggleChannelSpamConfirm(input) {

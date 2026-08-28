@@ -289,8 +289,8 @@ pub(crate) const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` ch
                 var name = el.querySelector('[data-mailbox-channel-name]');
                 var label = document.getElementById('mailbox-selector-label');
                 if (name && label) label.textContent = name.textContent;
-                var dropdown = el.closest('details');
-                if (dropdown) dropdown.open = false;
+                var popover = el.closest('[popover]');
+                if (popover && popover.matches(':popover-open')) popover.hidePopover();
                 setMailboxSidebarExpanded(false);
             }
         }
@@ -357,12 +357,17 @@ pub(crate) const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` ch
             setMobilePane(empty ? 'list' : 'detail');
         });
 
+        // Scoped to the clicked row's own list, like [`selectSidebarItem`]: the mailbox thread list
+        // and the schedule runs list both use these rows, and each highlights within itself.
         function selectThreadRow(el) {
-            document.querySelectorAll('#thread-list .thread-row').forEach(function (row) {
+            var list = el.closest('[data-thread-list]');
+            if (!list) return;
+            list.querySelectorAll('.thread-row').forEach(function (row) {
                 row.classList.remove('bg-base-300');
             });
             el.classList.add('bg-base-300');
-            // Opening a thread is reading it, so its reply mark has done its job.
+            // Opening a thread is reading it, so its reply mark has done its job. A schedule run
+            // carries no mark, so there this is a no-op.
             clearReplyMark(el);
         }
 
@@ -1474,6 +1479,12 @@ fn channel_sidebar(page: &MailboxPage<'_>) -> String {
 ///
 /// The selector stays outside `#thread-column`, so an htmx channel swap does not rebuild or move
 /// it. [`selectSidebarItem`] keeps its label and active item in sync with the full sidebar.
+///
+/// The menu is a native popover rather than a `<details>` dropdown: the browser then owns the
+/// interactions a menu is expected to have -- a click outside or Escape dismisses it, and it
+/// renders in the top layer, so it is never clipped by the scrolling columns beside it. Only
+/// picking a channel is left to us, because light dismissal does not fire for a click *inside*
+/// the menu.
 fn compact_mailbox_header(page: &MailboxPage<'_>) -> String {
     let selected_name = page
         .selected_channel
@@ -1517,18 +1528,18 @@ fn compact_mailbox_header(page: &MailboxPage<'_>) -> String {
                     aria-controls="mailbox-sidebar" aria-expanded="false" data-action="toggle-mailbox-sidebar">
                     {expand}
                 </button>
-                <details class="dropdown min-w-0 flex-1">
-                    <summary class="btn btn-ghost btn-sm w-full min-w-0 justify-between px-2">
-                        <span class="min-w-0 text-left leading-tight">
-                            <span class="block text-[10px] font-semibold uppercase tracking-wider opacity-50">Mailbox</span>
-                            <span id="mailbox-selector-label" class="block truncate">{selected_name}</span>
-                        </span>
-                        {chevron}
-                    </summary>
-                    <ul class="menu dropdown-content z-50 mt-2 w-72 flex-nowrap rounded-box border border-base-300 bg-base-100 p-2 shadow-2xl">
-                        {options}
-                    </ul>
-                </details>
+                <button type="button" class="btn btn-ghost btn-sm min-w-0 flex-1 justify-between px-2"
+                    popovertarget="mailbox-selector-menu" style="anchor-name:--mailbox-selector">
+                    <span class="min-w-0 text-left leading-tight">
+                        <span class="block text-[10px] font-semibold uppercase tracking-wider opacity-50">Mailbox</span>
+                        <span id="mailbox-selector-label" class="block truncate">{selected_name}</span>
+                    </span>
+                    {chevron}
+                </button>
+                <ul id="mailbox-selector-menu" popover style="position-anchor:--mailbox-selector"
+                    class="dropdown menu w-72 flex-nowrap rounded-box border border-base-300 bg-base-100 p-2 shadow-2xl">
+                    {options}
+                </ul>
             </div>
         "##,
         expand = icon(Icon::ChevronRight, BUTTON_ICON),
@@ -2238,7 +2249,7 @@ pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
 /// into it again until a full reload.
 fn thread_list_open_tag(swap: FragmentSwap) -> String {
     format!(
-        r##"<div id="thread-list"{THREAD_ROWS_SKELETON} class="flex-1 overflow-y-auto" sse-swap="thread" hx-swap="afterbegin"{oob}>"##,
+        r##"<div id="thread-list"{THREAD_ROWS_SKELETON} data-thread-list class="flex-1 overflow-y-auto" sse-swap="thread" hx-swap="afterbegin"{oob}>"##,
         oob = swap.oob_attribute(),
     )
 }

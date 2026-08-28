@@ -4411,6 +4411,39 @@ fn every_delegated_action_has_a_branch_in_the_bundle() {
     );
 }
 
+/// The bundle is one flat scope shared by every workspace, so a second `function name(...)` does
+/// not add a variant -- it silently replaces the first one everywhere. `selectSidebarItem` and
+/// `selectThreadRow` were each declared twice, and the schedules copies won even on the mailbox
+/// page that defined them, which is why picking a channel stopped closing the mailbox menu.
+#[test]
+fn no_function_name_is_declared_twice_in_the_bundle() {
+    let bundle = application_javascript();
+
+    let mut counts: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+    for (at, _) in bundle.match_indices("function ") {
+        let rest = &bundle[at + "function ".len()..];
+        let name = rest.split('(').next().unwrap_or_default().trim();
+        // Anonymous callbacks carry no name to collide on.
+        if name.is_empty() || !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            continue;
+        }
+        *counts.entry(name).or_default() += 1;
+    }
+
+    let duplicates: Vec<String> = counts
+        .into_iter()
+        .filter(|(_, count)| *count > 1)
+        .map(|(name, count)| format!("{name} ({count} declarations)"))
+        .collect();
+
+    assert!(
+        duplicates.is_empty(),
+        "these functions are declared more than once in /assets/app.js, so the last one wins on \
+         every page:\n{}",
+        duplicates.join("\n")
+    );
+}
+
 #[test]
 #[ignore = "developer aid: dumps /assets/app.js so it can be syntax-checked with node"]
 fn dump_application_javascript() {
