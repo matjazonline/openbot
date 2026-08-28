@@ -737,6 +737,48 @@ fn the_rail_badge_can_be_sent_back_out_of_band_after_a_company_is_saved() {
 }
 
 #[test]
+fn every_workspace_rail_link_closes_live_streams_before_navigation() {
+    let company = mailbox_company();
+    let email = mailbox_account_email();
+    let user = mailbox_user(&email);
+    let html = ui_shell(&UiShell {
+        title: "Mailbox",
+        user: &user,
+        company: Some(&company),
+        section: UiSection::Mailbox,
+        content: "",
+    });
+    let rail = html
+        .split_once(r#"<nav id="app-rail""#)
+        .expect("shell has the workspace rail")
+        .1
+        .split_once("</nav>")
+        .expect("workspace rail is closed")
+        .0;
+
+    assert!(rail.contains("href="));
+    assert_eq!(
+        rail.matches("href=").count(),
+        rail.matches(r#"data-action="navigate-workspace""#).count(),
+        "every full-page link in the workspace rail must release SSE connections"
+    );
+}
+
+#[test]
+fn workspace_navigation_cleanup_uses_the_htmx_sse_extension_lifecycle() {
+    let script = application_javascript();
+
+    assert!(script.contains(
+        "case 'navigate-workspace': closeLiveStreamsForNavigation(event, control); break;"
+    ));
+    assert!(script.contains("document.querySelectorAll('[sse-connect], [data-sse-connect]')"));
+    assert!(script.contains("window.htmx.trigger(owner, 'htmx:beforeCleanupElement')"));
+    assert!(script.contains("event.defaultPrevented || event.button !== 0"));
+    assert!(script.contains("event.metaKey || event.ctrlKey || event.shiftKey || event.altKey"));
+    assert!(script.contains("target.toLowerCase() !== '_self'"));
+}
+
+#[test]
 fn the_top_bar_names_the_selected_company_between_the_brand_and_the_account() {
     let mut company = mailbox_company();
     company.name = "Acme Logistics".to_string();

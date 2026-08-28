@@ -649,6 +649,15 @@ pub(crate) fn application_javascript() -> String {
 }
 
 const EVENT_DELEGATION_SCRIPT: &str = r##"
+function closeLiveStreamsForNavigation(event, link) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.hasAttribute('download')) return;
+    var target = link.getAttribute('target');
+    if (target && target.toLowerCase() !== '_self') return;
+    if (!window.htmx) return;
+    document.querySelectorAll('[sse-connect], [data-sse-connect]').forEach(function (owner) {
+        window.htmx.trigger(owner, 'htmx:beforeCleanupElement');
+    });
+}
 document.addEventListener('click', function (event) {
     var control = event.target.closest('[data-action]');
     if (!control) return;
@@ -659,6 +668,7 @@ document.addEventListener('click', function (event) {
         case 'toggle-mailbox-sidebar': toggleMailboxSidebar(); break;
         case 'toggle-rail': toggleRail(); break;
         case 'close-rail': setRailOpen(false); break;
+        case 'navigate-workspace': closeLiveStreamsForNavigation(event, control); break;
         case 'pane-back': setMobilePane('list'); break;
         case 'show-agent-tab': showAgentTab(control.dataset.advanced === 'true'); break;
         case 'toggle-agent-prompt': toggleAgentPromptGenerator(control.dataset.prefix); break;
@@ -1325,7 +1335,7 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
         .filter(|(destination, _, _, _)| rail_section_visible(user, *destination))
         .map(|(destination, path, glyph, title)| {
             format!(
-                r##"<a href="{path}?company_id={company_id}" class="btn btn-square btn-md {style}" title="{title}" aria-label="{title}"{current}>{glyph}<span class="rail-label">{title}</span></a>"##,
+                r##"<a href="{path}?company_id={company_id}" class="btn btn-square btn-md {style}" title="{title}" aria-label="{title}" data-action="navigate-workspace"{current}>{glyph}<span class="rail-label">{title}</span></a>"##,
                 style = if section == *destination {
                     "btn-primary"
                 } else {
@@ -1383,7 +1393,7 @@ fn rail_section_visible(user: &MailboxUser<'_>, section: UiSection) -> bool {
 pub fn rail_company_badge(company: &Company, swap: FragmentSwap) -> String {
     format!(
         r##"<a id="rail-company" href="/ui/companies?company_id={company_id}"
-                class="btn btn-square btn-md btn-ghost mt-auto" title="{name}" aria-label="Company: {name}"{oob}>{avatar}<span class="rail-label">{name}</span></a>"##,
+                class="btn btn-square btn-md btn-ghost mt-auto" title="{name}" aria-label="Company: {name}" data-action="navigate-workspace"{oob}>{avatar}<span class="rail-label">{name}</span></a>"##,
         company_id = company.id,
         name = escape_html_text(&company.name),
         oob = swap.oob_attribute(),
