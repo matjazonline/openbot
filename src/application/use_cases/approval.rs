@@ -1,3 +1,4 @@
+use crate::entities::task::TaskSuspension;
 use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -60,7 +61,7 @@ impl ApprovalUseCases {
         channel_slug: &ChannelSlug,
         company_slug: &CompanySlug,
         thread_id: Option<Uuid>,
-        task_id: Option<Uuid>,
+        suspension: Option<TaskSuspension>,
         step_key: &str,
         approver_email: &EmailAddress,
         action_type: &str,
@@ -122,7 +123,7 @@ impl ApprovalUseCases {
                 company_id,
                 channel_id,
                 thread_id,
-                task_id,
+                suspension,
                 step_key,
                 approver_email,
                 action_type,
@@ -406,7 +407,7 @@ fn already_processed_message(approval: &HumanApproval) -> String {
 mod tests {
     use super::*;
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
-    use crate::entities::task::TaskLeaseRef;
+    use crate::entities::task::{TaskLeaseRef, TaskSuspension};
     use crate::entities::{
         cursor::{MessageCursor, ThreadCursor},
         thread::Thread,
@@ -458,7 +459,7 @@ mod tests {
             company_id: Uuid,
             channel_id: Uuid,
             thread_id: Option<Uuid>,
-            task_id: Option<Uuid>,
+            suspension: Option<TaskSuspension>,
             step_key: &str,
             approver_email: &str,
             action_type: &str,
@@ -482,7 +483,7 @@ mod tests {
                 company_id,
                 channel_id: channel_id,
                 thread_id,
-                task_id,
+                task_id: suspension.map(TaskSuspension::task_id),
                 step_key: step_key.to_string(),
                 approver_email: approver_email.to_string(),
                 action_type: action_type.to_string(),
@@ -930,7 +931,7 @@ mod tests {
             channel_slug: "deploy".into(),
             company_slug: "acme".into(),
             thread_id: Some(thread_id),
-            task_id: None,
+            suspension: None,
             approver_email: "devops@acme.com".into(),
         };
 
@@ -988,7 +989,7 @@ mod tests {
             channel_slug: "deploy".into(),
             company_slug: "acme".into(),
             thread_id: Some(thread_id),
-            task_id: None,
+            suspension: None,
             approver_email: "devops@acme.com".into(),
         };
 

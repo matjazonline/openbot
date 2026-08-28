@@ -1,3 +1,4 @@
+use crate::entities::task::TaskSuspension;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -69,7 +70,7 @@ pub trait ApprovalPersistence: Send + Sync {
         company_id: Uuid,
         channel_id: Uuid,
         thread_id: Option<Uuid>,
-        task_id: Option<Uuid>,
+        suspension: Option<TaskSuspension>,
         step_key: &str,
         approver_email: &str,
         action_type: &str,
@@ -129,7 +130,7 @@ impl ApprovalPersistence for PostgresPersistence {
         company_id: Uuid,
         channel_id: Uuid,
         thread_id: Option<Uuid>,
-        task_id: Option<Uuid>,
+        suspension: Option<TaskSuspension>,
         step_key: &str,
         approver_email: &str,
         action_type: &str,
@@ -140,6 +141,7 @@ impl ApprovalPersistence for PostgresPersistence {
         token: &str,
         expires_at: DateTime<Utc>,
     ) -> AppResult<(HumanApproval, bool)> {
+        let task_id = suspension.map(TaskSuspension::task_id);
         let id = Uuid::new_v4();
         let token = Uuid::parse_str(token)
             .map_err(|e| AppError::Internal(format!("Invalid approval token: {}", e)))?;
@@ -196,23 +198,41 @@ impl ApprovalPersistence for PostgresPersistence {
 
         let created = db.token == token;
         if created {
-            if let Some(task_id) = task_id {
+            if let Some(suspension) = suspension {
+                // Parking a task is a write against a possibly-leased row. A run that has been
+                // superseded must not be able to make it, or it would park work the run that
+                // now owns the task is actively doing.
+                //
+                // The lease branch is guarded on the generation; the second branch covers a row
+                // that is already parked and so, by `background_tasks_lease_check`, holds no
+                // lease for anyone to match. A caller with no lease gets NULL binds, which makes
+                // the first branch unsatisfiable -- so it can only ever act on the second.
+                let lease = suspension.lease();
                 let paused = sqlx::query(
                     r#"UPDATE background_tasks
                        SET status = 'pending_approval', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
                            lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
                        WHERE id = $1 AND company_id = $2
-                         AND status IN ('processing', 'waiting_for_third_party_reply',
-                                        'pending_approval')"#,
+                         AND (
+                             ($3::uuid IS NOT NULL
+                              AND status = 'processing'
+                              AND worker_id = $3
+                              AND execution_generation = $4
+                              AND lock_expires_at > CURRENT_TIMESTAMP)
+                             OR status IN ('waiting_for_third_party_reply', 'pending_approval')
+                         )"#,
                 )
-                .bind(task_id)
+                .bind(suspension.task_id())
                 .bind(company_id)
+                .bind(lease.map(|lease| lease.worker_id))
+                .bind(lease.map(|lease| lease.execution_generation))
                 .execute(&mut *tx)
                 .await
                 .map_err(AppError::from)?;
                 if paused.rows_affected() != 1 {
                     return Err(AppError::Internal(
-                        "Approval task could not be paused".into(),
+                        "Approval task could not be paused: it is not suspendable by this caller"
+                            .into(),
                     ));
                 }
             }
@@ -497,6 +517,7 @@ impl ApprovalPersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::test_pool;
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
@@ -504,6 +525,164 @@ mod tests {
         thread::ThreadPersistence,
         user::UserPersistence,
     };
+
+    /// Parking a task is a leased write, and the two callers that do it are not equivalent.
+    ///
+    /// Regression for a guard that checked only `id`, `company_id` and `status`. Under it a run
+    /// whose lease had already been reaped could still park the task, suspending work the run
+    /// that now owns it was actively doing -- and the quorum-timeout sweep, which legitimately
+    /// holds no lease, was what made that guard look sufficient.
+    #[tokio::test]
+    async fn only_the_run_that_owns_a_task_may_park_it() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("park_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Park Test".to_string(),
+                slug: format!("park-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Park".into(),
+                slug: "park".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let email_addr = crate::entities::value_objects::EmailAddress::from(email.clone());
+        let thread = persistence
+            .create_thread(channel.id, "Park", std::slice::from_ref(&email_addr))
+            .await
+            .unwrap();
+        let task = persistence
+            .enqueue_task(
+                company.id,
+                channel.id,
+                Some(thread.id),
+                "test",
+                serde_json::json!({}),
+            )
+            .await
+            .unwrap();
+
+        let worker = Uuid::new_v4();
+        assert!(
+            persistence
+                .claim_task(task.id, worker, Utc::now() + chrono::Duration::minutes(5))
+                .await
+                .unwrap()
+        );
+        let claimed = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        let lease = crate::entities::task::TaskLeaseRef::of(&claimed).expect("claim records lease");
+
+        let park = async |suspension, step: &str| {
+            persistence
+                .create_approval(
+                    company.id,
+                    channel.id,
+                    Some(thread.id),
+                    suspension,
+                    step,
+                    &email,
+                    "tool",
+                    "Deploy",
+                    "Deploy application",
+                    serde_json::json!({}),
+                    serde_json::json!({}),
+                    &Uuid::new_v4().to_string(),
+                    Utc::now() + chrono::Duration::hours(1),
+                )
+                .await
+        };
+
+        // A superseded run: same task, same worker, a generation that is no longer current.
+        let stale = crate::entities::task::TaskLeaseRef {
+            execution_generation: Uuid::new_v4(),
+            ..lease
+        };
+        assert!(
+            park(Some(TaskSuspension::Leased(stale)), "stale-step")
+                .await
+                .is_err(),
+            "a superseded run must not be able to park the task"
+        );
+
+        // Nor may a caller holding no lease at all park a task that is still running.
+        assert!(
+            park(
+                Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
+                "unleased-step"
+            )
+            .await
+            .is_err(),
+            "an unleased caller must not be able to park a running task"
+        );
+
+        assert_eq!(
+            persistence
+                .get_task_by_id(task.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            crate::entities::task::TaskStatus::Processing,
+            "the task is still running and still owned"
+        );
+
+        // The run that actually owns the lease parks it.
+        let (_, created) = park(Some(TaskSuspension::Leased(lease)), "live-step")
+            .await
+            .unwrap();
+        assert!(created);
+        let parked = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        assert_eq!(
+            parked.status,
+            crate::entities::task::TaskStatus::PendingApproval
+        );
+        assert!(
+            parked.worker_id.is_none() && parked.execution_generation.is_none(),
+            "a parked task releases its lease"
+        );
+
+        // Once parked there is no owner left to fence against, so the unleased sweep may act --
+        // this is the quorum-timeout path.
+        assert!(
+            park(
+                Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
+                "sweep-step"
+            )
+            .await
+            .is_ok(),
+            "the timeout sweep must still be able to move an already-parked task"
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
 
     #[tokio::test]
     async fn approval_lookup_is_scoped_and_token_is_consumed_once() {

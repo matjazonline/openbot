@@ -291,7 +291,7 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::company_member::CompanyMembership;
-    use crate::entities::task::TaskLeaseRef;
+    use crate::entities::task::{TaskLeaseRef, TaskSuspension};
     use async_trait::async_trait;
     use axum::body::Body;
     use axum::http::Request;
@@ -1002,7 +1002,7 @@ mod tests {
             _company_id: Uuid,
             _channel_id: Uuid,
             _thread_id: Option<Uuid>,
-            _task_id: Option<Uuid>,
+            _suspension: Option<TaskSuspension>,
             _step_key: &str,
             _approver_email: &str,
             _action_type: &str,

@@ -21,7 +21,7 @@ use crate::{
         schedule::ScheduledRunPayload,
         task::{
             BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus,
-            TaskExecutionOutcome, TaskLeaseRef,
+            TaskExecutionOutcome, TaskLeaseRef, TaskSuspension,
         },
         value_objects::{EmailAddress, MessageId},
     },
@@ -817,7 +817,9 @@ impl TaskWorker {
                 &channel.slug,
                 &company.slug,
                 task.thread_id,
-                Some(task.id),
+                // The sweep holds no lease: this task is already parked awaiting third-party
+                // replies, and the quorum timeout is what moves it on to awaiting a human.
+                Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
                 &format!(
                     "quorum_timeout_{}_{}",
                     outreach.outreach_id,

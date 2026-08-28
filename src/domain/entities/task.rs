@@ -173,6 +173,39 @@ impl TaskLeaseRef {
     }
 }
 
+/// Which task an approval parks, and on whose authority.
+///
+/// Two callers park a task and they are not equivalent: the run that owns it parks itself, and a
+/// maintenance sweep parks one that is *already* parked. Modelling that as a bare `Option<Uuid>`
+/// let the second case's lack of a lease silently license the first, so a superseded run could
+/// park work the current run was actively doing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskSuspension {
+    /// The leased run is parking itself. Fenced on its lease.
+    Leased(TaskLeaseRef),
+    /// A sweep parking a task that is already suspended and so, by
+    /// `background_tasks_lease_check`, holds no lease. It may never park a running task.
+    AlreadySuspended { task_id: Uuid },
+}
+
+impl TaskSuspension {
+    pub fn task_id(self) -> Uuid {
+        match self {
+            TaskSuspension::Leased(lease) => lease.task_id,
+            TaskSuspension::AlreadySuspended { task_id } => task_id,
+        }
+    }
+
+    /// The lease to fence the write on, or `None` when the caller holds none and may therefore
+    /// only act on a task that is already suspended.
+    pub fn lease(self) -> Option<TaskLeaseRef> {
+        match self {
+            TaskSuspension::Leased(lease) => Some(lease),
+            TaskSuspension::AlreadySuspended { .. } => None,
+        }
+    }
+}
+
 /// Which numbered run at a task a ledger write is about.
 ///
 /// The number is derived from `retry_count`, so a task re-claimed after its lease lapsed reuses the

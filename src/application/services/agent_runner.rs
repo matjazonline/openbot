@@ -5,6 +5,7 @@ use crate::entities::approval::ApprovalStatus;
 use crate::entities::channel::Channel;
 use crate::entities::company::Company;
 use crate::entities::message::{Message, MessageRole};
+use crate::entities::task::TaskSuspension;
 use crate::entities::task::TokenUsage;
 use crate::entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress};
 use crate::services::agent_channel_tool::{
@@ -580,7 +581,12 @@ pub struct ApprovalContext {
     pub channel_slug: ChannelSlug,
     pub company_slug: CompanySlug,
     pub thread_id: Option<Uuid>,
-    pub task_id: Option<Uuid>,
+    /// Which task this run parks if the agent asks for approval, and on what authority.
+    ///
+    /// Carries the task id, so nothing is lost against the bare `Option<Uuid>` this replaced --
+    /// but parking a task is a write against a leased row, and only the lease can tell the run
+    /// that owns it from one that has already been superseded.
+    pub suspension: Option<TaskSuspension>,
     pub approver_email: EmailAddress,
 }
 
@@ -720,8 +726,8 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
             .unwrap_or_default();
         let task_str = self
             .context
-            .task_id
-            .map(|task| task.to_string())
+            .suspension
+            .map(|suspension| suspension.task_id().to_string())
             .unwrap_or_default();
         let step_key = format!(
             "{:x}",
@@ -783,7 +789,7 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
                 &self.context.channel_slug,
                 &self.context.company_slug,
                 self.context.thread_id,
-                self.context.task_id,
+                self.context.suspension,
                 &step_key,
                 &self.context.approver_email,
                 req.trigger.trigger_type(),

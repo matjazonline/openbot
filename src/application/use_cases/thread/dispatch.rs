@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::entities::task::TaskLeaseRef;
+use crate::entities::task::{TaskLeaseRef, TaskSuspension};
 
 use crate::{
     adapters::persistence::task::{
@@ -278,7 +278,8 @@ impl ThreadUseCases {
                         .history(&history)
                         .approval_use_cases(self.approval_use_cases.clone())
                         .approval_context(Some(
-                            self.approval_context_for(channel_match, ingest).await,
+                            self.approval_context_for(channel_match, ingest, lease)
+                                .await,
                         ))
                         .monitoring(self.monitoring.clone())
                         .config(Some(self.config.clone()))
@@ -414,6 +415,7 @@ impl ThreadUseCases {
         &self,
         channel_match: &ChannelMatch,
         ingest: &InboundIngestResult,
+        lease: TaskLeaseRef,
     ) -> AgentRunnerApprovalContext {
         let team_approver = self
             .company_persistence
@@ -442,7 +444,12 @@ impl ThreadUseCases {
             channel_slug: channel_match.reply_slug(),
             company_slug: channel_match.company.slug.clone(),
             thread_id: Some(channel_match.thread.id),
-            task_id: ingest.task_id,
+            // Only a task-driven run has a task to park; a direct ingest has no task row at
+            // all. When it does, it parks itself under its own lease.
+            suspension: ingest
+                .task_id
+                .is_some()
+                .then_some(TaskSuspension::Leased(lease)),
             approver_email,
         }
     }
