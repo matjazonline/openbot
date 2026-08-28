@@ -5,7 +5,6 @@ use crate::entities::{
     company::Company,
     message::Message,
     schedule::{ChannelSchedule, ScheduleDeliveryMode, ScheduleRun, ScheduleType},
-    task::ThreadActivity,
 };
 
 pub struct SchedulesPage<'a> {
@@ -193,7 +192,25 @@ fn truncate_chars(value: &str, limit: usize) -> String {
     format!("{kept}…")
 }
 
+/// The live owner stays mounted while SSE replaces its child column.
+///
+/// Replacing the element that owns `sse-connect` opens a disconnect/reconnect window in which a
+/// task-completion notification can be lost. HTTP responses replace this whole region; live
+/// events replace only [`schedule_runs_column_fragment`].
 pub fn schedule_runs_column(props: &ScheduleRunsColumnProps<'_>, swap: FragmentSwap) -> String {
+    format!(
+        r##"<div id="schedule-runs-live" class="contents"{oob}
+            hx-ext="sse" sse-connect="/ui/schedules/{schedule_id}/events?company_id={company_id}&page={page}"
+            sse-swap="schedule-runs" hx-target="#schedule-runs-column" hx-swap="outerHTML">{column}</div>"##,
+        oob = swap.oob_attribute(),
+        schedule_id = props.schedule.id,
+        company_id = props.company_id,
+        page = props.page,
+        column = schedule_runs_column_fragment(props),
+    )
+}
+
+pub(crate) fn schedule_runs_column_fragment(props: &ScheduleRunsColumnProps<'_>) -> String {
     let schedule = props.schedule;
     let company_id = props.company_id;
     let channel_name = props.channel.map(|c| c.name.as_str()).unwrap_or("Channel");
@@ -222,18 +239,7 @@ pub fn schedule_runs_column(props: &ScheduleRunsColumnProps<'_>, swap: FragmentS
 
                 let now = Utc::now();
                 let activity = run.activity(now);
-                let badge = match activity {
-                    Some(ThreadActivity::Working) => {
-                        r#"<span class="badge badge-primary badge-xs flex items-center gap-1"><span class="loading loading-spinner loading-xs"></span>Running</span>"#
-                    }
-                    Some(ThreadActivity::Queued) => {
-                        r#"<span class="badge badge-warning badge-xs">Queued</span>"#
-                    }
-                    Some(ThreadActivity::Failed) => {
-                        r#"<span class="badge badge-error badge-xs">Failed</span>"#
-                    }
-                    _ => r#"<span class="badge badge-ghost badge-xs opacity-60">Done</span>"#,
-                };
+                let badge = schedule_run_activity_badge(activity);
 
                 let snippet = run
                     .latest_response
@@ -287,9 +293,7 @@ pub fn schedule_runs_column(props: &ScheduleRunsColumnProps<'_>, swap: FragmentS
 
     format!(
         r##"
-        <section id="schedule-runs-column"{PANE_SKELETON} class="ui-pane-stacked flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-100"{oob}
-            hx-ext="sse" sse-connect="/ui/schedules/{schedule_id}/events?company_id={company_id}&page={page}"
-            sse-swap="schedule-runs" hx-swap="outerHTML">
+        <section id="schedule-runs-column"{PANE_SKELETON} class="ui-pane-stacked flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-100">
             <div class="border-b border-base-300 p-4 space-y-2">
                 <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0">
@@ -298,7 +302,7 @@ pub fn schedule_runs_column(props: &ScheduleRunsColumnProps<'_>, swap: FragmentS
                     </div>
                     <div class="flex items-center gap-1 shrink-0">
                         <form hx-post="/ui/schedules/{schedule_id}/run-now"
-                            hx-target="#schedule-runs-column" hx-swap="outerHTML" class="inline">
+                            hx-target="#schedule-runs-live" hx-swap="outerHTML" class="inline">
                             <input type="hidden" name="company_id" value="{company_id}">
                             <input type="hidden" name="page" value="{page}">
                             <button type="submit" class="btn btn-outline btn-xs" title="Run schedule immediately">
@@ -306,7 +310,7 @@ pub fn schedule_runs_column(props: &ScheduleRunsColumnProps<'_>, swap: FragmentS
                             </button>
                         </form>
                         <form hx-post="/ui/schedules/{schedule_id}/toggle"
-                            hx-target="#schedule-runs-column" hx-swap="outerHTML" class="inline">
+                            hx-target="#schedule-runs-live" hx-swap="outerHTML" class="inline">
                             <input type="hidden" name="company_id" value="{company_id}">
                             <input type="hidden" name="page" value="{page}">
                             <input type="hidden" name="enabled" value="{toggle_val}">
@@ -344,7 +348,6 @@ pub fn schedule_runs_column(props: &ScheduleRunsColumnProps<'_>, swap: FragmentS
             </div>
         </section>
         "##,
-        oob = swap.oob_attribute(),
         schedule_id = schedule.id,
         schedule_name = escape_html_text(&schedule.name),
         channel_name = escape_html_text(channel_name),
@@ -783,7 +786,7 @@ pub(crate) const SCHEDULES_SCRIPT: &str = r##"        function toggleScheduleTyp
         }
 
         document.body.addEventListener('htmx:afterSettle', function (event) {
-            if (!event.target || event.target.id !== 'schedule-runs-column') return;
+            if (!event.target || (event.target.id !== 'schedule-runs-column' && event.target.id !== 'schedule-runs-live')) return;
             var pane = document.getElementById('schedule-pane');
             if (!pane || !pane.dataset.threadId) return;
             var selected = document.querySelector('#schedule-runs-list .thread-row[data-thread-id="' + pane.dataset.threadId + '"]');

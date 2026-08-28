@@ -6,25 +6,6 @@
 
 use super::*;
 
-/// Whether a fragment is being swapped into its own slot or piggybacking on another response.
-///
-/// The pagination `<div>` is rendered inline on a first page load and out-of-band when appended
-/// to an existing list, so the two cases stay one function instead of a `bool` at the call site.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FragmentSwap {
-    Inline,
-    OutOfBand,
-}
-
-impl FragmentSwap {
-    pub(crate) fn oob_attribute(self) -> &'static str {
-        match self {
-            FragmentSwap::Inline => "",
-            FragmentSwap::OutOfBand => r##" hx-swap-oob="outerHTML""##,
-        }
-    }
-}
-
 /// Who the mailbox is rendered for, as the top bar shows them.
 pub struct MailboxUser<'a> {
     /// Their account id, which is what their own Team pane is keyed by.
@@ -619,6 +600,9 @@ const THEME_INIT_SCRIPT: &str = r#"
 
 /// The HTML shell for every `/ui` response: daisyUI over the Tailwind browser build, plus htmx.
 fn ui_layout(title: &str, body: &str) -> String {
+    let app_css = crate::adapters::http::routes::assets::app_css_url();
+    let app_js = crate::adapters::http::routes::assets::app_js_url();
+    let theme_init_js = crate::adapters::http::routes::assets::theme_init_js_url();
     format!(
         r##"<!DOCTYPE html>
 <html lang="en" data-theme="dark" class="h-full">
@@ -626,15 +610,15 @@ fn ui_layout(title: &str, body: &str) -> String {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Mail Agents</title>
-    <link href="/assets/app.css" rel="stylesheet" type="text/css" />
+    <link href="{app_css}" rel="stylesheet" type="text/css" />
     <style>{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}{APP_SHELL_STYLES}{THREAD_ROW_STYLES}{MAILBOX_LAYOUT_STYLES}{COMPACT_LAYOUT_STYLES}</style>
-    <script src="/assets/theme-init.js"></script>
+    <script src="{theme_init_js}"></script>
     <script src="/assets/htmx-2.0.4.min.js" defer></script>
     <script src="/assets/htmx-ext-sse-2.2.3.js" defer></script>
 </head>
 <body class="h-full overflow-hidden bg-base-100 text-base-content">
 {body}
-    <script src="/assets/app.js"></script>
+    <script src="{app_js}"></script>
 </body>
 </html>"##
     )
@@ -1728,96 +1712,6 @@ pub fn thread_list_fragment(column: &ThreadColumn<'_>, swap: FragmentSwap) -> St
     format!(
         "{cards}{pagination}",
         pagination = thread_pagination(column, swap)
-    )
-}
-
-/// A thread row's activity mark, or nothing at all when the thread is idle.
-///
-/// Every state gets a glyph, because every state now tells the reader something they cannot see
-/// from the messages: the agent has not started, or is answering, or has stopped and needs a
-/// person. Only a live run animates -- it is the one thing that will resolve on its own -- and only
-/// a failure takes a colour. The rest stay quiet, with the wording on hover.
-pub fn thread_activity_mark(activity: Option<ThreadActivity>) -> String {
-    match activity {
-        None => String::new(),
-        Some(activity) => format!(
-            r##"<span class="shrink-0 leading-none {tint}{pulse}" title="{label}">{mark}</span>"##,
-            tint = if activity == ThreadActivity::Failed {
-                "text-error"
-            } else {
-                "opacity-60"
-            },
-            pulse = if activity.is_running() {
-                " animate-pulse"
-            } else {
-                ""
-            },
-            label = escape_html_text(activity.label()),
-            mark = icon(activity_icon(activity), BUTTON_ICON),
-        ),
-    }
-}
-
-/// The glyph standing in for a thread state where there is room for a mark but not for a sentence.
-///
-/// `Queued` and `Working` share one on purpose: a queued task is picked up within a poll interval,
-/// and swapping shapes that fast reads as a flicker rather than as progress. The full wording
-/// rides along as the element's `title`.
-fn activity_icon(activity: ThreadActivity) -> Icon {
-    match activity {
-        ThreadActivity::Queued | ThreadActivity::Working => Icon::DotFill,
-        ThreadActivity::WaitingApproval => Icon::Hourglass,
-        ThreadActivity::WaitingReply => Icon::Mail,
-        ThreadActivity::Failed => Icon::Alert,
-    }
-}
-
-/// A thread row's activity slot: an element the live column can swap into on its own.
-///
-/// Each row listens on its own event name so a status change redraws only that badge. Reusing the
-/// column's `thread` event would insert the whole row at the top of the list, moving a thread
-/// merely because its task changed state -- a reorder nobody asked for.
-///
-/// `hx-target="this"` is not decoration. htmx attributes are inherited, and this slot lives inside
-/// a row button carrying `hx-target="#detail-pane"`; without pinning the target, every badge
-/// update swapped itself over the whole open conversation.
-fn thread_activity_slot(thread_id: Uuid, activity: Option<ThreadActivity>) -> String {
-    format!(
-        r##"<span class="thread-activity" sse-swap="{event}" hx-target="this" hx-swap="innerHTML">{mark}</span>"##,
-        event = thread_activity_event(thread_id),
-        mark = thread_activity_mark(activity),
-    )
-}
-
-/// The SSE event name carrying one thread's activity. Shared with the stream that emits it.
-pub fn thread_activity_event(thread_id: Uuid) -> String {
-    format!("activity-{thread_id}")
-}
-
-/// The strip under the open thread's messages: a spinner while an agent is working, a plain badge
-/// while it is blocked, and nothing when the thread is idle.
-///
-/// Unlike the column, this says everything it knows. The reader is here, waiting on this thread,
-/// so "Agent replying…" is the answer to the question they are actually asking -- where the same
-/// badge on a row they are not looking at would just be noise.
-///
-/// The spinner is shown only for work actually in progress. A thread parked on an approval gets a
-/// badge with no spinner, because something spinning forever reads as broken rather than blocked.
-pub fn thread_activity_strip(activity: Option<ThreadActivity>) -> String {
-    let Some(activity) = activity else {
-        return String::new();
-    };
-
-    let spinner = if activity == ThreadActivity::Working {
-        r##"<span class="loading loading-dots loading-sm"></span>"##
-    } else {
-        ""
-    };
-
-    format!(
-        r##"<div class="flex items-center gap-2 border-t border-base-300 px-6 py-2 text-xs opacity-70">{spinner}<span class="badge badge-sm shrink-0 {style}">{label}</span></div>"##,
-        style = task_status_style(activity.task_status()),
-        label = escape_html_text(activity.label()),
     )
 }
 

@@ -27,11 +27,9 @@ use crate::{
         pages,
         routes::{
             channel::reply_headers,
+            live_updates::channel_wake_ups,
             schedule::UiScheduleForm,
-            ui::{
-                load_account, load_managed_company, managed_company_membership, wake_ups,
-                workspace_user,
-            },
+            ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
         },
     },
     app_error::{AppError, AppResult},
@@ -120,6 +118,12 @@ struct SchedulesWorkspace {
     user_id: Uuid,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum RunsColumnRender {
+    LiveRegion,
+    RefreshFragment,
+}
+
 impl FromRequestParts<AppState> for SchedulesWorkspace {
     type Rejection = AuthError;
 
@@ -179,6 +183,32 @@ impl SchedulesWorkspace {
         schedule_id: Uuid,
         page: Option<usize>,
     ) -> AppResult<Html<String>> {
+        self.render_runs_column(company_id, schedule_id, page, RunsColumnRender::LiveRegion)
+            .await
+    }
+
+    async fn runs_column_fragment(
+        &self,
+        company_id: Uuid,
+        schedule_id: Uuid,
+        page: Option<usize>,
+    ) -> AppResult<Html<String>> {
+        self.render_runs_column(
+            company_id,
+            schedule_id,
+            page,
+            RunsColumnRender::RefreshFragment,
+        )
+        .await
+    }
+
+    async fn render_runs_column(
+        &self,
+        company_id: Uuid,
+        schedule_id: Uuid,
+        page: Option<usize>,
+        render: RunsColumnRender,
+    ) -> AppResult<Html<String>> {
         let page = page.unwrap_or(1).max(1);
         let schedule = self
             .schedule_use_cases
@@ -193,18 +223,23 @@ impl SchedulesWorkspace {
 
         let (runs, has_next) = self.runs_page(company_id, schedule.id, page).await?;
 
-        Ok(Html(pages::schedule_runs_column(
-            &pages::ScheduleRunsColumnProps {
-                company_id,
-                schedule: &schedule,
-                channel: channel.as_ref(),
-                runs: &runs,
-                selected_thread_id: runs.first().map(|run| run.thread_id),
-                page,
-                has_next,
-            },
-            pages::FragmentSwap::Inline,
-        )))
+        let props = pages::ScheduleRunsColumnProps {
+            company_id,
+            schedule: &schedule,
+            channel: channel.as_ref(),
+            runs: &runs,
+            selected_thread_id: runs.first().map(|run| run.thread_id),
+            page,
+            has_next,
+        };
+        let html = match render {
+            RunsColumnRender::LiveRegion => {
+                pages::schedule_runs_column(&props, pages::FragmentSwap::Inline)
+            }
+            RunsColumnRender::RefreshFragment => pages::schedule_runs_column_fragment(&props),
+        };
+
+        Ok(Html(html))
     }
 }
 
@@ -396,18 +431,22 @@ async fn schedule_runs_stream(
         .ok_or_else(|| AppError::NotFound("Schedule not found".into()))?;
     let channel_id = schedule.channel_id;
     let page = query.page;
-    let mut changes = Box::pin(wake_ups(&events, "schedule-runs", move |event| {
-        event.is_message_in_channel(channel_id) || event.is_activity_in_channel(channel_id)
-    }));
+    let mut changes = Box::pin(channel_wake_ups(&events, "schedule-runs", channel_id));
 
     let stream = async_stream::stream! {
-        while let Some(_change) = changes.next().await {
-            match workspace.runs_column(query.company_id, schedule_id, page).await {
+        loop {
+            // Reconcile immediately on connect. This closes the page-render/connect race and also
+            // makes a reconnect recover an activity notification missed while the socket was down.
+            match workspace.runs_column_fragment(query.company_id, schedule_id, page).await {
                 Ok(Html(column)) => yield Ok(Event::default().event("schedule-runs").data(column)),
                 Err(error) => {
                     tracing::warn!(%error, %schedule_id, "Schedule runs stream query failed");
                     return;
                 }
+            }
+
+            if changes.next().await.is_none() {
+                return;
             }
         }
     };
@@ -824,7 +863,7 @@ mod tests {
     use super::*;
     use crate::adapters::http::pages::{
         FragmentSwap, MailboxUser, ScheduleRunsColumnProps, ScheduleThreadPaneProps, SchedulesPage,
-        schedule_runs_column, schedule_thread_pane, schedules_page,
+        schedule_runs_column, schedule_runs_column_fragment, schedule_thread_pane, schedules_page,
     };
     use crate::entities::{
         company::Company,
@@ -1056,11 +1095,61 @@ mod tests {
         assert!(html.contains("2 msgs"));
         assert!(html.contains("Running")); // Processing with active lease
         assert!(html.contains("Run Now"));
+        assert!(html.contains(r#"id="schedule-runs-live" class="contents""#));
         assert!(html.contains(&format!(
             r#"sse-connect="/ui/schedules/{}/events?company_id={company_id}&page=1""#,
             schedule.id
         )));
         assert!(html.contains(r#"sse-swap="schedule-runs""#));
+        assert!(html.contains(r##"hx-target="#schedule-runs-column""##));
+
+        let refresh = schedule_runs_column_fragment(&ScheduleRunsColumnProps {
+            company_id,
+            schedule: &schedule,
+            channel: None,
+            runs: std::slice::from_ref(&run),
+            selected_thread_id: Some(run.thread_id),
+            page: 1,
+            has_next: false,
+        });
+        assert!(refresh.contains(r#"id="schedule-runs-column""#));
+        assert!(!refresh.contains("sse-connect"));
+        assert!(!refresh.contains(r#"id="schedule-runs-live""#));
+    }
+
+    #[test]
+    fn schedule_run_badges_do_not_call_suspended_tasks_done() {
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+        let schedule = test_schedule(company_id, channel_id);
+        let mut run = ScheduleRun {
+            thread_id: Uuid::new_v4(),
+            task_id: Uuid::new_v4(),
+            channel_id,
+            subject: "Suspended run".into(),
+            task_status: TaskStatus::PendingApproval,
+            lock_expires_at: None,
+            latest_response: None,
+            message_count: 1,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let render = |run: &ScheduleRun| {
+            schedule_runs_column_fragment(&ScheduleRunsColumnProps {
+                company_id,
+                schedule: &schedule,
+                channel: None,
+                runs: std::slice::from_ref(run),
+                selected_thread_id: None,
+                page: 1,
+                has_next: false,
+            })
+        };
+
+        assert!(render(&run).contains("Waiting for approval"));
+        run.task_status = TaskStatus::WaitingForThirdPartyReply;
+        assert!(render(&run).contains("Waiting for reply"));
     }
 
     #[test]

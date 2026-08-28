@@ -934,34 +934,40 @@ fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {
         }
     };
     format!(
-        r##"<fieldset class="rounded-box border border-base-300 bg-base-200 p-4"{disabled}>
-                        <legend class="px-2 text-sm font-semibold">Memory</legend>
+        r##"<fieldset class="rounded-lg border border-base-300 bg-base-200 p-4"{disabled}>
+                        <legend class="px-1 text-xs font-semibold">Memory</legend>
                         <p class="mb-3 text-[11px] opacity-60">Controls become authoritative only when the company's selected provider is ready.</p>
-                        <div class="grid grid-cols-4 gap-2 text-xs">
-                            <span></span><span>Company</span><span>Agent</span><span>User</span>
-                            <span>Retrieve</span>
-                            <input aria-label="Retrieve company memory" type="checkbox" name="retrieve_company_memory" value="true" class="checkbox checkbox-sm"{retrieve_company}{disabled}>
-                            <input aria-label="Retrieve agent memory" type="checkbox" name="retrieve_agent_memory" value="true" class="checkbox checkbox-sm"{retrieve_agent}{disabled}>
-                            <input aria-label="Retrieve user memory" type="checkbox" name="retrieve_user_memory" value="true" class="checkbox checkbox-sm"{retrieve_user}{disabled}>
-                            <span>Persist</span>
-                            <input aria-label="Persist company memory" type="checkbox" name="persist_company_memory" value="true" class="checkbox checkbox-sm"{persist_company}{disabled}>
-                            <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true" class="checkbox checkbox-sm"{persist_agent}{disabled}>
-                            <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true" class="checkbox checkbox-sm"{persist_user}{disabled}>
+                        <div class="grid max-w-sm grid-cols-4 items-center gap-x-2 gap-y-2 text-xs">
+                            <span></span>
+                            <span class="text-center opacity-70">Company</span>
+                            <span class="text-center opacity-70">Agent</span>
+                            <span class="text-center opacity-70">User</span>
+                            <span class="opacity-70">Retrieve</span>
+                            <input aria-label="Retrieve company memory" type="checkbox" name="retrieve_company_memory" value="true" class="checkbox checkbox-sm justify-self-center"{retrieve_company}{disabled}>
+                            <input aria-label="Retrieve agent memory" type="checkbox" name="retrieve_agent_memory" value="true" class="checkbox checkbox-sm justify-self-center"{retrieve_agent}{disabled}>
+                            <input aria-label="Retrieve user memory" type="checkbox" name="retrieve_user_memory" value="true" class="checkbox checkbox-sm justify-self-center"{retrieve_user}{disabled}>
+                            <span class="opacity-70">Persist</span>
+                            <input aria-label="Persist company memory" type="checkbox" name="persist_company_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_company}{disabled}>
+                            <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_agent}{disabled}>
+                            <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_user}{disabled}>
                         </div>
-                        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <label class="form-control"><span class="mb-1 text-xs opacity-70">Persistence mode</span>
+                        <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <label class="form-control w-full">
+                                <div class="label"><span class="text-xs opacity-70">Persistence mode</span></div>
                                 <select name="memory_persistence_mode" class="select w-full"{disabled}>
                                     <option value="audience_only"{audience_only_selected}>Audience only</option>
                                     <option value="scope_specific_facts"{scope_specific_selected}>Scope-specific facts</option>
                                 </select>
                             </label>
-                            <label class="form-control"><span class="mb-1 text-xs opacity-70">Recall mode</span>
+                            <label class="form-control w-full">
+                                <div class="label"><span class="text-xs opacity-70">Recall mode</span></div>
                                 <select name="memory_recall_mode" class="select w-full"{disabled}>
                                     <option value="fast"{fast_selected}>Fast</option>
                                     <option value="thinking"{thinking_selected}>Thinking</option>
                                 </select>
                             </label>
-                            <label class="form-control"><span class="mb-1 text-xs opacity-70">Maximum results</span>
+                            <label class="form-control w-full">
+                                <div class="label"><span class="text-xs opacity-70">Maximum results</span></div>
                                 <input name="memory_max_results" type="number" min="1" max="20" value="{max_results}" class="input w-full"{disabled}>
                             </label>
                         </div>

@@ -23,11 +23,8 @@ use axum::{
     routing::get,
 };
 use serde::Deserialize;
-use tokio_stream::{
-    Stream, StreamExt,
-    wrappers::{BroadcastStream, errors::BroadcastStreamRecvError},
-};
-use tracing::{debug, instrument, warn};
+use tokio_stream::{Stream, StreamExt};
+use tracing::{instrument, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -57,7 +54,10 @@ use crate::{
     },
 };
 
-use super::channel::{ThreadListQuery, ThreadListResponse, load_thread_page, reply_headers};
+use super::{
+    channel::{ThreadListQuery, ThreadListResponse, load_thread_page, reply_headers},
+    live_updates::{Wake, channel_wake_ups, thread_wake_ups},
+};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -547,42 +547,6 @@ fn resume_cursor<C: FromStr>(headers: &HeaderMap, after: Option<&str>) -> Option
         .and_then(|raw| raw.parse().ok())
 }
 
-/// Why a stream woke up.
-pub(super) enum Wake {
-    /// A specific event this reader cares about.
-    Event(MailboxEvent),
-    /// Events were dropped because this reader fell behind. *What* was missed is unknown, so the
-    /// reader has to refresh everything it tracks rather than guess.
-    Lagged,
-}
-
-/// Wake-ups for one reader, filtered to the events they care about.
-///
-/// Nothing downstream trusts the event as data: a message wake-up sends the reader back to its
-/// cursor query and an activity wake-up sends it back to the database for current state. That is
-/// why lag is survivable and is turned into a [`Wake::Lagged`] rather than an error. Filtering
-/// happens after the caller's authorization check, so no id from another company is observable.
-///
-/// The `use<Matches>` bound is load-bearing: without it Rust 2024 has the returned stream capture
-/// the `&MailboxEvents` borrow, and an SSE response has to be `'static`. Only the subscription —
-/// which `subscribe` hands back owned — actually outlives this call.
-pub(super) fn wake_ups<Matches>(
-    events: &MailboxEvents,
-    label: &'static str,
-    matches: Matches,
-) -> impl Stream<Item = Wake> + Send + use<Matches>
-where
-    Matches: Fn(&MailboxEvent) -> bool + Send + 'static,
-{
-    BroadcastStream::new(events.subscribe()).filter_map(move |event| match event {
-        Ok(event) => matches(&event).then_some(Wake::Event(event)),
-        Err(BroadcastStreamRecvError::Lagged(missed)) => {
-            debug!(missed, stream = label, "Live stream lagged, catching up");
-            Some(Wake::Lagged)
-        }
-    })
-}
-
 /// GET /ui/events - The open thread's messages as they are persisted (Protected).
 ///
 /// Each event is one rendered chat bubble, appended to `#message-scroll` by htmx's SSE extension.
@@ -621,9 +585,7 @@ async fn thread_message_stream(
 
     let mut cursor = resume_cursor(&headers, query.after.as_deref());
     let thread_id = thread.id;
-    let mut wake_ups = Box::pin(wake_ups(&events, "messages", move |event| {
-        event.is_message_in_thread(thread_id) || event.is_activity_in_thread(thread_id)
-    }));
+    let mut wake_ups = Box::pin(thread_wake_ups(&events, "messages", thread_id));
 
     let stream = async_stream::stream! {
         // Both start true so a connect emits the reader's backlog and the current activity, rather
@@ -729,9 +691,7 @@ async fn thread_column_stream(
     let company_id = query.company_id;
     let mut cursor = resume_cursor(&headers, query.after.as_deref());
     let channel_id = channel.id;
-    let mut wake_ups = Box::pin(wake_ups(&events, "threads", move |event| {
-        event.is_message_in_channel(channel_id) || event.is_activity_in_channel(channel_id)
-    }));
+    let mut wake_ups = Box::pin(channel_wake_ups(&events, "threads", channel_id));
 
     let stream = async_stream::stream! {
         let mut pending_rows = true;

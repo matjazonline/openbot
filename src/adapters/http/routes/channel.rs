@@ -37,7 +37,7 @@ use crate::{
 };
 
 use super::agent::{ModelOverrides, create_agent_from_instructions};
-use super::ui::wake_ups;
+use super::live_updates::thread_wake_ups;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -1149,9 +1149,7 @@ async fn simulation_stream(
         .filter(|thread| thread.channel_id == channel_id)
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
 
-    let mut wake_ups = Box::pin(wake_ups(&events, "simulation", move |event| {
-        event.is_message_in_thread(thread_id) || event.is_activity_in_thread(thread_id)
-    }));
+    let mut wake_ups = Box::pin(thread_wake_ups(&events, "simulation", thread_id));
     let app_domain_name = thread_use_cases.config().app_domain_name.clone();
 
     let stream = async_stream::stream! {

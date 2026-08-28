@@ -22,6 +22,7 @@ pub fn base_layout(title: &str, content: &str) -> String {
 }
 
 pub(crate) fn public_layout(title: &str, content: &str) -> String {
+    let app_css = crate::adapters::http::routes::assets::app_css_url();
     format!(
         r##"<!DOCTYPE html>
 <html lang="en" data-theme="dark" class="h-full">
@@ -29,7 +30,7 @@ pub(crate) fn public_layout(title: &str, content: &str) -> String {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Mail Agents</title>
-    <link href="/assets/app.css" rel="stylesheet" type="text/css" />
+    <link href="{app_css}" rel="stylesheet" type="text/css" />
     <style>
         [data-theme="dark"] {{
             --color-primary: oklch(50% 0.19 264.05);
@@ -485,6 +486,8 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
     } else {
         PUBLIC_NAV
     };
+    let app_css = crate::adapters::http::routes::assets::app_css_url();
+    let app_js = crate::adapters::http::routes::assets::app_js_url();
 
     format!(
         r##"<!DOCTYPE html>
@@ -493,7 +496,7 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Mail Agents</title>
-    <link href="/assets/app.css" rel="stylesheet" type="text/css" />
+    <link href="{app_css}" rel="stylesheet" type="text/css" />
     <script src="/assets/htmx-2.0.4.min.js" defer></script>
 </head>
 <body class="h-full font-sans antialiased text-slate-100 flex flex-col items-center p-4 md:p-8">
@@ -510,7 +513,7 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
             {content}
         </div>
     </div>
-    <script src="/assets/app.js"></script>
+    <script src="{app_js}"></script>
 </body>
 </html>"##
     )

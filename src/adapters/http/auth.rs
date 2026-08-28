@@ -55,6 +55,13 @@ fn authenticated_user(
         .map(|id| AuthenticatedUser { id })
 }
 
+fn is_htmx_request(headers: &axum::http::HeaderMap) -> bool {
+    headers
+        .get("HX-Request")
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value == "true")
+}
+
 fn auth_error(path: &str, is_htmx: bool) -> AuthError {
     if path.starts_with("/api/") {
         AuthError::Unauthorized
@@ -63,6 +70,14 @@ fn auth_error(path: &str, is_htmx: bool) -> AuthError {
     } else {
         AuthError::RedirectToLogin
     }
+}
+
+/// How *this* request should be told it is not signed in.
+///
+/// A page gets a redirect, an htmx fragment gets `HX-Redirect`, and only an API caller gets a bare
+/// 401 — a browser on `/ui` must never be left staring at the words "Authentication required".
+fn auth_error_for(parts: &Parts) -> AuthError {
+    auth_error(parts.uri.path(), is_htmx_request(&parts.headers))
 }
 
 pub async fn require_auth(
@@ -74,11 +89,7 @@ pub async fn require_auth(
         return next.run(request).await;
     }
 
-    let is_htmx = request
-        .headers()
-        .get("HX-Request")
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value == "true");
+    let is_htmx = is_htmx_request(request.headers());
 
     auth_error(request.uri().path(), is_htmx).into_response()
 }
@@ -90,18 +101,11 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let is_htmx = parts
-            .headers
-            .get("HX-Request")
-            .and_then(|v| v.to_str().ok())
-            .map(|v| v == "true")
-            .unwrap_or(false);
-
         if let Some(user) = authenticated_user(&state.sessions, &parts.headers) {
             return Ok(user);
         }
 
-        Err(auth_error(parts.uri.path(), is_htmx))
+        Err(auth_error_for(parts))
     }
 }
 
@@ -119,13 +123,16 @@ impl FromRequestParts<AppState> for Viewer {
     ) -> Result<Self, Self::Rejection> {
         let user = AuthenticatedUser::from_request_parts(parts, state).await?;
 
+        // A signed cookie whose account no longer exists is a signed-out browser, not an API
+        // client: send it back through the login page rather than answering a page request with
+        // bare 401 text.
         let account = state
             .user_use_cases
             .get_user_by_id(user.id)
             .await
             .ok()
             .flatten()
-            .ok_or(AuthError::Unauthorized)?;
+            .ok_or_else(|| auth_error_for(parts))?;
 
         Ok(Viewer {
             user_id: user.id,
@@ -174,6 +181,27 @@ mod tests {
                 .unwrap(),
             "/login"
         );
+    }
+
+    fn parts_for(uri: &str, is_htmx: bool) -> Parts {
+        let mut builder = Request::get(uri);
+        if is_htmx {
+            builder = builder.header("HX-Request", "true");
+        }
+        builder.body(Body::empty()).unwrap().into_parts().0
+    }
+
+    #[test]
+    fn a_ui_page_is_sent_to_login_rather_than_told_it_is_unauthorized() {
+        let response = auth_error_for(&parts_for("/ui/dashboard", false)).into_response();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get("location").unwrap(), "/login");
+
+        let fragment = auth_error_for(&parts_for("/ui/dashboard", true)).into_response();
+        assert_eq!(fragment.headers().get("HX-Redirect").unwrap(), "/login");
+
+        let api = auth_error_for(&parts_for("/api/companies", false)).into_response();
+        assert_eq!(api.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[test]

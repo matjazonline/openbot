@@ -7,6 +7,7 @@ pub mod channel;
 pub mod company;
 pub mod company_invite;
 pub mod health;
+mod live_updates;
 pub mod monitoring;
 pub mod onboarding;
 pub mod schedule;
