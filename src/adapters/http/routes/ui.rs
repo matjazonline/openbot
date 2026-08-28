@@ -279,6 +279,19 @@ async fn page_activity(
     thread_use_cases.thread_activity(&ids).await
 }
 
+/// Thread ids whose activity badges a newly connected column may already be displaying.
+async fn first_page_thread_ids(
+    thread_use_cases: &ThreadUseCases,
+    channel_id: Uuid,
+) -> AppResult<HashSet<Uuid>> {
+    Ok(thread_use_cases
+        .list_channel_threads(channel_id, None, STREAM_BATCH_LIMIT)
+        .await?
+        .into_iter()
+        .map(|thread| thread.id)
+        .collect())
+}
+
 /// What one thread is doing, for the strip under its messages.
 async fn thread_activity(
     thread_use_cases: &ThreadUseCases,
@@ -692,13 +705,17 @@ async fn thread_column_stream(
     let mut cursor = resume_cursor(&headers, query.after.as_deref());
     let channel_id = channel.id;
     let mut wake_ups = Box::pin(channel_wake_ups(&events, "threads", channel_id));
+    // Subscribe first, then snapshot every badge that can already be on screen. An activity
+    // change during this query stays buffered; one before the connection is recovered by the
+    // snapshot itself.
+    let initial_stale_badges = first_page_thread_ids(&thread_use_cases, channel_id).await?;
 
     let stream = async_stream::stream! {
         let mut pending_rows = true;
         // Threads whose badge is out of date. Kept as a set of ids rather than a flag because a
         // status change must redraw *only* that badge: re-sending the row would insert it at the
         // top of the column and move a thread for no reason a reader could see.
-        let mut stale_badges: HashSet<Uuid> = HashSet::new();
+        let mut stale_badges = initial_stale_badges;
 
         loop {
             if !stale_badges.is_empty() {
@@ -784,11 +801,8 @@ async fn thread_column_stream(
                 // likely to be showing rather than leave a stale spinner behind.
                 Some(Wake::Lagged) => {
                     pending_rows = true;
-                    match thread_use_cases
-                        .list_channel_threads(channel_id, None, STREAM_BATCH_LIMIT)
-                        .await
-                    {
-                        Ok(threads) => stale_badges.extend(threads.iter().map(|t| t.id)),
+                    match first_page_thread_ids(&thread_use_cases, channel_id).await {
+                        Ok(ids) => stale_badges.extend(ids),
                         Err(error) => {
                             warn!(%error, %channel_id, "Thread column catch-up query failed");
                             return;

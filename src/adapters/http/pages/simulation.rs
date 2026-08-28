@@ -119,7 +119,7 @@ fn simulation_compose_form(
                             <span class="text-indigo-400">{lookup_glyph}</span> Open Existing Thread by ID
                         </h3>
                         <p class="text-slate-400 text-xs mb-3">Inspect thread history and simulate follow-up reply messages for an existing thread.</p>
-                        <form hx-get="/companies/{company_id}/channels/{channel_id}/simulate/thread" hx-target="#simulation-result" hx-swap="innerHTML" class="flex flex-col sm:flex-row gap-3">
+                        <form hx-get="/companies/{company_id}/channels/{channel_id}/simulate/thread" hx-target="#simulation-result" hx-swap="innerHTML" hx-sync="#simulation-result:replace" class="flex flex-col sm:flex-row gap-3">
                             <input type="text" id="open_thread_id" name="thread_id" placeholder="Enter Thread ID (e.g. 550e8400-e29b-41d4-a716-446655440000)" required
                                 class="flex-1 px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <button type="submit"

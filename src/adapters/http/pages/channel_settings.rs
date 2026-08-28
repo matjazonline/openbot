@@ -244,7 +244,7 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
             <div class="border-t border-base-300 p-2">
                 <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
                     hx-get="/ui/channels/new?company_id={company_id}"
-                    hx-target="#channel-pane" hx-swap="outerHTML"
+                    hx-target="#channel-pane" hx-swap="outerHTML" hx-sync="#channel-pane:replace"
                     hx-push-url="/ui/channels?company_id={company_id}&new=1">{plus_glyph} New Channel</button>
             </div>
         </aside>
@@ -310,6 +310,7 @@ fn channel_settings_entry(
                     <a class="flex flex-col items-start gap-0.5 {active}"
                         hx-get="/ui/channels/{channel_id}?company_id={company_id}"
                         hx-target="#channel-pane" hx-swap="outerHTML"
+                        hx-sync="#channel-pane:replace"
                         hx-push-url="/ui/channels?company_id={company_id}&channel_id={channel_id}"
                         data-action="select-sidebar-item">
                         <span class="flex w-full min-w-0 items-center gap-2">
@@ -389,7 +390,7 @@ pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: b
                         </button>
                         <button type="button" class="btn btn-ghost"
                             hx-get="/ui/channels/close?company_id={company_id}"
-                            hx-target="#channel-pane" hx-swap="outerHTML"
+                            hx-target="#channel-pane" hx-swap="outerHTML" hx-sync="#channel-pane:replace"
                             hx-push-url="/ui/channels?company_id={company_id}">Cancel</button>
                         <button type="button" class="btn btn-error btn-outline ml-auto"
                             hx-delete="/ui/channels/{channel_id}?company_id={company_id}"
@@ -467,7 +468,7 @@ pub fn channel_create_pane_with_memory(pane: &ChannelCreatePane<'_>, memory_read
                         </button>
                         <button type="button" class="btn btn-ghost"
                             hx-get="/ui/channels/close?company_id={company_id}"
-                            hx-target="#channel-pane" hx-swap="outerHTML"
+                            hx-target="#channel-pane" hx-swap="outerHTML" hx-sync="#channel-pane:replace"
                             hx-push-url="/ui/channels?company_id={company_id}">Cancel</button>
                     </div>
                 </form>
@@ -504,7 +505,7 @@ pub fn channel_create_pane_with_memory(pane: &ChannelCreatePane<'_>, memory_read
                         </button>
                         <button type="button" class="btn btn-ghost"
                             hx-get="/ui/channels/close?company_id={company_id}"
-                            hx-target="#channel-pane" hx-swap="outerHTML"
+                            hx-target="#channel-pane" hx-swap="outerHTML" hx-sync="#channel-pane:replace"
                             hx-push-url="/ui/channels?company_id={company_id}">Cancel</button>
                     </div>
                 </form>
@@ -521,7 +522,7 @@ pub fn channel_create_pane_with_memory(pane: &ChannelCreatePane<'_>, memory_read
                         </button>
                         <button type="button" class="btn btn-ghost"
                             hx-get="/ui/channels/close?company_id={company_id}"
-                            hx-target="#channel-pane" hx-swap="outerHTML"
+                            hx-target="#channel-pane" hx-swap="outerHTML" hx-sync="#channel-pane:replace"
                             hx-push-url="/ui/channels?company_id={company_id}">Cancel</button>
                     </div>
                 </form>

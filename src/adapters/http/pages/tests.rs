@@ -947,6 +947,7 @@ fn agent_settings_list_targets_the_pane_and_swaps_out_of_band() {
         agent.id, company.id
     )));
     assert!(inline.contains("hx-target=\"#agent-pane\""));
+    assert!(inline.contains("hx-sync=\"#agent-pane:replace\""));
     assert!(inline.contains("@triage"));
     assert!(inline.contains("openai / gpt-4o"));
     assert!(inline.contains("menu-active"));
@@ -1232,6 +1233,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
         channel.id, company.id
     )));
     assert!(inline.contains("hx-target=\"#channel-pane\""));
+    assert!(inline.contains("hx-sync=\"#channel-pane:replace\""));
     assert!(inline.contains("inbox@acme.example.com"));
     assert!(inline.contains("menu-active"));
     assert!(!inline.contains("hx-swap-oob"));
@@ -1508,7 +1510,7 @@ fn cancelling_a_channel_form_dismisses_the_pane() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
     let close = format!(
-        "hx-get=\"/ui/channels/close?company_id={}\"\n                            hx-target=\"#channel-pane\" hx-swap=\"outerHTML\"\n                            hx-push-url=\"/ui/channels?company_id={}\">Cancel</button>",
+        "hx-get=\"/ui/channels/close?company_id={}\"\n                            hx-target=\"#channel-pane\" hx-swap=\"outerHTML\" hx-sync=\"#channel-pane:replace\"\n                            hx-push-url=\"/ui/channels?company_id={}\">Cancel</button>",
         company.id, company.id
     );
 
@@ -1876,6 +1878,7 @@ fn thread_column_streams_touched_threads_from_where_it_was_rendered() {
 
     // A bumped thread arrives as an insert at the top; the client drops the stale copy below.
     assert!(html.contains("sse-swap=\"thread\" hx-swap=\"afterbegin\""));
+    assert!(html.contains("hx-sync=\"#detail-pane:replace\""));
     assert!(html.contains(&format!("data-thread-id=\"{}\"", newest.id)));
 }
 
@@ -2501,6 +2504,7 @@ fn task_monitor_list_targets_the_pane_and_swaps_out_of_band() {
     let inline = task_monitor_list(&list, FragmentSwap::Inline);
     assert!(inline.contains(&format!("/ui/tasks/{}?company_id={}", task.id, company.id)));
     assert!(inline.contains("hx-target=\"#task-pane\""));
+    assert!(inline.contains("hx-sync=\"#task-pane:replace\""));
     assert!(inline.contains("menu-active"));
     assert!(inline.contains("Processing"));
     assert!(inline.contains("165 tokens"));
@@ -3057,6 +3061,7 @@ fn team_settings_list_groups_members_and_invites_and_swaps_out_of_band() {
         company.id, sam.user_id
     )));
     assert!(inline.contains("hx-target=\"#team-pane\""));
+    assert!(inline.contains("hx-sync=\"#team-pane:replace\""));
     assert!(inline.contains("menu-active"));
     assert!(!inline.contains("hx-swap-oob"));
     // Members, then invites; and a pending invite outranks one that is already answered.
@@ -3614,6 +3619,7 @@ fn outbox_list_says_when_nothing_matches_and_pages_only_when_there_is_more() {
     assert!(paged.contains("Older <svg"));
     assert!(paged.contains(r##"hx-swap-oob="outerHTML""##));
     assert!(paged.contains("page=2"));
+    assert!(paged.contains("hx-sync=\"#outbox-list:replace\""));
 }
 
 #[test]
@@ -3690,10 +3696,10 @@ fn the_ui_shell_carries_the_placeholder_machinery_for_its_swap_targets() {
     assert!(script.contains("class=\\\"skeleton "));
 }
 
-/// The dashboard is the one workspace whose body is not rendered with the page, so the placeholder
-/// has to be backed by a request that actually replaces it.
+/// The dashboard is the one workspace whose body is not rendered with the page. Its immediate SSE
+/// snapshot must be the placeholder's only writer, or a slower load request can overwrite it.
 #[test]
-fn the_dashboard_shows_a_placeholder_and_fetches_the_panels_behind_it() {
+fn the_dashboard_shows_a_placeholder_with_one_initial_writer() {
     let company = mailbox_company();
     let email = mailbox_account_email();
     let companies = [company];
@@ -3709,8 +3715,10 @@ fn the_dashboard_shows_a_placeholder_and_fetches_the_panels_behind_it() {
     });
 
     assert!(html.contains(r##"data-skeleton="panels""##));
-    assert!(html.contains(r##"hx-get="/ui/dashboard/panels?company_id="##));
-    assert!(html.contains(r##"hx-trigger="load""##));
+    assert!(html.contains(r##"sse-connect="/ui/dashboard/events?company_id="##));
+    assert!(html.contains(r##"sse-swap="dashboard""##));
+    assert!(!html.contains(r##"hx-get="/ui/dashboard/panels"##));
+    assert!(!html.contains(r##"hx-trigger="load""##));
     assert!(
         html.contains(r##"class="skeleton h-28 w-full""##),
         "the placeholder itself must be in the response, not only paintable later"

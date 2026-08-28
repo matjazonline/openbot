@@ -868,7 +868,9 @@ async fn simulate_channel_page(
                 false,
             )
             .await
-            .map(|(_, fragment)| fragment)
+            .map(|(thread, fragment)| {
+                pages::simulation_live_view(company.id, channel.id, thread.id, &fragment)
+            })
             .unwrap_or_else(|error_fragment| error_fragment),
         ),
         None => None,
@@ -1153,8 +1155,9 @@ async fn simulation_stream(
     let app_domain_name = thread_use_cases.config().app_domain_name.clone();
 
     let stream = async_stream::stream! {
-        // A lagged subscriber needs no special handling: the next render reads current state.
-        while wake_ups.next().await.is_some() {
+        loop {
+            // Re-read immediately on connect. Notifications are only wake-ups, so this also
+            // recovers anything committed before the browser subscribed or while it was offline.
             // `include_oob: false` -- the out-of-band form reset belongs to the POST that started
             // this run, not to every update after it.
             let rendered = load_simulation_thread_fragment(
@@ -1174,6 +1177,10 @@ async fn simulation_stream(
                     yield Ok(Event::default().event("simulation").data(error_fragment));
                     return;
                 }
+            }
+
+            if wake_ups.next().await.is_none() {
+                return;
             }
         }
     };
@@ -1722,20 +1729,30 @@ mod tests {
         assert!(sim_html.contains("Trigger Webhook Simulation"));
         assert!(sim_html.contains("Simulating..."));
         assert!(sim_html.contains("Open Existing Thread by ID"));
+        assert!(sim_html.contains(r##"hx-sync="#simulation-result:replace""##));
         assert!(sim_html.contains("Simulated Webhook Payload"));
         assert!(sim_html.contains("value=\"logged-in@test.com\""));
 
+        let loaded_thread_id = Uuid::parse_str("0f5421b8-9e78-4f21-ac52-3af494c3f344").unwrap();
+        let live_thread = pages::simulation_live_view(
+            company.id,
+            channel.id,
+            loaded_thread_id,
+            "<p>Loaded thread</p>",
+        );
         let sim_html_with_thread = pages::channel_simulation_page(
             &company,
             "example.com",
             &channel,
             "logged-in@test.com",
             Some("0f5421b8-9e78-4f21-ac52-3af494c3f344"),
-            None,
+            Some(&live_thread),
         );
         assert!(sim_html_with_thread.contains("Thread Loaded & Active"));
         assert!(sim_html_with_thread.contains("0f5421b8-9e78-4f21-ac52-3af494c3f344"));
         assert!(!sim_html_with_thread.contains("Simulated Webhook Payload"));
+        assert!(sim_html_with_thread.contains("id=\"simulation-live\""));
+        assert!(sim_html_with_thread.contains("sse-swap=\"simulation\""));
 
         let sim_result = crate::use_cases::channel::InboundEmailResult {
             resolved: true,

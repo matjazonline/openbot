@@ -99,7 +99,7 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
             <div class="border-t border-base-300 p-2">
                 <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
                     hx-get="/ui/agents/new?company_id={company_id}"
-                    hx-target="#agent-pane" hx-swap="outerHTML"
+                    hx-target="#agent-pane" hx-swap="outerHTML" hx-sync="#agent-pane:replace"
                     hx-push-url="/ui/agents?company_id={company_id}&new=1">{plus_glyph} New Agent</button>
             </div>
         </aside>
@@ -159,6 +159,7 @@ fn agent_settings_entry(company_id: Uuid, agent: &Agent, selected: bool) -> Stri
                     <a class="flex items-center gap-3 {active}"
                         hx-get="/ui/agents/{agent_id}?company_id={company_id}"
                         hx-target="#agent-pane" hx-swap="outerHTML"
+                        hx-sync="#agent-pane:replace"
                         hx-push-url="/ui/agents?company_id={company_id}&agent_id={agent_id}"
                         data-action="select-sidebar-item">
                         {avatar}
@@ -239,7 +240,7 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
                         </button>
                         <button type="button" class="btn btn-ghost"
                             hx-get="/ui/agents/{agent_id}?company_id={company_id}"
-                            hx-target="#agent-pane" hx-swap="outerHTML">Cancel</button>
+                            hx-target="#agent-pane" hx-swap="outerHTML" hx-sync="#agent-pane:replace">Cancel</button>
                         <button type="button" class="btn btn-error btn-outline ml-auto"
                             hx-delete="/ui/agents/{agent_id}?company_id={company_id}"
                             hx-target="#agent-pane" hx-swap="outerHTML"

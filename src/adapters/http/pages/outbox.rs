@@ -140,7 +140,7 @@ fn outbox_filter_form(company_id: Uuid, channels: &[Channel], filter: &OutboxFil
         r##"
             <form class="space-y-2 border-b border-base-300 px-3 pb-3"
                 hx-get="/ui/outbox/list" hx-trigger="change"
-                hx-target="#outbox-list" hx-swap="outerHTML">
+                hx-target="#outbox-list" hx-swap="outerHTML" hx-sync="#outbox-list:replace">
                 <input type="hidden" name="company_id" value="{company_id}">
                 <input type="hidden" name="limit" value="{limit}">
                 <select name="channel_id" class="select select-sm w-full" aria-label="Filter by channel">
@@ -186,7 +186,7 @@ pub fn outbox_list(list: &OutboxList<'_>, swap: FragmentSwap) -> String {
                 <div class="flex items-center justify-between gap-2 px-3 py-2 text-[11px] opacity-60">
                     <span class="truncate">{summary}</span>
                     <button type="button" class="btn btn-ghost btn-xs" title="Reload this page of the outbox"
-                        hx-get="{reload_url}" hx-target="#outbox-list" hx-swap="outerHTML">{reload_glyph}</button>
+                        hx-get="{reload_url}" hx-target="#outbox-list" hx-swap="outerHTML" hx-sync="#outbox-list:replace">{reload_glyph}</button>
                 </div>
                 <ul id="outbox-menu" class="menu w-full flex-1 flex-nowrap gap-1 overflow-y-auto px-2">{menu_body}</ul>
                 {pager}
@@ -232,6 +232,7 @@ fn outbox_menu_entry(list: &OutboxList<'_>, entry: &OutboxEntry) -> String {
                     <a class="flex flex-col items-start gap-0.5 {active}"
                         hx-get="/ui/outbox/{entry_id}?company_id={company_id}"
                         hx-target="#outbox-pane" hx-swap="outerHTML"
+                        hx-sync="#outbox-pane:replace"
                         hx-push-url="{push_url}"
                         data-action="select-sidebar-item">
                         <span class="flex w-full items-center gap-2">
@@ -264,7 +265,7 @@ fn outbox_pager(list: &OutboxList<'_>) -> String {
     let button = |page: usize, label: &str| {
         format!(
             r##"<button type="button" class="btn btn-ghost btn-xs"
-                        hx-get="{url}" hx-target="#outbox-list" hx-swap="outerHTML">{label}</button>"##,
+                        hx-get="{url}" hx-target="#outbox-list" hx-swap="outerHTML" hx-sync="#outbox-list:replace">{label}</button>"##,
             url = outbox_list_url(company_id, &filter.on_page(page), list.selected_entry_id),
         )
     };
@@ -334,7 +335,7 @@ pub fn outbox_detail_pane(pane: &OutboxDetailPane<'_>) -> String {
                     {task_link}
                     <button type="button" class="btn btn-ghost btn-sm btn-square text-xl leading-none" title="Reload this email"
                         hx-get="/ui/outbox/{entry_id}?company_id={company_id}"
-                        hx-target="#outbox-pane" hx-swap="outerHTML">{reload_glyph}</button>
+                        hx-target="#outbox-pane" hx-swap="outerHTML" hx-sync="#outbox-pane:replace">{reload_glyph}</button>
                 </div>
             </div>
             <div class="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">

@@ -185,7 +185,7 @@ pub fn company_settings_page(page: &CompanySettingsPage<'_>) -> String {
             <div class="border-t border-base-300 p-2">
                 <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
                     hx-get="/ui/companies/new"
-                    hx-target="#company-pane" hx-swap="outerHTML"
+                    hx-target="#company-pane" hx-swap="outerHTML" hx-sync="#company-pane:replace"
                     hx-push-url="/ui/companies?new=1">{plus_glyph} New Company</button>
             </div>
         </aside>
@@ -368,7 +368,7 @@ fn company_settings_body(
                         </button>
                         <button type="button" class="btn btn-ghost"
                             hx-get="/ui/companies/close"
-                            hx-target="#company-pane" hx-swap="outerHTML"
+                            hx-target="#company-pane" hx-swap="outerHTML" hx-sync="#company-pane:replace"
                             hx-push-url="/ui/companies">Cancel</button>
                         <button type="button" class="btn btn-error btn-outline ml-auto"
                             hx-delete="/ui/companies/{company_id}"
@@ -415,7 +415,7 @@ pub fn company_create_pane_with_memory(
                         </button>
                         <button type="button" class="btn btn-ghost"
                             hx-get="/ui/companies/close"
-                            hx-target="#company-pane" hx-swap="outerHTML"
+                            hx-target="#company-pane" hx-swap="outerHTML" hx-sync="#company-pane:replace"
                             hx-push-url="/ui/companies">Cancel</button>
                     </div>
                 </form>

@@ -43,3 +43,14 @@ external recipients must be reachable under their token policy and use an HTTPS 
 Skip full request bodies, headers, credential-bearing params, and write structs from tracing
 instrumentation. Explicitly record safe identifiers instead. Never derive `Debug` span fields for
 types containing API keys, passwords, session tokens, approval tokens, or raw email content.
+
+# Make partial-page updates race-safe
+
+Treat SSE events as wake-ups, never as state. Subscribe before querying, reconcile current state
+on every connect/reconnect, and use a durable cursor for append-only streams. Keep the element that
+owns `sse-connect` mounted; swap a child, and preserve live attributes in every OOB replacement.
+
+Read-only htmx controls that can issue competing requests to one target must use
+`hx-sync="#target:replace"`, so the last user intent wins. Do not abort accepted writes: disable or
+queue them instead. Tests must cover an event between render and subscribe and two reads completing
+out of order whenever a new live or partial-page update protocol is introduced.

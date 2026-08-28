@@ -142,7 +142,7 @@ fn task_filter_form(company_id: Uuid, channels: &[Channel], filter: &TaskFilter)
         r##"
             <form class="space-y-2 border-b border-base-300 px-3 pb-3"
                 hx-get="/ui/tasks/list" hx-trigger="change"
-                hx-target="#task-list" hx-swap="outerHTML">
+                hx-target="#task-list" hx-swap="outerHTML" hx-sync="#task-list:replace">
                 <input type="hidden" name="company_id" value="{company_id}">
                 <input type="hidden" name="limit" value="{limit}">
                 <select name="channel_id" class="select select-sm w-full" aria-label="Filter by channel">
@@ -188,7 +188,7 @@ pub fn task_monitor_list(list: &TaskMonitorList<'_>, swap: FragmentSwap) -> Stri
                 <div class="flex items-center justify-between gap-2 px-3 py-2 text-[11px] opacity-60">
                     <span class="truncate">{summary}</span>
                     <button type="button" class="btn btn-ghost btn-xs" title="Reload this page of tasks"
-                        hx-get="{reload_url}" hx-target="#task-list" hx-swap="outerHTML">{reload_glyph}</button>
+                        hx-get="{reload_url}" hx-target="#task-list" hx-swap="outerHTML" hx-sync="#task-list:replace">{reload_glyph}</button>
                 </div>
                 <ul id="task-menu" class="menu w-full flex-1 flex-nowrap gap-1 overflow-y-auto px-2">{menu_body}</ul>
                 {pager}
@@ -234,6 +234,7 @@ fn task_menu_entry(list: &TaskMonitorList<'_>, task: &BackgroundTask) -> String 
                     <a class="flex flex-col items-start gap-0.5 {active}"
                         hx-get="/ui/tasks/{task_id}?company_id={company_id}"
                         hx-target="#task-pane" hx-swap="outerHTML"
+                        hx-sync="#task-pane:replace"
                         hx-push-url="{push_url}"
                         data-action="select-sidebar-item">
                         <span class="flex w-full items-center gap-2">
@@ -265,7 +266,7 @@ fn task_pager(list: &TaskMonitorList<'_>) -> String {
     let button = |page: usize, label: &str| {
         format!(
             r##"<button type="button" class="btn btn-ghost btn-xs"
-                        hx-get="{url}" hx-target="#task-list" hx-swap="outerHTML">{label}</button>"##,
+                        hx-get="{url}" hx-target="#task-list" hx-swap="outerHTML" hx-sync="#task-list:replace">{label}</button>"##,
             url = task_list_url(company_id, &filter.on_page(page), list.selected_task_id),
         )
     };
@@ -337,7 +338,7 @@ pub fn task_detail_pane(pane: &TaskDetailPane<'_>) -> String {
                     {action_button}
                     <button type="button" class="btn btn-ghost btn-sm btn-square" title="Reload this task"
                         hx-get="/ui/tasks/{task_id}?company_id={company_id}"
-                        hx-target="#task-pane" hx-swap="outerHTML">{reload_glyph}</button>
+                        hx-target="#task-pane" hx-swap="outerHTML" hx-sync="#task-pane:replace">{reload_glyph}</button>
                 </div>
             </div>
             <div class="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">

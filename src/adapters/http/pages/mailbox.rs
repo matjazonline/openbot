@@ -1493,6 +1493,7 @@ fn compact_mailbox_header(page: &MailboxPage<'_>) -> String {
                     r##"<li><a class="{active}" data-mailbox-channel="{channel_id}"
                             hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
                             hx-target="#thread-column" hx-swap="outerHTML"
+                            hx-sync="#thread-column:replace"
                             hx-push-url="/ui?company_id={company_id}&channel_id={channel_id}"
                             data-action="select-sidebar-item">
                             <span class="min-w-0 truncate" data-mailbox-channel-name>{name}</span>
@@ -1599,7 +1600,7 @@ fn compose_button(company_id: Uuid, channel: &Channel) -> String {
         r##"<button id="compose-button" type="button" class="btn btn-primary btn-sm"
                     title="Start a new thread in this channel"
                     hx-get="/ui/compose?company_id={company_id}&channel_id={channel_id}"
-                    hx-target="#detail-pane" hx-swap="outerHTML">{pencil} New Thread</button>"##,
+                    hx-target="#detail-pane" hx-swap="outerHTML" hx-sync="#detail-pane:replace">{pencil} New Thread</button>"##,
         channel_id = channel.id,
         pencil = icon(Icon::Pencil, BUTTON_ICON),
     )
@@ -1617,6 +1618,7 @@ fn channel_menu_item(
                     <a class="flex flex-col items-start gap-0.5 {active}" data-mailbox-channel="{channel_id}"
                         hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
                         hx-target="#thread-column" hx-swap="outerHTML"
+                        hx-sync="#thread-column:replace"
                         hx-push-url="/ui?company_id={company_id}&channel_id={channel_id}"
                         data-action="select-sidebar-item">
                         <span class="flex w-full items-center gap-2">
@@ -1675,7 +1677,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
                     {compose_button}
                     <button type="button" class="btn btn-ghost btn-sm btn-square text-xl leading-none" title="Reload threads"
                         hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
-                        hx-target="#thread-column" hx-swap="outerHTML">{reload_glyph}</button>
+                        hx-target="#thread-column" hx-swap="outerHTML" hx-sync="#thread-column:replace">{reload_glyph}</button>
                 </div>
             </div>
             {list_open}
@@ -1751,6 +1753,7 @@ pub fn thread_row_fragment(
                     class="thread-row block w-full border-b border-base-300 px-4 py-3 text-left transition hover:bg-base-200 {active}"
                     hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
                     hx-target="#detail-pane" hx-swap="outerHTML"
+                    hx-sync="#detail-pane:replace"
                     hx-push-url="/ui?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
                     data-action="select-thread-row">
                     <div class="flex items-baseline justify-between gap-2">
@@ -1790,7 +1793,7 @@ fn thread_pagination(column: &ThreadColumn<'_>, swap: FragmentSwap) -> String {
                 <div id="thread-pagination" class="p-3"{oob}>
                     <button class="btn btn-ghost btn-sm btn-block" hx-disabled-elt="this"
                         hx-get="/ui/threads/list?company_id={company_id}&channel_id={channel_id}&cursor={cursor}"
-                        hx-target="#thread-list" hx-swap="beforeend">
+                        hx-target="#thread-list" hx-swap="beforeend" hx-sync="#thread-list:replace">
                         Load older threads
                     </button>
                 </div>
@@ -1865,10 +1868,10 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
                     <button type="button" class="btn btn-primary btn-sm" title="Send another message in this thread"
                         hx-get="/ui/reply?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
-                        hx-target="#detail-pane" hx-swap="outerHTML">{pencil} New Message</button>
+                        hx-target="#detail-pane" hx-swap="outerHTML" hx-sync="#detail-pane:replace">{pencil} New Message</button>
                     <button type="button" class="btn btn-ghost btn-sm btn-square" title="Reload messages"
                         hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
-                        hx-target="#detail-pane" hx-swap="outerHTML">{reload}</button>
+                        hx-target="#detail-pane" hx-swap="outerHTML" hx-sync="#detail-pane:replace">{reload}</button>
                     <a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={thread_id}"
                         class="btn btn-outline btn-sm">Open in Simulator</a>
                 </div>
@@ -2164,7 +2167,7 @@ pub fn compose_pane(pane: &ComposePane<'_>) -> String {
             pane.quiet,
             &format!(
                 r##"hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
-                            hx-target="#thread-column" hx-swap="outerHTML""##,
+                            hx-target="#thread-column" hx-swap="outerHTML" hx-sync="#thread-column:replace""##,
                 company_id = pane.company_id,
                 channel_id = pane.channel.id,
             ),
@@ -2217,7 +2220,7 @@ pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
             pane.quiet,
             &format!(
                 r##"hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
-                            hx-target="#detail-pane" hx-swap="outerHTML""##,
+                            hx-target="#detail-pane" hx-swap="outerHTML" hx-sync="#detail-pane:replace""##,
                 company_id = pane.company_id,
                 channel_id = pane.channel.id,
                 thread_id = pane.thread.id,

@@ -140,17 +140,15 @@ pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
     // `hx-ext="sse"` sits on the wrapper, not on the swapped element: a swap that replaced the
     // element carrying the connection would tear the stream down on its first tick.
     //
-    // The panels themselves are fetched once the shell is on screen rather than rendered into it,
-    // so the workspace paints immediately and the rollup's aggregates run against a placeholder.
-    // The fetch is what fills it, not the stream: a reader whose SSE connection never establishes
-    // still gets their numbers, and the stream then keeps them current.
+    // The immediate SSE snapshot is the only writer that fills the placeholder. Starting a
+    // separate load request here lets its older response overwrite that snapshot; the live-status
+    // banner already makes a connection failure visible and the stream reconnects itself.
     let content = format!(
         r##"
         {sidebar}
         <section class="flex min-w-0 flex-1 flex-col overflow-y-auto bg-base-100" hx-ext="sse"
             sse-connect="/ui/dashboard/events{query}">
-            <div id="{panels_id}"{PANELS_SKELETON} sse-swap="{event}" hx-swap="innerHTML"
-                hx-get="/ui/dashboard/panels{query}" hx-trigger="load">{placeholder}</div>
+            <div id="{panels_id}"{PANELS_SKELETON} sse-swap="{event}" hx-swap="innerHTML">{placeholder}</div>
         </section>
         "##,
         query = dashboard_query(target, shell.window),

@@ -1102,6 +1102,7 @@ mod tests {
         )));
         assert!(html.contains(r#"sse-swap="schedule-runs""#));
         assert!(html.contains(r##"hx-target="#schedule-runs-column""##));
+        assert!(html.contains(r##"hx-sync="#schedule-pane:replace""##));
 
         let refresh = schedule_runs_column_fragment(&ScheduleRunsColumnProps {
             company_id,

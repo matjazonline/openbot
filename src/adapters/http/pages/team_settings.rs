@@ -190,7 +190,7 @@ pub fn team_tab(list: &TeamSettingsList<'_>, pane_html: &str) -> String {
                     <div class="border-t border-base-300 p-2">
                         <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
                             hx-get="{new_endpoint}"
-                            hx-target="#team-pane" hx-swap="outerHTML">{plus_glyph} Invite Person</button>
+                            hx-target="#team-pane" hx-swap="outerHTML" hx-sync="#team-pane:replace">{plus_glyph} Invite Person</button>
                     </div>
             "##,
             new_endpoint = team_endpoint(company_id, "/new"),
@@ -293,6 +293,7 @@ fn member_entry(company: &Company, member: &CompanyMember, selected: bool) -> St
                     <a class="flex items-center gap-3 {active}"
                         hx-get="{endpoint}"
                         hx-target="#team-pane" hx-swap="outerHTML"
+                        hx-sync="#team-pane:replace"
                         hx-push-url="{push_url}"
                         data-action="select-sidebar-item">
                         {avatar}
@@ -329,6 +330,7 @@ fn invite_entry(company_id: Uuid, invite: &CompanyInvite, selected: bool) -> Str
                     <a class="flex w-full items-center gap-2 {active}"
                         hx-get="{endpoint}"
                         hx-target="#team-pane" hx-swap="outerHTML"
+                        hx-sync="#team-pane:replace"
                         hx-push-url="{push_url}"
                         data-action="select-sidebar-item">
                         <span class="min-w-0 truncate font-mono text-[13px]">{email}</span>
@@ -428,6 +430,7 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
                     <button type="button" class="btn btn-ghost"
                         hx-get="{close_endpoint}"
                         hx-target="#team-pane" hx-swap="outerHTML"
+                        hx-sync="#team-pane:replace"
                         hx-push-url="{cleared_url}">Close</button>
                     <div class="ml-auto">{remove_button}</div>
                 </div>
@@ -583,6 +586,7 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
                         <button type="button" class="btn btn-ghost"
                             hx-get="{close_endpoint}"
                             hx-target="#team-pane" hx-swap="outerHTML"
+                            hx-sync="#team-pane:replace"
                             hx-push-url="{cleared_url}">Cancel</button>
                         <button type="button" class="btn btn-error btn-outline ml-auto"
                             hx-delete="{invite_endpoint}"
@@ -617,6 +621,7 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
                     <button type="button" class="btn btn-ghost"
                         hx-get="{close_endpoint}"
                         hx-target="#team-pane" hx-swap="outerHTML"
+                        hx-sync="#team-pane:replace"
                         hx-push-url="{cleared_url}">Close</button>
                     {delete_button}
                 </div>
@@ -681,6 +686,7 @@ pub fn invite_create_pane(pane: &InviteCreatePane<'_>) -> String {
                         <button type="button" class="btn btn-ghost"
                             hx-get="{close_endpoint}"
                             hx-target="#team-pane" hx-swap="outerHTML"
+                            hx-sync="#team-pane:replace"
                             hx-push-url="{cleared_url}">Cancel</button>
                     </div>
                 </form>

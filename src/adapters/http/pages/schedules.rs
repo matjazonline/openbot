@@ -61,7 +61,7 @@ pub fn schedules_page(page: &SchedulesPage<'_>) -> String {
             <div class="border-t border-base-300 p-2">
                 <button type="button" class="btn btn-primary btn-sm btn-block justify-start"
                     hx-get="/ui/schedules/new?company_id={company_id}"
-                    hx-target="#schedule-pane" hx-swap="outerHTML"
+                    hx-target="#schedule-pane" hx-swap="outerHTML" hx-sync="#schedule-pane:replace"
                     hx-push-url="/ui/schedules?company_id={company_id}&new=1">{plus_glyph} New Schedule</button>
             </div>
         </aside>
@@ -121,6 +121,7 @@ pub fn schedules_sidebar_list(
                     <a class="flex flex-col items-start gap-1 {active}"
                         hx-get="/ui/schedules?company_id={company_id}&schedule_id={schedule_id}"
                         hx-target="#schedules-workspace"
+                        hx-sync="#schedules-workspace:replace"
                         hx-push-url="/ui/schedules?company_id={company_id}&schedule_id={schedule_id}"
                         data-action="select-sidebar-item">
                         <div class="flex w-full min-w-0 items-center justify-between gap-1">
@@ -251,6 +252,7 @@ pub(crate) fn schedule_runs_column_fragment(props: &ScheduleRunsColumnProps<'_>)
                     <a class="thread-row block border-b border-base-300 px-4 py-3 hover:bg-base-200 transition-colors cursor-pointer {active}"
                         hx-get="/ui/schedules/thread/{thread_id}?company_id={company_id}&schedule_id={schedule_id}"
                         hx-target="#schedule-pane" hx-swap="outerHTML"
+                        hx-sync="#schedule-pane:replace"
                         data-thread-id="{thread_id}"
                         data-action="select-thread-row">
                         <div class="flex items-center justify-between gap-1">
@@ -320,7 +322,7 @@ pub(crate) fn schedule_runs_column_fragment(props: &ScheduleRunsColumnProps<'_>)
                         </form>
                         <button type="button" class="btn btn-ghost btn-xs"
                             hx-get="/ui/schedules/{schedule_id}/edit?company_id={company_id}"
-                            hx-target="#schedule-pane" hx-swap="outerHTML">
+                            hx-target="#schedule-pane" hx-swap="outerHTML" hx-sync="#schedule-pane:replace">
                             Edit
                         </button>
                     </div>
@@ -340,11 +342,11 @@ pub(crate) fn schedule_runs_column_fragment(props: &ScheduleRunsColumnProps<'_>)
             <div class="flex items-center justify-between border-t border-base-300 px-3 py-2 text-xs">
                 <button class="btn btn-ghost btn-xs {prev_disabled}"
                     hx-get="/ui/schedules?company_id={company_id}&schedule_id={schedule_id}&page={prev_page}"
-                    hx-target="#schedules-workspace">« Newer</button>
+                    hx-target="#schedules-workspace" hx-sync="#schedules-workspace:replace">« Newer</button>
                 <span class="opacity-60 font-mono">Page {page}</span>
                 <button class="btn btn-ghost btn-xs {next_disabled}"
                     hx-get="/ui/schedules?company_id={company_id}&schedule_id={schedule_id}&page={next_page}"
-                    hx-target="#schedules-workspace">Older »</button>
+                    hx-target="#schedules-workspace" hx-sync="#schedules-workspace:replace">Older »</button>
             </div>
         </section>
         "##,
@@ -666,7 +668,7 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
                         <button type="submit" class="btn btn-primary">{submit_label}</button>
                         <button type="button" class="btn btn-ghost"
                             hx-get="/ui/schedules/close?company_id={company_id}"
-                            hx-target="#schedule-pane" hx-swap="outerHTML"
+                            hx-target="#schedule-pane" hx-swap="outerHTML" hx-sync="#schedule-pane:replace"
                             hx-push-url="/ui/schedules?company_id={company_id}">Cancel</button>
                         {delete_button}
                     </div>
@@ -786,7 +788,7 @@ pub(crate) const SCHEDULES_SCRIPT: &str = r##"        function toggleScheduleTyp
         }
 
         document.body.addEventListener('htmx:afterSettle', function (event) {
-            if (!event.target || (event.target.id !== 'schedule-runs-column' && event.target.id !== 'schedule-runs-live')) return;
+            if (!event.target || (event.target.id !== 'schedule-runs-column' && event.target.id !== 'schedule-runs-live' && event.target.id !== 'schedule-pane')) return;
             var pane = document.getElementById('schedule-pane');
             if (!pane || !pane.dataset.threadId) return;
             var selected = document.querySelector('#schedule-runs-list .thread-row[data-thread-id="' + pane.dataset.threadId + '"]');
