@@ -986,29 +986,41 @@ fn classic_memory_fields(memory_available: bool, channel: Option<&Channel>) -> S
     let max_results = channel.map_or(5, |c| c.memory_max_results);
     format!(
         r##"<fieldset class="rounded-lg border border-slate-700 bg-slate-800/50 p-4"{disabled}>
-                <legend class="px-2 text-xs font-semibold text-slate-300">Memory</legend>
+                <legend class="px-1 text-xs font-semibold text-slate-300">Memory</legend>
                 <p class="mb-3 text-[11px] text-slate-400">Enable recall and persistence by scope after the company provider is ready.</p>
-                <div class="grid grid-cols-4 gap-2 text-xs text-slate-300">
-                    <span></span><span>Company</span><span>Agent</span><span>User</span>
+                <div class="grid max-w-sm grid-cols-4 items-center gap-x-2 gap-y-2 text-xs text-slate-300">
+                    <span></span>
+                    <span class="text-center">Company</span>
+                    <span class="text-center">Agent</span>
+                    <span class="text-center">User</span>
                     <span>Retrieve</span>
-                    <input aria-label="Retrieve company memory" type="checkbox" name="retrieve_company_memory" value="true"{retrieve_company}{disabled}>
-                    <input aria-label="Retrieve agent memory" type="checkbox" name="retrieve_agent_memory" value="true"{retrieve_agent}{disabled}>
-                    <input aria-label="Retrieve user memory" type="checkbox" name="retrieve_user_memory" value="true"{retrieve_user}{disabled}>
+                    <input aria-label="Retrieve company memory" type="checkbox" name="retrieve_company_memory" value="true" class="justify-self-center"{retrieve_company}{disabled}>
+                    <input aria-label="Retrieve agent memory" type="checkbox" name="retrieve_agent_memory" value="true" class="justify-self-center"{retrieve_agent}{disabled}>
+                    <input aria-label="Retrieve user memory" type="checkbox" name="retrieve_user_memory" value="true" class="justify-self-center"{retrieve_user}{disabled}>
                     <span>Persist</span>
-                    <input aria-label="Persist company memory" type="checkbox" name="persist_company_memory" value="true"{persist_company}{disabled}>
-                    <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true"{persist_agent}{disabled}>
-                    <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true"{persist_user}{disabled}>
+                    <input aria-label="Persist company memory" type="checkbox" name="persist_company_memory" value="true" class="justify-self-center"{persist_company}{disabled}>
+                    <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true" class="justify-self-center"{persist_agent}{disabled}>
+                    <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true" class="justify-self-center"{persist_user}{disabled}>
                 </div>
-                <div class="mt-3 grid grid-cols-3 gap-3">
-                    <select aria-label="Memory persistence mode" name="memory_persistence_mode" class="px-3 py-2 bg-slate-800 border border-slate-700 rounded"{disabled}>
-                        <option value="audience_only"{audience_only_selected}>Audience only</option>
-                        <option value="scope_specific_facts"{scope_specific_selected}>Scope-specific facts</option>
-                    </select>
-                    <select aria-label="Memory recall mode" name="memory_recall_mode" class="px-3 py-2 bg-slate-800 border border-slate-700 rounded"{disabled}>
-                        <option value="fast"{fast_selected}>Fast</option>
-                        <option value="thinking"{thinking_selected}>Thinking</option>
-                    </select>
-                    <input aria-label="Memory result limit" name="memory_max_results" type="number" min="1" max="20" value="{max_results}" class="px-3 py-2 bg-slate-800 border border-slate-700 rounded"{disabled}>
+                <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <label class="block">
+                        <span class="mb-1 block text-xs font-medium text-slate-300">Persistence mode</span>
+                        <select aria-label="Memory persistence mode" name="memory_persistence_mode" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm"{disabled}>
+                            <option value="audience_only"{audience_only_selected}>Audience only</option>
+                            <option value="scope_specific_facts"{scope_specific_selected}>Scope-specific facts</option>
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="mb-1 block text-xs font-medium text-slate-300">Recall mode</span>
+                        <select aria-label="Memory recall mode" name="memory_recall_mode" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm"{disabled}>
+                            <option value="fast"{fast_selected}>Fast</option>
+                            <option value="thinking"{thinking_selected}>Thinking</option>
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="mb-1 block text-xs font-medium text-slate-300">Maximum results</span>
+                        <input aria-label="Memory result limit" name="memory_max_results" type="number" min="1" max="20" value="{max_results}" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm"{disabled}>
+                    </label>
                 </div>
             </fieldset>"##,
         fast_selected = if thinking { "" } else { " selected" },

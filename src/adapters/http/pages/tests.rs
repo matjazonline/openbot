@@ -4420,28 +4420,3 @@ fn dump_application_javascript() {
     )
     .expect("write bundle");
 }
-
-#[test]
-fn zz_dump_channel_edit_pane_html() {
-    let company = mailbox_company();
-    let triage = settings_agent(company.id, "Triage", "triage");
-    let channel = mailbox_channel(company.id);
-    let html = channel_edit_pane_with_memory(
-        &ChannelEditPane {
-            company: &company,
-            app_domain_name: "example.com",
-            channel: &channel,
-            agents: &[triage],
-            schedules: &[],
-            spam_scan_enabled: true,
-            draft: None,
-            error: None,
-        },
-        true,
-    );
-    std::fs::write(
-        "/private/tmp/claude-501/-Volumes-ssd1-dev-mail-agents-server/54196912-269a-46fa-a18f-974dd7c7e7bd/scratchpad/pane.html",
-        html,
-    )
-    .unwrap();
-}
