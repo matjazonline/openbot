@@ -17,7 +17,7 @@ use axum::{
     routing::{get, post},
 };
 use serde::Deserialize;
-use tracing::instrument;
+use tracing::{instrument, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -373,19 +373,39 @@ impl TaskMonitorView<'_> {
 
         // The transport is a separate process and never writes back into the task, so its state is
         // joined in here, at render time.
-        let deliveries = self
-            .thread_use_cases
-            .get_task_persistence()
+        let persistence = self.thread_use_cases.get_task_persistence().await;
+        let (deliveries, delivery_error) = match persistence.list_task_deliveries(task.id).await {
+            Ok(deliveries) => (deliveries, None),
+            Err(error) => {
+                warn!(task_id = %task.id, %error, "Could not load task delivery details");
+                (
+                    Vec::new(),
+                    Some("Delivery details could not be loaded. Reload the task to try again."),
+                )
+            }
+        };
+        let (attempts, attempts_error) = match persistence
+            .list_task_attempts(self.company.id, task.id)
             .await
-            .list_task_deliveries(task.id)
-            .await
-            .unwrap_or_default();
+        {
+            Ok(attempts) => (attempts, None),
+            Err(error) => {
+                warn!(task_id = %task.id, %error, "Could not load task execution attempts");
+                (
+                    Vec::new(),
+                    Some("Execution attempts could not be loaded. Reload the task to try again."),
+                )
+            }
+        };
 
         Ok(pages::task_detail_pane(&pages::TaskDetailPane {
             company_id: self.company.id,
             task,
             channel: channel.as_ref(),
             deliveries: &deliveries,
+            delivery_error: delivery_error.as_deref(),
+            attempts: &attempts,
+            attempts_error: attempts_error.as_deref(),
             error,
         }))
     }

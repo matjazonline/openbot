@@ -21,7 +21,10 @@ use crate::entities::{
     },
     message::{AttachmentMetadata, Message, MessageDirection, MessageRole},
     outbox::{OutboxEntry, OutboxFilter, OutboxStatus},
-    task::{BackgroundTask, TaskFilter, TaskStatus, ThreadActivity},
+    task::{
+        BackgroundTask, TaskAttemptRecord, TaskAttemptRecordStatus, TaskFilter, TaskStatus,
+        ThreadActivity,
+    },
     thread::Thread,
     user::User,
     value_objects::{AvatarUrl, EmailAddress},

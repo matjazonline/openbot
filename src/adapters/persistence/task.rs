@@ -23,8 +23,9 @@ use crate::{
         },
         stuck_work::{StuckWorkCensus, StuckWorkThresholds},
         task::{
-            BackgroundTask, NewTask, TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus,
-            TaskLeaseRef, TaskStatus, TaskStopReason, ThreadActivity, TokenUsage,
+            BackgroundTask, NewTask, TaskAttemptOutcome, TaskAttemptRecord,
+            TaskAttemptRecordStatus, TaskAttemptRef, TaskAttemptStatus, TaskLeaseRef, TaskStatus,
+            TaskStopReason, ThreadActivity, TokenUsage,
         },
         value_objects::MessageId,
     },
@@ -180,6 +181,42 @@ pub struct BackgroundTaskDb {
     pub run_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(sqlx::FromRow, Debug)]
+struct TaskAttemptRecordDb {
+    attempt_number: i32,
+    status: String,
+    error: Option<String>,
+    stop_reason: Option<String>,
+    prompt_tokens: Option<i32>,
+    completion_tokens: Option<i32>,
+    result: Option<Value>,
+    started_at: DateTime<Utc>,
+    finished_at: Option<DateTime<Utc>>,
+    execution_generation: Uuid,
+}
+
+impl TryFrom<TaskAttemptRecordDb> for TaskAttemptRecord {
+    type Error = AppError;
+
+    fn try_from(db: TaskAttemptRecordDb) -> AppResult<Self> {
+        Ok(Self {
+            attempt_number: db.attempt_number,
+            status: TaskAttemptRecordStatus::from_str(&db.status).map_err(AppError::Internal)?,
+            error: db.error,
+            stop_reason: db
+                .stop_reason
+                .map(|reason| TaskStopReason::from_str(&reason).map_err(AppError::Internal))
+                .transpose()?,
+            prompt_tokens: db.prompt_tokens,
+            completion_tokens: db.completion_tokens,
+            result: db.result,
+            started_at: db.started_at,
+            finished_at: db.finished_at,
+            execution_generation: db.execution_generation,
+        })
+    }
 }
 
 #[derive(sqlx::FromRow, Debug)]
@@ -559,6 +596,18 @@ pub trait TaskPersistence: Send + Sync {
     async fn enqueue_task(&self, new_task: NewTask) -> AppResult<BackgroundTask>;
 
     async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<BackgroundTask>>;
+
+    /// Every execution attempt for one company-owned task, oldest first.
+    ///
+    /// The company predicate is part of the query because the task id originates in a browser
+    /// route; authorization must scope the object being listed, not merely a preceding lookup.
+    async fn list_task_attempts(
+        &self,
+        _company_id: Uuid,
+        _task_id: Uuid,
+    ) -> AppResult<Vec<TaskAttemptRecord>> {
+        Ok(Vec::new())
+    }
 
     async fn get_task_by_source_message_id(
         &self,
@@ -1523,6 +1572,30 @@ impl TaskPersistence for PostgresPersistence {
             Some(d) => Ok(Some(d.try_into()?)),
             None => Ok(None),
         }
+    }
+
+    async fn list_task_attempts(
+        &self,
+        company_id: Uuid,
+        task_id: Uuid,
+    ) -> AppResult<Vec<TaskAttemptRecord>> {
+        let rows = sqlx::query_as::<_, TaskAttemptRecordDb>(
+            r#"SELECT attempt.attempt_number, attempt.status, attempt.error,
+                      attempt.stop_reason, attempt.prompt_tokens, attempt.completion_tokens,
+                      attempt.result, attempt.started_at, attempt.finished_at,
+                      attempt.execution_generation
+               FROM task_attempts AS attempt
+               JOIN background_tasks AS task ON task.id = attempt.task_id
+               WHERE task.company_id = $1 AND attempt.task_id = $2
+               ORDER BY attempt.attempt_number"#,
+        )
+        .bind(company_id)
+        .bind(task_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        rows.into_iter().map(TryInto::try_into).collect()
     }
 
     async fn get_task_by_source_message_id(
@@ -4021,6 +4094,90 @@ mod tests {
         .await
         .unwrap();
         (company, channel)
+    }
+
+    #[tokio::test]
+    async fn task_attempt_history_is_ordered_and_company_scoped() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let (other_company, _) = seed_company_and_channel(&persistence).await;
+        let task = persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                company.id,
+                channel.id,
+                None,
+                "attempt-history",
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        for attempt_number in [1, 2] {
+            let attempt = TaskAttemptRef {
+                task_id: task.id,
+                attempt_number,
+                execution_generation: Uuid::new_v4(),
+            };
+            persistence.begin_task_attempt(attempt).await.unwrap();
+            persistence
+                .finish_task_attempt(&TaskAttemptOutcome {
+                    attempt,
+                    status: if attempt_number == 1 {
+                        TaskAttemptStatus::Failed
+                    } else {
+                        TaskAttemptStatus::Completed
+                    },
+                    stop_reason: if attempt_number == 1 {
+                        TaskStopReason::RetryableFailure
+                    } else {
+                        TaskStopReason::Completed
+                    },
+                    error: (attempt_number == 1).then(|| "retry me".to_string()),
+                    tokens: Some(TokenUsage::new(
+                        attempt_number as usize * 10,
+                        attempt_number as usize * 2,
+                    )),
+                })
+                .await
+                .unwrap();
+        }
+
+        let attempts = persistence
+            .list_task_attempts(company.id, task.id)
+            .await
+            .unwrap();
+        assert_eq!(
+            attempts
+                .iter()
+                .map(|attempt| attempt.attempt_number)
+                .collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+        assert_eq!(attempts[0].status, TaskAttemptRecordStatus::Failed);
+        assert_eq!(
+            attempts[0].stop_reason,
+            Some(TaskStopReason::RetryableFailure)
+        );
+        assert_eq!(attempts[0].total_tokens(), Some(12));
+        assert!(attempts[0].duration_ms().is_some());
+        assert!(
+            persistence
+                .list_task_attempts(other_company.id, task.id)
+                .await
+                .unwrap()
+                .is_empty(),
+            "another company cannot read a guessed task's attempt history"
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+        CompanyPersistence::delete(&persistence, other_company.id)
+            .await
+            .unwrap();
     }
 
     /// The whole point of the correlation id: one query returns the trail.

@@ -294,6 +294,22 @@ impl std::fmt::Display for TaskStopReason {
     }
 }
 
+impl FromStr for TaskStopReason {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "completed" => Ok(Self::Completed),
+            "retryable_failure" => Ok(Self::RetryableFailure),
+            "terminal_failure" => Ok(Self::TerminalFailure),
+            "timed_out" => Ok(Self::TimedOut),
+            "shutdown" => Ok(Self::Shutdown),
+            "lease_lost" => Ok(Self::LeaseLost),
+            other => Err(format!("Unknown task stop reason: {other}")),
+        }
+    }
+}
+
 impl TaskExecutionOutcome {
     /// The message to record against the attempt and the task row, if this run failed.
     pub fn failure_message(&self) -> Option<&str> {
@@ -314,6 +330,62 @@ impl TaskExecutionOutcome {
 pub enum TaskAttemptStatus {
     Completed,
     Failed,
+}
+
+/// The state of an attempt as read from the durable execution ledger.
+///
+/// Unlike [`TaskAttemptStatus`], this includes the open `processing` state because the Tasks UI
+/// reads an attempt while it may still be running.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskAttemptRecordStatus {
+    Processing,
+    Completed,
+    Failed,
+}
+
+impl FromStr for TaskAttemptRecordStatus {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "processing" => Ok(Self::Processing),
+            "completed" => Ok(Self::Completed),
+            "failed" => Ok(Self::Failed),
+            other => Err(format!("Unknown task attempt status: {other}")),
+        }
+    }
+}
+
+/// One execution recorded for a task, including failed runs that the task payload no longer
+/// represents after a retry succeeds.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskAttemptRecord {
+    pub attempt_number: i32,
+    pub status: TaskAttemptRecordStatus,
+    pub error: Option<String>,
+    pub stop_reason: Option<TaskStopReason>,
+    pub prompt_tokens: Option<i32>,
+    pub completion_tokens: Option<i32>,
+    pub result: Option<serde_json::Value>,
+    pub started_at: chrono::DateTime<chrono::Utc>,
+    pub finished_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub execution_generation: Uuid,
+}
+
+impl TaskAttemptRecord {
+    pub fn total_tokens(&self) -> Option<i64> {
+        match (self.prompt_tokens, self.completion_tokens) {
+            (None, None) => None,
+            (prompt, completion) => {
+                Some(i64::from(prompt.unwrap_or(0)) + i64::from(completion.unwrap_or(0)))
+            }
+        }
+    }
+
+    pub fn duration_ms(&self) -> Option<i64> {
+        self.finished_at
+            .map(|finished_at| (finished_at - self.started_at).num_milliseconds().max(0))
+    }
 }
 
 impl TaskAttemptStatus {

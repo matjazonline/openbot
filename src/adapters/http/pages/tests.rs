@@ -1,5 +1,6 @@
 use super::*;
 use crate::entities::correlation::CorrelationId;
+use crate::entities::task::{TaskAttemptRecord, TaskAttemptRecordStatus, TaskStopReason};
 use crate::use_cases::user::LoginMethods;
 use chrono::Utc;
 use serde_json::json;
@@ -2686,6 +2687,9 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
 
     let html = task_detail_pane(&TaskDetailPane {
         deliveries: &[],
+        delivery_error: None,
+        attempts: &[],
+        attempts_error: None,
         company_id: company.id,
         task: &task,
         channel: Some(&channel),
@@ -2720,12 +2724,111 @@ fn task_detail_pane_offers_the_action_the_status_allows() {
         task: &stopped,
         channel: None,
         deliveries: &[],
+        delivery_error: None,
+        attempts: &[],
+        attempts_error: None,
         error: None,
     });
     assert!(stopped_html.contains(&format!("/ui/tasks/{}/resume", stopped.id)));
     assert!(!stopped_html.contains("/stop?"));
     // A task whose channel is gone still renders, falling back to the raw id.
     assert!(stopped_html.contains(&stopped.channel_id.to_string()));
+}
+
+#[test]
+fn task_detail_pane_surfaces_execution_history_metadata_and_load_failures() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let started_at = Utc::now() - chrono::Duration::seconds(3);
+    let generation = Uuid::new_v4();
+    let mut task = monitored_task(company.id, channel.id, TaskStatus::Processing);
+    task.worker_id = Some(Uuid::new_v4());
+    task.execution_generation = Some(generation);
+    task.locked_at = Some(started_at);
+    task.lock_expires_at = Some(Utc::now() + chrono::Duration::minutes(5));
+    task.payload = json!({
+        "execution_parameters": {
+            "provider": "openai<script>",
+            "model": "gpt-test",
+            "agent_name": "Triage",
+            "executed_at": started_at.to_rfc3339(),
+        },
+        "execution_result": {
+            "email_sent": true,
+            "outbound_message_id": "message-123",
+            "token_usage": { "prompt_tokens": 5, "completion_tokens": 6, "total_tokens": 11 },
+            "metadata": {
+                "finish_reason": "end_turn",
+                "execution_diagnostics": {
+                    "duration_ms": 1250,
+                    "tool_call_count": 2,
+                    "response_characters": 800,
+                    "token_usage_source": "provider"
+                },
+                "observability": { "summary": { "total_events": 9, "total_llm_calls": 2 } }
+            }
+        }
+    });
+    let attempts = [
+        TaskAttemptRecord {
+            attempt_number: 1,
+            status: TaskAttemptRecordStatus::Failed,
+            error: Some("provider timed out <unsafe>".to_string()),
+            stop_reason: Some(TaskStopReason::TimedOut),
+            prompt_tokens: Some(100),
+            completion_tokens: Some(20),
+            result: Some(json!({ "api_key": "do-not-render", "note": "first run" })),
+            started_at,
+            finished_at: Some(started_at + chrono::Duration::seconds(2)),
+            execution_generation: Uuid::new_v4(),
+        },
+        TaskAttemptRecord {
+            attempt_number: 2,
+            status: TaskAttemptRecordStatus::Processing,
+            error: None,
+            stop_reason: None,
+            prompt_tokens: Some(5),
+            completion_tokens: Some(6),
+            result: None,
+            started_at,
+            finished_at: None,
+            execution_generation: generation,
+        },
+    ];
+
+    let html = task_detail_pane(&TaskDetailPane {
+        company_id: company.id,
+        task: &task,
+        channel: Some(&channel),
+        deliveries: &[],
+        delivery_error: Some("Delivery details could not be loaded: database unavailable"),
+        attempts: &attempts,
+        attempts_error: Some("Execution attempts were partially unavailable"),
+        error: None,
+    });
+
+    assert!(html.contains("Latest execution"));
+    assert!(html.contains("openai&lt;script&gt;"));
+    assert!(!html.contains("openai<script>"));
+    assert!(html.contains("gpt-test"));
+    assert!(html.contains("1.25 s"));
+    assert!(html.contains("end_turn"));
+    assert!(html.contains("Tool calls"));
+    assert!(html.contains("Execution attempts"));
+    assert!(html.contains("Attempt 1"));
+    assert!(html.contains("Attempt 2"));
+    assert!(html.contains("timed_out"));
+    assert!(html.contains("131 tokens"));
+    assert!(html.contains("All attempts"));
+    assert!(html.contains("125"));
+    assert!(html.contains("***masked***"));
+    assert!(!html.contains("do-not-render"));
+    assert!(html.contains("provider timed out &lt;unsafe&gt;"));
+    assert!(html.contains("Queue diagnostics"));
+    assert!(html.contains(&task.correlation_id.to_string()));
+    assert!(html.contains(&generation.to_string()));
+    assert!(html.contains("Delivery details could not be loaded"));
+    assert!(html.contains("Execution attempts were partially unavailable"));
 }
 
 #[test]
@@ -3550,6 +3653,9 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
 
     let html = task_detail_pane(&TaskDetailPane {
         deliveries: std::slice::from_ref(&failed),
+        delivery_error: None,
+        attempts: &[],
+        attempts_error: None,
         company_id: company.id,
         task: &task,
         channel: Some(&channel),
@@ -3572,6 +3678,9 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
     // A task that sent nothing must not grow an empty section.
     let quiet = task_detail_pane(&TaskDetailPane {
         deliveries: &[],
+        delivery_error: None,
+        attempts: &[],
+        attempts_error: None,
         company_id: company.id,
         task: &task,
         channel: Some(&channel),
