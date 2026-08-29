@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
         app_state.runtime_identity.clone(),
         active_task_executions.clone(),
         task_worker_concurrency,
-        app_state.hydradb_activity.clone(),
+        app_state.memory_provider_activity.clone(),
     );
     let runtime_sampler =
         RuntimeMetricSampler::new(app_state.runtime_metrics.clone(), runtime_source);

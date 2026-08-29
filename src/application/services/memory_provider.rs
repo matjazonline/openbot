@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
 
@@ -174,6 +177,93 @@ mod tests {
             conversation.assistant(),
             MAX_MEMORY_PERSIST_ASSISTANT_ANSWER_CHARS,
         );
+    }
+}
+
+/// The providers this deployment has been configured for, as opposed to the one a company has
+/// selected. A set rather than a bool per provider: "is memory available here at all" and "is
+/// *this* provider available here" are the only two questions asked of it, and both stay one
+/// call as providers are added.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ConfiguredMemoryProviders(HashSet<MemoryProviderKind>);
+
+impl ConfiguredMemoryProviders {
+    pub fn contains(&self, kind: MemoryProviderKind) -> bool {
+        self.0.contains(&kind)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl ConfiguredMemoryProviders {
+    /// Resolve a submitted provider value against what this deployment can actually run.
+    ///
+    /// Both the JSON API and the HTML forms take this value, so the decision — including which
+    /// spellings mean "off" and how an unconfigured provider is reported — lives here rather than
+    /// being written out once per transport.
+    pub fn select(&self, value: Option<&str>) -> Result<SelectedMemoryProvider, String> {
+        match value.map(str::trim) {
+            None | Some("") | Some("none") => Ok(SelectedMemoryProvider::Disabled),
+            Some(value) => match MemoryProviderKind::parse(value) {
+                Some(kind) if self.contains(kind) => Ok(SelectedMemoryProvider::Provider(kind)),
+                Some(kind) => Err(format!(
+                    "{} is not configured for this deployment.",
+                    kind.label()
+                )),
+                None => Err("Unsupported memory provider.".into()),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectedMemoryProvider {
+    Disabled,
+    Provider(MemoryProviderKind),
+}
+
+impl FromIterator<MemoryProviderKind> for ConfiguredMemoryProviders {
+    fn from_iter<I: IntoIterator<Item = MemoryProviderKind>>(kinds: I) -> Self {
+        Self(kinds.into_iter().collect())
+    }
+}
+
+#[cfg(test)]
+mod configured_provider_tests {
+    use super::*;
+
+    #[test]
+    fn a_submitted_value_resolves_only_against_configured_providers() {
+        let configured = ConfiguredMemoryProviders::from_iter([MemoryProviderKind::Hindsight]);
+        assert_eq!(
+            configured.select(Some("hindsight")),
+            Ok(SelectedMemoryProvider::Provider(
+                MemoryProviderKind::Hindsight
+            ))
+        );
+        assert_eq!(
+            configured.select(Some("hydradb")),
+            Err("HydraDB is not configured for this deployment.".into())
+        );
+        assert_eq!(
+            configured.select(Some("shodh")),
+            Err("Unsupported memory provider.".into())
+        );
+        for off in [None, Some(""), Some("none"), Some("  ")] {
+            assert_eq!(configured.select(off), Ok(SelectedMemoryProvider::Disabled));
+        }
+    }
+
+    #[test]
+    fn an_unconfigured_deployment_offers_nothing() {
+        let configured = ConfiguredMemoryProviders::default();
+        assert!(configured.is_empty());
+        for kind in MemoryProviderKind::ALL {
+            assert!(!configured.contains(kind));
+            assert!(configured.select(Some(kind.as_str())).is_err());
+        }
     }
 }
 

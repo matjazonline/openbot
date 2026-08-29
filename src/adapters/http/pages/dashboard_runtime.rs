@@ -48,7 +48,7 @@ pub(super) fn machine_section(page: &DashboardPage<'_>) -> String {
                 {task_workers}
                 {cpu}
                 {database}
-                {hydradb}
+                {memory_provider}
                 {process}
             </div>
         </div>"##,
@@ -85,7 +85,7 @@ pub(super) fn machine_section(page: &DashboardPage<'_>) -> String {
         task_workers = task_worker_capacity(runtime),
         cpu = runtime_cpu_panel(runtime, page.window),
         database = runtime_database_panel(runtime, page.window),
-        hydradb = hydradb_panel(runtime, page.window),
+        memory_provider = memory_provider_panel(runtime, page.window),
     )
 }
 
@@ -299,13 +299,13 @@ fn runtime_database_panel(runtime: &RuntimeMetricSnapshot, window: DashboardWind
 /// Calls, failures and total time across the rendered range, summed from the same buckets the
 /// chart draws so the figures and the line can never disagree.
 #[derive(Default)]
-struct HydraDbRange {
+struct MemoryProviderRange {
     calls: i64,
     failures: i64,
     total_ms: f64,
 }
 
-impl HydraDbRange {
+impl MemoryProviderRange {
     fn summed(buckets: &[RuntimeMetricBucket]) -> Self {
         buckets.iter().fold(Self::default(), |range, bucket| {
             let calls = bucket.hydradb_calls.unwrap_or_default();
@@ -326,12 +326,12 @@ impl HydraDbRange {
 /// Memory provider health as the application experienced it. Every provision, readiness check,
 /// recall and ingestion is counted where it completes, so this is call latency rather than a
 /// synthetic probe, and a range with no calls says so instead of showing a zero.
-fn hydradb_panel(runtime: &RuntimeMetricSnapshot, window: DashboardWindow) -> String {
-    let range = HydraDbRange::summed(&runtime.buckets);
+fn memory_provider_panel(runtime: &RuntimeMetricSnapshot, window: DashboardWindow) -> String {
+    let range = MemoryProviderRange::summed(&runtime.buckets);
     if range.calls == 0 {
         return panel(
-            "HydraDB memory calls",
-            r##"<div class="px-4 py-6 text-sm opacity-60">— No HydraDB calls were made in this range.</div>"##,
+            "Memory provider calls",
+            r##"<div class="px-4 py-6 text-sm opacity-60">— No memory provider calls were made in this range.</div>"##,
         );
     }
 
@@ -343,7 +343,7 @@ fn hydradb_panel(runtime: &RuntimeMetricSnapshot, window: DashboardWindow) -> St
         .mean_ms()
         .map_or_else(|| "—".to_string(), |mean| format!("{mean:.0} ms"));
     let summary = stat_row(
-        "HydraDB memory calls",
+        "Memory provider calls",
         &format!(
             "{calls}{failures}{latency}",
             calls = stat(Stat::new("Calls", &range.calls.to_string(), window.label())),
@@ -369,7 +369,7 @@ fn hydradb_panel(runtime: &RuntimeMetricSnapshot, window: DashboardWindow) -> St
     format!(
         "{summary}{}",
         panel(
-            "HydraDB call latency",
+            "Memory provider call latency",
             &format!(
                 "{chart}{footer}",
                 chart = chart::time_chart(&TimeChart {
@@ -405,7 +405,7 @@ fn bytes(value: Option<i64>) -> String {
 mod tests {
     use super::*;
     use crate::entities::runtime_metrics::{
-        HydraDbInterval, MachineId, MachineIdentity, RuntimeMetricSample,
+        MachineId, MachineIdentity, MemoryProviderInterval, RuntimeMetricSample,
         TaskWorkerConcurrencyRecommendation,
     };
     use chrono::Utc;
@@ -429,7 +429,7 @@ mod tests {
     }
 
     #[test]
-    fn hydradb_panel_weights_latency_by_the_calls_each_bucket_carries() {
+    fn memory_provider_panel_weights_latency_by_the_calls_each_bucket_carries() {
         let snapshot = RuntimeMetricSnapshot {
             buckets: vec![
                 bucket(Some(1), Some(0), Some(100.0)),
@@ -439,7 +439,7 @@ mod tests {
             ..RuntimeMetricSnapshot::default()
         };
 
-        let html = hydradb_panel(&snapshot, DashboardWindow::last_hour());
+        let html = memory_provider_panel(&snapshot, DashboardWindow::last_hour());
         assert!(
             html.contains(">4<"),
             "every call in the range is counted: {html}"
@@ -456,14 +456,14 @@ mod tests {
     }
 
     #[test]
-    fn hydradb_panel_distinguishes_an_idle_range_from_a_zero() {
+    fn memory_provider_panel_distinguishes_an_idle_range_from_a_zero() {
         let snapshot = RuntimeMetricSnapshot {
             buckets: vec![bucket(Some(0), Some(0), None), bucket(None, None, None)],
             ..RuntimeMetricSnapshot::default()
         };
 
-        let html = hydradb_panel(&snapshot, DashboardWindow::last_hour());
-        assert!(html.contains("No HydraDB calls"), "{html}");
+        let html = memory_provider_panel(&snapshot, DashboardWindow::last_hour());
+        assert!(html.contains("No memory provider calls"), "{html}");
         assert!(!html.contains("Mean latency"), "{html}");
     }
 
@@ -488,7 +488,7 @@ mod tests {
                 pool_size: 10,
                 pool_idle: 7,
                 pool_active: 3,
-                hydradb: HydraDbInterval::default(),
+                hydradb: MemoryProviderInterval::default(),
             }),
             suggested_task_worker_concurrency: Some(TaskWorkerConcurrencyRecommendation {
                 maximum: 3,

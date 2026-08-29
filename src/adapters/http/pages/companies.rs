@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub fn companies_page(companies: &[Company]) -> String {
+pub fn companies_page(companies: &[Company], configured: &ConfiguredMemoryProviders) -> String {
     let list_html = company_list_fragment(companies);
 
     let content = format!(
@@ -68,7 +68,7 @@ pub fn companies_page(companies: &[Company]) -> String {
                     <select id="company_memory_provider" name="memory_provider"
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
                         <option value="">Disabled</option>
-                        <option value="hydradb">HydraDB</option>
+                        {memory_provider_options}
                     </select>
                     <p class="mt-1 text-[11px] text-slate-500">Disabling suspends memory but retains the connection and channel choices. Deleting the company removes its remote memory.</p>
                 </div>
@@ -88,7 +88,8 @@ pub fn companies_page(companies: &[Company]) -> String {
                 {list_html}
             </div>
         </div>
-    "##
+    "##,
+        memory_provider_options = memory_provider_options("", configured),
     );
 
     base_layout("Companies", &content)
@@ -156,16 +157,11 @@ pub fn company_row_fragment(company: &Company) -> String {
     )
 }
 
-pub fn company_edit_fragment(company: &Company) -> String {
+pub fn company_edit_fragment(company: &Company, configured: &ConfiguredMemoryProviders) -> String {
     let api_key_val = company.api_key.as_deref().unwrap_or("");
     let provider_val = company.provider.as_deref().unwrap_or("");
     let model_val = company.model.as_deref().unwrap_or("");
     let memory_disabled_selected = if company.memory_provider.is_none() {
-        "selected"
-    } else {
-        ""
-    };
-    let memory_hydradb_selected = if company.memory_provider.is_some() {
         "selected"
     } else {
         ""
@@ -214,7 +210,7 @@ pub fn company_edit_fragment(company: &Company) -> String {
                 <label class="block text-xs font-medium text-slate-300 mb-1">Long-term Memory</label>
                 <select name="memory_provider" class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
                     <option value="" {memory_disabled_selected}>Disabled</option>
-                    <option value="hydradb" {memory_hydradb_selected}>HydraDB</option>
+                    {memory_provider_options}
                 </select>
                 <p class="mt-1 text-[11px] text-slate-500">Disabling suspends memory but retains the connection and channel choices. Deleting the company removes its remote memory.</p>
             </div>
@@ -238,7 +234,13 @@ pub fn company_edit_fragment(company: &Company) -> String {
         model = model_val,
         avatar_url = escape_html_text(company.avatar_url.as_deref().unwrap_or("")),
         memory_disabled_selected = memory_disabled_selected,
-        memory_hydradb_selected = memory_hydradb_selected,
+        memory_provider_options = memory_provider_options(
+            company
+                .memory_provider
+                .map(MemoryProviderKind::as_str)
+                .unwrap_or_default(),
+            configured,
+        ),
     )
 }
 

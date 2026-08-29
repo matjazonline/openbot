@@ -30,6 +30,13 @@ pub const MEMORY_READINESS_WINDOW_SECONDS: i64 = 15 * 60;
 pub const MEMORY_READINESS_TIMEOUT_ERROR: &str = "memory provider readiness deadline was exceeded";
 pub const MEMORY_TRUNCATION_MARKER: &str = "\n...[truncated]";
 
+/// Hindsight publishes no `bank_id` limit. Our worst case is the User scope at 123 bytes
+/// (`mail-agents-company-{32 hex}--user_{64 hex}`), so bound it conservatively here rather than
+/// discovering the real limit in production.
+pub const MAX_HINDSIGHT_BANK_ID_BYTES: usize = 128;
+/// Hindsight's recall is budgeted in tokens rather than rows; this is the per-scope budget.
+pub const HINDSIGHT_RECALL_MAX_TOKENS: u32 = 4_096;
+
 /// Truncate free text at a Unicode scalar boundary while keeping the marker inside the limit.
 pub fn truncate_memory_text(value: &str, max_chars: usize) -> (String, bool) {
     let mut chars = value.chars();
@@ -53,13 +60,34 @@ pub fn truncate_memory_text(value: &str, max_chars: usize) -> (String, bool) {
 #[serde(rename_all = "lowercase")]
 pub enum MemoryProviderKind {
     Hydradb,
+    Hindsight,
 }
 
 impl MemoryProviderKind {
+    /// Every provider the application knows about, in the order the settings UI offers them.
+    /// Iterating this is what keeps the wire strings, the `<select>` options and the stored-value
+    /// parsing from drifting apart as providers are added.
+    pub const ALL: [Self; 2] = [Self::Hydradb, Self::Hindsight];
+
+    /// The wire and database value. Must stay in sync with the `provider` CHECK constraints in
+    /// `migrations/20260817000000_init_schema.sql`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Hydradb => "hydradb",
+            Self::Hindsight => "hindsight",
         }
+    }
+
+    /// The human-facing name, for settings copy and operator-visible errors.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Hydradb => "HydraDB",
+            Self::Hindsight => "Hindsight",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|kind| kind.as_str() == value)
     }
 }
 
@@ -171,6 +199,8 @@ pub enum MemoryProviderError {
     TooManyResults,
     #[error("memory provider operation exceeded its target collection bound")]
     TooManyTargets,
+    #[error("memory provider identifier is not well formed")]
+    InvalidIdentifier,
 }
 
 impl MemoryProviderError {
@@ -406,6 +436,22 @@ pub struct MemoryChunk {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn every_provider_kind_round_trips_through_its_wire_value() {
+        for kind in MemoryProviderKind::ALL {
+            assert_eq!(MemoryProviderKind::parse(kind.as_str()), Some(kind));
+            assert!(!kind.label().is_empty());
+        }
+        assert_eq!(MemoryProviderKind::parse("none"), None);
+        assert_eq!(MemoryProviderKind::parse(""), None);
+    }
+
+    #[test]
+    fn identifier_errors_are_not_retryable_and_carry_no_bound_label() {
+        assert!(!MemoryProviderError::InvalidIdentifier.retryable());
+        assert_eq!(MemoryProviderError::InvalidIdentifier.bound_label(), None);
+    }
+
     #[test]
     fn unavailable_scopes_are_skipped_without_company_fallback() {
         let scopes = resolve_scopes(false, true, true, None, None);

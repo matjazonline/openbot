@@ -37,6 +37,7 @@ use crate::{
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
+    services::memory_provider::{ConfiguredMemoryProviders, SelectedMemoryProvider},
     use_cases::{
         agent::AgentUseCases,
         channel::ChannelUseCases,
@@ -223,7 +224,7 @@ impl Workspace {
                 body: pages::CompanyPaneBody::Settings,
             },
             memory.as_ref(),
-            self.memory_use_cases.hydradb_configured(),
+            self.memory_use_cases.configured(),
         ))
     }
 
@@ -367,7 +368,7 @@ async fn companies_page(
                 draft: &pages::CompanyDraft::default(),
                 error: None,
             },
-            workspace.memory_use_cases.hydradb_configured(),
+            workspace.memory_use_cases.configured(),
         ),
         None => pages::company_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline),
     };
@@ -398,7 +399,7 @@ async fn create_pane(workspace: Workspace) -> AppResult<Response> {
             draft: &pages::CompanyDraft::default(),
             error: None,
         },
-        workspace.memory_use_cases.hydradb_configured(),
+        workspace.memory_use_cases.configured(),
     );
     let list = workspace.deselected_list().await?;
 
@@ -435,7 +436,7 @@ async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> 
     let submitted = SubmittedCompany::new(form);
 
     let created = match submitted.write().and_then(|write| {
-        submitted.validate_memory(workspace.memory_use_cases.hydradb_configured())?;
+        submitted.selected_memory(workspace.memory_use_cases.configured())?;
         Ok(write)
     }) {
         Ok(write) => {
@@ -464,7 +465,7 @@ async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> 
                 draft: &submitted.draft(),
                 error: Some(&format!("Failed to create company: {err}")),
             },
-            workspace.memory_use_cases.hydradb_configured(),
+            workspace.memory_use_cases.configured(),
         ))
         .into_response(),
     }
@@ -485,7 +486,7 @@ async fn update_company(
     let submitted = SubmittedCompany::new(form);
 
     let saved = match submitted.write().and_then(|write| {
-        submitted.validate_memory(workspace.memory_use_cases.hydradb_configured())?;
+        submitted.selected_memory(workspace.memory_use_cases.configured())?;
         Ok(write)
     }) {
         Ok(write) => {
@@ -607,25 +608,26 @@ impl SubmittedCompany {
         })
     }
 
-    fn validate_memory(&self, hydradb_configured: bool) -> Result<(), String> {
-        match self.form.memory_provider.as_deref().map(str::trim) {
-            None | Some("") | Some("none") => Ok(()),
-            Some("hydradb") if hydradb_configured => Ok(()),
-            Some("hydradb") => Err("HydraDB is not configured for this deployment.".into()),
-            Some(_) => Err("Unsupported memory provider.".into()),
-        }
+    fn selected_memory(
+        &self,
+        configured: &ConfiguredMemoryProviders,
+    ) -> Result<SelectedMemoryProvider, String> {
+        configured.select(self.form.memory_provider.as_deref())
     }
 }
 
 impl Workspace {
     async fn apply_memory(&self, submitted: &SubmittedCompany, company_id: Uuid) -> AppResult<()> {
-        match submitted.form.memory_provider.as_deref().map(str::trim) {
-            Some("hydradb") => {
+        match submitted
+            .selected_memory(self.memory_use_cases.configured())
+            .map_err(AppError::BadRequest)?
+        {
+            SelectedMemoryProvider::Provider(kind) => {
                 self.memory_use_cases
-                    .select_hydradb(self.user_id, company_id)
+                    .select_provider(self.user_id, company_id, kind)
                     .await?;
             }
-            _ => {
+            SelectedMemoryProvider::Disabled => {
                 self.memory_use_cases
                     .disable(self.user_id, company_id)
                     .await?

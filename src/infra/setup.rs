@@ -1,20 +1,22 @@
 use crate::{
     adapters::{
         http::{app_state::AppState, session::SessionAuthority},
-        memory::hydradb::HydraDbProvider,
+        memory::{hindsight::HindsightProvider, hydradb::HydraDbProvider},
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
         protocols::{EgressRegistry, email::EmailEgressAdapter},
         storage::{FileStorage, gcs::GcsFileStorage},
     },
     domain::monitoring::MonitoringService,
-    entities::runtime_metrics::MachineIdentity,
+    entities::{memory::MemoryProviderKind, runtime_metrics::MachineIdentity},
     infra::{
         argon2_password_hasher, config::AppConfig, events::MailboxEvents, postgres_persistence,
     },
     services::{
-        memory_coordinator::MemoryCoordinator, memory_provider::MemoryProviderRegistry,
-        memory_worker::MemoryWorker, outbound_dispatcher::SmtpConfirmationSender,
-        runtime_metrics::HydraDbActivity,
+        memory_coordinator::MemoryCoordinator,
+        memory_provider::{ConfiguredMemoryProviders, MemoryProviderRegistry},
+        memory_worker::MemoryWorker,
+        outbound_dispatcher::SmtpConfirmationSender,
+        runtime_metrics::MemoryProviderActivity,
     },
     use_cases::{
         agent::AgentUseCases,
@@ -49,8 +51,12 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     };
 
     let postgres_arc = Arc::new(postgres_persistence().await?);
-    let hydradb_activity = HydraDbActivity::default();
+    let memory_provider_activity = MemoryProviderActivity::default();
+    // One registry entry and one configured-set entry per provider this deployment carries
+    // credentials for. The activity handle is shared: the runtime panel is a machine-level
+    // aggregate, not a per-provider split.
     let mut memory_providers = MemoryProviderRegistry::default();
+    let mut configured_memory_providers = Vec::new();
     if let Some(hydradb) = config.hydradb.as_ref() {
         let provider = HydraDbProvider::new(
             hydradb.base_url.clone(),
@@ -58,12 +64,25 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             hydradb.fast_timeout,
             hydradb.thinking_timeout,
         )?
-        .with_activity(hydradb_activity.clone());
-        memory_providers = memory_providers.register(
-            crate::entities::memory::MemoryProviderKind::Hydradb,
-            Arc::new(provider),
-        );
+        .with_activity(memory_provider_activity.clone());
+        memory_providers =
+            memory_providers.register(MemoryProviderKind::Hydradb, Arc::new(provider));
+        configured_memory_providers.push(MemoryProviderKind::Hydradb);
     }
+    if let Some(hindsight) = config.hindsight.as_ref() {
+        let provider = HindsightProvider::new(
+            hindsight.base_url.clone(),
+            hindsight.api_key.clone(),
+            hindsight.fast_timeout,
+            hindsight.thinking_timeout,
+        )?
+        .with_activity(memory_provider_activity.clone());
+        memory_providers =
+            memory_providers.register(MemoryProviderKind::Hindsight, Arc::new(provider));
+        configured_memory_providers.push(MemoryProviderKind::Hindsight);
+    }
+    let configured_memory_providers =
+        ConfiguredMemoryProviders::from_iter(configured_memory_providers);
     let memory_providers = Arc::new(memory_providers);
     let memory_coordinator = Arc::new(MemoryCoordinator::new(
         postgres_arc.clone(),
@@ -74,7 +93,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         postgres_arc.clone(),
         postgres_arc.clone(),
         postgres_arc.clone(),
-        config.hydradb.is_some(),
+        configured_memory_providers,
     ));
     let memory_worker = Arc::new(MemoryWorker::new(
         postgres_arc.clone(),
@@ -153,7 +172,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         dashboard_persistence: postgres_arc.clone(),
         runtime_metrics: postgres_arc.clone(),
         runtime_identity,
-        hydradb_activity,
+        memory_provider_activity,
         sessions,
         file_storage,
         events: MailboxEvents::new(),

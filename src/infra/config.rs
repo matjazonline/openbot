@@ -9,10 +9,11 @@ use crate::{
     entities::{
         memory::{
             MAX_MEMORY_PROVIDER_BASE_URL_BYTES, MAX_MEMORY_PROVIDER_CREDENTIAL_BYTES,
-            MAX_MEMORY_PROVIDER_REQUEST_SECONDS,
+            MAX_MEMORY_PROVIDER_REQUEST_SECONDS, MemoryProviderKind,
         },
         value_objects::EmailAddress,
     },
+    services::memory_provider::ConfiguredMemoryProviders,
 };
 
 pub const DEFAULT_TASK_WORKER_CONCURRENCY: usize = 4;
@@ -76,29 +77,50 @@ pub struct AppConfig {
     pub operator_emails: Vec<EmailAddress>,
     /// Authenticated SendGrid inbound webhook configuration. `None` disables the route.
     pub sendgrid_inbound: Option<SendGridInboundConfig>,
-    /// Deployment-wide HydraDB credentials. Company selection remains disabled when absent.
-    pub hydradb: Option<HydraDbConfig>,
+    /// Deployment-wide provider credentials. A provider absent here cannot be selected by any
+    /// company, and a company already pointing at it degrades to no-memory rather than failing.
+    pub hydradb: Option<MemoryProviderHttpConfig>,
+    pub hindsight: Option<MemoryProviderHttpConfig>,
 }
 
+impl AppConfig {
+    /// The memory providers this deployment carries credentials for. Derived from the config
+    /// rather than stored, so it cannot fall out of step with what `infra::setup` registers.
+    pub fn configured_memory_providers(&self) -> ConfiguredMemoryProviders {
+        MemoryProviderKind::ALL
+            .into_iter()
+            .filter(|kind| match kind {
+                MemoryProviderKind::Hydradb => self.hydradb.is_some(),
+                MemoryProviderKind::Hindsight => self.hindsight.is_some(),
+            })
+            .collect()
+    }
+}
+
+/// Every HTTP memory provider is configured the same way: a base URL, a credential, and the two
+/// request deadlines `MemoryRecallMode` selects between. One shape and one validation, keyed by
+/// the env-var prefix, so a new provider adds four documented variables and no new rules.
 #[derive(Clone)]
-pub struct HydraDbConfig {
+pub struct MemoryProviderHttpConfig {
     pub api_key: SecretString,
     pub base_url: String,
     pub fast_timeout: StdDuration,
     pub thinking_timeout: StdDuration,
 }
 
-impl HydraDbConfig {
-    fn from_env() -> Option<Self> {
+impl MemoryProviderHttpConfig {
+    fn from_env(prefix: &str) -> Option<Self> {
         Self::from_values(
-            non_empty_var("HYDRA_DB_API_KEY"),
-            non_empty_var("HYDRA_DB_BASE_URL"),
-            non_empty_var("HYDRA_DB_FAST_TIMEOUT_SECS"),
-            non_empty_var("HYDRA_DB_THINKING_TIMEOUT_SECS"),
+            prefix,
+            non_empty_var(&format!("{prefix}_API_KEY")),
+            non_empty_var(&format!("{prefix}_BASE_URL")),
+            non_empty_var(&format!("{prefix}_FAST_TIMEOUT_SECS")),
+            non_empty_var(&format!("{prefix}_THINKING_TIMEOUT_SECS")),
         )
     }
 
     fn from_values(
+        prefix: &str,
         api_key: Option<String>,
         base_url: Option<String>,
         fast_timeout: Option<String>,
@@ -111,53 +133,45 @@ impl HydraDbConfig {
         {
             return None;
         }
-        let api_key = api_key.expect(
-            "HYDRA_DB_API_KEY, HYDRA_DB_BASE_URL, HYDRA_DB_FAST_TIMEOUT_SECS and \
-             HYDRA_DB_THINKING_TIMEOUT_SECS must either all be set or all be absent",
+        let all_or_nothing = format!(
+            "{prefix}_API_KEY, {prefix}_BASE_URL, {prefix}_FAST_TIMEOUT_SECS and \
+             {prefix}_THINKING_TIMEOUT_SECS must either all be set or all be absent"
         );
-        let base_url = base_url.expect(
-            "HYDRA_DB_API_KEY, HYDRA_DB_BASE_URL, HYDRA_DB_FAST_TIMEOUT_SECS and \
-             HYDRA_DB_THINKING_TIMEOUT_SECS must either all be set or all be absent",
-        );
+        let api_key = api_key.unwrap_or_else(|| panic!("{all_or_nothing}"));
+        let base_url = base_url.unwrap_or_else(|| panic!("{all_or_nothing}"));
         assert!(
             api_key.len() <= MAX_MEMORY_PROVIDER_CREDENTIAL_BYTES,
-            "HYDRA_DB_API_KEY exceeds the maximum supported credential length"
+            "{prefix}_API_KEY exceeds the maximum supported credential length"
         );
         assert!(
             base_url.len() <= MAX_MEMORY_PROVIDER_BASE_URL_BYTES,
-            "HYDRA_DB_BASE_URL exceeds the maximum supported URL length"
+            "{prefix}_BASE_URL exceeds the maximum supported URL length"
         );
         let fast_timeout = parse_positive_seconds(
-            "HYDRA_DB_FAST_TIMEOUT_SECS",
-            fast_timeout.expect(
-                "HYDRA_DB_API_KEY, HYDRA_DB_BASE_URL, HYDRA_DB_FAST_TIMEOUT_SECS and \
-                 HYDRA_DB_THINKING_TIMEOUT_SECS must either all be set or all be absent",
-            ),
+            &format!("{prefix}_FAST_TIMEOUT_SECS"),
+            fast_timeout.unwrap_or_else(|| panic!("{all_or_nothing}")),
         );
         let thinking_timeout = parse_positive_seconds(
-            "HYDRA_DB_THINKING_TIMEOUT_SECS",
-            thinking_timeout.expect(
-                "HYDRA_DB_API_KEY, HYDRA_DB_BASE_URL, HYDRA_DB_FAST_TIMEOUT_SECS and \
-                 HYDRA_DB_THINKING_TIMEOUT_SECS must either all be set or all be absent",
-            ),
+            &format!("{prefix}_THINKING_TIMEOUT_SECS"),
+            thinking_timeout.unwrap_or_else(|| panic!("{all_or_nothing}")),
         );
         assert!(
             fast_timeout.as_secs() <= MAX_MEMORY_PROVIDER_REQUEST_SECONDS,
-            "HYDRA_DB_FAST_TIMEOUT_SECS must be at most {MAX_MEMORY_PROVIDER_REQUEST_SECONDS}"
+            "{prefix}_FAST_TIMEOUT_SECS must be at most {MAX_MEMORY_PROVIDER_REQUEST_SECONDS}"
         );
         assert!(
             thinking_timeout.as_secs() <= MAX_MEMORY_PROVIDER_REQUEST_SECONDS,
-            "HYDRA_DB_THINKING_TIMEOUT_SECS must be at most {MAX_MEMORY_PROVIDER_REQUEST_SECONDS}"
+            "{prefix}_THINKING_TIMEOUT_SECS must be at most {MAX_MEMORY_PROVIDER_REQUEST_SECONDS}"
         );
         let parsed_url = url::Url::parse(&base_url)
-            .expect("HYDRA_DB_BASE_URL must be an absolute http or https URL");
+            .unwrap_or_else(|_| panic!("{prefix}_BASE_URL must be an absolute http or https URL"));
         assert!(
             matches!(parsed_url.scheme(), "http" | "https") && parsed_url.host().is_some(),
-            "HYDRA_DB_BASE_URL must be an absolute http or https URL"
+            "{prefix}_BASE_URL must be an absolute http or https URL"
         );
         assert!(
             thinking_timeout >= fast_timeout,
-            "HYDRA_DB_THINKING_TIMEOUT_SECS must be at least HYDRA_DB_FAST_TIMEOUT_SECS"
+            "{prefix}_THINKING_TIMEOUT_SECS must be at least {prefix}_FAST_TIMEOUT_SECS"
         );
         Some(Self {
             api_key: SecretString::from(api_key),
@@ -501,7 +515,8 @@ impl AppConfig {
             .unwrap_or(false);
 
         let gcs = GcsConfig::from_env(&app_domain_name);
-        let hydradb = HydraDbConfig::from_env();
+        let hydradb = MemoryProviderHttpConfig::from_env("HYDRA_DB");
+        let hindsight = MemoryProviderHttpConfig::from_env("HINDSIGHT");
 
         Self {
             jwt_secret,
@@ -531,6 +546,7 @@ impl AppConfig {
             operator_emails,
             sendgrid_inbound,
             hydradb,
+            hindsight,
         }
     }
 
@@ -574,6 +590,7 @@ impl AppConfig {
             operator_emails: Vec::new(),
             sendgrid_inbound: None,
             hydradb: None,
+            hindsight: None,
         }
     }
 }
@@ -631,9 +648,12 @@ mod tests {
     }
 
     #[test]
-    fn hydradb_config_is_all_or_nothing_and_validated() {
-        assert!(HydraDbConfig::from_values(None, None, None, None).is_none());
-        let config = HydraDbConfig::from_values(
+    fn memory_provider_config_is_all_or_nothing_and_validated() {
+        assert!(
+            MemoryProviderHttpConfig::from_values("HYDRA_DB", None, None, None, None).is_none()
+        );
+        let config = MemoryProviderHttpConfig::from_values(
+            "HYDRA_DB",
             Some("secret".into()),
             Some("https://hydra.example/v2/".into()),
             Some("5".into()),
@@ -645,14 +665,46 @@ mod tests {
     }
 
     #[test]
-    fn hydradb_request_timeouts_accept_the_safe_upper_boundary() {
-        let config = HydraDbConfig::from_values(
+    fn hindsight_config_is_all_or_nothing_and_validated() {
+        assert!(
+            MemoryProviderHttpConfig::from_values("HINDSIGHT", None, None, None, None).is_none()
+        );
+        // The org path segment lives in the base URL, so cloud and self-hosted differ by
+        // configuration alone.
+        let config = MemoryProviderHttpConfig::from_values(
+            "HINDSIGHT",
+            Some("secret".into()),
+            Some("https://api.hindsight.vectorize.io/v1/default/".into()),
+            Some("15".into()),
+            Some("60".into()),
+        )
+        .unwrap();
+        assert_eq!(
+            config.base_url,
+            "https://api.hindsight.vectorize.io/v1/default"
+        );
+        assert_eq!(config.thinking_timeout, StdDuration::from_secs(60));
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "HINDSIGHT_API_KEY, HINDSIGHT_BASE_URL, HINDSIGHT_FAST_TIMEOUT_SECS and \
+                    HINDSIGHT_THINKING_TIMEOUT_SECS must either all be set or all be absent"
+    )]
+    fn partial_memory_provider_config_names_its_own_variables() {
+        MemoryProviderHttpConfig::from_values("HINDSIGHT", Some("secret".into()), None, None, None);
+    }
+
+    #[test]
+    fn memory_provider_request_timeouts_accept_the_safe_upper_boundary() {
+        let config = MemoryProviderHttpConfig::from_values(
+            "HYDRA_DB",
             Some("secret".into()),
             Some("https://hydra.example/v2".into()),
             Some(MAX_MEMORY_PROVIDER_REQUEST_SECONDS.to_string()),
             Some(MAX_MEMORY_PROVIDER_REQUEST_SECONDS.to_string()),
         )
-        .expect("bounded HydraDB config");
+        .expect("bounded memory provider config");
 
         assert_eq!(
             config.thinking_timeout,
@@ -662,8 +714,9 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "HYDRA_DB_THINKING_TIMEOUT_SECS must be at most 110")]
-    fn hydradb_request_timeouts_reject_values_beyond_the_worker_deadline() {
-        HydraDbConfig::from_values(
+    fn memory_provider_request_timeouts_reject_values_beyond_the_worker_deadline() {
+        MemoryProviderHttpConfig::from_values(
+            "HYDRA_DB",
             Some("secret".into()),
             Some("https://hydra.example/v2".into()),
             Some("110".into()),
@@ -672,11 +725,12 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "HYDRA_DB_API_KEY exceeds the maximum supported credential length")]
-    fn hydradb_rejects_oversized_credentials_without_echoing_them() {
-        HydraDbConfig::from_values(
+    #[should_panic(expected = "HINDSIGHT_API_KEY exceeds the maximum supported credential length")]
+    fn memory_provider_rejects_oversized_credentials_without_echoing_them() {
+        MemoryProviderHttpConfig::from_values(
+            "HINDSIGHT",
             Some("x".repeat(MAX_MEMORY_PROVIDER_CREDENTIAL_BYTES + 1)),
-            Some("https://hydra.example/v2".into()),
+            Some("https://api.hindsight.vectorize.io/v1/default".into()),
             Some("10".into()),
             Some("60".into()),
         );

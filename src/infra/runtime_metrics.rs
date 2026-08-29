@@ -4,7 +4,9 @@ use chrono::Utc;
 
 use crate::{
     entities::runtime_metrics::{MachineIdentity, RuntimeMetricObservation},
-    services::runtime_metrics::{ActiveTaskExecutions, HydraDbActivity, RuntimeMetricSource},
+    services::runtime_metrics::{
+        ActiveTaskExecutions, MemoryProviderActivity, RuntimeMetricSource,
+    },
 };
 
 const PROC_STATUS: &str = "/proc/self/status";
@@ -49,7 +51,7 @@ pub struct LinuxRuntimeMetricSource {
     previous_throttle: Option<(u64, Instant)>,
     active_task_executions: ActiveTaskExecutions,
     task_worker_concurrency_limit: i32,
-    hydradb: HydraDbActivity,
+    hydradb: MemoryProviderActivity,
 }
 
 impl LinuxRuntimeMetricSource {
@@ -57,7 +59,7 @@ impl LinuxRuntimeMetricSource {
         identity: MachineIdentity,
         active_task_executions: ActiveTaskExecutions,
         task_worker_concurrency_limit: usize,
-        hydradb: HydraDbActivity,
+        hydradb: MemoryProviderActivity,
     ) -> Self {
         Self {
             identity,
@@ -290,7 +292,7 @@ mod tests {
             previous_throttle: None,
             active_task_executions: ActiveTaskExecutions::default(),
             task_worker_concurrency_limit: 4,
-            hydradb: HydraDbActivity::default(),
+            hydradb: MemoryProviderActivity::default(),
         };
 
         let gauge = source.active_task_executions.clone();

@@ -91,19 +91,22 @@ impl MachineIdentity {
     }
 }
 
-/// HydraDB calls that completed on this machine during one sampling interval.
+/// Memory provider calls that completed on this machine during one sampling interval.
+///
+/// The aggregate spans every configured provider. The `hydradb_` column names it persists into
+/// predate the second provider and are kept deliberately — see the schema comment.
 ///
 /// Counted rather than probed: the interval reports the memory calls the application actually
 /// made, so an idle machine costs the provider nothing and the latency shown is the latency
 /// recall and ingestion really paid.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct HydraDbInterval {
+pub struct MemoryProviderInterval {
     pub calls: i32,
     pub failures: i32,
     pub total_duration_ms: f64,
 }
 
-impl HydraDbInterval {
+impl MemoryProviderInterval {
     /// `None` for an interval with no calls — an idle interval has no latency to average.
     pub fn mean_duration_ms(&self) -> Option<f64> {
         (self.calls > 0).then(|| self.total_duration_ms / f64::from(self.calls))
@@ -122,7 +125,7 @@ pub struct RuntimeMetricObservation {
     pub cpu_throttle_percent: Option<f64>,
     pub active_task_executions: i32,
     pub task_worker_concurrency_limit: i32,
-    pub hydradb: HydraDbInterval,
+    pub hydradb: MemoryProviderInterval,
 }
 
 /// One durable ten-second reading from one serving machine.
@@ -142,7 +145,7 @@ pub struct RuntimeMetricSample {
     pub pool_size: i32,
     pub pool_idle: i32,
     pub pool_active: i32,
-    pub hydradb: HydraDbInterval,
+    pub hydradb: MemoryProviderInterval,
 }
 
 /// Aggregates rendered as one point in the selected dashboard range.
@@ -155,7 +158,7 @@ pub struct RuntimeMetricBucket {
     pub database_acquire_p50_ms: Option<f64>,
     pub database_acquire_p95_ms: Option<f64>,
     /// `None` where no sample landed in the bucket at all; `Some(0)` where the machine was up
-    /// and made no HydraDB calls. The two are a gap and a quiet period, not the same thing.
+    /// and made no memory provider calls. The two are a gap and a quiet period, not the same thing.
     pub hydradb_calls: Option<i64>,
     pub hydradb_failures: Option<i64>,
     pub hydradb_mean_ms: Option<f64>,

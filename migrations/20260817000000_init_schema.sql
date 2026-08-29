@@ -149,7 +149,7 @@ CREATE TABLE companies (
     CONSTRAINT companies_avatar_url_scheme_check
         CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://'),
     CONSTRAINT companies_memory_provider_check
-        CHECK (memory_provider IS NULL OR memory_provider = 'hydradb')
+        CHECK (memory_provider IS NULL OR memory_provider IN ('hydradb', 'hindsight'))
 );
 
 CREATE INDEX companies_user_created_idx
@@ -996,7 +996,7 @@ CREATE INDEX schedule_runs_materialization_expired_idx
 -- definitions past each other breaks company deletion.
 CREATE TABLE memory_provider_connections (
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL CHECK (provider IN ('hydradb')),
+    provider TEXT NOT NULL CHECK (provider IN ('hydradb', 'hindsight')),
     remote_database_id TEXT NOT NULL,
     readiness TEXT NOT NULL DEFAULT 'pending'
         CHECK (readiness IN ('pending', 'provisioning', 'ready', 'failed')),
@@ -1014,7 +1014,7 @@ CREATE TABLE memory_provider_connections (
 -- `operation_generation` fences the workers: an operation leased under an older generation cannot
 -- apply its result over a newer decision.
 CREATE TABLE memory_remote_resource_lifecycles (
-    provider TEXT NOT NULL CHECK (provider = 'hydradb'),
+    provider TEXT NOT NULL CHECK (provider IN ('hydradb', 'hindsight')),
     remote_database_id TEXT NOT NULL,
     company_id UUID NULL REFERENCES companies(id) ON DELETE SET NULL,
     desired_state TEXT NOT NULL CHECK (desired_state IN ('present', 'absent')),
@@ -1042,7 +1042,7 @@ CREATE TABLE memory_remote_resource_lifecycles (
 CREATE TABLE memory_provisioning_jobs (
     id UUID PRIMARY KEY,
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL CHECK (provider = 'hydradb'),
+    provider TEXT NOT NULL CHECK (provider IN ('hydradb', 'hindsight')),
     remote_database_id TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'leased', 'completed', 'failed')),
@@ -1102,7 +1102,7 @@ CREATE INDEX memory_provisioning_jobs_due_idx
 
 CREATE TABLE memory_cleanup_jobs (
     id UUID PRIMARY KEY,
-    provider TEXT NOT NULL CHECK (provider IN ('hydradb')),
+    provider TEXT NOT NULL CHECK (provider IN ('hydradb', 'hindsight')),
     remote_database_id TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'leased', 'completed', 'failed')),
@@ -1241,9 +1241,11 @@ CREATE TABLE runtime_metric_samples (
     pool_active INTEGER NOT NULL,
     active_task_executions INTEGER NOT NULL DEFAULT 0,
     task_worker_concurrency_limit INTEGER NOT NULL DEFAULT 1,
-    -- HydraDB calls counted per ten-second sample rather than probed, so the figures are the
-    -- latency and failures memory recall and ingestion actually paid, and an idle machine polls
-    -- nobody.
+    -- Memory provider calls counted per ten-second sample rather than probed, so the figures are
+    -- the latency and failures memory recall and ingestion actually paid, and an idle machine
+    -- polls nobody. The aggregate spans every configured provider; the `hydradb_` column names
+    -- predate the second one and are kept deliberately, because renaming them would mean a
+    -- migration on a table whose CHECK constraints are coupled to the column list.
     hydradb_calls INTEGER NOT NULL DEFAULT 0,
     hydradb_failures INTEGER NOT NULL DEFAULT 0,
     hydradb_duration_ms DOUBLE PRECISION NOT NULL DEFAULT 0,

@@ -1212,6 +1212,7 @@ mod tests {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             hydradb: None,
+            hindsight: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],
@@ -1270,7 +1271,7 @@ mod tests {
             Arc::new(crate::services::memory_provider::MemoryProviderRegistry::default());
         let monitoring = Arc::new(crate::adapters::monitoring::InMemoryMonitor::new());
         let app_state = AppState {
-            hydradb_activity: Default::default(),
+            memory_provider_activity: Default::default(),
             // Lazy: this test drives mocked persistence and never opens a connection.
             db: sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
                 .expect("valid lazy pool url"),
@@ -1332,7 +1333,7 @@ mod tests {
                 company_persistence.clone(),
                 memory_persistence.clone(),
                 memory_persistence.clone(),
-                false,
+                Default::default(),
             )),
             memory_worker: Arc::new(crate::services::memory_worker::MemoryWorker::new(
                 memory_persistence,

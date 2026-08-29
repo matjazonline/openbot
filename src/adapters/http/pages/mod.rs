@@ -26,6 +26,7 @@ use crate::entities::{
     user::User,
     value_objects::{AvatarUrl, EmailAddress},
 };
+use crate::services::memory_provider::ConfiguredMemoryProviders;
 use crate::use_cases::{
     channel::InboundEmailResult,
     user::{AccountChangeKind, PendingChange},

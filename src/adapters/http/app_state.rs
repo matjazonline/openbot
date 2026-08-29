@@ -13,7 +13,7 @@ use crate::{
     infra::{config::AppConfig, events::MailboxEvents},
     services::{
         memory_worker::MemoryWorker,
-        runtime_metrics::{HydraDbActivity, RuntimeMetricPersistence},
+        runtime_metrics::{MemoryProviderActivity, RuntimeMetricPersistence},
     },
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
@@ -43,7 +43,7 @@ pub struct AppState {
     pub runtime_metrics: Arc<dyn RuntimeMetricPersistence>,
     pub runtime_identity: MachineIdentity,
     /// Tally the memory provider writes into and the runtime sampler drains each ten seconds.
-    pub hydradb_activity: HydraDbActivity,
+    pub memory_provider_activity: MemoryProviderActivity,
     /// Issues and verifies sessions; the only thing that decides who a request is.
     pub sessions: Arc<SessionAuthority>,
     /// Where a picked file is stored; `None` when no bucket is configured, which is what the

@@ -10,7 +10,7 @@ use crate::{
     entities::{
         dashboard::DashboardWindow,
         runtime_metrics::{
-            HydraDbInterval, MachineId, MachineIdentity, MachineRegion, RuntimeMetricBucket,
+            MachineId, MachineIdentity, MachineRegion, MemoryProviderInterval, RuntimeMetricBucket,
             RuntimeMetricObservation, RuntimeMetricSample, RuntimeMetricSnapshot,
             TASK_WORKER_RECOMMENDATION_POLICY, TaskWorkerConcurrencyRecommendation,
         },
@@ -278,7 +278,7 @@ fn sample_from_row(row: &sqlx::postgres::PgRow) -> AppResult<RuntimeMetricSample
         pool_size: row.try_get("pool_size").map_err(AppError::from)?,
         pool_idle: row.try_get("pool_idle").map_err(AppError::from)?,
         pool_active: row.try_get("pool_active").map_err(AppError::from)?,
-        hydradb: HydraDbInterval {
+        hydradb: MemoryProviderInterval {
             calls: row.try_get("hydradb_calls").map_err(AppError::from)?,
             failures: row.try_get("hydradb_failures").map_err(AppError::from)?,
             total_duration_ms: row.try_get("hydradb_duration_ms").map_err(AppError::from)?,
@@ -429,7 +429,7 @@ mod tests {
             cpu_throttle_percent: Some(1.25),
             active_task_executions: 2,
             task_worker_concurrency_limit: 4,
-            hydradb: HydraDbInterval {
+            hydradb: MemoryProviderInterval {
                 calls: 4,
                 failures: 1,
                 total_duration_ms: 500.0,

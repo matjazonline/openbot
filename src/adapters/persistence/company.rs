@@ -41,12 +41,13 @@ impl From<CompanyDb> for Company {
             provider: db.provider,
             model: db.model,
             enable_llm_spam_guardrail: db.enable_llm_spam_guardrail,
-            memory_provider: match db.memory_provider.as_deref() {
-                Some("hydradb") => Some(MemoryProviderKind::Hydradb),
-                // `none` is accepted only as a legacy stored representation. New writes use NULL.
-                Some("none") | None => None,
-                Some(_) => None,
-            },
+            // `none` is accepted only as a legacy stored representation, and an unknown value
+            // reads as "no provider" rather than failing the row: memory is optional, and a
+            // company must stay loadable after a provider is withdrawn from a deployment.
+            memory_provider: db
+                .memory_provider
+                .as_deref()
+                .and_then(MemoryProviderKind::parse),
             avatar_url: db.avatar_url.map(AvatarUrl::from),
             created_at: db.created_at,
         }

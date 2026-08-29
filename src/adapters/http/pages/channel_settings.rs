@@ -937,6 +937,7 @@ fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {
                         <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             <label class="form-control w-full">
                                 <div class="label"><span class="text-xs opacity-70">Persistence mode</span></div>
+                                <div class="label"><span class="text-[11px] opacity-60">Scope-specific facts constrains extraction to the scope. On HydraDB it is an instruction the extractor must follow; on Hindsight it is context the extractor is given, not an enforced filter.</span></div>
                                 <select name="memory_persistence_mode" class="select w-full"{disabled}>
                                     <option value="audience_only"{audience_only_selected}>Audience only</option>
                                     <option value="scope_specific_facts"{scope_specific_selected}>Scope-specific facts</option>

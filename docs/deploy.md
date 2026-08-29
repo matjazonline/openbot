@@ -109,6 +109,7 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 | `APPLE_OAUTH_CLIENT_ID` / `APPLE_OAUTH_TEAM_ID` / `APPLE_OAUTH_KEY_ID` / `APPLE_OAUTH_PRIVATE_KEY_BASE64` | Optional Sign in with Apple. Set all four, use the Services ID as the client ID, base64-encode the `.p8` private key, and register `https://<APP_DOMAIN_NAME>/auth/apple/callback` as the return URL. Apple requires a real HTTPS domain and does not accept localhost. Register the outbound mail domain and sender with Apple's private email relay so confirmation codes reach relay addresses. |
 | `CREDENTIAL_ENCRYPTION_KEYS` | Versioned AES-256-GCM keys (`1:<base64-32-bytes>,2:<base64-32-bytes>`). Keep prior versions during rotation; the highest version is active. |
 | `HYDRA_DB_API_KEY` | Optional deployment-wide HydraDB credential. Set with all three `HYDRA_DB_*` settings below or leave all four absent. |
+| `HINDSIGHT_API_KEY` | Optional deployment-wide Hindsight credential. Set with all three `HINDSIGHT_*` settings below or leave all four absent. |
 | `GCS_SERVICE_ACCOUNT_JSON_BASE64` | The Cloud Storage service account key, base64-encoded — see [Picture uploads](#picture-uploads) |
 
 Credential encryption keys are rotated additively: append a higher version, deploy, and let startup
@@ -120,7 +121,14 @@ invalidate provider keys that may already have been copied from an older dump.
 Non-secret settings live in the `[env]` block of `fly.toml`. `.env.example`
 documents the full set.
 
-### HydraDB long-term memory
+### Long-term memory providers
+
+Two memory backends are supported, HydraDB and Hindsight. Each is disabled unless all four of its
+settings are present. A deployment may configure either, both, or neither; company owners pick one
+per company in company settings, and switching retires the connection to the provider being left
+so its remote data is torn down rather than orphaned.
+
+#### HydraDB
 
 HydraDB is disabled unless all four settings below are present. Startup validates the group; it
 does not make a network call or promise that the credential is accepted. Company owners select
@@ -134,7 +142,27 @@ memory controls remain unavailable until that connection reports `ready`.
 | `HYDRA_DB_FAST_TIMEOUT_SECS` | Request timeout for fast calls; 1–110 seconds |
 | `HYDRA_DB_THINKING_TIMEOUT_SECS` | Request timeout for thinking calls; 1–110 seconds and at least the fast timeout |
 
-HydraDB traffic also has fixed, provider-neutral application bounds. They are intentionally not
+#### Hindsight
+
+Hindsight partitions memory only by *bank*, so each company scope gets its own bank named
+`{remote_database_id}--{scope}`. Provisioning creates the company bank; the agent and user banks
+are created on first write, because their names are not knowable until a message arrives. Recall
+issues one call per enabled scope and ranks the results by the scope weights the channel
+configured. Retain runs asynchronously — Hindsight extracts facts with an LLM pass — so a memory
+becomes recallable shortly after the reply rather than at once.
+
+| Setting | Requirement |
+| --- | --- |
+| `HINDSIGHT_API_KEY` | Secret bearer credential; never stored in PostgreSQL or logged |
+| `HINDSIGHT_BASE_URL` | Absolute `http` or `https` base URL **including the API version and organization path segment** — `https://api.hindsight.vectorize.io/v1/default` for Hindsight Cloud, `http://localhost:8888/v1/default` self-hosted |
+| `HINDSIGHT_FAST_TIMEOUT_SECS` | Request timeout for fast calls; 1–110 seconds |
+| `HINDSIGHT_THINKING_TIMEOUT_SECS` | Request timeout for thinking calls; 1–110 seconds and at least the fast timeout |
+
+Scope-specific persistence is passed to Hindsight as per-item extraction context rather than as an
+enforced filter, because its own extraction instructions are bank-level while the channel's
+persistence mode can change between messages.
+
+Memory traffic also has fixed, provider-neutral application bounds. They are intentionally not
 deployment settings, so increasing a provider timeout or changing a deployment cannot remove the
 safety envelope:
 

@@ -18,7 +18,7 @@ use crate::{
     entities::{
         dashboard::DashboardWindow,
         runtime_metrics::{
-            HydraDbInterval, MachineId, RuntimeMetricObservation, RuntimeMetricSample,
+            MachineId, MemoryProviderInterval, RuntimeMetricObservation, RuntimeMetricSample,
             RuntimeMetricSnapshot,
         },
     },
@@ -55,15 +55,15 @@ impl Drop for ActiveTaskExecutionGuard {
     }
 }
 
-/// Shared by the HydraDB adapter and the sampler. Every completed call is recorded once, and the
+/// Shared by every memory provider adapter and the sampler. Every completed call is recorded once, and the
 /// sampler drains the tally, so each sample reports exactly the calls made since the previous one.
 ///
 /// A lock rather than a set of atomics: the three figures are one reading, and a drain that
 /// interleaved with a record could otherwise report more failures than calls.
 #[derive(Clone, Default)]
-pub struct HydraDbActivity(Arc<Mutex<HydraDbInterval>>);
+pub struct MemoryProviderActivity(Arc<Mutex<MemoryProviderInterval>>);
 
-impl HydraDbActivity {
+impl MemoryProviderActivity {
     pub fn record(&self, duration: Duration, succeeded: bool) {
         let mut interval = self.lock();
         interval.calls = interval.calls.saturating_add(1);
@@ -76,13 +76,13 @@ impl HydraDbActivity {
     /// Take the interval and start the next one. Called once per sample; a sample that fails to
     /// persist carries its calls into the buffered backlog rather than losing or double-counting
     /// them.
-    pub fn drain(&self) -> HydraDbInterval {
+    pub fn drain(&self) -> MemoryProviderInterval {
         std::mem::take(&mut *self.lock())
     }
 
     /// A poisoned tally is recoverable: counters have no invariant a panic could have broken
     /// halfway, and losing memory metrics is never a reason to fail a memory call.
-    fn lock(&self) -> std::sync::MutexGuard<'_, HydraDbInterval> {
+    fn lock(&self) -> std::sync::MutexGuard<'_, MemoryProviderInterval> {
         self.0
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -241,7 +241,7 @@ mod tests {
                 cpu_throttle_percent: None,
                 active_task_executions: 0,
                 task_worker_concurrency_limit: 4,
-                hydradb: HydraDbInterval::default(),
+                hydradb: MemoryProviderInterval::default(),
             }
         }
     }
@@ -333,8 +333,8 @@ mod tests {
     }
 
     #[test]
-    fn hydradb_activity_tallies_calls_and_starts_a_new_interval_on_drain() {
-        let activity = HydraDbActivity::default();
+    fn memory_provider_activity_tallies_calls_and_starts_a_new_interval_on_drain() {
+        let activity = MemoryProviderActivity::default();
         activity.record(Duration::from_millis(20), true);
         activity.record(Duration::from_millis(40), false);
 

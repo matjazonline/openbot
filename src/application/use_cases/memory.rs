@@ -9,6 +9,7 @@ use crate::{
     entities::memory::{
         LeasedCleanupJob, LeasedProvisioningJob, MemoryConnection, MemoryProviderKind,
     },
+    services::memory_provider::ConfiguredMemoryProviders,
     use_cases::company::{CompanyPersistence, owned_company},
 };
 
@@ -123,7 +124,7 @@ pub struct MemoryUseCases {
     companies: Arc<dyn CompanyPersistence>,
     persistence: Arc<dyn MemoryConnectionPersistence>,
     bindings: Arc<dyn MemoryBindingPersistence>,
-    hydradb_configured: bool,
+    configured: ConfiguredMemoryProviders,
 }
 
 impl MemoryUseCases {
@@ -131,18 +132,18 @@ impl MemoryUseCases {
         companies: Arc<dyn CompanyPersistence>,
         persistence: Arc<dyn MemoryConnectionPersistence>,
         bindings: Arc<dyn MemoryBindingPersistence>,
-        hydradb_configured: bool,
+        configured: ConfiguredMemoryProviders,
     ) -> Self {
         Self {
             companies,
             persistence,
             bindings,
-            hydradb_configured,
+            configured,
         }
     }
 
-    pub fn hydradb_configured(&self) -> bool {
-        self.hydradb_configured
+    pub fn configured(&self) -> &ConfiguredMemoryProviders {
+        &self.configured
     }
 
     pub async fn status(
@@ -152,26 +153,22 @@ impl MemoryUseCases {
     ) -> AppResult<Option<MemoryConnection>> {
         owned_company(self.companies.as_ref(), user_id, company_id).await?;
         let binding = self.bindings.active_binding(company_id).await?;
-        if !self.hydradb_configured {
-            return Ok(None);
-        }
-        Ok(binding.connection())
+        // Gate on the *selected* provider: a connection to a provider this deployment no longer
+        // configures has no runtime behind it, and reporting it as live would be a lie.
+        Ok(binding
+            .connection()
+            .filter(|connection| self.configured.contains(connection.provider)))
     }
 
-    pub async fn select_hydradb(
+    pub async fn select_provider(
         &self,
         user_id: Uuid,
         company_id: Uuid,
+        provider: MemoryProviderKind,
     ) -> AppResult<MemoryConnection> {
-        if !self.hydradb_configured {
-            return Err(AppError::BadRequest(
-                "HydraDB is not configured for this deployment.".into(),
-            ));
-        }
+        self.require_configured(provider)?;
         owned_company(self.companies.as_ref(), user_id, company_id).await?;
-        self.persistence
-            .select_provider(company_id, MemoryProviderKind::Hydradb)
-            .await
+        self.persistence.select_provider(company_id, provider).await
     }
 
     pub async fn disable(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
@@ -180,17 +177,24 @@ impl MemoryUseCases {
     }
 
     pub async fn retry(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        if !self.hydradb_configured {
-            return Err(AppError::BadRequest(
-                "HydraDB is not configured for this deployment.".into(),
-            ));
-        }
         let company = owned_company(self.companies.as_ref(), user_id, company_id).await?;
-        if company.memory_provider != Some(MemoryProviderKind::Hydradb) {
+        let Some(provider) = company.memory_provider else {
             return Err(AppError::BadRequest(
-                "Select HydraDB before retrying provisioning.".into(),
+                "Select a memory provider before retrying provisioning.".into(),
             ));
-        }
+        };
+        self.require_configured(provider)?;
         self.persistence.retry_provisioning(company_id).await
+    }
+
+    fn require_configured(&self, provider: MemoryProviderKind) -> AppResult<()> {
+        if self.configured.contains(provider) {
+            Ok(())
+        } else {
+            Err(AppError::BadRequest(format!(
+                "{} is not configured for this deployment.",
+                provider.label()
+            )))
+        }
     }
 }

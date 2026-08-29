@@ -1553,6 +1553,90 @@ mod tests {
         assert_eq!(cleanup.as_deref(), Some("pending"));
     }
 
+    /// Switching providers has to retire the one being left, or its remote data is never torn
+    /// down. Only reachable now that a second provider exists.
+    #[tokio::test]
+    async fn switching_providers_retires_the_previous_connection_and_enqueues_its_cleanup() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let persistence = PostgresPersistence::new(pool.clone());
+        let company_id = memory_company(&persistence).await;
+
+        let hydradb = persistence
+            .select_provider(company_id, MemoryProviderKind::Hydradb)
+            .await
+            .expect("first selection");
+        let hindsight = persistence
+            .select_provider(company_id, MemoryProviderKind::Hindsight)
+            .await
+            .expect("second selection");
+        assert_eq!(hindsight.provider, MemoryProviderKind::Hindsight);
+        // Both providers address the same company namespace, so only the provider column
+        // distinguishes the two connections.
+        assert_eq!(hindsight.remote_database_id, hydradb.remote_database_id);
+
+        let remaining: Vec<String> = sqlx::query_scalar(
+            "SELECT provider FROM memory_provider_connections WHERE company_id = $1",
+        )
+        .bind(company_id)
+        .fetch_all(&pool)
+        .await
+        .expect("remaining connections");
+        assert_eq!(remaining, ["hindsight"]);
+
+        // The BEFORE DELETE trigger flips the abandoned lifecycle and enqueues exactly one job.
+        let lifecycle: Option<String> = sqlx::query_scalar(
+            "SELECT desired_state FROM memory_remote_resource_lifecycles \
+             WHERE provider = 'hydradb' AND remote_database_id = $1",
+        )
+        .bind(&hydradb.remote_database_id)
+        .fetch_optional(&pool)
+        .await
+        .expect("retired lifecycle");
+        assert_eq!(lifecycle.as_deref(), Some("absent"));
+
+        let cleanup_jobs: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM memory_cleanup_jobs \
+             WHERE provider = 'hydradb' AND remote_database_id = $1",
+        )
+        .bind(&hydradb.remote_database_id)
+        .fetch_one(&pool)
+        .await
+        .expect("cleanup jobs");
+        assert_eq!(cleanup_jobs, 1);
+
+        // No queued create for the provider we walked away from.
+        let abandoned_jobs: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM memory_provisioning_jobs WHERE company_id = $1 AND provider = 'hydradb'",
+        )
+        .bind(company_id)
+        .fetch_one(&pool)
+        .await
+        .expect("abandoned provisioning jobs");
+        assert_eq!(abandoned_jobs, 0);
+
+        // And the binding follows the newly selected provider.
+        let binding = persistence.active_binding(company_id).await.unwrap();
+        assert_eq!(
+            binding.connection().map(|connection| connection.provider),
+            Some(MemoryProviderKind::Hindsight)
+        );
+
+        // Selecting a provider queues a *claimable* provisioning job, and these tests share one
+        // database with `memory_worker`'s, whose workers claim unscoped. Left behind, this row is
+        // picked up by whichever worker test runs next — and since their registries only carry the
+        // provider they are exercising, the claim resolves to no provider and that test's own job
+        // never runs. Cleanup jobs need no such care: the 180s quiescence window keeps them
+        // unclaimable well past the end of a run.
+        sqlx::query("DELETE FROM memory_provisioning_jobs WHERE company_id = $1")
+            .bind(company_id)
+            .execute(&pool)
+            .await
+            .expect("retire this test's queued provisioning work");
+    }
+
     #[tokio::test]
     async fn retry_is_refused_against_a_retained_connection_once_memory_is_disabled() {
         let Some(pool) = test_pool().await else {

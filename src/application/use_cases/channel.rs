@@ -291,13 +291,21 @@ impl ChannelUseCases {
             AppError::BadRequest("Memory is not configured for this deployment.".into())
         })?;
         let binding = persistence.active_binding(company_id).await?;
-        if self.config.hydradb.is_none() {
+        let configured = self.config.configured_memory_providers();
+        if configured.is_empty() {
             return Err(AppError::BadRequest(
                 "Memory is not configured for this deployment.".into(),
             ));
         }
         match binding {
-            ActiveMemoryBinding::Ready(_) => Ok(()),
+            // A connection whose provider this deployment no longer configures has no runtime
+            // behind it, however ready the stored row claims to be.
+            ActiveMemoryBinding::Ready(connection) if configured.contains(connection.provider) => {
+                Ok(())
+            }
+            ActiveMemoryBinding::Ready(_) => Err(AppError::BadRequest(
+                "The selected memory provider is not configured for this deployment.".into(),
+            )),
             ActiveMemoryBinding::Disabled => Err(AppError::BadRequest(
                 "Select a memory provider before enabling memory.".into(),
             )),
@@ -316,10 +324,9 @@ impl ChannelUseCases {
             return Ok(false);
         };
         let binding = persistence.active_binding(company_id).await?;
-        if self.config.hydradb.is_none() {
-            return Ok(false);
-        }
-        Ok(matches!(binding, ActiveMemoryBinding::Ready(_)))
+        let configured = self.config.configured_memory_providers();
+        Ok(matches!(binding, ActiveMemoryBinding::Ready(connection)
+            if configured.contains(connection.provider)))
     }
 
     #[instrument(skip(self))]
@@ -1171,6 +1178,7 @@ mod tests {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             hydradb: None,
+            hindsight: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],

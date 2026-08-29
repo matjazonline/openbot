@@ -59,12 +59,8 @@ pub(super) struct CleanupJobDb {
 }
 
 fn provider(value: &str) -> AppResult<MemoryProviderKind> {
-    match value {
-        "hydradb" => Ok(MemoryProviderKind::Hydradb),
-        _ => Err(AppError::Internal(
-            "Stored memory provider is not supported.".into(),
-        )),
-    }
+    MemoryProviderKind::parse(value)
+        .ok_or_else(|| AppError::Internal("Stored memory provider is not supported.".into()))
 }
 
 fn readiness(value: &str) -> AppResult<MemoryConnectionReadiness> {

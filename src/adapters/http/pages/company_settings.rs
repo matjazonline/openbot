@@ -265,13 +265,13 @@ pub fn company_settings_empty_pane(message: &str, swap: FragmentSwap) -> String 
 }
 
 pub fn company_edit_pane(pane: &CompanyEditPane<'_>) -> String {
-    company_edit_pane_with_memory(pane, None, false)
+    company_edit_pane_with_memory(pane, None, &ConfiguredMemoryProviders::default())
 }
 
 pub fn company_edit_pane_with_memory(
     pane: &CompanyEditPane<'_>,
     memory: Option<&MemoryConnection>,
-    hydradb_configured: bool,
+    configured: &ConfiguredMemoryProviders,
 ) -> String {
     let company_id = pane.company.id;
 
@@ -297,7 +297,7 @@ pub fn company_edit_pane_with_memory(
         created_at = super::format_date(pane.company.created_at),
         tabs = company_tabs(company_id, pane.body.tab()),
         body = match pane.body {
-            CompanyPaneBody::Settings => company_settings_body(pane, memory, hydradb_configured),
+            CompanyPaneBody::Settings => company_settings_body(pane, memory, configured),
             CompanyPaneBody::Team(html) => html.to_string(),
         },
     )
@@ -333,7 +333,7 @@ fn company_tabs(company_id: Uuid, tab: CompanyTab) -> String {
 fn company_settings_body(
     pane: &CompanyEditPane<'_>,
     memory: Option<&MemoryConnection>,
-    hydradb_configured: bool,
+    configured: &ConfiguredMemoryProviders,
 ) -> String {
     if !pane.editable {
         return format!(
@@ -382,18 +382,18 @@ fn company_settings_body(
         name = escape_html_text(&pane.company.name),
         error_html = form_error_banner(pane.error),
         workspace_links = workspace_links(company_id, pane.counts),
-        fields = company_fields(draft, hydradb_configured),
-        memory_status = memory_status(pane.company.id, memory, hydradb_configured),
+        fields = company_fields(draft, configured),
+        memory_status = memory_status(pane.company.id, memory, configured),
     )
 }
 
 pub fn company_create_pane(pane: &CompanyCreatePane<'_>) -> String {
-    company_create_pane_with_memory(pane, false)
+    company_create_pane_with_memory(pane, &ConfiguredMemoryProviders::default())
 }
 
 pub fn company_create_pane_with_memory(
     pane: &CompanyCreatePane<'_>,
-    hydradb_configured: bool,
+    configured: &ConfiguredMemoryProviders,
 ) -> String {
     format!(
         r##"
@@ -423,7 +423,7 @@ pub fn company_create_pane_with_memory(
         </section>
         "##,
         error_html = form_error_banner(pane.error),
-        fields = company_fields(pane.draft, hydradb_configured),
+        fields = company_fields(pane.draft, configured),
     )
 }
 
@@ -461,7 +461,7 @@ fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
 }
 
 /// Everything about a company except which URL its form submits to.
-fn company_fields(draft: &CompanyDraft<'_>, hydradb_configured: bool) -> String {
+fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProviders) -> String {
     let overrides_open =
         if draft.provider.is_empty() && draft.model.is_empty() && draft.api_key.is_empty() {
             ""
@@ -509,9 +509,9 @@ fn company_fields(draft: &CompanyDraft<'_>, hydradb_configured: bool) -> String 
                         <div class="label"><span class="text-xs opacity-70">Long-term memory</span></div>
                         <select name="memory_provider" class="select w-full">
                             <option value="" {memory_disabled_selected}>Disabled</option>
-                            <option value="hydradb" {memory_hydradb_selected} {memory_hydradb_disabled}>HydraDB</option>
+                            {memory_provider_options}
                         </select>
-                        <div class="label"><span class="text-[11px] opacity-60">Disabling suspends memory immediately but retains the HydraDB connection and channel memory choices. Company deletion removes the remote memory database.</span></div>
+                        <div class="label"><span class="text-[11px] opacity-60">Disabling suspends memory immediately but retains the provider connection and channel memory choices. Company deletion removes the remote memory. Hindsight extracts facts in the background, so a memory becomes recallable shortly after the reply rather than at once.</span></div>
                     </label>
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
                         <summary class="collapse-title text-sm font-medium">Default model &amp; key</summary>
@@ -538,29 +538,53 @@ fn company_fields(draft: &CompanyDraft<'_>, hydradb_configured: bool) -> String 
         } else {
             ""
         },
-        memory_hydradb_selected = if draft.memory_provider == MemoryProviderKind::Hydradb.as_str() {
-            "selected"
-        } else {
-            ""
-        },
-        memory_hydradb_disabled = if hydradb_configured { "" } else { "disabled" },
+        memory_provider_options = memory_provider_options(draft.memory_provider, configured),
     )
+}
+
+/// One option per known provider, disabled unless this deployment can actually run it. Rendering
+/// from `MemoryProviderKind::ALL` is what keeps the form and the enum from drifting apart.
+pub(super) fn memory_provider_options(
+    selected: &str,
+    configured: &ConfiguredMemoryProviders,
+) -> String {
+    MemoryProviderKind::ALL
+        .into_iter()
+        .map(|kind| {
+            format!(
+                r#"<option value="{value}" {selected} {disabled}>{label}</option>"#,
+                value = kind.as_str(),
+                selected = if selected == kind.as_str() {
+                    "selected"
+                } else {
+                    ""
+                },
+                disabled = if configured.contains(kind) {
+                    ""
+                } else {
+                    "disabled"
+                },
+                label = escape_html_text(kind.label()),
+            )
+        })
+        .collect()
 }
 
 fn memory_status(
     company_id: Uuid,
     memory: Option<&MemoryConnection>,
-    hydradb_configured: bool,
+    configured: &ConfiguredMemoryProviders,
 ) -> String {
     let Some(memory) = memory else {
-        let detail = if hydradb_configured {
-            "Long-term memory is disabled."
+        let detail = if configured.is_empty() {
+            "Long-term memory is unavailable because this deployment configures no provider."
+                .to_string()
         } else {
-            "HydraDB is unavailable because this deployment is not configured for it."
+            "Long-term memory is disabled.".to_string()
         };
         return format!(
             r#"<div class="alert"><span>{}</span></div>"#,
-            escape_html_text(detail),
+            escape_html_text(&detail),
         );
     };
     let readiness = match (
@@ -576,7 +600,9 @@ fn memory_status(
         (_, Some(MemoryProvisioningPhase::WaitingReady), _) => "waiting for readiness",
         _ => memory.readiness.as_str(),
     };
-    let retry = if memory.readiness == MemoryConnectionReadiness::Failed && hydradb_configured {
+    let retry = if memory.readiness == MemoryConnectionReadiness::Failed
+        && configured.contains(memory.provider)
+    {
         format!(
             r##"<button type="button" class="btn btn-sm" hx-post="/ui/companies/{company_id}/memory/retry" hx-target="#company-pane" hx-swap="outerHTML" hx-disabled-elt="this"><span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>Retry provisioning</button>"##
         )
@@ -594,7 +620,8 @@ fn memory_status(
         })
         .unwrap_or_default();
     format!(
-        r#"<div class="alert flex items-center justify-between"><div><span class="badge badge-outline">HydraDB: {}</span>{}</div>{}</div>"#,
+        r#"<div class="alert flex items-center justify-between"><div><span class="badge badge-outline">{}: {}</span>{}</div>{}</div>"#,
+        escape_html_text(memory.provider.label()),
         escape_html_text(readiness),
         error,
         retry,

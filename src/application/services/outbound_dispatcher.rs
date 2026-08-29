@@ -588,6 +588,7 @@ mod tests {
             jwt_secret: "secret".into(),
             sendgrid_inbound: None,
             hydradb: None,
+            hindsight: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".into(),
             cors_allowed_origins: vec![],

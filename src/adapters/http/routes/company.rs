@@ -15,6 +15,7 @@ use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
     entities::{company::Company, memory::MemoryConnection, value_objects::AvatarUrl},
+    services::memory_provider::{ConfiguredMemoryProviders, SelectedMemoryProvider},
     use_cases::{
         company::{CompanyUseCases, CompanyWrite},
         memory::MemoryUseCases,
@@ -108,15 +109,16 @@ impl From<MemoryConnection> for MemoryStatusResponse {
     }
 }
 
-fn validate_memory_provider(value: Option<&str>, hydradb_configured: bool) -> AppResult<()> {
-    match value.map(str::trim) {
-        None | Some("") | Some("none") => Ok(()),
-        Some("hydradb") if hydradb_configured => Ok(()),
-        Some("hydradb") => Err(AppError::BadRequest(
-            "HydraDB is not configured for this deployment.".into(),
-        )),
-        Some(_) => Err(AppError::BadRequest("Unsupported memory provider.".into())),
-    }
+/// Reject an unusable provider before the company write, so a bad selection never leaves a
+/// half-applied company behind.
+fn validate_memory_provider(
+    value: Option<&str>,
+    configured: &ConfiguredMemoryProviders,
+) -> AppResult<()> {
+    configured
+        .select(value)
+        .map(|_| ())
+        .map_err(AppError::BadRequest)
 }
 
 async fn apply_memory_provider(
@@ -125,10 +127,16 @@ async fn apply_memory_provider(
     company_id: Uuid,
     value: Option<&str>,
 ) -> AppResult<Option<MemoryConnection>> {
-    validate_memory_provider(value, memory.hydradb_configured())?;
-    match value.map(str::trim) {
-        Some("hydradb") => memory.select_hydradb(user_id, company_id).await.map(Some),
-        _ => {
+    match memory
+        .configured()
+        .select(value)
+        .map_err(AppError::BadRequest)?
+    {
+        SelectedMemoryProvider::Provider(kind) => memory
+            .select_provider(user_id, company_id, kind)
+            .await
+            .map(Some),
+        SelectedMemoryProvider::Disabled => {
             memory.disable(user_id, company_id).await?;
             Ok(None)
         }
@@ -136,9 +144,10 @@ async fn apply_memory_provider(
 }
 
 /// GET /companies - Full HTML page listing all user companies (Protected).
-#[instrument(skip(company_use_cases, user))]
+#[instrument(skip(company_use_cases, memory_use_cases, user))]
 async fn list_companies(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
     user: AuthenticatedUser,
 ) -> impl IntoResponse {
     let companies = company_use_cases
@@ -146,7 +155,10 @@ async fn list_companies(
         .await
         .unwrap_or_default();
 
-    Html(pages::companies_page(&companies))
+    Html(pages::companies_page(
+        &companies,
+        memory_use_cases.configured(),
+    ))
 }
 
 /// POST /companies - HTMX create company form submission (Protected).
@@ -159,7 +171,7 @@ async fn create_company(
 ) -> impl IntoResponse {
     let created = match validate_memory_provider(
         form.memory_provider.as_deref(),
-        memory_use_cases.hydradb_configured(),
+        memory_use_cases.configured(),
     )
     .and_then(|()| form.write())
     {
@@ -203,16 +215,20 @@ async fn create_company(
 }
 
 /// GET /companies/{id}/edit - Returns inline edit form fragment (Protected).
-#[instrument(skip(company_use_cases, _user))]
+#[instrument(skip(company_use_cases, memory_use_cases, _user))]
 async fn edit_company_form(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
+    State(memory_use_cases): State<Arc<MemoryUseCases>>,
     _user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
     if let Ok(Some(company)) = company_use_cases.get_company(id).await
         && company.user_id == _user.id
     {
-        Html(pages::company_edit_fragment(&company))
+        Html(pages::company_edit_fragment(
+            &company,
+            memory_use_cases.configured(),
+        ))
     } else {
         Html(pages::error_alert("Company not found."))
     }
@@ -245,7 +261,7 @@ async fn update_company(
 ) -> impl IntoResponse {
     let saved = match validate_memory_provider(
         form.memory_provider.as_deref(),
-        memory_use_cases.hydradb_configured(),
+        memory_use_cases.configured(),
     )
     .and_then(|()| form.write())
     {
@@ -304,7 +320,7 @@ async fn create_company_json(
 ) -> AppResult<impl IntoResponse> {
     validate_memory_provider(
         payload.memory_provider.as_deref(),
-        memory_use_cases.hydradb_configured(),
+        memory_use_cases.configured(),
     )?;
     let company = company_use_cases
         .create_company(user.id, payload.write()?)
@@ -337,7 +353,7 @@ async fn update_company_json(
 ) -> AppResult<impl IntoResponse> {
     validate_memory_provider(
         payload.memory_provider.as_deref(),
-        memory_use_cases.hydradb_configured(),
+        memory_use_cases.configured(),
     )?;
     let company = company_use_cases
         .update_company_for_user(_user.id, id, payload.write()?)
@@ -396,6 +412,12 @@ mod tests {
     use chrono::Utc;
 
     use super::*;
+    use crate::entities::memory::MemoryProviderKind;
+
+    /// A deployment with every provider available, so the forms under test render the full list.
+    fn configured_providers() -> ConfiguredMemoryProviders {
+        ConfiguredMemoryProviders::from_iter(MemoryProviderKind::ALL)
+    }
 
     #[test]
     fn companies_page_renders_htmx_crud_elements() {
@@ -413,7 +435,7 @@ mod tests {
             created_at: Utc::now(),
         };
 
-        let page_html = pages::companies_page(&[company.clone()]);
+        let page_html = pages::companies_page(&[company.clone()], &configured_providers());
         assert!(page_html.contains("Test Corp"));
         assert!(page_html.contains("/test-corp"));
         assert!(page_html.contains("hx-post=\"/companies\""));
@@ -430,7 +452,7 @@ mod tests {
         assert!(page_html.contains("action=\"/logout\""));
         assert!(page_html.contains(r##"data-action="select-company""##));
 
-        let edit_fragment = pages::company_edit_fragment(&company);
+        let edit_fragment = pages::company_edit_fragment(&company, &configured_providers());
         assert!(edit_fragment.contains("hx-put="));
         assert!(edit_fragment.contains("value=\"Test Corp\""));
     }
@@ -477,7 +499,7 @@ mod tests {
             memory_provider: None,
             created_at: Utc::now(),
         };
-        assert!(pages::company_edit_fragment(&company).contains(
+        assert!(pages::company_edit_fragment(&company, &configured_providers()).contains(
             r#"<input type="hidden" name="avatar_url" value="https://cdn.example.com/acme.png">"#
         ));
     }

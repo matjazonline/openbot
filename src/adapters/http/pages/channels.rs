@@ -1005,6 +1005,7 @@ fn classic_memory_fields(memory_available: bool, channel: Option<&Channel>) -> S
                 <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <label class="block">
                         <span class="mb-1 block text-xs font-medium text-slate-300">Persistence mode</span>
+                        <span class="mb-1 block text-[11px] text-slate-500">Scope-specific facts constrains extraction to the scope. On HydraDB it is an instruction the extractor must follow; on Hindsight it is context the extractor is given, not an enforced filter.</span>
                         <select aria-label="Memory persistence mode" name="memory_persistence_mode" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm"{disabled}>
                             <option value="audience_only"{audience_only_selected}>Audience only</option>
                             <option value="scope_specific_facts"{scope_specific_selected}>Scope-specific facts</option>
