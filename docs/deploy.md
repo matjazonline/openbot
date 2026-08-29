@@ -128,6 +128,13 @@ documents the full set.
 | `RUNTIME_THREAD_STACK_BYTES` | Stack reserved per async runtime thread; 2 MiB–256 MiB, default 16 MiB. The task-worker → dispatch → agent-runner chain of `async fn` frames overruns Tokio's 2 MiB default in an unoptimized build. |
 | `SMTP_ALLOW_PLAINTEXT_LOCAL` | Development-only, default `false`; plaintext is accepted only with no credentials and a host that resolves exclusively to loopback. Never enable it for a deployed relay. |
 
+`RUNTIME_THREAD_STACK_BYTES` does not reach threads the process did not spawn itself, which means
+libtest's. `.cargo/config.toml` sets `RUST_MIN_STACK` to the same value for the test suite; keep the
+two in step. Because that also raises the ceiling at which CI would notice the chain growing,
+`scripts/stack-budget.sh` re-runs the suite at the stock 2 MiB thread stack and fails if it no
+longer fits — that is the regression alarm, and CI runs it. `scripts/stack-frames.sh` then reports
+which frames grew (arm64/macOS only).
+
 ### Long-term memory providers
 
 Two memory backends are supported, HydraDB and Hindsight. Each is disabled unless all four of its

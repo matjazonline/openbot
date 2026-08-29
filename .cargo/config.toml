@@ -1,0 +1,7 @@
+[env]
+# libtest runs each test on a thread it spawns itself, which the runtime's `thread_stack_size`
+# cannot reach; std sizes those threads from RUST_MIN_STACK. Keep this level with
+# DEFAULT_RUNTIME_THREAD_STACK_BYTES in src/infra/config.rs, so a test that drives the
+# task-worker -> dispatch -> agent-runner chain fails on its assertions rather than on the guard
+# page. See scripts/stack-frames.sh for what that chain costs.
+RUST_MIN_STACK = "16777216"

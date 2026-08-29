@@ -50,3 +50,9 @@ jobs:
         run: cargo sqlx migrate run
       - name: Database-backed test suite
         run: cargo test --locked --all-targets
+      # .cargo/config.toml gives every test thread 16 MiB, which is what keeps the
+      # task-worker -> dispatch -> agent-runner chain off the guard page -- and which would also
+      # let that chain grow twelvefold before anything complained. Re-run the suite at the stack a
+      # thread gets by default, so growth is a red build rather than a crash months later.
+      - name: Stack budget
+        run: scripts/stack-budget.sh

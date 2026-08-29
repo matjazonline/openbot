@@ -138,8 +138,10 @@ impl ThreadUseCases {
             info!("Skipping agent execution for context-only message ID {message_id}");
             return Ok(DispatchOutcome::Skipped);
         }
-        self.run_claimed_dispatch(ingest, send_email, lease, correlation_id)
-            .await
+        // The guard above is the whole reason this function exists, so the dispatch it delegates to
+        // is boxed rather than stored inline -- an `async fn` that only forwards still pays its
+        // child future's size in stack. See `scripts/stack-frames.sh`.
+        Box::pin(self.run_claimed_dispatch(ingest, send_email, lease, correlation_id)).await
     }
 
     /// The dispatch proper: run the agents, deliver the reply, and record what happened on the
@@ -158,9 +160,9 @@ impl ThreadUseCases {
             return Ok(DispatchOutcome::Skipped);
         };
 
-        let Some(run) = self
-            .run_agents(&matches, parsed, ingest, lease, correlation_id)
-            .await?
+        // The fattest of this function's children by a wide margin: it runs the agents.
+        let Some(run) =
+            Box::pin(self.run_agents(&matches, parsed, ingest, lease, correlation_id)).await?
         else {
             info!("Agent execution suspended for task approval or outreach");
             return Ok(DispatchOutcome::Suspended);
@@ -368,7 +370,8 @@ impl ThreadUseCases {
                         .as_ref()
                         .map(|agent| agent.run_timeout(self.agent_run_timeout))
                         .unwrap_or(self.agent_run_timeout);
-                    match tokio::time::timeout(run_timeout, runner.execute()).await {
+                    // Boxed, not detached: dropping the `Timeout` still drops the provider call.
+                    match tokio::time::timeout(run_timeout, Box::pin(runner.execute())).await {
                         Ok(result) => result.map_err(AppError::from),
                         Err(_) => Err(AppError::Timeout(format!(
                             "agent run exceeded the {}s limit",

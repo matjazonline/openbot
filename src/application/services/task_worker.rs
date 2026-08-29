@@ -407,11 +407,7 @@ impl TaskWorker {
             },
             move |task, shutdown| {
                 let worker = Arc::clone(&executor);
-                async move {
-                    worker
-                        .process_claimed_task_until_shutdown(task, shutdown)
-                        .await
-                }
+                async move { worker.process_claimed_task(task, Some(shutdown)).await }
             },
         )
         .await;
@@ -428,20 +424,14 @@ impl TaskWorker {
             .map_err(|e| e.to_string())
     }
 
-    #[cfg(test)]
-    async fn process_claimed_task(&self, task: BackgroundTask) {
-        self.process_claimed_task_inner(task, None).await;
-    }
-
-    async fn process_claimed_task_until_shutdown(
-        &self,
-        task: BackgroundTask,
-        shutdown: broadcast::Receiver<()>,
-    ) {
-        self.process_claimed_task_inner(task, Some(shutdown)).await;
-    }
-
-    async fn process_claimed_task_inner(
+    /// Run one claimed task to a terminal state.
+    ///
+    /// `shutdown` is absent only in tests, which drive a task with no shutdown to race against.
+    /// This is called directly from the poll loop's closure rather than through a wrapper: in an
+    /// unoptimized build every `async fn` between the spawned task and the agent costs its child
+    /// future's size in stack, and the wrapper that used to sit here cost 200 KiB to pass an
+    /// `Option`. See `scripts/stack-frames.sh`.
+    async fn process_claimed_task(
         &self,
         task: BackgroundTask,
         mut shutdown: Option<broadcast::Receiver<()>>,
@@ -481,7 +471,7 @@ impl TaskWorker {
         let tasks = self.claim_pending_task_batch(1).await?;
         let claimed = tasks.len();
         for task in tasks {
-            self.process_claimed_task(task).await;
+            self.process_claimed_task(task, None).await;
         }
         Ok(polled(claimed, 1))
     }
@@ -1017,7 +1007,7 @@ impl TaskWorker {
         lease: TaskLeaseRef,
     ) -> Result<TaskExecutionOutcome, TaskFailure> {
         if task.task_type == SCHEDULED_AGENT_RUN_TASK {
-            self.execute_scheduled_task(task).await?;
+            Box::pin(self.execute_scheduled_task(task)).await?;
             return Ok(TaskExecutionOutcome::Replied);
         }
 
@@ -1092,19 +1082,22 @@ impl TaskWorker {
         // mailbox send can ask to stay in-app, and this worker is a different process from the one
         // that took the request.
         let deliver = ingest_exec.deliver;
-        let dispatch = self
-            .thread_use_cases
-            .execute_claimed_agent_task_and_dispatch(
-                &ingest_exec,
-                deliver,
-                lease,
-                task.correlation_id,
-            )
-            .await
-            .map_err(|error| match error {
-                crate::app_error::AppError::Timeout(message) => TaskFailure::TimedOut(message),
-                other => TaskFailure::Retryable(other.to_string()),
-            })?;
+        // Boxed for the same reason as the scheduled branch above: both descend into the agent, and
+        // both would otherwise be stored inline in this frame.
+        let dispatch = Box::pin(
+            self.thread_use_cases
+                .execute_claimed_agent_task_and_dispatch(
+                    &ingest_exec,
+                    deliver,
+                    lease,
+                    task.correlation_id,
+                ),
+        )
+        .await
+        .map_err(|error| match error {
+            crate::app_error::AppError::Timeout(message) => TaskFailure::TimedOut(message),
+            other => TaskFailure::Retryable(other.to_string()),
+        })?;
 
         Ok(match dispatch {
             DispatchOutcome::Suspended => TaskExecutionOutcome::Suspended,
@@ -1263,7 +1256,8 @@ impl TaskWorker {
             .as_ref()
             .map(|agent| agent.run_timeout(self.agent_run_timeout))
             .unwrap_or(self.agent_run_timeout);
-        let output = tokio::time::timeout(run_timeout, runner.execute())
+        // Boxed, not detached: dropping the `Timeout` still drops the provider call.
+        let output = tokio::time::timeout(run_timeout, Box::pin(runner.execute()))
             .await
             .map_err(|_| {
                 TaskFailure::TimedOut(format!(
@@ -1437,10 +1431,13 @@ impl TaskWorker {
         );
 
         let lease = TaskLease::worker(lease);
+        // `run_task` reaches the agent, and its future is the largest thing on this stack. Boxing
+        // it leaves a pointer in this frame instead of the whole state machine, which is what keeps
+        // the chain below from spending the thread's stack before it gets there.
         let supervised = while_leased(
             &*self.task_persistence,
             &lease,
-            self.run_task(task, lease.reference).instrument(run_span),
+            Box::pin(self.run_task(task, lease.reference)).instrument(run_span),
         );
         match supervised.await {
             Leased::Finished(Ok(outcome)) => outcome,

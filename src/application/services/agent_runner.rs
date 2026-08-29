@@ -1089,8 +1089,9 @@ impl<'a> AgentRunner<'a> {
         };
 
         // Keep the provider future inside the lease/timeout supervisor. Dropping this future drops
-        // the provider call itself instead of detaching a still-running Tokio task.
-        let task_result = task.run().await;
+        // the provider call itself instead of detaching a still-running Tokio task. Boxing keeps
+        // that property while leaving only a pointer in this frame.
+        let task_result = Box::pin(task.run()).await;
         let duration_ms = start_time.elapsed().as_millis() as u64;
 
         match task_result {
@@ -1259,7 +1260,9 @@ struct AgentTask {
 
 impl AgentTask {
     async fn run(self) -> anyhow::Result<AgentExecutionOutput> {
-        let agent = self.build_agent().await?;
+        // `build_agent` parses the agent config and wires every tool; it is the deepest point of
+        // the whole task chain and the frame that used to tip it over the guard page.
+        let agent = Box::pin(self.build_agent()).await?;
 
         let safe_prompt_log = sanitize_text(&self.full_prompt, Some(&self.api_key));
         info!(
@@ -1270,7 +1273,9 @@ impl AgentTask {
             safe_prompt_log
         );
 
-        let response = agent.chat(&self.full_prompt).await?;
+        // The provider call descends into the `ai_agents` runtime, whose own `async fn` chain is
+        // not ours to shrink. Boxing here caps what this side of the boundary contributes to it.
+        let response = Box::pin(agent.chat(&self.full_prompt)).await?;
         info!(
             "{}",
             sanitize_text(&format!("{:?}", response), Some(&self.api_key))
@@ -1327,7 +1332,24 @@ impl AgentTask {
         })
     }
 
+    /// Wire the agent the run will use.
+    ///
+    /// Only the two `auto_configure_*` calls need to be `async`, and they are all this function
+    /// keeps. Everything on either side of them is synchronous and lives in the helpers below, so
+    /// none of it is part of this future: an `async fn` at the bottom of the task chain pays for
+    /// its whole body in stack, and this one used to cost 292 KiB of it.
     async fn build_agent(&self) -> anyhow::Result<ai_agents::RuntimeAgent> {
+        let builder = self.builder_with_provider()?.auto_configure_features()?;
+        // Both are `ai_agents` futures we cannot slim down, so box them at the boundary rather
+        // than carry them inline.
+        let builder = Box::pin(builder.auto_configure_mcp()).await?;
+        let builder = Box::pin(builder.auto_configure_spawner()).await?;
+        self.build_with_tools(builder)
+    }
+
+    /// The agent config, the approval handler and the LLM provider — everything the builder needs
+    /// before the runtime's own auto-configuration runs.
+    fn builder_with_provider(&self) -> anyhow::Result<AgentBuilder> {
         let mut builder = AgentBuilder::from_yaml(&self.config_yaml)?;
 
         if let Some((use_cases, context)) = self.approval.clone() {
@@ -1361,14 +1383,17 @@ impl AgentTask {
         if let Some(choice) = self.tool_choice.clone() {
             provider = provider.with_tool_choice(choice);
         }
-        builder = builder.llm(std::sync::Arc::new(provider));
+        Ok(builder.llm(std::sync::Arc::new(provider)))
+    }
 
-        let mut builder = builder
-            .auto_configure_features()?
-            .auto_configure_mcp()
-            .await?
-            .auto_configure_spawner()
-            .await?;
+    /// Our own three tools, the trace hooks, and the delivery context the prompt templates read.
+    ///
+    /// Called after the runtime's auto-configuration, which is what registers the built-in tool
+    /// registry these are added to.
+    fn build_with_tools(
+        &self,
+        mut builder: AgentBuilder,
+    ) -> anyhow::Result<ai_agents::RuntimeAgent> {
         if let Some((task_persistence, channel_persistence, context)) = self.outreach.clone() {
             if let Some(agent_persistence) = self.agent_persistence.clone() {
                 builder = builder.tool(Arc::new(ListCompanyAgentsTool::new(
@@ -2281,6 +2306,60 @@ mod tests {
         assert_eq!(usage.prompt_tokens, 100);
         assert_eq!(usage.completion_tokens, 50);
         assert_eq!(usage.total_tokens, 150);
+    }
+
+    /// `build_agent` is split across a sync/async/sync seam so that only the two
+    /// `auto_configure_*` calls sit in the future. This drives the whole seam on the config shape
+    /// production actually sends -- `base_agent_config` plus `ensure_config_fields` -- and reads
+    /// back the delivery context, which the last of the three stages is what sets. Building an
+    /// agent needs no provider call, so this stays offline; only `chat` would go out.
+    ///
+    /// It does not check which tools ended up registered: `RuntimeAgent` exposes no accessor for
+    /// that, and this config declares none. The ordering constraint behind that is documented on
+    /// `build_with_tools`.
+    #[tokio::test]
+    async fn build_agent_wires_an_agent_from_a_production_shaped_config() -> anyhow::Result<()> {
+        let mut config = base_agent_config();
+        ensure_config_fields(
+            &mut config,
+            "openai",
+            "gpt-4o",
+            "test-key",
+            Some("You are a legal assistant."),
+            Some("pravnik"),
+        );
+        let config_yaml = serde_yaml::to_string(&config)?;
+        let (provider_config, base_url, tool_choice) = provider_config_from_agent_config(&config)?;
+
+        let task = AgentTask {
+            config_yaml,
+            provider_name: "openai".to_string(),
+            model_name: "gpt-4o".to_string(),
+            api_key: "test-key".to_string(),
+            provider_config,
+            base_url,
+            tool_choice,
+            approval: None,
+            outreach: None,
+            agent_persistence: None,
+            agent_channel_tool: None,
+            trace: None,
+            monitoring: None,
+            recipient_role: Some(RecipientRole::Cc),
+            full_prompt: "Kaksen je odpovedni rok?".to_string(),
+            history_message_count: 0,
+            internal_requires_approval: true,
+            suspended: Arc::new(AtomicBool::new(false)),
+        };
+
+        let agent = task.build_agent().await?;
+
+        // Set last, by `build_with_tools`, so reading them back proves the whole seam ran in order.
+        let context = agent.get_context();
+        assert_eq!(context["recipient_role"], serde_json::json!("cc"));
+        assert_eq!(context["is_to"], serde_json::json!(false));
+        assert_eq!(context["is_cc"], serde_json::json!(true));
+        Ok(())
     }
 
     #[test]

@@ -64,6 +64,32 @@ The decomposition that fits this codebase, in order:
 Prefer `let ... else` and early `continue` over another `if let` nesting level. If you're at
 column 30, the fix is an extraction, not a rustfmt reflow.
 
+# Keep `async fn` chains shallow
+
+An unoptimized `async fn` poll frame materialises the child future it constructs, so every level of
+`await` nesting costs real stack. `process_claimed_task_until_shutdown` was one line —
+`self.process_claimed_task_inner(task, Some(shutdown)).await` — and cost **200 KiB**. The
+task-worker → dispatch → agent-runner chain reached 1,997 KiB of a 2,080 KiB thread stack and
+aborted the process inside serde_yaml, parsing an agent config that was nothing unusual. Optimized
+builds cost several times less, so this is a rule about the builds tests and development run on —
+which is where it will bite you.
+
+**This qualifies the rule above: splitting one `async fn` into two that call each other adds a
+level and makes the stack worse.** What actually reduces it, in order:
+
+1. **Extract a synchronous helper.** A non-`async fn` contributes no future and no frame at all —
+   the "pure decisions, separately" rule paying off a second way. `build_agent` went 292 KiB → 174
+   KiB by moving everything but its two `await`s into `builder_with_provider` and
+   `build_with_tools`.
+2. **Delete a level.** An `async fn` that only forwards, or only adapts an argument, is pure cost;
+   never add one.
+3. **`Box::pin` the seam.** At a call descending into the agent, a provider, or any external
+   runtime, the parent then holds a pointer rather than the whole state machine. Say why in a
+   comment — these read as noise and get tidied away otherwise.
+
+The chain above is now 347 KiB. `scripts/stack-frames.sh` prints what each frame costs: measure
+before and after rather than reasoning about it.
+
 # One decision, one place
 
 Before writing a lookup or derivation, grep the file for it — this codebase's large functions
