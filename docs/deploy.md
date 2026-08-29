@@ -125,6 +125,7 @@ documents the full set.
 | --- | --- |
 | `TASK_WORKER_CONCURRENCY` | Concurrent durable agent tasks per process; 1–64, default 4 |
 | `AGENT_RUN_TIMEOUT_SECS` | Fallback wall-clock deadline for one agent/provider run; 1–3600 seconds, default 300. An agent's optional `run_timeout_secs` overrides it; a timeout consumes an attempt and cancels the provider future. |
+| `RUNTIME_THREAD_STACK_BYTES` | Stack reserved per async runtime thread; 2 MiB–256 MiB, default 16 MiB. The task-worker → dispatch → agent-runner chain of `async fn` frames overruns Tokio's 2 MiB default in an unoptimized build. |
 | `SMTP_ALLOW_PLAINTEXT_LOCAL` | Development-only, default `false`; plaintext is accepted only with no credentials and a host that resolves exclusively to loopback. Never enable it for a deployed relay. |
 
 ### Long-term memory providers

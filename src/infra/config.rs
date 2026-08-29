@@ -21,6 +21,19 @@ pub const DEFAULT_TASK_WORKER_CONCURRENCY: usize = 4;
 pub const MAX_TASK_WORKER_CONCURRENCY: usize = 64;
 pub const DEFAULT_AGENT_RUN_TIMEOUT_SECS: u64 = 300;
 
+/// Stack size for the async runtime's worker and blocking threads.
+///
+/// Tokio's 2 MiB default is not enough for this process. A background task descends through
+/// `run_task_loop` -> `while_leased` -> `run_claimed_dispatch` -> `AgentRunner::execute` ->
+/// `AgentBuilder::from_yaml`, and every level is an `async fn` whose unoptimized poll frame runs
+/// to a few hundred KiB; measured on an aborted `email_agent_dispatch` run, that one chain used
+/// 2,069 KiB and hit the guard page inside serde_yaml while parsing the agent config. Reserve
+/// enough that the depth is not the thing that decides whether a task completes.
+pub const DEFAULT_RUNTIME_THREAD_STACK_BYTES: usize = 16 * 1024 * 1024;
+/// Below Tokio's own default the process would be less stable than leaving this unset.
+pub const MIN_RUNTIME_THREAD_STACK_BYTES: usize = 2 * 1024 * 1024;
+pub const MAX_RUNTIME_THREAD_STACK_BYTES: usize = 256 * 1024 * 1024;
+
 /// Load the bounded background-task parallelism once during process startup.
 pub fn task_worker_concurrency_from_env() -> usize {
     parse_task_worker_concurrency(env::var("TASK_WORKER_CONCURRENCY").ok().as_deref())
@@ -37,6 +50,25 @@ fn parse_task_worker_concurrency(value: Option<&str>) -> usize {
         "TASK_WORKER_CONCURRENCY must be between 1 and {MAX_TASK_WORKER_CONCURRENCY}"
     );
     concurrency
+}
+
+/// Load the async runtime's per-thread stack reservation once during process startup.
+pub fn runtime_thread_stack_bytes_from_env() -> usize {
+    parse_runtime_thread_stack_bytes(env::var("RUNTIME_THREAD_STACK_BYTES").ok().as_deref())
+}
+
+fn parse_runtime_thread_stack_bytes(value: Option<&str>) -> usize {
+    let bytes = value.map_or(DEFAULT_RUNTIME_THREAD_STACK_BYTES, |value| {
+        value
+            .parse::<usize>()
+            .expect("RUNTIME_THREAD_STACK_BYTES must be a positive integer")
+    });
+    assert!(
+        (MIN_RUNTIME_THREAD_STACK_BYTES..=MAX_RUNTIME_THREAD_STACK_BYTES).contains(&bytes),
+        "RUNTIME_THREAD_STACK_BYTES must be between {MIN_RUNTIME_THREAD_STACK_BYTES} and \
+         {MAX_RUNTIME_THREAD_STACK_BYTES}"
+    );
+    bytes
 }
 
 pub fn agent_run_timeout_from_env() -> StdDuration {
@@ -648,6 +680,21 @@ mod tests {
     fn task_worker_concurrency_is_bounded_and_defaults_to_four() {
         assert_eq!(parse_task_worker_concurrency(None), 4);
         assert_eq!(parse_task_worker_concurrency(Some("8")), 8);
+    }
+
+    #[test]
+    fn runtime_thread_stack_is_bounded_and_defaults_to_sixteen_mebibytes() {
+        assert_eq!(parse_runtime_thread_stack_bytes(None), 16 * 1024 * 1024);
+        assert_eq!(
+            parse_runtime_thread_stack_bytes(Some("8388608")),
+            8 * 1024 * 1024
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "RUNTIME_THREAD_STACK_BYTES must be between")]
+    fn runtime_thread_stack_below_the_tokio_default_is_rejected() {
+        parse_runtime_thread_stack_bytes(Some("1048576"));
     }
 
     #[test]

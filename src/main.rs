@@ -20,7 +20,10 @@ use mail_agents::{
     adapters::smtp::SmtpServer,
     infra::{
         app::create_app,
-        config::{agent_run_timeout_from_env, task_worker_concurrency_from_env},
+        config::{
+            agent_run_timeout_from_env, runtime_thread_stack_bytes_from_env,
+            task_worker_concurrency_from_env,
+        },
         events::run_mailbox_event_listener,
         runtime_metrics::LinuxRuntimeMetricSource,
         setup::{init_app_state, init_tracing},
@@ -31,11 +34,20 @@ use mail_agents::{
     },
 };
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+/// Build the runtime by hand rather than through `#[tokio::main]`, which offers no way to widen
+/// the worker stacks -- see `DEFAULT_RUNTIME_THREAD_STACK_BYTES` for why 2 MiB is not enough here.
+fn main() -> anyhow::Result<()> {
     dotenv().ok();
     init_tracing();
 
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(runtime_thread_stack_bytes_from_env())
+        .build()?
+        .block_on(serve())
+}
+
+async fn serve() -> anyhow::Result<()> {
     let task_worker_concurrency = task_worker_concurrency_from_env();
     let app_state = init_app_state().await?;
     let memory_worker = app_state.memory_worker.clone();
