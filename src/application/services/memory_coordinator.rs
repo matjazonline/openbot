@@ -594,6 +594,7 @@ mod tests {
             slug: "memory-agent".into(),
             provider: None,
             model: None,
+            run_timeout_secs: None,
             api_key: None,
             system_prompt: None,
             description: None,

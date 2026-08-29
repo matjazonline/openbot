@@ -821,6 +821,7 @@ mod tests {
             slug: "support-agent".to_string(),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
+            run_timeout_secs: None,
             api_key: Some("sk-test123".to_string()),
             system_prompt: Some("You are a helpful agent.".to_string()),
             description: None,

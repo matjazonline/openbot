@@ -11,9 +11,7 @@ use crate::{
     entities::runtime_metrics::MachineIdentity,
     infra::{
         argon2_password_hasher,
-        config::{
-            AppConfig, agent_run_timeout_from_env, smtp_allow_plaintext_local_from_env,
-        },
+        config::{AppConfig, agent_run_timeout_from_env, smtp_allow_plaintext_local_from_env},
         events::MailboxEvents,
         postgres_persistence,
     },

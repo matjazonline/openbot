@@ -382,6 +382,7 @@ mod tests {
             slug: slug.to_string(),
             provider: None,
             model: None,
+            run_timeout_secs: None,
             api_key: None,
             system_prompt: Some("Help with email.".to_string()),
             description: Some("A ready-made helper".to_string()),

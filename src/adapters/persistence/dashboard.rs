@@ -590,7 +590,7 @@ mod tests {
     use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::test_pool;
     use crate::entities::task::{
-        TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus, TokenUsage,
+        TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus, TaskStopReason, TokenUsage,
     };
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
@@ -722,6 +722,7 @@ mod tests {
             .finish_task_attempt(&TaskAttemptOutcome {
                 attempt,
                 status: TaskAttemptStatus::Completed,
+                stop_reason: TaskStopReason::Completed,
                 error: None,
                 tokens: Some(TokenUsage::new(3, 5)),
             })
@@ -818,6 +819,7 @@ mod tests {
         let outcome = TaskAttemptOutcome {
             attempt,
             status: TaskAttemptStatus::Completed,
+            stop_reason: TaskStopReason::Completed,
             error: None,
             tokens: Some(TokenUsage::new(11, 7)),
         };
@@ -868,8 +870,8 @@ mod tests {
             "the current execution generation must still be able to finish"
         );
 
-        let reopened: (String, Option<i32>) = sqlx::query_as(
-            "SELECT status, prompt_tokens FROM task_attempts WHERE task_id = $1 AND attempt_number = $2",
+        let reopened: (String, Option<i32>, Option<String>) = sqlx::query_as(
+            "SELECT status, prompt_tokens, stop_reason FROM task_attempts WHERE task_id = $1 AND attempt_number = $2",
         )
         .bind(task_id)
         .bind(9_999_i32)
@@ -877,8 +879,16 @@ mod tests {
         .await
         .expect("the reopened row is readable");
 
-        assert_eq!(reopened.0, "completed", "the replacement run finished");
+        assert_eq!(
+            reopened.0,
+            TaskAttemptStatus::Completed.as_str(),
+            "the replacement run finished"
+        );
         assert_eq!(reopened.1, Some(11));
+        assert_eq!(
+            reopened.2.as_deref(),
+            Some(TaskStopReason::Completed.as_str())
+        );
 
         CompanyPersistence::delete(&persistence, company)
             .await

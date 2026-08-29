@@ -21,7 +21,7 @@ kill_timeout = "30s"
   ENABLE_LLM_SPAM_GUARDRAIL = "false"
   # API-bound agent executions; four is conservative for one shared CPU.
   TASK_WORKER_CONCURRENCY = "4"
-  # One provider run cannot hold a worker slot indefinitely (valid range: 1-3600 seconds).
+  # Fallback per provider run; an agent may override it (valid range: 1-3600 seconds).
   AGENT_RUN_TIMEOUT_SECS = "300"
   # Production relays use certificate-validated TLS. Never enable this local-only escape hatch
   # on Fly; startup also rejects it when SMTP credentials are configured.

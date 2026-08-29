@@ -555,6 +555,45 @@ mod tests {
     use serde_json::json;
     use std::sync::Mutex;
 
+    #[test]
+    fn agent_timeout_is_optional_bounded_and_overrides_the_global_default() {
+        let mut inherited = AgentWrite {
+            name: "Inherited".into(),
+            slug: "inherited".into(),
+            ..AgentWrite::default()
+        };
+        inherited.normalize().unwrap();
+
+        let mut invalid = AgentWrite {
+            name: "Invalid".into(),
+            slug: "invalid".into(),
+            run_timeout_secs: Some(MAX_AGENT_RUN_TIMEOUT_SECS + 1),
+            ..AgentWrite::default()
+        };
+        assert!(invalid.normalize().is_err());
+
+        let agent = Agent {
+            id: Uuid::new_v4(),
+            company_id: None,
+            name: "Timed".into(),
+            slug: "timed".into(),
+            provider: None,
+            model: None,
+            run_timeout_secs: Some(45),
+            api_key: None,
+            system_prompt: None,
+            description: None,
+            config_json: None,
+            avatar_url: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: Utc::now(),
+        };
+        assert_eq!(
+            agent.run_timeout(std::time::Duration::from_secs(300)),
+            std::time::Duration::from_secs(45)
+        );
+    }
+
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
         /// Accepted memberships, as `(user_id, company_id, access)`.
@@ -658,6 +697,7 @@ mod tests {
                 slug: write.slug,
                 provider: write.provider,
                 model: write.model,
+                run_timeout_secs: write.run_timeout_secs,
                 api_key: write.api_key,
                 system_prompt: write.system_prompt,
                 description: write.description,

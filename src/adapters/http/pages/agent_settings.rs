@@ -311,6 +311,12 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                             placeholder="Describe the agent's role, responsibilities, rules and tone. A full system prompt is generated when the agent is created."
                             class="textarea w-full font-mono text-xs">{system_prompt}</textarea>
                     </label>
+                    <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Run timeout (seconds)</span></div>
+                        <input type="number" name="run_timeout_secs" min="1" max="3600"
+                            value="{simple_run_timeout}" placeholder="Use deployment default"
+                            class="input w-full">
+                    </label>
                     <button type="submit" class="btn btn-primary">
                         <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
                         <span class="[.htmx-request_&]:hidden">Create Agent</span>
@@ -339,6 +345,11 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
         name = escape_html_text(pane.draft.name),
         avatar_field = agent_avatar_field("simple", pane.draft),
         system_prompt = escape_html_text(pane.draft.system_prompt),
+        simple_run_timeout = pane
+            .draft
+            .run_timeout_secs
+            .map(|seconds| seconds.to_string())
+            .unwrap_or_default(),
         fields = agent_fields(&AgentFields {
             scope: AgentFormScope::Company(pane.company.id),
             agent_id: None,

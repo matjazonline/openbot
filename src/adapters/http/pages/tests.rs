@@ -1067,6 +1067,7 @@ fn agent_settings_list_targets_the_pane_and_swaps_out_of_band() {
     let agent = Agent {
         provider: Some("openai".to_string()),
         model: Some("gpt-4o".to_string()),
+        run_timeout_secs: Some(45),
         ..settings_agent(company.id, "Triage", "triage")
     };
     let list = AgentSettingsList {
@@ -1115,6 +1116,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     let agent = Agent {
         provider: Some("openai".to_string()),
         model: Some("gpt-4o".to_string()),
+        run_timeout_secs: Some(45),
         api_key: Some("sk-test".to_string()),
         system_prompt: Some("Answer <billing> questions.".to_string()),
         description: None,
@@ -1137,6 +1139,8 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     assert!(html.contains("value=\"triage\""));
     assert!(html.contains("value=\"openai\""));
     assert!(html.contains("value=\"gpt-4o\""));
+    assert!(html.contains("name=\"run_timeout_secs\" min=\"1\" max=\"3600\""));
+    assert!(html.contains("value=\"45\""));
     assert!(html.contains("Answer &lt;billing&gt; questions.</textarea>"));
     assert!(html.contains("\"temperature\": 0.2"));
     // Overrides are set, so the collapsed section starts open.
@@ -1393,6 +1397,7 @@ fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
         slug: slug.to_string(),
         provider: None,
         model: None,
+        run_timeout_secs: None,
         api_key: None,
         system_prompt: None,
         description: None,

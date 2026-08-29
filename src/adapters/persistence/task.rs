@@ -20,8 +20,8 @@ use crate::{
             OutreachStatus,
         },
         task::{
-            BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskLeaseRef, TaskStatus,
-            ThreadActivity, TokenUsage,
+            BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus, TaskLeaseRef,
+            TaskStatus, TaskStopReason, ThreadActivity, TokenUsage,
         },
         value_objects::MessageId,
     },
@@ -48,16 +48,21 @@ const BEGIN_ATTEMPT_SQL: &str = r#"INSERT INTO task_attempts
    VALUES ($1, $2, $3, $4, 'processing', CURRENT_TIMESTAMP)
    ON CONFLICT (task_id, attempt_number) DO UPDATE
       SET status = 'processing', started_at = CURRENT_TIMESTAMP, finished_at = NULL,
-          error = NULL, prompt_tokens = NULL, completion_tokens = NULL,
+          error = NULL, stop_reason = NULL, prompt_tokens = NULL, completion_tokens = NULL,
           execution_generation = EXCLUDED.execution_generation"#;
 
 /// Close the ledger row, but only while it is still the open one. If another worker took the task
 /// over and reopened the row, this run is no longer the run of record and must not overwrite it.
 const FINISH_ATTEMPT_SQL: &str = r#"UPDATE task_attempts
    SET status = $4, error = $5, prompt_tokens = $6, completion_tokens = $7,
+       stop_reason = $8,
        finished_at = CURRENT_TIMESTAMP
    WHERE task_id = $1 AND attempt_number = $2 AND execution_generation = $3
      AND status = 'processing'"#;
+
+/// What a reaped run is recorded as having failed with. The reaper writes it to both the task row
+/// and the attempt ledger, which must agree on why the run vanished.
+const LEASE_EXPIRED_ERROR: &str = "Task lease expired without the run reporting a result";
 
 /// Log when a lease-guarded state change was ignored because the lease or status moved on.
 ///
@@ -1287,7 +1292,7 @@ impl TaskPersistence for PostgresPersistence {
                        WHEN retry_count + 1 >= max_retries THEN 'dead_letter'
                        ELSE 'pending'
                    END,
-                   last_error = 'Task lease expired without the run reporting a result',
+                   last_error = $1,
                    -- The same exponential backoff a reported failure gets, with the exponent
                    -- capped so it cannot run away: 30s * 2^attempt.
                    run_at = CURRENT_TIMESTAMP
@@ -1301,6 +1306,7 @@ impl TaskPersistence for PostgresPersistence {
                  AND (lock_expires_at IS NULL OR lock_expires_at <= CURRENT_TIMESTAMP)
                RETURNING id, retry_count"#,
         )
+        .bind(LEASE_EXPIRED_ERROR)
         .fetch_all(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -1311,13 +1317,17 @@ impl TaskPersistence for PostgresPersistence {
         for (task_id, retry_count) in &reaped {
             sqlx::query(
                 r#"UPDATE task_attempts
-                   SET status = 'failed',
-                       error = 'Task lease expired without the run reporting a result',
+                   SET status = $3,
+                       error = $4,
+                       stop_reason = $5,
                        finished_at = CURRENT_TIMESTAMP
                    WHERE task_id = $1 AND attempt_number = $2 AND status = 'processing'"#,
             )
             .bind(task_id)
             .bind(retry_count)
+            .bind(TaskAttemptStatus::Failed.as_str())
+            .bind(LEASE_EXPIRED_ERROR)
+            .bind(TaskStopReason::LeaseLost.as_str())
             .execute(&mut *tx)
             .await
             .map_err(AppError::from)?;
@@ -1585,6 +1595,7 @@ impl TaskPersistence for PostgresPersistence {
             .bind(outcome.error.as_deref())
             .bind(tokens(|usage| usage.prompt_tokens))
             .bind(tokens(|usage| usage.completion_tokens))
+            .bind(outcome.stop_reason.as_str())
             .execute(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -2514,6 +2525,19 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(open, 0, "a reaped run must not leave its ledger row open");
+        let lease_lost: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM task_attempts WHERE task_id = $1 AND stop_reason = $2",
+        )
+        .bind(task.id)
+        .bind(TaskStopReason::LeaseLost.as_str())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            lease_lost,
+            i64::from(task.max_retries),
+            "every reaped attempt records why execution stopped"
+        );
 
         CompanyPersistence::delete(&persistence, company.id)
             .await
@@ -2879,6 +2903,11 @@ mod tests {
 
     #[tokio::test]
     async fn concurrent_workers_claim_once_and_a_failed_task_is_not_immediately_reclaimed() {
+        // Both claims below are unscoped, and the row is deliberately sorted to the very front of
+        // the queue -- which makes it the first thing any *other* unscoped claim takes too. Held
+        // from before the row is queued until after the last claim, so the only claims racing for
+        // it are this test's own two.
+        let _claim_guard = UNSCOPED_CLAIM.lock().await;
         let Some(pool) = test_pool().await else {
             return;
         };
@@ -2933,10 +2962,11 @@ mod tests {
             .await
             .unwrap();
 
-        // `claim_pending_tasks` polls the whole queue ordered by `run_at`, not this company's slice
-        // of it, and it also reclaims 'processing' rows whose lease has expired. Sort this task
-        // ahead of *everything* — concurrent tests and any orphan rows a previously aborted run
-        // left behind — or both single-slot workers fill up elsewhere and never reach it. Keeping
+        // `claim_pending_tasks` polls the whole queue, not this company's slice of it. Its first
+        // sort key is the per-company round, and a brand-new company's only task is always round 1
+        // — so sorting this row ahead of every other round-1 row is what puts it first overall,
+        // ahead of concurrent tests' rows and any orphans a previously aborted run left behind.
+        // Without it both single-slot workers fill up elsewhere and never reach this task. Keeping
         // the limit at 1 also means this test steals at most one foreign task.
         sqlx::query(
             "UPDATE background_tasks SET run_at = CURRENT_TIMESTAMP - INTERVAL '100 years' WHERE id = $1",

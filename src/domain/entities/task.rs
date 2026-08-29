@@ -260,6 +260,38 @@ pub enum TaskExecutionOutcome {
     TerminalFailure(String),
 }
 
+/// Bounded operational reason for an execution ending. Detailed provider/database text belongs
+/// in the durable attempt error, not in metric labels where it would create unbounded cardinality.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskStopReason {
+    Completed,
+    RetryableFailure,
+    TerminalFailure,
+    TimedOut,
+    Shutdown,
+    LeaseLost,
+}
+
+impl TaskStopReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Completed => "completed",
+            Self::RetryableFailure => "retryable_failure",
+            Self::TerminalFailure => "terminal_failure",
+            Self::TimedOut => "timed_out",
+            Self::Shutdown => "shutdown",
+            Self::LeaseLost => "lease_lost",
+        }
+    }
+}
+
+impl std::fmt::Display for TaskStopReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 impl TaskExecutionOutcome {
     /// The message to record against the attempt and the task row, if this run failed.
     pub fn failure_message(&self) -> Option<&str> {
@@ -300,6 +332,7 @@ impl TaskAttemptStatus {
 pub struct TaskAttemptOutcome {
     pub attempt: TaskAttemptRef,
     pub status: TaskAttemptStatus,
+    pub stop_reason: TaskStopReason,
     pub error: Option<String>,
     /// `None` when the run never reached a model — a guard rejected it, or it failed first.
     pub tokens: Option<TokenUsage>,

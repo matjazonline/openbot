@@ -1,6 +1,8 @@
 use std::net::IpAddr;
 use uuid::Uuid;
 
+use crate::entities::task::TaskStopReason;
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AiExecutionMetrics {
     pub company_id: Option<Uuid>,
@@ -70,33 +72,6 @@ impl std::fmt::Display for TaskStatusMetric {
             TaskStatusMetric::Failed => write!(f, "failed"),
             TaskStatusMetric::Retried => write!(f, "retried"),
         }
-    }
-}
-
-/// Bounded operational reason for an execution ending. Detailed provider/database text belongs
-/// in the durable attempt error, not in metric labels where it would create unbounded cardinality.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TaskStopReason {
-    Completed,
-    RetryableFailure,
-    TerminalFailure,
-    TimedOut,
-    Shutdown,
-    LeaseLost,
-}
-
-impl std::fmt::Display for TaskStopReason {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let value = match self {
-            Self::Completed => "completed",
-            Self::RetryableFailure => "retryable_failure",
-            Self::TerminalFailure => "terminal_failure",
-            Self::TimedOut => "timed_out",
-            Self::Shutdown => "shutdown",
-            Self::LeaseLost => "lease_lost",
-        };
-        f.write_str(value)
     }
 }
 

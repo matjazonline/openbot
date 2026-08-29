@@ -11,9 +11,7 @@ use crate::{
         Leased, OutboundSend, OutboxEmail, TASK_LEASE_SECONDS, TaskLease, TaskPersistence,
         report_outcome, while_leased,
     },
-    domain::monitoring::{
-        MonitoringService, TaskExecutionMetrics, TaskStatusMetric, TaskStopReason,
-    },
+    domain::monitoring::{MonitoringService, TaskExecutionMetrics, TaskStatusMetric},
     entities::{
         agent::Agent,
         channel::{Channel, PUBLIC_PARTICIPANT},
@@ -23,7 +21,7 @@ use crate::{
         schedule::ScheduledRunPayload,
         task::{
             BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus,
-            TaskExecutionOutcome, TaskLeaseRef, TaskSuspension,
+            TaskExecutionOutcome, TaskLeaseRef, TaskStopReason, TaskSuspension,
         },
         value_objects::{EmailAddress, MessageId},
     },
@@ -558,6 +556,7 @@ impl TaskWorker {
                     attempt,
                     current.as_ref(),
                     TaskAttemptStatus::Completed,
+                    TaskStopReason::Completed,
                     None,
                 )
                 .await;
@@ -590,6 +589,7 @@ impl TaskWorker {
             attempt,
             current.as_ref(),
             TaskAttemptStatus::Failed,
+            stop_reason,
             Some(err_msg.clone()),
         )
         .await;
@@ -621,11 +621,13 @@ impl TaskWorker {
         attempt: TaskAttemptRef,
         current: Option<&BackgroundTask>,
         status: TaskAttemptStatus,
+        stop_reason: TaskStopReason,
         error: Option<String>,
     ) {
         let outcome = TaskAttemptOutcome {
             attempt,
             status,
+            stop_reason,
             error,
             // The run writes its usage into the payload, so it is only on the re-read row; the
             // copy this worker claimed predates the run entirely.
@@ -657,6 +659,11 @@ impl TaskWorker {
                 stop_reason,
                 retry_count: task.retry_count as u32,
             });
+            m.increment_counter(
+                &format!("task_execution_stops_{}_total", stop_reason.as_str()),
+                1,
+                &[],
+            );
         }
     }
 

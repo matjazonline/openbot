@@ -262,6 +262,7 @@ mod tests {
             slug: "broken".into(),
             provider: None,
             model: None,
+            run_timeout_secs: None,
             api_key: None,
             system_prompt: None,
             description: None,
@@ -316,6 +317,7 @@ mod tests {
                 slug: "support-agent".to_string(),
                 provider: Some("openai".to_string()),
                 model: Some("gpt-4o".to_string()),
+                run_timeout_secs: Some(45),
                 api_key: Some("key_123".to_string()),
                 system_prompt: Some("You are a helpful support agent.".to_string()),
                 description: Some("Answers customer support questions.".to_string()),
@@ -331,6 +333,7 @@ mod tests {
         assert_eq!(agent.slug, "support-agent");
         assert_eq!(agent.provider.as_deref(), Some("openai"));
         assert_eq!(agent.model.as_deref(), Some("gpt-4o"));
+        assert_eq!(agent.run_timeout_secs, Some(45));
         assert_eq!(agent.api_key.as_deref(), Some("key_123"));
         assert_eq!(
             agent.system_prompt.as_deref(),

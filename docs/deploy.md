@@ -123,7 +123,7 @@ documents the full set.
 | Setting | Requirement |
 | --- | --- |
 | `TASK_WORKER_CONCURRENCY` | Concurrent durable agent tasks per process; 1–64, default 4 |
-| `AGENT_RUN_TIMEOUT_SECS` | Wall-clock deadline for one agent/provider run; 1–3600 seconds, default 300; a timeout consumes an attempt and cancels the provider future |
+| `AGENT_RUN_TIMEOUT_SECS` | Fallback wall-clock deadline for one agent/provider run; 1–3600 seconds, default 300. An agent's optional `run_timeout_secs` overrides it; a timeout consumes an attempt and cancels the provider future. |
 | `SMTP_ALLOW_PLAINTEXT_LOCAL` | Development-only, default `false`; plaintext is accepted only with no credentials and a host that resolves exclusively to loopback. Never enable it for a deployed relay. |
 
 ### HydraDB long-term memory
