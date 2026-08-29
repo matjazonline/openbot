@@ -20,7 +20,7 @@ use mail_agents::{
     adapters::smtp::SmtpServer,
     infra::{
         app::create_app,
-        config::task_worker_concurrency_from_env,
+        config::{agent_run_timeout_from_env, task_worker_concurrency_from_env},
         events::run_mailbox_event_listener,
         runtime_metrics::LinuxRuntimeMetricSource,
         setup::{init_app_state, init_tracing},
@@ -62,12 +62,13 @@ async fn main() -> anyhow::Result<()> {
             app_state.config.clone(),
         )
         .with_task_concurrency(task_worker_concurrency)
+        .with_agent_run_timeout(agent_run_timeout_from_env())
         .with_active_task_executions(active_task_executions)
         .with_schedules(app_state.schedule_use_cases.clone())
         .with_monitoring(app_state.monitoring.clone()),
     );
 
-    tokio::spawn(task_worker.start_worker_loop(shutdown_rx.resubscribe()));
+    let task_worker_handle = tokio::spawn(task_worker.start_worker_loop(shutdown_rx.resubscribe()));
     let mut memory_worker_handle = tokio::spawn(memory_worker.run(shutdown_rx.resubscribe()));
 
     // Initialize Incoming SMTP Server loop
@@ -76,11 +77,11 @@ async fn main() -> anyhow::Result<()> {
             .with_monitoring(app_state.monitoring.clone()),
     );
 
-    tokio::spawn(smtp_server.start_server_loop(shutdown_rx.resubscribe()));
+    let smtp_handle = tokio::spawn(smtp_server.start_server_loop(shutdown_rx.resubscribe()));
 
     // Republish committed messages to open mailboxes. It listens on the database rather than
     // in-process because the writer is usually the task worker or the SMTP loop above.
-    tokio::spawn(run_mailbox_event_listener(
+    let mailbox_listener_handle = tokio::spawn(run_mailbox_event_listener(
         app_state.db.clone(),
         app_state.events.clone(),
         shutdown_rx.resubscribe(),
@@ -122,26 +123,33 @@ async fn main() -> anyhow::Result<()> {
     // Also covers an HTTP server that ended without a signal: every background owner receives the
     // same stop notification, and the sampler is explicitly joined rather than detached.
     let _ = shutdown_tx.send(());
-    match timeout(Duration::from_secs(5), &mut runtime_sampler_handle).await {
-        Ok(Ok(())) => {}
-        Ok(Err(error)) => warn!(%error, "Runtime metric sampler task ended unexpectedly"),
-        Err(_) => {
-            warn!("Runtime metric sampler did not stop within 5s; aborting it");
-            runtime_sampler_handle.abort();
-            let _ = runtime_sampler_handle.await;
-        }
-    }
-    match timeout(Duration::from_secs(5), &mut memory_worker_handle).await {
-        Ok(Ok(())) => {}
-        Ok(Err(error)) => warn!(%error, "Memory worker task ended unexpectedly"),
-        Err(_) => {
-            warn!("Memory worker did not stop within 5s; aborting it");
-            memory_worker_handle.abort();
-            let _ = memory_worker_handle.await;
-        }
-    }
+    let mut task_worker_handle = task_worker_handle;
+    let mut smtp_handle = smtp_handle;
+    let mut mailbox_listener_handle = mailbox_listener_handle;
+    tokio::join!(
+        join_background("runtime metric sampler", &mut runtime_sampler_handle),
+        join_background("memory worker", &mut memory_worker_handle),
+        join_background("task worker", &mut task_worker_handle),
+        join_background("SMTP listener", &mut smtp_handle),
+        join_background("mailbox listener", &mut mailbox_listener_handle),
+    );
 
     Ok(())
+}
+
+async fn join_background(name: &str, handle: &mut tokio::task::JoinHandle<()>) {
+    match timeout(DRAIN_GRACE, &mut *handle).await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => warn!(%error, component = name, "Background task ended unexpectedly"),
+        Err(_) => {
+            warn!(
+                component = name,
+                "Background task did not stop within drain grace; aborting it"
+            );
+            handle.abort();
+            let _ = handle.await;
+        }
+    }
 }
 
 /// Waits until graceful shutdown has begun, then bounds how long connections may keep draining.
@@ -227,5 +235,16 @@ mod tests {
 
         assert_eq!(outcome, DrainOutcome::Forced);
         assert_eq!(started.elapsed(), Duration::ZERO);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_background_owner_that_ignores_shutdown_is_aborted_inside_the_drain_grace() {
+        let mut handle = tokio::spawn(std::future::pending::<()>());
+        let started = Instant::now();
+
+        join_background("test owner", &mut handle).await;
+
+        assert!(handle.is_finished());
+        assert_eq!(started.elapsed(), DRAIN_GRACE);
     }
 }

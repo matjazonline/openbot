@@ -70,6 +70,7 @@ pub struct AgentForm {
     pub slug: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
+    pub run_timeout_secs: Option<u32>,
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
@@ -135,6 +136,7 @@ pub struct AgentJsonPayload {
     pub slug: String,
     pub provider: Option<String>,
     pub model: Option<String>,
+    pub run_timeout_secs: Option<u32>,
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
@@ -180,6 +182,7 @@ pub(super) async fn create_agent_from_instructions(
     slug: &str,
     instructions: &str,
     overrides: ModelOverrides<'_>,
+    run_timeout_secs: Option<u32>,
     avatar_url: Option<&AvatarUrl>,
 ) -> Result<Agent, String> {
     // Expansion runs on the company's own credentials: the overrides are what the *agent* will
@@ -198,6 +201,7 @@ pub(super) async fn create_agent_from_instructions(
                 slug: slug.to_string(),
                 provider: overrides.provider.map(str::to_string),
                 model: overrides.model.map(str::to_string),
+                run_timeout_secs,
                 api_key: overrides.api_key.map(str::to_string),
                 system_prompt: Some(system_prompt),
                 avatar_url: avatar_url.cloned(),
@@ -271,6 +275,7 @@ async fn create_agent_handler(
                 slug: form.slug(),
                 provider: form.provider.clone(),
                 model: form.model.clone(),
+                run_timeout_secs: form.run_timeout_secs,
                 api_key: form.api_key.clone(),
                 system_prompt: form.system_prompt.clone(),
                 description: form.description.clone(),
@@ -507,6 +512,7 @@ async fn update_agent_handler(
                 slug: form.slug(),
                 provider: form.provider.clone(),
                 model: form.model.clone(),
+                run_timeout_secs: form.run_timeout_secs,
                 api_key: form.api_key.clone(),
                 system_prompt: form.system_prompt.clone(),
                 description: form.description.clone(),
@@ -565,6 +571,7 @@ async fn create_agent_json(
                 slug: payload.slug.clone(),
                 provider: payload.provider.clone(),
                 model: payload.model.clone(),
+                run_timeout_secs: payload.run_timeout_secs,
                 api_key: payload.api_key.clone(),
                 system_prompt: payload.system_prompt.clone(),
                 description: payload.description.clone(),
@@ -617,6 +624,7 @@ async fn update_agent_json(
                 slug: payload.slug.clone(),
                 provider: payload.provider.clone(),
                 model: payload.model.clone(),
+                run_timeout_secs: payload.run_timeout_secs,
                 api_key: payload.api_key.clone(),
                 system_prompt: payload.system_prompt.clone(),
                 description: payload.description.clone(),

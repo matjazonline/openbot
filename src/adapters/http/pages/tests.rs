@@ -17,6 +17,98 @@ fn test_render_markdown_formats_content_and_removes_unsafe_html() {
 }
 
 #[test]
+fn legacy_approval_prompts_escape_every_external_field() {
+    let now = Utc::now();
+    let approval = HumanApproval {
+        id: Uuid::new_v4(),
+        company_id: Uuid::new_v4(),
+        channel_id: Uuid::new_v4(),
+        thread_id: None,
+        task_id: None,
+        step_key: "step".into(),
+        approver_email: r#"approver" onmouseover="alert(1)@example.com"#.into(),
+        action_type: "<script>type</script>".into(),
+        action_title: "Approve <img src=x onerror=alert(1)>".into(),
+        action_summary: "Summary </p><script>alert(1)</script>".into(),
+        payload: json!({}),
+        token: "safe-token".into(),
+        status: ApprovalStatus::Pending,
+        expires_at: now,
+        created_at: now,
+        updated_at: now,
+    };
+
+    let details = approval_details_page(&approval);
+    let result = approval_result_page("Result <script>", &approval, "Done </p>");
+    let list = channel_approvals_fragment(std::slice::from_ref(&approval));
+    for html in [&details, &result, &list] {
+        assert!(!html.contains("<script>type"));
+        assert!(!html.contains("<img src=x"));
+        assert!(!html.contains("onmouseover=\"alert(1)"));
+    }
+    assert!(details.contains("&lt;script&gt;type&lt;/script&gt;"));
+    assert!(result.contains("Result &lt;script&gt;"));
+}
+
+#[test]
+fn legacy_agent_json_and_confirmation_attribute_are_escaped() {
+    let company = mailbox_company();
+    let agent = Agent {
+        config_json: Some(json!({"label": "</span><script>alert(1)</script>"})),
+        system_prompt: Some("Answer <unsafe> input".into()),
+        ..settings_agent(
+            company.id,
+            r#"Triage" autofocus onfocus="alert(1)"#,
+            "triage<script>",
+        )
+    };
+
+    let row = agent_row_fragment(&company, &agent);
+    let edit = agent_edit_fragment(&company, &agent);
+    for html in [&row, &edit] {
+        assert!(!html.contains("<script>alert(1)</script>"));
+        assert!(!html.contains("autofocus onfocus=\"alert(1)"));
+    }
+    assert!(row.contains("&lt;/span&gt;&lt;script&gt;alert(1)&lt;/script&gt;"));
+    assert!(row.contains("Triage&quot; autofocus"));
+    assert!(edit.contains("Answer &lt;unsafe&gt; input"));
+}
+
+#[test]
+fn simulation_attribute_values_and_message_ids_are_escaped() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let html = channel_simulation_page(
+        &company,
+        "example.com",
+        &channel,
+        r#"sender@example.com" data-injected="yes"#,
+        None,
+        None,
+    );
+    assert!(!html.contains(r#"data-injected="yes""#));
+    assert!(html.contains("data-server-sender=\"sender@example.com&quot;"));
+
+    let thread = mailbox_thread(channel.id);
+    let mut message = mailbox_message(thread.id, "body");
+    message.message_id = "<id><script>alert(1)</script>".into();
+    let rendered = channel_simulation_loaded_thread_fragment(
+        &company,
+        &channel,
+        "example.com",
+        &thread,
+        &[message],
+        &[],
+        false,
+    );
+    assert!(
+        !rendered.contains("<script>alert(1)</script>"),
+        "{rendered}"
+    );
+    assert!(rendered.contains("&lt;id&gt;&lt;script&gt;alert(1)&lt;/script&gt;"));
+}
+
+#[test]
 fn library_agent_fields_reuse_the_advanced_editor_and_avatar_picker() {
     let html = library_agent_fields(
         &AgentDraft {

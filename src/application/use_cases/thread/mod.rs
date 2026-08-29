@@ -34,7 +34,7 @@ use crate::{
     services::{
         email_parser::{ParsedEmail, RawInboundPayload},
         memory_coordinator::MemoryCoordinator,
-        outbound_dispatcher::{OutboundDispatcher, OutboundEmail, SentEmailResult},
+        outbound_dispatcher::{MailTransport, OutboundDispatcher, OutboundEmail, SentEmailResult},
     },
     use_cases::{
         agent::AgentPersistence,
@@ -186,10 +186,12 @@ pub struct ThreadUseCases {
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
     egress_registry: Arc<EgressRegistry>,
+    mail_dispatcher: Arc<OutboundDispatcher>,
     /// Where inbound attachments are kept; `None` on a deployment with no private bucket.
     file_storage: Option<Arc<dyn FileStorage>>,
     memory: Option<Arc<MemoryCoordinator>>,
     config: Arc<AppConfig>,
+    agent_run_timeout: std::time::Duration,
 }
 
 impl ThreadUseCases {
@@ -200,8 +202,10 @@ impl ThreadUseCases {
         task_persistence: Arc<dyn TaskPersistence>,
         config: Arc<AppConfig>,
     ) -> Self {
+        let mail_dispatcher = Arc::new(OutboundDispatcher::disabled(config.clone()));
         let egress_registry = Arc::new(
-            EgressRegistry::new().register(Arc::new(EmailEgressAdapter::new(config.clone()))),
+            EgressRegistry::new()
+                .register(Arc::new(EmailEgressAdapter::new(mail_dispatcher.clone()))),
         );
 
         Self {
@@ -214,15 +218,32 @@ impl ThreadUseCases {
             approval_use_cases: None,
             monitoring: None,
             egress_registry,
+            mail_dispatcher,
             file_storage: None,
             memory: None,
             config,
+            agent_run_timeout: std::time::Duration::from_secs(300),
         }
+    }
+
+    pub fn with_agent_run_timeout(mut self, timeout: std::time::Duration) -> Self {
+        assert!(!timeout.is_zero(), "agent run timeout must be positive");
+        self.agent_run_timeout = timeout;
+        self
     }
 
     pub fn with_egress_registry(mut self, egress_registry: Arc<EgressRegistry>) -> Self {
         self.egress_registry = egress_registry;
         self
+    }
+
+    pub fn with_mail_transport(mut self, transport: Arc<dyn MailTransport>) -> Self {
+        self.mail_dispatcher = Arc::new(OutboundDispatcher::new(self.config.clone(), transport));
+        self
+    }
+
+    pub fn mail_dispatcher(&self) -> &Arc<OutboundDispatcher> {
+        &self.mail_dispatcher
     }
 
     pub fn with_agent_persistence(mut self, agent_persistence: Arc<dyn AgentPersistence>) -> Self {
@@ -383,8 +404,8 @@ impl ThreadUseCases {
             return Ok(None);
         }
         let prepared = match idempotency_key {
-            Some(key) => OutboundDispatcher::prepare_idempotent(&self.config, email, key)?,
-            None => OutboundDispatcher::prepare(&self.config, email)?,
+            Some(key) => self.mail_dispatcher.prepare_idempotent(email, key)?,
+            None => self.mail_dispatcher.prepare(email)?,
         };
         Ok(Some(prepared))
     }
@@ -541,13 +562,10 @@ impl ThreadUseCases {
                 let _ = adapter.dispatch_bounce(bounce).await;
             } else {
                 let bounce_body = format_bounce_email_body(bounce, &self.config.app_domain_name);
-                let _ = OutboundDispatcher::send_bounce(
-                    &self.config,
-                    &bounce.recipient_to,
-                    &bounce.original_subject,
-                    &bounce_body,
-                )
-                .await;
+                let _ = self
+                    .mail_dispatcher
+                    .send_bounce(&bounce.recipient_to, &bounce.original_subject, &bounce_body)
+                    .await;
             }
         }
     }

@@ -3,6 +3,9 @@ use uuid::Uuid;
 
 use crate::entities::{creation::CreationProvenance, value_objects::AvatarUrl};
 
+pub const MIN_AGENT_RUN_TIMEOUT_SECS: u32 = 1;
+pub const MAX_AGENT_RUN_TIMEOUT_SECS: u32 = 3_600;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Agent {
     pub id: Uuid,
@@ -13,6 +16,9 @@ pub struct Agent {
     pub slug: String,
     pub provider: Option<String>,
     pub model: Option<String>,
+    /// Per-run wall-clock limit. `None` inherits the deployment-wide default.
+    #[serde(default)]
+    pub run_timeout_secs: Option<u32>,
     #[serde(skip_serializing)]
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
@@ -35,5 +41,11 @@ impl Agent {
         serde_json::json!({
             "system_prompt": "You are a helpful email agent."
         })
+    }
+
+    pub fn run_timeout(&self, global: std::time::Duration) -> std::time::Duration {
+        self.run_timeout_secs
+            .map(|seconds| std::time::Duration::from_secs(u64::from(seconds)))
+            .unwrap_or(global)
     }
 }

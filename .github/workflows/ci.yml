@@ -30,6 +30,14 @@ jobs:
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Generated CSS is current
+        run: npm run check:css
       - name: Formatting
         run: cargo fmt --all -- --check
       - name: Offline compilation

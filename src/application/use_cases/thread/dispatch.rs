@@ -39,9 +39,7 @@ use crate::{
         },
         email_parser::ParsedEmail,
         memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
-        outbound_dispatcher::{
-            OutboundDispatcher, OutboundEmail, SentEmailResult, agent_response_email_body,
-        },
+        outbound_dispatcher::{OutboundEmail, SentEmailResult, agent_response_email_body},
         outreach_tool::OutreachToolContext,
     },
 };
@@ -68,7 +66,7 @@ struct AgentRun<'a> {
     completion_tokens: usize,
     /// The first agent error from any matched channel. Its presence means the whole logical task
     /// failed: no reply is committed for any channel, and the worker retries the task.
-    failure: Option<String>,
+    failure: Option<AppError>,
     primary_params: Option<ResolvedAgentParams>,
     primary_agent: Option<Agent>,
 }
@@ -147,7 +145,7 @@ impl ThreadUseCases {
         // row are one logical effect: if any matched agent failed, none of them may land, or a
         // retry would deliver a second, contradictory answer into the same thread.
         if let Some(error) = run.failure {
-            return Err(AppError::Internal(error));
+            return Err(error);
         }
 
         let response = self.combine_responses(&run.outputs);
@@ -324,9 +322,19 @@ impl ThreadUseCases {
                             );
                         }
                     }
-                    runner.execute().await
+                    let run_timeout = agent
+                        .as_ref()
+                        .map(|agent| agent.run_timeout(self.agent_run_timeout))
+                        .unwrap_or(self.agent_run_timeout);
+                    match tokio::time::timeout(run_timeout, runner.execute()).await {
+                        Ok(result) => result.map_err(AppError::from),
+                        Err(_) => Err(AppError::Timeout(format!(
+                            "agent run exceeded the {}s limit",
+                            run_timeout.as_secs()
+                        ))),
+                    }
                 }
-                Err(err) => Err(anyhow::anyhow!("{err}")),
+                Err(err) => Err(AppError::Internal(err.to_string())),
             };
 
             match result {
@@ -349,7 +357,7 @@ impl ThreadUseCases {
                     // not something an agent said. Pushing it here is how it used to reach the
                     // reply body, the thread history and the outbox.
                     if run.failure.is_none() {
-                        run.failure = Some(err.to_string());
+                        run.failure = Some(err);
                     }
                 }
             }
@@ -732,9 +740,11 @@ impl ThreadUseCases {
         }
         match idempotency_key {
             Some(key) => {
-                OutboundDispatcher::send_idempotent(&self.config, outbound_email, key).await
+                self.mail_dispatcher
+                    .send_idempotent(outbound_email, key)
+                    .await
             }
-            None => OutboundDispatcher::send(&self.config, outbound_email).await,
+            None => self.mail_dispatcher.send(outbound_email).await,
         }
     }
 
@@ -767,11 +777,9 @@ impl ThreadUseCases {
             return Ok((sent, None));
         };
         let idempotency_key = format!("task:{task_id}:agent-reply");
-        let prepared = OutboundDispatcher::prepare_idempotent(
-            &self.config,
-            outbound_email.clone(),
-            &idempotency_key,
-        )?;
+        let prepared = self
+            .mail_dispatcher
+            .prepare_idempotent(outbound_email.clone(), &idempotency_key)?;
 
         let pending = OutboundSend {
             company_id,
@@ -968,7 +976,7 @@ impl ThreadUseCases {
             "response": response,
             "email_sent": delivery.email_sent,
             "outbound_message_id": delivery.message_id,
-            "error": run.failure,
+            "error": run.failure.as_ref().map(ToString::to_string),
             "token_usage": TokenUsage::new(run.prompt_tokens, run.completion_tokens),
         });
         if let (Some(meta), Some(object)) = (metadata, execution_result.as_object_mut()) {

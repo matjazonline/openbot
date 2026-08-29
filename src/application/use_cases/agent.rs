@@ -8,7 +8,10 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        agent::Agent, creation::CreationProvenance, user::Viewer, value_objects::AvatarUrl,
+        agent::{Agent, MAX_AGENT_RUN_TIMEOUT_SECS, MIN_AGENT_RUN_TIMEOUT_SECS},
+        creation::CreationProvenance,
+        user::Viewer,
+        value_objects::AvatarUrl,
     },
     use_cases::{
         channel::{SlugKind, validate_slug},
@@ -33,6 +36,7 @@ pub struct AgentWrite {
     pub slug: String,
     pub provider: Option<String>,
     pub model: Option<String>,
+    pub run_timeout_secs: Option<u32>,
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     /// Short statement of what the agent is for, read by the agent directory tool.
@@ -55,6 +59,14 @@ impl AgentWrite {
             ));
         }
         validate_slug(&self.slug, SlugKind::AgentSlug)?;
+
+        if let Some(seconds) = self.run_timeout_secs
+            && !(MIN_AGENT_RUN_TIMEOUT_SECS..=MAX_AGENT_RUN_TIMEOUT_SECS).contains(&seconds)
+        {
+            return Err(AppError::BadRequest(format!(
+                "Agent run timeout must be between {MIN_AGENT_RUN_TIMEOUT_SECS} and {MAX_AGENT_RUN_TIMEOUT_SECS} seconds."
+            )));
+        }
 
         for field in [
             &mut self.provider,

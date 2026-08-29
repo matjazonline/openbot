@@ -7,6 +7,7 @@ use time::Duration;
 use crate::{
     adapters::http::session::MIN_SECRET_BYTES,
     entities::{
+        agent::MAX_AGENT_RUN_TIMEOUT_SECS,
         memory::{
             MAX_MEMORY_PROVIDER_BASE_URL_BYTES, MAX_MEMORY_PROVIDER_CREDENTIAL_BYTES,
             MAX_MEMORY_PROVIDER_REQUEST_SECONDS,
@@ -17,6 +18,7 @@ use crate::{
 
 pub const DEFAULT_TASK_WORKER_CONCURRENCY: usize = 4;
 pub const MAX_TASK_WORKER_CONCURRENCY: usize = 64;
+pub const DEFAULT_AGENT_RUN_TIMEOUT_SECS: u64 = 300;
 
 /// Load the bounded background-task parallelism once during process startup.
 pub fn task_worker_concurrency_from_env() -> usize {
@@ -34,6 +36,34 @@ fn parse_task_worker_concurrency(value: Option<&str>) -> usize {
         "TASK_WORKER_CONCURRENCY must be between 1 and {MAX_TASK_WORKER_CONCURRENCY}"
     );
     concurrency
+}
+
+pub fn agent_run_timeout_from_env() -> StdDuration {
+    parse_agent_run_timeout(env::var("AGENT_RUN_TIMEOUT_SECS").ok().as_deref())
+}
+
+pub fn smtp_allow_plaintext_local_from_env() -> bool {
+    parse_smtp_allow_plaintext_local(env::var("SMTP_ALLOW_PLAINTEXT_LOCAL").ok().as_deref())
+}
+
+fn parse_smtp_allow_plaintext_local(value: Option<&str>) -> bool {
+    value
+        .unwrap_or("false")
+        .parse::<bool>()
+        .expect("SMTP_ALLOW_PLAINTEXT_LOCAL must be true or false")
+}
+
+fn parse_agent_run_timeout(value: Option<&str>) -> StdDuration {
+    let seconds = value.map_or(DEFAULT_AGENT_RUN_TIMEOUT_SECS, |value| {
+        value
+            .parse::<u64>()
+            .expect("AGENT_RUN_TIMEOUT_SECS must be a positive integer")
+    });
+    assert!(
+        (1..=u64::from(MAX_AGENT_RUN_TIMEOUT_SECS)).contains(&seconds),
+        "AGENT_RUN_TIMEOUT_SECS must be between 1 and {MAX_AGENT_RUN_TIMEOUT_SECS}"
+    );
+    StdDuration::from_secs(seconds)
 }
 
 pub struct AppConfig {
@@ -318,11 +348,23 @@ fn default_attachments_folder(app_domain_name: &str) -> String {
 }
 
 /// Whether this is a developer's machine rather than a deployment, for the purpose of cookies.
-fn is_local_domain(domain: &str) -> bool {
-    let domain = domain.trim().to_ascii_lowercase();
-    let domain = domain.split(':').next().unwrap_or(&domain);
+pub fn is_loopback_host(host: &str) -> bool {
+    let host = host.trim().trim_matches(['[', ']']).to_ascii_lowercase();
+    host.is_empty()
+        || host == "localhost"
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|address| address.is_loopback())
+}
 
-    domain.is_empty() || domain == "localhost" || domain == "127.0.0.1" || domain == "[::1]"
+fn is_local_domain(domain: &str) -> bool {
+    let domain = domain.trim();
+    let host = if domain.starts_with('[') {
+        domain.split_once(']').map_or(domain, |(host, _)| host)
+    } else {
+        domain.split_once(':').map_or(domain, |(host, _)| host)
+    };
+    is_loopback_host(host)
 }
 
 /// An environment variable that is set to something, treating blank as unset.
@@ -341,7 +383,7 @@ impl AppConfig {
     /// Local SMTP defaults deliberately do not turn this on.
     pub fn email_confirmation_enabled(&self) -> bool {
         !self.smtp_host.trim().is_empty()
-            && self.smtp_host != "localhost"
+            && !is_loopback_host(&self.smtp_host)
             && !self.smtp_from_address.trim().is_empty()
             && self.smtp_from_address != "noreply@localhost"
     }
@@ -592,6 +634,27 @@ mod tests {
     }
 
     #[test]
+    fn agent_run_timeout_is_bounded_and_defaults_to_five_minutes() {
+        assert_eq!(parse_agent_run_timeout(None), StdDuration::from_secs(300));
+        assert_eq!(
+            parse_agent_run_timeout(Some("45")),
+            StdDuration::from_secs(45)
+        );
+    }
+
+    #[test]
+    fn smtp_plaintext_local_is_an_explicit_opt_in() {
+        assert!(!parse_smtp_allow_plaintext_local(None));
+        assert!(parse_smtp_allow_plaintext_local(Some("true")));
+    }
+
+    #[test]
+    #[should_panic(expected = "AGENT_RUN_TIMEOUT_SECS must be between 1 and 3600")]
+    fn agent_run_timeout_rejects_zero() {
+        parse_agent_run_timeout(Some("0"));
+    }
+
+    #[test]
     fn attachments_are_namespaced_by_application_domain_by_default() {
         assert_eq!(
             default_attachments_folder("mail.example.com"),
@@ -624,6 +687,8 @@ mod tests {
         assert!(is_local_domain("localhost"));
         assert!(is_local_domain("LocalHost:3001"));
         assert!(is_local_domain("127.0.0.1"));
+        assert!(is_local_domain("[::1]"));
+        assert!(is_local_domain("[::1]:3001"));
         assert!(is_local_domain(""));
 
         assert!(!is_local_domain("example.com"));

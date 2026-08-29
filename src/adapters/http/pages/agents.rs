@@ -196,7 +196,7 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
             </div>
         </div>
         "##,
-        company_name = company_name,
+        company_name = escape_html_text(company_name),
         company_id = company_id,
         avatar_field = legacy_agent_avatar_field("new", "", None),
         prompt_gen_html = prompt_gen_html,
@@ -213,7 +213,7 @@ pub fn agent_list_fragment(company: &Company, agents: &[Agent]) -> String {
                 <p class="text-sm">No agents configured for <span class="font-semibold text-white">{}</span> yet.</p>
                 <p class="text-xs text-slate-500 mt-1">Use Add Agent to create your first one.</p>
             </div>"#,
-            company.name
+            escape_html_text(&company.name)
         );
     }
 
@@ -278,13 +278,13 @@ pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
         agent_id = agent_id,
         company_id = company_id,
         avatar = avatar_bubble(agent.avatar_url.as_ref(), name, AvatarSize::Row),
-        name = name,
-        slug = slug,
-        provider = provider,
-        model = model,
+        name = escape_html_attr(name),
+        slug = escape_html_text(slug),
+        provider = escape_html_text(provider),
+        model = escape_html_text(model),
         api_key_badge = api_key_badge,
-        system_prompt_display = system_prompt_display,
-        config_display = config_display
+        system_prompt_display = escape_html_text(system_prompt_display),
+        config_display = escape_html_text(&config_display)
     )
 }
 
@@ -369,15 +369,15 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
         "##,
         agent_id = agent_id,
         company_id = company_id,
-        name = name,
-        slug = slug,
+        name = escape_html_attr(name),
+        slug = escape_html_attr(slug),
         avatar_field =
             legacy_agent_avatar_field(&agent_id.to_string(), name, agent.avatar_url.as_ref()),
-        provider = provider,
-        model = model,
-        api_key = api_key,
-        system_prompt = system_prompt,
-        config_json_str = config_json_str,
+        provider = escape_html_attr(provider),
+        model = escape_html_attr(model),
+        api_key = escape_html_attr(api_key),
+        system_prompt = escape_html_text(system_prompt),
+        config_json_str = escape_html_text(&config_json_str),
         prompt_gen_html = prompt_gen_html
     )
 }

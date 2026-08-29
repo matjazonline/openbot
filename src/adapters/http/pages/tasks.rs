@@ -46,7 +46,10 @@ fn channel_filter_options(channels: &[Channel], current: Option<Uuid>) -> String
         };
         options.push_str(&format!(
             "<option value=\"{}\" {}>{} (/{})</option>",
-            channel.id, selected, channel.name, channel.slug
+            channel.id,
+            selected,
+            escape_html_text(&channel.name),
+            escape_html_text(&channel.slug)
         ));
     }
     options
@@ -197,8 +200,8 @@ pub fn company_tasks_page(
             </div>
         </div>
         "##,
-        company_name = company.name,
-        slug = company.slug,
+        company_name = escape_html_text(&company.name),
+        slug = escape_html_text(&company.slug),
         task_list_html = task_list_html,
     );
 
@@ -228,8 +231,8 @@ pub fn task_list_fragment(
         format!(
             r##"<a href="{href}" hx-get="{hx_get}" hx-target="#task-list" hx-swap="innerHTML"
                 class="px-3 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition">{label}</a>"##,
-            href = link.href,
-            hx_get = link.hx_get,
+            href = escape_html_attr(&link.href),
+            hx_get = escape_html_attr(&link.hx_get),
             label = label,
         )
     };
@@ -570,8 +573,9 @@ fn finish_reason_badge(metadata: &serde_json::Value) -> String {
 /// full (secret-scrubbed) task payload.
 pub fn render_message_task_parameters_html(payload: &serde_json::Value) -> String {
     let sanitized_payload = sanitize_json_payload(payload);
-    let payload_str =
-        serde_json::to_string_pretty(&sanitized_payload).unwrap_or_else(|_| payload.to_string());
+    let payload_str = super::escape_html_text(
+        &serde_json::to_string_pretty(&sanitized_payload).unwrap_or_else(|_| payload.to_string()),
+    );
 
     let mut badges = model_badges(&sanitized_payload);
     badges.extend(email_badges(&sanitized_payload));
@@ -716,7 +720,8 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
 
     let error_html = match &task.last_error {
         Some(err) if !err.is_empty() => format!(
-            r##"<div class="mt-2 text-xs font-mono bg-slate-950/80 p-2 rounded border border-rose-900/50 text-rose-300">Error: {err}</div>"##
+            r##"<div class="mt-2 text-xs font-mono bg-slate-950/80 p-2 rounded border border-rose-900/50 text-rose-300">Error: {err}</div>"##,
+            err = escape_html_text(err),
         ),
         _ => String::new(),
     };
@@ -765,7 +770,7 @@ pub fn task_row_fragment(company_id: Uuid, task: &BackgroundTask) -> String {
         status_badge = status_badge,
         retry_count = task.retry_count,
         max_retries = task.max_retries,
-        task_type = task.task_type,
+        task_type = escape_html_text(&task.task_type),
         created_at_str = created_at_str,
         thread_info = thread_info,
         token_meter_badge = token_meter_badge,

@@ -249,6 +249,12 @@ pub enum TaskExecutionOutcome {
     /// Something transient failed. The attempt is consumed and the task is retried with backoff
     /// until `max_retries`, at which point it dead-letters.
     RetryableFailure(String),
+    /// The configured per-agent wall-clock deadline elapsed.
+    TimedOut(String),
+    /// Process shutdown cancelled an active durable execution.
+    Interrupted(String),
+    /// The task stopped because this worker no longer owned its lease.
+    LeaseLost(String),
     /// The task cannot succeed however often it is retried -- an unparseable payload, a missing
     /// field a retry cannot conjure. It dead-letters now instead of burning every attempt first.
     TerminalFailure(String),
@@ -259,6 +265,9 @@ impl TaskExecutionOutcome {
     pub fn failure_message(&self) -> Option<&str> {
         match self {
             TaskExecutionOutcome::RetryableFailure(message)
+            | TaskExecutionOutcome::TimedOut(message)
+            | TaskExecutionOutcome::Interrupted(message)
+            | TaskExecutionOutcome::LeaseLost(message)
             | TaskExecutionOutcome::TerminalFailure(message) => Some(message),
             TaskExecutionOutcome::Replied | TaskExecutionOutcome::Suspended => None,
         }

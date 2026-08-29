@@ -18,6 +18,7 @@ pub struct AgentDb {
     pub slug: String,
     pub provider: Option<String>,
     pub model: Option<String>,
+    pub run_timeout_secs: Option<i32>,
     pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     pub description: Option<String>,
@@ -38,6 +39,11 @@ impl TryFrom<AgentDb> for Agent {
             slug: db.slug,
             provider: db.provider,
             model: db.model,
+            run_timeout_secs: db
+                .run_timeout_secs
+                .map(u32::try_from)
+                .transpose()
+                .map_err(|_| AppError::Internal("Invalid agents.run_timeout_secs".into()))?,
             api_key: db.api_key,
             system_prompt: db.system_prompt,
             description: db.description,
@@ -63,11 +69,16 @@ impl AgentPersistence for PostgresPersistence {
     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
         let uuid = Uuid::new_v4();
         let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
+        let run_timeout_secs = write
+            .run_timeout_secs
+            .map(i32::try_from)
+            .transpose()
+            .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
 
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at"#,
+            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, run_timeout_secs)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs"#,
         )
         .bind(uuid)
         .bind(company_id)
@@ -81,6 +92,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(&write.config_json)
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(serde_json::to_value(write.created_by.unwrap_or_else(CreationProvenance::system)).map_err(|e| AppError::Internal(e.to_string()))?)
+        .bind(run_timeout_secs)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -91,10 +103,15 @@ impl AgentPersistence for PostgresPersistence {
     async fn create_library(&self, write: AgentWrite) -> AppResult<Agent> {
         let uuid = Uuid::new_v4();
         let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
+        let run_timeout_secs = write
+            .run_timeout_secs
+            .map(i32::try_from)
+            .transpose()
+            .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by)
-               VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at"#,
+            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, run_timeout_secs)
+               VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs"#,
         )
         .bind(uuid)
         .bind(&write.name)
@@ -107,6 +124,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(&write.config_json)
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(serde_json::to_value(write.created_by.unwrap_or_else(CreationProvenance::system)).map_err(|e| AppError::Internal(e.to_string()))?)
+        .bind(run_timeout_secs)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -115,7 +133,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>> {
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at
+            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs
                FROM agents WHERE id = $1"#,
         )
         .bind(id)
@@ -132,7 +150,7 @@ impl AgentPersistence for PostgresPersistence {
         agent_slug: &str,
     ) -> AppResult<Option<Agent>> {
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT a.id, a.company_id, a.name, a.slug, a.provider, a.model, a.api_key, a.system_prompt, a.description, a.config_json, a.avatar_url, a.created_by, a.created_at
+            r#"SELECT a.id, a.company_id, a.name, a.slug, a.provider, a.model, a.api_key, a.system_prompt, a.description, a.config_json, a.avatar_url, a.created_by, a.created_at, a.run_timeout_secs
                FROM agents a
                JOIN companies c ON c.id = a.company_id
                WHERE c.slug = $1 AND a.slug = $2"#,
@@ -148,7 +166,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>> {
         let db_list = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, NULL::text AS api_key, system_prompt, description, config_json, avatar_url, created_by, created_at
+            r#"SELECT id, company_id, name, slug, provider, model, NULL::text AS api_key, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs
                FROM agents WHERE company_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -162,7 +180,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn list_library(&self) -> AppResult<Vec<Agent>> {
         let rows = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, NULL::text AS api_key, system_prompt, description, config_json, avatar_url, created_by, created_at
+            r#"SELECT id, company_id, name, slug, provider, model, NULL::text AS api_key, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs
                FROM agents WHERE company_id IS NULL
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -174,11 +192,16 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
         let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
+        let run_timeout_secs = write
+            .run_timeout_secs
+            .map(i32::try_from)
+            .transpose()
+            .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
         let db = sqlx::query_as::<_, AgentDb>(
             r#"UPDATE agents
-               SET name = $1, slug = $2, provider = $3, model = $4, api_key = $5, system_prompt = $6, description = $7, config_json = $8, avatar_url = $9
-               WHERE id = $10
-               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at"#,
+               SET name = $1, slug = $2, provider = $3, model = $4, api_key = $5, system_prompt = $6, description = $7, config_json = $8, avatar_url = $9, run_timeout_secs = $10
+               WHERE id = $11
+               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs"#,
         )
         .bind(&write.name)
         .bind(&write.slug)
@@ -189,6 +212,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(&write.description)
         .bind(&write.config_json)
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
+        .bind(run_timeout_secs)
         .bind(id)
         .fetch_one(&self.pool)
         .await

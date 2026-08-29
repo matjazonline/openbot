@@ -57,6 +57,7 @@ impl MonitoringService for TracingMonitor {
             task_type = %metrics.task_type,
             duration_ms = metrics.duration_ms,
             status = %metrics.status,
+            stop_reason = %metrics.stop_reason,
             retry_count = metrics.retry_count,
             "Task Execution Processed"
         );

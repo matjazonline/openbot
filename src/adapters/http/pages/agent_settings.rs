@@ -63,6 +63,7 @@ pub struct AgentDraft<'a> {
     pub description: &'a str,
     pub provider: &'a str,
     pub model: &'a str,
+    pub run_timeout_secs: Option<u32>,
     pub api_key: &'a str,
     pub config_json: &'a str,
     pub avatar_url: &'a str,
@@ -405,6 +406,10 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         api_key: draft.api_key,
         api_key_placeholder,
     });
+    let run_timeout_value = draft
+        .run_timeout_secs
+        .map(|seconds| seconds.to_string())
+        .unwrap_or_default();
 
     format!(
         r##"
@@ -435,6 +440,13 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                         <summary class="collapse-title text-sm font-medium">Custom model &amp; config</summary>
                         <div class="collapse-content space-y-4">
                             {model_connection_fields}
+                            <label class="form-control w-full">
+                                <div class="label"><span class="text-xs opacity-70">Run timeout (seconds)</span></div>
+                                <input type="number" name="run_timeout_secs" min="1" max="3600"
+                                    value="{run_timeout_value}" placeholder="Use deployment default"
+                                    class="input w-full">
+                                <div class="label"><span class="text-xs opacity-60">Leave blank to inherit AGENT_RUN_TIMEOUT_SECS.</span></div>
+                            </label>
                             <label class="form-control w-full">
                                 <div class="label">
                                     <span class="text-xs opacity-70">Description</span>
@@ -611,6 +623,7 @@ fn stored_draft<'a>(agent: &'a Agent, config_json: &'a str) -> AgentDraft<'a> {
         description: agent.description.as_deref().unwrap_or(""),
         provider: agent.provider.as_deref().unwrap_or(""),
         model: agent.model.as_deref().unwrap_or(""),
+        run_timeout_secs: agent.run_timeout_secs,
         api_key: agent.api_key.as_deref().unwrap_or(""),
         config_json,
         avatar_url: agent

@@ -17,6 +17,9 @@ pub enum AppError {
     #[error("Conflict: {0}")]
     Conflict(String),
 
+    #[error("Execution timed out: {0}")]
+    Timeout(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }

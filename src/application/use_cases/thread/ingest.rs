@@ -28,10 +28,7 @@ use crate::{
         thread::Thread,
         value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
     },
-    services::{
-        email_parser::{ParsedEmail, RawInboundPayload},
-        outbound_dispatcher::OutboundDispatcher,
-    },
+    services::email_parser::{ParsedEmail, RawInboundPayload},
     use_cases::channel::{
         SystemAddress, find_similar_channel_slugs, parse_platform_address,
         parse_recipient_address_pipeline,
@@ -556,16 +553,17 @@ impl ThreadUseCases {
 
         // Fire and forget, like `handle_bounce_dispatch`: a relay that is down must not turn a
         // help request into a retried task.
-        if let Err(error) = OutboundDispatcher::send_system_reply(
-            &self.config,
-            &company.slug,
-            system.local_part(),
-            &EmailAddress::from(parsed.sender.clone()),
-            &parsed.subject,
-            Some(MessageId::from(parsed.message_id.clone())),
-            &body,
-        )
-        .await
+        if let Err(error) = self
+            .mail_dispatcher
+            .send_system_reply(
+                &company.slug,
+                system.local_part(),
+                &EmailAddress::from(parsed.sender.clone()),
+                &parsed.subject,
+                Some(MessageId::from(parsed.message_id.clone())),
+                &body,
+            )
+            .await
         {
             warn!(
                 "Could not deliver the {} reply to '{}': {}",

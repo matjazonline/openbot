@@ -104,7 +104,7 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 | `DATABASE_URL` | Points at `mail-agents-db.internal` |
 | `JWT_SECRET` | Session signing key |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | Outbound relay credentials |
-| `SMTP_HOST` / `SMTP_FROM_ADDRESS` | Outbound relay and sender; when both are configured with a non-local host, new accounts must confirm a six-digit code sent by email. If outbound SMTP is not configured, registration skips confirmation. |
+| `SMTP_HOST` / `SMTP_FROM_ADDRESS` | Outbound TLS relay and sender; when both are configured with a non-local host, new accounts must confirm a six-digit code sent by email. Remote relay certificates are validated. If outbound SMTP is not configured, registration skips confirmation. |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Optional Google registration/login. Set both and register `https://<APP_DOMAIN_NAME>/auth/google/callback` as an authorized redirect URI in Google Cloud. |
 | `APPLE_OAUTH_CLIENT_ID` / `APPLE_OAUTH_TEAM_ID` / `APPLE_OAUTH_KEY_ID` / `APPLE_OAUTH_PRIVATE_KEY_BASE64` | Optional Sign in with Apple. Set all four, use the Services ID as the client ID, base64-encode the `.p8` private key, and register `https://<APP_DOMAIN_NAME>/auth/apple/callback` as the return URL. Apple requires a real HTTPS domain and does not accept localhost. Register the outbound mail domain and sender with Apple's private email relay so confirmation codes reach relay addresses. |
 | `CREDENTIAL_ENCRYPTION_KEYS` | Versioned AES-256-GCM keys (`1:<base64-32-bytes>,2:<base64-32-bytes>`). Keep prior versions during rotation; the highest version is active. |
@@ -119,6 +119,12 @@ invalidate provider keys that may already have been copied from an older dump.
 
 Non-secret settings live in the `[env]` block of `fly.toml`. `.env.example`
 documents the full set.
+
+| Setting | Requirement |
+| --- | --- |
+| `TASK_WORKER_CONCURRENCY` | Concurrent durable agent tasks per process; 1–64, default 4 |
+| `AGENT_RUN_TIMEOUT_SECS` | Wall-clock deadline for one agent/provider run; 1–3600 seconds, default 300; a timeout consumes an attempt and cancels the provider future |
+| `SMTP_ALLOW_PLAINTEXT_LOCAL` | Development-only, default `false`; plaintext is accepted only with no credentials and a host that resolves exclusively to loopback. Never enable it for a deployed relay. |
 
 ### HydraDB long-term memory
 

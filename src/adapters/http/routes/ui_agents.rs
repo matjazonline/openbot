@@ -301,6 +301,7 @@ async fn create_agent(
             &submitted.slug,
             submitted.form.system_prompt.as_deref().unwrap_or_default(),
             submitted.overrides(),
+            submitted.form.run_timeout_secs,
             avatar_url.as_ref(),
         )
         .await
@@ -320,6 +321,7 @@ async fn create_agent(
                     slug: submitted.slug.clone(),
                     provider: submitted.form.provider.clone(),
                     model: submitted.form.model.clone(),
+                    run_timeout_secs: submitted.form.run_timeout_secs,
                     api_key: submitted.form.api_key.clone(),
                     system_prompt: submitted.form.system_prompt.clone(),
                     description: submitted.form.description.clone(),
@@ -376,6 +378,7 @@ async fn update_agent(
                 slug: submitted.slug.clone(),
                 provider: submitted.form.provider.clone(),
                 model: submitted.form.model.clone(),
+                run_timeout_secs: submitted.form.run_timeout_secs,
                 api_key: submitted.form.api_key.clone(),
                 system_prompt: submitted.form.system_prompt.clone(),
                 description: submitted.form.description.clone(),
@@ -569,6 +572,7 @@ impl SubmittedAgent {
             description: self.form.description.as_deref().unwrap_or(""),
             provider: self.form.provider.as_deref().unwrap_or(""),
             model: self.form.model.as_deref().unwrap_or(""),
+            run_timeout_secs: self.form.run_timeout_secs,
             api_key: self.form.api_key.as_deref().unwrap_or(""),
             config_json: self.form.config_json.as_deref().unwrap_or(""),
             avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),

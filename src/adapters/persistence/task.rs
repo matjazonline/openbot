@@ -1604,11 +1604,20 @@ impl TaskPersistence for PostgresPersistence {
             // without any backoff -- so a task that reliably outlived its lease looped for ever
             // instead of dead-lettering. `reap_expired_task_leases` now turns those back into
             // pending rows, paying an attempt each time.
-            r#"WITH claimable AS (
-                   SELECT id
+            r#"WITH ranked AS (
+                   SELECT id, run_at, created_at,
+                          ROW_NUMBER() OVER (
+                              PARTITION BY company_id
+                              ORDER BY run_at ASC, created_at ASC, id ASC
+                          ) AS company_round
                    FROM background_tasks
                    WHERE status = 'pending' AND run_at <= CURRENT_TIMESTAMP
-                   ORDER BY run_at ASC, created_at ASC, id ASC
+               ), claimable AS (
+                   SELECT task.id
+                   FROM background_tasks AS task
+                   JOIN ranked ON ranked.id = task.id
+                   ORDER BY ranked.company_round ASC, ranked.run_at ASC,
+                            ranked.created_at ASC, task.id ASC
                    FOR UPDATE SKIP LOCKED
                    LIMIT $1
                )
@@ -2050,7 +2059,7 @@ fn json_uuid(value: &Value, pointer: &str) -> AppResult<Uuid> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::persistence::test_support::test_pool;
+    use crate::adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool};
     use crate::entities::message::{Message, MessageDirection, MessageRole};
     use crate::services::outbound_dispatcher::OutboundEmail;
     use crate::use_cases::{
@@ -2066,6 +2075,116 @@ mod tests {
         assert_eq!(required_response_count(3, 50.0), 2);
         assert_eq!(required_response_count(4, 50.0), 2);
         assert_eq!(required_response_count(10, 20.0), 2);
+    }
+
+    #[tokio::test]
+    async fn pending_claims_take_one_company_round_before_a_second_task_from_a_backlog() {
+        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let email = format!("fair_owner_{suffix}@example.com");
+        persistence
+            .create_user(&format!("fair_owner_{suffix}"), &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let mut companies = Vec::new();
+        let mut channels = Vec::new();
+        for label in ["backlog", "waiting"] {
+            let company = CompanyPersistence::create(
+                &persistence,
+                owner.id,
+                CompanyWrite {
+                    name: format!("Fair {label}"),
+                    slug: format!("fair-{label}-{suffix}"),
+                    ..CompanyWrite::default()
+                },
+            )
+            .await
+            .unwrap();
+            let channel = ChannelPersistence::create(
+                &persistence,
+                company.id,
+                ChannelWrite {
+                    name: label.into(),
+                    slug: label.into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
+            )
+            .await
+            .unwrap();
+            companies.push(company);
+            channels.push(channel);
+        }
+
+        let mut backlog_ids = Vec::new();
+        for _ in 0..3 {
+            backlog_ids.push(
+                persistence
+                    .enqueue_task(
+                        companies[0].id,
+                        channels[0].id,
+                        None,
+                        "fairness",
+                        serde_json::json!({}),
+                    )
+                    .await
+                    .unwrap()
+                    .id,
+            );
+        }
+        let waiting = persistence
+            .enqueue_task(
+                companies[1].id,
+                channels[1].id,
+                None,
+                "fairness",
+                serde_json::json!({}),
+            )
+            .await
+            .unwrap();
+        let mut owned_ids = backlog_ids.clone();
+        owned_ids.push(waiting.id);
+        sqlx::query(
+            "UPDATE background_tasks SET run_at = CURRENT_TIMESTAMP - INTERVAL '300 years' WHERE id = ANY($1)",
+        )
+        .bind(&owned_ids)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let claimed = persistence
+            .claim_pending_tasks(Uuid::new_v4(), Utc::now() + chrono::Duration::minutes(5), 2)
+            .await
+            .unwrap();
+        assert_eq!(
+            claimed
+                .iter()
+                .filter(|task| task.company_id == companies[0].id)
+                .count(),
+            1
+        );
+        assert_eq!(
+            claimed
+                .iter()
+                .filter(|task| task.company_id == companies[1].id)
+                .count(),
+            1
+        );
+
+        for company in companies {
+            CompanyPersistence::delete(&persistence, company.id)
+                .await
+                .unwrap();
+        }
     }
 
     /// The mailbox asks for a whole page of threads at once, and each thread must report the state

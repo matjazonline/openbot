@@ -589,6 +589,7 @@ pub(super) async fn resolve_channel_agents(
                 api_key: form.api_key.as_deref(),
             },
             None,
+            None,
         )
         .await?
     } else {
