@@ -8,8 +8,25 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::approval::{ApprovalStatus, HumanApproval},
+    entities::approval::{ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval},
 };
+
+/// One approval to write, and the notification to queue alongside it.
+///
+/// Borrows the two halves of the request rather than copying them: the caller has just built the
+/// notification body out of both and still owns them.
+pub struct NewApproval<'a> {
+    pub subject: &'a ApprovalSubject,
+    pub action: &'a ApprovalAction,
+    /// The serialized [`OutboundEmail`](crate::services::outbound_dispatcher::OutboundEmail) that
+    /// carries the decision links. Written in the same transaction as the approval row, so a
+    /// crash cannot leave an approval nobody was ever told about.
+    pub notification: Value,
+    /// The secret in the decision URLs. A `Uuid` end to end -- the column is one, so taking a
+    /// `&str` here only added a parse that could fail on a value this code had just generated.
+    pub token: Uuid,
+    pub expires_at: DateTime<Utc>,
+}
 
 #[derive(sqlx::FromRow, Debug)]
 pub struct HumanApprovalDb {
@@ -65,21 +82,13 @@ impl TryFrom<HumanApprovalDb> for HumanApproval {
 
 #[async_trait]
 pub trait ApprovalPersistence: Send + Sync {
+    /// Writes the approval and queues its notification in one transaction.
+    ///
+    /// Returns the approval and whether *this* call created it: asking twice about the same
+    /// `step_key` returns the standing one rather than mailing a second link.
     async fn create_approval(
         &self,
-        company_id: Uuid,
-        channel_id: Uuid,
-        thread_id: Option<Uuid>,
-        suspension: Option<TaskSuspension>,
-        step_key: &str,
-        approver_email: &str,
-        action_type: &str,
-        action_title: &str,
-        action_summary: &str,
-        payload: Value,
-        notification: Value,
-        token: &str,
-        expires_at: DateTime<Utc>,
+        new_approval: NewApproval<'_>,
     ) -> AppResult<(HumanApproval, bool)>;
 
     async fn find_approval_by_step_key(
@@ -127,24 +136,17 @@ pub trait ApprovalPersistence: Send + Sync {
 impl ApprovalPersistence for PostgresPersistence {
     async fn create_approval(
         &self,
-        company_id: Uuid,
-        channel_id: Uuid,
-        thread_id: Option<Uuid>,
-        suspension: Option<TaskSuspension>,
-        step_key: &str,
-        approver_email: &str,
-        action_type: &str,
-        action_title: &str,
-        action_summary: &str,
-        payload: Value,
-        notification: Value,
-        token: &str,
-        expires_at: DateTime<Utc>,
+        new_approval: NewApproval<'_>,
     ) -> AppResult<(HumanApproval, bool)> {
-        let task_id = suspension.map(TaskSuspension::task_id);
+        let NewApproval {
+            subject,
+            action,
+            notification,
+            token,
+            expires_at,
+        } = new_approval;
+        let task_id = subject.suspension.map(TaskSuspension::task_id);
         let id = Uuid::new_v4();
-        let token = Uuid::parse_str(token)
-            .map_err(|e| AppError::Internal(format!("Invalid approval token: {}", e)))?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
@@ -180,16 +182,16 @@ impl ApprovalPersistence for PostgresPersistence {
             "#,
         ))
         .bind(id)
-        .bind(company_id)
-        .bind(channel_id)
-        .bind(thread_id)
+        .bind(subject.company_id)
+        .bind(subject.channel_id)
+        .bind(subject.thread_id)
         .bind(task_id)
-        .bind(step_key)
-        .bind(approver_email)
-        .bind(action_type)
-        .bind(action_title)
-        .bind(action_summary)
-        .bind(payload)
+        .bind(&action.step_key)
+        .bind(subject.approver_email.as_str())
+        .bind(&action.action_type)
+        .bind(&action.title)
+        .bind(&action.summary)
+        .bind(&action.payload)
         .bind(token)
         .bind(expires_at)
         .fetch_one(&mut *tx)
@@ -198,7 +200,7 @@ impl ApprovalPersistence for PostgresPersistence {
 
         let created = db.token == token;
         if created {
-            if let Some(suspension) = suspension {
+            if let Some(suspension) = subject.suspension {
                 // Parking a task is a write against a possibly-leased row. A run that has been
                 // superseded must not be able to make it, or it would park work the run that
                 // now owns the task is actively doing.
@@ -223,7 +225,7 @@ impl ApprovalPersistence for PostgresPersistence {
                          )"#,
                 )
                 .bind(suspension.task_id())
-                .bind(company_id)
+                .bind(subject.company_id)
                 .bind(lease.map(|lease| lease.worker_id))
                 .bind(lease.map(|lease| lease.execution_generation))
                 .execute(&mut *tx)
@@ -239,13 +241,15 @@ impl ApprovalPersistence for PostgresPersistence {
 
             sqlx::query(
                 r#"INSERT INTO email_outbox (
-                        id, company_id, channel_id, task_id, idempotency_key, payload
-                   ) VALUES ($1, $2, $3, $4, $5, $6)"#,
+                        id, company_id, channel_id, task_id, correlation_id,
+                        idempotency_key, payload
+                   ) VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
             )
             .bind(Uuid::new_v4())
-            .bind(company_id)
-            .bind(channel_id)
+            .bind(subject.company_id)
+            .bind(subject.channel_id)
             .bind(task_id)
+            .bind(subject.correlation_id.as_uuid())
             .bind(format!("approval:{}", db.id))
             .bind(notification)
             .execute(&mut *tx)
@@ -519,6 +523,8 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::test_pool;
+    use crate::entities::correlation::CorrelationId;
+    use crate::entities::task::NewTask;
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
         company::{CompanyPersistence, CompanyWrite},
@@ -532,6 +538,38 @@ mod tests {
     /// whose lease had already been reaped could still park the task, suspending work the run
     /// that now owns it was actively doing -- and the quorum-timeout sweep, which legitimately
     /// holds no lease, was what made that guard look sufficient.
+    /// The "who and where" half of an approval, which every test here shares.
+    fn approval_subject(
+        company: &crate::entities::company::Company,
+        channel: &crate::entities::channel::Channel,
+        thread_id: Uuid,
+        approver: &str,
+    ) -> ApprovalSubject {
+        ApprovalSubject {
+            company_id: company.id,
+            channel_id: channel.id,
+            channel_name: channel.name.clone(),
+            channel_slug: channel.slug.clone(),
+            company_slug: company.slug.clone(),
+            thread_id: Some(thread_id),
+            suspension: None,
+            correlation_id: CorrelationId::new(),
+            approver_email: approver.into(),
+        }
+    }
+
+    /// The "what" half. Only `step_key` distinguishes one of these tests' requests from another,
+    /// which is exactly the asymmetry the two structs exist to express.
+    fn deploy_action(step_key: &str) -> ApprovalAction {
+        ApprovalAction {
+            step_key: step_key.to_string(),
+            action_type: "tool".to_string(),
+            title: "Deploy".to_string(),
+            summary: "Deploy application".to_string(),
+            payload: serde_json::json!({}),
+        }
+    }
+
     #[tokio::test]
     async fn only_the_run_that_owns_a_task_may_park_it() {
         let Some(pool) = test_pool().await else {
@@ -578,13 +616,13 @@ mod tests {
             .await
             .unwrap();
         let task = persistence
-            .enqueue_task(
+            .enqueue_task(NewTask::starting_new_chain(
                 company.id,
                 channel.id,
                 Some(thread.id),
                 "test",
                 serde_json::json!({}),
-            )
+            ))
             .await
             .unwrap();
 
@@ -600,21 +638,16 @@ mod tests {
 
         let park = async |suspension, step: &str| {
             persistence
-                .create_approval(
-                    company.id,
-                    channel.id,
-                    Some(thread.id),
-                    suspension,
-                    step,
-                    &email,
-                    "tool",
-                    "Deploy",
-                    "Deploy application",
-                    serde_json::json!({}),
-                    serde_json::json!({}),
-                    &Uuid::new_v4().to_string(),
-                    Utc::now() + chrono::Duration::hours(1),
-                )
+                .create_approval(NewApproval {
+                    subject: &ApprovalSubject {
+                        suspension,
+                        ..approval_subject(&company, &channel, thread.id, &email)
+                    },
+                    action: &deploy_action(step),
+                    notification: serde_json::json!({}),
+                    token: Uuid::new_v4(),
+                    expires_at: Utc::now() + chrono::Duration::hours(1),
+                })
                 .await
         };
 
@@ -729,23 +762,15 @@ mod tests {
             .create_thread(channel.id, "Approval", std::slice::from_ref(&email_addr))
             .await
             .unwrap();
-        let token = Uuid::new_v4().to_string();
+        let token = Uuid::new_v4();
         let (approval, created) = persistence
-            .create_approval(
-                company.id,
-                channel.id,
-                Some(thread.id),
-                None,
-                "deploy-step",
-                &email,
-                "tool",
-                "Deploy",
-                "Deploy application",
-                serde_json::json!({}),
-                serde_json::json!({}),
-                &token,
-                chrono::Utc::now() + chrono::Duration::hours(1),
-            )
+            .create_approval(NewApproval {
+                subject: &approval_subject(&company, &channel, thread.id, &email),
+                action: &deploy_action("deploy-step"),
+                notification: serde_json::json!({}),
+                token,
+                expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
+            })
             .await
             .unwrap();
         assert!(created);
@@ -772,9 +797,10 @@ mod tests {
         );
 
         let now = chrono::Utc::now();
+        let token_str = token.to_string();
         let (first, second) = tokio::join!(
-            persistence.consume_pending_approval(&token, ApprovalStatus::Approved, now),
-            persistence.consume_pending_approval(&token, ApprovalStatus::Approved, now)
+            persistence.consume_pending_approval(&token_str, ApprovalStatus::Approved, now),
+            persistence.consume_pending_approval(&token_str, ApprovalStatus::Approved, now)
         );
         assert_eq!(
             [first.unwrap(), second.unwrap()]

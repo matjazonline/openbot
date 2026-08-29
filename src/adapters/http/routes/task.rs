@@ -353,6 +353,7 @@ async fn resume_company_task(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::correlation::CorrelationId;
     use crate::entities::task::BackgroundTask;
 
     #[test]
@@ -408,6 +409,7 @@ mod tests {
         let thread_id = Uuid::new_v4();
 
         let task = crate::entities::task::BackgroundTask {
+            correlation_id: CorrelationId::new(),
             id: Uuid::new_v4(),
             company_id,
             channel_id: channel_id,
@@ -439,6 +441,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
         let task = BackgroundTask {
+            correlation_id: CorrelationId::new(),
             id: Uuid::new_v4(),
             company_id,
             channel_id: channel_id,
@@ -613,6 +616,7 @@ mod tests {
         };
 
         let task = BackgroundTask {
+            correlation_id: CorrelationId::new(),
             id: Uuid::new_v4(),
             company_id,
             channel_id: channel_id,

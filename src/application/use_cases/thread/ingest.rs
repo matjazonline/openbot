@@ -25,6 +25,7 @@ use crate::{
         message::{Message, MessageDirection, MessageRole},
         message_contract::NormalizedInboundMessage,
         outreach::OutreachReplyMatch,
+        task::NewTask,
         thread::Thread,
         value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
     },
@@ -1211,6 +1212,7 @@ impl ThreadUseCases {
 
         let mut norm = norm;
         norm.is_context_only = context_only;
+        let correlation_id = norm.correlation_id;
 
         let mut result = InboundIngestResult {
             accepted: true,
@@ -1248,13 +1250,16 @@ impl ThreadUseCases {
         // Durable task: survives a crash between ingest and agent execution.
         let task = self
             .task_persistence
-            .enqueue_task(
-                primary.company.id,
-                primary.channel.id,
-                Some(primary.thread.id),
-                AGENT_DISPATCH_TASK,
-                durable_ingest_payload(&durable_result),
-            )
+            .enqueue_task(NewTask {
+                company_id: primary.company.id,
+                channel_id: primary.channel.id,
+                thread_id: Some(primary.thread.id),
+                task_type: AGENT_DISPATCH_TASK.to_string(),
+                payload: durable_ingest_payload(&durable_result),
+                // The chain starts at the message, not here: an inter-channel reply carrying a
+                // correlation header keeps the chain its sender was already on.
+                correlation_id,
+            })
             .await?;
         result.task_id = Some(task.id);
         Ok(result)

@@ -509,6 +509,12 @@ CREATE TABLE background_tasks (
     channel_id UUID NOT NULL,
     thread_id UUID,
     source_message_id TEXT,
+    -- The inbound event this task descends from, minted once at ingress and inherited by every
+    -- task the run goes on to spawn (an outreach in another channel, an approval resume, a
+    -- schedule's next occurrence). Never re-minted here: the `ON CONFLICT` below returns the
+    -- task a redelivered message already has, correlation id and all, so a duplicate delivery
+    -- joins the original chain instead of starting a second one.
+    correlation_id UUID NOT NULL,
     task_type TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     payload JSONB NOT NULL DEFAULT '{}',
@@ -575,6 +581,10 @@ CREATE INDEX background_tasks_company_channel_created_idx
     ON background_tasks (company_id, channel_id, created_at DESC, id DESC);
 CREATE INDEX background_tasks_company_status_created_idx
     ON background_tasks (company_id, status, created_at DESC, id DESC);
+-- The whole-chain lookup: every task one inbound event caused, in the order it caused them.
+CREATE INDEX background_tasks_correlation_idx
+    ON background_tasks (correlation_id, created_at);
+
 CREATE INDEX background_tasks_thread_idx
     ON background_tasks (thread_id) WHERE thread_id IS NOT NULL;
 CREATE INDEX background_tasks_waiting_due_idx
@@ -732,6 +742,9 @@ CREATE TABLE email_outbox (
     id UUID PRIMARY KEY,
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     task_id UUID,
+    -- Inherited from the task whose work produced this email. `task_id` is cleared when the task
+    -- is deleted, so this is what keeps a delivered email attached to the chain that sent it.
+    correlation_id UUID NOT NULL,
     idempotency_key TEXT NOT NULL UNIQUE,
     payload JSONB NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
@@ -784,6 +797,9 @@ CREATE INDEX email_outbox_sending_lease_idx
     ON email_outbox (lock_expires_at, id) WHERE status = 'sending';
 CREATE INDEX email_outbox_company_created_idx
     ON email_outbox (company_id, created_at DESC, id DESC);
+CREATE INDEX email_outbox_correlation_idx
+    ON email_outbox (correlation_id, created_at);
+
 CREATE INDEX email_outbox_task_idx
     ON email_outbox (task_id) WHERE task_id IS NOT NULL;
 CREATE INDEX email_outbox_company_channel_created_idx

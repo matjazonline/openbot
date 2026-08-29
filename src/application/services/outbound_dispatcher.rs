@@ -18,7 +18,10 @@ use std::sync::Arc;
 
 use crate::{
     app_error::{AppError, AppResult},
-    entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId},
+    entities::{
+        correlation::{CORRELATION_HEADER, CorrelationId},
+        value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId},
+    },
     infra::config::AppConfig,
     use_cases::user::ConfirmationCodeSender,
 };
@@ -57,6 +60,9 @@ pub struct OutboundEmail {
     pub body_text: String,
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,
+    /// The chain that produced this email, stamped onto the wire so an inter-channel recipient
+    /// stays on it -- see [`CorrelationId`].
+    pub correlation_id: CorrelationId,
 }
 
 /// One server-generated message: a bounce, or a reply from a reserved `_` address.
@@ -87,6 +93,7 @@ pub struct SentEmailResult {
     pub source_channel_id: Option<Uuid>,
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,
+    pub correlation_id: CorrelationId,
 }
 
 /// Wrap an agent's answer in the shared plain-text email template.
@@ -300,6 +307,8 @@ impl OutboundDispatcher {
             source_channel_id: Some(email.channel_id),
             hop_count: next_hop,
             trace_channels: trace,
+            // Carried, never re-minted: the reply belongs to the chain of the message it answers.
+            correlation_id: email.correlation_id,
         })
     }
 
@@ -371,6 +380,10 @@ impl OutboundDispatcher {
             builder = builder.header(CustomHeader {
                 name: HeaderName::new_from_ascii_str("X-MailAgents-Hop-Count"),
                 value: prepared.hop_count.to_string(),
+            });
+            builder = builder.header(CustomHeader {
+                name: HeaderName::new_from_ascii_str(CORRELATION_HEADER),
+                value: prepared.correlation_id.to_string(),
             });
             builder = builder.header(CustomHeader {
                 name: HeaderName::new_from_ascii_str("X-MailAgents-Trace"),
@@ -545,6 +558,9 @@ impl OutboundDispatcher {
             source_channel_id: None,
             hop_count: 0,
             trace_channels: Vec::new(),
+            // A bounce or a `_` address reply answers a message we refused to process, so there
+            // is no task chain to join: this notice is its own event.
+            correlation_id: CorrelationId::new(),
         })
     }
 }
@@ -601,6 +617,7 @@ mod tests {
 
     fn test_email() -> OutboundEmail {
         OutboundEmail {
+            correlation_id: CorrelationId::new(),
             channel_id: Uuid::new_v4(),
             channel_name: "Support Bot".into(),
             channel_slug: "support".into(),

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::entities::value_objects::EmailAddress;
+use crate::entities::{correlation::CorrelationId, value_objects::EmailAddress};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -82,6 +82,9 @@ pub struct CreateOutreachRequest {
     pub company_id: Uuid,
     /// The channel every target email goes out as.
     pub channel_id: Uuid,
+    /// The chain the outreaching task belongs to, so the emails this sends out and the replies
+    /// they provoke stay on the same trail as the run that asked for them.
+    pub correlation_id: CorrelationId,
     pub worker_id: Uuid,
     pub outreach_key: String,
     pub required_threshold_percent: f64,

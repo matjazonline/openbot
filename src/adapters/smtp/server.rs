@@ -961,6 +961,7 @@ pub fn parse_raw_mime_to_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::task::NewTask;
 
     #[tokio::test]
     async fn smtp_line_limits_accept_boundary_and_reject_one_over() {
@@ -1315,18 +1316,22 @@ mod tests {
         }
         async fn enqueue_task(
             &self,
-            company_id: Uuid,
-            channel_id: Uuid,
-            thread_id: Option<Uuid>,
-            task_type: &str,
-            payload: serde_json::Value,
+            NewTask {
+                company_id,
+                channel_id,
+                thread_id,
+                task_type,
+                payload,
+                correlation_id,
+            }: NewTask,
         ) -> AppResult<crate::entities::task::BackgroundTask> {
             Ok(crate::entities::task::BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
                 channel_id,
                 thread_id,
-                task_type: task_type.to_string(),
+                correlation_id,
+                task_type,
                 status: crate::entities::task::TaskStatus::Pending,
                 payload,
                 retry_count: 0,

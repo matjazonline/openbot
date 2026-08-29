@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinSet;
 use tokio::time::{Duration, Instant, sleep, sleep_until};
-use tracing::{info, warn};
+use tracing::{Instrument, info, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -14,11 +14,14 @@ use crate::{
     domain::monitoring::{MonitoringService, TaskExecutionMetrics, TaskStatusMetric},
     entities::{
         agent::Agent,
+        approval::{ApprovalAction, ApprovalSubject, QUORUM_TIMEOUT_ACTION},
         channel::{Channel, PUBLIC_PARTICIPANT},
         company::Company,
+        correlation::CorrelationId,
         message::{Message, MessageDirection, MessageRole},
         outreach::DueOutreach,
         schedule::ScheduledRunPayload,
+        stuck_work::StuckWorkThresholds,
         task::{
             BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus,
             TaskExecutionOutcome, TaskLeaseRef, TaskSuspension,
@@ -457,7 +460,48 @@ impl TaskWorker {
         }
 
         self.check_quorum_timeouts().await?;
+        self.report_stuck_work().await;
         Ok(Polled::Idle)
+    }
+
+    /// Publish how much work is stuck, and say so in the log when any of it is.
+    ///
+    /// The queue tables have always known this; nothing looked. Every figure goes out as a gauge
+    /// on every sweep, zeroes included, so an alert built on one can clear itself -- a metric that
+    /// simply stops being published looks identical to a healthy system, which is the failure mode
+    /// worth avoiding here.
+    ///
+    /// Failing to take the census is not worth failing maintenance over: the reaping above is real
+    /// work and this is only reporting on it.
+    async fn report_stuck_work(&self) {
+        let census = match self
+            .task_persistence
+            .census_stuck_work(StuckWorkThresholds::default())
+            .await
+        {
+            Ok(census) => census,
+            Err(error) => {
+                warn!(error = %error, "Could not take the stuck-work census");
+                return;
+            }
+        };
+
+        if let Some(monitoring) = self.monitoring.as_ref() {
+            for (kind, count) in census.gauges() {
+                monitoring.record_gauge("stuck_work", count as f64, &[("kind", kind.as_str())]);
+            }
+        }
+
+        // A healthy system stays silent. Every thirty seconds is far too often to say "all clear".
+        for (kind, count) in census.alerts() {
+            warn!(
+                target: "monitoring::stuck_work",
+                kind = %kind.as_str(),
+                count = count,
+                detail = %kind.description(),
+                "Work is stuck"
+            );
+        }
     }
 
     /// Record the fate of one executed task: completed, suspended awaiting someone else, or failed
@@ -519,7 +563,15 @@ impl TaskWorker {
             TaskExecutionOutcome::TerminalFailure(message) => (message, true),
         };
 
-        warn!("Failed background task {}: {}", task_id, err_msg);
+        warn!(
+            task_id = %task_id,
+            correlation_id = %task.correlation_id,
+            task_type = %task.task_type,
+            retry_count = task.retry_count,
+            dead_letter = dead_letter_now || task.retry_count + 1 >= task.max_retries,
+            error = %err_msg,
+            "Background task failed"
+        );
         self.close_out_attempt(
             task,
             attempt,
@@ -809,40 +861,47 @@ impl TaskWorker {
             outreach.task_id, current_percent, outreach.required_threshold_percent
         );
 
+        let subject = ApprovalSubject {
+            company_id: task.company_id,
+            channel_id: task.channel_id,
+            channel_name: channel.name.clone(),
+            channel_slug: channel.slug.clone(),
+            company_slug: company.slug.clone(),
+            thread_id: task.thread_id,
+            // The sweep holds no lease: this task is already parked awaiting third-party replies,
+            // and the quorum timeout is what moves it on to awaiting a human.
+            suspension: Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
+            correlation_id: task.correlation_id,
+            approver_email,
+        };
+        let action = ApprovalAction {
+            // Keyed on the deadline as well as the outreach, so a timeout that is extended and
+            // then expires again asks afresh rather than reusing the answered request.
+            step_key: format!(
+                "quorum_timeout_{}_{}",
+                outreach.outreach_id,
+                outreach.expires_at.timestamp()
+            ),
+            action_type: QUORUM_TIMEOUT_ACTION.to_string(),
+            title: "Partial Quorum Timeout: Action Required".to_string(),
+            summary: format!(
+                "Outreach timed out with {}/{} responses ({:.1}%). Required: {:.1}%.",
+                outreach.response_count,
+                outreach.target_count,
+                current_percent,
+                outreach.required_threshold_percent
+            ),
+            payload: serde_json::json!({
+                "outreach_id": outreach.outreach_id,
+                "current_percent": current_percent,
+                "required_percent": outreach.required_threshold_percent,
+                "current_count": outreach.response_count,
+                "total_targets": outreach.target_count,
+            }),
+        };
+
         if let Err(error) = approval_use_cases
-            .create_and_send_approval_request(
-                task.company_id,
-                task.channel_id,
-                &channel.name,
-                &channel.slug,
-                &company.slug,
-                task.thread_id,
-                // The sweep holds no lease: this task is already parked awaiting third-party
-                // replies, and the quorum timeout is what moves it on to awaiting a human.
-                Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
-                &format!(
-                    "quorum_timeout_{}_{}",
-                    outreach.outreach_id,
-                    outreach.expires_at.timestamp()
-                ),
-                &approver_email,
-                "quorum_timeout",
-                "Partial Quorum Timeout: Action Required",
-                &format!(
-                    "Outreach timed out with {}/{} responses ({:.1}%). Required: {:.1}%.",
-                    outreach.response_count,
-                    outreach.target_count,
-                    current_percent,
-                    outreach.required_threshold_percent
-                ),
-                serde_json::json!({
-                    "outreach_id": outreach.outreach_id,
-                    "current_percent": current_percent,
-                    "required_percent": outreach.required_threshold_percent,
-                    "current_count": outreach.response_count,
-                    "total_targets": outreach.target_count,
-                }),
-            )
+            .create_and_send_approval_request(&subject, action)
             .await
         {
             // Nobody was asked, so put the outreach back into waiting rather than stranding it.
@@ -958,7 +1017,12 @@ impl TaskWorker {
         let deliver = ingest_exec.deliver;
         let dispatch = self
             .thread_use_cases
-            .execute_claimed_agent_task_and_dispatch(&ingest_exec, deliver, lease)
+            .execute_claimed_agent_task_and_dispatch(
+                &ingest_exec,
+                deliver,
+                lease,
+                task.correlation_id,
+            )
             .await
             .map_err(|e| e.to_string())?;
 
@@ -997,7 +1061,7 @@ impl TaskWorker {
             }
             None => {
                 let answer = self
-                    .run_scheduled_agent(task.id, &payload, &context)
+                    .run_scheduled_agent(task.id, task.correlation_id, &payload, &context)
                     .await?;
                 self.save_scheduled_reply(task, &payload, &context, &answer)
                     .await?;
@@ -1064,6 +1128,7 @@ impl TaskWorker {
     async fn run_scheduled_agent(
         &self,
         task_id: Uuid,
+        correlation_id: CorrelationId,
         payload: &ScheduledRunPayload,
         context: &ScheduledRunContext,
     ) -> Result<String, String> {
@@ -1111,6 +1176,7 @@ impl TaskWorker {
                 Some(context.channel.id),
                 context.agent.as_ref().map(|agent| agent.id),
             )
+            .trace(correlation_id, Some(task_id))
             .execute()
             .await
             .map_err(|e| e.to_string())?;
@@ -1198,6 +1264,7 @@ impl TaskWorker {
             body_text: agent_response_email_body(answer),
             hop_count: 0,
             trace_channels: vec![channel.id],
+            correlation_id: task.correlation_id,
         };
 
         self.task_persistence
@@ -1205,6 +1272,7 @@ impl TaskWorker {
                 company_id: company.id,
                 channel_id: channel.id,
                 task_id: Some(task.id),
+                correlation_id: task.correlation_id,
                 idempotency_key: format!("task:{}:scheduled-email", task.id),
                 payload: serde_json::to_value(&outbound_email)
                     .map_err(|e| format!("Serialization error: {e}"))?,
@@ -1264,11 +1332,23 @@ impl TaskWorker {
             );
         }
 
+        // One span for the whole run, so every event the agent, its tools and the outbox emit
+        // underneath it carries the chain without each of them having to know about it.
+        let run_span = tracing::info_span!(
+            "task-run",
+            correlation_id = %task.correlation_id,
+            task_id = %task.id,
+            task_type = %task.task_type,
+            company_id = %task.company_id,
+            channel_id = %task.channel_id,
+            attempt = attempt.attempt_number,
+        );
+
         let lease = TaskLease::worker(lease);
         match while_leased(
             &*self.task_persistence,
             &lease,
-            self.run_task(task, lease.reference),
+            self.run_task(task, lease.reference).instrument(run_span),
         )
         .await
         {
@@ -1326,6 +1406,7 @@ impl TaskWorker {
                     ),
                     hop_count: parsed.hop_count,
                     trace_channels: parsed.trace_channels,
+                    correlation_id: task.correlation_id,
                 };
 
                 match self
@@ -1364,6 +1445,7 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::company_member::CompanyMembership;
+    use crate::entities::task::NewTask;
     use crate::entities::task::TaskLeaseRef;
     use async_trait::async_trait;
     use chrono::Utc;
@@ -1633,18 +1715,22 @@ mod tests {
 
         async fn enqueue_task(
             &self,
-            company_id: Uuid,
-            channel_id: Uuid,
-            thread_id: Option<Uuid>,
-            task_type: &str,
-            payload: serde_json::Value,
+            NewTask {
+                company_id,
+                channel_id,
+                thread_id,
+                task_type,
+                payload,
+                correlation_id,
+            }: NewTask,
         ) -> AppResult<BackgroundTask> {
             let task = BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
                 channel_id,
                 thread_id,
-                task_type: task_type.to_string(),
+                correlation_id,
+                task_type,
                 status: TaskStatus::Pending,
                 payload,
                 retry_count: 0,
@@ -2109,13 +2195,13 @@ mod tests {
     async fn expired_lease_is_reclaimed_and_stale_worker_cannot_complete() {
         let persistence = MockTaskPersistence::default();
         let _task = persistence
-            .enqueue_task(
+            .enqueue_task(NewTask::starting_new_chain(
                 Uuid::new_v4(),
                 Uuid::new_v4(),
                 None,
                 "email_agent_dispatch",
                 serde_json::json!({}),
-            )
+            ))
             .await
             .unwrap();
         let first_worker = Uuid::new_v4();
@@ -2221,13 +2307,13 @@ mod tests {
         let channel_id = Uuid::new_v4();
 
         let task = task_persistence
-            .enqueue_task(
+            .enqueue_task(NewTask::starting_new_chain(
                 company_id,
                 channel_id,
                 None,
                 "email_agent_dispatch",
                 serde_json::json!({}),
-            )
+            ))
             .await
             .unwrap();
         assert_eq!(task.status, TaskStatus::Pending);
@@ -2410,13 +2496,13 @@ mod tests {
 
         let payload_json = serde_json::to_value(&ingest).unwrap();
         let task = task_persistence
-            .enqueue_task(
+            .enqueue_task(NewTask::starting_new_chain(
                 company_id,
                 channel_id,
                 Some(thread_id),
                 "email_agent_dispatch",
                 payload_json,
-            )
+            ))
             .await
             .unwrap();
 
@@ -2553,13 +2639,13 @@ mod tests {
         });
 
         let task = task_persistence
-            .enqueue_task(
+            .enqueue_task(NewTask::starting_new_chain(
                 company_id,
                 channel_id,
                 Some(thread_id),
                 "scheduled_agent_run",
                 scheduled_payload,
-            )
+            ))
             .await
             .unwrap();
 
@@ -2705,7 +2791,7 @@ mod tests {
         ));
 
         let task = task_persistence
-            .enqueue_task(
+            .enqueue_task(NewTask::starting_new_chain(
                 company_id,
                 channel_id,
                 Some(thread_id),
@@ -2722,7 +2808,7 @@ mod tests {
                     "recipient_emails": ["ops@example.com", "cc@example.com"],
                     "trigger_message_id": trigger.to_string(),
                 }),
-            )
+            ))
             .await
             .unwrap();
 

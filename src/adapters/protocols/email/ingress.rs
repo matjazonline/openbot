@@ -2,6 +2,7 @@ use crate::{
     adapters::storage::FileStorage,
     entities::{
         channel::{ChannelType, ParticipantIdentity},
+        correlation::{CORRELATION_HEADER, CorrelationId},
         message_contract::NormalizedInboundMessage,
         value_objects::{MessageId, ThreadIndex},
     },
@@ -41,6 +42,10 @@ impl EmailIngressAdapter {
     }
 
     pub fn parse(payload: RawInboundPayload, config: &AppConfig) -> NormalizedInboundMessage {
+        // Read before `payload` is consumed. Extracted here rather than in `EmailParser` because
+        // this is the protocol boundary the id crosses, and because `parse_headers` already
+        // returns a nine-tuple that a tenth element would not improve.
+        let correlation_id = correlation_from_headers(payload.headers.as_deref());
         let parsed = EmailParser::parse(payload, &config.app_domain_name);
 
         let sender = ParticipantIdentity::email(&parsed.sender);
@@ -73,6 +78,7 @@ impl EmailIngressAdapter {
             channel_id_header: parsed.channel_id_header,
             hop_count: parsed.hop_count,
             trace_channels: parsed.trace_channels,
+            correlation_id,
             protocol: ChannelType::Email,
             spf_status: parsed.spf_status,
             dkim_status: parsed.dkim_status,
@@ -80,5 +86,56 @@ impl EmailIngressAdapter {
             spam_score: parsed.spam_score,
             is_context_only: parsed.is_context_only,
         }
+    }
+}
+
+/// The chain this message already belongs to, or a fresh one.
+///
+/// A missing or malformed header is not an error: an external sender has no reason to set one, so
+/// the absence simply means this message starts its own chain.
+fn correlation_from_headers(headers: Option<&str>) -> CorrelationId {
+    let prefix = format!("{}:", CORRELATION_HEADER.to_lowercase());
+    let supplied = headers.and_then(|headers| {
+        headers
+            .lines()
+            .map(str::trim)
+            .find(|line| line.to_lowercase().starts_with(&prefix))
+            .map(|line| line[prefix.len()..].trim().to_string())
+    });
+    CorrelationId::parse_or_new(supplied.as_deref())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_inter_channel_reply_stays_on_the_chain_it_came_from() {
+        let id = CorrelationId::new();
+        let headers = format!(
+            "Message-ID: <a@example.com>\nX-MailAgents-Correlation-ID: {id}\nSubject: Re: hi"
+        );
+        assert_eq!(correlation_from_headers(Some(&headers)), id);
+    }
+
+    #[test]
+    fn header_matching_ignores_case_the_way_rfc_5322_does() {
+        let id = CorrelationId::new();
+        let headers = format!("x-mailagents-correlation-id:  {id}  ");
+        assert_eq!(correlation_from_headers(Some(&headers)), id);
+    }
+
+    #[test]
+    fn a_message_from_outside_starts_its_own_chain() {
+        // No header at all, and a header we cannot read, both mean "mint one" rather than "fail".
+        assert_ne!(
+            correlation_from_headers(None),
+            correlation_from_headers(None)
+        );
+        let garbage = "X-MailAgents-Correlation-ID: not-a-uuid";
+        assert_ne!(
+            correlation_from_headers(Some(garbage)),
+            correlation_from_headers(Some(garbage))
+        );
     }
 }

@@ -4,6 +4,7 @@ use uuid::Uuid;
 use crate::entities::{
     auth::AuthVerdict,
     channel::{ChannelType, ParticipantIdentity},
+    correlation::CorrelationId,
     message::AttachmentMetadata,
     value_objects::{MessageId, ThreadIndex},
 };
@@ -27,6 +28,12 @@ pub struct NormalizedInboundMessage {
     pub channel_id_header: Option<Uuid>,
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,
+    /// The chain this message belongs to: adopted from its `X-MailAgents-Correlation-ID` header
+    /// when it has one, minted at ingress when it does not.
+    ///
+    /// Deliberately not `#[serde(default)]`: this round-trips through the durable task payload,
+    /// and a default would quietly mint a second chain for a message that already had one.
+    pub correlation_id: CorrelationId,
     pub protocol: ChannelType,
     #[serde(default)]
     pub spf_status: AuthVerdict,
@@ -52,4 +59,5 @@ pub struct NormalizedOutboundMessage {
     pub channel_id: Uuid,
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,
+    pub correlation_id: CorrelationId,
 }

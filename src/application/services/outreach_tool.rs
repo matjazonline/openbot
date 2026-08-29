@@ -1,6 +1,7 @@
 use crate::{
     adapters::persistence::task::TaskPersistence,
     entities::{
+        correlation::CorrelationId,
         outreach::{CreateOutreachRequest, OutreachTargetRequest},
         value_objects::{ChannelSlug, CompanySlug, MessageId},
     },
@@ -32,6 +33,9 @@ pub const OUTREACH_TOOL_ID: &str = "outreach_and_await_quorum";
 #[derive(Debug, Clone)]
 pub struct OutreachToolContext {
     pub task_id: Uuid,
+    /// The chain the running task belongs to, so every email this tool sends and every reply it
+    /// waits for stays on the trail of the run that asked for them.
+    pub correlation_id: CorrelationId,
     pub worker_id: Uuid,
     pub company_id: Uuid,
     pub channel_id: Uuid,
@@ -179,6 +183,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
                 task_id: self.context.task_id,
                 company_id: self.context.company_id,
                 channel_id: self.context.channel_id,
+                correlation_id: self.context.correlation_id,
                 worker_id: self.context.worker_id,
                 outreach_key: request.idempotency_key(self.context.task_id, &target_emails),
                 required_threshold_percent: request.threshold_percent,
@@ -320,6 +325,7 @@ impl OutreachAndAwaitQuorumTool {
                     body_text: request.body.to_string(),
                     hop_count: self.context.hop_count,
                     trace_channels: self.context.trace_channels.clone(),
+                    correlation_id: self.context.correlation_id,
                 })
                 .map_err(|error| format!("Failed to serialize outreach email: {error}"))?;
                 Ok(OutreachTargetRequest {

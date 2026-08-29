@@ -39,6 +39,12 @@ impl MonitoringService for CompositeMonitor {
         }
     }
 
+    fn record_gauge(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
+        for monitor in &self.monitors {
+            monitor.record_gauge(name, value, labels);
+        }
+    }
+
     fn record_histogram(&self, name: &str, duration_ms: f64, labels: &[(&str, &str)]) {
         for monitor in &self.monitors {
             monitor.record_histogram(name, duration_ms, labels);

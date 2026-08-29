@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
+use crate::entities::correlation::CorrelationId;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
@@ -313,12 +315,78 @@ impl TokenUsage {
     }
 }
 
+/// Everything needed to enqueue one task.
+///
+/// One value rather than six positional parameters: `company_id`, `channel_id` and the optional
+/// `thread_id` are all bare `Uuid`s that the compiler would happily let a caller swap, and
+/// `correlation_id` joining them made that worse rather than better.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NewTask {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub thread_id: Option<Uuid>,
+    pub task_type: String,
+    pub payload: serde_json::Value,
+    /// The chain this task belongs to.
+    ///
+    /// A task enqueued *by* a running task must pass that task's id through, so an outreach into
+    /// another channel, an approval resume, and a schedule's next occurrence all stay one trail.
+    /// [`CorrelationId::new`] belongs at ingress, not here.
+    pub correlation_id: CorrelationId,
+}
+
+impl NewTask {
+    /// A task that begins a chain of its own, for the few callers that legitimately start one: a
+    /// schedule firing, and tests.
+    ///
+    /// Anything reacting to work already under way must use [`NewTask::caused_by`] or set
+    /// `correlation_id` explicitly instead -- minting here would silently split one trail in two,
+    /// which is the failure the whole mechanism exists to prevent.
+    pub fn starting_new_chain(
+        company_id: Uuid,
+        channel_id: Uuid,
+        thread_id: Option<Uuid>,
+        task_type: impl Into<String>,
+        payload: serde_json::Value,
+    ) -> Self {
+        Self {
+            company_id,
+            channel_id,
+            thread_id,
+            task_type: task_type.into(),
+            payload,
+            correlation_id: CorrelationId::new(),
+        }
+    }
+
+    /// A task caused by work already under way, inheriting its chain.
+    pub fn caused_by(
+        parent: &BackgroundTask,
+        channel_id: Uuid,
+        thread_id: Option<Uuid>,
+        task_type: impl Into<String>,
+        payload: serde_json::Value,
+    ) -> Self {
+        Self {
+            company_id: parent.company_id,
+            channel_id,
+            thread_id,
+            task_type: task_type.into(),
+            payload,
+            correlation_id: parent.correlation_id,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BackgroundTask {
     pub id: Uuid,
     pub company_id: Uuid,
     pub channel_id: Uuid,
     pub thread_id: Option<Uuid>,
+    /// The inbound event this task descends from. Inherited, never minted here -- see
+    /// [`CorrelationId`] and [`NewTask::correlation_id`].
+    pub correlation_id: CorrelationId,
     pub task_type: String,
     pub status: TaskStatus,
     pub payload: serde_json::Value,

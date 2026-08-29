@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
+use sqlx::postgres::types::PgInterval;
 use sqlx::{Postgres, QueryBuilder};
 use std::collections::HashMap;
 use std::future::Future;
@@ -13,14 +14,16 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
+        correlation::CorrelationId,
         message::Message,
         outbox::{OutboxEntry, OutboxStatus},
         outreach::{
             CreateOutreachRequest, DueOutreach, OutreachProgress, OutreachReplyMatch,
             OutreachStatus,
         },
+        stuck_work::{StuckWorkCensus, StuckWorkThresholds},
         task::{
-            BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskLeaseRef, TaskStatus,
+            BackgroundTask, NewTask, TaskAttemptOutcome, TaskAttemptRef, TaskLeaseRef, TaskStatus,
             ThreadActivity, TokenUsage,
         },
         value_objects::MessageId,
@@ -158,6 +161,7 @@ pub struct BackgroundTaskDb {
     pub company_id: Uuid,
     pub channel_id: Uuid,
     pub thread_id: Option<Uuid>,
+    pub correlation_id: Uuid,
     pub task_type: String,
     pub status: String,
     pub payload: Value,
@@ -204,6 +208,7 @@ impl TryFrom<BackgroundTaskDb> for BackgroundTask {
             company_id: db.company_id,
             channel_id: db.channel_id,
             thread_id: db.thread_id,
+            correlation_id: db.correlation_id.into(),
             task_type: db.task_type,
             status,
             payload: db.payload,
@@ -304,6 +309,10 @@ pub struct OutboundSend {
     /// The task whose work produced this email. Carries no lifecycle meaning — it is the join the
     /// task view uses to show delivery state, nothing writes back through it.
     pub task_id: Option<Uuid>,
+    /// The chain this email belongs to, inherited from the task that produced it. Unlike
+    /// `task_id` it is never cleared, so a delivered email stays attached to its trail even after
+    /// the task row is gone.
+    pub correlation_id: CorrelationId,
     /// Stable across every retry of the same logical send — that is what makes it a lock, and what
     /// the delivered Message-ID is derived from.
     pub idempotency_key: String,
@@ -470,6 +479,21 @@ pub trait TaskPersistence: Send + Sync {
         Ok(0)
     }
 
+    /// How much work is stuck right now, by kind.
+    ///
+    /// One query rather than seven: the maintenance sweep runs on a timer against the same pool
+    /// the workers claim from, and seven round trips every thirty seconds to answer one question
+    /// is a poor trade for a sweep that usually finds nothing.
+    ///
+    /// The default reports a quiet system, which is the honest answer for a double that stores no
+    /// queue at all.
+    async fn census_stuck_work(
+        &self,
+        _thresholds: StuckWorkThresholds,
+    ) -> AppResult<StuckWorkCensus> {
+        Ok(StuckWorkCensus::default())
+    }
+
     /// Every delivery this task handed to the transport, oldest first.
     ///
     /// Exists so the task view can show delivery state without the transport writing back into the
@@ -527,14 +551,7 @@ pub trait TaskPersistence: Send + Sync {
         Ok(false)
     }
 
-    async fn enqueue_task(
-        &self,
-        company_id: Uuid,
-        channel_id: Uuid,
-        thread_id: Option<Uuid>,
-        task_type: &str,
-        payload: Value,
-    ) -> AppResult<BackgroundTask>;
+    async fn enqueue_task(&self, new_task: NewTask) -> AppResult<BackgroundTask>;
 
     async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<BackgroundTask>>;
 
@@ -747,13 +764,15 @@ impl TaskPersistence for PostgresPersistence {
             for (position, target) in request.targets.iter().enumerate() {
                 sqlx::query(
                     r#"INSERT INTO email_outbox (
-                            id, company_id, channel_id, task_id, idempotency_key, payload
-                       ) VALUES ($1, $2, $3, $4, $5, $6)"#,
+                            id, company_id, channel_id, task_id, correlation_id,
+                            idempotency_key, payload
+                       ) VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
                 )
                 .bind(target.outbox_id)
                 .bind(request.company_id)
                 .bind(request.channel_id)
                 .bind(request.task_id)
+                .bind(request.correlation_id.as_uuid())
                 .bind(format!("outreach:{}:target:{}", outreach.id, position))
                 .bind(&target.outbox_payload)
                 .execute(&mut *tx)
@@ -1193,8 +1212,9 @@ impl TaskPersistence for PostgresPersistence {
         // caller that dies right after queueing still gets its email delivered.
         let row: Option<(Uuid,)> = sqlx::query_as(
             r#"INSERT INTO email_outbox (
-                    id, company_id, channel_id, task_id, idempotency_key, payload
-               ) VALUES ($1, $2, $3, $4, $5, $6)
+                    id, company_id, channel_id, task_id, correlation_id,
+                    idempotency_key, payload
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7)
                ON CONFLICT (idempotency_key) DO NOTHING
                RETURNING id"#,
         )
@@ -1202,6 +1222,7 @@ impl TaskPersistence for PostgresPersistence {
         .bind(send.company_id)
         .bind(send.channel_id)
         .bind(send.task_id)
+        .bind(send.correlation_id.as_uuid())
         .bind(&send.idempotency_key)
         .bind(&send.payload)
         .fetch_optional(&self.pool)
@@ -1273,6 +1294,83 @@ impl TaskPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
         Ok(result.rows_affected() == 1)
+    }
+
+    async fn census_stuck_work(
+        &self,
+        thresholds: StuckWorkThresholds,
+    ) -> AppResult<StuckWorkCensus> {
+        // Counted in one pass with FILTER rather than seven statements. Each arm is a bounded
+        // index scan: the status arms hit `background_tasks_company_status_created_idx` and
+        // `email_outbox_pending_idx`, and the lease arm hits
+        // `background_tasks_processing_lease_idx`.
+        //
+        // `wait_expires_at` is what the reply arm compares against rather than the parked
+        // threshold: an outreach states its own deadline, and a task waiting inside the window it
+        // asked for is not stuck. The threshold is the fallback for a parked row that named no
+        // deadline at all.
+        let row: (i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
+            r#"WITH tasks AS (
+                   SELECT
+                       count(*) FILTER (WHERE status = 'dead_letter') AS dead_lettered,
+                       count(*) FILTER (
+                           WHERE status = 'pending'
+                             AND run_at < CURRENT_TIMESTAMP - $1::interval
+                       ) AS queue_overdue,
+                       count(*) FILTER (
+                           WHERE status = 'processing'
+                             AND lock_expires_at < CURRENT_TIMESTAMP
+                       ) AS lease_expired,
+                       count(*) FILTER (
+                           WHERE status = 'pending_approval'
+                             AND updated_at < CURRENT_TIMESTAMP - $2::interval
+                       ) AS approval_overdue,
+                       count(*) FILTER (
+                           WHERE status = 'waiting_for_third_party_reply'
+                             AND COALESCE(
+                                     wait_expires_at,
+                                     updated_at + $2::interval
+                                 ) < CURRENT_TIMESTAMP
+                       ) AS reply_overdue
+                   FROM background_tasks
+               ),
+               outbox AS (
+                   SELECT
+                       count(*) FILTER (WHERE status = 'failed') AS outbox_failed,
+                       count(*) FILTER (
+                           WHERE status = 'pending'
+                             AND available_at < CURRENT_TIMESTAMP - $1::interval
+                       ) AS outbox_overdue
+                   FROM email_outbox
+               )
+               SELECT tasks.dead_lettered, tasks.queue_overdue, tasks.lease_expired,
+                      tasks.approval_overdue, tasks.reply_overdue,
+                      outbox.outbox_failed, outbox.outbox_overdue
+               FROM tasks, outbox"#,
+        )
+        .bind(
+            PgInterval::try_from(thresholds.queue_overdue_after()).map_err(|error| {
+                AppError::Internal(format!("Invalid queue-overdue threshold: {error}"))
+            })?,
+        )
+        .bind(
+            PgInterval::try_from(thresholds.parked_overdue_after()).map_err(|error| {
+                AppError::Internal(format!("Invalid parked-overdue threshold: {error}"))
+            })?,
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(StuckWorkCensus {
+            dead_lettered: row.0,
+            queue_overdue: row.1,
+            lease_expired: row.2,
+            approval_overdue: row.3,
+            reply_overdue: row.4,
+            outbox_failed: row.5,
+            outbox_overdue: row.6,
+        })
     }
 
     async fn reap_expired_task_leases(&self) -> AppResult<u64> {
@@ -1392,26 +1490,16 @@ impl TaskPersistence for PostgresPersistence {
         Ok(result.rows_affected() == 1)
     }
 
-    async fn enqueue_task(
-        &self,
-        company_id: Uuid,
-        channel_id: Uuid,
-        thread_id: Option<Uuid>,
-        task_type: &str,
-        payload: Value,
-    ) -> AppResult<BackgroundTask> {
+    async fn enqueue_task(&self, new_task: NewTask) -> AppResult<BackgroundTask> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let task = insert_task(
-            &mut tx, company_id, channel_id, thread_id, task_type, payload,
-        )
-        .await?;
+        let task = insert_task(&mut tx, new_task).await?;
         tx.commit().await.map_err(AppError::from)?;
         Ok(task)
     }
 
     async fn get_task_by_id(&self, id: Uuid) -> AppResult<Option<BackgroundTask>> {
         let db = sqlx::query_as::<_, BackgroundTaskDb>(
-            r#"SELECT id, company_id, channel_id, thread_id, task_type, status, payload,
+            r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
                        retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
                        run_at, created_at, updated_at
                FROM background_tasks WHERE id = $1"#,
@@ -1433,7 +1521,7 @@ impl TaskPersistence for PostgresPersistence {
         message_id: &str,
     ) -> AppResult<Option<BackgroundTask>> {
         let db = sqlx::query_as::<_, BackgroundTaskDb>(
-            r#"SELECT id, company_id, channel_id, thread_id, task_type, status, payload,
+            r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
                       retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
                       run_at, created_at, updated_at
                FROM background_tasks
@@ -1499,8 +1587,9 @@ impl TaskPersistence for PostgresPersistence {
                 // this send. `None` means an equivalent send is already queued.
                 let row: Option<(Uuid,)> = sqlx::query_as(
                     r#"INSERT INTO email_outbox (
-                            id, company_id, channel_id, task_id, idempotency_key, payload
-                       ) VALUES ($1, $2, $3, $4, $5, $6)
+                            id, company_id, channel_id, task_id, correlation_id,
+                            idempotency_key, payload
+                       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
                        ON CONFLICT (idempotency_key) DO NOTHING
                        RETURNING id"#,
                 )
@@ -1508,6 +1597,7 @@ impl TaskPersistence for PostgresPersistence {
                 .bind(send.company_id)
                 .bind(send.channel_id)
                 .bind(send.task_id)
+                .bind(send.correlation_id.as_uuid())
                 .bind(&send.idempotency_key)
                 .bind(&send.payload)
                 .fetch_optional(&mut *tx)
@@ -1622,7 +1712,8 @@ impl TaskPersistence for PostgresPersistence {
                FROM claimable
                WHERE task.id = claimable.id
                RETURNING task.id, task.company_id, task.channel_id, task.thread_id,
-                         task.task_type, task.status, task.payload, task.retry_count,
+                         task.correlation_id, task.task_type, task.status, task.payload,
+                         task.retry_count,
                          task.max_retries, task.last_error, task.worker_id, task.execution_generation, task.locked_at,
                          task.lock_expires_at, task.run_at, task.created_at, task.updated_at"#,
         )
@@ -1720,7 +1811,7 @@ impl TaskPersistence for PostgresPersistence {
                WHERE id = $1
                  AND status IN ('pending', 'processing', 'pending_approval',
                                 'waiting_for_third_party_reply', 'failed')
-               RETURNING id, company_id, channel_id, thread_id, task_type, status, payload,
+               RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
                           retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
                           run_at, created_at, updated_at"#,
         )
@@ -1757,7 +1848,7 @@ impl TaskPersistence for PostgresPersistence {
                WHERE id = $1
                  AND status IN ('stopped', 'pending_approval',
                                 'waiting_for_third_party_reply', 'failed')
-               RETURNING id, company_id, channel_id, thread_id, task_type, status, payload,
+               RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
                           retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
                           run_at, created_at, updated_at"#,
         )
@@ -1790,7 +1881,7 @@ impl TaskPersistence for PostgresPersistence {
         limit: i64,
     ) -> AppResult<Vec<BackgroundTask>> {
         let mut query = QueryBuilder::<Postgres>::new(
-            r#"SELECT id, company_id, channel_id, thread_id, task_type, status, payload,
+            r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
                       retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
                       run_at, created_at, updated_at
                FROM background_tasks WHERE company_id = "#,
@@ -1917,12 +2008,16 @@ fn outreach_progress(
 /// has rather than starting a second run of it.
 async fn insert_task(
     tx: &mut sqlx::Transaction<'_, Postgres>,
-    company_id: Uuid,
-    channel_id: Uuid,
-    thread_id: Option<Uuid>,
-    task_type: &str,
-    payload: Value,
+    new_task: NewTask,
 ) -> AppResult<BackgroundTask> {
+    let NewTask {
+        company_id,
+        channel_id,
+        thread_id,
+        task_type,
+        payload,
+        correlation_id,
+    } = new_task;
     let id = Uuid::new_v4();
     let source_message_id = payload
         .pointer("/inbound_message/message_id")
@@ -1938,12 +2033,14 @@ async fn insert_task(
     let db = sqlx::query_as::<_, BackgroundTaskDb>(
         r#"INSERT INTO background_tasks (
                 id, company_id, channel_id, thread_id, source_message_id,
-                task_type, status, payload
+                correlation_id, task_type, status, payload
            )
-           VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8)
            ON CONFLICT (company_id, source_message_id)
+           -- Deliberately does not touch `correlation_id`: a redelivered message joins the chain
+           -- its first delivery started rather than overwriting it with a fresher one.
            DO UPDATE SET source_message_id = EXCLUDED.source_message_id
-           RETURNING id, company_id, channel_id, thread_id, task_type, status, payload,
+           RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
                       retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
                       run_at, created_at, updated_at"#,
     )
@@ -1952,7 +2049,8 @@ async fn insert_task(
     .bind(channel_id)
     .bind(thread_id)
     .bind(source_message_id)
-    .bind(task_type)
+    .bind(correlation_id.as_uuid())
+    .bind(&task_type)
     .bind(payload)
     .fetch_one(&mut **tx)
     .await
@@ -2124,13 +2222,13 @@ mod tests {
 
         let enqueue = async |thread_id: Uuid| {
             persistence
-                .enqueue_task(
+                .enqueue_task(NewTask::starting_new_chain(
                     company.id,
                     channel.id,
                     Some(thread_id),
                     "email_agent_dispatch",
                     serde_json::json!({}),
-                )
+                ))
                 .await
                 .unwrap()
         };
@@ -2289,13 +2387,13 @@ mod tests {
             .await
             .unwrap();
         let task = persistence
-            .enqueue_task(
+            .enqueue_task(NewTask::starting_new_chain(
                 company.id,
                 channel.id,
                 Some(thread.id),
                 "test",
                 serde_json::json!({}),
-            )
+            ))
             .await
             .unwrap();
 
@@ -2449,13 +2547,13 @@ mod tests {
             .await
             .unwrap();
         let task = persistence
-            .enqueue_task(
+            .enqueue_task(NewTask::starting_new_chain(
                 company.id,
                 channel.id,
                 Some(thread.id),
                 "test",
                 serde_json::json!({}),
-            )
+            ))
             .await
             .unwrap();
 
@@ -2587,13 +2685,13 @@ mod tests {
             .await
             .unwrap();
         let task = persistence
-            .enqueue_task(
+            .enqueue_task(NewTask::starting_new_chain(
                 company.id,
                 channel.id,
                 Some(thread.id),
                 "test",
                 serde_json::json!({}),
-            )
+            ))
             .await
             .unwrap();
 
@@ -2627,6 +2725,7 @@ mod tests {
             created_at: Utc::now(),
         };
         let send = |key: &str| OutboundSend {
+            correlation_id: CorrelationId::new(),
             company_id: company.id,
             channel_id: channel.id,
             task_id: Some(task.id),
@@ -2804,13 +2903,13 @@ mod tests {
             .await
             .unwrap();
         let task = persistence
-            .enqueue_task(
+            .enqueue_task(NewTask::starting_new_chain(
                 company.id,
                 channel.id,
                 Some(thread.id),
                 "test",
                 serde_json::json!({}),
-            )
+            ))
             .await
             .unwrap();
 
@@ -2964,6 +3063,7 @@ mod tests {
 
         let key = format!("task:{suffix}:agent-reply");
         let send = || OutboundSend {
+            correlation_id: CorrelationId::new(),
             company_id: company.id,
             channel_id: channel.id,
             task_id: None,
@@ -3066,6 +3166,7 @@ mod tests {
             .unwrap();
             persistence
                 .enqueue_outbound_send(OutboundSend {
+                    correlation_id: CorrelationId::new(),
                     company_id: company.id,
                     channel_id: channel.id,
                     task_id: None,
@@ -3160,6 +3261,7 @@ mod tests {
 
         let outbox_id = persistence
             .enqueue_outbound_send(OutboundSend {
+                correlation_id: CorrelationId::new(),
                 company_id: company.id,
                 channel_id: channel.id,
                 task_id: None,
@@ -3364,6 +3466,7 @@ mod tests {
 
         let outbox_id = persistence
             .enqueue_outbound_send(OutboundSend {
+                correlation_id: CorrelationId::new(),
                 company_id: company.id,
                 channel_id: channel.id,
                 task_id: None,
@@ -3463,7 +3566,13 @@ mod tests {
         .await
         .unwrap();
         let task = persistence
-            .enqueue_task(company.id, channel.id, None, "test", serde_json::json!({}))
+            .enqueue_task(NewTask::starting_new_chain(
+                company.id,
+                channel.id,
+                None,
+                "test",
+                serde_json::json!({}),
+            ))
             .await
             .unwrap();
 
@@ -3478,6 +3587,7 @@ mod tests {
 
         let outbox_id = persistence
             .enqueue_outbound_send(OutboundSend {
+                correlation_id: CorrelationId::new(),
                 company_id: company.id,
                 channel_id: channel.id,
                 task_id: Some(task.id),
@@ -3585,13 +3695,13 @@ mod tests {
             .await
             .unwrap();
         let task = persistence
-            .enqueue_task(
+            .enqueue_task(NewTask::starting_new_chain(
                 company.id,
                 channel.id,
                 Some(thread.id),
                 "email_agent_dispatch",
                 serde_json::json!({}),
-            )
+            ))
             .await
             .unwrap();
         let worker_id = Uuid::new_v4();
@@ -3609,6 +3719,7 @@ mod tests {
         let outbox_id = Uuid::new_v4();
         let target_email = "vendor@supplier.example";
         let outbox_payload = serde_json::to_value(OutboundEmail {
+            correlation_id: CorrelationId::new(),
             channel_id: channel.id,
             channel_name: channel.name.clone(),
             channel_slug: channel.slug.clone(),
@@ -3625,6 +3736,7 @@ mod tests {
         .unwrap();
         let progress = persistence
             .create_outreach_and_pause(CreateOutreachRequest {
+                correlation_id: CorrelationId::new(),
                 id: outreach_id,
                 task_id: task.id,
                 company_id: company.id,
@@ -3715,5 +3827,264 @@ mod tests {
         CompanyPersistence::delete(&persistence, company.id)
             .await
             .unwrap();
+    }
+
+    /// A company and an enabled channel to hang tasks off, with a unique slug per call so
+    /// database-backed tests do not collide with each other or with a previous run.
+    async fn seed_company_and_channel(
+        persistence: &PostgresPersistence,
+    ) -> (
+        crate::entities::company::Company,
+        crate::entities::channel::Channel,
+    ) {
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("chain_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Chain Test".to_string(),
+                slug: format!("chain-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            persistence,
+            company.id,
+            ChannelWrite {
+                name: "Chain".into(),
+                slug: "chain".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        (company, channel)
+    }
+
+    /// The whole point of the correlation id: one query returns the trail.
+    #[tokio::test]
+    async fn a_chain_is_inherited_by_children_and_readable_in_one_query() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+
+        // The inbound message mints one chain; a second, unrelated message mints another.
+        let chain = CorrelationId::new();
+        let other_chain = CorrelationId::new();
+
+        let parent = persistence
+            .enqueue_task(NewTask {
+                company_id: company.id,
+                channel_id: channel.id,
+                thread_id: None,
+                task_type: "email_agent_dispatch".to_string(),
+                payload: serde_json::json!({}),
+                correlation_id: chain,
+            })
+            .await
+            .unwrap();
+        assert_eq!(parent.correlation_id, chain, "the chain round-trips");
+
+        // A task the run spawns -- an outreach into another channel, say -- inherits it.
+        let child = persistence
+            .enqueue_task(NewTask::caused_by(
+                &parent,
+                channel.id,
+                None,
+                "email_agent_dispatch",
+                serde_json::json!({ "spawned": true }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(child.correlation_id, chain);
+
+        let unrelated = persistence
+            .enqueue_task(NewTask {
+                company_id: company.id,
+                channel_id: channel.id,
+                thread_id: None,
+                task_type: "email_agent_dispatch".to_string(),
+                payload: serde_json::json!({ "unrelated": true }),
+                correlation_id: other_chain,
+            })
+            .await
+            .unwrap();
+
+        // The email the run sends carries the chain too, so the outbound leg is on the trail.
+        persistence
+            .enqueue_outbound_send(OutboundSend {
+                company_id: company.id,
+                channel_id: channel.id,
+                task_id: Some(parent.id),
+                correlation_id: chain,
+                idempotency_key: format!("chain-test:{}", parent.id),
+                payload: serde_json::json!({}),
+            })
+            .await
+            .unwrap();
+
+        let task_ids: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM background_tasks WHERE correlation_id = $1 ORDER BY created_at",
+        )
+        .bind(chain.as_uuid())
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert!(task_ids.contains(&parent.id));
+        assert!(task_ids.contains(&child.id));
+        assert!(
+            !task_ids.contains(&unrelated.id),
+            "a different message must not join this chain"
+        );
+
+        let sent: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM email_outbox WHERE correlation_id = $1")
+                .bind(chain.as_uuid())
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(sent, 1, "the outbound leg is on the same trail");
+    }
+
+    /// A redelivered message must not fork the chain its first delivery started.
+    #[tokio::test]
+    async fn a_redelivered_message_rejoins_its_original_chain() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+
+        let message_id = format!("<redelivery-{}@example.com>", Uuid::new_v4());
+        let payload = serde_json::json!({ "inbound_message": { "message_id": message_id } });
+        let first_chain = CorrelationId::new();
+
+        let first = persistence
+            .enqueue_task(NewTask {
+                company_id: company.id,
+                channel_id: channel.id,
+                thread_id: None,
+                task_type: "email_agent_dispatch".to_string(),
+                payload: payload.clone(),
+                correlation_id: first_chain,
+            })
+            .await
+            .unwrap();
+
+        // The same message arrives again and is given a fresh id by ingress.
+        let second = persistence
+            .enqueue_task(NewTask {
+                company_id: company.id,
+                channel_id: channel.id,
+                thread_id: None,
+                task_type: "email_agent_dispatch".to_string(),
+                payload,
+                correlation_id: CorrelationId::new(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(
+            second.id, first.id,
+            "the duplicate returns the original task"
+        );
+        assert_eq!(
+            second.correlation_id, first_chain,
+            "and keeps the chain it already had"
+        );
+    }
+
+    /// The census must see each kind of stall.
+    ///
+    /// Asserted as "at least ours" rather than as an exact delta: the suite shares one database
+    /// and runs in parallel, so other tests are planting and completing tasks throughout. The
+    /// counting *logic* is pinned by the unit tests on [`StuckWorkCensus`]; what this checks is
+    /// that the SQL classifies a real row into the right bucket at all.
+    #[tokio::test]
+    async fn the_census_sees_each_kind_of_stuck_work() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let thresholds = StuckWorkThresholds::default();
+
+        let dead = persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                company.id,
+                channel.id,
+                None,
+                "census-dead",
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+        sqlx::query("UPDATE background_tasks SET status = 'dead_letter' WHERE id = $1")
+            .bind(dead.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let overdue = persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                company.id,
+                channel.id,
+                None,
+                "census-overdue",
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE background_tasks SET run_at = CURRENT_TIMESTAMP - interval '1 hour' \
+             WHERE id = $1",
+        )
+        .bind(overdue.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let census = persistence.census_stuck_work(thresholds).await.unwrap();
+        assert!(
+            census.dead_lettered >= 1,
+            "the dead-lettered task is counted"
+        );
+        assert!(census.queue_overdue >= 1, "the overdue task is counted");
+        assert!(!census.is_quiet());
+
+        // The discriminating case, which is safe to assert exactly because it is about one row:
+        // a task queued to run now is not overdue, so flipping only `run_at` back must drop it
+        // out of the bucket again.
+        sqlx::query("UPDATE background_tasks SET run_at = CURRENT_TIMESTAMP WHERE id = $1")
+            .bind(overdue.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let still_overdue: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM background_tasks \
+             WHERE id = $1 AND status = 'pending' \
+               AND run_at < CURRENT_TIMESTAMP - $2::interval",
+        )
+        .bind(overdue.id)
+        .bind(PgInterval::try_from(thresholds.queue_overdue_after()).unwrap())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(still_overdue, 0, "a task due now is not stuck");
     }
 }

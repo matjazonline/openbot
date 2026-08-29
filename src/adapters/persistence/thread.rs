@@ -993,7 +993,8 @@ mod tests {
         // Task & outreach setup in DB
         let task_id = Uuid::new_v4();
         sqlx::query(
-            "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, task_type, status, payload) VALUES ($1, $2, $3, $4, 'email_agent_dispatch', 'waiting_for_third_party_reply', '{}')",
+            "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload) \
+             VALUES ($1, $2, $3, $4, gen_random_uuid(), 'email_agent_dispatch', 'waiting_for_third_party_reply', '{}')",
         )
         .bind(task_id)
         .bind(company.id)
@@ -1027,9 +1028,9 @@ mod tests {
         let outbox_id = Uuid::new_v4();
         sqlx::query(
             r#"INSERT INTO email_outbox (
-                    id, company_id, channel_id, task_id, idempotency_key, payload, status,
-                    provider_message_id
-               ) VALUES ($1, $2, $3, $4, $5, '{}', 'sent', $6)"#,
+                    id, company_id, channel_id, task_id, correlation_id, idempotency_key, payload,
+                    status, provider_message_id
+               ) VALUES ($1, $2, $3, $4, gen_random_uuid(), $5, '{}', 'sent', $6)"#,
         )
         .bind(outbox_id)
         .bind(company.id)

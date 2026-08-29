@@ -1,6 +1,7 @@
 pub mod agent_channel_tool;
 pub mod agent_directory_tool;
 pub mod agent_runner;
+pub mod agent_trace_hooks;
 pub mod attachment_store;
 pub mod email_parser;
 pub mod llm_guardrail;
@@ -11,6 +12,7 @@ pub mod memory_provider;
 pub mod memory_worker;
 pub mod outbound_dispatcher;
 pub mod outreach_tool;
+pub mod prompt_fence;
 pub mod runtime_metrics;
 pub mod spam_scanner;
 pub mod task_worker;

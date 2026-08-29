@@ -72,6 +72,16 @@ impl MonitoringService for TracingMonitor {
         );
     }
 
+    fn record_gauge(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
+        info!(
+            target: "monitoring::gauge",
+            metric = %name,
+            value = value,
+            labels = ?labels,
+            "Gauge recorded"
+        );
+    }
+
     fn record_histogram(&self, name: &str, duration_ms: f64, labels: &[(&str, &str)]) {
         info!(
             target: "monitoring::histogram",

@@ -54,6 +54,7 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
             body_text: message.content.clone(),
             hop_count: message.hop_count,
             trace_channels: message.trace_channels.clone(),
+            correlation_id: message.correlation_id,
         };
 
         OutboundDispatcher::send(&self.config, outbound).await?;

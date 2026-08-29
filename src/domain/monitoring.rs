@@ -89,6 +89,14 @@ pub trait MonitoringService: Send + Sync {
     fn record_smtp_connection(&self, metrics: &SmtpConnectionMetrics);
     fn record_task_execution(&self, metrics: &TaskExecutionMetrics);
     fn increment_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]);
+    /// Report the *current* value of something that goes up and down.
+    ///
+    /// Distinct from [`Self::increment_counter`] because a standing condition is not an
+    /// occurrence: four dead-lettered tasks are four dead-lettered tasks however many times the
+    /// sweep looks at them, and adding four to a counter every thirty seconds would describe a
+    /// runaway failure that is not happening. A gauge also *clears*, which is what lets an alert
+    /// on it stop firing once the work is dealt with.
+    fn record_gauge(&self, name: &str, value: f64, labels: &[(&str, &str)]);
     fn record_histogram(&self, name: &str, duration_ms: f64, labels: &[(&str, &str)]);
     fn get_stats_json(&self) -> serde_json::Value;
 }

@@ -3,6 +3,8 @@ use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit, Ou
 use crate::entities::agent::Agent;
 use crate::entities::channel::Channel;
 use crate::entities::company_member::CompanyMembership;
+use crate::entities::correlation::CorrelationId;
+use crate::entities::task::NewTask;
 use crate::entities::task::TaskLeaseRef;
 use crate::services::email_parser::MAX_CHANNEL_HOPS;
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
@@ -530,18 +532,22 @@ impl TaskPersistence for MockTaskPersistence {
 
     async fn enqueue_task(
         &self,
-        company_id: Uuid,
-        channel_id: Uuid,
-        thread_id: Option<Uuid>,
-        task_type: &str,
-        payload: serde_json::Value,
+        NewTask {
+            company_id,
+            channel_id,
+            thread_id,
+            task_type,
+            payload,
+            correlation_id,
+        }: NewTask,
     ) -> AppResult<crate::entities::task::BackgroundTask> {
         let task = crate::entities::task::BackgroundTask {
             id: Uuid::new_v4(),
             company_id,
             channel_id,
             thread_id,
-            task_type: task_type.to_string(),
+            correlation_id,
+            task_type,
             status: crate::entities::task::TaskStatus::Pending,
             payload,
             retry_count: 0,
@@ -909,6 +915,7 @@ async fn test_inter_channel_hop_limit_rejection() {
     let prepared = thread_use_cases
         .prepare_internal_channel_delivery(
             OutboundEmail {
+                correlation_id: CorrelationId::new(),
                 channel_id: source_channel_id,
                 channel_name: "Source Flow".to_string(),
                 channel_slug: "source".into(),
@@ -2651,13 +2658,13 @@ async fn test_sender_verification_and_delegation_target_check() {
         }
     });
     let task = task_persistence
-        .enqueue_task(
+        .enqueue_task(NewTask::starting_new_chain(
             company_id,
             channel_id,
             Some(thread_id),
             "email_agent_dispatch",
             delegation_payload,
-        )
+        ))
         .await
         .unwrap();
 
@@ -2837,6 +2844,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
     let call = use_cases
         .prepare_internal_channel_delivery(
             OutboundEmail {
+                correlation_id: CorrelationId::new(),
                 channel_id: channel_a_id,
                 channel_name: "Agent A".to_string(),
                 channel_slug: "agent-a".into(),
@@ -2906,6 +2914,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
     let prepared = use_cases
         .prepare_internal_channel_delivery(
             OutboundEmail {
+                correlation_id: CorrelationId::new(),
                 channel_id: channel_b_id,
                 channel_name: "Agent B".to_string(),
                 channel_slug: "agent-b".into(),
@@ -3042,6 +3051,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
     let unsolicited_prepared = use_cases
         .prepare_internal_channel_delivery(
             OutboundEmail {
+                correlation_id: CorrelationId::new(),
                 channel_id: channel_b_id,
                 channel_name: "Agent B".to_string(),
                 channel_slug: "agent-b".into(),
@@ -3167,6 +3177,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
     let max_hop_prepared = use_cases
         .prepare_internal_channel_delivery(
             OutboundEmail {
+                correlation_id: CorrelationId::new(),
                 channel_id: channel_a_id,
                 channel_name: "Agent A".to_string(),
                 channel_slug: "agent-a".into(),
@@ -4670,6 +4681,7 @@ async fn an_agent_cannot_use_help_to_enumerate_its_company() {
         channel_id: Uuid::new_v4(),
     };
     let norm = NormalizedInboundMessage {
+        correlation_id: CorrelationId::new(),
         message_id: MessageId::from("<internal-help@acme.com>"),
         thread_ref: None,
         references: Vec::new(),
@@ -4808,6 +4820,7 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
                 worker_id: Uuid::new_v4(),
                 execution_generation: Uuid::new_v4(),
             },
+            CorrelationId::new(),
         )
         .await;
 

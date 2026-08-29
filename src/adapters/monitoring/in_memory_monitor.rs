@@ -6,6 +6,20 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// A gauge's identity is its name *and* its labels. Folding the labels into the key keeps
+/// `stuck_work{kind="dead_lettered"}` from overwriting `stuck_work{kind="outbox_failed"}`.
+fn gauge_key(name: &str, labels: &[(&str, &str)]) -> String {
+    if labels.is_empty() {
+        return name.to_string();
+    }
+    let rendered = labels
+        .iter()
+        .map(|(key, value)| format!("{key}={value}"))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("{name}{{{rendered}}}")
+}
+
 pub struct InMemoryMonitor {
     // AI Metrics
     ai_total_executions: AtomicU64,
@@ -38,6 +52,9 @@ pub struct InMemoryMonitor {
 
     // Custom Counters
     custom_counters: RwLock<HashMap<String, u64>>,
+    /// Latest value per labelled gauge. Overwritten rather than accumulated -- see
+    /// [`MonitoringService::record_gauge`].
+    gauges: RwLock<HashMap<String, f64>>,
 }
 
 impl InMemoryMonitor {
@@ -70,6 +87,7 @@ impl InMemoryMonitor {
             task_total_duration_ms: AtomicU64::new(0),
 
             custom_counters: RwLock::new(HashMap::new()),
+            gauges: RwLock::new(HashMap::new()),
         }
     }
 }
@@ -137,6 +155,12 @@ impl MonitoringService for InMemoryMonitor {
         }
     }
 
+    fn record_gauge(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
+        if let Ok(mut lock) = self.gauges.write() {
+            lock.insert(gauge_key(name, labels), value);
+        }
+    }
+
     fn record_histogram(&self, name: &str, duration_ms: f64, _labels: &[(&str, &str)]) {
         self.increment_counter(&format!("{}_ms", name), duration_ms as u64, &[]);
     }
@@ -163,6 +187,13 @@ impl MonitoringService for InMemoryMonitor {
             .read()
             .ok()
             .map(|c| c.clone())
+            .unwrap_or_default();
+
+        let gauges: HashMap<String, f64> = self
+            .gauges
+            .read()
+            .ok()
+            .map(|gauges| gauges.clone())
             .unwrap_or_default();
 
         serde_json::json!({
@@ -195,7 +226,8 @@ impl MonitoringService for InMemoryMonitor {
                 "retried": self.task_retried.load(Ordering::Relaxed),
                 "avg_latency_ms": task_avg_latency_ms
             },
-            "custom_counters": custom
+            "custom_counters": custom,
+            "gauges": gauges
         })
     }
 }

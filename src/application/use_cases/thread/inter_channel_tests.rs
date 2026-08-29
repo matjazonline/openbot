@@ -192,6 +192,7 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
 
 fn inbound(from: &str, to: &str, message_id: &str, subject: &str) -> NormalizedInboundMessage {
     NormalizedInboundMessage {
+        correlation_id: CorrelationId::new(),
         message_id: message_id.into(),
         thread_ref: None,
         references: Vec::new(),
@@ -308,6 +309,7 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
 
     let outbox_to_b = Uuid::new_v4();
     let request_to_b = OutboundEmail {
+        correlation_id: CorrelationId::new(),
         channel_id: fx.channel_a.id,
         channel_name: fx.channel_a.name.clone(),
         channel_slug: fx.channel_a.slug.clone(),
@@ -324,6 +326,7 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
     let progress = TaskPersistence::create_outreach_and_pause(
         fx.persistence.as_ref(),
         CreateOutreachRequest {
+            correlation_id: CorrelationId::new(),
             id: Uuid::new_v4(),
             task_id: task_a,
             company_id: fx.company.id,
@@ -386,6 +389,7 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
     // M4: B answers A, quoting M1 so the reply correlates to A's outstanding outreach.
     let outbox_to_a = Uuid::new_v4();
     let answer_to_a = OutboundEmail {
+        correlation_id: CorrelationId::new(),
         channel_id: fx.channel_b.id,
         channel_name: fx.channel_b.name.clone(),
         channel_slug: fx.channel_b.slug.clone(),

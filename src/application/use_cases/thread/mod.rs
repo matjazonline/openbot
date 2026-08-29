@@ -23,6 +23,7 @@ use crate::{
     entities::{
         channel::{Channel, ChannelType, ParticipantIdentity},
         company::Company,
+        correlation::CorrelationId,
         cursor::{MessageCursor, ThreadCursor},
         message::{Message, MessageDirection, MessageRole},
         message_contract::NormalizedInboundMessage,
@@ -442,6 +443,10 @@ impl ThreadUseCases {
             channel_id_header: Some(source_channel_id),
             hop_count: sent.hop_count,
             trace_channels: sent.trace_channels.clone(),
+            // Internal delivery never touches the wire, so the header the SMTP path would have
+            // carried is passed straight across instead. Agent A's run and agent B's run are one
+            // chain, which is the case the correlation id exists for.
+            correlation_id: sent.correlation_id,
             protocol: ChannelType::Email,
             spf_status: Default::default(),
             dkim_status: Default::default(),
@@ -1049,6 +1054,17 @@ pub struct InboundIngestResult {
 }
 
 impl InboundIngestResult {
+    /// The chain this ingest belongs to.
+    ///
+    /// `None` only for a rejection, which never got as far as a normalized message and so has no
+    /// chain to be on. Anything that dispatches an agent has one, and must carry it rather than
+    /// mint a replacement.
+    pub fn correlation_id(&self) -> Option<CorrelationId> {
+        self.normalized_message
+            .as_ref()
+            .map(|norm| norm.correlation_id)
+    }
+
     pub fn rejected(reason: &str) -> Self {
         Self {
             accepted: false,

@@ -1,15 +1,17 @@
-use crate::entities::task::TaskSuspension;
 use chrono::Utc;
 use std::sync::Arc;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::{approval::ApprovalPersistence, task::TaskPersistence},
+    adapters::persistence::{
+        approval::{ApprovalPersistence, NewApproval},
+        task::TaskPersistence,
+    },
     app_error::{AppError, AppResult},
     entities::{
-        approval::{ApprovalStatus, HumanApproval},
+        approval::{ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval},
         message::{Message, MessageDirection, MessageRole},
-        value_objects::{ChannelSlug, CompanySlug, EmailAddress},
     },
     infra::config::AppConfig,
     services::outbound_dispatcher::OutboundEmail,
@@ -55,61 +57,50 @@ impl ApprovalUseCases {
 
     pub async fn create_and_send_approval_request(
         &self,
-        company_id: Uuid,
-        channel_id: Uuid,
-        channel_name: &str,
-        channel_slug: &ChannelSlug,
-        company_slug: &CompanySlug,
-        thread_id: Option<Uuid>,
-        suspension: Option<TaskSuspension>,
-        step_key: &str,
-        approver_email: &EmailAddress,
-        action_type: &str,
-        action_title: &str,
-        action_summary: &str,
-        payload: serde_json::Value,
+        subject: &ApprovalSubject,
+        action: ApprovalAction,
     ) -> AppResult<HumanApproval> {
-        let token = Uuid::new_v4().to_string();
+        let token = Uuid::new_v4();
         let expires_at = Utc::now() + chrono::Duration::hours(24);
         let domain = &self.config.app_domain_name;
-        let confirm_url = format!("http://{}/approvals/{}?action=confirm", domain, token);
-        let reject_url = format!("http://{}/approvals/{}?action=reject", domain, token);
-        let body_text = if action_type == "quorum_timeout" {
-            let proceed_url = format!(
-                "http://{}/approvals/{}?action=proceed_partial",
-                domain, token
-            );
-            let extend_24_url = format!("http://{}/approvals/{}?action=extend_24h", domain, token);
-            let extend_48_url = format!("http://{}/approvals/{}?action=extend_48h", domain, token);
+        let link = |decision: &str| format!("http://{domain}/approvals/{token}?action={decision}");
+
+        let body_text = if action.is_quorum_timeout() {
             format!(
                 "Outreach Timeout Decision for Channel '{}'\n\nAction: {}\nSummary: {}\n\nProceed with available responses:\n{}\n\nExtend 24 hours:\n{}\n\nExtend 48 hours:\n{}\n\nReject and stop the task:\n{}\n\nThis link is valid for 24 hours.",
-                channel_name,
-                action_title,
-                action_summary,
-                proceed_url,
-                extend_24_url,
-                extend_48_url,
-                reject_url
+                subject.channel_name,
+                action.title,
+                action.summary,
+                link("proceed_partial"),
+                link("extend_24h"),
+                link("extend_48h"),
+                link("reject"),
             )
         } else {
             format!(
                 "Action Approval Requested for Channel '{}'\n\nAction: {}\nSummary: {}\n\nClick to CONFIRM:\n{}\n\nClick to REJECT:\n{}\n\nThis link is valid for 24 hours.",
-                channel_name, action_title, action_summary, confirm_url, reject_url
+                subject.channel_name,
+                action.title,
+                action.summary,
+                link("confirm"),
+                link("reject"),
             )
         };
+
         let notification = serde_json::to_value(OutboundEmail {
-            channel_id,
-            channel_name: channel_name.to_string(),
-            channel_slug: channel_slug.clone(),
-            company_slug: company_slug.clone(),
-            trigger_message_id: format!("<approval-{}@{}>", token, domain).into(),
+            channel_id: subject.channel_id,
+            channel_name: subject.channel_name.clone(),
+            channel_slug: subject.channel_slug.clone(),
+            company_slug: subject.company_slug.clone(),
+            trigger_message_id: format!("<approval-{token}@{domain}>").into(),
             thread_references: vec![],
-            recipient_to: approver_email.clone(),
+            recipient_to: subject.approver_email.clone(),
             recipients_cc: vec![],
-            subject: format!("[APPROVAL REQUIRED] {}", action_title),
+            subject: format!("[APPROVAL REQUIRED] {}", action.title),
             body_text,
             hop_count: 0,
-            trace_channels: vec![channel_id],
+            trace_channels: vec![subject.channel_id],
+            correlation_id: subject.correlation_id,
         })
         .map_err(|error| {
             AppError::Internal(format!(
@@ -119,34 +110,35 @@ impl ApprovalUseCases {
 
         let (approval, created) = self
             .approval_persistence
-            .create_approval(
-                company_id,
-                channel_id,
-                thread_id,
-                suspension,
-                step_key,
-                approver_email,
-                action_type,
-                action_title,
-                action_summary,
-                payload,
+            .create_approval(NewApproval {
+                subject,
+                action: &action,
                 notification,
-                &token,
+                token,
                 expires_at,
-            )
+            })
             .await?;
 
-        if !created {
-            return Ok(approval);
+        if created {
+            info!(
+                approval_id = %approval.id,
+                correlation_id = %subject.correlation_id,
+                channel_id = %subject.channel_id,
+                action_type = %action.action_type,
+                "Queued an approval request for a human"
+            );
+        } else {
+            info!(
+                approval_id = %approval.id,
+                correlation_id = %subject.correlation_id,
+                step_key = %action.step_key,
+                "Reused the approval already standing for this step"
+            );
         }
 
         Ok(approval)
     }
 
-    /// Apply the decision behind a one-click approval link.
-    ///
-    /// Every exit either reports what the link did or explains why it no longer applies; a link
-    /// that arrives twice is answered, not failed.
     pub async fn process_link_action(
         &self,
         token: &str,
@@ -407,7 +399,10 @@ fn already_processed_message(approval: &HumanApproval) -> String {
 mod tests {
     use super::*;
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
+    use crate::entities::correlation::CorrelationId;
+    use crate::entities::task::NewTask;
     use crate::entities::task::{TaskLeaseRef, TaskSuspension};
+    use crate::entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress};
     use crate::entities::{
         cursor::{MessageCursor, ThreadCursor},
         thread::Thread,
@@ -456,40 +451,35 @@ mod tests {
     impl ApprovalPersistence for MockApprovalPersistence {
         async fn create_approval(
             &self,
-            company_id: Uuid,
-            channel_id: Uuid,
-            thread_id: Option<Uuid>,
-            suspension: Option<TaskSuspension>,
-            step_key: &str,
-            approver_email: &str,
-            action_type: &str,
-            action_title: &str,
-            action_summary: &str,
-            payload: serde_json::Value,
-            _notification: serde_json::Value,
-            token: &str,
-            expires_at: chrono::DateTime<chrono::Utc>,
+            new_approval: NewApproval<'_>,
         ) -> AppResult<(HumanApproval, bool)> {
+            let NewApproval {
+                subject,
+                action,
+                token,
+                expires_at,
+                ..
+            } = new_approval;
             let mut approvals = self.approvals.lock().unwrap();
             if let Some(existing) = approvals
                 .iter()
-                .find(|a| a.thread_id == thread_id && a.step_key == step_key)
+                .find(|a| a.thread_id == subject.thread_id && a.step_key == action.step_key)
             {
                 return Ok((existing.clone(), false));
             }
 
             let approval = HumanApproval {
                 id: Uuid::new_v4(),
-                company_id,
-                channel_id: channel_id,
-                thread_id,
-                task_id: suspension.map(TaskSuspension::task_id),
-                step_key: step_key.to_string(),
-                approver_email: approver_email.to_string(),
-                action_type: action_type.to_string(),
-                action_title: action_title.to_string(),
-                action_summary: action_summary.to_string(),
-                payload,
+                company_id: subject.company_id,
+                channel_id: subject.channel_id,
+                thread_id: subject.thread_id,
+                task_id: subject.suspension.map(TaskSuspension::task_id),
+                step_key: action.step_key.clone(),
+                approver_email: subject.approver_email.to_string(),
+                action_type: action.action_type.clone(),
+                action_title: action.title.clone(),
+                action_summary: action.summary.clone(),
+                payload: action.payload.clone(),
                 token: token.to_string(),
                 status: ApprovalStatus::Pending,
                 expires_at,
@@ -601,11 +591,7 @@ mod tests {
 
         async fn enqueue_task(
             &self,
-            _company_id: Uuid,
-            _channel_id: Uuid,
-            _thread_id: Option<Uuid>,
-            _task_type: &str,
-            _payload: serde_json::Value,
+            _new_task: NewTask,
         ) -> AppResult<crate::entities::task::BackgroundTask> {
             unimplemented!()
         }
@@ -804,23 +790,31 @@ mod tests {
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
+        // One subject, reused across every request this test raises -- which is the point of
+        // splitting it out: only the action differs between them.
+        let subject = ApprovalSubject {
+            company_id,
+            channel_id,
+            channel_name: "Support Channel".to_string(),
+            channel_slug: ChannelSlug::from("support"),
+            company_slug: CompanySlug::from("acme"),
+            thread_id: Some(thread_id),
+            suspension: None,
+            correlation_id: CorrelationId::new(),
+            approver_email: EmailAddress::from("manager@acme.com"),
+        };
 
         // 1. Create approval request
         let approval = use_cases
             .create_and_send_approval_request(
-                company_id,
-                channel_id,
-                "Support Channel",
-                &ChannelSlug::from("support"),
-                &CompanySlug::from("acme"),
-                Some(thread_id),
-                None,
-                "step_key_hash_123",
-                &EmailAddress::from("manager@acme.com"),
-                "tool",
-                "Tool Execution: command",
-                "Execute deploy command",
-                serde_json::json!({}),
+                &subject,
+                ApprovalAction {
+                    step_key: "step_key_hash_123".to_string(),
+                    action_type: "tool".to_string(),
+                    title: "Tool Execution: command".to_string(),
+                    summary: "Execute deploy command".to_string(),
+                    payload: serde_json::json!({}),
+                },
             )
             .await
             .unwrap();
@@ -829,19 +823,14 @@ mod tests {
 
         let duplicate = use_cases
             .create_and_send_approval_request(
-                company_id,
-                channel_id,
-                "Support Channel",
-                &ChannelSlug::from("support"),
-                &CompanySlug::from("acme"),
-                Some(thread_id),
-                None,
-                "step_key_hash_123",
-                &EmailAddress::from("manager@acme.com"),
-                "tool",
-                "Tool Execution: command",
-                "Execute deploy command",
-                serde_json::json!({}),
+                &subject,
+                ApprovalAction {
+                    step_key: "step_key_hash_123".to_string(),
+                    action_type: "tool".to_string(),
+                    title: "Tool Execution: command".to_string(),
+                    summary: "Execute deploy command".to_string(),
+                    payload: serde_json::json!({}),
+                },
             )
             .await
             .unwrap();
@@ -899,9 +888,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_simulated_server_restart_with_agent_approval_handler() {
-        use crate::services::agent_runner::{
-            AgentApprovalHandler, ApprovalContext as AgentApprovalContext,
-        };
+        use crate::services::agent_runner::AgentApprovalHandler;
         use ai_agents::hitl::{ApprovalHandler, ApprovalRequest, ApprovalTrigger};
 
         // Shared persistent database mock across server instances
@@ -924,7 +911,8 @@ mod tests {
             config.clone(),
         ));
 
-        let ctx1 = AgentApprovalContext {
+        let ctx1 = ApprovalSubject {
+            correlation_id: CorrelationId::new(),
             company_id,
             channel_id,
             channel_name: "Deploy Agent".into(),
@@ -982,7 +970,8 @@ mod tests {
         assert!(result_msg.contains("CONFIRMED successfully"));
 
         // 2. Server 2 re-runs Agent task after restart
-        let ctx2 = AgentApprovalContext {
+        let ctx2 = ApprovalSubject {
+            correlation_id: CorrelationId::new(),
             company_id,
             channel_id,
             channel_name: "Deploy Agent".into(),
@@ -1034,23 +1023,30 @@ mod tests {
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
+        // One subject, two requests: only the step key and the decision differ.
+        let subject = ApprovalSubject {
+            company_id,
+            channel_id,
+            channel_name: "Support".to_string(),
+            channel_slug: ChannelSlug::from("support"),
+            company_slug: CompanySlug::from("acme"),
+            thread_id: Some(thread_id),
+            suspension: None,
+            correlation_id: CorrelationId::new(),
+            approver_email: EmailAddress::from("manager@acme.com"),
+        };
 
         // Create approval request for partial quorum timeout
         let approval = use_cases
             .create_and_send_approval_request(
-                company_id,
-                channel_id,
-                "Support",
-                &ChannelSlug::from("support"),
-                &CompanySlug::from("acme"),
-                Some(thread_id),
-                None,
-                "step_quorum_timeout_123",
-                &EmailAddress::from("manager@acme.com"),
-                "quorum_timeout",
-                "Partial Quorum Timeout: Action Required",
-                "Received 1/4 responses (25.0%). Required: 50.0%.",
-                serde_json::json!({ "threshold_percent": 50.0 }),
+                &subject,
+                ApprovalAction {
+                    step_key: "step_quorum_timeout_123".to_string(),
+                    action_type: "quorum_timeout".to_string(),
+                    title: "Partial Quorum Timeout: Action Required".to_string(),
+                    summary: "Received 1/4 responses (25.0%). Required: 50.0%.".to_string(),
+                    payload: serde_json::json!({ "threshold_percent": 50.0 }),
+                },
             )
             .await
             .unwrap();
@@ -1066,19 +1062,14 @@ mod tests {
         // 2. Create another approval and test "extend_24h" action
         let approval2 = use_cases
             .create_and_send_approval_request(
-                company_id,
-                channel_id,
-                "Support",
-                &ChannelSlug::from("support"),
-                &CompanySlug::from("acme"),
-                Some(thread_id),
-                None,
-                "step_quorum_timeout_456",
-                &EmailAddress::from("manager@acme.com"),
-                "quorum_timeout",
-                "Partial Quorum Timeout: Action Required",
-                "Received 1/4 responses (25.0%). Required: 50.0%.",
-                serde_json::json!({ "threshold_percent": 50.0 }),
+                &subject,
+                ApprovalAction {
+                    step_key: "step_quorum_timeout_456".to_string(),
+                    action_type: "quorum_timeout".to_string(),
+                    title: "Partial Quorum Timeout: Action Required".to_string(),
+                    summary: "Received 1/4 responses (25.0%). Required: 50.0%.".to_string(),
+                    payload: serde_json::json!({ "threshold_percent": 50.0 }),
+                },
             )
             .await
             .unwrap();

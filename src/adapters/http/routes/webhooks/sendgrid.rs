@@ -289,8 +289,11 @@ fn verify_sendgrid_signature_at(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::approval::NewApproval;
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::company_member::CompanyMembership;
+    use crate::entities::correlation::CorrelationId;
+    use crate::entities::task::NewTask;
     use crate::entities::task::{TaskLeaseRef, TaskSuspension};
     use async_trait::async_trait;
     use axum::body::Body;
@@ -687,18 +690,22 @@ mod tests {
         }
         async fn enqueue_task(
             &self,
-            company_id: Uuid,
-            channel_id: Uuid,
-            thread_id: Option<Uuid>,
-            task_type: &str,
-            payload: serde_json::Value,
+            NewTask {
+                company_id,
+                channel_id,
+                thread_id,
+                task_type,
+                payload,
+                correlation_id,
+            }: NewTask,
         ) -> AppResult<crate::entities::task::BackgroundTask> {
             let task = crate::entities::task::BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
                 channel_id,
                 thread_id,
-                task_type: task_type.to_string(),
+                correlation_id,
+                task_type,
                 status: crate::entities::task::TaskStatus::Pending,
                 payload,
                 retry_count: 0,
@@ -999,19 +1006,7 @@ mod tests {
     impl crate::adapters::persistence::approval::ApprovalPersistence for MockApprovalPersistence {
         async fn create_approval(
             &self,
-            _company_id: Uuid,
-            _channel_id: Uuid,
-            _thread_id: Option<Uuid>,
-            _suspension: Option<TaskSuspension>,
-            _step_key: &str,
-            _approver_email: &str,
-            _action_type: &str,
-            _action_title: &str,
-            _action_summary: &str,
-            _payload: serde_json::Value,
-            _notification: serde_json::Value,
-            _token: &str,
-            _expires_at: chrono::DateTime<chrono::Utc>,
+            _new_approval: NewApproval<'_>,
         ) -> AppResult<(crate::entities::approval::HumanApproval, bool)> {
             unimplemented!()
         }

@@ -186,7 +186,8 @@ mod tests {
         .unwrap();
         let task_id = Uuid::new_v4();
         sqlx::query(
-            "INSERT INTO background_tasks (id, company_id, channel_id, task_type, payload) VALUES ($1, $2, $3, 'agent_run', '{}')",
+            "INSERT INTO background_tasks (id, company_id, channel_id, correlation_id, task_type, payload) \
+             VALUES ($1, $2, $3, gen_random_uuid(), 'agent_run', '{}')",
         ).bind(task_id).bind(company.id).bind(source.id).execute(persistence.pool()).await.unwrap();
         let provenance =
             CreationProvenance::agent(parent.id, parent.name.clone(), source.id, task_id);

@@ -7,10 +7,12 @@ use crate::{
     adapters::persistence::{schedule::SchedulePersistence, task::TaskPersistence},
     app_error::{AppError, AppResult},
     entities::{
+        correlation::CorrelationId,
         message::{Message, MessageDirection, MessageRole},
         schedule::{
             ChannelSchedule, ScheduleDeliveryMode, ScheduleType, ScheduleWrite, ScheduledRunPayload,
         },
+        task::NewTask,
         value_objects::{EmailAddress, MessageId},
     },
     infra::config::AppConfig,
@@ -443,13 +445,16 @@ impl ScheduleUseCases {
 
         let task = self
             .task_persistence
-            .enqueue_task(
-                company.id,
-                channel.id,
-                Some(thread.id),
-                SCHEDULED_AGENT_RUN_TASK,
-                task_payload,
-            )
+            .enqueue_task(NewTask {
+                company_id: company.id,
+                channel_id: channel.id,
+                thread_id: Some(thread.id),
+                task_type: SCHEDULED_AGENT_RUN_TASK.to_string(),
+                payload: task_payload,
+                // A schedule firing is an ingress of its own: nothing outside caused this run, so
+                // this is one of the few places a chain legitimately begins.
+                correlation_id: CorrelationId::new(),
+            })
             .await?;
 
         info!(
@@ -1049,18 +1054,22 @@ mod tests {
 
         async fn enqueue_task(
             &self,
-            company_id: Uuid,
-            channel_id: Uuid,
-            thread_id: Option<Uuid>,
-            task_type: &str,
-            payload: serde_json::Value,
+            NewTask {
+                company_id,
+                channel_id,
+                thread_id,
+                task_type,
+                payload,
+                correlation_id,
+            }: NewTask,
         ) -> AppResult<BackgroundTask> {
             let task = BackgroundTask {
                 id: Uuid::new_v4(),
                 company_id,
                 channel_id,
                 thread_id,
-                task_type: task_type.to_string(),
+                correlation_id,
+                task_type,
                 status: TaskStatus::Pending,
                 payload,
                 retry_count: 0,

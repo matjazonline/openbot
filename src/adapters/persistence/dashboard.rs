@@ -589,6 +589,7 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::test_pool;
+    use crate::entities::task::NewTask;
     use crate::entities::task::{
         TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus, TokenUsage,
     };
@@ -645,13 +646,13 @@ mod tests {
         .await
         .expect("the fixture channel is created");
         let task = persistence
-            .enqueue_task(
+            .enqueue_task(NewTask::starting_new_chain(
                 company.id,
                 channel.id,
                 None,
                 "dashboard-probe",
                 serde_json::json!({}),
-            )
+            ))
             .await
             .expect("the fixture task is queued");
 

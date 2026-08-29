@@ -721,6 +721,7 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool};
+    use crate::entities::task::NewTask;
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
         company::{CompanyPersistence, CompanyWrite},
@@ -1068,21 +1069,25 @@ mod tests {
         });
         let first_task = TaskPersistence::enqueue_task(
             &persistence,
-            company.id,
-            channel.id,
-            Some(first_thread.id),
-            "scheduled_agent_run",
-            payload.clone(),
+            NewTask::starting_new_chain(
+                company.id,
+                channel.id,
+                Some(first_thread.id),
+                "scheduled_agent_run",
+                payload.clone(),
+            ),
         )
         .await
         .unwrap();
         let resumed_task = TaskPersistence::enqueue_task(
             &persistence,
-            company.id,
-            channel.id,
-            Some(first_thread.id),
-            "scheduled_agent_run",
-            payload,
+            NewTask::starting_new_chain(
+                company.id,
+                channel.id,
+                Some(first_thread.id),
+                "scheduled_agent_run",
+                payload,
+            ),
         )
         .await
         .unwrap();
@@ -1107,11 +1112,13 @@ mod tests {
                 .unwrap();
         TaskPersistence::enqueue_task(
             &persistence,
-            company.id,
-            channel.id,
-            Some(manual_thread.id),
-            "scheduled_agent_run",
-            serde_json::json!({ "schedule_id": one_off.id }),
+            NewTask::starting_new_chain(
+                company.id,
+                channel.id,
+                Some(manual_thread.id),
+                "scheduled_agent_run",
+                serde_json::json!({ "schedule_id": one_off.id }),
+            ),
         )
         .await
         .unwrap();

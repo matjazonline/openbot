@@ -1,4 +1,5 @@
 use super::*;
+use crate::entities::correlation::CorrelationId;
 use crate::use_cases::user::LoginMethods;
 use chrono::Utc;
 use serde_json::json;
@@ -44,6 +45,7 @@ fn test_find_task_for_message_multi_task_matching() {
     let task2_id = Uuid::new_v4();
 
     let task1 = BackgroundTask {
+        correlation_id: CorrelationId::new(),
         id: task1_id,
         company_id,
         channel_id,
@@ -72,6 +74,7 @@ fn test_find_task_for_message_multi_task_matching() {
     };
 
     let task2 = BackgroundTask {
+        correlation_id: CorrelationId::new(),
         id: task2_id,
         company_id,
         channel_id,
@@ -2454,6 +2457,7 @@ fn compose_pane_shows_the_channel_address_and_errors() {
 
 fn monitored_task(company_id: Uuid, channel_id: Uuid, status: TaskStatus) -> BackgroundTask {
     BackgroundTask {
+        correlation_id: CorrelationId::new(),
         id: Uuid::new_v4(),
         company_id,
         channel_id,
