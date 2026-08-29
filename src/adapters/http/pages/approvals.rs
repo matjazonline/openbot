@@ -66,12 +66,12 @@ pub fn approval_result_page(title: &str, approval: &HumanApproval, message: &str
         </div>
         "##,
         status_badge = status_badge,
-        title = title,
-        message = message,
-        action_title = approval.action_title,
-        approver_email = approval.approver_email,
-        action_type = approval.action_type,
-        action_summary = approval.action_summary,
+        title = escape_html_text(title),
+        message = escape_html_text(message),
+        action_title = escape_html_text(&approval.action_title),
+        approver_email = escape_html_text(&approval.approver_email),
+        action_type = escape_html_text(&approval.action_type),
+        action_summary = escape_html_text(&approval.action_summary),
     );
 
     base_layout(title, &content)
@@ -110,13 +110,13 @@ pub fn approval_details_page(approval: &HumanApproval) -> String {
         pending_glyph = icon(Icon::Hourglass, BUTTON_ICON),
         confirm_glyph = icon(Icon::Check, BUTTON_ICON),
         reject_glyph = icon(Icon::X, BUTTON_ICON),
-        action_title = approval.action_title,
-        action_summary = approval.action_summary,
-        approver_email = approval.approver_email,
-        action_type = approval.action_type,
+        action_title = escape_html_text(&approval.action_title),
+        action_summary = escape_html_text(&approval.action_summary),
+        approver_email = escape_html_text(&approval.approver_email),
+        action_type = escape_html_text(&approval.action_type),
         expires_at = super::format_date_time(approval.expires_at),
-        confirm_link = confirm_link,
-        reject_link = reject_link,
+        confirm_link = escape_html_attr(&confirm_link),
+        reject_link = escape_html_attr(&reject_link),
     );
 
     base_layout("Confirm Action", &content)
@@ -145,10 +145,10 @@ pub fn channel_approvals_fragment(approvals: &[HumanApproval]) -> String {
                     <span class="text-slate-500 font-mono text-[10px]">{created_at}</span>
                 </div>
                 "##,
-                action_title = a.action_title,
+                action_title = escape_html_text(&a.action_title),
                 badge = badge,
-                action_summary = a.action_summary,
-                approver = a.approver_email,
+                action_summary = escape_html_text(&a.action_summary),
+                approver = escape_html_text(&a.approver_email),
                 created_at = super::format_date_time(a.created_at),
             )
         })

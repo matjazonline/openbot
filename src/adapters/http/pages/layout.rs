@@ -22,6 +22,7 @@ pub fn base_layout(title: &str, content: &str) -> String {
 }
 
 pub(crate) fn public_layout(title: &str, content: &str) -> String {
+    let title = escape_html_text(title);
     let app_css = crate::adapters::http::routes::assets::app_css_url();
     format!(
         r##"<!DOCTYPE html>
@@ -476,6 +477,7 @@ pub(crate) const LEGACY_FORMS_SCRIPT: &str = r##"        function slugifyValue(v
         }"##;
 
 pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String {
+    let title = escape_html_text(title);
     let home_href = if authenticated {
         "/companies"
     } else {
@@ -626,4 +628,13 @@ pub(crate) fn escape_html_text(value: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
+}
+
+/// Escape an untrusted value for a quoted HTML attribute.
+///
+/// The character set is currently the same as text escaping, but the separate name makes the
+/// output context explicit at call sites and prevents a future text-only relaxation from opening
+/// attributes, `data-*` values, or htmx confirmation prompts.
+pub(crate) fn escape_html_attr(value: &str) -> String {
+    escape_html_text(value)
 }

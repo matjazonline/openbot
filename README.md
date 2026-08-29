@@ -61,7 +61,7 @@ Email clients append the entire historical thread below newly typed text. Feedin
 - **Durable Task Store (`background_tasks`):** Ingests inbound emails synchronously and enqueues background processing tasks, allowing the webhook to return `HTTP 200 OK` in < 100ms.
 - **Task Worker Poller (`TaskWorker`):** Independent loops keep long agent runs from holding up mail delivery. The task loop continuously fills up to `TASK_WORKER_CONCURRENCY` execution slots (default 4), polling an empty queue every 500ms and refilling a slot immediately when a task finishes. The outbox loop claims and sends up to 10 emails every 500ms; a maintenance loop reaps expired delivery leases and checks quorum timeouts every 30 seconds. A failed poll backs off for 5 seconds. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
 - **Leased Execution:** Claims use `FOR UPDATE SKIP LOCKED` and a 15-minute lease. Background executions renew the lease every 5 minutes, and an expired lease can be reclaimed by another worker.
-- **Shutdown:** `Ctrl+C` broadcasts a shutdown signal to the worker and SMTP listener. The task loop stops claiming and drains its active execution slots; the process-level worker and SMTP tasks are not explicitly awaited beyond the runtime's bounded shutdown window.
+- **Shutdown:** `Ctrl+C` or SIGTERM stops admission, cancels in-flight provider work, records leased durable tasks as retryable, and joins the task worker, SMTP listener, mailbox listener, memory worker, and runtime sampler within the bounded drain window.
 
 #### Task Execution Flow
 

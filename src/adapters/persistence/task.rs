@@ -23,8 +23,8 @@ use crate::{
         },
         stuck_work::{StuckWorkCensus, StuckWorkThresholds},
         task::{
-            BackgroundTask, NewTask, TaskAttemptOutcome, TaskAttemptRef, TaskLeaseRef, TaskStatus,
-            ThreadActivity, TokenUsage,
+            BackgroundTask, NewTask, TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus,
+            TaskLeaseRef, TaskStatus, TaskStopReason, ThreadActivity, TokenUsage,
         },
         value_objects::MessageId,
     },
@@ -51,16 +51,21 @@ const BEGIN_ATTEMPT_SQL: &str = r#"INSERT INTO task_attempts
    VALUES ($1, $2, $3, $4, 'processing', CURRENT_TIMESTAMP)
    ON CONFLICT (task_id, attempt_number) DO UPDATE
       SET status = 'processing', started_at = CURRENT_TIMESTAMP, finished_at = NULL,
-          error = NULL, prompt_tokens = NULL, completion_tokens = NULL,
+          error = NULL, stop_reason = NULL, prompt_tokens = NULL, completion_tokens = NULL,
           execution_generation = EXCLUDED.execution_generation"#;
 
 /// Close the ledger row, but only while it is still the open one. If another worker took the task
 /// over and reopened the row, this run is no longer the run of record and must not overwrite it.
 const FINISH_ATTEMPT_SQL: &str = r#"UPDATE task_attempts
    SET status = $4, error = $5, prompt_tokens = $6, completion_tokens = $7,
+       stop_reason = $8,
        finished_at = CURRENT_TIMESTAMP
    WHERE task_id = $1 AND attempt_number = $2 AND execution_generation = $3
      AND status = 'processing'"#;
+
+/// What a reaped run is recorded as having failed with. The reaper writes it to both the task row
+/// and the attempt ledger, which must agree on why the run vanished.
+const LEASE_EXPIRED_ERROR: &str = "Task lease expired without the run reporting a result";
 
 /// Log when a lease-guarded state change was ignored because the lease or status moved on.
 ///
@@ -1385,7 +1390,7 @@ impl TaskPersistence for PostgresPersistence {
                        WHEN retry_count + 1 >= max_retries THEN 'dead_letter'
                        ELSE 'pending'
                    END,
-                   last_error = 'Task lease expired without the run reporting a result',
+                   last_error = $1,
                    -- The same exponential backoff a reported failure gets, with the exponent
                    -- capped so it cannot run away: 30s * 2^attempt.
                    run_at = CURRENT_TIMESTAMP
@@ -1399,6 +1404,7 @@ impl TaskPersistence for PostgresPersistence {
                  AND (lock_expires_at IS NULL OR lock_expires_at <= CURRENT_TIMESTAMP)
                RETURNING id, retry_count"#,
         )
+        .bind(LEASE_EXPIRED_ERROR)
         .fetch_all(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -1409,13 +1415,17 @@ impl TaskPersistence for PostgresPersistence {
         for (task_id, retry_count) in &reaped {
             sqlx::query(
                 r#"UPDATE task_attempts
-                   SET status = 'failed',
-                       error = 'Task lease expired without the run reporting a result',
+                   SET status = $3,
+                       error = $4,
+                       stop_reason = $5,
                        finished_at = CURRENT_TIMESTAMP
                    WHERE task_id = $1 AND attempt_number = $2 AND status = 'processing'"#,
             )
             .bind(task_id)
             .bind(retry_count)
+            .bind(TaskAttemptStatus::Failed.as_str())
+            .bind(LEASE_EXPIRED_ERROR)
+            .bind(TaskStopReason::LeaseLost.as_str())
             .execute(&mut *tx)
             .await
             .map_err(AppError::from)?;
@@ -1675,6 +1685,7 @@ impl TaskPersistence for PostgresPersistence {
             .bind(outcome.error.as_deref())
             .bind(tokens(|usage| usage.prompt_tokens))
             .bind(tokens(|usage| usage.completion_tokens))
+            .bind(outcome.stop_reason.as_str())
             .execute(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -1694,11 +1705,20 @@ impl TaskPersistence for PostgresPersistence {
             // without any backoff -- so a task that reliably outlived its lease looped for ever
             // instead of dead-lettering. `reap_expired_task_leases` now turns those back into
             // pending rows, paying an attempt each time.
-            r#"WITH claimable AS (
-                   SELECT id
+            r#"WITH ranked AS (
+                   SELECT id, run_at, created_at,
+                          ROW_NUMBER() OVER (
+                              PARTITION BY company_id
+                              ORDER BY run_at ASC, created_at ASC, id ASC
+                          ) AS company_round
                    FROM background_tasks
                    WHERE status = 'pending' AND run_at <= CURRENT_TIMESTAMP
-                   ORDER BY run_at ASC, created_at ASC, id ASC
+               ), claimable AS (
+                   SELECT task.id
+                   FROM background_tasks AS task
+                   JOIN ranked ON ranked.id = task.id
+                   ORDER BY ranked.company_round ASC, ranked.run_at ASC,
+                            ranked.created_at ASC, task.id ASC
                    FOR UPDATE SKIP LOCKED
                    LIMIT $1
                )
@@ -2148,7 +2168,7 @@ fn json_uuid(value: &Value, pointer: &str) -> AppResult<Uuid> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::persistence::test_support::test_pool;
+    use crate::adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool};
     use crate::entities::message::{Message, MessageDirection, MessageRole};
     use crate::services::outbound_dispatcher::OutboundEmail;
     use crate::use_cases::{
@@ -2164,6 +2184,116 @@ mod tests {
         assert_eq!(required_response_count(3, 50.0), 2);
         assert_eq!(required_response_count(4, 50.0), 2);
         assert_eq!(required_response_count(10, 20.0), 2);
+    }
+
+    #[tokio::test]
+    async fn pending_claims_take_one_company_round_before_a_second_task_from_a_backlog() {
+        let _claim_guard = UNSCOPED_CLAIM.lock().await;
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let email = format!("fair_owner_{suffix}@example.com");
+        persistence
+            .create_user(&format!("fair_owner_{suffix}"), &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let mut companies = Vec::new();
+        let mut channels = Vec::new();
+        for label in ["backlog", "waiting"] {
+            let company = CompanyPersistence::create(
+                &persistence,
+                owner.id,
+                CompanyWrite {
+                    name: format!("Fair {label}"),
+                    slug: format!("fair-{label}-{suffix}"),
+                    ..CompanyWrite::default()
+                },
+            )
+            .await
+            .unwrap();
+            let channel = ChannelPersistence::create(
+                &persistence,
+                company.id,
+                ChannelWrite {
+                    name: label.into(),
+                    slug: label.into(),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
+            )
+            .await
+            .unwrap();
+            companies.push(company);
+            channels.push(channel);
+        }
+
+        let mut backlog_ids = Vec::new();
+        for _ in 0..3 {
+            backlog_ids.push(
+                persistence
+                    .enqueue_task(NewTask::starting_new_chain(
+                        companies[0].id,
+                        channels[0].id,
+                        None,
+                        "fairness",
+                        serde_json::json!({}),
+                    ))
+                    .await
+                    .unwrap()
+                    .id,
+            );
+        }
+        let waiting = persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                companies[1].id,
+                channels[1].id,
+                None,
+                "fairness",
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+        let mut owned_ids = backlog_ids.clone();
+        owned_ids.push(waiting.id);
+        sqlx::query(
+            "UPDATE background_tasks SET run_at = CURRENT_TIMESTAMP - INTERVAL '300 years' WHERE id = ANY($1)",
+        )
+        .bind(&owned_ids)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let claimed = persistence
+            .claim_pending_tasks(Uuid::new_v4(), Utc::now() + chrono::Duration::minutes(5), 2)
+            .await
+            .unwrap();
+        assert_eq!(
+            claimed
+                .iter()
+                .filter(|task| task.company_id == companies[0].id)
+                .count(),
+            1
+        );
+        assert_eq!(
+            claimed
+                .iter()
+                .filter(|task| task.company_id == companies[1].id)
+                .count(),
+            1
+        );
+
+        for company in companies {
+            CompanyPersistence::delete(&persistence, company.id)
+                .await
+                .unwrap();
+        }
     }
 
     /// The mailbox asks for a whole page of threads at once, and each thread must report the state
@@ -2493,6 +2623,19 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(open, 0, "a reaped run must not leave its ledger row open");
+        let lease_lost: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM task_attempts WHERE task_id = $1 AND stop_reason = $2",
+        )
+        .bind(task.id)
+        .bind(TaskStopReason::LeaseLost.as_str())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            lease_lost,
+            i64::from(task.max_retries),
+            "every reaped attempt records why execution stopped"
+        );
 
         CompanyPersistence::delete(&persistence, company.id)
             .await
@@ -2859,6 +3002,11 @@ mod tests {
 
     #[tokio::test]
     async fn concurrent_workers_claim_once_and_a_failed_task_is_not_immediately_reclaimed() {
+        // Both claims below are unscoped, and the row is deliberately sorted to the very front of
+        // the queue -- which makes it the first thing any *other* unscoped claim takes too. Held
+        // from before the row is queued until after the last claim, so the only claims racing for
+        // it are this test's own two.
+        let _claim_guard = UNSCOPED_CLAIM.lock().await;
         let Some(pool) = test_pool().await else {
             return;
         };
@@ -2913,10 +3061,11 @@ mod tests {
             .await
             .unwrap();
 
-        // `claim_pending_tasks` polls the whole queue ordered by `run_at`, not this company's slice
-        // of it, and it also reclaims 'processing' rows whose lease has expired. Sort this task
-        // ahead of *everything* — concurrent tests and any orphan rows a previously aborted run
-        // left behind — or both single-slot workers fill up elsewhere and never reach it. Keeping
+        // `claim_pending_tasks` polls the whole queue, not this company's slice of it. Its first
+        // sort key is the per-company round, and a brand-new company's only task is always round 1
+        // — so sorting this row ahead of every other round-1 row is what puts it first overall,
+        // ahead of concurrent tests' rows and any orphans a previously aborted run left behind.
+        // Without it both single-slot workers fill up elsewhere and never reach this task. Keeping
         // the limit at 1 also means this test steals at most one foreign task.
         sqlx::query(
             "UPDATE background_tasks SET run_at = CURRENT_TIMESTAMP - INTERVAL '100 years' WHERE id = $1",

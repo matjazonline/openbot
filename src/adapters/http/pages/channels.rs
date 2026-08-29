@@ -50,7 +50,8 @@ fn inline_agent_form(
     let form_hidden = if error_msg.is_some() { "" } else { "hidden" };
     let error_html = match error_msg {
         Some(msg) => format!(
-            r#"<div class="p-2 mb-2 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-xs">{msg}</div>"#
+            r#"<div class="p-2 mb-2 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-xs">{msg}</div>"#,
+            msg = escape_html_text(msg),
         ),
         None => String::new(),
     };
@@ -501,9 +502,9 @@ pub fn channels_page(page: &ChannelsPage<'_>) -> String {
             </div>
         </div>
         "##,
-        company_name = company.name,
-        slug = company.slug,
-        app_domain_name = app_domain_name,
+        company_name = escape_html_text(&company.name),
+        slug = escape_html_text(&company.slug),
+        app_domain_name = escape_html_text(app_domain_name),
         list_html = list_html,
     );
 
@@ -664,7 +665,7 @@ pub fn channel_thread_list_fragment(
             "##,
             company_id = company_id,
             channel_id = channel_id,
-            cursor = cursor,
+            cursor = escape_html_attr(cursor),
             oob = oob,
         ),
         None => format!(r##"<div id="thread-pagination"{oob}></div>"##),
@@ -784,15 +785,15 @@ pub fn channel_row_fragment(
         "##,
         company_id = company.id,
         channel_id = channel.id,
-        name = channel.name,
-        display_slug = display_slug,
+        name = escape_html_attr(&channel.name),
+        display_slug = escape_html_text(&display_slug),
         created_at_str = created_at_str,
-        provider_str = provider_str,
-        model_str = model_str,
+        provider_str = escape_html_text(provider_str),
+        model_str = escape_html_text(model_str),
         api_key_str = api_key_str,
-        assigned_agents_str = assigned_agents_str,
-        emails_str = emails_str,
-        config_str = config_str,
+        assigned_agents_str = escape_html_text(&assigned_agents_str),
+        emails_str = escape_html_text(&emails_str),
+        config_str = escape_html_text(&config_str),
     )
 }
 
@@ -951,17 +952,17 @@ pub fn channel_edit_fragment(
         "##,
         channel_id = channel.id,
         company_id = company.id,
-        name = channel.name,
-        slug = channel.slug,
+        name = escape_html_attr(&channel.name),
+        slug = escape_html_attr(&channel.slug),
         enabled_checked = if channel.enabled { "checked" } else { "" },
         add_3rd_party_checked = if channel.add_3rd_party { "checked" } else { "" },
-        company_slug = company.slug,
-        app_domain_name = app_domain_name,
-        emails_str = emails_str,
-        provider_val = provider_val,
-        model_val = model_val,
-        api_key_val = api_key_val,
-        config_str = config_str,
+        company_slug = escape_html_text(&company.slug),
+        app_domain_name = escape_html_text(app_domain_name),
+        emails_str = escape_html_attr(&emails_str),
+        provider_val = escape_html_attr(provider_val),
+        model_val = escape_html_attr(model_val),
+        api_key_val = escape_html_attr(api_key_val),
+        config_str = escape_html_text(&config_str),
         agents_selection_html = agents_selection_html,
         custom_config_hidden = custom_config_hidden,
     )

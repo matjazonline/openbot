@@ -100,6 +100,7 @@ fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
         slug: payload.slug,
         provider: payload.provider,
         model: payload.model,
+        run_timeout_secs: payload.run_timeout_secs,
         api_key: payload.api_key,
         system_prompt: payload.system_prompt,
         description: payload.description,
@@ -265,6 +266,7 @@ async fn workspace(
                 description: agent.description.as_deref().unwrap_or(""),
                 provider: agent.provider.as_deref().unwrap_or(""),
                 model: agent.model.as_deref().unwrap_or(""),
+                run_timeout_secs: agent.run_timeout_secs,
                 api_key: agent.api_key.as_deref().unwrap_or(""),
                 config_json: &config_json,
                 avatar_url: agent

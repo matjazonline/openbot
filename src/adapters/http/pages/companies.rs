@@ -151,8 +151,8 @@ pub fn company_row_fragment(company: &Company) -> String {
         </div>
         "##,
         id = company.id,
-        name = company.name,
-        slug = company.slug,
+        name = escape_html_attr(&company.name),
+        slug = escape_html_text(&company.slug),
         created_at_str = created_at_str,
     )
 }
@@ -227,12 +227,12 @@ pub fn company_edit_fragment(company: &Company, configured: &ConfiguredMemoryPro
         </form>
         "##,
         id = company.id,
-        name = company.name,
-        slug = company.slug,
-        api_key = api_key_val,
-        provider = provider_val,
-        model = model_val,
-        avatar_url = escape_html_text(company.avatar_url.as_deref().unwrap_or("")),
+        name = escape_html_attr(&company.name),
+        slug = escape_html_attr(&company.slug),
+        api_key = escape_html_attr(api_key_val),
+        provider = escape_html_attr(provider_val),
+        model = escape_html_attr(model_val),
+        avatar_url = escape_html_attr(company.avatar_url.as_deref().unwrap_or("")),
         memory_disabled_selected = memory_disabled_selected,
         memory_provider_options = memory_provider_options(
             company
@@ -299,8 +299,8 @@ pub fn company_invites_page(
             </div>
         </div>
         "##,
-        company_name = company.name,
-        slug = company.slug,
+        company_name = escape_html_text(&company.name),
+        slug = escape_html_text(&company.slug),
         company_id = company.id,
         invites_html = invites_html,
         team_html = team_html,
@@ -448,8 +448,8 @@ pub fn company_team_row_fragment(company_id: Uuid, member: &CompanyMember) -> St
         "##,
         company_id = company_id,
         user_id = member.user_id,
-        username = username_display,
-        email = email_display,
+        username = escape_html_attr(username_display),
+        email = escape_html_text(email_display),
         role_options = company_access_role_options(member.role),
         created_at_str = created_at_str,
     )
@@ -489,7 +489,7 @@ pub fn user_invites_page(user_email: &str, invites: &[CompanyInvite]) -> String 
             </div>
         </div>
         "##,
-        user_email = user_email,
+        user_email = escape_html_text(user_email),
         list_html = list_html,
     );
 

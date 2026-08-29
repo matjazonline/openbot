@@ -5,18 +5,17 @@ use crate::{
     adapters::protocols::ProtocolEgressAdapter,
     app_error::AppResult,
     entities::{channel::ChannelType, message_contract::NormalizedOutboundMessage},
-    infra::config::AppConfig,
     services::outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
     use_cases::thread::{BounceInfo, format_bounce_email_body},
 };
 
 pub struct EmailEgressAdapter {
-    config: Arc<AppConfig>,
+    dispatcher: Arc<OutboundDispatcher>,
 }
 
 impl EmailEgressAdapter {
-    pub fn new(config: Arc<AppConfig>) -> Self {
-        Self { config }
+    pub fn new(dispatcher: Arc<OutboundDispatcher>) -> Self {
+        Self { dispatcher }
     }
 }
 
@@ -57,18 +56,18 @@ impl ProtocolEgressAdapter for EmailEgressAdapter {
             correlation_id: message.correlation_id,
         };
 
-        OutboundDispatcher::send(&self.config, outbound).await?;
+        self.dispatcher.send(outbound).await?;
         Ok(())
     }
 
     async fn dispatch_bounce(&self, bounce_info: &BounceInfo) -> AppResult<()> {
-        OutboundDispatcher::send_bounce(
-            &self.config,
-            &bounce_info.recipient_to,
-            &bounce_info.original_subject,
-            &format_bounce_email_body(bounce_info, &self.config.app_domain_name),
-        )
-        .await?;
+        self.dispatcher
+            .send_bounce(
+                &bounce_info.recipient_to,
+                &bounce_info.original_subject,
+                &format_bounce_email_body(bounce_info, self.dispatcher.app_domain_name()),
+            )
+            .await?;
 
         Ok(())
     }

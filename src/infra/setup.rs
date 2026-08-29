@@ -4,18 +4,22 @@ use crate::{
         memory::{hindsight::HindsightProvider, hydradb::HydraDbProvider},
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
         protocols::{EgressRegistry, email::EmailEgressAdapter},
+        smtp::LettreMailTransport,
         storage::{FileStorage, gcs::GcsFileStorage},
     },
     domain::monitoring::MonitoringService,
     entities::{memory::MemoryProviderKind, runtime_metrics::MachineIdentity},
     infra::{
-        argon2_password_hasher, config::AppConfig, events::MailboxEvents, postgres_persistence,
+        argon2_password_hasher,
+        config::{AppConfig, agent_run_timeout_from_env, smtp_allow_plaintext_local_from_env},
+        events::MailboxEvents,
+        postgres_persistence,
     },
     services::{
         memory_coordinator::MemoryCoordinator,
         memory_provider::{ConfiguredMemoryProviders, MemoryProviderRegistry},
         memory_worker::MemoryWorker,
-        outbound_dispatcher::SmtpConfirmationSender,
+        outbound_dispatcher::{MailTransport, OutboundDispatcher, SmtpConfirmationSender},
         runtime_metrics::MemoryProviderActivity,
     },
     use_cases::{
@@ -35,6 +39,13 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 
 pub async fn init_app_state() -> anyhow::Result<AppState> {
     let config = Arc::new(AppConfig::from_env());
+    let agent_run_timeout = agent_run_timeout_from_env();
+    let mail_transport: Arc<dyn MailTransport> =
+        LettreMailTransport::from_config(&config, smtp_allow_plaintext_local_from_env()).await?;
+    let mail_dispatcher = Arc::new(OutboundDispatcher::new(
+        config.clone(),
+        mail_transport.clone(),
+    ));
 
     let sessions = Arc::new(SessionAuthority::new(&config));
 
@@ -107,7 +118,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         .with_email_confirmation(EmailConfirmation {
             registrations: postgres_arc.clone(),
             account_changes: postgres_arc.clone(),
-            codes: Arc::new(SmtpConfirmationSender::new(config.clone())),
+            codes: Arc::new(SmtpConfirmationSender::new(mail_dispatcher.clone())),
             config: config.clone(),
         });
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
@@ -126,8 +137,9 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         config.clone(),
     ));
 
-    let egress_registry =
-        Arc::new(EgressRegistry::new().register(Arc::new(EmailEgressAdapter::new(config.clone()))));
+    let egress_registry = Arc::new(
+        EgressRegistry::new().register(Arc::new(EmailEgressAdapter::new(mail_dispatcher))),
+    );
 
     let thread_use_cases = Arc::new(
         ThreadUseCases::new(
@@ -137,6 +149,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             postgres_arc.clone(),
             config.clone(),
         )
+        .with_agent_run_timeout(agent_run_timeout)
+        .with_mail_transport(mail_transport)
         .with_egress_registry(egress_registry)
         .with_agent_persistence(postgres_arc.clone())
         .with_agent_channel_provisioning(postgres_arc.clone())

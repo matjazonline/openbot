@@ -134,8 +134,8 @@ fn simulation_compose_form(
             "##,
         company_id = company_id,
         channel_id = channel_id,
-        target_recipient = target_recipient,
-        sender_email = sender_email,
+        target_recipient = escape_html_attr(target_recipient),
+        sender_email = escape_html_attr(sender_email),
         payload_glyph = icon(Icon::Zap, BUTTON_ICON),
         lookup_glyph = icon(Icon::Search, BUTTON_ICON),
     )
@@ -174,8 +174,8 @@ pub fn channel_simulation_page(
         "##,
         back_glyph = icon(Icon::ArrowLeft, BUTTON_ICON),
         company_id = company.id,
-        channel_name = channel.name,
-        target_recipient = target_recipient,
+        channel_name = escape_html_text(&channel.name),
+        target_recipient = escape_html_text(&target_recipient),
         form_container_content = form_container_content,
         initial_result_val = initial_result_val,
     );
@@ -399,15 +399,15 @@ pub fn channel_simulation_failure_fragment(
         "##,
         oob_form_swap = oob_form_swap,
         error_glyph = icon(Icon::X, BUTTON_ICON),
-        error_msg = error_msg,
-        provider_str = provider_str,
-        model_str = model_str,
+        error_msg = escape_html_text(error_msg),
+        provider_str = escape_html_text(provider_str),
+        model_str = escape_html_text(model_str),
         api_key_status = api_key_status,
-        to_str = to_str,
-        from_str = from_str,
-        company_name = company_name,
-        channel_name = channel_name,
-        subject_str = subject_str,
+        to_str = escape_html_text(to_str),
+        from_str = escape_html_text(from_str),
+        company_name = escape_html_text(&company_name),
+        channel_name = escape_html_text(&channel_name),
+        subject_str = escape_html_text(subject_str),
     )
 }
 
@@ -859,6 +859,11 @@ pub(crate) fn simulate_reply_form(fields: &ReplyFormFields<'_>) -> String {
     } = *fields;
     let run_test_checked = if run_test_checked { " checked" } else { "" };
     let run_checked = if run_checked { " checked" } else { "" };
+    let thread_id_str = escape_html_text(thread_id_str);
+    let last_msg_id = escape_html_attr(last_msg_id);
+    let to_value = escape_html_attr(to_value);
+    let from_value = escape_html_attr(from_value);
+    let subject = escape_html_attr(subject);
 
     format!(
         r##"
@@ -1148,8 +1153,8 @@ pub fn channel_simulation_thread_error_fragment(
         </div>
         "##,
         error_glyph = icon(Icon::X, BUTTON_ICON),
-        thread_id_input = thread_id_input,
-        error_msg = error_msg,
+        thread_id_input = escape_html_text(thread_id_input),
+        error_msg = escape_html_text(error_msg),
     );
 
     if include_oob {

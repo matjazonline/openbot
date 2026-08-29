@@ -24,7 +24,7 @@ use crate::{
         stuck_work::StuckWorkThresholds,
         task::{
             BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus,
-            TaskExecutionOutcome, TaskLeaseRef, TaskSuspension,
+            TaskExecutionOutcome, TaskLeaseRef, TaskStopReason, TaskSuspension,
         },
         value_objects::{EmailAddress, MessageId},
     },
@@ -32,7 +32,7 @@ use crate::{
     services::{
         agent_runner::{AgentRunner, ResolvedAgentParams},
         memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
-        outbound_dispatcher::{OutboundDispatcher, OutboundEmail, agent_response_email_body},
+        outbound_dispatcher::{OutboundEmail, agent_response_email_body},
         runtime_metrics::ActiveTaskExecutions,
     },
     use_cases::{
@@ -93,9 +93,9 @@ fn polled(claimed: usize, batch_size: i64) -> Polled {
 /// The work runs at the top of the loop rather than after the first sleep, so a queue that already
 /// has something in it at startup is served immediately.
 ///
-/// Shutdown is only observed between iterations. That is deliberate: an agent run cut off midway
-/// through writing its result is worse than one that finishes while the process is winding down —
-/// the lease is what protects a run that outlives its process, not cancellation here.
+/// Shutdown is observed between iterations. Durable agent execution uses the separately bounded
+/// task loop below, where cancellation reaches the provider future and the lease-fenced atomic
+/// commit makes interruption safe.
 async fn poll_until_shutdown<State, Work>(
     name: &'static str,
     interval: Duration,
@@ -140,7 +140,7 @@ async fn run_bounded_task_loop<Item, Claim, ClaimFuture, Execute, ExecuteFuture>
     Item: Send + 'static,
     Claim: FnMut(usize) -> ClaimFuture,
     ClaimFuture: Future<Output = Result<Vec<Item>, String>>,
-    Execute: Fn(Item) -> ExecuteFuture,
+    Execute: Fn(Item, broadcast::Receiver<()>) -> ExecuteFuture,
     ExecuteFuture: Future<Output = ()> + Send + 'static,
 {
     debug_assert!(concurrency > 0);
@@ -150,12 +150,23 @@ async fn run_bounded_task_loop<Item, Claim, ClaimFuture, Execute, ExecuteFuture>
     loop {
         let available = concurrency.saturating_sub(running.len());
         if available > 0 && Instant::now() >= next_poll {
-            match claim(available).await {
+            // Subscribe prospective execution slots before the claim. If shutdown races the
+            // database response, a task claimed at that boundary still receives the already-sent
+            // cancellation and releases its durable lease as retryable.
+            let execution_shutdowns = (0..available)
+                .map(|_| shutdown.resubscribe())
+                .collect::<Vec<_>>();
+            let claim_result = tokio::select! {
+                biased;
+                _ = shutdown.recv() => break,
+                result = claim(available) => result,
+            };
+            match claim_result {
                 Ok(items) => {
                     let claimed = items.len();
                     debug_assert!(claimed <= available, "claim exceeded requested capacity");
-                    for item in items {
-                        running.spawn(execute(item));
+                    for (item, execution_shutdown) in items.into_iter().zip(execution_shutdowns) {
+                        running.spawn(execute(item, execution_shutdown));
                     }
                     next_poll = if claimed < available {
                         Instant::now() + interval
@@ -234,6 +245,7 @@ fn reply_subject(subject: &str) -> String {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TaskFailure {
     Retryable(String),
+    TimedOut(String),
     Terminal(String),
 }
 
@@ -265,6 +277,7 @@ pub struct TaskWorker {
     monitoring: Option<Arc<dyn MonitoringService>>,
     worker_id: uuid::Uuid,
     task_concurrency: usize,
+    agent_run_timeout: std::time::Duration,
     active_task_executions: ActiveTaskExecutions,
 }
 
@@ -282,6 +295,7 @@ impl TaskWorker {
             monitoring: None,
             worker_id: uuid::Uuid::new_v4(),
             task_concurrency: 1,
+            agent_run_timeout: std::time::Duration::from_secs(300),
             active_task_executions: ActiveTaskExecutions::default(),
         }
     }
@@ -299,6 +313,12 @@ impl TaskWorker {
     pub fn with_task_concurrency(mut self, concurrency: usize) -> Self {
         assert!(concurrency > 0, "task worker concurrency must be positive");
         self.task_concurrency = concurrency;
+        self
+    }
+
+    pub fn with_agent_run_timeout(mut self, timeout: std::time::Duration) -> Self {
+        assert!(!timeout.is_zero(), "agent run timeout must be positive");
+        self.agent_run_timeout = timeout;
         self
     }
 
@@ -326,16 +346,16 @@ impl TaskWorker {
             MAINTENANCE_INTERVAL
         );
 
-        let tasks = tokio::spawn(Arc::clone(&self).run_task_loop(shutdown_rx.resubscribe()));
-        let outbox = tokio::spawn(poll_until_shutdown(
+        let tasks = Arc::clone(&self).run_task_loop(shutdown_rx.resubscribe());
+        let outbox = poll_until_shutdown(
             "outbox",
             OUTBOX_POLL_INTERVAL,
             shutdown_rx.resubscribe(),
             Arc::clone(&self),
             |worker| async move { worker.process_outbox_emails().await },
-        ));
+        );
         let schedules = if self.schedule_use_cases.is_some() {
-            tokio::spawn(poll_until_shutdown(
+            futures::future::Either::Left(poll_until_shutdown(
                 "schedule",
                 SCHEDULE_POLL_INTERVAL,
                 shutdown_rx.resubscribe(),
@@ -343,15 +363,15 @@ impl TaskWorker {
                 |worker| async move { worker.process_due_schedules().await },
             ))
         } else {
-            tokio::spawn(async {})
+            futures::future::Either::Right(std::future::ready(()))
         };
-        let maintenance = tokio::spawn(poll_until_shutdown(
+        let maintenance = poll_until_shutdown(
             "maintenance",
             MAINTENANCE_INTERVAL,
             shutdown_rx,
             self,
             |worker| async move { worker.run_maintenance().await },
-        ));
+        );
 
         let _ = tokio::join!(tasks, outbox, schedules, maintenance);
     }
@@ -385,9 +405,13 @@ impl TaskWorker {
                 let worker = Arc::clone(&claimant);
                 async move { worker.claim_pending_task_batch(available).await }
             },
-            move |task| {
+            move |task, shutdown| {
                 let worker = Arc::clone(&executor);
-                async move { worker.process_claimed_task(task).await }
+                async move {
+                    worker
+                        .process_claimed_task_until_shutdown(task, shutdown)
+                        .await
+                }
             },
         )
         .await;
@@ -404,7 +428,24 @@ impl TaskWorker {
             .map_err(|e| e.to_string())
     }
 
+    #[cfg(test)]
     async fn process_claimed_task(&self, task: BackgroundTask) {
+        self.process_claimed_task_inner(task, None).await;
+    }
+
+    async fn process_claimed_task_until_shutdown(
+        &self,
+        task: BackgroundTask,
+        shutdown: broadcast::Receiver<()>,
+    ) {
+        self.process_claimed_task_inner(task, Some(shutdown)).await;
+    }
+
+    async fn process_claimed_task_inner(
+        &self,
+        task: BackgroundTask,
+        mut shutdown: Option<broadcast::Receiver<()>>,
+    ) {
         // A row this worker just claimed always carries its lease; the constraint on
         // `background_tasks` makes a `processing` row without one unrepresentable. Bailing rather
         // than asserting keeps a surprising row from taking the worker down with it.
@@ -419,9 +460,17 @@ impl TaskWorker {
         info!("Processing task {} (type = '{}')", task.id, task.task_type);
         let start_time = std::time::Instant::now();
         let attempt = TaskAttemptRef::of(&task, lease);
-        let outcome = self
-            .execute_single_task_with_lease(&task, lease, attempt)
-            .await;
+        let execution = self.execute_single_task_with_lease(&task, lease, attempt);
+        tokio::pin!(execution);
+        let outcome = match shutdown.as_mut() {
+            Some(shutdown) => tokio::select! {
+                outcome = &mut execution => outcome,
+                _ = shutdown.recv() => TaskExecutionOutcome::Interrupted(
+                    "Task execution interrupted by shutdown".into(),
+                ),
+            },
+            None => execution.await,
+        };
         let duration_ms = start_time.elapsed().as_millis() as u64;
         self.close_out_task(&task, lease, attempt, outcome, duration_ms)
             .await;
@@ -525,7 +574,7 @@ impl TaskWorker {
             }
         };
 
-        let (err_msg, dead_letter_now) = match outcome {
+        let (err_msg, dead_letter_now, stop_reason) = match outcome {
             TaskExecutionOutcome::Suspended => {
                 info!("Background task {} suspended by its agent", task_id);
                 return;
@@ -551,16 +600,31 @@ impl TaskWorker {
                     attempt,
                     current.as_ref(),
                     TaskAttemptStatus::Completed,
+                    TaskStopReason::Completed,
                     None,
                 )
                 .await;
                 let outcome = self.task_persistence.mark_task_completed(lease).await;
                 report_outcome("Task", task_id, "completion", outcome);
-                self.record_task_metric(task, duration_ms, TaskStatusMetric::Completed);
+                self.record_task_metric(
+                    task,
+                    duration_ms,
+                    TaskStatusMetric::Completed,
+                    TaskStopReason::Completed,
+                );
                 return;
             }
-            TaskExecutionOutcome::RetryableFailure(message) => (message, false),
-            TaskExecutionOutcome::TerminalFailure(message) => (message, true),
+            TaskExecutionOutcome::RetryableFailure(message) => {
+                (message, false, TaskStopReason::RetryableFailure)
+            }
+            TaskExecutionOutcome::TimedOut(message) => (message, false, TaskStopReason::TimedOut),
+            TaskExecutionOutcome::Interrupted(message) => {
+                (message, false, TaskStopReason::Shutdown)
+            }
+            TaskExecutionOutcome::LeaseLost(message) => (message, false, TaskStopReason::LeaseLost),
+            TaskExecutionOutcome::TerminalFailure(message) => {
+                (message, true, TaskStopReason::TerminalFailure)
+            }
         };
 
         warn!(
@@ -577,6 +641,7 @@ impl TaskWorker {
             attempt,
             current.as_ref(),
             TaskAttemptStatus::Failed,
+            stop_reason,
             Some(err_msg.clone()),
         )
         .await;
@@ -591,7 +656,7 @@ impl TaskWorker {
             .mark_task_failed(lease, &err_msg, next_run, is_dead_letter)
             .await;
         report_outcome("Task", task_id, "failure", outcome);
-        self.record_task_metric(task, duration_ms, TaskStatusMetric::Failed);
+        self.record_task_metric(task, duration_ms, TaskStatusMetric::Failed, stop_reason);
     }
 
     /// Close this run's row in the attempt ledger, which is what the dashboard reads duration and
@@ -608,11 +673,13 @@ impl TaskWorker {
         attempt: TaskAttemptRef,
         current: Option<&BackgroundTask>,
         status: TaskAttemptStatus,
+        stop_reason: TaskStopReason,
         error: Option<String>,
     ) {
         let outcome = TaskAttemptOutcome {
             attempt,
             status,
+            stop_reason,
             error,
             // The run writes its usage into the payload, so it is only on the re-read row; the
             // copy this worker claimed predates the run entirely.
@@ -632,6 +699,7 @@ impl TaskWorker {
         task: &BackgroundTask,
         duration_ms: u64,
         status: TaskStatusMetric,
+        stop_reason: TaskStopReason,
     ) {
         if let Some(ref m) = self.monitoring {
             m.record_task_execution(&TaskExecutionMetrics {
@@ -640,8 +708,14 @@ impl TaskWorker {
                 task_type: task.task_type.clone(),
                 duration_ms,
                 status,
+                stop_reason,
                 retry_count: task.retry_count as u32,
             });
+            m.increment_counter(
+                &format!("task_execution_stops_{}_total", stop_reason.as_str()),
+                1,
+                &[],
+            );
         }
     }
 
@@ -767,7 +841,10 @@ impl TaskWorker {
             return Ok(sent.outbound_message_id);
         }
 
-        let sent = OutboundDispatcher::send_idempotent(&self.config, email, &idempotency_key)
+        let sent = self
+            .thread_use_cases
+            .mail_dispatcher()
+            .send_idempotent(email, &idempotency_key)
             .await
             .map_err(DeliveryFailure::retryable)?;
         // The email is out; failing to log it in the thread must not re-send it.
@@ -1024,7 +1101,10 @@ impl TaskWorker {
                 task.correlation_id,
             )
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|error| match error {
+                crate::app_error::AppError::Timeout(message) => TaskFailure::TimedOut(message),
+                other => TaskFailure::Retryable(other.to_string()),
+            })?;
 
         Ok(match dispatch {
             DispatchOutcome::Suspended => TaskExecutionOutcome::Suspended,
@@ -1037,7 +1117,7 @@ impl TaskWorker {
     ///
     /// Split from the inbound path because a scheduled run has no inbound message to ingest, but
     /// it shares the guard that matters — a retry must not run the agent, or reply, twice.
-    async fn execute_scheduled_task(&self, task: &BackgroundTask) -> Result<(), String> {
+    async fn execute_scheduled_task(&self, task: &BackgroundTask) -> Result<(), TaskFailure> {
         let payload: ScheduledRunPayload = serde_json::from_value(task.payload.clone())
             .map_err(|e| format!("Invalid scheduled task payload: {e}"))?;
         let context = self.load_scheduled_run_context(&payload).await?;
@@ -1085,6 +1165,7 @@ impl TaskWorker {
 
         self.deliver_scheduled_reply(task, &payload, &context, &answer)
             .await
+            .map_err(TaskFailure::from)
     }
 
     /// Everything a scheduled run needs loaded before the agent can be built.
@@ -1131,7 +1212,7 @@ impl TaskWorker {
         correlation_id: CorrelationId,
         payload: &ScheduledRunPayload,
         context: &ScheduledRunContext,
-    ) -> Result<String, String> {
+    ) -> Result<String, TaskFailure> {
         let history = self
             .thread_use_cases
             .thread_persistence()
@@ -1165,7 +1246,7 @@ impl TaskWorker {
             prompt.push_str(&recalled);
         }
 
-        let output = AgentRunner::new(&prompt, &params)
+        let runner = AgentRunner::new(&prompt, &params)
             .subject(Some(&payload.subject))
             .history(&history)
             .monitoring(self.monitoring.clone())
@@ -1176,10 +1257,21 @@ impl TaskWorker {
                 Some(context.channel.id),
                 context.agent.as_ref().map(|agent| agent.id),
             )
-            .trace(correlation_id, Some(task_id))
-            .execute()
+            .trace(correlation_id, Some(task_id));
+        let run_timeout = context
+            .agent
+            .as_ref()
+            .map(|agent| agent.run_timeout(self.agent_run_timeout))
+            .unwrap_or(self.agent_run_timeout);
+        let output = tokio::time::timeout(run_timeout, runner.execute())
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|_| {
+                TaskFailure::TimedOut(format!(
+                    "agent run exceeded the {}s limit",
+                    run_timeout.as_secs()
+                ))
+            })?
+            .map_err(|error| TaskFailure::Retryable(error.to_string()))?;
 
         Ok(output.content)
     }
@@ -1345,16 +1437,18 @@ impl TaskWorker {
         );
 
         let lease = TaskLease::worker(lease);
-        match while_leased(
+        let supervised = while_leased(
             &*self.task_persistence,
             &lease,
             self.run_task(task, lease.reference).instrument(run_span),
-        )
-        .await
-        {
+        );
+        match supervised.await {
             Leased::Finished(Ok(outcome)) => outcome,
             Leased::Finished(Err(TaskFailure::Retryable(message))) => {
                 TaskExecutionOutcome::RetryableFailure(message)
+            }
+            Leased::Finished(Err(TaskFailure::TimedOut(message))) => {
+                TaskExecutionOutcome::TimedOut(message)
             }
             Leased::Finished(Err(TaskFailure::Terminal(message))) => {
                 TaskExecutionOutcome::TerminalFailure(message)
@@ -1362,9 +1456,9 @@ impl TaskWorker {
             // This run is no longer the one of record, so it must not report a result. Reporting
             // it as retryable is safe: every write it can still make is fenced on the worker id
             // the replacement run does not share.
-            Leased::Lost => TaskExecutionOutcome::RetryableFailure(
-                "Task lease was lost during execution".into(),
-            ),
+            Leased::Lost => {
+                TaskExecutionOutcome::LeaseLost("Task lease was lost during execution".into())
+            }
         }
     }
 
@@ -1421,7 +1515,11 @@ impl TaskWorker {
                             .await;
                     }
                     Ok(None) => {
-                        let _ = OutboundDispatcher::send(&self.config, stop_email).await;
+                        let _ = self
+                            .thread_use_cases
+                            .mail_dispatcher()
+                            .send(stop_email)
+                            .await;
                     }
                     Err(error) => warn!("Failed to prepare stop notification: {error}"),
                 }
@@ -1453,7 +1551,7 @@ mod tests {
         Mutex,
         atomic::{AtomicUsize, Ordering},
     };
-    use tokio::sync::Semaphore;
+    use tokio::sync::{Notify, Semaphore};
     use uuid::Uuid;
 
     use crate::{
@@ -1986,7 +2084,7 @@ mod tests {
                     .min(available);
                 async move { Ok((0..count).collect::<Vec<_>>()) }
             },
-            move |_| {
+            move |_, _shutdown| {
                 let running = Arc::clone(&execution_running);
                 let maximum = Arc::clone(&execution_maximum);
                 let started = Arc::clone(&execution_started);
@@ -2025,6 +2123,46 @@ mod tests {
         let _ = shutdown_tx.send(());
         permits.add_permits(8);
         driver.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn shutdown_interrupts_active_work_without_claiming_again() {
+        let claim_calls = Arc::new(AtomicUsize::new(0));
+        let interrupted = Arc::new(AtomicUsize::new(0));
+        let started = Arc::new(Notify::new());
+        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+
+        let observed_claim_calls = Arc::clone(&claim_calls);
+        let observed_interrupted = Arc::clone(&interrupted);
+        let execution_started = Arc::clone(&started);
+        let driver = tokio::spawn(run_bounded_task_loop(
+            Duration::ZERO,
+            shutdown_rx,
+            1,
+            move |_| {
+                let call = observed_claim_calls.fetch_add(1, Ordering::SeqCst);
+                async move { Ok(if call == 0 { vec![()] } else { Vec::new() }) }
+            },
+            move |_, mut shutdown| {
+                let interrupted = Arc::clone(&observed_interrupted);
+                let started = Arc::clone(&execution_started);
+                async move {
+                    started.notify_one();
+                    let _ = shutdown.recv().await;
+                    interrupted.fetch_add(1, Ordering::SeqCst);
+                }
+            },
+        ));
+
+        started.notified().await;
+        shutdown_tx.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(1), driver)
+            .await
+            .expect("task loop should drain promptly")
+            .unwrap();
+
+        assert_eq!(claim_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(interrupted.load(Ordering::SeqCst), 1);
     }
 
     /// The driver runs before it sleeps. A queue with something already in it at startup must be
@@ -2166,6 +2304,13 @@ mod tests {
     /// left to finish and write a result over theirs.
     #[tokio::test(start_paused = true)]
     async fn a_lost_lease_abandons_the_work() {
+        struct DropGuard(Arc<std::sync::atomic::AtomicBool>);
+        impl Drop for DropGuard {
+            fn drop(&mut self) {
+                self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+
         let persistence = MockTaskPersistence {
             renewals_before_loss: Some(1),
             ..Default::default()
@@ -2176,9 +2321,12 @@ mod tests {
             execution_generation: Uuid::new_v4(),
         });
         let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
         let ran = Arc::clone(&finished);
+        let drop_flag = Arc::clone(&dropped);
         let outcome = while_leased(&persistence, &lease, async move {
+            let _guard = DropGuard(drop_flag);
             tokio::time::sleep(Duration::from_secs(6000)).await;
             ran.store(true, std::sync::atomic::Ordering::SeqCst);
         })
@@ -2188,6 +2336,10 @@ mod tests {
         assert!(
             !finished.load(std::sync::atomic::Ordering::SeqCst),
             "work must be dropped the moment the lease is gone"
+        );
+        assert!(
+            dropped.load(std::sync::atomic::Ordering::SeqCst),
+            "lease loss must drop the provider future itself"
         );
     }
 

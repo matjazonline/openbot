@@ -63,6 +63,7 @@ pub struct AgentDraft<'a> {
     pub description: &'a str,
     pub provider: &'a str,
     pub model: &'a str,
+    pub run_timeout_secs: Option<u32>,
     pub api_key: &'a str,
     pub config_json: &'a str,
     pub avatar_url: &'a str,
@@ -310,6 +311,12 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                             placeholder="Describe the agent's role, responsibilities, rules and tone. A full system prompt is generated when the agent is created."
                             class="textarea w-full font-mono text-xs">{system_prompt}</textarea>
                     </label>
+                    <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Run timeout (seconds)</span></div>
+                        <input type="number" name="run_timeout_secs" min="1" max="3600"
+                            value="{simple_run_timeout}" placeholder="Use deployment default"
+                            class="input w-full">
+                    </label>
                     <button type="submit" class="btn btn-primary">
                         <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
                         <span class="[.htmx-request_&]:hidden">Create Agent</span>
@@ -338,6 +345,11 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
         name = escape_html_text(pane.draft.name),
         avatar_field = agent_avatar_field("simple", pane.draft),
         system_prompt = escape_html_text(pane.draft.system_prompt),
+        simple_run_timeout = pane
+            .draft
+            .run_timeout_secs
+            .map(|seconds| seconds.to_string())
+            .unwrap_or_default(),
         fields = agent_fields(&AgentFields {
             scope: AgentFormScope::Company(pane.company.id),
             agent_id: None,
@@ -405,6 +417,10 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         api_key: draft.api_key,
         api_key_placeholder,
     });
+    let run_timeout_value = draft
+        .run_timeout_secs
+        .map(|seconds| seconds.to_string())
+        .unwrap_or_default();
 
     format!(
         r##"
@@ -435,6 +451,13 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                         <summary class="collapse-title text-sm font-medium">Custom model &amp; config</summary>
                         <div class="collapse-content space-y-4">
                             {model_connection_fields}
+                            <label class="form-control w-full">
+                                <div class="label"><span class="text-xs opacity-70">Run timeout (seconds)</span></div>
+                                <input type="number" name="run_timeout_secs" min="1" max="3600"
+                                    value="{run_timeout_value}" placeholder="Use deployment default"
+                                    class="input w-full">
+                                <div class="label"><span class="text-xs opacity-60">Leave blank to inherit AGENT_RUN_TIMEOUT_SECS.</span></div>
+                            </label>
                             <label class="form-control w-full">
                                 <div class="label">
                                     <span class="text-xs opacity-70">Description</span>
@@ -611,6 +634,7 @@ fn stored_draft<'a>(agent: &'a Agent, config_json: &'a str) -> AgentDraft<'a> {
         description: agent.description.as_deref().unwrap_or(""),
         provider: agent.provider.as_deref().unwrap_or(""),
         model: agent.model.as_deref().unwrap_or(""),
+        run_timeout_secs: agent.run_timeout_secs,
         api_key: agent.api_key.as_deref().unwrap_or(""),
         config_json,
         avatar_url: agent

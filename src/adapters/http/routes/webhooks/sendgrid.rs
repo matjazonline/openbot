@@ -292,9 +292,8 @@ mod tests {
     use crate::adapters::persistence::approval::NewApproval;
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::company_member::CompanyMembership;
-    use crate::entities::correlation::CorrelationId;
     use crate::entities::task::NewTask;
-    use crate::entities::task::{TaskLeaseRef, TaskSuspension};
+    use crate::entities::task::TaskLeaseRef;
     use async_trait::async_trait;
     use axum::body::Body;
     use axum::http::Request;

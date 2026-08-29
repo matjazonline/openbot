@@ -251,9 +251,47 @@ pub enum TaskExecutionOutcome {
     /// Something transient failed. The attempt is consumed and the task is retried with backoff
     /// until `max_retries`, at which point it dead-letters.
     RetryableFailure(String),
+    /// The configured per-agent wall-clock deadline elapsed.
+    TimedOut(String),
+    /// Process shutdown cancelled an active durable execution.
+    Interrupted(String),
+    /// The task stopped because this worker no longer owned its lease.
+    LeaseLost(String),
     /// The task cannot succeed however often it is retried -- an unparseable payload, a missing
     /// field a retry cannot conjure. It dead-letters now instead of burning every attempt first.
     TerminalFailure(String),
+}
+
+/// Bounded operational reason for an execution ending. Detailed provider/database text belongs
+/// in the durable attempt error, not in metric labels where it would create unbounded cardinality.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskStopReason {
+    Completed,
+    RetryableFailure,
+    TerminalFailure,
+    TimedOut,
+    Shutdown,
+    LeaseLost,
+}
+
+impl TaskStopReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Completed => "completed",
+            Self::RetryableFailure => "retryable_failure",
+            Self::TerminalFailure => "terminal_failure",
+            Self::TimedOut => "timed_out",
+            Self::Shutdown => "shutdown",
+            Self::LeaseLost => "lease_lost",
+        }
+    }
+}
+
+impl std::fmt::Display for TaskStopReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 impl TaskExecutionOutcome {
@@ -261,6 +299,9 @@ impl TaskExecutionOutcome {
     pub fn failure_message(&self) -> Option<&str> {
         match self {
             TaskExecutionOutcome::RetryableFailure(message)
+            | TaskExecutionOutcome::TimedOut(message)
+            | TaskExecutionOutcome::Interrupted(message)
+            | TaskExecutionOutcome::LeaseLost(message)
             | TaskExecutionOutcome::TerminalFailure(message) => Some(message),
             TaskExecutionOutcome::Replied | TaskExecutionOutcome::Suspended => None,
         }
@@ -293,6 +334,7 @@ impl TaskAttemptStatus {
 pub struct TaskAttemptOutcome {
     pub attempt: TaskAttemptRef,
     pub status: TaskAttemptStatus,
+    pub stop_reason: TaskStopReason,
     pub error: Option<String>,
     /// `None` when the run never reached a model — a guard rejected it, or it failed first.
     pub tokens: Option<TokenUsage>,

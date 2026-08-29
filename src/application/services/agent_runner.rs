@@ -1088,12 +1088,13 @@ impl<'a> AgentRunner<'a> {
             suspended: Arc::new(AtomicBool::new(false)),
         };
 
-        // Run on its own task: provider futures are deep, and this keeps the caller's stack shallow.
-        let task_result = tokio::spawn(task.run()).await;
+        // Keep the provider future inside the lease/timeout supervisor. Dropping this future drops
+        // the provider call itself instead of detaching a still-running Tokio task.
+        let task_result = task.run().await;
         let duration_ms = start_time.elapsed().as_millis() as u64;
 
         match task_result {
-            Ok(Ok(mut output)) => {
+            Ok(mut output) => {
                 // Wall-clock time is only known here, after the task has been awaited.
                 if let Some(diagnostics) = output
                     .metadata
@@ -1106,21 +1107,11 @@ impl<'a> AgentRunner<'a> {
                 self.record_execution(duration_ms, Some(&output.token_usage), None);
                 Ok(output)
             }
-            Ok(Err(err)) => {
+            Err(err) => {
                 let err_msg = sanitize_text(&err.to_string(), Some(key));
                 tracing::warn!("AI Agent execution failed ({err_msg})");
                 self.record_execution(duration_ms, None, Some(err_msg.clone()));
                 Err(anyhow::anyhow!("{err_msg}"))
-            }
-            Err(join_err) => {
-                let err_msg = sanitize_text(&join_err.to_string(), Some(key));
-                tracing::warn!("AI Agent task panicked or was cancelled ({err_msg})");
-                self.record_execution(
-                    duration_ms,
-                    None,
-                    Some(format!("Panicked or cancelled: {}", err_msg)),
-                );
-                Err(anyhow::anyhow!("Task failed: {err_msg}"))
             }
         }
     }
@@ -1847,6 +1838,7 @@ mod tests {
             slug: "tech-agent".to_string(),
             provider: Some("anthropic".to_string()),
             model: Some("claude-3-5-sonnet".to_string()),
+            run_timeout_secs: None,
             api_key: Some("agent-api-key".to_string()),
             system_prompt: None,
             description: None,
@@ -2052,6 +2044,7 @@ mod tests {
             slug: "support-agent".to_string(),
             provider: None,
             model: None,
+            run_timeout_secs: None,
             api_key: None,
             system_prompt: Some("You are a helpful triage assistant.".to_string()),
             description: None,

@@ -1,6 +1,8 @@
 use std::net::IpAddr;
 use uuid::Uuid;
 
+use crate::entities::task::TaskStopReason;
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AiExecutionMetrics {
     pub company_id: Option<Uuid>,
@@ -80,6 +82,7 @@ pub struct TaskExecutionMetrics {
     pub task_type: String,
     pub duration_ms: u64,
     pub status: TaskStatusMetric,
+    pub stop_reason: TaskStopReason,
     pub retry_count: u32,
 }
 
