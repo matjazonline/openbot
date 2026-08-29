@@ -431,9 +431,13 @@ fn append_base_context_prompt(config: &mut serde_json::Value) {
         return;
     };
 
-    config["system_prompt"] = serde_json::json!(format!(
-        "{system_prompt}\n\n{UNTRUSTED_INPUT_SYSTEM_PROMPT}\n\n{BASE_CONTEXT_SYSTEM_PROMPT}"
-    ));
+    config["system_prompt"] = serde_json::json!(full_system_prompt(system_prompt));
+}
+
+/// The system prompt an agent actually runs with: its own, then the convention for reading fenced
+/// untrusted input, then the runtime context block.
+fn full_system_prompt(agent_prompt: &str) -> String {
+    format!("{agent_prompt}\n\n{UNTRUSTED_INPUT_SYSTEM_PROMPT}\n\n{BASE_CONTEXT_SYSTEM_PROMPT}")
 }
 
 pub fn merge_json(base: &mut serde_json::Value, override_val: &serde_json::Value) {
@@ -1707,9 +1711,7 @@ mod tests {
             &mut expected,
             &serde_json::json!({
                 "name": "Acme Corp",
-                "system_prompt": format!(
-                    "You are a helpful assistant.\n\n{BASE_CONTEXT_SYSTEM_PROMPT}"
-                ),
+                "system_prompt": full_system_prompt("You are a helpful assistant."),
                 "llm": {
                     "provider": "google",
                     "model": "gemini-2.5-flash",
@@ -1777,7 +1779,7 @@ mod tests {
             &mut expected,
             &serde_json::json!({
                 "name": "Support Channel",
-                "system_prompt": format!("Channel prompt\n\n{BASE_CONTEXT_SYSTEM_PROMPT}"),
+                "system_prompt": full_system_prompt("Channel prompt"),
                 "temperature": 0.2,
                 "llm": {
                     "provider": "openai",
@@ -1867,7 +1869,7 @@ mod tests {
             &mut expected,
             &serde_json::json!({
                 "name": "Tech Agent",
-                "system_prompt": format!("Agent prompt\n\n{BASE_CONTEXT_SYSTEM_PROMPT}"),
+                "system_prompt": full_system_prompt("Agent prompt"),
                 "temperature": 0.7,
                 "channel_only_field": true,
                 "llm": {
@@ -2063,7 +2065,7 @@ mod tests {
         let cfg = resolved.config();
         assert_eq!(
             cfg.get("system_prompt").unwrap().as_str().unwrap(),
-            format!("You are a helpful triage assistant.\n\n{BASE_CONTEXT_SYSTEM_PROMPT}")
+            full_system_prompt("You are a helpful triage assistant.")
         );
     }
 
@@ -2087,7 +2089,7 @@ mod tests {
         let cfg = resolved.config();
         assert_eq!(
             cfg.get("system_prompt").unwrap().as_str().unwrap(),
-            format!("You are a helpful assistant.\n\n{BASE_CONTEXT_SYSTEM_PROMPT}")
+            full_system_prompt("You are a helpful assistant.")
         );
     }
 
