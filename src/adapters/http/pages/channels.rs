@@ -356,41 +356,6 @@ fn advanced_channel_form(
                         placeholder="Leave blank for Company Team, @public for open access, or comma-separated emails">
                     <p class="text-[11px] text-slate-400 mt-1">Leave blank for Company Team members. Use <code class="text-indigo-300">@public</code> to allow anyone, or specify email addresses.</p>
                 </div>
-                <div>
-                    <a href="#" data-action="toggle-next"
-                        class="text-xs text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer inline-flex items-center gap-1">
-                        <span>Custom Channel Agent</span>
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </a>
-                    <div class="hidden space-y-4 mt-3">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label for="channel_provider" class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional Override)</label>
-                                <input type="text" id="channel_provider" name="provider"
-                                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                                    placeholder="google, openai, anthropic">
-                            </div>
-                            <div>
-                                <label for="channel_model" class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional Override)</label>
-                                <input type="text" id="channel_model" name="model"
-                                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                                    placeholder="gemini-2.5-flash, gpt-4o">
-                            </div>
-                            <div>
-                                <label for="channel_api_key" class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional Override)</label>
-                                <input type="password" id="channel_api_key" name="api_key"
-                                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                                    placeholder="Overrides company key">
-                            </div>
-                        </div>
-                        <div>
-                            <label for="channel_config" class="block text-xs font-medium text-slate-300 mb-1">Channel Config (JSON, Optional)</label>
-                            <textarea id="channel_config" name="channel_config" rows="3"
-                                class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                placeholder='&#123; "trigger": "email", "action": "ai_reply" &#125;'></textarea>
-                        </div>
-                    </div>
-                </div>
                 {memory_fields_html}
                 {spam_warning_html}
                 <div class="flex justify-end">
@@ -700,17 +665,10 @@ pub fn channel_row_fragment(
         }
         _ => "None".to_string(),
     };
-    let config_str = match &channel.channel_config {
-        Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
-        None => "None".to_string(),
-    };
-    let provider_str = channel.provider.as_deref().unwrap_or("Default (Company)");
-    let model_str = channel.model.as_deref().unwrap_or("Default (Company)");
-    let api_key_str = if channel.api_key.is_some() {
-        "Configured (Channel Override)"
-    } else {
-        "Default (Company)"
-    };
+    let config_str = "Configured on active agent";
+    let provider_str = "Configured on active agent";
+    let model_str = "Configured on active agent";
+    let api_key_str = "Company connection";
     let display_slug = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
     let disabled_badge = if channel.enabled {
         ""
@@ -809,13 +767,6 @@ pub fn channel_edit_fragment(
         None => String::new(),
     };
     let alias_slugs_str = super::channel_settings::stored_alias_slugs(channel);
-    let config_str = match &channel.channel_config {
-        Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
-        None => String::new(),
-    };
-    let provider_val = channel.provider.as_deref().unwrap_or("");
-    let model_val = channel.model.as_deref().unwrap_or("");
-    let api_key_val = channel.api_key.as_deref().unwrap_or("");
     let agents_selection_html = render_agents_selection(
         company.id,
         agents,
@@ -832,15 +783,6 @@ pub fn channel_edit_fragment(
         })
         .unwrap_or(false);
     let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, !is_public);
-    let custom_config_hidden = if !provider_val.is_empty()
-        || !model_val.is_empty()
-        || !api_key_val.is_empty()
-        || !config_str.is_empty()
-    {
-        ""
-    } else {
-        "hidden"
-    };
     let memory_fields_html =
         classic_memory_fields(company.memory_provider.is_some(), Some(channel));
 
@@ -881,40 +823,6 @@ pub fn channel_edit_fragment(
                     class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     placeholder="Leave blank for Company Team, @public for open access, or comma-separated emails">
                 <p class="text-[11px] text-slate-400 mt-1">Leave blank for Company Team members. Use <code class="text-indigo-300">@public</code> to allow anyone, or specify email addresses.</p>
-            </div>
-            <div>
-                <a href="#" data-action="toggle-next"
-                    class="text-xs text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer inline-flex items-center gap-1">
-                    <span>Custom Channel Agent</span>
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </a>
-                <div class="{custom_config_hidden} space-y-4 mt-3">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional Override)</label>
-                            <input type="text" name="provider" value="{provider_val}"
-                                class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                                placeholder="google, openai, anthropic">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional Override)</label>
-                            <input type="text" name="model" value="{model_val}"
-                                class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                                placeholder="gemini-2.5-flash, gpt-4o">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional Override)</label>
-                            <input type="password" name="api_key" value="{api_key_val}"
-                                class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                                placeholder="Leave empty to use Company key">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Channel Config (JSON)</label>
-                        <textarea name="channel_config" rows="3"
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500">{config_str}</textarea>
-                    </div>
-                </div>
             </div>
             {memory_fields_html}
             <div>
@@ -959,12 +867,7 @@ pub fn channel_edit_fragment(
         company_slug = escape_html_text(&company.slug),
         app_domain_name = escape_html_text(app_domain_name),
         emails_str = escape_html_attr(&emails_str),
-        provider_val = escape_html_attr(provider_val),
-        model_val = escape_html_attr(model_val),
-        api_key_val = escape_html_attr(api_key_val),
-        config_str = escape_html_text(&config_str),
         agents_selection_html = agents_selection_html,
-        custom_config_hidden = custom_config_hidden,
     )
 }
 
@@ -977,14 +880,6 @@ fn classic_memory_fields(memory_available: bool, channel: Option<&Channel>) -> S
     let persist_company = checked(channel.is_some_and(|c| c.persist_company_memory));
     let persist_agent = checked(channel.is_some_and(|c| c.persist_agent_memory));
     let persist_user = checked(channel.is_some_and(|c| c.persist_user_memory));
-    let scope_specific = channel.is_some_and(|c| {
-        c.memory_persistence_mode
-            == crate::entities::memory::MemoryPersistenceMode::ScopeSpecificFacts
-    });
-    let thinking = channel.is_some_and(|c| {
-        c.memory_recall_mode == crate::entities::memory::MemoryRecallMode::Thinking
-    });
-    let max_results = channel.map_or(5, |c| c.memory_max_results);
     format!(
         r##"<fieldset class="rounded-lg border border-slate-700 bg-slate-800/50 p-4"{disabled}>
                 <legend class="px-1 text-xs font-semibold text-slate-300">Memory</legend>
@@ -1003,31 +898,6 @@ fn classic_memory_fields(memory_available: bool, channel: Option<&Channel>) -> S
                     <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true" class="justify-self-center"{persist_agent}{disabled}>
                     <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true" class="justify-self-center"{persist_user}{disabled}>
                 </div>
-                <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <label class="block">
-                        <span class="mb-1 block text-xs font-medium text-slate-300">Persistence mode</span>
-                        <span class="mb-1 block text-[11px] text-slate-500">Scope-specific facts constrains extraction to the scope. On HydraDB it is an instruction the extractor must follow; on Hindsight it is context the extractor is given, not an enforced filter.</span>
-                        <select aria-label="Memory persistence mode" name="memory_persistence_mode" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm"{disabled}>
-                            <option value="audience_only"{audience_only_selected}>Audience only</option>
-                            <option value="scope_specific_facts"{scope_specific_selected}>Scope-specific facts</option>
-                        </select>
-                    </label>
-                    <label class="block">
-                        <span class="mb-1 block text-xs font-medium text-slate-300">Recall mode</span>
-                        <select aria-label="Memory recall mode" name="memory_recall_mode" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm"{disabled}>
-                            <option value="fast"{fast_selected}>Fast</option>
-                            <option value="thinking"{thinking_selected}>Thinking</option>
-                        </select>
-                    </label>
-                    <label class="block">
-                        <span class="mb-1 block text-xs font-medium text-slate-300">Maximum results</span>
-                        <input aria-label="Memory result limit" name="memory_max_results" type="number" min="1" max="20" value="{max_results}" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm"{disabled}>
-                    </label>
-                </div>
             </fieldset>"##,
-        fast_selected = if thinking { "" } else { " selected" },
-        thinking_selected = if thinking { " selected" } else { "" },
-        audience_only_selected = if scope_specific { "" } else { " selected" },
-        scope_specific_selected = if scope_specific { " selected" } else { "" },
     )
 }

@@ -823,14 +823,8 @@ fn durable_ingest_payload(ingest: &InboundIngestResult) -> serde_json::Value {
     if let Some(company) = durable.company.as_mut() {
         company.api_key = None;
     }
-    if let Some(channel) = durable.channel.as_mut() {
-        channel.api_key = None;
-        scrub_json_secrets(channel.channel_config.as_mut());
-    }
     for channel_match in &mut durable.channel_matches {
         channel_match.company.api_key = None;
-        channel_match.channel.api_key = None;
-        scrub_json_secrets(channel_match.channel.channel_config.as_mut());
     }
     serde_json::to_value(durable).unwrap_or_default()
 }

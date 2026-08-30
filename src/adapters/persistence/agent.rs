@@ -6,7 +6,12 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::{agent::Agent, creation::CreationProvenance, value_objects::AvatarUrl},
+    entities::{
+        agent::Agent,
+        creation::CreationProvenance,
+        memory::{MemoryPersistenceMode, MemoryRecallMode},
+        value_objects::AvatarUrl,
+    },
     use_cases::agent::{AgentPersistence, AgentWrite},
 };
 
@@ -19,10 +24,12 @@ pub struct AgentDb {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub run_timeout_secs: Option<i32>,
-    pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
+    pub memory_persistence_mode: String,
+    pub memory_recall_mode: String,
+    pub memory_max_results: i16,
     pub avatar_url: Option<String>,
     pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
@@ -44,10 +51,19 @@ impl TryFrom<AgentDb> for Agent {
                 .map(u32::try_from)
                 .transpose()
                 .map_err(|_| AppError::Internal("Invalid agents.run_timeout_secs".into()))?,
-            api_key: db.api_key,
             system_prompt: db.system_prompt,
             description: db.description,
             config_json: db.config_json,
+            memory_persistence_mode: match db.memory_persistence_mode.as_str() {
+                "scope_specific_facts" => MemoryPersistenceMode::ScopeSpecificFacts,
+                _ => MemoryPersistenceMode::AudienceOnly,
+            },
+            memory_recall_mode: match db.memory_recall_mode.as_str() {
+                "thinking" => MemoryRecallMode::Thinking,
+                _ => MemoryRecallMode::Fast,
+            },
+            memory_max_results: u8::try_from(db.memory_max_results)
+                .map_err(|_| AppError::Internal("Invalid agents.memory_max_results".into()))?,
             avatar_url: db.avatar_url.map(AvatarUrl::from),
             created_by: serde_json::from_value(db.created_by).map_err(|err| {
                 AppError::Internal(format!("Invalid agents.created_by provenance: {err}"))
@@ -57,18 +73,10 @@ impl TryFrom<AgentDb> for Agent {
     }
 }
 
-impl PostgresPersistence {
-    fn decode_agent(&self, mut db: AgentDb) -> AppResult<Agent> {
-        db.api_key = self.decrypt_credential(db.api_key)?;
-        db.try_into()
-    }
-}
-
 #[async_trait]
 impl AgentPersistence for PostgresPersistence {
     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
         let uuid = Uuid::new_v4();
-        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let run_timeout_secs = write
             .run_timeout_secs
             .map(i32::try_from)
@@ -76,9 +84,9 @@ impl AgentPersistence for PostgresPersistence {
             .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
 
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, run_timeout_secs)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs"#,
+            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+               RETURNING id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results"#,
         )
         .bind(uuid)
         .bind(company_id)
@@ -86,54 +94,57 @@ impl AgentPersistence for PostgresPersistence {
         .bind(&write.slug)
         .bind(&write.provider)
         .bind(&write.model)
-        .bind(encrypted_api_key)
         .bind(&write.system_prompt)
         .bind(&write.description)
         .bind(&write.config_json)
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(serde_json::to_value(write.created_by.unwrap_or_else(CreationProvenance::system)).map_err(|e| AppError::Internal(e.to_string()))?)
         .bind(run_timeout_secs)
+        .bind(write.memory_persistence_mode.as_str())
+        .bind(write.memory_recall_mode.as_str())
+        .bind(i16::from(write.memory_max_results))
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        self.decode_agent(db)
+        db.try_into()
     }
 
     async fn create_library(&self, write: AgentWrite) -> AppResult<Agent> {
         let uuid = Uuid::new_v4();
-        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let run_timeout_secs = write
             .run_timeout_secs
             .map(i32::try_from)
             .transpose()
             .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, run_timeout_secs)
-               VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs"#,
+            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results)
+               VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+               RETURNING id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results"#,
         )
         .bind(uuid)
         .bind(&write.name)
         .bind(&write.slug)
         .bind(&write.provider)
         .bind(&write.model)
-        .bind(encrypted_api_key)
         .bind(&write.system_prompt)
         .bind(&write.description)
         .bind(&write.config_json)
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(serde_json::to_value(write.created_by.unwrap_or_else(CreationProvenance::system)).map_err(|e| AppError::Internal(e.to_string()))?)
         .bind(run_timeout_secs)
+        .bind(write.memory_persistence_mode.as_str())
+        .bind(write.memory_recall_mode.as_str())
+        .bind(i16::from(write.memory_max_results))
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
-        self.decode_agent(db)
+        db.try_into()
     }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>> {
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs
+            r#"SELECT id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results
                FROM agents WHERE id = $1"#,
         )
         .bind(id)
@@ -141,7 +152,7 @@ impl AgentPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        db.map(|db| self.decode_agent(db)).transpose()
+        db.map(TryInto::try_into).transpose()
     }
 
     async fn get_by_company_slug_and_agent_slug(
@@ -150,7 +161,7 @@ impl AgentPersistence for PostgresPersistence {
         agent_slug: &str,
     ) -> AppResult<Option<Agent>> {
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT a.id, a.company_id, a.name, a.slug, a.provider, a.model, a.api_key, a.system_prompt, a.description, a.config_json, a.avatar_url, a.created_by, a.created_at, a.run_timeout_secs
+            r#"SELECT a.id, a.company_id, a.name, a.slug, a.provider, a.model, a.system_prompt, a.description, a.config_json, a.avatar_url, a.created_by, a.created_at, a.run_timeout_secs, a.memory_persistence_mode, a.memory_recall_mode, a.memory_max_results
                FROM agents a
                JOIN companies c ON c.id = a.company_id
                WHERE c.slug = $1 AND a.slug = $2"#,
@@ -161,12 +172,12 @@ impl AgentPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        db.map(|db| self.decode_agent(db)).transpose()
+        db.map(TryInto::try_into).transpose()
     }
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>> {
         let db_list = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, NULL::text AS api_key, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs
+            r#"SELECT id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results
                FROM agents WHERE company_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -180,7 +191,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn list_library(&self) -> AppResult<Vec<Agent>> {
         let rows = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, NULL::text AS api_key, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs
+            r#"SELECT id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results
                FROM agents WHERE company_id IS NULL
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -191,7 +202,6 @@ impl AgentPersistence for PostgresPersistence {
     }
 
     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
-        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let run_timeout_secs = write
             .run_timeout_secs
             .map(i32::try_from)
@@ -199,26 +209,28 @@ impl AgentPersistence for PostgresPersistence {
             .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
         let db = sqlx::query_as::<_, AgentDb>(
             r#"UPDATE agents
-               SET name = $1, slug = $2, provider = $3, model = $4, api_key = $5, system_prompt = $6, description = $7, config_json = $8, avatar_url = $9, run_timeout_secs = $10
-               WHERE id = $11
-               RETURNING id, company_id, name, slug, provider, model, api_key, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs"#,
+               SET name = $1, slug = $2, provider = $3, model = $4, system_prompt = $5, description = $6, config_json = $7, avatar_url = $8, run_timeout_secs = $9, memory_persistence_mode = $10, memory_recall_mode = $11, memory_max_results = $12
+               WHERE id = $13
+               RETURNING id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results"#,
         )
         .bind(&write.name)
         .bind(&write.slug)
         .bind(&write.provider)
         .bind(&write.model)
-        .bind(encrypted_api_key)
         .bind(&write.system_prompt)
         .bind(&write.description)
         .bind(&write.config_json)
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(run_timeout_secs)
+        .bind(write.memory_persistence_mode.as_str())
+        .bind(write.memory_recall_mode.as_str())
+        .bind(i16::from(write.memory_max_results))
         .bind(id)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        self.decode_agent(db)
+        db.try_into()
     }
 
     async fn delete(&self, id: Uuid) -> AppResult<()> {
@@ -230,10 +242,10 @@ impl AgentPersistence for PostgresPersistence {
                     .as_database_error()
                     .and_then(|db| db.code())
                     .as_deref()
-                    == Some("23503")
+                    .is_some_and(|code| code == "23503" || code == "23514")
                 {
                     AppError::Conflict(
-                        "This library agent is assigned to one or more channels.".into(),
+                        "This agent is active on an enabled channel. Disable or reassign the channel before deleting it.".into(),
                     )
                 } else {
                     AppError::from(error)
@@ -256,6 +268,9 @@ mod tests {
     #[test]
     fn malformed_provenance_is_a_conversion_error_not_a_panic() {
         let db = AgentDb {
+            memory_persistence_mode: "audience_only".into(),
+            memory_recall_mode: "fast".into(),
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: None,
             name: "Broken".into(),
@@ -263,7 +278,6 @@ mod tests {
             provider: None,
             model: None,
             run_timeout_secs: None,
-            api_key: None,
             system_prompt: None,
             description: None,
             config_json: None,
@@ -313,12 +327,15 @@ mod tests {
             &persistence,
             company.id,
             AgentWrite {
+                memory_persistence_mode:
+                    crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
+                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+                memory_max_results: 5,
                 name: "Support Agent".to_string(),
                 slug: "support-agent".to_string(),
                 provider: Some("openai".to_string()),
                 model: Some("gpt-4o".to_string()),
                 run_timeout_secs: Some(45),
-                api_key: Some("key_123".to_string()),
                 system_prompt: Some("You are a helpful support agent.".to_string()),
                 description: Some("Answers customer support questions.".to_string()),
                 config_json: Some(config.clone()),
@@ -334,7 +351,6 @@ mod tests {
         assert_eq!(agent.provider.as_deref(), Some("openai"));
         assert_eq!(agent.model.as_deref(), Some("gpt-4o"));
         assert_eq!(agent.run_timeout_secs, Some(45));
-        assert_eq!(agent.api_key.as_deref(), Some("key_123"));
         assert_eq!(
             agent.system_prompt.as_deref(),
             Some("You are a helpful support agent.")
@@ -368,7 +384,6 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(updated.name, "Support Agent V2");
-        assert_eq!(updated.api_key, None);
         // Clearing the field clears the picture -- a blank avatar box is how one is removed.
         assert_eq!(updated.avatar_url, None);
 

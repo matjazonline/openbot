@@ -15,7 +15,11 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
-    entities::{agent::Agent, value_objects::AvatarUrl},
+    entities::{
+        agent::Agent,
+        memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
+        value_objects::AvatarUrl,
+    },
     use_cases::{agent::AgentUseCases, company::CompanyUseCases},
 };
 
@@ -71,12 +75,14 @@ pub struct AgentForm {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub run_timeout_secs: Option<u32>,
-    pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
     pub description: Option<String>,
     pub config_json: Option<String>,
     pub avatar_url: Option<String>,
+    pub memory_persistence_mode: Option<MemoryPersistenceMode>,
+    pub memory_recall_mode: Option<MemoryRecallMode>,
+    pub memory_max_results: Option<u8>,
     /// `"simple"` means `system_prompt` holds instructions to expand, not the prompt itself.
     pub form_mode: Option<String>,
 }
@@ -117,7 +123,6 @@ pub struct InlineAgentForm {
     pub inline_agent_slug: Option<String>,
     pub inline_agent_provider: Option<String>,
     pub inline_agent_model: Option<String>,
-    pub inline_agent_api_key: Option<String>,
     pub inline_agent_system_prompt: Option<String>,
     pub inline_agent_config_json: Option<String>,
 
@@ -125,7 +130,6 @@ pub struct InlineAgentForm {
     pub slug: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
-    pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     pub config_json: Option<String>,
 }
@@ -137,12 +141,17 @@ pub struct AgentJsonPayload {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub run_timeout_secs: Option<u32>,
-    pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
     pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
     pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub memory_persistence_mode: MemoryPersistenceMode,
+    #[serde(default)]
+    pub memory_recall_mode: MemoryRecallMode,
+    #[serde(default = "default_memory_max_results")]
+    pub memory_max_results: u8,
 }
 
 impl AgentJsonPayload {
@@ -160,13 +169,11 @@ pub struct AgentResponse {
 
 /// What an agent answers with when it should not take the company's LLM settings.
 ///
-/// The three always travel together and are all `Option<&str>`, so they are passed as one value
-/// rather than three adjacent parameters a call site could put out of order.
+/// The model selection an agent may override. Credentials remain company-owned.
 #[derive(Debug, Clone, Copy, Default)]
 pub(super) struct ModelOverrides<'a> {
     pub provider: Option<&'a str>,
     pub model: Option<&'a str>,
-    pub api_key: Option<&'a str>,
 }
 
 /// An agent built from plain-language instructions rather than a written system prompt.
@@ -185,31 +192,52 @@ pub(super) async fn create_agent_from_instructions(
     run_timeout_secs: Option<u32>,
     avatar_url: Option<&AvatarUrl>,
 ) -> Result<Agent, String> {
+    let write = agent_write_from_instructions(
+        agent_use_cases,
+        user_id,
+        company_id,
+        name,
+        slug,
+        instructions,
+        overrides,
+        run_timeout_secs,
+        avatar_url,
+    )
+    .await?;
+    agent_use_cases
+        .create_agent(user_id, company_id, write)
+        .await
+        .map_err(|err| format!("Failed to create agent: {err}"))
+}
+
+pub(super) async fn agent_write_from_instructions(
+    agent_use_cases: &AgentUseCases,
+    user_id: Uuid,
+    company_id: Uuid,
+    name: &str,
+    slug: &str,
+    instructions: &str,
+    overrides: ModelOverrides<'_>,
+    run_timeout_secs: Option<u32>,
+    avatar_url: Option<&AvatarUrl>,
+) -> Result<AgentWrite, String> {
     // Expansion runs on the company's own credentials: the overrides are what the *agent* will
     // answer with, not necessarily a model that can write its prompt.
     let system_prompt = agent_use_cases
-        .generate_system_prompt(user_id, company_id, instructions, None, None, None)
+        .generate_system_prompt(user_id, company_id, instructions, None, None)
         .await
         .map_err(|err| format!("Failed to generate agent prompt: {err}"))?;
 
-    agent_use_cases
-        .create_agent(
-            user_id,
-            company_id,
-            AgentWrite {
-                name: name.to_string(),
-                slug: slug.to_string(),
-                provider: overrides.provider.map(str::to_string),
-                model: overrides.model.map(str::to_string),
-                run_timeout_secs,
-                api_key: overrides.api_key.map(str::to_string),
-                system_prompt: Some(system_prompt),
-                avatar_url: avatar_url.cloned(),
-                ..AgentWrite::default()
-            },
-        )
-        .await
-        .map_err(|err| format!("Failed to create agent: {err}"))
+    Ok(AgentWrite {
+        name: name.to_string(),
+        slug: slug.to_string(),
+        provider: overrides.provider.map(str::to_string),
+        model: overrides.model.map(str::to_string),
+        run_timeout_secs,
+        system_prompt: Some(system_prompt),
+        avatar_url: avatar_url.cloned(),
+        ..AgentWrite::default()
+    })
 }
 
 /// GET /companies/{company_id}/agents - Full HTML page listing agents (Protected).
@@ -276,10 +304,14 @@ async fn create_agent_handler(
                 provider: form.provider.clone(),
                 model: form.model.clone(),
                 run_timeout_secs: form.run_timeout_secs,
-                api_key: form.api_key.clone(),
                 system_prompt: form.system_prompt.clone(),
                 description: form.description.clone(),
                 config_json,
+                memory_persistence_mode: form.memory_persistence_mode.unwrap_or_default(),
+                memory_recall_mode: form.memory_recall_mode.unwrap_or_default(),
+                memory_max_results: form
+                    .memory_max_results
+                    .unwrap_or_else(default_memory_max_results),
                 avatar_url,
                 created_by: None,
             },
@@ -357,11 +389,6 @@ async fn create_agent_inline_handler(
         .filter(|s| !s.trim().is_empty())
         .or_else(|| form.model.filter(|s| !s.trim().is_empty()));
 
-    let api_key = form
-        .inline_agent_api_key
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| form.api_key.filter(|s| !s.trim().is_empty()));
-
     let system_prompt = form
         .inline_agent_system_prompt
         .filter(|s| !s.trim().is_empty())
@@ -398,7 +425,6 @@ async fn create_agent_inline_handler(
                 slug: slug.clone(),
                 provider: provider.clone(),
                 model: model.clone(),
-                api_key: api_key.clone(),
                 system_prompt: system_prompt.clone(),
                 config_json,
                 ..AgentWrite::default()
@@ -513,10 +539,14 @@ async fn update_agent_handler(
                 provider: form.provider.clone(),
                 model: form.model.clone(),
                 run_timeout_secs: form.run_timeout_secs,
-                api_key: form.api_key.clone(),
                 system_prompt: form.system_prompt.clone(),
                 description: form.description.clone(),
                 config_json,
+                memory_persistence_mode: form.memory_persistence_mode.unwrap_or_default(),
+                memory_recall_mode: form.memory_recall_mode.unwrap_or_default(),
+                memory_max_results: form
+                    .memory_max_results
+                    .unwrap_or_else(default_memory_max_results),
                 avatar_url,
                 created_by: None,
             },
@@ -572,10 +602,12 @@ async fn create_agent_json(
                 provider: payload.provider.clone(),
                 model: payload.model.clone(),
                 run_timeout_secs: payload.run_timeout_secs,
-                api_key: payload.api_key.clone(),
                 system_prompt: payload.system_prompt.clone(),
                 description: payload.description.clone(),
                 config_json: payload.config_json.clone(),
+                memory_persistence_mode: payload.memory_persistence_mode,
+                memory_recall_mode: payload.memory_recall_mode,
+                memory_max_results: payload.memory_max_results,
                 avatar_url,
                 created_by: None,
             },
@@ -625,10 +657,12 @@ async fn update_agent_json(
                 provider: payload.provider.clone(),
                 model: payload.model.clone(),
                 run_timeout_secs: payload.run_timeout_secs,
-                api_key: payload.api_key.clone(),
                 system_prompt: payload.system_prompt.clone(),
                 description: payload.description.clone(),
                 config_json: payload.config_json.clone(),
+                memory_persistence_mode: payload.memory_persistence_mode,
+                memory_recall_mode: payload.memory_recall_mode,
+                memory_max_results: payload.memory_max_results,
                 avatar_url,
                 created_by: None,
             },
@@ -664,10 +698,8 @@ pub struct GeneratePromptForm {
     pub prompt: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
-    pub api_key: Option<String>,
     pub inline_agent_provider: Option<String>,
     pub inline_agent_model: Option<String>,
-    pub inline_agent_api_key: Option<String>,
     pub target_id: Option<String>,
     pub gen_box_id: Option<String>,
 }
@@ -677,7 +709,6 @@ pub struct GeneratePromptJsonPayload {
     pub instructions: String,
     pub provider: Option<String>,
     pub model: Option<String>,
-    pub api_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -717,11 +748,6 @@ pub async fn generate_agent_prompt_handler(
         .model
         .filter(|s| !s.trim().is_empty())
         .or_else(|| form.inline_agent_model.filter(|s| !s.trim().is_empty()));
-    let api_key_override = form
-        .api_key
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| form.inline_agent_api_key.filter(|s| !s.trim().is_empty()));
-
     let target_id = form
         .target_id
         .unwrap_or_else(|| "agent_system_prompt".to_string());
@@ -734,7 +760,6 @@ pub async fn generate_agent_prompt_handler(
             &instructions,
             provider_override.as_deref(),
             model_override.as_deref(),
-            api_key_override.as_deref(),
         )
         .await
     {
@@ -780,7 +805,6 @@ pub async fn generate_agent_prompt_json(
             &payload.instructions,
             payload.provider.as_deref(),
             payload.model.as_deref(),
-            payload.api_key.as_deref(),
         )
         .await?;
 
@@ -815,6 +839,9 @@ mod tests {
         };
 
         let agent = Agent {
+            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: Some(company.id),
             name: "Support Agent".to_string(),
@@ -822,7 +849,6 @@ mod tests {
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
             run_timeout_secs: None,
-            api_key: Some("sk-test123".to_string()),
             system_prompt: Some("You are a helpful agent.".to_string()),
             description: None,
             config_json: Some(json!({ "temperature": 0.5 })),
@@ -836,7 +862,7 @@ mod tests {
         assert!(row_html.contains("@support-agent"));
         assert!(row_html.contains("openai"));
         assert!(row_html.contains("gpt-4o"));
-        assert!(row_html.contains("Key Configured"));
+        assert!(!row_html.contains("Key Configured"));
 
         let edit_html = pages::agent_edit_fragment(&company, &agent);
         assert!(edit_html.contains("hx-put="));

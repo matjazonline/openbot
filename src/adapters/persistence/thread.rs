@@ -739,7 +739,7 @@ mod tests {
             ChannelWrite {
                 name: "First".into(),
                 slug: "first".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -751,7 +751,7 @@ mod tests {
             ChannelWrite {
                 name: "Second".into(),
                 slug: "second".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -947,7 +947,7 @@ mod tests {
             ChannelWrite {
                 name: "Outbox Channel".into(),
                 slug: format!("outbox-channel-{suffix}"),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -1108,7 +1108,7 @@ mod tests {
             ChannelWrite {
                 name: "Stream".into(),
                 slug: "stream".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )

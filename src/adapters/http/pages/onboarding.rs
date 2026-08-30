@@ -101,7 +101,7 @@ pub fn onboarding_channel_page(
         {error_html}
         <form method="post" action="/ui/onboarding/companies/{company_id}/channel" class="space-y-5" {busy_handler}>
             {library_html}
-            <fieldset class="fieldset"><legend class="fieldset-legend">Channel name <span class="font-normal opacity-60">(optional)</span></legend><input id="onboarding_channel_name" name="name" type="text" class="input w-full" placeholder="Customer Support"><p class="label opacity-60">For example: <span class="font-mono">customer-support@{company_slug}...</span></p></fieldset>
+            <fieldset class="fieldset"><legend class="fieldset-legend">Custom agent and channel name</legend><input id="onboarding_channel_name" name="name" type="text" class="input w-full" placeholder="Customer Support"><p class="label opacity-60">Required when creating a custom agent. For example: <span class="font-mono">customer-support@{company_slug}...</span></p></fieldset>
             <fieldset class="fieldset"><legend class="fieldset-legend">What should this custom agent do?</legend><textarea id="onboarding_instructions" name="instructions" rows="7" class="textarea w-full" placeholder="Read incoming customer emails, identify the request, draft a concise and friendly answer, ask for missing details, and clearly list any next actions."></textarea><p class="label opacity-60">Required only when creating a custom agent.</p></fieldset>
             <div class="card-actions items-center justify-between"><a href="/ui" class="btn btn-ghost">Finish later</a>{submit_button}</div>
         </form>"##,

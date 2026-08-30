@@ -639,7 +639,7 @@ mod tests {
             ChannelWrite {
                 name: "Dashboard".into(),
                 slug: "dashboard".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )

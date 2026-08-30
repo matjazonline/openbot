@@ -10,6 +10,7 @@ use crate::{
     entities::{
         agent::{Agent, MAX_AGENT_RUN_TIMEOUT_SECS, MIN_AGENT_RUN_TIMEOUT_SECS},
         creation::CreationProvenance,
+        memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
         user::Viewer,
         value_objects::AvatarUrl,
     },
@@ -30,20 +31,42 @@ pub fn agent_not_found() -> AppError {
 ///
 /// Values reach persistence already normalized — see [`AgentWrite::normalize`]. Mirrors
 /// [`crate::use_cases::channel::ChannelWrite`].
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct AgentWrite {
     pub name: String,
     pub slug: String,
     pub provider: Option<String>,
     pub model: Option<String>,
     pub run_timeout_secs: Option<u32>,
-    pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     /// Short statement of what the agent is for, read by the agent directory tool.
     pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
+    pub memory_persistence_mode: MemoryPersistenceMode,
+    pub memory_recall_mode: MemoryRecallMode,
+    pub memory_max_results: u8,
     pub avatar_url: Option<AvatarUrl>,
     pub created_by: Option<CreationProvenance>,
+}
+
+impl Default for AgentWrite {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            slug: String::new(),
+            provider: None,
+            model: None,
+            run_timeout_secs: None,
+            system_prompt: None,
+            description: None,
+            config_json: None,
+            memory_persistence_mode: MemoryPersistenceMode::AudienceOnly,
+            memory_recall_mode: MemoryRecallMode::Fast,
+            memory_max_results: default_memory_max_results(),
+            avatar_url: None,
+            created_by: None,
+        }
+    }
 }
 
 impl AgentWrite {
@@ -71,7 +94,6 @@ impl AgentWrite {
         for field in [
             &mut self.provider,
             &mut self.model,
-            &mut self.api_key,
             &mut self.system_prompt,
             &mut self.description,
         ] {
@@ -83,8 +105,56 @@ impl AgentWrite {
             }
         }
 
+        if !(1..=20).contains(&self.memory_max_results) {
+            return Err(AppError::BadRequest(
+                "Memory result limit must be between 1 and 20.".into(),
+            ));
+        }
+        validate_agent_config(self.config_json.as_ref())?;
+
         Ok(())
     }
+}
+
+fn validate_agent_config(config: Option<&serde_json::Value>) -> AppResult<()> {
+    let Some(config) = config else { return Ok(()) };
+    let object = config
+        .as_object()
+        .ok_or_else(|| AppError::BadRequest("Agent config must be a JSON object.".into()))?;
+    for reserved in ["name", "system_prompt"] {
+        if object.contains_key(reserved) {
+            return Err(AppError::BadRequest(format!(
+                "Agent config path '{reserved}' is reserved; use the typed agent field instead."
+            )));
+        }
+    }
+    if let Some(llm) = object.get("llm").and_then(serde_json::Value::as_object) {
+        for reserved in ["provider", "model", "api_key"] {
+            if llm.contains_key(reserved) {
+                return Err(AppError::BadRequest(format!(
+                    "Agent config path 'llm.{reserved}' is reserved; use the typed agent or company field instead."
+                )));
+            }
+        }
+    }
+    fn contains_secret_key(value: &serde_json::Value) -> bool {
+        match value {
+            serde_json::Value::Object(map) => map.iter().any(|(key, value)| {
+                matches!(
+                    key.to_ascii_lowercase().as_str(),
+                    "api_key" | "apikey" | "api-key"
+                ) || contains_secret_key(value)
+            }),
+            serde_json::Value::Array(values) => values.iter().any(contains_secret_key),
+            _ => false,
+        }
+    }
+    if contains_secret_key(config) {
+        return Err(AppError::BadRequest(
+            "Agent config must not contain API keys or other model credentials.".into(),
+        ));
+    }
+    Ok(())
 }
 
 #[async_trait]
@@ -348,7 +418,6 @@ impl AgentUseCases {
         instructions: &str,
         provider_override: Option<&str>,
         model_override: Option<&str>,
-        api_key_override: Option<&str>,
     ) -> AppResult<String> {
         self.verify_company_manager(user_id, company_id).await?;
 
@@ -358,12 +427,7 @@ impl AgentUseCases {
             .await?
             .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
 
-        let llm = PromptGeneratorLlm::resolve(
-            &company,
-            provider_override,
-            model_override,
-            api_key_override,
-        )?;
+        let llm = PromptGeneratorLlm::resolve(&company, provider_override, model_override)?;
 
         generate_prompt_with(llm, instructions).await
     }
@@ -455,27 +519,32 @@ impl PromptGeneratorLlm {
         company: &crate::entities::company::Company,
         provider_override: Option<&str>,
         model_override: Option<&str>,
-        api_key_override: Option<&str>,
     ) -> AppResult<Self> {
-        let provider = non_empty(provider_override)
-            .or_else(|| non_empty(company.provider.as_deref()))
+        let company_provider = non_empty(company.provider.as_deref())
             .map(|provider| provider.to_lowercase())
             .ok_or_else(|| {
                 AppError::Internal(
-                    "LLM provider is missing. Please configure one in company settings or in the form."
+                    "LLM provider is missing. Please configure the company model connection."
                         .into(),
                 )
             })?;
+        let provider = non_empty(provider_override)
+            .map(str::to_lowercase)
+            .unwrap_or_else(|| company_provider.clone());
+        if provider != company_provider {
+            return Err(AppError::BadRequest(format!(
+                "Agent provider '{provider}' does not match company model connection provider '{company_provider}'."
+            )));
+        }
 
         let model = non_empty(model_override)
             .or_else(|| non_empty(company.model.as_deref()))
             .unwrap_or_else(|| default_model_for(&provider))
             .to_string();
 
-        let api_key = non_empty(api_key_override)
-            .or_else(|| non_empty(company.api_key.as_deref()))
+        let api_key = non_empty(company.api_key.as_deref())
             .ok_or_else(|| AppError::Internal(format!(
-                "API key is missing for provider '{}'. Please configure an API key in company settings or in the form.",
+                "API key is missing for provider '{}'. Please configure the company model connection.",
                 provider
             )))?
             .to_string();
@@ -573,6 +642,9 @@ mod tests {
         assert!(invalid.normalize().is_err());
 
         let agent = Agent {
+            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: None,
             name: "Timed".into(),
@@ -580,7 +652,6 @@ mod tests {
             provider: None,
             model: None,
             run_timeout_secs: Some(45),
-            api_key: None,
             system_prompt: None,
             description: None,
             config_json: None,
@@ -592,6 +663,37 @@ mod tests {
             agent.run_timeout(std::time::Duration::from_secs(300)),
             std::time::Duration::from_secs(45)
         );
+    }
+
+    #[test]
+    fn agent_config_accepts_supplementary_settings_and_rejects_typed_or_secret_paths() {
+        for config in [
+            json!({"name": "forged"}),
+            json!({"system_prompt": "forged"}),
+            json!({"llm": {"provider": "other"}}),
+            json!({"llm": {"model": "other"}}),
+            json!({"llm": {"api_key": "secret"}}),
+            json!({"tools": {"nested": {"api-key": "secret"}}}),
+        ] {
+            let mut write = AgentWrite {
+                name: "Configured".into(),
+                slug: "configured".into(),
+                config_json: Some(config),
+                ..AgentWrite::default()
+            };
+            assert!(write.normalize().is_err());
+        }
+
+        let mut allowed = AgentWrite {
+            name: "Configured".into(),
+            slug: "configured".into(),
+            config_json: Some(json!({
+                "llm": {"temperature": 0.2, "max_tokens": 512},
+                "tools": {"web": {"enabled": true}}
+            })),
+            ..AgentWrite::default()
+        };
+        allowed.normalize().unwrap();
     }
 
     struct MockCompanyPersistence {
@@ -691,6 +793,10 @@ mod tests {
     impl AgentPersistence for MockAgentPersistence {
         async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
             let agent = Agent {
+                memory_persistence_mode:
+                    crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
+                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+                memory_max_results: 5,
                 id: Uuid::new_v4(),
                 company_id: Some(company_id),
                 name: write.name,
@@ -698,7 +804,6 @@ mod tests {
                 provider: write.provider,
                 model: write.model,
                 run_timeout_secs: write.run_timeout_secs,
-                api_key: write.api_key,
                 system_prompt: write.system_prompt,
                 description: write.description,
                 config_json: write.config_json,
@@ -756,9 +861,11 @@ mod tests {
             agent.slug = write.slug;
             agent.provider = write.provider;
             agent.model = write.model;
-            agent.api_key = write.api_key;
             agent.system_prompt = write.system_prompt;
             agent.description = write.description;
+            agent.memory_persistence_mode = write.memory_persistence_mode;
+            agent.memory_recall_mode = write.memory_recall_mode;
+            agent.memory_max_results = write.memory_max_results;
             agent.config_json = write.config_json;
             agent.avatar_url = write.avatar_url;
             Ok(agent.clone())
@@ -813,7 +920,7 @@ mod tests {
         assert!(invalid_res.is_err());
 
         // 1. Owner creates agent with config_json
-        let config = json!({ "temperature": 0.7, "system_prompt": "Hello" });
+        let config = json!({ "temperature": 0.7 });
 
         let agent = use_cases
             .create_agent(
@@ -824,7 +931,6 @@ mod tests {
                     slug: "support-bot".to_string(),
                     provider: Some("openai".to_string()),
                     model: Some("gpt-4o".to_string()),
-                    api_key: Some("key_123".to_string()),
                     system_prompt: Some("Prompt".to_string()),
                     config_json: Some(config.clone()),
                     ..AgentWrite::default()
@@ -837,7 +943,6 @@ mod tests {
         assert_eq!(agent.slug, "support-bot");
         assert_eq!(agent.provider.as_deref(), Some("openai"));
         assert_eq!(agent.model.as_deref(), Some("gpt-4o"));
-        assert_eq!(agent.api_key.as_deref(), Some("key_123"));
         assert_eq!(agent.system_prompt.as_deref(), Some("Prompt"));
         assert_eq!(agent.config_json, Some(config));
 
@@ -885,7 +990,6 @@ mod tests {
         assert_eq!(updated.slug, "updated-bot");
         assert_eq!(updated.provider.as_deref(), Some("anthropic"));
         assert_eq!(updated.model.as_deref(), Some("claude-3-5-sonnet"));
-        assert_eq!(updated.api_key, None);
         assert_eq!(updated.system_prompt, None);
         assert_eq!(updated.config_json, Some(updated_config));
 
@@ -948,7 +1052,7 @@ Guidelines:
             created_at: Utc::now(),
         };
 
-        let company_error = PromptGeneratorLlm::resolve(&company, None, None, None)
+        let company_error = PromptGeneratorLlm::resolve(&company, None, None)
             .err()
             .expect("a company without its own key must be rejected");
         assert!(company_error.to_string().contains("API key is missing"));

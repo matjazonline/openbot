@@ -216,11 +216,11 @@ fn report_task_join(result: Option<Result<(), tokio::task::JoinError>>) {
 }
 
 /// What a scheduled run needs loaded before the agent can answer: the company and channel it runs
-/// as, and the agent configured on that channel, if any.
+/// as, and the active agent configured at position 0.
 struct ScheduledRunContext {
     company: Company,
     channel: Channel,
-    agent: Option<Agent>,
+    agent: Agent,
 }
 
 /// The Message-ID of a scheduled run's reply, derived from the task so a retry reuses it and the
@@ -1147,7 +1147,7 @@ impl TaskWorker {
                 .persist(MemoryPersistInput {
                     company: &context.company,
                     channel: &context.channel,
-                    agent: context.agent.as_ref(),
+                    agent: Some(&context.agent),
                     sender: None,
                     task_id: task.id,
                     user_context: &payload.prompt,
@@ -1185,11 +1185,17 @@ impl TaskWorker {
         let first_agent_id = channel
             .agent_ids
             .as_ref()
-            .and_then(|ids| ids.first().copied());
-        let agent = match (self.thread_use_cases.agent_persistence(), first_agent_id) {
-            (Some(agents), Some(id)) => agents.get_by_id(id).await.map_err(|e| e.to_string())?,
-            _ => None,
-        };
+            .and_then(|ids| ids.first().copied())
+            .ok_or_else(|| "Enabled channel has no active agent at position 0.".to_string())?;
+        let agents = self
+            .thread_use_cases
+            .agent_persistence()
+            .ok_or_else(|| "Agent persistence is unavailable.".to_string())?;
+        let agent = agents
+            .get_by_id(first_agent_id)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("Active agent {first_agent_id} was not found."))?;
 
         Ok(ScheduledRunContext {
             company,
@@ -1213,12 +1219,8 @@ impl TaskWorker {
             .await
             .map_err(|e| e.to_string())?;
 
-        let params = ResolvedAgentParams::new(
-            Some(&context.company),
-            Some(&context.channel),
-            context.agent.as_ref(),
-        )
-        .map_err(|e| format!("Failed to resolve agent parameters: {e}"))?;
+        let params = ResolvedAgentParams::new(Some(&context.company), Some(&context.agent))
+            .map_err(|e| format!("Failed to resolve agent parameters: {e}"))?;
 
         let mut prompt = payload.prompt.clone();
         if let Some(memory) = self.thread_use_cases.memory_coordinator()
@@ -1226,7 +1228,7 @@ impl TaskWorker {
                 .recall(MemoryRecallInput {
                     company: &context.company,
                     channel: &context.channel,
-                    agent: context.agent.as_ref(),
+                    agent: Some(&context.agent),
                     sender: None,
                     audience: MemoryRecallAudience::MemberOrSystem,
                     task_id,
@@ -1248,14 +1250,10 @@ impl TaskWorker {
             .ids(
                 Some(context.company.id),
                 Some(context.channel.id),
-                context.agent.as_ref().map(|agent| agent.id),
+                Some(context.agent.id),
             )
             .trace(correlation_id, Some(task_id));
-        let run_timeout = context
-            .agent
-            .as_ref()
-            .map(|agent| agent.run_timeout(self.agent_run_timeout))
-            .unwrap_or(self.agent_run_timeout);
+        let run_timeout = context.agent.run_timeout(self.agent_run_timeout);
         // Boxed, not detached: dropping the `Timeout` still drops the provider call.
         let output = tokio::time::timeout(run_timeout, Box::pin(runner.execute()))
             .await
@@ -1554,6 +1552,7 @@ mod tests {
     use crate::{
         app_error::AppResult,
         entities::{
+            agent::Agent,
             channel::Channel,
             company::Company,
             cursor::{MessageCursor, ThreadCursor},
@@ -1562,10 +1561,62 @@ mod tests {
             thread::Thread,
         },
         use_cases::{
+            agent::{AgentPersistence, AgentWrite},
             company::{CompanyPersistence, CompanyWrite},
             thread::ThreadPersistence,
         },
     };
+
+    struct MockAgentPersistence {
+        agent: Agent,
+    }
+
+    #[async_trait]
+    impl AgentPersistence for MockAgentPersistence {
+        async fn create(&self, _company_id: Uuid, _write: AgentWrite) -> AppResult<Agent> {
+            unimplemented!()
+        }
+        async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>> {
+            Ok((self.agent.id == id).then(|| self.agent.clone()))
+        }
+        async fn get_by_company_slug_and_agent_slug(
+            &self,
+            _company_slug: &str,
+            _agent_slug: &str,
+        ) -> AppResult<Option<Agent>> {
+            unimplemented!()
+        }
+        async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Agent>> {
+            unimplemented!()
+        }
+        async fn update(&self, _id: Uuid, _write: AgentWrite) -> AppResult<Agent> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+            unimplemented!()
+        }
+    }
+
+    fn active_agent(company_id: Uuid, id: Uuid) -> Agent {
+        Agent {
+            id,
+            company_id: Some(company_id),
+            name: "Test agent".into(),
+            slug: "test-agent".into(),
+            provider: None,
+            model: None,
+            run_timeout_secs: None,
+            system_prompt: Some("Help with the request.".into()),
+            description: None,
+            config_json: None,
+            avatar_url: None,
+            memory_persistence_mode: Default::default(),
+            memory_recall_mode: Default::default(),
+            memory_max_results: crate::entities::memory::default_memory_max_results(),
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: Utc::now(),
+        }
+    }
 
     struct MockCompanyPersistence {
         company: Option<Company>,
@@ -2492,6 +2543,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
+        let agent_id = Uuid::new_v4();
 
         let task_persistence = Arc::new(MockTaskPersistence::default());
         let thread_persistence = Arc::new(MockThreadPersistence {
@@ -2522,21 +2574,14 @@ mod tests {
             description: None,
             slug: "support".into(),
             alias_slugs: Vec::new(),
-            api_key: None,
-            provider: None,
-            model: None,
             participant_emails: None,
-            agent_ids: None,
-            channel_config: None,
+            agent_ids: Some(vec![agent_id]),
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
             retrieve_user_memory: false,
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
@@ -2579,13 +2624,18 @@ mod tests {
             operator_emails: Vec::new(),
         });
 
-        let thread_use_cases = Arc::new(ThreadUseCases::new(
-            thread_persistence,
-            channel_persistence,
-            company_persistence,
-            task_persistence.clone(),
-            config.clone(),
-        ));
+        let thread_use_cases = Arc::new(
+            ThreadUseCases::new(
+                thread_persistence,
+                channel_persistence,
+                company_persistence,
+                task_persistence.clone(),
+                config.clone(),
+            )
+            .with_agent_persistence(Arc::new(MockAgentPersistence {
+                agent: active_agent(company_id, agent_id),
+            })),
+        );
 
         let worker = TaskWorker::new(task_persistence.clone(), thread_use_cases, config);
 
@@ -2680,6 +2730,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
+        let agent_id = Uuid::new_v4();
 
         let company = Company {
             id: company_id,
@@ -2704,21 +2755,14 @@ mod tests {
             description: None,
             slug: "audit".into(),
             alias_slugs: Vec::new(),
-            api_key: None,
-            provider: None,
-            model: None,
             participant_emails: None,
-            agent_ids: None,
-            channel_config: None,
+            agent_ids: Some(vec![agent_id]),
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
             retrieve_user_memory: false,
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
@@ -2759,17 +2803,22 @@ mod tests {
             operator_emails: Vec::new(),
         });
 
-        let thread_use_cases = Arc::new(ThreadUseCases::new(
-            thread_persistence.clone(),
-            Arc::new(MockChannelPersistence {
-                channel: Some(channel.clone()),
-            }),
-            Arc::new(MockCompanyPersistence {
-                company: Some(company.clone()),
-            }),
-            task_persistence.clone(),
-            config.clone(),
-        ));
+        let thread_use_cases = Arc::new(
+            ThreadUseCases::new(
+                thread_persistence.clone(),
+                Arc::new(MockChannelPersistence {
+                    channel: Some(channel.clone()),
+                }),
+                Arc::new(MockCompanyPersistence {
+                    company: Some(company.clone()),
+                }),
+                task_persistence.clone(),
+                config.clone(),
+            )
+            .with_agent_persistence(Arc::new(MockAgentPersistence {
+                agent: active_agent(company_id, agent_id),
+            })),
+        );
 
         let worker = Arc::new(TaskWorker::new(
             task_persistence.clone(),
@@ -2825,6 +2874,7 @@ mod tests {
         let channel_id = Uuid::new_v4();
         let thread_id = Uuid::new_v4();
         let trigger = MessageId::new("<TRIGGER123@domain.com>");
+        let agent_id = Uuid::new_v4();
 
         let company = Company {
             id: company_id,
@@ -2849,21 +2899,14 @@ mod tests {
             description: None,
             slug: "audit".into(),
             alias_slugs: Vec::new(),
-            api_key: None,
-            provider: None,
-            model: None,
             participant_emails: None,
-            agent_ids: None,
-            channel_config: None,
+            agent_ids: Some(vec![agent_id]),
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
             retrieve_user_memory: false,
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         };
@@ -2925,17 +2968,22 @@ mod tests {
             operator_emails: Vec::new(),
         });
 
-        let thread_use_cases = Arc::new(ThreadUseCases::new(
-            thread_persistence.clone(),
-            Arc::new(MockChannelPersistence {
-                channel: Some(channel.clone()),
-            }),
-            Arc::new(MockCompanyPersistence {
-                company: Some(company.clone()),
-            }),
-            task_persistence.clone(),
-            config.clone(),
-        ));
+        let thread_use_cases = Arc::new(
+            ThreadUseCases::new(
+                thread_persistence.clone(),
+                Arc::new(MockChannelPersistence {
+                    channel: Some(channel.clone()),
+                }),
+                Arc::new(MockCompanyPersistence {
+                    company: Some(company.clone()),
+                }),
+                task_persistence.clone(),
+                config.clone(),
+            )
+            .with_agent_persistence(Arc::new(MockAgentPersistence {
+                agent: active_agent(company_id, agent_id),
+            })),
+        );
 
         let worker = Arc::new(TaskWorker::new(
             task_persistence.clone(),

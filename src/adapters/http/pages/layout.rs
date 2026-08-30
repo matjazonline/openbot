@@ -24,6 +24,7 @@ pub fn base_layout(title: &str, content: &str) -> String {
 pub(crate) fn public_layout(title: &str, content: &str) -> String {
     let title = escape_html_text(title);
     let app_css = crate::adapters::http::routes::assets::app_css_url();
+    let logo_light = crate::adapters::http::routes::assets::logo_light_url();
     format!(
         r##"<!DOCTYPE html>
 <html lang="en" data-theme="dark" class="h-full">
@@ -47,7 +48,7 @@ pub(crate) fn public_layout(title: &str, content: &str) -> String {
         <nav class="navbar min-h-0 px-0">
             <div class="flex-1">
                 <a href="/login" title="BusyBots">
-                    <img src="/assets/busybots-logo-light.png" alt="BusyBots" class="h-10 w-auto">
+                    <img src="{logo_light}" alt="BusyBots" class="h-10 w-auto">
                 </a>
             </div>
             <div class="flex-none gap-2">
@@ -490,6 +491,7 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
     };
     let app_css = crate::adapters::http::routes::assets::app_css_url();
     let app_js = crate::adapters::http::routes::assets::app_js_url();
+    let logo_light = crate::adapters::http::routes::assets::logo_light_url();
 
     format!(
         r##"<!DOCTYPE html>
@@ -505,7 +507,7 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
     <div class="w-full max-w-4xl">
         <nav class="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
             <a href="{home_href}" class="flex items-center" title="BusyBots">
-                <img src="/assets/busybots-logo-light.png" alt="BusyBots" class="h-9 w-auto">
+                <img src="{logo_light}" alt="BusyBots" class="h-9 w-auto">
             </a>
             <div class="flex items-center gap-4 text-sm font-medium">
                 {navigation}

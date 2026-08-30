@@ -2297,7 +2297,7 @@ mod tests {
                 ChannelWrite {
                     name: label.into(),
                     slug: label.into(),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
             )
@@ -2405,7 +2405,7 @@ mod tests {
             ChannelWrite {
                 name: "Activity".into(),
                 slug: "activity".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -2578,7 +2578,7 @@ mod tests {
             ChannelWrite {
                 name: "Reaper".into(),
                 slug: "reaper".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -2751,7 +2751,7 @@ mod tests {
             ChannelWrite {
                 name: "Fence".into(),
                 slug: "fence".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -2889,7 +2889,7 @@ mod tests {
             ChannelWrite {
                 name: "Commit".into(),
                 slug: "commit".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -3112,7 +3112,7 @@ mod tests {
             ChannelWrite {
                 name: "Queue".into(),
                 slug: "queue".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -3276,7 +3276,7 @@ mod tests {
             ChannelWrite {
                 name: "Enqueue".into(),
                 slug: "enqueue".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -3380,7 +3380,7 @@ mod tests {
                 ChannelWrite {
                     name: name.into(),
                     slug: name.to_lowercase().into(),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
             )
@@ -3474,7 +3474,7 @@ mod tests {
             ChannelWrite {
                 name: "Reap".into(),
                 slug: "reap".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -3679,7 +3679,7 @@ mod tests {
             ChannelWrite {
                 name: "Dead".into(),
                 slug: "dead".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -3781,7 +3781,7 @@ mod tests {
             ChannelWrite {
                 name: "Delivery".into(),
                 slug: "delivery".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -3900,7 +3900,7 @@ mod tests {
                 name: "Outreach".into(),
                 slug: "outreach".into(),
                 participant_emails: Some(vec![owner_email.clone()]),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -4087,7 +4087,7 @@ mod tests {
             ChannelWrite {
                 name: "Chain".into(),
                 slug: "chain".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )

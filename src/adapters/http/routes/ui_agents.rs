@@ -85,7 +85,6 @@ pub struct PromptGeneratorForm {
     pub id_prefix: Option<Uuid>,
     pub provider: Option<String>,
     pub model: Option<String>,
-    pub api_key: Option<String>,
 }
 
 impl PromptGeneratorForm {
@@ -251,7 +250,6 @@ async fn generate_prompt(
     let overrides = ModelOverrides {
         provider: form.provider.as_deref(),
         model: form.model.as_deref(),
-        api_key: form.api_key.as_deref(),
     };
 
     let generated = workspace
@@ -262,7 +260,6 @@ async fn generate_prompt(
             instructions,
             overrides.provider,
             overrides.model,
-            overrides.api_key,
         )
         .await;
 
@@ -322,10 +319,18 @@ async fn create_agent(
                     provider: submitted.form.provider.clone(),
                     model: submitted.form.model.clone(),
                     run_timeout_secs: submitted.form.run_timeout_secs,
-                    api_key: submitted.form.api_key.clone(),
                     system_prompt: submitted.form.system_prompt.clone(),
                     description: submitted.form.description.clone(),
                     config_json,
+                    memory_persistence_mode: submitted
+                        .form
+                        .memory_persistence_mode
+                        .unwrap_or_default(),
+                    memory_recall_mode: submitted.form.memory_recall_mode.unwrap_or_default(),
+                    memory_max_results: submitted
+                        .form
+                        .memory_max_results
+                        .unwrap_or_else(crate::entities::memory::default_memory_max_results),
                     avatar_url,
                     created_by: None,
                 },
@@ -379,10 +384,15 @@ async fn update_agent(
                 provider: submitted.form.provider.clone(),
                 model: submitted.form.model.clone(),
                 run_timeout_secs: submitted.form.run_timeout_secs,
-                api_key: submitted.form.api_key.clone(),
                 system_prompt: submitted.form.system_prompt.clone(),
                 description: submitted.form.description.clone(),
                 config_json,
+                memory_persistence_mode: submitted.form.memory_persistence_mode.unwrap_or_default(),
+                memory_recall_mode: submitted.form.memory_recall_mode.unwrap_or_default(),
+                memory_max_results: submitted
+                    .form
+                    .memory_max_results
+                    .unwrap_or_else(crate::entities::memory::default_memory_max_results),
                 avatar_url,
                 created_by: None,
             },
@@ -560,7 +570,6 @@ impl SubmittedAgent {
         ModelOverrides {
             provider: self.form.provider.as_deref(),
             model: self.form.model.as_deref(),
-            api_key: self.form.api_key.as_deref(),
         }
     }
 
@@ -573,7 +582,22 @@ impl SubmittedAgent {
             provider: self.form.provider.as_deref().unwrap_or(""),
             model: self.form.model.as_deref().unwrap_or(""),
             run_timeout_secs: self.form.run_timeout_secs,
-            api_key: self.form.api_key.as_deref().unwrap_or(""),
+            memory_persistence_mode: self
+                .form
+                .memory_persistence_mode
+                .as_ref()
+                .map(|mode| mode.as_str())
+                .unwrap_or("audience_only"),
+            memory_recall_mode: self
+                .form
+                .memory_recall_mode
+                .as_ref()
+                .map(|mode| mode.as_str())
+                .unwrap_or("fast"),
+            memory_max_results: self
+                .form
+                .memory_max_results
+                .unwrap_or_else(crate::entities::memory::default_memory_max_results),
             config_json: self.form.config_json.as_deref().unwrap_or(""),
             avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
             advanced: !self.is_simple(),

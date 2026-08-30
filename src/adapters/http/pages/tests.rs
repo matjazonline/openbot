@@ -124,7 +124,7 @@ fn library_agent_fields_reuse_the_advanced_editor_and_avatar_picker() {
     assert!(html.contains("Agent Picture"));
     assert!(html.contains("/ui/uploads/avatar"));
     assert!(html.contains("/ui/agent-library/generate-prompt"));
-    assert!(html.contains("Used by this library agent"));
+    assert!(html.contains("Memory persistence"));
     assert!(!html.contains("Overrides the company key"));
 }
 
@@ -351,21 +351,14 @@ fn mailbox_channel(company_id: Uuid) -> Channel {
         description: None,
         slug: "inbox".into(),
         alias_slugs: Vec::new(),
-        api_key: None,
-        provider: None,
-        model: None,
         participant_emails: Some(vec!["person@example.com".into()]),
         agent_ids: None,
-        channel_config: None,
         retrieve_company_memory: false,
         retrieve_agent_memory: false,
         retrieve_user_memory: false,
         persist_company_memory: false,
         persist_agent_memory: false,
         persist_user_memory: false,
-        memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-        memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-        memory_max_results: 5,
         created_by: crate::entities::creation::CreationProvenance::system(),
         created_at: Utc::now(),
     }
@@ -1121,7 +1114,6 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         provider: Some("openai".to_string()),
         model: Some("gpt-4o".to_string()),
         run_timeout_secs: Some(45),
-        api_key: Some("sk-test".to_string()),
         system_prompt: Some("Answer <billing> questions.".to_string()),
         description: None,
         config_json: Some(serde_json::json!({ "temperature": 0.2 })),
@@ -1395,6 +1387,9 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
 
 fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
     Agent {
+        memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
+        memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+        memory_max_results: 5,
         id: Uuid::new_v4(),
         company_id: Some(company_id),
         name: name.to_string(),
@@ -1402,7 +1397,6 @@ fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
         provider: None,
         model: None,
         run_timeout_secs: None,
-        api_key: None,
         system_prompt: None,
         description: None,
         config_json: None,
@@ -1420,8 +1414,6 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
     let channel = Channel {
         participant_emails: Some(vec!["person@example.com".into(), "@public".into()]),
         agent_ids: Some(vec![triage.id]),
-        channel_config: Some(serde_json::json!({ "mode": "async" })),
-        provider: Some("openai".to_string()),
         ..mailbox_channel(company.id)
     };
 
@@ -1443,8 +1435,8 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
     assert!(html.contains("value=\"Inbox\""));
     assert!(html.contains("value=\"inbox\""));
     assert!(html.contains("value=\"person@example.com, @public\""));
-    assert!(html.contains("value=\"openai\""));
-    assert!(html.contains("&quot;mode&quot;: &quot;async&quot;\n}</textarea>"));
+    assert!(!html.contains("name=\"provider\""));
+    assert!(!html.contains("name=\"channel_config\""));
 
     // Only the assigned agent is checked, and the hidden field carries the submitted order.
     assert!(html.contains(&format!("value=\"{}\" checked", triage.id)));
@@ -1455,9 +1447,6 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
         triage.id
     )));
     assert!(html.contains("Triage &lt;bot&gt;"));
-
-    // Overrides are already set, so their section arrives open rather than collapsed.
-    assert!(html.contains("bg-base-200\" open>"));
 
     assert!(html.contains(&format!(
         "hx-delete=\"/ui/channels/{}?company_id={}\"",
@@ -1572,7 +1561,6 @@ fn channel_edit_pane_keeps_a_rejected_save_in_the_form() {
         name: "Renamed",
         slug: "renamed",
         participant_emails: "@public",
-        channel_config: "{ not json",
         advanced: true,
         ..ChannelDraft::default()
     };
@@ -1591,7 +1579,7 @@ fn channel_edit_pane_keeps_a_rejected_save_in_the_form() {
     assert!(html.contains("alert alert-error"));
     assert!(html.contains("Invalid JSON config"));
     assert!(html.contains("value=\"Renamed\""));
-    assert!(html.contains("{ not json</textarea>"));
+    assert!(!html.contains("name=\"channel_config\""));
     // The header still names the stored channel; only the form carries the attempt.
     assert!(html.contains("<h2 class=\"truncate text-xl font-bold\">Inbox</h2>"));
     // The draft names @public, so the confirmation the use case will demand is live.

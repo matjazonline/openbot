@@ -136,8 +136,14 @@ impl MemoryCoordinator {
                 &database_id,
                 &query,
                 &resolution.resolved,
-                channel.memory_recall_mode,
-                channel.memory_max_results,
+                input.agent.map_or(
+                    crate::entities::memory::MemoryRecallMode::default(),
+                    |agent| agent.memory_recall_mode,
+                ),
+                input.agent.map_or_else(
+                    crate::entities::memory::default_memory_max_results,
+                    |agent| agent.memory_max_results,
+                ),
                 Some(&additional_context),
             )
             .await;
@@ -148,7 +154,11 @@ impl MemoryCoordinator {
         );
         let chunks = match recalled {
             Ok(chunks) => {
-                if chunks.len() > channel.memory_max_results as usize
+                if chunks.len()
+                    > input.agent.map_or_else(
+                        crate::entities::memory::default_memory_max_results,
+                        |agent| agent.memory_max_results,
+                    ) as usize
                     || chunks.len() > crate::entities::memory::MAX_MEMORY_RETURNED_ROWS
                 {
                     let error = crate::entities::memory::MemoryProviderError::TooManyResults;
@@ -260,8 +270,11 @@ impl MemoryCoordinator {
             .map(|scope| MemoryPersistenceTarget {
                 scope: scope.scope,
                 collection: scope.collection,
-                custom_instructions: (channel.memory_persistence_mode
-                    == MemoryPersistenceMode::ScopeSpecificFacts)
+                custom_instructions: input
+                    .agent
+                    .is_some_and(|agent| {
+                        agent.memory_persistence_mode == MemoryPersistenceMode::ScopeSpecificFacts
+                    })
                     .then(|| scope.scope.extraction_instructions()),
             })
             .collect();
@@ -564,12 +577,8 @@ mod tests {
             description: None,
             slug: "memory".into(),
             alias_slugs: Vec::new(),
-            api_key: None,
-            provider: None,
-            model: None,
             participant_emails: None,
             agent_ids: None,
-            channel_config: None,
             enabled: true,
             add_3rd_party: false,
             retrieve_company_memory: true,
@@ -578,9 +587,6 @@ mod tests {
             persist_company_memory: true,
             persist_agent_memory: false,
             persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: MemoryRecallMode::Fast,
-            memory_max_results: 5,
             created_by: CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         }
@@ -588,6 +594,9 @@ mod tests {
 
     fn memory_agent(company_id: Uuid) -> Agent {
         Agent {
+            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: Some(company_id),
             name: "Memory agent".into(),
@@ -595,7 +604,6 @@ mod tests {
             provider: None,
             model: None,
             run_timeout_secs: None,
-            api_key: None,
             system_prompt: None,
             description: None,
             config_json: None,
@@ -868,11 +876,11 @@ mod tests {
     async fn scope_specific_persistence_assigns_exact_instructions_per_target() {
         let company_id = Uuid::new_v4();
         let company = stale_company(company_id);
-        let agent = memory_agent(company_id);
+        let mut agent = memory_agent(company_id);
         let mut channel = memory_channel(company_id);
         channel.persist_agent_memory = true;
         channel.persist_user_memory = true;
-        channel.memory_persistence_mode = MemoryPersistenceMode::ScopeSpecificFacts;
+        agent.memory_persistence_mode = MemoryPersistenceMode::ScopeSpecificFacts;
         let (coordinator, provider) = ready_coordinator(company_id);
 
         let report = coordinator

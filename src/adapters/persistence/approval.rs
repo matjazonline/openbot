@@ -604,7 +604,7 @@ mod tests {
             ChannelWrite {
                 name: "Park".into(),
                 slug: "park".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -751,7 +751,7 @@ mod tests {
             ChannelWrite {
                 name: "Approval".into(),
                 slug: "approval".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )

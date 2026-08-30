@@ -19,12 +19,7 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
-    entities::{
-        channel::Channel,
-        cursor::ThreadCursor,
-        memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
-        thread::Thread,
-    },
+    entities::{channel::Channel, cursor::ThreadCursor, thread::Thread},
     infra::{config::AppConfig, events::MailboxEvents},
     services::email_parser::RawInboundPayload,
     use_cases::{
@@ -36,7 +31,7 @@ use crate::{
     },
 };
 
-use super::agent::{ModelOverrides, create_agent_from_instructions};
+use super::agent::{ModelOverrides, agent_write_from_instructions};
 use super::live_updates::thread_wake_ups;
 
 pub fn router() -> Router<AppState> {
@@ -101,12 +96,8 @@ pub struct ChannelForm {
     pub alias_slugs: Option<String>,
     pub system_prompt: Option<String>,
     pub form_mode: Option<String>,
-    pub api_key: Option<String>,
-    pub provider: Option<String>,
-    pub model: Option<String>,
     pub participant_emails: Option<String>,
     pub agent_ids: Option<String>,
-    pub channel_config: Option<String>,
     pub confirm_spam_disabled: Option<String>,
     pub enabled: Option<String>,
     pub add_3rd_party: Option<String>,
@@ -116,9 +107,6 @@ pub struct ChannelForm {
     pub persist_company_memory: Option<String>,
     pub persist_agent_memory: Option<String>,
     pub persist_user_memory: Option<String>,
-    pub memory_persistence_mode: Option<String>,
-    pub memory_recall_mode: Option<String>,
-    pub memory_max_results: Option<String>,
 }
 
 impl ChannelForm {
@@ -141,33 +129,6 @@ impl ChannelForm {
     }
 
     pub fn memory_settings(&self) -> Result<SubmittedMemorySettings, String> {
-        let persistence_mode = match self
-            .memory_persistence_mode
-            .as_deref()
-            .unwrap_or("audience_only")
-        {
-            "audience_only" => MemoryPersistenceMode::AudienceOnly,
-            "scope_specific_facts" => MemoryPersistenceMode::ScopeSpecificFacts,
-            _ => {
-                return Err(
-                    "Memory persistence mode must be audience_only or scope_specific_facts.".into(),
-                );
-            }
-        };
-        let recall_mode = match self.memory_recall_mode.as_deref().unwrap_or("fast") {
-            "fast" => MemoryRecallMode::Fast,
-            "thinking" => MemoryRecallMode::Thinking,
-            _ => return Err("Memory recall mode must be fast or thinking.".into()),
-        };
-        let max_results = self
-            .memory_max_results
-            .as_deref()
-            .unwrap_or("5")
-            .parse::<u8>()
-            .map_err(|_| "Memory result limit must be between 1 and 20.".to_string())?;
-        if !(1..=20).contains(&max_results) {
-            return Err("Memory result limit must be between 1 and 20.".into());
-        }
         Ok(SubmittedMemorySettings {
             retrieve_company: checkbox_ticked(self.retrieve_company_memory.as_deref()),
             retrieve_agent: checkbox_ticked(self.retrieve_agent_memory.as_deref()),
@@ -175,9 +136,6 @@ impl ChannelForm {
             persist_company: checkbox_ticked(self.persist_company_memory.as_deref()),
             persist_agent: checkbox_ticked(self.persist_agent_memory.as_deref()),
             persist_user: checkbox_ticked(self.persist_user_memory.as_deref()),
-            persistence_mode,
-            recall_mode,
-            max_results,
         })
     }
 }
@@ -189,9 +147,6 @@ pub struct SubmittedMemorySettings {
     pub persist_company: bool,
     pub persist_agent: bool,
     pub persist_user: bool,
-    pub persistence_mode: MemoryPersistenceMode,
-    pub recall_mode: MemoryRecallMode,
-    pub max_results: u8,
 }
 
 /// The two shapes a browser sends for a ticked checkbox, in one place.
@@ -243,12 +198,8 @@ pub struct ChannelJsonPayload {
     /// A PUT replaces the alias set wholesale, like every other field here.
     pub alias_slugs: Option<Vec<String>>,
     pub system_prompt: Option<String>,
-    pub api_key: Option<String>,
-    pub provider: Option<String>,
-    pub model: Option<String>,
     pub participant_emails: Option<Vec<String>>,
     pub agent_ids: Option<Vec<Uuid>>,
-    pub channel_config: Option<serde_json::Value>,
     pub confirm_spam_disabled: Option<bool>,
     /// Omitted means enabled: like every other field here, a PUT replaces rather than patches.
     pub enabled: Option<bool>,
@@ -266,12 +217,6 @@ pub struct ChannelJsonPayload {
     pub persist_agent_memory: bool,
     #[serde(default)]
     pub persist_user_memory: bool,
-    #[serde(default)]
-    pub memory_persistence_mode: MemoryPersistenceMode,
-    #[serde(default)]
-    pub memory_recall_mode: MemoryRecallMode,
-    #[serde(default = "default_memory_max_results")]
-    pub memory_max_results: u8,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -464,6 +409,12 @@ async fn create_channel_handler(
         .map(String::from)
         .unwrap_or_else(|| slugify(&form.name));
 
+    let simple_agent =
+        match simple_channel_agent_write(&agent_use_cases, &form, &slug, user.id, company_id).await
+        {
+            Ok(agent) => agent,
+            Err(message) => return view.render(Some(message)).await,
+        };
     let agent_ids =
         match resolve_channel_agents(&agent_use_cases, &form, &slug, user.id, company_id).await {
             Ok(agent_ids) => agent_ids,
@@ -478,11 +429,6 @@ async fn create_channel_handler(
         Err(error) => return view.render(Some(error)).await,
     };
 
-    let channel_config = match parse_config_form(form.channel_config) {
-        Ok(c) => c,
-        Err(err) => return view.render(Some(err)).await,
-    };
-
     let write = ChannelWrite {
         enabled,
         add_3rd_party,
@@ -490,27 +436,29 @@ async fn create_channel_handler(
         description: parse_text_form(form.description),
         slug,
         alias_slugs: parse_list_form(form.alias_slugs),
-        api_key: form.api_key,
-        provider: form.provider,
-        model: form.model,
         participant_emails: parse_emails_form(form.participant_emails),
         agent_ids,
-        channel_config,
         retrieve_company_memory: memory.retrieve_company,
         retrieve_agent_memory: memory.retrieve_agent,
         retrieve_user_memory: memory.retrieve_user,
         persist_company_memory: memory.persist_company,
         persist_agent_memory: memory.persist_agent,
         persist_user_memory: memory.persist_user,
-        memory_persistence_mode: memory.persistence_mode,
-        memory_recall_mode: memory.recall_mode,
-        memory_max_results: memory.max_results,
         created_by: None,
     };
-    match channel_use_cases
-        .create_channel(user.id, company_id, write, confirm_spam_disabled)
-        .await
-    {
+    let created = match simple_agent {
+        Some(agent) => {
+            channel_use_cases
+                .create_channel_with_agent(user.id, company_id, agent, write, confirm_spam_disabled)
+                .await
+        }
+        None => {
+            channel_use_cases
+                .create_channel(user.id, company_id, write, confirm_spam_disabled)
+                .await
+        }
+    };
+    match created {
         Ok(_) => view.render(None).await,
         Err(err) => {
             view.render(Some(format!("Failed to create channel: {err}")))
@@ -575,45 +523,59 @@ pub(super) async fn resolve_channel_agents(
         return Ok(agent_ids);
     };
 
-    let agent = if form.form_mode.as_deref() == Some("simple") {
-        create_agent_from_instructions(
-            agent_use_cases,
+    if form.form_mode.as_deref() == Some("simple") {
+        return Ok(agent_ids);
+    }
+    let agent = agent_use_cases
+        .create_agent(
             user_id,
             company_id,
-            &form.name,
-            slug,
-            instructions,
-            ModelOverrides {
-                provider: form.provider.as_deref(),
-                model: form.model.as_deref(),
-                api_key: form.api_key.as_deref(),
+            AgentWrite {
+                name: form.name.clone(),
+                slug: slug.to_string(),
+                system_prompt: Some(instructions.to_string()),
+                ..AgentWrite::default()
             },
-            None,
-            None,
         )
-        .await?
-    } else {
-        agent_use_cases
-            .create_agent(
-                user_id,
-                company_id,
-                AgentWrite {
-                    name: form.name.clone(),
-                    slug: slug.to_string(),
-                    provider: form.provider.clone(),
-                    model: form.model.clone(),
-                    api_key: form.api_key.clone(),
-                    system_prompt: Some(instructions.to_string()),
-                    ..AgentWrite::default()
-                },
-            )
-            .await
-            .map_err(|err| format!("Failed to create agent for channel: {err}"))?
-    };
+        .await
+        .map_err(|err| format!("Failed to create agent for channel: {err}"))?;
 
     let mut ids = agent_ids.unwrap_or_default();
     ids.push(agent.id);
     Ok(Some(ids))
+}
+
+pub(super) async fn simple_channel_agent_write(
+    agent_use_cases: &AgentUseCases,
+    form: &ChannelForm,
+    slug: &str,
+    user_id: Uuid,
+    company_id: Uuid,
+) -> Result<Option<AgentWrite>, String> {
+    if form.form_mode.as_deref() != Some("simple") {
+        return Ok(None);
+    }
+    let Some(instructions) = form
+        .system_prompt
+        .as_deref()
+        .map(str::trim)
+        .filter(|instructions| !instructions.is_empty())
+    else {
+        return Ok(None);
+    };
+    agent_write_from_instructions(
+        agent_use_cases,
+        user_id,
+        company_id,
+        &form.name,
+        slug,
+        instructions,
+        ModelOverrides::default(),
+        None,
+        None,
+    )
+    .await
+    .map(Some)
 }
 
 /// GET /companies/{company_id}/channels/{id}/edit - HTMX edit channel form fragment (Protected).
@@ -733,22 +695,13 @@ async fn update_channel_handler(
     let emails = parse_emails_form(form.participant_emails);
     let agent_ids = parse_agent_ids_form(form.agent_ids);
 
-    let channel_config = match parse_config_form(form.channel_config) {
-        Ok(c) => c,
-        Err(err) => return Html(pages::error_alert(&err)),
-    };
-
     let write = ChannelWrite {
         name: form.name,
         description: parse_text_form(form.description),
         slug,
         alias_slugs: parse_list_form(form.alias_slugs),
-        api_key: form.api_key,
-        provider: form.provider,
-        model: form.model,
         participant_emails: emails,
         agent_ids,
-        channel_config,
         enabled,
         add_3rd_party,
         retrieve_company_memory: memory.retrieve_company,
@@ -757,9 +710,6 @@ async fn update_channel_handler(
         persist_company_memory: memory.persist_company,
         persist_agent_memory: memory.persist_agent,
         persist_user_memory: memory.persist_user,
-        memory_persistence_mode: memory.persistence_mode,
-        memory_recall_mode: memory.recall_mode,
-        memory_max_results: memory.max_results,
         created_by: None,
     };
 
@@ -1411,7 +1361,6 @@ async fn list_channel_threads_json(
 /// JSON API: Create company channel (Protected).
 async fn create_channel_json(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
     Json(payload): Json<ChannelJsonPayload>,
@@ -1425,43 +1374,24 @@ async fn create_channel_json(
         .map(String::from)
         .unwrap_or_else(|| slugify(&payload.name));
 
-    let mut agent_ids = payload.agent_ids;
-
-    if let Some(ref prompt) = payload.system_prompt {
-        let prompt_trimmed = prompt.trim();
-        if !prompt_trimmed.is_empty() {
-            let agent = agent_use_cases
-                .create_agent(
-                    user.id,
-                    company_id,
-                    AgentWrite {
-                        name: payload.name.clone(),
-                        slug: slug.clone(),
-                        provider: payload.provider.clone(),
-                        model: payload.model.clone(),
-                        api_key: payload.api_key.clone(),
-                        system_prompt: Some(prompt_trimmed.to_string()),
-                        ..AgentWrite::default()
-                    },
-                )
-                .await?;
-            let mut ids = agent_ids.unwrap_or_default();
-            ids.push(agent.id);
-            agent_ids = Some(ids);
-        }
-    }
+    let agent_ids = payload.agent_ids;
+    let agent = payload.system_prompt.as_deref().and_then(|prompt| {
+        let prompt = prompt.trim();
+        (!prompt.is_empty()).then(|| AgentWrite {
+            name: payload.name.clone(),
+            slug: slug.clone(),
+            system_prompt: Some(prompt.to_string()),
+            ..AgentWrite::default()
+        })
+    });
 
     let write = ChannelWrite {
         name: payload.name,
         description: parse_text_form(payload.description),
         slug,
         alias_slugs: payload.alias_slugs.unwrap_or_default(),
-        api_key: payload.api_key,
-        provider: payload.provider,
-        model: payload.model,
         participant_emails: payload.participant_emails,
         agent_ids,
-        channel_config: payload.channel_config,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
         retrieve_company_memory: payload.retrieve_company_memory,
@@ -1470,15 +1400,21 @@ async fn create_channel_json(
         persist_company_memory: payload.persist_company_memory,
         persist_agent_memory: payload.persist_agent_memory,
         persist_user_memory: payload.persist_user_memory,
-        memory_persistence_mode: payload.memory_persistence_mode,
-        memory_recall_mode: payload.memory_recall_mode,
-        memory_max_results: payload.memory_max_results,
         created_by: None,
     };
 
-    let channel = channel_use_cases
-        .create_channel(user.id, company_id, write, confirm_spam_disabled)
-        .await?;
+    let channel = match agent {
+        Some(agent) => {
+            channel_use_cases
+                .create_channel_with_agent(user.id, company_id, agent, write, confirm_spam_disabled)
+                .await?
+        }
+        None => {
+            channel_use_cases
+                .create_channel(user.id, company_id, write, confirm_spam_disabled)
+                .await?
+        }
+    };
 
     Ok((
         StatusCode::CREATED,
@@ -1524,12 +1460,8 @@ async fn update_channel_json(
         description: parse_text_form(payload.description),
         slug,
         alias_slugs: payload.alias_slugs.unwrap_or_default(),
-        api_key: payload.api_key,
-        provider: payload.provider,
-        model: payload.model,
         participant_emails: payload.participant_emails,
         agent_ids: payload.agent_ids,
-        channel_config: payload.channel_config,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
         retrieve_company_memory: payload.retrieve_company_memory,
@@ -1538,9 +1470,6 @@ async fn update_channel_json(
         persist_company_memory: payload.persist_company_memory,
         persist_agent_memory: payload.persist_agent_memory,
         persist_user_memory: payload.persist_user_memory,
-        memory_persistence_mode: payload.memory_persistence_mode,
-        memory_recall_mode: payload.memory_recall_mode,
-        memory_max_results: payload.memory_max_results,
         created_by: None,
     };
 
@@ -1580,7 +1509,6 @@ async fn delete_channel_json(
 mod tests {
     use crate::entities::{company::Company, thread::Thread};
     use chrono::Utc;
-    use serde_json::json;
 
     use super::*;
 
@@ -1628,21 +1556,14 @@ mod tests {
             description: None,
             slug: "auto-dispatcher".into(),
             alias_slugs: Vec::new(),
-            api_key: None,
-            provider: None,
-            model: None,
             participant_emails: Some(vec!["agent@test.com".into()]),
             agent_ids: None,
-            channel_config: Some(json!({ "mode": "async" })),
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
             retrieve_user_memory: false,
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         };
@@ -1657,11 +1578,10 @@ mod tests {
             focus: pages::ChannelsPageFocus::default(),
         };
         let page_html = pages::channels_page(&page);
-        assert!(page_html.contains("Custom Channel Agent"));
-        assert!(page_html.contains("LLM Provider (Optional Override)"));
-        assert!(page_html.contains("LLM Model (Optional Override)"));
-        assert!(page_html.contains("LLM API Key (Optional Override)"));
-        assert!(page_html.contains("Channel Config (JSON, Optional)"));
+        assert!(!page_html.contains("LLM Provider (Optional Override)"));
+        assert!(!page_html.contains("LLM Model (Optional Override)"));
+        assert!(!page_html.contains("LLM API Key (Optional Override)"));
+        assert!(!page_html.contains("Channel Config (JSON, Optional)"));
         assert!(page_html.contains("id=\"channel-form-toggle\""));
         assert!(page_html.contains("id=\"channel-form-card\" class=\"hidden"));
         assert!(page_html.contains("aria-controls=\"channel-form-card\""));
@@ -1676,7 +1596,7 @@ mod tests {
         assert!(row_html.contains("Auto Dispatcher"));
         assert!(row_html.contains("auto-dispatcher@acme.example.com"));
         assert!(row_html.contains("agent@test.com"));
-        assert!(row_html.contains("async"));
+        assert!(!row_html.contains("async"));
         assert!(row_html.contains("Task Executions"));
         assert!(row_html.contains("New Thread"));
         assert!(row_html.contains(&format!(
@@ -1711,7 +1631,7 @@ mod tests {
         let edit_html = pages::channel_edit_fragment(&company, "example.com", &channel, &[], true);
         assert!(edit_html.contains("hx-put="));
         assert!(edit_html.contains("value=\"Auto Dispatcher\""));
-        assert!(edit_html.contains("Custom Channel Agent"));
+        assert!(!edit_html.contains("Custom Channel Agent"));
 
         let sim_html = pages::channel_simulation_page(
             &company,

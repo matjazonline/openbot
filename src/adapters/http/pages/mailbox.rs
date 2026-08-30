@@ -861,14 +861,19 @@ pub fn mailbox_no_company_page(user: &MailboxUser<'_>) -> String {
 /// The wordmark, in both inks: the dark one for the light theme, the light one for the dark
 /// theme. Both are sent, and [`BRAND_LOGO_STYLES`] hides the one that does not belong -- swapping
 /// the `src` from script instead would leave the mark blank for a moment on every theme change.
-const BRAND_LOGO: &str = r##"
+fn brand_logo() -> String {
+    let logo_light = crate::adapters::http::routes::assets::logo_light_url();
+    format!(
+        r##"
                 <img src="/assets/busybots-logo-dark-hor.png" alt="BusyBots"
                     class="brand-logo brand-logo-on-light h-10 w-auto">
-                <img src="/assets/busybots-logo-light.png" alt="BusyBots"
+                <img src="{logo_light}" alt="BusyBots"
                     class="brand-logo brand-logo-on-dark h-10 w-auto">
-"##;
+"##
+    )
+}
 
-/// Which of [`BRAND_LOGO`]'s two inks the current theme shows. Written against `data-theme` on
+/// Which of [`brand_logo`]'s two inks the current theme shows. Written against `data-theme` on
 /// `<html>`, which `THEME_INIT_SCRIPT` sets before the first paint and `applyTheme` keeps current.
 ///
 /// Dark is the default here as it is everywhere else: an unset `data-theme` is the dark theme.
@@ -1191,6 +1196,7 @@ const THEME_CONTROLLER: &str = r##"
 /// group leaves and the company name sits on the bar's centre line rather than merely between its
 /// neighbours -- which would drift as the account's name grows.
 fn top_bar(user: &MailboxUser<'_>, company: Option<&Company>) -> String {
+    let brand_logo = brand_logo();
     let company_name = match company {
         Some(company) => topbar_company(company, FragmentSwap::Inline),
         None => String::new(),
@@ -1204,7 +1210,7 @@ fn top_bar(user: &MailboxUser<'_>, company: Option<&Company>) -> String {
                 <button type="button" class="ui-mobile-back btn btn-ghost btn-square btn-sm"
                     title="Back to the list" aria-label="Back to the list" data-action="pane-back">{back}</button>
                 <a href="/ui" class="ui-desktop-only flex items-center" title="BusyBots">
-{BRAND_LOGO}
+{brand_logo}
                 </a>
             </div>
             <div class="flex min-w-0 items-center justify-center">

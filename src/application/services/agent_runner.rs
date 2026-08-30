@@ -2,7 +2,6 @@ use crate::adapters::persistence::task::TaskPersistence;
 use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService};
 use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::approval::{ApprovalAction, ApprovalStatus, ApprovalSubject};
-use crate::entities::channel::Channel;
 use crate::entities::company::Company;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::message::{Message, MessageRole};
@@ -258,22 +257,10 @@ pub struct ResolvedAgentParams {
 }
 
 impl ResolvedAgentParams {
-    /// Resolves LLM execution parameters by combining Company, Channel, and Agent entities.
-    /// Company values are overridden by Channel and Channel values are overridden by Agent.
-    pub fn new(
-        company: Option<&Company>,
-        channel: Option<&Channel>,
-        agent: Option<&AgentEntity>,
-    ) -> anyhow::Result<Self> {
+    /// Resolve executable agent settings. Credentials always come from the company's encrypted
+    /// model connection; an agent may select a model only for that same provider.
+    pub fn new(company: Option<&Company>, agent: Option<&AgentEntity>) -> anyhow::Result<Self> {
         let mut config = base_agent_config();
-
-        if let Some(ch_cfg) = channel.and_then(|w| w.channel_config.as_ref()) {
-            if config.is_object() && ch_cfg.is_object() {
-                merge_json(&mut config, ch_cfg);
-            } else {
-                config = ch_cfg.clone();
-            }
-        }
 
         if let Some(agent_cfg) = agent.and_then(|a| a.config_json.as_ref()) {
             if config.is_object() && agent_cfg.is_object() {
@@ -283,33 +270,24 @@ impl ResolvedAgentParams {
             }
         }
 
-        let wf_llm = config.get("llm");
-
+        let company_provider = company
+            .and_then(|c| c.provider.as_deref())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_lowercase)
+            .ok_or_else(|| anyhow::anyhow!("Company model connection provider is missing"))?;
         let provider = agent
             .and_then(|a| a.provider.as_deref())
-            .map(|s| s.trim())
+            .map(str::trim)
             .filter(|s| !s.is_empty())
-            .or_else(|| {
-                channel
-                    .and_then(|w| w.provider.as_deref())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            })
-            .or_else(|| {
-                company
-                    .and_then(|c| c.provider.as_deref())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            })
-            .or_else(|| {
-                wf_llm
-                    .and_then(|llm| llm.get("provider"))
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            })
-            .map(|s| s.to_lowercase())
-            .ok_or_else(|| anyhow::anyhow!("Agent provider is missing"))?;
+            .map(str::to_lowercase)
+            .unwrap_or_else(|| company_provider.clone());
+
+        if provider != company_provider {
+            anyhow::bail!(
+                "Agent provider '{provider}' does not match company model connection provider '{company_provider}'"
+            );
+        }
 
         if !matches!(
             provider.as_str(),
@@ -326,55 +304,23 @@ impl ResolvedAgentParams {
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .or_else(|| {
-                channel
-                    .and_then(|w| w.model.as_deref())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            })
-            .or_else(|| {
                 company
                     .and_then(|c| c.model.as_deref())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            })
-            .or_else(|| {
-                wf_llm
-                    .and_then(|llm| llm.get("model"))
-                    .and_then(|v| v.as_str())
                     .map(|s| s.trim())
                     .filter(|s| !s.is_empty())
             })
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Agent model is missing"))?;
 
-        let api_key = agent
-            .and_then(|a| a.api_key.as_deref())
-            .map(|s| s.trim())
+        let api_key = company
+            .and_then(|c| c.api_key.as_deref())
+            .map(str::trim)
             .filter(|s| !s.is_empty())
-            .or_else(|| {
-                channel
-                    .and_then(|w| w.api_key.as_deref())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            })
-            .or_else(|| {
-                company
-                    .and_then(|c| c.api_key.as_deref())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            })
-            .or_else(|| {
-                wf_llm
-                    .and_then(|llm| llm.get("api_key"))
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            })
             .map(|s| s.to_string())
             .ok_or_else(|| {
                 tracing::warn!("API key is missing for provider '{}'", provider);
                 anyhow::anyhow!(
-                    "API key is missing for provider '{}'. Please configure an API key in channel or company settings.",
+                    "API key is missing for provider '{}'. Please configure the company model connection.",
                     provider
                 )
             })?;
@@ -382,7 +328,6 @@ impl ResolvedAgentParams {
         let fallback_sys_prompt = agent.and_then(|a| a.system_prompt.as_deref());
         let fallback_name = agent
             .map(|a| a.name.as_str())
-            .or_else(|| channel.map(|w| w.name.as_str()))
             .or_else(|| company.map(|c| c.name.as_str()));
         ensure_config_fields(
             &mut config,
@@ -470,35 +415,17 @@ pub fn ensure_config_fields(
     }
 
     if let serde_json::Value::Object(map) = config {
-        let has_name = map
-            .get("name")
-            .and_then(|v| v.as_str())
-            .map(|s| s.trim())
+        let name_str = fallback_name
+            .map(str::trim)
             .filter(|s| !s.is_empty())
-            .is_some();
+            .unwrap_or("agent");
+        map.insert("name".to_string(), serde_json::json!(name_str));
 
-        if !has_name {
-            let name_str = fallback_name
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .unwrap_or("agent");
-            map.insert("name".to_string(), serde_json::json!(name_str));
-        }
-
-        let has_system_prompt = map
-            .get("system_prompt")
-            .and_then(|v| v.as_str())
-            .map(|s| s.trim())
+        let sys_prompt = fallback_system_prompt
+            .map(str::trim)
             .filter(|s| !s.is_empty())
-            .is_some();
-
-        if !has_system_prompt {
-            let sys_prompt = fallback_system_prompt
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .unwrap_or("You are a helpful assistant.");
-            map.insert("system_prompt".to_string(), serde_json::json!(sys_prompt));
-        }
+            .unwrap_or("You are a helpful assistant.");
+        map.insert("system_prompt".to_string(), serde_json::json!(sys_prompt));
 
         let llm_val = map.entry("llm").or_insert_with(|| serde_json::json!({}));
         if !llm_val.is_object() {
@@ -512,35 +439,9 @@ pub fn ensure_config_fields(
                 llm_map.insert("max_tokens".to_string(), serde_json::json!(8192));
             }
 
-            if llm_map
-                .get("provider")
-                .and_then(|v| v.as_str())
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .is_none()
-            {
-                llm_map.insert("provider".to_string(), serde_json::json!(provider));
-            }
-
-            if llm_map
-                .get("model")
-                .and_then(|v| v.as_str())
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .is_none()
-            {
-                llm_map.insert("model".to_string(), serde_json::json!(model));
-            }
-
-            if llm_map
-                .get("api_key")
-                .and_then(|v| v.as_str())
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .is_none()
-            {
-                llm_map.insert("api_key".to_string(), serde_json::json!(api_key));
-            }
+            llm_map.insert("provider".to_string(), serde_json::json!(provider));
+            llm_map.insert("model".to_string(), serde_json::json!(model));
+            llm_map.insert("api_key".to_string(), serde_json::json!(api_key));
         }
     }
 }
@@ -1527,10 +1428,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_runner_returns_error_when_provider_missing() -> anyhow::Result<()> {
-        let result = ResolvedAgentParams::new(None, None, None);
+        let result = ResolvedAgentParams::new(None, None);
         assert!(result.is_err());
         let err_str = result.unwrap_err().to_string();
-        assert!(err_str.contains("Agent provider is missing"));
+        assert!(err_str.contains("Company model connection provider is missing"));
         Ok(())
     }
 
@@ -1549,7 +1450,7 @@ mod tests {
             memory_provider: None,
             created_at: chrono::Utc::now(),
         };
-        let result = ResolvedAgentParams::new(Some(&company), None, None);
+        let result = ResolvedAgentParams::new(Some(&company), None);
         assert!(result.is_err());
         let err_str = result.unwrap_err().to_string();
         assert!(err_str.contains("Agent model is missing"));
@@ -1571,55 +1472,10 @@ mod tests {
             memory_provider: None,
             created_at: chrono::Utc::now(),
         };
-        let result = ResolvedAgentParams::new(Some(&company), None, None);
+        let result = ResolvedAgentParams::new(Some(&company), None);
         assert!(result.is_err());
         let err_str = result.unwrap_err().to_string();
         assert!(err_str.contains("API key is missing"));
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_agent_runner_accepts_runtime_api_key_in_config() -> anyhow::Result<()> {
-        let custom_config = serde_json::json!({
-            "name": "CustomKeyAgent",
-            "system_prompt": "You are a test assistant.",
-            "llm": {
-                "provider": "google",
-                "model": "gemini-2.5-flash",
-                "api_key": "custom_runtime_test_key"
-            }
-        });
-        let channel = Channel {
-            description: None,
-            enabled: true,
-            add_3rd_party: true,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
-            id: Uuid::new_v4(),
-            company_id: Uuid::new_v4(),
-            name: "Test".to_string(),
-            slug: "test".into(),
-            alias_slugs: Vec::new(),
-            api_key: None,
-            provider: None,
-            model: None,
-            participant_emails: None,
-            agent_ids: None,
-            channel_config: Some(custom_config),
-            created_by: crate::entities::creation::CreationProvenance::system(),
-            created_at: chrono::Utc::now(),
-        };
-        let params = ResolvedAgentParams::new(None, Some(&channel), None)?;
-
-        let result = AgentRunner::new("Hello world", &params).execute().await;
-        assert!(result.is_err());
         Ok(())
     }
 
@@ -1638,7 +1494,7 @@ mod tests {
             memory_provider: None,
             created_at: chrono::Utc::now(),
         };
-        let params = ResolvedAgentParams::new(Some(&company), None, None)?;
+        let params = ResolvedAgentParams::new(Some(&company), None)?;
         let result = AgentRunner::new("Hello world", &params).execute().await;
         assert!(result.is_err());
         Ok(())
@@ -1659,7 +1515,7 @@ mod tests {
             memory_provider: None,
             created_at: chrono::Utc::now(),
         };
-        let params = ResolvedAgentParams::new(Some(&company), None, None)?;
+        let params = ResolvedAgentParams::new(Some(&company), None)?;
         let result = AgentRunner::new("Hello world", &params).execute().await;
         assert!(result.is_err());
         Ok(())
@@ -1718,7 +1574,7 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
-        let resolved = ResolvedAgentParams::new(Some(&company), None, None).unwrap();
+        let resolved = ResolvedAgentParams::new(Some(&company), None).unwrap();
         assert_eq!(resolved.provider(), "google");
         assert_eq!(resolved.model(), "gemini-2.5-flash");
         assert_eq!(resolved.api_key(), "company-api-key");
@@ -1740,227 +1596,6 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_agent_params_channel_overrides_company() {
-        let company = Company {
-            id: Uuid::new_v4(),
-            user_id: Uuid::new_v4(),
-            name: "Acme Corp".to_string(),
-            slug: "acme".into(),
-            api_key: Some("company-api-key".to_string()),
-            provider: Some("google".to_string()),
-            model: Some("gemini-2.5-flash".to_string()),
-            enable_llm_spam_guardrail: None,
-            avatar_url: None,
-            memory_provider: None,
-            created_at: chrono::Utc::now(),
-        };
-
-        let channel = Channel {
-            description: None,
-            enabled: true,
-            add_3rd_party: true,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
-            id: Uuid::new_v4(),
-            company_id: company.id,
-            name: "Support Channel".to_string(),
-            slug: "support".into(),
-            alias_slugs: Vec::new(),
-            api_key: Some("channel-api-key".to_string()),
-            provider: Some("openai".to_string()),
-            model: None, // Should keep company's model
-            participant_emails: None,
-            agent_ids: None,
-            channel_config: Some(serde_json::json!({
-                "system_prompt": "Channel prompt",
-                "temperature": 0.2
-            })),
-            created_by: crate::entities::creation::CreationProvenance::system(),
-            created_at: chrono::Utc::now(),
-        };
-
-        let resolved = ResolvedAgentParams::new(Some(&company), Some(&channel), None).unwrap();
-        assert_eq!(resolved.provider(), "openai"); // channel overridden
-        assert_eq!(resolved.model(), "gemini-2.5-flash"); // Kept company
-        assert_eq!(resolved.api_key(), "channel-api-key"); // channel overridden
-        let mut expected = base_agent_config();
-        merge_json(
-            &mut expected,
-            &serde_json::json!({
-                "name": "Support Channel",
-                "system_prompt": full_system_prompt("Channel prompt"),
-                "temperature": 0.2,
-                "llm": {
-                    "provider": "openai",
-                    "model": "gemini-2.5-flash",
-                    "api_key": "channel-api-key",
-                    "max_tokens": 8192
-                }
-            }),
-        );
-        assert_eq!(resolved.config(), &expected);
-    }
-
-    #[test]
-    fn test_resolve_agent_params_agent_overrides_channel_and_company() {
-        let company = Company {
-            id: Uuid::new_v4(),
-            user_id: Uuid::new_v4(),
-            name: "Acme Corp".to_string(),
-            slug: "acme".into(),
-            api_key: Some("company-api-key".to_string()),
-            provider: Some("google".to_string()),
-            model: Some("gemini-2.5-flash".to_string()),
-            enable_llm_spam_guardrail: None,
-            avatar_url: None,
-            memory_provider: None,
-            created_at: chrono::Utc::now(),
-        };
-
-        let channel = Channel {
-            description: None,
-            enabled: true,
-            add_3rd_party: true,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
-            id: Uuid::new_v4(),
-            company_id: company.id,
-            name: "Support Channel".to_string(),
-            slug: "support".into(),
-            alias_slugs: Vec::new(),
-            api_key: Some("channel-api-key".to_string()),
-            provider: Some("openai".to_string()),
-            model: Some("gpt-4o".to_string()),
-            participant_emails: None,
-            agent_ids: None,
-            channel_config: Some(serde_json::json!({
-                "system_prompt": "Channel prompt",
-                "temperature": 0.2,
-                "channel_only_field": true
-            })),
-            created_by: crate::entities::creation::CreationProvenance::system(),
-            created_at: chrono::Utc::now(),
-        };
-
-        let agent = AgentEntity {
-            id: Uuid::new_v4(),
-            company_id: Some(company.id),
-            name: "Tech Agent".to_string(),
-            slug: "tech-agent".to_string(),
-            provider: Some("anthropic".to_string()),
-            model: Some("claude-3-5-sonnet".to_string()),
-            run_timeout_secs: None,
-            api_key: Some("agent-api-key".to_string()),
-            system_prompt: None,
-            description: None,
-            config_json: Some(serde_json::json!({
-                "system_prompt": "Agent prompt",
-                "temperature": 0.7
-            })),
-            avatar_url: None,
-            created_by: crate::entities::creation::CreationProvenance::system(),
-            created_at: chrono::Utc::now(),
-        };
-
-        let resolved =
-            ResolvedAgentParams::new(Some(&company), Some(&channel), Some(&agent)).unwrap();
-        assert_eq!(resolved.provider(), "anthropic"); // Agent overridden
-        assert_eq!(resolved.model(), "claude-3-5-sonnet"); // Agent overridden
-        assert_eq!(resolved.api_key(), "agent-api-key"); // Agent overridden
-        let mut expected = base_agent_config();
-        merge_json(
-            &mut expected,
-            &serde_json::json!({
-                "name": "Tech Agent",
-                "system_prompt": full_system_prompt("Agent prompt"),
-                "temperature": 0.7,
-                "channel_only_field": true,
-                "llm": {
-                    "provider": "anthropic",
-                    "model": "claude-3-5-sonnet",
-                    "api_key": "agent-api-key",
-                    "max_tokens": 8192
-                }
-            }),
-        );
-        assert_eq!(resolved.config(), &expected);
-
-        let (p, m, k, c) = resolved.into_tuple();
-        assert_eq!(p, "anthropic");
-        assert_eq!(m, "claude-3-5-sonnet");
-        assert_eq!(k, "agent-api-key");
-        assert!(c.is_object());
-    }
-
-    #[test]
-    fn test_resolve_agent_params_handles_empty_or_whitespace_strings() {
-        let company = Company {
-            id: Uuid::new_v4(),
-            user_id: Uuid::new_v4(),
-            name: "Acme Corp".to_string(),
-            slug: "acme".into(),
-            api_key: Some("  ".to_string()),
-            provider: Some("google".to_string()),
-            model: Some("gemini-2.5-flash".to_string()),
-            enable_llm_spam_guardrail: None,
-            avatar_url: None,
-            memory_provider: None,
-            created_at: chrono::Utc::now(),
-        };
-
-        let channel = Channel {
-            description: None,
-            enabled: true,
-            add_3rd_party: true,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
-            id: Uuid::new_v4(),
-            company_id: company.id,
-            name: "Support Channel".to_string(),
-            slug: "support".into(),
-            alias_slugs: Vec::new(),
-            api_key: Some("".to_string()),
-            provider: Some("   ".to_string()),
-            model: Some("".to_string()),
-            participant_emails: None,
-            agent_ids: None,
-            channel_config: None,
-            created_by: crate::entities::creation::CreationProvenance::system(),
-            created_at: chrono::Utc::now(),
-        };
-
-        let resolved = ResolvedAgentParams::new(Some(&company), Some(&channel), None);
-        assert!(resolved.is_err());
-        assert!(
-            resolved
-                .unwrap_err()
-                .to_string()
-                .contains("API key is missing")
-        );
-    }
-
-    #[test]
     fn test_resolve_agent_params_validates_provider() {
         let company = Company {
             id: Uuid::new_v4(),
@@ -1976,7 +1611,7 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
-        let err = ResolvedAgentParams::new(Some(&company), None, None).unwrap_err();
+        let err = ResolvedAgentParams::new(Some(&company), None).unwrap_err();
         assert!(
             err.to_string()
                 .contains("Unsupported agent provider 'unsupported_provider'")
@@ -1986,64 +1621,8 @@ mod tests {
             provider: Some("groq".to_string()),
             ..company
         };
-        let resolved = ResolvedAgentParams::new(Some(&company_groq), None, None).unwrap();
+        let resolved = ResolvedAgentParams::new(Some(&company_groq), None).unwrap();
         assert_eq!(resolved.provider(), "groq");
-    }
-
-    #[test]
-    fn test_resolve_agent_params_populates_missing_config_llm_fields() {
-        let company = Company {
-            id: Uuid::new_v4(),
-            user_id: Uuid::new_v4(),
-            name: "Acme Corp".to_string(),
-            slug: "acme".into(),
-            api_key: Some("company-key".to_string()),
-            provider: Some("openai".to_string()),
-            model: Some("gpt-4o".to_string()),
-            enable_llm_spam_guardrail: None,
-            avatar_url: None,
-            memory_provider: None,
-            created_at: chrono::Utc::now(),
-        };
-
-        let channel = Channel {
-            description: None,
-            enabled: true,
-            add_3rd_party: true,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
-            id: Uuid::new_v4(),
-            company_id: company.id,
-            name: "Support Channel".to_string(),
-            slug: "support".into(),
-            alias_slugs: Vec::new(),
-            api_key: None,
-            provider: None,
-            model: None,
-            participant_emails: None,
-            agent_ids: None,
-            channel_config: Some(serde_json::json!({
-                "llm": {
-                    "provider": "openai"
-                    // model and api_key missing in llm block
-                }
-            })),
-            created_by: crate::entities::creation::CreationProvenance::system(),
-            created_at: chrono::Utc::now(),
-        };
-
-        let resolved = ResolvedAgentParams::new(Some(&company), Some(&channel), None).unwrap();
-        let config_llm = resolved.config().get("llm").unwrap().clone();
-        assert_eq!(config_llm.get("provider").unwrap(), "openai");
-        assert_eq!(config_llm.get("model").unwrap(), "gpt-4o");
-        assert_eq!(config_llm.get("api_key").unwrap(), "company-key");
     }
 
     #[test]
@@ -2063,6 +1642,9 @@ mod tests {
         };
 
         let agent = AgentEntity {
+            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: Some(company.id),
             name: "Support Agent".to_string(),
@@ -2070,7 +1652,6 @@ mod tests {
             provider: None,
             model: None,
             run_timeout_secs: None,
-            api_key: None,
             system_prompt: Some("You are a helpful triage assistant.".to_string()),
             description: None,
             config_json: None,
@@ -2079,11 +1660,20 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
-        let resolved = ResolvedAgentParams::new(Some(&company), None, Some(&agent)).unwrap();
+        let resolved = ResolvedAgentParams::new(Some(&company), Some(&agent)).unwrap();
         let cfg = resolved.config();
         assert_eq!(
             cfg.get("system_prompt").unwrap().as_str().unwrap(),
             full_system_prompt("You are a helpful triage assistant.")
+        );
+
+        let mut mismatched = agent;
+        mismatched.provider = Some("anthropic".into());
+        let error = ResolvedAgentParams::new(Some(&company), Some(&mismatched)).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("does not match company model connection")
         );
     }
 
@@ -2103,7 +1693,7 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
-        let resolved = ResolvedAgentParams::new(Some(&company), None, None).unwrap();
+        let resolved = ResolvedAgentParams::new(Some(&company), None).unwrap();
         let cfg = resolved.config();
         assert_eq!(
             cfg.get("system_prompt").unwrap().as_str().unwrap(),
@@ -2463,12 +2053,8 @@ system_prompt: Hello
             description: None,
             slug: slug.into(),
             alias_slugs: Vec::new(),
-            api_key: None,
-            provider: None,
-            model: None,
             participant_emails: None,
             agent_ids: Some(vec![Uuid::new_v4()]),
-            channel_config: None,
             enabled: true,
             add_3rd_party: true,
             retrieve_company_memory: false,
@@ -2477,9 +2063,6 @@ system_prompt: Hello
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         }
@@ -2631,7 +2214,7 @@ system_prompt: Hello
             memory_provider: None,
             created_at: chrono::Utc::now(),
         };
-        ResolvedAgentParams::new(Some(&company), None, None).expect("params resolve")
+        ResolvedAgentParams::new(Some(&company), None).expect("params resolve")
     }
 
     fn history_message(role: MessageRole, sender: &str, subject: &str, body: &str) -> Message {

@@ -243,14 +243,11 @@ impl ThreadUseCases {
                 .thread_persistence
                 .list_messages_by_thread_id(channel_match.thread.id)
                 .await?;
-            let agent = self
-                .first_agent_for(channel_match, &mut agent_cache)
-                .await?;
-            let params = ResolvedAgentParams::new(
-                Some(&channel_match.company),
-                Some(&channel_match.channel),
-                agent.as_ref(),
+            let agent = Some(
+                self.first_agent_for(channel_match, &mut agent_cache)
+                    .await?,
             );
+            let params = ResolvedAgentParams::new(Some(&channel_match.company), agent.as_ref());
             if index == 0 {
                 run.primary_params = params.as_ref().ok().cloned();
                 run.primary_agent = agent.clone();
@@ -442,9 +439,11 @@ impl ThreadUseCases {
         &self,
         channel_match: &ChannelMatch,
         cache: &mut HashMap<Uuid, Option<Agent>>,
-    ) -> AppResult<Option<Agent>> {
+    ) -> AppResult<Agent> {
         let Some(persistence) = self.agent_persistence.as_ref() else {
-            return Ok(None);
+            return Err(AppError::Internal(
+                "Agent persistence is unavailable for an enabled channel.".into(),
+            ));
         };
         let Some(&agent_id) = channel_match
             .channel
@@ -452,14 +451,27 @@ impl ThreadUseCases {
             .as_ref()
             .and_then(|ids| ids.first())
         else {
-            return Ok(None);
+            return Err(AppError::Internal(format!(
+                "Enabled channel '{}' has no active agent at position 0.",
+                channel_match.channel.slug
+            )));
         };
         if let Some(cached) = cache.get(&agent_id) {
-            return Ok(cached.clone());
+            return cached.clone().ok_or_else(|| {
+                AppError::Internal(format!(
+                    "Active agent {agent_id} for channel '{}' was not found.",
+                    channel_match.channel.slug
+                ))
+            });
         }
         let loaded = persistence.get_by_id(agent_id).await?;
         cache.insert(agent_id, loaded.clone());
-        Ok(loaded)
+        loaded.ok_or_else(|| {
+            AppError::Internal(format!(
+                "Active agent {agent_id} for channel '{}' was not found.",
+                channel_match.channel.slug
+            ))
+        })
     }
 
     /// Approvals go to the first non-public channel participant, falling back to any company team

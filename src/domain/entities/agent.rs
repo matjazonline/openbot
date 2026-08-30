@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::entities::{creation::CreationProvenance, value_objects::AvatarUrl};
+use crate::entities::{
+    creation::CreationProvenance,
+    memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
+    value_objects::AvatarUrl,
+};
 
 pub const MIN_AGENT_RUN_TIMEOUT_SECS: u32 = 1;
 pub const MAX_AGENT_RUN_TIMEOUT_SECS: u32 = 3_600;
@@ -19,13 +23,17 @@ pub struct Agent {
     /// Per-run wall-clock limit. `None` inherits the deployment-wide default.
     #[serde(default)]
     pub run_timeout_secs: Option<u32>,
-    #[serde(skip_serializing)]
-    pub api_key: Option<String>,
     pub system_prompt: Option<String>,
     /// A short statement of what this agent is for, shown to other agents in the same company by
     /// the agent directory tool. Not part of the prompt.
     pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
+    #[serde(default)]
+    pub memory_persistence_mode: MemoryPersistenceMode,
+    #[serde(default)]
+    pub memory_recall_mode: MemoryRecallMode,
+    #[serde(default = "default_memory_max_results")]
+    pub memory_max_results: u8,
     /// The picture shown next to the agent's name; `None` renders as a letter bubble.
     pub avatar_url: Option<AvatarUrl>,
     pub created_by: CreationProvenance,

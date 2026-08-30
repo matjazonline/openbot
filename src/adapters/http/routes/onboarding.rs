@@ -221,15 +221,15 @@ async fn create_channel(
         .into_response());
     }
 
-    let mut channel_specs = selected_library_agents
+    let channel_specs = selected_library_agents
         .iter()
         .map(|agent| (agent.name.clone(), agent.slug.clone(), agent.id))
         .collect::<Vec<_>>();
-    let mut custom_agent_id = None;
+    let mut custom_agent = None;
 
     if !custom_name.is_empty() {
         let system_prompt = match agent_use_cases
-            .generate_system_prompt(user.id, company_id, custom_instructions, None, None, None)
+            .generate_system_prompt(user.id, company_id, custom_instructions, None, None)
             .await
         {
             Ok(prompt) => prompt,
@@ -244,35 +244,48 @@ async fn create_channel(
             }
         };
         let slug = slugify(custom_name);
-        let agent = match agent_use_cases
-            .create_agent(
-                user.id,
-                company_id,
-                AgentWrite {
-                    name: custom_name.to_string(),
-                    slug: slug.clone(),
-                    system_prompt: Some(system_prompt.clone()),
-                    ..AgentWrite::default()
-                },
-            )
+        custom_agent = Some((
+            AgentWrite {
+                name: custom_name.to_string(),
+                slug: slug.clone(),
+                system_prompt: Some(system_prompt),
+                ..AgentWrite::default()
+            },
+            ChannelWrite {
+                name: custom_name.to_string(),
+                slug,
+                enabled: true,
+                add_3rd_party: true,
+                ..ChannelWrite::default()
+            },
+        ));
+    }
+
+    let mut created_channels = Vec::new();
+    let mut custom_agent_id = None;
+    if let Some((agent, channel)) = custom_agent {
+        match channel_use_cases
+            .create_channel_with_agent(user.id, company_id, agent, channel, false)
             .await
         {
-            Ok(agent) => agent,
+            Ok(channel) => {
+                custom_agent_id = channel
+                    .agent_ids
+                    .as_ref()
+                    .and_then(|ids| ids.first().copied());
+                created_channels.push(channel);
+            }
             Err(err) => {
                 return Ok(Html(pages::onboarding_channel_page(
                     &mailbox_user,
                     &company,
                     &library_agents,
-                    Some(&format!("Could not create the agent: {err}")),
+                    Some(&format!("Could not create the channel and agent: {err}")),
                 ))
                 .into_response());
             }
-        };
-        custom_agent_id = Some(agent.id);
-        channel_specs.push((custom_name.to_string(), slug, agent.id));
+        }
     }
-
-    let mut created_channels = Vec::new();
     for (name, slug, agent_id) in channel_specs {
         let write = ChannelWrite {
             name,
@@ -376,6 +389,9 @@ mod tests {
 
     fn library_agent(name: &str, slug: &str) -> Agent {
         Agent {
+            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
+            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
+            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: None,
             name: name.to_string(),
@@ -383,7 +399,6 @@ mod tests {
             provider: None,
             model: None,
             run_timeout_secs: None,
-            api_key: None,
             system_prompt: Some("Help with email.".to_string()),
             description: Some("A ready-made helper".to_string()),
             config_json: None,
@@ -414,21 +429,14 @@ mod tests {
             description: None,
             slug: "customer-support".into(),
             alias_slugs: Vec::new(),
-            api_key: None,
-            provider: None,
-            model: None,
             participant_emails: None,
             agent_ids: None,
-            channel_config: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
             retrieve_user_memory: false,
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
         };
@@ -453,6 +461,12 @@ mod tests {
         assert!(channel_page.contains(&format!("value=\"{}\"", library_agent.id)));
         assert!(channel_page.contains("Scheduler"));
         assert!(channel_page.contains("Each agent gets a channel with the same name"));
+        assert!(channel_page.contains("Custom agent and channel name"));
+        assert!(channel_page.contains("Required when creating a custom agent."));
+        assert!(
+            !channel_page
+                .contains("Channel name <span class=\"font-normal opacity-60\">(optional)")
+        );
         assert!(channel_page.contains(r##"data-submit="busy-once""##));
         // The spinner is Tailwind's `animate-spin` on an inline SVG, not daisyUI's
         // `loading-spinner` -- see `busy_submit_button` for why.

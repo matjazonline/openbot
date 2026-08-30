@@ -64,7 +64,9 @@ pub struct AgentDraft<'a> {
     pub provider: &'a str,
     pub model: &'a str,
     pub run_timeout_secs: Option<u32>,
-    pub api_key: &'a str,
+    pub memory_persistence_mode: &'a str,
+    pub memory_recall_mode: &'a str,
+    pub memory_max_results: u8,
     pub config_json: &'a str,
     pub avatar_url: &'a str,
     /// Whether the create pane should open on the Advanced tab.
@@ -391,32 +393,27 @@ fn id_prefix(agent_id: Option<Uuid>) -> String {
 fn agent_fields(fields: &AgentFields<'_>) -> String {
     let draft = fields.draft;
     let id_prefix = id_prefix(fields.agent_id);
-    let overrides_open = if draft.provider.is_empty()
-        && draft.model.is_empty()
-        && draft.api_key.is_empty()
-        && draft.config_json.is_empty()
-    {
-        ""
-    } else {
-        " open"
+    let overrides_open =
+        if draft.provider.is_empty() && draft.model.is_empty() && draft.config_json.is_empty() {
+            ""
+        } else {
+            " open"
+        };
+    let description_help = match fields.scope {
+        AgentFormScope::Company(_) => "Shown to other agents in this company",
+        AgentFormScope::Library => "Shown to agents in companies that select it",
     };
-    let (api_key_placeholder, description_help) = match fields.scope {
-        AgentFormScope::Company(_) => (
-            "Overrides the company key",
-            "Shown to other agents in this company",
-        ),
-        AgentFormScope::Library => (
-            "Used by this library agent",
-            "Shown to agents in companies that select it",
-        ),
-    };
-    let model_connection_fields = model_connection_fields(&ModelConnectionFields {
-        agent_id_suffix: Some(&id_prefix),
-        provider: draft.provider,
-        model: draft.model,
-        api_key: draft.api_key,
-        api_key_placeholder,
-    });
+    let model_connection_fields = format!(
+        r##"
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Provider</span></div>
+                <input id="agent-provider-{id_prefix}" name="provider" value="{provider}" class="input w-full" placeholder="Inherit company provider"></label>
+            <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Model</span></div>
+                <input id="agent-model-{id_prefix}" name="model" value="{model}" class="input w-full" placeholder="Inherit company model"></label>
+        </div>"##,
+        provider = escape_html_attr(draft.provider),
+        model = escape_html_attr(draft.model),
+    );
     let run_timeout_value = draft
         .run_timeout_secs
         .map(|seconds| seconds.to_string())
@@ -458,6 +455,26 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                                     class="input w-full">
                                 <div class="label"><span class="text-xs opacity-60">Leave blank to inherit AGENT_RUN_TIMEOUT_SECS.</span></div>
                             </label>
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                <label class="form-control w-full">
+                                    <div class="label"><span class="text-xs opacity-70">Memory persistence</span></div>
+                                    <select name="memory_persistence_mode" class="select w-full">
+                                        <option value="audience_only"{memory_audience_selected}>Audience only</option>
+                                        <option value="scope_specific_facts"{memory_scope_selected}>Scope-specific facts</option>
+                                    </select>
+                                </label>
+                                <label class="form-control w-full">
+                                    <div class="label"><span class="text-xs opacity-70">Memory recall</span></div>
+                                    <select name="memory_recall_mode" class="select w-full">
+                                        <option value="fast"{memory_fast_selected}>Fast</option>
+                                        <option value="thinking"{memory_thinking_selected}>Thinking</option>
+                                    </select>
+                                </label>
+                                <label class="form-control w-full">
+                                    <div class="label"><span class="text-xs opacity-70">Maximum memory results</span></div>
+                                    <input name="memory_max_results" type="number" min="1" max="20" value="{memory_max_results}" class="input w-full">
+                                </label>
+                            </div>
                             <label class="form-control w-full">
                                 <div class="label">
                                     <span class="text-xs opacity-70">Description</span>
@@ -484,6 +501,27 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         description = escape_html_text(draft.description),
         config_json = escape_html_text(draft.config_json),
         avatar_field = agent_avatar_field(&id_prefix, draft),
+        memory_audience_selected = if draft.memory_persistence_mode == "audience_only" {
+            " selected"
+        } else {
+            ""
+        },
+        memory_scope_selected = if draft.memory_persistence_mode == "scope_specific_facts" {
+            " selected"
+        } else {
+            ""
+        },
+        memory_fast_selected = if draft.memory_recall_mode == "fast" {
+            " selected"
+        } else {
+            ""
+        },
+        memory_thinking_selected = if draft.memory_recall_mode == "thinking" {
+            " selected"
+        } else {
+            ""
+        },
+        memory_max_results = draft.memory_max_results,
     )
 }
 
@@ -635,7 +673,9 @@ fn stored_draft<'a>(agent: &'a Agent, config_json: &'a str) -> AgentDraft<'a> {
         provider: agent.provider.as_deref().unwrap_or(""),
         model: agent.model.as_deref().unwrap_or(""),
         run_timeout_secs: agent.run_timeout_secs,
-        api_key: agent.api_key.as_deref().unwrap_or(""),
+        memory_persistence_mode: agent.memory_persistence_mode.as_str(),
+        memory_recall_mode: agent.memory_recall_mode.as_str(),
+        memory_max_results: agent.memory_max_results,
         config_json,
         avatar_url: agent
             .avatar_url

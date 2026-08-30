@@ -8,12 +8,15 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
+        agent::Agent,
         channel::Channel,
         creation::CreationProvenance,
-        memory::{MemoryPersistenceMode, MemoryRecallMode},
-        value_objects::{ChannelSlug, CompanySlug, EmailAddress},
+        value_objects::{AvatarUrl, ChannelSlug, CompanySlug, EmailAddress},
     },
-    use_cases::channel::{ChannelPersistence, ChannelWrite},
+    use_cases::{
+        agent::{AgentPersistence, AgentWrite},
+        channel::{ChannelPersistence, ChannelWrite},
+    },
 };
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
@@ -24,12 +27,8 @@ pub struct ChannelDb {
     pub description: Option<String>,
     pub slug: String,
     pub alias_slugs: Vec<String>,
-    pub api_key: Option<String>,
-    pub provider: Option<String>,
-    pub model: Option<String>,
     pub participant_emails: Option<Vec<String>>,
     pub agent_ids: Option<Vec<Uuid>>,
-    pub channel_config: Option<serde_json::Value>,
     pub enabled: bool,
     pub add_3rd_party: bool,
     pub retrieve_company_memory: bool,
@@ -38,9 +37,6 @@ pub struct ChannelDb {
     pub persist_company_memory: bool,
     pub persist_agent_memory: bool,
     pub persist_user_memory: bool,
-    pub memory_persistence_mode: String,
-    pub memory_recall_mode: String,
-    pub memory_max_results: i16,
     pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
 }
@@ -56,14 +52,10 @@ impl TryFrom<ChannelDb> for Channel {
             description: db.description,
             slug: ChannelSlug::from(db.slug),
             alias_slugs: db.alias_slugs.into_iter().map(ChannelSlug::from).collect(),
-            api_key: db.api_key,
-            provider: db.provider,
-            model: db.model,
             participant_emails: db
                 .participant_emails
                 .map(|emails| emails.into_iter().map(EmailAddress::from).collect()),
             agent_ids: db.agent_ids,
-            channel_config: db.channel_config,
             enabled: db.enabled,
             add_3rd_party: db.add_3rd_party,
             retrieve_company_memory: db.retrieve_company_memory,
@@ -72,16 +64,6 @@ impl TryFrom<ChannelDb> for Channel {
             persist_company_memory: db.persist_company_memory,
             persist_agent_memory: db.persist_agent_memory,
             persist_user_memory: db.persist_user_memory,
-            memory_persistence_mode: match db.memory_persistence_mode.as_str() {
-                "scope_specific_facts" => MemoryPersistenceMode::ScopeSpecificFacts,
-                _ => MemoryPersistenceMode::AudienceOnly,
-            },
-            memory_recall_mode: if db.memory_recall_mode == "thinking" {
-                MemoryRecallMode::Thinking
-            } else {
-                MemoryRecallMode::Fast
-            },
-            memory_max_results: db.memory_max_results as u8,
             created_by: serde_json::from_value(db.created_by).map_err(|err| {
                 AppError::Internal(format!("Invalid channels.created_by provenance: {err}"))
             })?,
@@ -99,7 +81,6 @@ const CHANNEL_SELECT: &str = r#"
                 FROM channel_slugs cs
                 WHERE cs.channel_id = ch.id AND NOT cs.is_primary),
                ARRAY[]::text[]) AS alias_slugs,
-           ch.api_key, ch.provider, ch.model,
            CASE ch.access_mode
                WHEN 'public' THEN ARRAY['@public']::text[] || COALESCE(
                    (SELECT array_agg(cp.email::text ORDER BY cp.email::text)
@@ -113,10 +94,9 @@ const CHANNEL_SELECT: &str = r#"
            END AS participant_emails,
            (SELECT array_agg(ca.agent_id ORDER BY ca.position)
             FROM channel_agents ca WHERE ca.channel_id = ch.id) AS agent_ids,
-           ch.channel_config, ch.enabled, ch.add_3rd_party,
+           ch.enabled, ch.add_3rd_party,
            ch.retrieve_company_memory, ch.retrieve_agent_memory, ch.retrieve_user_memory,
            ch.persist_company_memory, ch.persist_agent_memory, ch.persist_user_memory,
-           ch.memory_persistence_mode, ch.memory_recall_mode, ch.memory_max_results,
            ch.created_by, ch.created_at
     FROM channels ch
 "#;
@@ -129,11 +109,7 @@ async fn load_channel(persistence: &PostgresPersistence, id: Uuid) -> AppResult<
         .await
         .map_err(AppError::from)?;
 
-    db.map(|mut db| {
-        db.api_key = persistence.decrypt_credential(db.api_key)?;
-        db.try_into()
-    })
-    .transpose()
+    db.map(TryInto::try_into).transpose()
 }
 
 /// Write a channel's canonical slug plus its aliases into the shared per-company slug namespace.
@@ -211,29 +187,22 @@ fn channel_access(participant_emails: Option<Vec<String>>) -> (&'static str, Vec
 impl ChannelPersistence for PostgresPersistence {
     async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
         let uuid = Uuid::new_v4();
-        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let (access_mode, participants) = channel_access(write.participant_emails);
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
 
         sqlx::query(
             r#"INSERT INTO channels (
-                    id, company_id, name, description, access_mode, api_key, provider, model,
-                    channel_config, enabled, add_3rd_party, created_by,
+                    id, company_id, name, description, access_mode, enabled, add_3rd_party, created_by,
                     retrieve_company_memory, retrieve_agent_memory, retrieve_user_memory,
-                    persist_company_memory, persist_agent_memory, persist_user_memory,
-                    memory_persistence_mode, memory_recall_mode, memory_max_results
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-                         $13, $14, $15, $16, $17, $18, $19, $20, $21)"#,
+                    persist_company_memory, persist_agent_memory, persist_user_memory
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+                         $9, $10, $11, $12, $13, $14)"#,
         )
         .bind(uuid)
         .bind(company_id)
         .bind(write.name)
         .bind(write.description)
         .bind(access_mode)
-        .bind(encrypted_api_key)
-        .bind(write.provider)
-        .bind(write.model)
-        .bind(write.channel_config)
         .bind(write.enabled)
         .bind(write.add_3rd_party)
         .bind(
@@ -246,9 +215,6 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(write.persist_company_memory)
         .bind(write.persist_agent_memory)
         .bind(write.persist_user_memory)
-        .bind(write.memory_persistence_mode.as_str())
-        .bind(write.memory_recall_mode.as_str())
-        .bind(i16::from(write.memory_max_results))
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -284,6 +250,131 @@ impl ChannelPersistence for PostgresPersistence {
             .ok_or_else(|| AppError::Internal("Created channel was not found".into()))
     }
 
+    async fn create_with_agent(
+        &self,
+        company_id: Uuid,
+        agent: AgentWrite,
+        channel: ChannelWrite,
+    ) -> AppResult<(Agent, Channel)> {
+        let agent_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+        let run_timeout_secs = agent
+            .run_timeout_secs
+            .map(i32::try_from)
+            .transpose()
+            .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
+        let agent_created_by =
+            serde_json::to_value(agent.created_by.unwrap_or_else(CreationProvenance::system))
+                .map_err(|error| AppError::Internal(error.to_string()))?;
+        let channel_created_by = serde_json::to_value(
+            channel
+                .created_by
+                .clone()
+                .unwrap_or_else(CreationProvenance::system),
+        )
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+        let (access_mode, participants) = channel_access(channel.participant_emails.clone());
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+
+        sqlx::query(
+            r#"INSERT INTO agents
+               (id, company_id, name, slug, provider, model, system_prompt, description,
+                config_json, avatar_url, created_by, run_timeout_secs,
+                memory_persistence_mode, memory_recall_mode, memory_max_results)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)"#,
+        )
+        .bind(agent_id)
+        .bind(company_id)
+        .bind(&agent.name)
+        .bind(&agent.slug)
+        .bind(&agent.provider)
+        .bind(&agent.model)
+        .bind(&agent.system_prompt)
+        .bind(&agent.description)
+        .bind(&agent.config_json)
+        .bind(agent.avatar_url.as_ref().map(AvatarUrl::as_str))
+        .bind(agent_created_by)
+        .bind(run_timeout_secs)
+        .bind(agent.memory_persistence_mode.as_str())
+        .bind(agent.memory_recall_mode.as_str())
+        .bind(i16::from(agent.memory_max_results))
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+
+        sqlx::query(
+            r#"INSERT INTO channels (
+                    id, company_id, name, description, access_mode, enabled, add_3rd_party,
+                    created_by, retrieve_company_memory, retrieve_agent_memory,
+                    retrieve_user_memory, persist_company_memory, persist_agent_memory,
+                    persist_user_memory)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)"#,
+        )
+        .bind(channel_id)
+        .bind(company_id)
+        .bind(&channel.name)
+        .bind(&channel.description)
+        .bind(access_mode)
+        .bind(channel.enabled)
+        .bind(channel.add_3rd_party)
+        .bind(channel_created_by)
+        .bind(channel.retrieve_company_memory)
+        .bind(channel.retrieve_agent_memory)
+        .bind(channel.retrieve_user_memory)
+        .bind(channel.persist_company_memory)
+        .bind(channel.persist_agent_memory)
+        .bind(channel.persist_user_memory)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+
+        insert_channel_slugs(
+            &mut tx,
+            company_id,
+            channel_id,
+            &channel.slug,
+            &channel.alias_slugs,
+        )
+        .await?;
+        for email in participants {
+            sqlx::query("INSERT INTO channel_participants (channel_id, email) VALUES ($1, $2)")
+                .bind(channel_id)
+                .bind(email)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+        }
+        let mut assigned = vec![agent_id];
+        assigned.extend(
+            channel
+                .agent_ids
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|id| *id != agent_id),
+        );
+        for (position, assigned_agent_id) in assigned.into_iter().enumerate() {
+            sqlx::query(
+                "INSERT INTO channel_agents (company_id, channel_id, agent_id, position) VALUES ($1, $2, $3, $4)",
+            )
+            .bind(company_id)
+            .bind(channel_id)
+            .bind(assigned_agent_id)
+            .bind(position as i32)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+        }
+        tx.commit().await.map_err(AppError::from)?;
+
+        let agent = AgentPersistence::get_by_id(self, agent_id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Created agent was not found".into()))?;
+        let channel = load_channel(self, channel_id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Created channel was not found".into()))?;
+        Ok((agent, channel))
+    }
+
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>> {
         load_channel(self, id).await
     }
@@ -305,20 +396,13 @@ impl ChannelPersistence for PostgresPersistence {
             .await
             .map_err(AppError::from)?;
 
-        db.map(|mut db| {
-            db.api_key = self.decrypt_credential(db.api_key)?;
-            db.try_into()
-        })
-        .transpose()
+        db.map(TryInto::try_into).transpose()
     }
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
-        let select = CHANNEL_SELECT.replace(
-            "ch.api_key, ch.provider, ch.model",
-            "NULL::text AS api_key, ch.provider, ch.model",
+        let query = format!(
+            "{CHANNEL_SELECT} WHERE ch.company_id = $1 ORDER BY ch.created_at DESC, ch.id DESC"
         );
-        let query =
-            format!("{select} WHERE ch.company_id = $1 ORDER BY ch.created_at DESC, ch.id DESC");
         let db_list = sqlx::query_as::<_, ChannelDb>(&query)
             .bind(company_id)
             .fetch_all(&self.pool)
@@ -330,26 +414,19 @@ impl ChannelPersistence for PostgresPersistence {
 
     async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
         let (access_mode, participants) = channel_access(write.participant_emails);
-        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let result = sqlx::query(
             r#"UPDATE channels
-               SET name = $1, description = $2, access_mode = $3, api_key = $4,
-                   provider = $5, model = $6, channel_config = $7, enabled = $8,
-                   add_3rd_party = $9, retrieve_company_memory = $10,
-                   retrieve_agent_memory = $11, retrieve_user_memory = $12,
-                   persist_company_memory = $13, persist_agent_memory = $14,
-                   persist_user_memory = $15, memory_persistence_mode = $16,
-                   memory_recall_mode = $17, memory_max_results = $18
-               WHERE id = $19"#,
+               SET name = $1, description = $2, access_mode = $3, enabled = $4,
+                   add_3rd_party = $5, retrieve_company_memory = $6,
+                   retrieve_agent_memory = $7, retrieve_user_memory = $8,
+                   persist_company_memory = $9, persist_agent_memory = $10,
+                   persist_user_memory = $11
+               WHERE id = $12"#,
         )
         .bind(write.name)
         .bind(write.description)
         .bind(access_mode)
-        .bind(encrypted_api_key)
-        .bind(write.provider)
-        .bind(write.model)
-        .bind(write.channel_config)
         .bind(write.enabled)
         .bind(write.add_3rd_party)
         .bind(write.retrieve_company_memory)
@@ -358,9 +435,6 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(write.persist_company_memory)
         .bind(write.persist_agent_memory)
         .bind(write.persist_user_memory)
-        .bind(write.memory_persistence_mode.as_str())
-        .bind(write.memory_recall_mode.as_str())
-        .bind(i16::from(write.memory_max_results))
         .bind(id)
         .execute(&mut *tx)
         .await
@@ -440,7 +514,6 @@ mod tests {
     use crate::use_cases::agent::AgentWrite;
     use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
     use crate::use_cases::user::UserPersistence;
-    use serde_json::json;
 
     #[tokio::test]
     async fn postgres_channel_persistence_works() {
@@ -478,7 +551,6 @@ mod tests {
 
         // 1. Create Channel
         let emails = vec!["a@example.com".to_string(), "b@example.com".to_string()];
-        let config = json!({ "key": "value" });
 
         let agent1 = AgentPersistence::create(
             &persistence,
@@ -512,12 +584,8 @@ mod tests {
                 description: Some("Takes support mail from the website form.".into()),
                 slug: "inbound-email".into(),
                 alias_slugs: Vec::new(),
-                api_key: Some("ch_key_123".into()),
-                provider: Some("openai".into()),
-                model: Some("gpt-4o".into()),
                 participant_emails: Some(emails.clone()),
                 agent_ids: Some(agent_ids.clone()),
-                channel_config: Some(config.clone()),
                 enabled: true,
                 // Deliberately the opposite of `enabled`, so a swapped pair of same-typed binds
                 // cannot pass this test.
@@ -528,10 +596,6 @@ mod tests {
                 persist_company_memory: false,
                 persist_agent_memory: false,
                 persist_user_memory: false,
-                memory_persistence_mode:
-                    crate::entities::memory::MemoryPersistenceMode::ScopeSpecificFacts,
-                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-                memory_max_results: 5,
                 created_by: None,
             },
         )
@@ -544,9 +608,6 @@ mod tests {
             Some("Takes support mail from the website form.")
         );
         assert_eq!(channel.slug, "inbound-email");
-        assert_eq!(channel.api_key.as_deref(), Some("ch_key_123"));
-        assert_eq!(channel.provider.as_deref(), Some("openai"));
-        assert_eq!(channel.model.as_deref(), Some("gpt-4o"));
         assert_eq!(
             channel.participant_emails,
             Some(
@@ -557,13 +618,8 @@ mod tests {
             )
         );
         assert_eq!(channel.agent_ids, Some(agent_ids));
-        assert_eq!(channel.channel_config, Some(config));
         assert!(channel.enabled);
         assert!(!channel.add_3rd_party);
-        assert_eq!(
-            channel.memory_persistence_mode,
-            crate::entities::memory::MemoryPersistenceMode::ScopeSpecificFacts
-        );
 
         // 2. Get by ID
         let fetched = ChannelPersistence::get_by_id(&persistence, channel.id)
@@ -594,10 +650,6 @@ mod tests {
                 persist_company_memory: false,
                 persist_agent_memory: false,
                 persist_user_memory: false,
-                memory_persistence_mode:
-                    crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-                memory_max_results: 5,
                 created_by: None,
                 ..ChannelWrite::default()
             },
@@ -610,16 +662,11 @@ mod tests {
             Some("Now also handles refund requests."),
             "an edited description must survive a round trip"
         );
-        assert_eq!(updated.api_key, None);
         assert_eq!(updated.participant_emails, None);
         assert!(!updated.enabled, "the off switch must survive a round trip");
         assert!(
             updated.add_3rd_party,
             "the third-party switch must survive a round trip"
-        );
-        assert_eq!(
-            updated.memory_persistence_mode,
-            crate::entities::memory::MemoryPersistenceMode::AudienceOnly
         );
 
         let reread = ChannelPersistence::get_by_id(&persistence, channel.id)
@@ -644,6 +691,93 @@ mod tests {
 
         // Cleanup
         let _ = CompanyPersistence::delete(&persistence, company.id).await;
+    }
+
+    #[tokio::test]
+    async fn agent_and_enabled_channel_creation_is_atomic() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let suffix = Uuid::new_v4().simple().to_string();
+        let email = format!("atomic-channel-{suffix}@example.com");
+        let user = persistence
+            .create_user(&format!("atomic-channel-{suffix}"), &email, "hash")
+            .await
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            user.id,
+            CompanyWrite {
+                name: "Atomic Channel Corp".into(),
+                slug: format!("atomic-channel-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Taken".into(),
+                slug: "taken".into(),
+                enabled: false,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let before = AgentPersistence::list_by_company_id(&persistence, company.id)
+            .await
+            .unwrap()
+            .len();
+        let failed = ChannelPersistence::create_with_agent(
+            &persistence,
+            company.id,
+            AgentWrite {
+                name: "Rolled back".into(),
+                slug: "rolled-back".into(),
+                ..AgentWrite::default()
+            },
+            ChannelWrite {
+                name: "Collision".into(),
+                slug: "taken".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await;
+        assert!(failed.is_err());
+        assert_eq!(
+            AgentPersistence::list_by_company_id(&persistence, company.id)
+                .await
+                .unwrap()
+                .len(),
+            before,
+            "a failed channel insert must roll its new agent back"
+        );
+
+        let (agent, channel) = ChannelPersistence::create_with_agent(
+            &persistence,
+            company.id,
+            AgentWrite {
+                name: "Atomic agent".into(),
+                slug: "atomic-agent".into(),
+                ..AgentWrite::default()
+            },
+            ChannelWrite {
+                name: "Atomic channel".into(),
+                slug: "atomic".into(),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert!(channel.enabled);
+        assert_eq!(channel.agent_ids, Some(vec![agent.id]));
     }
 
     /// Aliases and canonical slugs share one namespace per company, enforced by the database.
@@ -695,7 +829,7 @@ mod tests {
             name: "Support".into(),
             slug: slug.into(),
             alias_slugs: aliases.iter().map(|a| (*a).to_string()).collect(),
-            enabled: true,
+            enabled: false,
             ..ChannelWrite::default()
         };
 

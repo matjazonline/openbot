@@ -198,7 +198,6 @@ CREATE TABLE agents (
     slug CITEXT NOT NULL,
     provider TEXT,
     model TEXT,
-    api_key TEXT,
     system_prompt TEXT,
     -- What this agent is for, in one line. Read by the `list_company_agents` tool so a sibling
     -- agent can pick the right colleague without its address book living in a system prompt.
@@ -207,6 +206,14 @@ CREATE TABLE agents (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     avatar_url TEXT,
     created_by JSONB NOT NULL,
+    -- Wall-clock budget for a single agent run. NULL leaves the runner's own default in place.
+    run_timeout_secs INTEGER,
+    memory_recall_mode TEXT NOT NULL DEFAULT 'fast'
+        CHECK (memory_recall_mode IN ('fast', 'thinking')),
+    memory_max_results SMALLINT NOT NULL DEFAULT 5
+        CHECK (memory_max_results BETWEEN 1 AND 20),
+    memory_persistence_mode TEXT NOT NULL DEFAULT 'audience_only'
+        CHECK (memory_persistence_mode IN ('audience_only', 'scope_specific_facts')),
     CONSTRAINT agents_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT agents_company_slug_key UNIQUE (company_id, slug),
     CONSTRAINT agents_name_not_blank CHECK (btrim(name) <> ''),
@@ -219,7 +226,9 @@ CREATE TABLE agents (
     ),
     CONSTRAINT agents_avatar_url_scheme_check
         CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://'),
-    CONSTRAINT agents_created_by_shape_check CHECK (valid_creation_provenance(created_by))
+    CONSTRAINT agents_created_by_shape_check CHECK (valid_creation_provenance(created_by)),
+    CONSTRAINT agents_run_timeout_secs_check
+        CHECK (run_timeout_secs BETWEEN 1 AND 3600)
 );
 
 CREATE INDEX agents_company_created_idx
@@ -254,10 +263,6 @@ CREATE TABLE channels (
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     access_mode TEXT NOT NULL DEFAULT 'team',
-    channel_config JSONB,
-    api_key TEXT,
-    provider TEXT,
-    model TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- A reversible off switch: disabling stops the channel taking traffic without deleting its
     -- threads, tasks and approvals the way DELETE FROM channels does.
@@ -275,22 +280,13 @@ CREATE TABLE channels (
     persist_company_memory BOOLEAN NOT NULL DEFAULT FALSE,
     persist_agent_memory BOOLEAN NOT NULL DEFAULT FALSE,
     persist_user_memory BOOLEAN NOT NULL DEFAULT FALSE,
-    memory_recall_mode TEXT NOT NULL DEFAULT 'fast'
-        CHECK (memory_recall_mode IN ('fast', 'thinking')),
-    memory_max_results SMALLINT NOT NULL DEFAULT 5
-        CHECK (memory_max_results BETWEEN 1 AND 20),
     -- What this channel is for, in one line. Read back to a teammate who mails an address that
     -- does not exist, so they can find the channel they meant without asking anyone.
     description TEXT,
-    memory_persistence_mode TEXT NOT NULL DEFAULT 'audience_only'
-        CHECK (memory_persistence_mode IN ('audience_only', 'scope_specific_facts')),
     CONSTRAINT channels_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT channels_name_not_blank CHECK (btrim(name) <> ''),
     CONSTRAINT channels_access_mode_check
         CHECK (access_mode IN ('team', 'allowlist', 'public')),
-    CONSTRAINT channels_config_object_check CHECK (
-        channel_config IS NULL OR jsonb_typeof(channel_config) = 'object'
-    ),
     CONSTRAINT channels_created_by_shape_check CHECK (valid_creation_provenance(created_by))
 );
 
@@ -358,6 +354,40 @@ $$;
 CREATE TRIGGER channel_agents_scope_check
 BEFORE INSERT OR UPDATE ON channel_agents
 FOR EACH ROW EXECUTE FUNCTION enforce_channel_agent_scope();
+
+CREATE FUNCTION enforce_enabled_channel_has_active_agent() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+    checked_channel_id UUID;
+BEGIN
+    IF TG_TABLE_NAME = 'channels' THEN
+        checked_channel_id := COALESCE(NEW.id, OLD.id);
+    ELSE
+        checked_channel_id := COALESCE(NEW.channel_id, OLD.channel_id);
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM channels AS channel
+        WHERE channel.id = checked_channel_id AND channel.enabled
+    ) AND NOT EXISTS (
+        SELECT 1 FROM channel_agents AS assignment
+        WHERE assignment.channel_id = checked_channel_id AND assignment.position = 0
+    ) THEN
+        RAISE EXCEPTION 'enabled channel must have an active agent at position 0'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER enabled_channel_active_agent_check
+AFTER INSERT OR UPDATE OF enabled ON channels
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION enforce_enabled_channel_has_active_agent();
+
+CREATE CONSTRAINT TRIGGER channel_assignment_active_agent_check
+AFTER INSERT OR UPDATE OR DELETE ON channel_agents
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION enforce_enabled_channel_has_active_agent();
 
 CREATE TABLE channel_participants (
     channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
@@ -680,6 +710,9 @@ CREATE TABLE task_attempts (
     attempt_number INTEGER NOT NULL,
     status TEXT NOT NULL,
     error TEXT,
+    -- Why the attempt stopped running, beyond the coarse `status`. NULL for attempts still in
+    -- flight and for rows written before the worker started recording it.
+    stop_reason TEXT,
     prompt_tokens INTEGER,
     completion_tokens INTEGER,
     result JSONB,
@@ -694,7 +727,11 @@ CREATE TABLE task_attempts (
     CONSTRAINT task_attempts_token_check CHECK (
         (prompt_tokens IS NULL OR prompt_tokens >= 0)
         AND (completion_tokens IS NULL OR completion_tokens >= 0)
-    )
+    ),
+    CONSTRAINT task_attempts_stop_reason_check CHECK (stop_reason IN (
+        'completed', 'retryable_failure', 'terminal_failure',
+        'timed_out', 'shutdown', 'lease_lost'
+    ))
 );
 
 CREATE TABLE human_approvals (

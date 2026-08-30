@@ -51,6 +51,9 @@ struct LibraryAgentResponse {
     system_prompt: Option<String>,
     description: Option<String>,
     config_json: Option<serde_json::Value>,
+    memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode,
+    memory_recall_mode: crate::entities::memory::MemoryRecallMode,
+    memory_max_results: u8,
     avatar_url: Option<AvatarUrl>,
     created_by: crate::entities::creation::CreationProvenance,
     created_at: chrono::DateTime<chrono::Utc>,
@@ -68,6 +71,9 @@ impl From<Agent> for LibraryAgentResponse {
             system_prompt: agent.system_prompt,
             description: agent.description,
             config_json: agent.config_json,
+            memory_persistence_mode: agent.memory_persistence_mode,
+            memory_recall_mode: agent.memory_recall_mode,
+            memory_max_results: agent.memory_max_results,
             avatar_url: agent.avatar_url,
             created_by: agent.created_by,
             created_at: agent.created_at,
@@ -101,10 +107,12 @@ fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
         provider: payload.provider,
         model: payload.model,
         run_timeout_secs: payload.run_timeout_secs,
-        api_key: payload.api_key,
         system_prompt: payload.system_prompt,
         description: payload.description,
         config_json: payload.config_json,
+        memory_persistence_mode: payload.memory_persistence_mode,
+        memory_recall_mode: payload.memory_recall_mode,
+        memory_max_results: payload.memory_max_results,
         avatar_url,
         created_by: None,
     })
@@ -182,7 +190,6 @@ struct PromptPayload {
     instructions: String,
     provider: Option<String>,
     model: Option<String>,
-    api_key: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -195,7 +202,6 @@ struct PromptForm {
     instructions: String,
     provider: Option<String>,
     model: Option<String>,
-    api_key: Option<String>,
     id_prefix: Option<String>,
 }
 
@@ -212,7 +218,7 @@ async fn generate_prompt_fragment(
             &form.instructions,
             form.provider.as_deref(),
             form.model.as_deref(),
-            form.api_key.as_deref(),
+            None,
         )
         .await?;
     Ok(Html(pages::agent_prompt_generated(
@@ -234,7 +240,7 @@ async fn generate_prompt(
             &payload.instructions,
             payload.provider.as_deref(),
             payload.model.as_deref(),
-            payload.api_key.as_deref(),
+            None,
         )
         .await?;
     Ok(Json(PromptResponse { system_prompt }))
@@ -267,7 +273,9 @@ async fn workspace(
                 provider: agent.provider.as_deref().unwrap_or(""),
                 model: agent.model.as_deref().unwrap_or(""),
                 run_timeout_secs: agent.run_timeout_secs,
-                api_key: agent.api_key.as_deref().unwrap_or(""),
+                memory_persistence_mode: agent.memory_persistence_mode.as_str(),
+                memory_recall_mode: agent.memory_recall_mode.as_str(),
+                memory_max_results: agent.memory_max_results,
                 config_json: &config_json,
                 avatar_url: agent
                     .avatar_url

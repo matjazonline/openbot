@@ -126,10 +126,6 @@ pub struct ChannelDraft<'a> {
     pub system_prompt: &'a str,
     pub participant_emails: &'a str,
     pub agent_ids: &'a [Uuid],
-    pub provider: &'a str,
-    pub model: &'a str,
-    pub api_key: &'a str,
-    pub channel_config: &'a str,
     /// Whether the create pane should open on the Advanced tab.
     pub advanced: bool,
     /// Whether the channel takes traffic. A new channel starts enabled, which is why this type
@@ -143,9 +139,6 @@ pub struct ChannelDraft<'a> {
     pub persist_company_memory: bool,
     pub persist_agent_memory: bool,
     pub persist_user_memory: bool,
-    pub memory_persistence_mode: &'a str,
-    pub memory_recall_mode: &'a str,
-    pub memory_max_results: String,
 }
 
 impl Default for ChannelDraft<'_> {
@@ -158,10 +151,6 @@ impl Default for ChannelDraft<'_> {
             system_prompt: "",
             participant_emails: "",
             agent_ids: &[],
-            provider: "",
-            model: "",
-            api_key: "",
-            channel_config: "",
             advanced: false,
             enabled: true,
             add_3rd_party: true,
@@ -171,9 +160,6 @@ impl Default for ChannelDraft<'_> {
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
-            memory_persistence_mode: "audience_only",
-            memory_recall_mode: "fast",
-            memory_max_results: "5".into(),
         }
     }
 }
@@ -339,8 +325,7 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
 pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: bool) -> String {
     let participants = stored_participants(pane.channel);
     let aliases = stored_alias_slugs(pane.channel);
-    let config = stored_config(pane.channel);
-    let stored = stored_draft(pane.channel, &participants, &aliases, &config);
+    let stored = stored_draft(pane.channel, &participants, &aliases);
     let draft = pane.draft.unwrap_or(&stored);
     let company_id = pane.company.id;
     let channel_id = pane.channel.id;
@@ -551,23 +536,6 @@ struct ChannelFields<'a> {
 
 fn channel_fields(fields: &ChannelFields<'_>) -> String {
     let draft = fields.draft;
-    let overrides_open = if draft.provider.is_empty()
-        && draft.model.is_empty()
-        && draft.api_key.is_empty()
-        && draft.channel_config.is_empty()
-    {
-        ""
-    } else {
-        " open"
-    };
-    let model_connection_fields = model_connection_fields(&ModelConnectionFields {
-        agent_id_suffix: None,
-        provider: draft.provider,
-        model: draft.model,
-        api_key: draft.api_key,
-        api_key_placeholder: "Overrides the company key",
-    });
-
     format!(
         r##"
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -609,17 +577,6 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                             class="input w-full">
                         <div class="label"><span class="text-[11px] opacity-60">Blank means the company team. Use <code class="font-mono">@public</code> to let anyone write in.</span></div>
                     </label>
-                    <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
-                        <summary class="collapse-title text-sm font-medium">Custom model &amp; config</summary>
-                        <div class="collapse-content space-y-4">
-                            {model_connection_fields}
-                            <label class="form-control w-full">
-                                <div class="label"><span class="text-xs opacity-70">Channel Config (JSON)</span></div>
-                                <textarea name="channel_config" rows="4" placeholder='{{ "trigger": "email", "action": "ai_reply" }}'
-                                    class="textarea w-full font-mono text-xs">{channel_config}</textarea>
-                            </label>
-                        </div>
-                    </details>
                     {memory_fields}
                     <div class="form-control w-full">
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
@@ -654,7 +611,6 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
             fields.id_prefix
         ),
         participant_emails = escape_html_text(draft.participant_emails),
-        channel_config = escape_html_text(draft.channel_config),
         memory_fields = memory_fields(fields.memory_ready, draft),
         enabled_checked = if draft.enabled { " checked" } else { "" },
         add_3rd_party_checked = if draft.add_3rd_party { " checked" } else { "" },
@@ -672,8 +628,8 @@ fn agent_radios(company_id: Uuid, agents: &[Agent], selected: &[Uuid], id_prefix
         return format!(
             r##"<div class="rounded-box border border-dashed border-base-300 p-4 text-center text-xs opacity-70">
                             <input type="hidden" name="agent_ids" value="">
-                            This company has no agents yet. The channel falls back to its own model settings —
-                            or <a href="/ui/agents?company_id={company_id}&amp;new=1" class="link">create an agent</a> first.
+                            This company has no agents yet. Create an agent before enabling this channel —
+                            <a href="/ui/agents?company_id={company_id}&amp;new=1" class="link">create an agent</a>.
                         </div>"##
         );
     }
@@ -863,14 +819,12 @@ fn spam_disabled_confirmation(spam_scan_enabled: bool, is_public: bool) -> Strin
 
 /// A stored channel as the form sees it.
 ///
-/// The two fields the channel does not hold as text — its participants and its config JSON — are
-/// rendered by [`stored_participants`] and [`stored_config`] and passed in, so the draft can stay
+/// The channel's list-valued fields are rendered as form text and passed in so the draft can stay
 /// a pure set of borrows.
 fn stored_draft<'a>(
     channel: &'a Channel,
     participant_emails: &'a str,
     alias_slugs: &'a str,
-    channel_config: &'a str,
 ) -> ChannelDraft<'a> {
     ChannelDraft {
         name: &channel.name,
@@ -880,10 +834,6 @@ fn stored_draft<'a>(
         system_prompt: "",
         participant_emails,
         agent_ids: channel.agent_ids.as_deref().unwrap_or(&[]),
-        provider: channel.provider.as_deref().unwrap_or(""),
-        model: channel.model.as_deref().unwrap_or(""),
-        api_key: channel.api_key.as_deref().unwrap_or(""),
-        channel_config,
         advanced: true,
         enabled: channel.enabled,
         add_3rd_party: channel.add_3rd_party,
@@ -893,29 +843,12 @@ fn stored_draft<'a>(
         persist_company_memory: channel.persist_company_memory,
         persist_agent_memory: channel.persist_agent_memory,
         persist_user_memory: channel.persist_user_memory,
-        memory_persistence_mode: channel.memory_persistence_mode.as_str(),
-        memory_recall_mode: channel.memory_recall_mode.as_str(),
-        memory_max_results: channel.memory_max_results.to_string(),
     }
 }
 
 fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {
     let disabled = if memory_ready { "" } else { " disabled" };
     let checked = |value: bool| if value { " checked" } else { "" };
-    let recall_selected = |value: &str| {
-        if draft.memory_recall_mode == value {
-            " selected"
-        } else {
-            ""
-        }
-    };
-    let persistence_selected = |value: &str| {
-        if draft.memory_persistence_mode == value {
-            " selected"
-        } else {
-            ""
-        }
-    };
     format!(
         r##"<fieldset class="rounded-lg border border-base-300 bg-base-200 p-4"{disabled}>
                         <legend class="px-1 text-xs font-semibold">Memory</legend>
@@ -934,27 +867,6 @@ fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {
                             <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_agent}{disabled}>
                             <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_user}{disabled}>
                         </div>
-                        <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            <label class="form-control w-full">
-                                <div class="label"><span class="text-xs opacity-70">Persistence mode</span></div>
-                                <div class="label"><span class="text-[11px] opacity-60">Scope-specific facts constrains extraction to the scope. On HydraDB it is an instruction the extractor must follow; on Hindsight it is context the extractor is given, not an enforced filter.</span></div>
-                                <select name="memory_persistence_mode" class="select w-full"{disabled}>
-                                    <option value="audience_only"{audience_only_selected}>Audience only</option>
-                                    <option value="scope_specific_facts"{scope_specific_selected}>Scope-specific facts</option>
-                                </select>
-                            </label>
-                            <label class="form-control w-full">
-                                <div class="label"><span class="text-xs opacity-70">Recall mode</span></div>
-                                <select name="memory_recall_mode" class="select w-full"{disabled}>
-                                    <option value="fast"{fast_selected}>Fast</option>
-                                    <option value="thinking"{thinking_selected}>Thinking</option>
-                                </select>
-                            </label>
-                            <label class="form-control w-full">
-                                <div class="label"><span class="text-xs opacity-70">Maximum results</span></div>
-                                <input name="memory_max_results" type="number" min="1" max="20" value="{max_results}" class="input w-full"{disabled}>
-                            </label>
-                        </div>
                     </fieldset>"##,
         retrieve_company = checked(draft.retrieve_company_memory),
         retrieve_agent = checked(draft.retrieve_agent_memory),
@@ -962,11 +874,6 @@ fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {
         persist_company = checked(draft.persist_company_memory),
         persist_agent = checked(draft.persist_agent_memory),
         persist_user = checked(draft.persist_user_memory),
-        audience_only_selected = persistence_selected("audience_only"),
-        scope_specific_selected = persistence_selected("scope_specific_facts"),
-        fast_selected = recall_selected("fast"),
-        thinking_selected = recall_selected("thinking"),
-        max_results = escape_html_text(&draft.memory_max_results),
     )
 }
 
@@ -999,12 +906,6 @@ pub fn stored_participants(channel: &Channel) -> String {
 }
 
 /// The channel's config as the JSON text the form submits.
-pub fn stored_config(channel: &Channel) -> String {
-    match &channel.channel_config {
-        Some(config) => serde_json::to_string_pretty(config).unwrap_or_else(|_| config.to_string()),
-        None => String::new(),
-    }
-}
 
 pub fn channel_schedules_card(
     company_id: Uuid,

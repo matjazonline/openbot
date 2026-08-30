@@ -771,7 +771,7 @@ mod tests {
             ChannelWrite {
                 name: "Ops".into(),
                 slug: "ops".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -802,7 +802,7 @@ mod tests {
                 delivery_mode: ScheduleDeliveryMode::MailboxOnly,
                 recipient_emails: vec![],
                 timezone: ScheduleTimezone::utc(),
-                enabled: true,
+                enabled: false,
             },
         )
         .await;
@@ -918,7 +918,7 @@ mod tests {
             ChannelWrite {
                 name: "Ops".into(),
                 slug: "ops".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -930,7 +930,7 @@ mod tests {
             ChannelWrite {
                 name: "Planning".into(),
                 slug: "planning".into(),
-                enabled: true,
+                enabled: false,
                 ..ChannelWrite::default()
             },
         )
@@ -1232,7 +1232,7 @@ mod tests {
                 delivery_mode: ScheduleDeliveryMode::EmailParticipants,
                 recipient_emails: vec![],
                 timezone: ScheduleTimezone::utc(),
-                enabled: true,
+                enabled: false,
             },
         )
         .await
@@ -1270,7 +1270,7 @@ mod tests {
                 delivery_mode: paused.delivery_mode,
                 recipient_emails: vec![],
                 timezone: paused.timezone,
-                enabled: true,
+                enabled: false,
             },
         )
         .await

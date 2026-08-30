@@ -7,14 +7,15 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
+        agent::Agent,
         channel::{Channel, PUBLIC_PARTICIPANT},
         company::{Company, CompanyAccess},
         creation::CreationProvenance,
-        memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
         user::Viewer,
         value_objects::{ChannelSlug, CompanySlug},
     },
     infra::config::AppConfig,
+    use_cases::agent::AgentWrite,
     use_cases::company::{CompanyPersistence, managed_company},
     use_cases::memory::{ActiveMemoryBinding, MemoryBindingPersistence},
 };
@@ -33,12 +34,8 @@ pub struct ChannelWrite {
     pub slug: String,
     /// Extra local parts the channel also answers on. Replaced wholesale by every write.
     pub alias_slugs: Vec<String>,
-    pub api_key: Option<String>,
-    pub provider: Option<String>,
-    pub model: Option<String>,
     pub participant_emails: Option<Vec<String>>,
     pub agent_ids: Option<Vec<Uuid>>,
-    pub channel_config: Option<serde_json::Value>,
     pub enabled: bool,
     /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
     pub add_3rd_party: bool,
@@ -48,9 +45,6 @@ pub struct ChannelWrite {
     pub persist_company_memory: bool,
     pub persist_agent_memory: bool,
     pub persist_user_memory: bool,
-    pub memory_persistence_mode: MemoryPersistenceMode,
-    pub memory_recall_mode: MemoryRecallMode,
-    pub memory_max_results: u8,
     pub created_by: Option<CreationProvenance>,
 }
 
@@ -61,12 +55,8 @@ impl Default for ChannelWrite {
             description: None,
             slug: String::new(),
             alias_slugs: Vec::new(),
-            api_key: None,
-            provider: None,
-            model: None,
             participant_emails: None,
             agent_ids: None,
-            channel_config: None,
             enabled: false,
             add_3rd_party: false,
             created_by: None,
@@ -76,9 +66,6 @@ impl Default for ChannelWrite {
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
-            memory_persistence_mode: MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: MemoryRecallMode::Fast,
-            memory_max_results: default_memory_max_results(),
         }
     }
 }
@@ -103,10 +90,6 @@ impl ChannelWrite {
         validate_slug(&self.slug, SlugKind::ChannelAddress)?;
         self.normalize_alias_slugs()?;
 
-        blank_to_none(&mut self.api_key);
-        blank_to_none(&mut self.provider);
-        blank_to_none(&mut self.model);
-
         if let Some(emails) = self.participant_emails.as_mut() {
             emails.retain_mut(|email| {
                 *email = email.trim().to_lowercase();
@@ -114,9 +97,9 @@ impl ChannelWrite {
             });
         }
 
-        if !(1..=20).contains(&self.memory_max_results) {
+        if self.enabled && self.agent_ids.as_ref().is_none_or(Vec::is_empty) {
             return Err(AppError::BadRequest(
-                "Memory result limit must be between 1 and 20.".into(),
+                "An enabled channel must have an active agent at position 0.".into(),
             ));
         }
 
@@ -154,24 +137,6 @@ impl ChannelWrite {
     }
 }
 
-impl ChannelWrite {
-    pub fn memory_defaults(mut self) -> Self {
-        self.memory_persistence_mode = MemoryPersistenceMode::AudienceOnly;
-        self.memory_recall_mode = MemoryRecallMode::Fast;
-        self.memory_max_results = default_memory_max_results();
-        self
-    }
-}
-
-fn blank_to_none(value: &mut Option<String>) {
-    if let Some(inner) = value.as_mut() {
-        *inner = inner.trim().to_string();
-        if inner.is_empty() {
-            *value = None;
-        }
-    }
-}
-
 /// A channel belonging to another company is reported exactly like a missing one, so an id probe
 /// cannot tell a foreign channel from a nonexistent one. See [`managed_company`].
 pub fn channel_not_found() -> AppError {
@@ -181,6 +146,18 @@ pub fn channel_not_found() -> AppError {
 #[async_trait]
 pub trait ChannelPersistence: Send + Sync {
     async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel>;
+
+    /// Atomically creates an executable agent, its channel, and the position-0 assignment.
+    async fn create_with_agent(
+        &self,
+        _company_id: Uuid,
+        _agent: AgentWrite,
+        _channel: ChannelWrite,
+    ) -> AppResult<(Agent, Channel)> {
+        Err(AppError::Internal(
+            "Atomic agent/channel creation is unavailable.".into(),
+        ))
+    }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>>;
 
@@ -254,6 +231,38 @@ impl ChannelUseCases {
         );
 
         self.channel_persistence.create(company_id, write).await
+    }
+
+    #[instrument(skip(self, agent))]
+    pub async fn create_channel_with_agent(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        mut agent: AgentWrite,
+        mut channel: ChannelWrite,
+        confirm_spam_disabled: bool,
+    ) -> AppResult<Channel> {
+        self.verify_company_manager(user_id, company_id).await?;
+        let provenance = CreationProvenance::user(user_id);
+        agent.created_by = Some(provenance.clone());
+        channel.created_by = Some(provenance);
+        agent.normalize()?;
+
+        // The transaction supplies the new agent at position 0. Validate all other channel
+        // fields without pretending that a persisted assignment already exists.
+        let enabled = channel.enabled;
+        channel.enabled = false;
+        channel.normalize()?;
+        channel.enabled = enabled;
+        self.check_spam_interlock(&channel, confirm_spam_disabled)?;
+        self.check_memory_interlock(user_id, company_id, &channel)
+            .await?;
+
+        let (_, channel) = self
+            .channel_persistence
+            .create_with_agent(company_id, agent, channel)
+            .await?;
+        Ok(channel)
     }
 
     /// A channel open to `@public` must not be saved while the server has no spam scanning at all,
@@ -990,7 +999,6 @@ mod tests {
     use crate::entities::value_objects::EmailAddress;
     use crate::use_cases::company::CompanyWrite;
     use chrono::Utc;
-    use serde_json::json;
     use std::sync::Mutex;
 
     struct MockCompanyPersistence {
@@ -1149,14 +1157,10 @@ mod tests {
             description: None,
             slug: write.slug.into(),
             alias_slugs: Vec::new(),
-            api_key: write.api_key,
-            provider: write.provider,
-            model: write.model,
             participant_emails: write
                 .participant_emails
                 .map(|emails| emails.into_iter().map(EmailAddress::from).collect()),
             agent_ids: write.agent_ids,
-            channel_config: write.channel_config,
             enabled: write.enabled,
             add_3rd_party: write.add_3rd_party,
             retrieve_company_memory: false,
@@ -1165,9 +1169,6 @@ mod tests {
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
             created_by: write.created_by.unwrap_or_else(CreationProvenance::system),
             created_at: Utc::now(),
         }
@@ -1187,7 +1188,7 @@ mod tests {
             smtp_username: "".to_string(),
             smtp_password: "".to_string(),
             smtp_from_address: "noreply@mailagents.com".to_string(),
-            incoming_smtp_enabled: true,
+            incoming_smtp_enabled: false,
             incoming_smtp_host: "0.0.0.0".to_string(),
             incoming_smtp_port: 2525,
             max_spam_score: 5.0,
@@ -1245,7 +1246,7 @@ mod tests {
                 ChannelWrite {
                     name: "Elsewhere".into(),
                     slug: "elsewhere".into(),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
                 false,
@@ -1273,7 +1274,7 @@ mod tests {
         let write = || ChannelWrite {
             name: "Hijack".into(),
             slug: "hijack".into(),
-            enabled: true,
+            enabled: false,
             ..ChannelWrite::default()
         };
         let foreign_err = use_cases
@@ -1372,7 +1373,7 @@ mod tests {
                 ChannelWrite {
                     name: "Admin Channel".into(),
                     slug: "admin-channel".into(),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
                 false,
@@ -1395,7 +1396,7 @@ mod tests {
                 ChannelWrite {
                     name: "Managed Channel".into(),
                     slug: "managed-channel".into(),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
                 false,
@@ -1443,7 +1444,6 @@ mod tests {
             "agent1@example.com".to_string(),
             "agent2@example.com".to_string(),
         ];
-        let config = json!({ "trigger": "email_received", "action": "forward" });
 
         let agent_id1 = Uuid::new_v4();
         let agent_id2 = Uuid::new_v4();
@@ -1456,13 +1456,9 @@ mod tests {
                 ChannelWrite {
                     name: "Support Flow".into(),
                     slug: "support-flow".into(),
-                    api_key: Some("key_123".into()),
-                    provider: Some("openai".into()),
-                    model: Some("gpt-4o".into()),
                     participant_emails: Some(emails.clone()),
                     agent_ids: Some(agent_ids.clone()),
-                    channel_config: Some(config.clone()),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
                 false,
@@ -1472,9 +1468,6 @@ mod tests {
 
         assert_eq!(channel.name, "Support Flow");
         assert_eq!(channel.slug, "support-flow");
-        assert_eq!(channel.api_key.as_deref(), Some("key_123"));
-        assert_eq!(channel.provider.as_deref(), Some("openai"));
-        assert_eq!(channel.model.as_deref(), Some("gpt-4o"));
         assert_eq!(
             channel.participant_emails,
             Some(
@@ -1485,7 +1478,6 @@ mod tests {
             )
         );
         assert_eq!(channel.agent_ids, Some(agent_ids));
-        assert_eq!(channel.channel_config, Some(config));
 
         // 2. Non-owner cannot create channel
         let non_owner_id = Uuid::new_v4();
@@ -1496,7 +1488,7 @@ mod tests {
                 ChannelWrite {
                     name: "Hacker Flow".into(),
                     slug: "hacker-flow".into(),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
                 false,
@@ -1512,7 +1504,6 @@ mod tests {
         assert_eq!(list.len(), 1);
 
         // 4. Update channel
-        let updated_config = json!({ "trigger": "webhook", "action": "notify" });
         let updated = use_cases
             .update_channel(
                 owner_id,
@@ -1521,8 +1512,7 @@ mod tests {
                 ChannelWrite {
                     name: "Updated Flow".into(),
                     slug: "updated-flow".into(),
-                    channel_config: Some(updated_config.clone()),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
                 false,
@@ -1533,7 +1523,6 @@ mod tests {
         assert_eq!(updated.slug, "updated-flow");
         assert_eq!(updated.participant_emails, None);
         assert_eq!(updated.agent_ids, None);
-        assert_eq!(updated.channel_config, Some(updated_config));
 
         // 5. Delete channel
         use_cases
@@ -1616,7 +1605,7 @@ mod tests {
                 "support".into(),
                 "   ".into(),
             ],
-            enabled: true,
+            enabled: false,
             ..ChannelWrite::default()
         };
 
@@ -1633,7 +1622,7 @@ mod tests {
             name: "Support".into(),
             slug: "support".into(),
             alias_slugs: vec!["sales-quiet".into()],
-            enabled: true,
+            enabled: false,
             ..ChannelWrite::default()
         };
 
@@ -1696,7 +1685,7 @@ mod tests {
         let company_id = uuid::Uuid::new_v4();
         let available = vec![
             Channel {
-                enabled: true,
+                enabled: false,
                 add_3rd_party: true,
                 id: uuid::Uuid::new_v4(),
                 company_id,
@@ -1704,27 +1693,19 @@ mod tests {
                 description: None,
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
-                api_key: None,
-                provider: None,
-                model: None,
                 participant_emails: None,
                 agent_ids: None,
-                channel_config: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
                 retrieve_user_memory: false,
                 persist_company_memory: false,
                 persist_agent_memory: false,
                 persist_user_memory: false,
-                memory_persistence_mode:
-                    crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-                memory_max_results: 5,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
             },
             Channel {
-                enabled: true,
+                enabled: false,
                 add_3rd_party: true,
                 id: uuid::Uuid::new_v4(),
                 company_id,
@@ -1732,22 +1713,14 @@ mod tests {
                 description: None,
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
-                api_key: None,
-                provider: None,
-                model: None,
                 participant_emails: None,
                 agent_ids: None,
-                channel_config: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
                 retrieve_user_memory: false,
                 persist_company_memory: false,
                 persist_agent_memory: false,
                 persist_user_memory: false,
-                memory_persistence_mode:
-                    crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-                memory_max_results: 5,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
             },
@@ -1796,7 +1769,7 @@ mod tests {
                 ChannelWrite {
                     name: "Support Flow".into(),
                     slug: "support".into(),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
                 false,
@@ -1834,7 +1807,7 @@ mod tests {
                     name: "Restricted Flow".into(),
                     slug: "restricted".into(),
                     participant_emails: Some(vec!["agent@example.com".to_string()]),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
                 false,
@@ -1918,7 +1891,7 @@ mod tests {
                     name: "Public Flow".into(),
                     slug: "public".into(),
                     participant_emails: Some(vec!["@public".to_string()]),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
                 false,
@@ -1940,7 +1913,7 @@ mod tests {
                     name: "Public Flow".into(),
                     slug: "public".into(),
                     participant_emails: Some(vec!["@public".to_string()]),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
                 true,
@@ -1957,7 +1930,7 @@ mod tests {
                     name: "Restricted Flow".into(),
                     slug: "restricted".into(),
                     participant_emails: Some(vec!["allowed@example.com".to_string()]),
-                    enabled: true,
+                    enabled: false,
                     ..ChannelWrite::default()
                 },
                 false,

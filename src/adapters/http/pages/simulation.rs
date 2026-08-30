@@ -200,54 +200,9 @@ const DEFAULT_MODEL_LABEL: &str = "gemini-2.5-flash (default)";
 ///
 /// Settings cascade channel → company → the channel's own `llm` config block, so this reports what
 /// a run would really use rather than what any single record says.
-pub fn resolve_llm_info(channel: Option<&Channel>, company: Option<&Company>) -> LlmInfo {
-    match (channel, company) {
-        (Some(channel), Some(company)) => {
-            let channel_llm = channel
-                .channel_config
-                .as_ref()
-                .and_then(|config| config.get("llm"));
-            let config_value = |key: &str| {
-                channel_llm
-                    .and_then(|llm| llm.get(key))
-                    .and_then(|value| value.as_str())
-                    .filter(|value| !value.trim().is_empty())
-            };
-
-            let provider = non_blank(channel.provider.as_deref())
-                .or_else(|| non_blank(company.provider.as_deref()))
-                .or_else(|| config_value("provider"));
-            let model = non_blank(channel.model.as_deref())
-                .or_else(|| non_blank(company.model.as_deref()))
-                .or_else(|| config_value("model"));
-
-            LlmInfo {
-                provider: provider.unwrap_or(DEFAULT_PROVIDER_LABEL).to_string(),
-                model: model.unwrap_or(DEFAULT_MODEL_LABEL).to_string(),
-                api_key_status: api_key_status(
-                    non_blank(channel.api_key.as_deref()).is_some(),
-                    non_blank(company.api_key.as_deref()).is_some(),
-                    config_value("api_key").is_some(),
-                ),
-            }
-        }
-        (Some(channel), None) => LlmInfo {
-            provider: channel
-                .provider
-                .as_deref()
-                .unwrap_or(DEFAULT_PROVIDER_LABEL)
-                .to_string(),
-            model: channel
-                .model
-                .as_deref()
-                .unwrap_or(DEFAULT_MODEL_LABEL)
-                .to_string(),
-            api_key_status: match non_blank(channel.api_key.as_deref()) {
-                Some(_) => configured_badge("Channel"),
-                None => missing_badge(),
-            },
-        },
-        (None, Some(company)) => LlmInfo {
+pub fn resolve_llm_info(_channel: Option<&Channel>, company: Option<&Company>) -> LlmInfo {
+    match company {
+        Some(company) => LlmInfo {
             provider: company
                 .provider
                 .as_deref()
@@ -263,27 +218,12 @@ pub fn resolve_llm_info(channel: Option<&Channel>, company: Option<&Company>) ->
                 None => missing_badge(),
             },
         },
-        (None, None) => LlmInfo {
+        None => LlmInfo {
             provider: "N/A".to_string(),
             model: "N/A".to_string(),
             api_key_status: "<span class=\"text-slate-400\">Unknown</span>".to_string(),
         },
     }
-}
-
-/// Where the company-owned API key for a run would come from, most specific source first.
-fn api_key_status(on_channel: bool, on_company: bool, in_channel_config: bool) -> String {
-    if on_channel {
-        return configured_badge("Channel");
-    }
-    if on_company {
-        return configured_badge("Company");
-    }
-    if in_channel_config {
-        return configured_badge("Channel Config");
-    }
-
-    missing_badge()
 }
 
 fn configured_badge(source: &str) -> String {
@@ -595,13 +535,7 @@ pub fn channel_simulation_result_fragment(
         .as_deref()
         .unwrap_or("(No text body)");
 
-    let channel_config_str = match &result.channel {
-        Some(wf) => match &wf.channel_config {
-            Some(cfg) => serde_json::to_string_pretty(cfg).unwrap_or_else(|_| cfg.to_string()),
-            None => "None".to_string(),
-        },
-        None => "None".to_string(),
-    };
+    let channel_config_str = "Execution config belongs to the active agent.".to_string();
 
     let body_fragment = simulation_routing_report(
         &status_banner,
@@ -950,12 +884,11 @@ pub(crate) fn simulate_reply_form(fields: &ReplyFormFields<'_>) -> String {
 /// The channel configuration an agent reply would have used, for messages with no recorded task.
 pub(crate) fn resolved_agent_config(
     company: Option<&Company>,
-    channel: Option<&Channel>,
+    _channel: Option<&Channel>,
 ) -> serde_json::Value {
-    crate::services::agent_runner::ResolvedAgentParams::new(company, channel, None)
+    crate::services::agent_runner::ResolvedAgentParams::new(company, None)
         .map(|p| p.config().clone())
         .ok()
-        .or_else(|| channel.and_then(|c| c.channel_config.clone()))
         .unwrap_or_else(|| serde_json::json!({}))
 }
 

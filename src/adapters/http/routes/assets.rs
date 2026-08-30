@@ -43,6 +43,12 @@ fn fingerprint(bytes: &[u8]) -> String {
 
 static APP_CSS_URL: LazyLock<String> =
     LazyLock::new(|| format!("/assets/app.css?v={}", fingerprint(APP_CSS)));
+static LOGO_LIGHT_URL: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "/assets/busybots-logo-light.png?v={}",
+        fingerprint(LOGO_LIGHT_PNG)
+    )
+});
 static APP_JS_URL: LazyLock<String> = LazyLock::new(|| {
     format!(
         "/assets/app.js?v={}",
@@ -59,6 +65,10 @@ static THEME_INIT_JS_URL: LazyLock<String> = LazyLock::new(|| {
 /// The `<link>`/`<script>` URLs the page shells must use, fingerprinted so a rebuild invalidates.
 pub fn app_css_url() -> &'static str {
     &APP_CSS_URL
+}
+
+pub fn logo_light_url() -> &'static str {
+    &LOGO_LIGHT_URL
 }
 
 pub fn app_js_url() -> &'static str {
@@ -143,7 +153,12 @@ mod tests {
 
     #[test]
     fn first_party_asset_urls_carry_a_version() {
-        for url in [app_css_url(), app_js_url(), theme_init_js_url()] {
+        for url in [
+            app_css_url(),
+            logo_light_url(),
+            app_js_url(),
+            theme_init_js_url(),
+        ] {
             let (path, version) = url.split_once("?v=").expect("fingerprinted asset url");
             assert!(path.starts_with("/assets/"));
             assert_eq!(version.len(), 16, "{url}");

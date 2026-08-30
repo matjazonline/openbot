@@ -104,7 +104,7 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
         "agent_prompt_gen_box",
         "agent_prompt_gen_input",
         "agent_prompt_gen_status",
-        ", #agent_provider, #agent_model, #agent_api_key",
+        ", #agent_provider, #agent_model",
     );
 
     let content = format!(
@@ -161,11 +161,6 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                             <label for="agent_model" class="block text-xs font-medium text-slate-300 mb-1">Model</label>
                             <input type="text" id="agent_model" name="model"
                                 placeholder="gpt-4o, claude-3-5-sonnet" class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
-                        </div>
-                        <div>
-                            <label for="agent_api_key" class="block text-xs font-medium text-slate-300 mb-1">API Key</label>
-                            <input type="password" id="agent_api_key" name="api_key"
-                                placeholder="sk-..." class="w-full bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
                         </div>
                         <div>
                             <label for="agent_run_timeout_secs" class="block text-xs font-medium text-slate-300 mb-1">Run Timeout</label>
@@ -243,11 +238,6 @@ pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
         .map(|seconds| format!("{seconds}s"))
         .unwrap_or_else(|| "Default".to_string());
     let system_prompt_display = agent.system_prompt.as_deref().unwrap_or("-");
-    let api_key_badge = if agent.api_key.is_some() {
-        r#"<span class="px-2 py-0.5 text-[10px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded">Key Configured</span>"#
-    } else {
-        r#"<span class="px-2 py-0.5 text-[10px] font-medium bg-slate-700/50 text-slate-400 rounded">No Key</span>"#
-    };
 
     let config_display = agent
         .config_json
@@ -263,7 +253,6 @@ pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
                     {avatar}
                     <span class="font-bold text-white text-base">{name}</span>
                     <span class="text-xs font-mono text-indigo-300 bg-indigo-950/60 border border-indigo-800/50 px-2 py-0.5 rounded">@{slug}</span>
-                    {api_key_badge}
                 </div>
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 font-mono">
                     <div><span class="text-slate-500">Provider:</span> <span class="text-slate-200">{provider}</span></div>
@@ -293,7 +282,6 @@ pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
         provider = escape_html_text(provider),
         model = escape_html_text(model),
         run_timeout = run_timeout,
-        api_key_badge = api_key_badge,
         system_prompt_display = escape_html_text(system_prompt_display),
         config_display = escape_html_text(&config_display)
     )
@@ -310,7 +298,6 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
         .run_timeout_secs
         .map(|seconds| seconds.to_string())
         .unwrap_or_default();
-    let api_key = agent.api_key.as_deref().unwrap_or("");
     let system_prompt = agent.system_prompt.as_deref().unwrap_or("");
     let config_json_str = agent
         .config_json
@@ -324,7 +311,7 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
         &format!("agent_prompt_gen_input_{agent_id}"),
         &format!("agent_prompt_gen_status_{agent_id}"),
         &format!(
-            ", #agent-row-{agent_id} input[name=provider], #agent-row-{agent_id} input[name=model], #agent-row-{agent_id} input[name=api_key]"
+            ", #agent-row-{agent_id} input[name=provider], #agent-row-{agent_id} input[name=model]"
         ),
     );
 
@@ -353,10 +340,6 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1">Model</label>
                         <input type="text" name="model" value="{model}" placeholder="gpt-4o" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">API Key</label>
-                        <input type="password" name="api_key" value="{api_key}" placeholder="sk-..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1">Run Timeout</label>
@@ -395,7 +378,6 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
         provider = escape_html_attr(provider),
         model = escape_html_attr(model),
         run_timeout = run_timeout,
-        api_key = escape_html_attr(api_key),
         system_prompt = escape_html_text(system_prompt),
         config_json_str = escape_html_text(&config_json_str),
         prompt_gen_html = prompt_gen_html

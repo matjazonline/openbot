@@ -110,7 +110,9 @@ impl CreateAgentChannelTool {
         let mut channel = ChannelWrite {
             name: input.name,
             slug: input.slug,
-            enabled: true,
+            // The agent id is allocated inside the provisioning transaction. Normalize while
+            // disabled, then enable before the deferred database invariant is checked at commit.
+            enabled: false,
             add_3rd_party: false,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -118,14 +120,12 @@ impl CreateAgentChannelTool {
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
             created_by: Some(provenance),
             ..ChannelWrite::default()
         };
         agent.normalize().map_err(|e| e.to_string())?;
         channel.normalize().map_err(|e| e.to_string())?;
+        channel.enabled = true;
         let canonical = serde_json::json!({
             "name": agent.name,
             "slug": agent.slug,

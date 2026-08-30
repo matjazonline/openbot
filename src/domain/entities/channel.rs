@@ -4,7 +4,6 @@ use uuid::Uuid;
 use crate::entities::company_member::CompanyMembership;
 use crate::entities::{
     creation::CreationProvenance,
-    memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
     value_objects::{ChannelSlug, CompanySlug, EmailAddress},
 };
 
@@ -80,13 +79,8 @@ pub struct Channel {
     /// payloads written before aliases existed must still re-hydrate.
     #[serde(default)]
     pub alias_slugs: Vec<ChannelSlug>,
-    #[serde(skip_serializing)]
-    pub api_key: Option<String>,
-    pub provider: Option<String>,
-    pub model: Option<String>,
     pub participant_emails: Option<Vec<EmailAddress>>,
     pub agent_ids: Option<Vec<Uuid>>,
-    pub channel_config: Option<serde_json::Value>,
     /// Whether the channel takes traffic at all. A disabled channel keeps its threads and tasks
     /// but bounces inbound mail and cannot be an internal delivery target.
     ///
@@ -115,12 +109,6 @@ pub struct Channel {
     pub persist_agent_memory: bool,
     #[serde(default)]
     pub persist_user_memory: bool,
-    #[serde(default)]
-    pub memory_persistence_mode: MemoryPersistenceMode,
-    #[serde(default)]
-    pub memory_recall_mode: MemoryRecallMode,
-    #[serde(default = "default_memory_max_results")]
-    pub memory_max_results: u8,
     pub created_by: CreationProvenance,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
@@ -265,18 +253,6 @@ impl Channel {
         app_domain_name: &str,
     ) -> EmailAddress {
         EmailAddress::new(format!("{channel_slug}@{company_slug}.{app_domain_name}"))
-    }
-
-    pub fn default_config() -> serde_json::Value {
-        serde_json::json!({
-            "name": "MinimalAgent",
-            "system_prompt": "You are a helpful assistant.",
-            "llm": {
-              "provider": "google",
-              "model": "gemini-2.5-flash",
-              "api_key": null
-            }
-        })
     }
 }
 
@@ -442,12 +418,8 @@ mod tests {
             description: None,
             slug: "support".into(),
             alias_slugs: aliases.iter().map(|a| ChannelSlug::from(*a)).collect(),
-            api_key: None,
-            provider: None,
-            model: None,
             participant_emails: None,
             agent_ids: None,
-            channel_config: None,
             enabled: true,
             add_3rd_party: true,
             retrieve_company_memory: false,
@@ -456,9 +428,6 @@ mod tests {
             persist_company_memory: false,
             persist_agent_memory: false,
             persist_user_memory: false,
-            memory_persistence_mode: MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
             created_by: CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         }

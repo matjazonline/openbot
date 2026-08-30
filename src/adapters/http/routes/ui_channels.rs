@@ -43,8 +43,8 @@ use crate::{
 
 use super::{
     channel::{
-        ChannelForm, parse_agent_ids_form, parse_config_form, parse_emails_form, parse_list_form,
-        parse_text_form, resolve_channel_agents, slugify,
+        ChannelForm, parse_agent_ids_form, parse_emails_form, parse_list_form, parse_text_form,
+        resolve_channel_agents, simple_channel_agent_write, slugify,
     },
     ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
 };
@@ -159,7 +159,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn rejected_memory_limit_is_preserved_in_the_draft() {
+    async fn obsolete_channel_memory_tuning_is_ignored_by_the_form() {
         let request = Request::builder()
             .method("POST")
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
@@ -173,8 +173,8 @@ mod tests {
             .0;
         let submitted = SubmittedChannel::new(form);
 
-        assert!(submitted.write(None, None).is_err());
-        assert_eq!(submitted.draft().memory_max_results, "0");
+        assert!(submitted.write(None).is_ok());
+        assert_eq!(submitted.draft().name, "Support");
     }
 }
 
@@ -300,6 +300,18 @@ async fn create_channel(
         Ok(Html(view.create_pane(&agents, &submitted.draft(), Some(&message))).into_response())
     };
 
+    let simple_agent = match simple_channel_agent_write(
+        &workspace.agent_use_cases,
+        &submitted.form,
+        &submitted.slug,
+        workspace.user_id,
+        company.id,
+    )
+    .await
+    {
+        Ok(agent) => agent,
+        Err(message) => return rejected(message),
+    };
     let agent_ids = match resolve_channel_agents(
         &workspace.agent_use_cases,
         &submitted.form,
@@ -312,24 +324,35 @@ async fn create_channel(
         Ok(agent_ids) => agent_ids,
         Err(message) => return rejected(message),
     };
-    let channel_config = match parse_config_form(submitted.form.channel_config.clone()) {
-        Ok(config) => config,
-        Err(message) => return rejected(message),
-    };
-
-    let write = match submitted.write(agent_ids, channel_config) {
+    let write = match submitted.write(agent_ids) {
         Ok(write) => write,
         Err(message) => return rejected(message),
     };
-    let created = workspace
-        .channel_use_cases
-        .create_channel(
-            workspace.user_id,
-            company.id,
-            write,
-            submitted.form.confirm_spam_disabled(),
-        )
-        .await;
+    let created = match simple_agent {
+        Some(agent) => {
+            workspace
+                .channel_use_cases
+                .create_channel_with_agent(
+                    workspace.user_id,
+                    company.id,
+                    agent,
+                    write,
+                    submitted.form.confirm_spam_disabled(),
+                )
+                .await
+        }
+        None => {
+            workspace
+                .channel_use_cases
+                .create_channel(
+                    workspace.user_id,
+                    company.id,
+                    write,
+                    submitted.form.confirm_spam_disabled(),
+                )
+                .await
+        }
+    };
 
     match created {
         Ok(channel) => {
@@ -440,12 +463,7 @@ async fn update_channel(
         .into_response())
     };
 
-    let channel_config = match parse_config_form(submitted.form.channel_config.clone()) {
-        Ok(config) => config,
-        Err(message) => return rejected(message),
-    };
-
-    let write = match submitted.write(Some(submitted.agent_ids.clone()), channel_config) {
+    let write = match submitted.write(Some(submitted.agent_ids.clone())) {
         Ok(write) => write,
         Err(message) => return rejected(message),
     };
@@ -660,10 +678,6 @@ impl SubmittedChannel {
             system_prompt: self.form.system_prompt.as_deref().unwrap_or(""),
             participant_emails: self.form.participant_emails.as_deref().unwrap_or(""),
             agent_ids: &self.agent_ids,
-            provider: self.form.provider.as_deref().unwrap_or(""),
-            model: self.form.model.as_deref().unwrap_or(""),
-            api_key: self.form.api_key.as_deref().unwrap_or(""),
-            channel_config: self.form.channel_config.as_deref().unwrap_or(""),
             advanced: self.form.form_mode.as_deref() != Some("simple"),
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
@@ -673,39 +687,19 @@ impl SubmittedChannel {
             persist_company_memory: self.form.persist_company_memory.is_some(),
             persist_agent_memory: self.form.persist_agent_memory.is_some(),
             persist_user_memory: self.form.persist_user_memory.is_some(),
-            memory_persistence_mode: self
-                .form
-                .memory_persistence_mode
-                .as_deref()
-                .unwrap_or("audience_only"),
-            memory_recall_mode: self.form.memory_recall_mode.as_deref().unwrap_or("fast"),
-            memory_max_results: self
-                .form
-                .memory_max_results
-                .clone()
-                .unwrap_or_else(|| "5".into()),
         }
     }
 
-    /// The write this submission asks for. `agent_ids` and `channel_config` are passed in because
-    /// each handler resolves them differently (create may mint an agent; update reuses the list).
-    fn write(
-        &self,
-        agent_ids: Option<Vec<Uuid>>,
-        channel_config: Option<serde_json::Value>,
-    ) -> Result<ChannelWrite, String> {
+    /// The write this submission asks for. Create may mint an agent while update reuses the list.
+    fn write(&self, agent_ids: Option<Vec<Uuid>>) -> Result<ChannelWrite, String> {
         let memory = self.form.memory_settings()?;
         Ok(ChannelWrite {
             name: self.form.name.clone(),
             description: parse_text_form(self.form.description.clone()),
             slug: self.slug.clone(),
             alias_slugs: parse_list_form(self.form.alias_slugs.clone()),
-            api_key: self.form.api_key.clone(),
-            provider: self.form.provider.clone(),
-            model: self.form.model.clone(),
             participant_emails: parse_emails_form(self.form.participant_emails.clone()),
             agent_ids,
-            channel_config,
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
             retrieve_company_memory: memory.retrieve_company,
@@ -714,9 +708,6 @@ impl SubmittedChannel {
             persist_company_memory: memory.persist_company,
             persist_agent_memory: memory.persist_agent,
             persist_user_memory: memory.persist_user,
-            memory_persistence_mode: memory.persistence_mode,
-            memory_recall_mode: memory.recall_mode,
-            memory_max_results: memory.max_results,
             created_by: None,
         })
     }
