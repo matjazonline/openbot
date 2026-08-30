@@ -57,7 +57,7 @@ pub fn task_monitor_query(
     filter: &TaskFilter,
     selected_task_id: Option<Uuid>,
 ) -> String {
-    let mut params = vec![format!("company_id={company_id}")];
+    let mut params = vec![format!("company_id={company_id}"), "view=list".to_string()];
     if let Some(channel_id) = filter.channel_id {
         params.push(format!("channel_id={channel_id}"));
     }
@@ -105,6 +105,10 @@ pub fn task_monitor_page(page: &TaskMonitorPage<'_>) -> String {
         r##"
         <aside class="ui-pane-list flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
+            <div class="join mx-3 mb-3" aria-label="Tasks view">
+                <a class="btn btn-sm join-item flex-1" href="/ui/tasks?company_id={company_id}&amp;view=board">Board</a>
+                <a class="btn btn-sm join-item btn-primary flex-1" aria-current="page">List</a>
+            </div>
             {filters}
             {list_html}
         </aside>
@@ -114,6 +118,7 @@ pub fn task_monitor_page(page: &TaskMonitorPage<'_>) -> String {
         filters = task_filter_form(company.id, page.channels, page.list.filter),
         list_html = task_monitor_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
+        company_id = company.id,
     );
 
     ui_shell(&UiShell {

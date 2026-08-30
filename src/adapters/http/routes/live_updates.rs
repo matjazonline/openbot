@@ -50,3 +50,13 @@ pub(super) fn channel_wake_ups(
         event.is_message_in_channel(channel_id) || event.is_activity_in_channel(channel_id)
     })
 }
+
+pub(super) fn task_chain_wake_ups(
+    events: &MailboxEvents,
+    label: &'static str,
+    company_id: Uuid,
+) -> impl Stream<Item = Wake> + Send + use<> {
+    wake_ups(events, label, move |event| {
+        event.is_task_chain_in_company(company_id)
+    })
+}

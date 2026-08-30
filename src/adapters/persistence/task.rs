@@ -23,9 +23,12 @@ use crate::{
         },
         stuck_work::{StuckWorkCensus, StuckWorkThresholds},
         task::{
-            BackgroundTask, NewTask, TaskAttemptOutcome, TaskAttemptRecord,
-            TaskAttemptRecordStatus, TaskAttemptRef, TaskAttemptStatus, TaskLeaseRef, TaskStatus,
-            TaskStopReason, ThreadActivity, TokenUsage,
+            BackgroundTask, ChainStage, NewTask, TaskApprovalContext, TaskAttemptOutcome,
+            TaskAttemptRecord, TaskAttemptRecordStatus, TaskAttemptRef, TaskAttemptStatus,
+            TaskBoardFilter, TaskChainBoard, TaskChainCard, TaskChainCounts, TaskChainDetail,
+            TaskChainTaskDetail, TaskLeaseRef, TaskOutreachContext, TaskStatus, TaskStatusEvent,
+            TaskStatusEventCursor, TaskStopReason, TaskTransitionActorKind, TaskTransitionReason,
+            ThreadActivity, TokenUsage,
         },
         value_objects::MessageId,
     },
@@ -67,6 +70,47 @@ const FINISH_ATTEMPT_SQL: &str = r#"UPDATE task_attempts
 /// What a reaped run is recorded as having failed with. The reaper writes it to both the task row
 /// and the attempt ledger, which must agree on why the run vanished.
 const LEASE_EXPIRED_ERROR: &str = "Task lease expired without the run reporting a result";
+
+pub(crate) async fn set_task_transition_context(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    reason: TaskTransitionReason,
+    actor_kind: TaskTransitionActorKind,
+    actor_id: Option<Uuid>,
+) -> AppResult<()> {
+    sqlx::query(
+        r#"SELECT set_config('mail_agents.task_transition_reason', $1, TRUE),
+                  set_config('mail_agents.task_transition_actor_kind', $2, TRUE),
+                  set_config('mail_agents.task_transition_actor_id', COALESCE($3::text, ''), TRUE)"#,
+    )
+    .bind(reason.as_str())
+    .bind(actor_kind.as_str())
+    .bind(actor_id)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    Ok(())
+}
+
+pub(crate) async fn set_task_transition_source(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    approval_id: Option<Uuid>,
+    outreach_id: Option<Uuid>,
+) -> AppResult<()> {
+    sqlx::query(
+        r#"SELECT set_config(
+                      'mail_agents.task_transition_approval_id', COALESCE($1::text, ''), TRUE
+                  ),
+                  set_config(
+                      'mail_agents.task_transition_outreach_id', COALESCE($2::text, ''), TRUE
+                  )"#,
+    )
+    .bind(approval_id)
+    .bind(outreach_id)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    Ok(())
+}
 
 /// Log when a lease-guarded state change was ignored because the lease or status moved on.
 ///
@@ -195,6 +239,135 @@ struct TaskAttemptRecordDb {
     started_at: DateTime<Utc>,
     finished_at: Option<DateTime<Utc>>,
     execution_generation: Uuid,
+}
+
+#[derive(sqlx::FromRow, Debug)]
+struct TaskStatusEventDb {
+    id: Uuid,
+    company_id: Uuid,
+    task_id: Uuid,
+    correlation_id: Uuid,
+    sequence: i32,
+    from_status: Option<String>,
+    to_status: String,
+    reason: String,
+    actor_kind: String,
+    actor_id: Option<Uuid>,
+    related_approval_id: Option<Uuid>,
+    related_outreach_id: Option<Uuid>,
+    retry_count: i32,
+    run_at: DateTime<Utc>,
+    execution_generation: Option<Uuid>,
+    transitioned_at: DateTime<Utc>,
+}
+
+impl TryFrom<TaskStatusEventDb> for TaskStatusEvent {
+    type Error = AppError;
+
+    fn try_from(db: TaskStatusEventDb) -> AppResult<Self> {
+        let row = format!("task_status_events row {}", db.id);
+        let parse_status = |value: &str| {
+            TaskStatus::from_str(value)
+                .map_err(|error| AppError::Internal(format!("{row}: {error}")))
+        };
+        Ok(Self {
+            id: db.id,
+            company_id: db.company_id,
+            task_id: db.task_id,
+            correlation_id: db.correlation_id.into(),
+            sequence: db.sequence,
+            from_status: db.from_status.as_deref().map(parse_status).transpose()?,
+            to_status: parse_status(&db.to_status)?,
+            reason: TaskTransitionReason::from_str(&db.reason)
+                .map_err(|error| AppError::Internal(format!("{row}: {error}")))?,
+            actor_kind: TaskTransitionActorKind::from_str(&db.actor_kind)
+                .map_err(|error| AppError::Internal(format!("{row}: {error}")))?,
+            actor_id: db.actor_id,
+            related_approval_id: db.related_approval_id,
+            related_outreach_id: db.related_outreach_id,
+            retry_count: db.retry_count,
+            run_at: db.run_at,
+            execution_generation: db.execution_generation,
+            transitioned_at: db.transitioned_at,
+        })
+    }
+}
+
+#[derive(sqlx::FromRow, Debug)]
+struct TaskChainCardDb {
+    correlation_id: Uuid,
+    stage: String,
+    title: String,
+    channel_names: Vec<String>,
+    agent_names: Vec<String>,
+    total_tasks: i64,
+    pending: i64,
+    processing: i64,
+    expired_processing: i64,
+    pending_approval: i64,
+    waiting_reply: i64,
+    completed: i64,
+    failed: i64,
+    dead_letter: i64,
+    stopped: i64,
+    total_deliveries: i64,
+    delivery_pending: i64,
+    delivery_sending: i64,
+    delivery_sent: i64,
+    delivery_failed: i64,
+    created_at: DateTime<Utc>,
+    last_activity_at: DateTime<Utc>,
+    next_action_at: Option<DateTime<Utc>>,
+    retry_count: i64,
+    failure_summary: Option<String>,
+    stage_total: i64,
+}
+
+impl TryFrom<TaskChainCardDb> for (TaskChainCard, i64) {
+    type Error = AppError;
+
+    fn try_from(db: TaskChainCardDb) -> AppResult<Self> {
+        let stage = ChainStage::from_str(&db.stage).map_err(|error| {
+            AppError::Internal(format!(
+                "task chain {} has invalid stage: {error}",
+                db.correlation_id
+            ))
+        })?;
+        let counts = TaskChainCounts {
+            total_tasks: db.total_tasks,
+            pending: db.pending,
+            processing: db.processing,
+            expired_processing: db.expired_processing,
+            pending_approval: db.pending_approval,
+            waiting_reply: db.waiting_reply,
+            completed: db.completed,
+            failed: db.failed,
+            dead_letter: db.dead_letter,
+            stopped: db.stopped,
+            total_deliveries: db.total_deliveries,
+            delivery_pending: db.delivery_pending,
+            delivery_sending: db.delivery_sending,
+            delivery_sent: db.delivery_sent,
+            delivery_failed: db.delivery_failed,
+        };
+        debug_assert_eq!(stage, ChainStage::derive(&counts));
+        Ok((
+            TaskChainCard {
+                correlation_id: db.correlation_id.into(),
+                stage,
+                title: db.title,
+                channel_names: db.channel_names,
+                agent_names: db.agent_names,
+                counts,
+                created_at: db.created_at,
+                last_activity_at: db.last_activity_at,
+                next_action_at: db.next_action_at,
+                retry_count: db.retry_count,
+                failure_summary: db.failure_summary,
+            },
+            db.stage_total,
+        ))
+    }
 }
 
 impl TryFrom<TaskAttemptRecordDb> for TaskAttemptRecord {
@@ -680,9 +853,71 @@ pub trait TaskPersistence: Send + Sync {
         is_dead_letter: bool,
     ) -> AppResult<bool>;
 
+    /// The same fenced failure transition with its bounded operational reason attached to the
+    /// status event. Older in-memory doubles may keep implementing [`Self::mark_task_failed`].
+    async fn mark_task_failed_with_reason(
+        &self,
+        lease: TaskLeaseRef,
+        error_msg: &str,
+        next_run_at: DateTime<Utc>,
+        is_dead_letter: bool,
+        _reason: TaskStopReason,
+    ) -> AppResult<bool> {
+        self.mark_task_failed(lease, error_msg, next_run_at, is_dead_letter)
+            .await
+    }
+
     async fn stop_task(&self, id: Uuid) -> AppResult<BackgroundTask>;
 
     async fn resume_task(&self, id: Uuid) -> AppResult<BackgroundTask>;
+
+    /// Operator-attributed variants used by authenticated UI mutations.
+    async fn stop_task_as(&self, id: Uuid, _operator_id: Uuid) -> AppResult<BackgroundTask> {
+        self.stop_task(id).await
+    }
+
+    async fn resume_task_as(&self, id: Uuid, _operator_id: Uuid) -> AppResult<BackgroundTask> {
+        self.resume_task(id).await
+    }
+
+    async fn resume_task_after_approval(
+        &self,
+        id: Uuid,
+        _approval_id: Uuid,
+    ) -> AppResult<BackgroundTask> {
+        self.resume_task(id).await
+    }
+
+    /// The six-column correlation-chain read model. Defaults keep narrow test doubles small.
+    async fn list_task_chain_board(
+        &self,
+        _company_id: Uuid,
+        filter: TaskBoardFilter,
+    ) -> AppResult<TaskChainBoard> {
+        Ok(TaskChainBoard {
+            cards: HashMap::new(),
+            totals: HashMap::new(),
+            per_column_limit: filter.per_column_limit,
+        })
+    }
+
+    async fn get_task_chain_detail(
+        &self,
+        _company_id: Uuid,
+        _correlation_id: CorrelationId,
+    ) -> AppResult<Option<TaskChainDetail>> {
+        Ok(None)
+    }
+
+    async fn list_task_status_events(
+        &self,
+        _company_id: Uuid,
+        _correlation_id: CorrelationId,
+        _cursor: Option<TaskStatusEventCursor>,
+        _limit: usize,
+    ) -> AppResult<Vec<TaskStatusEvent>> {
+        Ok(Vec::new())
+    }
 
     async fn list_company_tasks(
         &self,
@@ -850,6 +1085,14 @@ impl TaskPersistence for PostgresPersistence {
             .map_err(|error| AppError::Internal(error.to_string()))?;
         let suspended = status == OutreachStatus::Waiting;
         if suspended {
+            set_task_transition_context(
+                &mut tx,
+                TaskTransitionReason::OutreachStarted,
+                TaskTransitionActorKind::Outreach,
+                None,
+            )
+            .await?;
+            set_task_transition_source(&mut tx, None, Some(outreach.id)).await?;
             let paused = sqlx::query(
                 r#"UPDATE background_tasks
                    SET status = 'waiting_for_third_party_reply', wait_expires_at = $1,
@@ -988,6 +1231,14 @@ impl TaskPersistence for PostgresPersistence {
                 OutreachStatus::Waiting | OutreachStatus::TimeoutPendingApproval
             )
         {
+            set_task_transition_context(
+                &mut tx,
+                TaskTransitionReason::OutreachReplyReceived,
+                TaskTransitionActorKind::Outreach,
+                None,
+            )
+            .await?;
+            set_task_transition_source(&mut tx, None, Some(outreach.id)).await?;
             sqlx::query(
                 r#"UPDATE task_outreaches SET status = 'threshold_met',
                        updated_at = CURRENT_TIMESTAMP WHERE id = $1"#,
@@ -1115,6 +1366,14 @@ impl TaskPersistence for PostgresPersistence {
             tx.rollback().await.map_err(AppError::from)?;
             return Ok(false);
         };
+        set_task_transition_context(
+            &mut tx,
+            TaskTransitionReason::OutreachTimedOut,
+            TaskTransitionActorKind::Outreach,
+            None,
+        )
+        .await?;
+        set_task_transition_source(&mut tx, None, Some(outreach_id)).await?;
         let updated = sqlx::query(
             r#"UPDATE background_tasks
                SET status = 'pending_approval', wait_expires_at = NULL,
@@ -1142,6 +1401,14 @@ impl TaskPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
         if let Some((task_id, expires_at)) = row {
+            set_task_transition_context(
+                &mut tx,
+                TaskTransitionReason::OutreachExtended,
+                TaskTransitionActorKind::Outreach,
+                None,
+            )
+            .await?;
+            set_task_transition_source(&mut tx, None, Some(outreach_id)).await?;
             sqlx::query(
                 r#"UPDATE background_tasks
                    SET status = 'waiting_for_third_party_reply', wait_expires_at = $2,
@@ -1598,6 +1865,407 @@ impl TaskPersistence for PostgresPersistence {
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
+    async fn list_task_chain_board(
+        &self,
+        company_id: Uuid,
+        filter: TaskBoardFilter,
+    ) -> AppResult<TaskChainBoard> {
+        let rows = sqlx::query_as::<_, TaskChainCardDb>(
+            r#"WITH eligible AS (
+                   SELECT DISTINCT task.correlation_id
+                   FROM background_tasks AS task
+                   WHERE task.company_id = $1
+                     AND ($2::uuid IS NULL OR EXISTS (
+                         SELECT 1
+                         FROM background_tasks AS filtered_task
+                         WHERE filtered_task.company_id = task.company_id
+                           AND filtered_task.correlation_id = task.correlation_id
+                           AND filtered_task.channel_id = $2
+                     ))
+               ),
+               task_rollup AS (
+                   SELECT task.correlation_id,
+                          (array_agg(
+                              COALESCE(NULLIF(thread.subject, ''), task.task_type)
+                              ORDER BY task.created_at, task.id
+                          ))[1] AS title,
+                          COUNT(*)::bigint AS total_tasks,
+                          COUNT(*) FILTER (WHERE task.status = 'pending')::bigint AS pending,
+                          COUNT(*) FILTER (WHERE task.status = 'processing')::bigint AS processing,
+                          COUNT(*) FILTER (
+                              WHERE task.status = 'processing'
+                                AND task.lock_expires_at <= CURRENT_TIMESTAMP
+                          )::bigint AS expired_processing,
+                          COUNT(*) FILTER (WHERE task.status = 'pending_approval')::bigint
+                              AS pending_approval,
+                          COUNT(*) FILTER (
+                              WHERE task.status = 'waiting_for_third_party_reply'
+                          )::bigint AS waiting_reply,
+                          COUNT(*) FILTER (WHERE task.status = 'completed')::bigint AS completed,
+                          COUNT(*) FILTER (WHERE task.status = 'failed')::bigint AS failed,
+                          COUNT(*) FILTER (WHERE task.status = 'dead_letter')::bigint
+                              AS dead_letter,
+                          COUNT(*) FILTER (WHERE task.status = 'stopped')::bigint AS stopped,
+                          SUM(task.retry_count)::bigint AS retry_count,
+                          MIN(task.created_at) AS created_at,
+                          MAX(task.updated_at) AS task_last_activity,
+                          LEAST(
+                              MIN(task.run_at) FILTER (WHERE task.status = 'pending'),
+                              MIN(task.wait_expires_at) FILTER (
+                                  WHERE task.status = 'waiting_for_third_party_reply'
+                              )
+                          ) AS task_next_action,
+                          CASE
+                              WHEN COUNT(*) FILTER (
+                                  WHERE task.status IN ('failed', 'dead_letter')
+                              ) > 0 THEN 'One or more tasks failed'
+                              WHEN COUNT(*) FILTER (WHERE task.status = 'stopped') > 0
+                                  THEN 'Stopped by an operator'
+                              ELSE NULL
+                          END AS failure_summary
+                   FROM background_tasks AS task
+                   JOIN eligible ON eligible.correlation_id = task.correlation_id
+                   LEFT JOIN threads AS thread
+                     ON thread.company_id = task.company_id
+                    AND thread.channel_id = task.channel_id
+                    AND thread.id = task.thread_id
+                   WHERE task.company_id = $1
+                   GROUP BY task.correlation_id
+               ),
+               participant_rollup AS (
+                   SELECT task.correlation_id,
+                          array_agg(DISTINCT channel.name ORDER BY channel.name) AS channel_names,
+                          COALESCE(
+                              array_agg(DISTINCT agent.name ORDER BY agent.name)
+                                  FILTER (WHERE agent.id IS NOT NULL),
+                              ARRAY[]::text[]
+                          ) AS agent_names
+                   FROM background_tasks AS task
+                   JOIN eligible ON eligible.correlation_id = task.correlation_id
+                   JOIN channels AS channel
+                     ON channel.company_id = task.company_id AND channel.id = task.channel_id
+                   LEFT JOIN channel_agents AS assignment
+                     ON assignment.company_id = channel.company_id
+                    AND assignment.channel_id = channel.id
+                   LEFT JOIN agents AS agent ON agent.id = assignment.agent_id
+                   WHERE task.company_id = $1
+                   GROUP BY task.correlation_id
+               ),
+               delivery_rollup AS (
+                   SELECT outbox.correlation_id,
+                          COUNT(*)::bigint AS total_deliveries,
+                          COUNT(*) FILTER (WHERE outbox.status = 'pending')::bigint
+                              AS delivery_pending,
+                          COUNT(*) FILTER (WHERE outbox.status = 'sending')::bigint
+                              AS delivery_sending,
+                          COUNT(*) FILTER (WHERE outbox.status = 'sent')::bigint AS delivery_sent,
+                          COUNT(*) FILTER (WHERE outbox.status = 'failed')::bigint
+                              AS delivery_failed,
+                          MAX(outbox.updated_at) AS delivery_last_activity,
+                          MIN(outbox.available_at) FILTER (WHERE outbox.status = 'pending')
+                              AS delivery_next_action
+                   FROM email_outbox AS outbox
+                   JOIN eligible ON eligible.correlation_id = outbox.correlation_id
+                   WHERE outbox.company_id = $1
+                   GROUP BY outbox.correlation_id
+               ),
+               combined AS (
+                   SELECT task_rollup.correlation_id, task_rollup.title,
+                          participant_rollup.channel_names, participant_rollup.agent_names,
+                          task_rollup.total_tasks, task_rollup.pending, task_rollup.processing,
+                          task_rollup.expired_processing, task_rollup.pending_approval,
+                          task_rollup.waiting_reply, task_rollup.completed, task_rollup.failed,
+                          task_rollup.dead_letter, task_rollup.stopped,
+                          COALESCE(delivery_rollup.total_deliveries, 0) AS total_deliveries,
+                          COALESCE(delivery_rollup.delivery_pending, 0) AS delivery_pending,
+                          COALESCE(delivery_rollup.delivery_sending, 0) AS delivery_sending,
+                          COALESCE(delivery_rollup.delivery_sent, 0) AS delivery_sent,
+                          COALESCE(delivery_rollup.delivery_failed, 0) AS delivery_failed,
+                          task_rollup.created_at,
+                          GREATEST(
+                              task_rollup.task_last_activity,
+                              COALESCE(delivery_rollup.delivery_last_activity, '-infinity')
+                          ) AS last_activity_at,
+                          LEAST(task_rollup.task_next_action, delivery_rollup.delivery_next_action)
+                              AS next_action_at,
+                          task_rollup.retry_count, task_rollup.failure_summary,
+                          (task_rollup.pending + task_rollup.processing
+                              + task_rollup.pending_approval + task_rollup.waiting_reply
+                              + COALESCE(delivery_rollup.delivery_pending, 0)
+                              + COALESCE(delivery_rollup.delivery_sending, 0)) > 0 AS is_active,
+                          (task_rollup.failed + task_rollup.dead_letter
+                              + task_rollup.expired_processing
+                              + COALESCE(delivery_rollup.delivery_failed, 0)) > 0 AS is_unresolved
+                   FROM task_rollup
+                   JOIN participant_rollup
+                     ON participant_rollup.correlation_id = task_rollup.correlation_id
+                   LEFT JOIN delivery_rollup
+                     ON delivery_rollup.correlation_id = task_rollup.correlation_id
+               ),
+               staged AS (
+                   SELECT combined.*,
+                          CASE
+                              WHEN failed > 0 OR dead_letter > 0 OR stopped > 0
+                                   OR expired_processing > 0 OR delivery_failed > 0
+                                  THEN 'needs_attention'
+                              WHEN pending_approval > 0 THEN 'waiting_approval'
+                              WHEN processing > 0 OR delivery_sending > 0 THEN 'running'
+                              WHEN waiting_reply > 0 THEN 'waiting_reply'
+                              WHEN pending > 0 OR delivery_pending > 0 THEN 'queued'
+                              WHEN total_tasks > 0 AND completed = total_tasks
+                                   AND delivery_sent = total_deliveries THEN 'completed'
+                              ELSE 'needs_attention'
+                          END AS stage
+                   FROM combined
+                   WHERE is_active OR is_unresolved OR last_activity_at >= $3
+               ),
+               ranked AS (
+                   SELECT staged.*,
+                          COUNT(*) OVER (PARTITION BY stage)::bigint AS stage_total,
+                          ROW_NUMBER() OVER (
+                              PARTITION BY stage
+                              ORDER BY last_activity_at DESC, correlation_id
+                          ) AS stage_rank
+                   FROM staged
+               )
+               SELECT correlation_id, stage, title, channel_names, agent_names,
+                      total_tasks, pending, processing, expired_processing, pending_approval,
+                      waiting_reply, completed, failed, dead_letter, stopped,
+                      total_deliveries, delivery_pending, delivery_sending, delivery_sent,
+                      delivery_failed, created_at, last_activity_at, next_action_at, retry_count,
+                      failure_summary, stage_total
+               FROM ranked
+               WHERE stage_rank <= $4
+               ORDER BY CASE stage
+                            WHEN 'queued' THEN 1
+                            WHEN 'running' THEN 2
+                            WHEN 'waiting_approval' THEN 3
+                            WHEN 'waiting_reply' THEN 4
+                            WHEN 'completed' THEN 5
+                            ELSE 6
+                        END,
+                        last_activity_at DESC, correlation_id"#,
+        )
+        .bind(company_id)
+        .bind(filter.channel_id)
+        .bind(filter.terminal_since)
+        .bind(filter.per_column_limit as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        let mut board = TaskChainBoard {
+            cards: ChainStage::ALL
+                .into_iter()
+                .map(|stage| (stage, Vec::new()))
+                .collect(),
+            totals: ChainStage::ALL
+                .into_iter()
+                .map(|stage| (stage, 0))
+                .collect(),
+            per_column_limit: filter.per_column_limit,
+        };
+        for row in rows {
+            let (card, total) = row.try_into()?;
+            board.totals.insert(card.stage, total);
+            board.cards.entry(card.stage).or_default().push(card);
+        }
+        Ok(board)
+    }
+
+    async fn list_task_status_events(
+        &self,
+        company_id: Uuid,
+        correlation_id: CorrelationId,
+        cursor: Option<TaskStatusEventCursor>,
+        limit: usize,
+    ) -> AppResult<Vec<TaskStatusEvent>> {
+        let mut query = QueryBuilder::<Postgres>::new(
+            r#"SELECT id, company_id, task_id, correlation_id, sequence, from_status, to_status,
+                      reason, actor_kind, actor_id, related_approval_id, related_outreach_id,
+                      retry_count, run_at, execution_generation, transitioned_at
+               FROM task_status_events
+               WHERE company_id = "#,
+        );
+        query
+            .push_bind(company_id)
+            .push(" AND correlation_id = ")
+            .push_bind(correlation_id.as_uuid());
+        if let Some(cursor) = cursor {
+            query
+                .push(" AND (transitioned_at, task_id, sequence, id) > (")
+                .push_bind(cursor.transitioned_at)
+                .push(", ")
+                .push_bind(cursor.task_id)
+                .push(", ")
+                .push_bind(cursor.sequence)
+                .push(", ")
+                .push_bind(cursor.id)
+                .push(")");
+        }
+        query
+            .push(" ORDER BY transitioned_at, task_id, sequence, id LIMIT ")
+            .push_bind(limit.clamp(1, 200) as i64);
+
+        let rows = query
+            .build_query_as::<TaskStatusEventDb>()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn get_task_chain_detail(
+        &self,
+        company_id: Uuid,
+        correlation_id: CorrelationId,
+    ) -> AppResult<Option<TaskChainDetail>> {
+        let header = sqlx::query_as::<_, (String, Vec<String>, Vec<String>)>(
+            r#"SELECT
+                   (array_agg(
+                       COALESCE(NULLIF(thread.subject, ''), task.task_type)
+                       ORDER BY task.created_at, task.id
+                   ))[1] AS title,
+                   array_agg(DISTINCT channel.name ORDER BY channel.name) AS channel_names,
+                   COALESCE(
+                       array_agg(DISTINCT agent.name ORDER BY agent.name)
+                           FILTER (WHERE agent.id IS NOT NULL),
+                       ARRAY[]::text[]
+                   ) AS agent_names
+               FROM background_tasks AS task
+               JOIN channels AS channel
+                 ON channel.company_id = task.company_id AND channel.id = task.channel_id
+               LEFT JOIN threads AS thread
+                 ON thread.company_id = task.company_id
+                AND thread.channel_id = task.channel_id AND thread.id = task.thread_id
+               LEFT JOIN channel_agents AS assignment
+                 ON assignment.company_id = channel.company_id
+                AND assignment.channel_id = channel.id
+               LEFT JOIN agents AS agent ON agent.id = assignment.agent_id
+               WHERE task.company_id = $1 AND task.correlation_id = $2
+               GROUP BY task.correlation_id"#,
+        )
+        .bind(company_id)
+        .bind(correlation_id.as_uuid())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        let Some((title, channel_names, agent_names)) = header else {
+            return Ok(None);
+        };
+
+        let task_rows = sqlx::query_as::<_, BackgroundTaskDb>(
+            r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status,
+                      payload, retry_count, max_retries, last_error, worker_id,
+                      execution_generation, locked_at, lock_expires_at, run_at, created_at,
+                      updated_at
+               FROM background_tasks
+               WHERE company_id = $1 AND correlation_id = $2
+               ORDER BY created_at, id
+               LIMIT 200"#,
+        )
+        .bind(company_id)
+        .bind(correlation_id.as_uuid())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        let mut tasks = Vec::with_capacity(task_rows.len());
+        for row in task_rows {
+            let task: BackgroundTask = row.try_into()?;
+            let attempts = self.list_task_attempts(company_id, task.id).await?;
+            let deliveries = self.list_task_deliveries(task.id).await?;
+            tasks.push(TaskChainTaskDetail {
+                task,
+                attempts,
+                deliveries,
+            });
+        }
+
+        let events = self
+            .list_task_status_events(company_id, correlation_id, None, 200)
+            .await?;
+        let approvals =
+            sqlx::query_as::<_, (Uuid, Uuid, String, String, DateTime<Utc>, DateTime<Utc>)>(
+                r#"SELECT approval.id, approval.task_id, approval.status, approval.action_title,
+                      approval.created_at, approval.updated_at
+               FROM human_approvals AS approval
+               JOIN background_tasks AS task ON task.id = approval.task_id
+               WHERE task.company_id = $1 AND task.correlation_id = $2
+               ORDER BY approval.created_at, approval.id"#,
+            )
+            .bind(company_id)
+            .bind(correlation_id.as_uuid())
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?
+            .into_iter()
+            .map(|row| TaskApprovalContext {
+                id: row.0,
+                task_id: row.1,
+                status: row.2,
+                action_title: row.3,
+                created_at: row.4,
+                updated_at: row.5,
+            })
+            .collect();
+
+        let outreaches = sqlx::query_as::<
+            _,
+            (
+                Uuid,
+                Uuid,
+                String,
+                f64,
+                i64,
+                i64,
+                DateTime<Utc>,
+                DateTime<Utc>,
+            ),
+        >(
+            r#"SELECT outreach.id, outreach.task_id, outreach.status,
+                      outreach.required_threshold_percent::double precision,
+                      COUNT(target.*)::bigint,
+                      COUNT(target.*) FILTER (WHERE target.responded_at IS NOT NULL)::bigint,
+                      outreach.expires_at, outreach.created_at
+               FROM task_outreaches AS outreach
+               JOIN background_tasks AS task ON task.id = outreach.task_id
+               LEFT JOIN task_outreach_targets AS target ON target.outreach_id = outreach.id
+               WHERE task.company_id = $1 AND task.correlation_id = $2
+               GROUP BY outreach.id
+               ORDER BY outreach.created_at, outreach.id"#,
+        )
+        .bind(company_id)
+        .bind(correlation_id.as_uuid())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?
+        .into_iter()
+        .map(|row| TaskOutreachContext {
+            id: row.0,
+            task_id: row.1,
+            status: row.2,
+            required_threshold_percent: row.3,
+            target_count: row.4,
+            response_count: row.5,
+            expires_at: row.6,
+            created_at: row.7,
+        })
+        .collect();
+
+        Ok(Some(TaskChainDetail {
+            company_id,
+            correlation_id,
+            title,
+            channel_names,
+            agent_names,
+            tasks,
+            events,
+            approvals,
+            outreaches,
+        }))
+    }
+
     async fn get_task_by_source_message_id(
         &self,
         company_id: Uuid,
@@ -1867,90 +2535,80 @@ impl TaskPersistence for PostgresPersistence {
         next_run_at: DateTime<Utc>,
         is_dead_letter: bool,
     ) -> AppResult<bool> {
-        let new_status = if is_dead_letter {
-            "dead_letter"
-        } else {
-            "pending"
-        };
-
-        let result = sqlx::query(
-            r#"UPDATE background_tasks
-               SET status = $1, retry_count = retry_count + 1, last_error = $2,
-                   run_at = $3, worker_id = NULL, execution_generation = NULL, locked_at = NULL,
-                   lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $4 AND status = 'processing' AND worker_id = $5
-                 AND execution_generation = $6
-                 AND lock_expires_at > CURRENT_TIMESTAMP"#,
+        mark_task_failed_on(
+            &self.pool,
+            lease,
+            error_msg,
+            next_run_at,
+            is_dead_letter,
+            TaskStopReason::RetryableFailure,
         )
-        .bind(new_status)
-        .bind(error_msg)
-        .bind(next_run_at)
-        .bind(lease.task_id)
-        .bind(lease.worker_id)
-        .bind(lease.execution_generation)
-        .execute(&self.pool)
         .await
-        .map_err(AppError::from)?;
+    }
 
-        Ok(result.rows_affected() > 0)
+    async fn mark_task_failed_with_reason(
+        &self,
+        lease: TaskLeaseRef,
+        error_msg: &str,
+        next_run_at: DateTime<Utc>,
+        is_dead_letter: bool,
+        reason: TaskStopReason,
+    ) -> AppResult<bool> {
+        mark_task_failed_on(
+            &self.pool,
+            lease,
+            error_msg,
+            next_run_at,
+            is_dead_letter,
+            reason,
+        )
+        .await
     }
 
     async fn stop_task(&self, id: Uuid) -> AppResult<BackgroundTask> {
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let db = sqlx::query_as::<_, BackgroundTaskDb>(
-            r#"UPDATE background_tasks
-               SET status = 'stopped', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
-                   lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $1
-                 AND status IN ('pending', 'processing', 'pending_approval',
-                                'waiting_for_third_party_reply', 'failed')
-               RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
-                          retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
-                          run_at, created_at, updated_at"#,
-        )
-        .bind(id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        sqlx::query(
-            r#"UPDATE task_outreaches SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
-               WHERE task_id = $1 AND status IN ('waiting', 'timeout_pending_approval')"#,
-        )
-        .bind(id)
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        sqlx::query(
-            r#"UPDATE email_outbox SET status = 'failed', last_error = 'Task stopped',
-                   updated_at = CURRENT_TIMESTAMP
-               WHERE task_id = $1 AND status = 'pending'"#,
-        )
-        .bind(id)
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        tx.commit().await.map_err(AppError::from)?;
-        db.try_into()
+        stop_task_on(&self.pool, id, None).await
+    }
+
+    async fn stop_task_as(&self, id: Uuid, operator_id: Uuid) -> AppResult<BackgroundTask> {
+        stop_task_on(&self.pool, id, Some(operator_id)).await
     }
 
     async fn resume_task(&self, id: Uuid) -> AppResult<BackgroundTask> {
-        let db = sqlx::query_as::<_, BackgroundTaskDb>(
-            r#"UPDATE background_tasks
-               SET status = 'pending', run_at = CURRENT_TIMESTAMP, worker_id = NULL, execution_generation = NULL,
-                   locked_at = NULL, lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
-               WHERE id = $1
-                 AND status IN ('stopped', 'pending_approval',
-                                'waiting_for_third_party_reply', 'failed')
-               RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
-                          retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
-                          run_at, created_at, updated_at"#,
-        )
-        .bind(id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(AppError::from)?;
+        resume_task_on(&self.pool, id, None).await
+    }
 
-        db.try_into()
+    async fn resume_task_as(&self, id: Uuid, operator_id: Uuid) -> AppResult<BackgroundTask> {
+        resume_task_on(
+            &self.pool,
+            id,
+            Some(TransitionAttribution {
+                reason: TaskTransitionReason::OperatorResumed,
+                actor_kind: TaskTransitionActorKind::Operator,
+                actor_id: Some(operator_id),
+                approval_id: None,
+                outreach_id: None,
+            }),
+        )
+        .await
+    }
+
+    async fn resume_task_after_approval(
+        &self,
+        id: Uuid,
+        approval_id: Uuid,
+    ) -> AppResult<BackgroundTask> {
+        resume_task_on(
+            &self.pool,
+            id,
+            Some(TransitionAttribution {
+                reason: TaskTransitionReason::ApprovalAccepted,
+                actor_kind: TaskTransitionActorKind::Approval,
+                actor_id: None,
+                approval_id: Some(approval_id),
+                outreach_id: None,
+            }),
+        )
+        .await
     }
 
     async fn list_company_tasks(
@@ -2067,6 +2725,155 @@ impl TaskPersistence for PostgresPersistence {
 
         db.map(OutboxEntry::try_from).transpose()
     }
+}
+
+async fn mark_task_failed_on(
+    pool: &sqlx::PgPool,
+    lease: TaskLeaseRef,
+    error_msg: &str,
+    next_run_at: DateTime<Utc>,
+    is_dead_letter: bool,
+    stop_reason: TaskStopReason,
+) -> AppResult<bool> {
+    let status = if is_dead_letter {
+        "dead_letter"
+    } else {
+        "pending"
+    };
+    let reason = match stop_reason {
+        TaskStopReason::RetryableFailure => TaskTransitionReason::RetryableFailure,
+        TaskStopReason::TerminalFailure => TaskTransitionReason::TerminalFailure,
+        TaskStopReason::TimedOut => TaskTransitionReason::TimedOut,
+        TaskStopReason::Shutdown => TaskTransitionReason::Shutdown,
+        TaskStopReason::LeaseLost => TaskTransitionReason::LeaseLost,
+        TaskStopReason::Completed => TaskTransitionReason::Completed,
+    };
+    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    set_task_transition_context(
+        &mut tx,
+        reason,
+        TaskTransitionActorKind::Worker,
+        Some(lease.worker_id),
+    )
+    .await?;
+    let result = sqlx::query(
+        r#"UPDATE background_tasks
+           SET status = $1, retry_count = retry_count + 1, last_error = $2,
+               run_at = $3, worker_id = NULL, execution_generation = NULL, locked_at = NULL,
+               lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $4 AND status = 'processing' AND worker_id = $5
+             AND execution_generation = $6
+             AND lock_expires_at > CURRENT_TIMESTAMP"#,
+    )
+    .bind(status)
+    .bind(error_msg)
+    .bind(next_run_at)
+    .bind(lease.task_id)
+    .bind(lease.worker_id)
+    .bind(lease.execution_generation)
+    .execute(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
+    tx.commit().await.map_err(AppError::from)?;
+    Ok(result.rows_affected() == 1)
+}
+
+async fn stop_task_on(
+    pool: &sqlx::PgPool,
+    id: Uuid,
+    operator_id: Option<Uuid>,
+) -> AppResult<BackgroundTask> {
+    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    if let Some(operator_id) = operator_id {
+        set_task_transition_context(
+            &mut tx,
+            TaskTransitionReason::OperatorStopped,
+            TaskTransitionActorKind::Operator,
+            Some(operator_id),
+        )
+        .await?;
+    }
+    let db = sqlx::query_as::<_, BackgroundTaskDb>(
+        r#"UPDATE background_tasks
+           SET status = 'stopped', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
+               lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $1
+             AND status IN ('pending', 'processing', 'pending_approval',
+                            'waiting_for_third_party_reply', 'failed', 'dead_letter')
+           RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status,
+                     payload, retry_count, max_retries, last_error, worker_id,
+                     execution_generation, locked_at, lock_expires_at, run_at, created_at,
+                     updated_at"#,
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
+    sqlx::query(
+        r#"UPDATE task_outreaches SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+           WHERE task_id = $1 AND status IN ('waiting', 'timeout_pending_approval')"#,
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
+    sqlx::query(
+        r#"UPDATE email_outbox SET status = 'failed', last_error = 'Task stopped',
+               updated_at = CURRENT_TIMESTAMP
+           WHERE task_id = $1 AND status = 'pending'"#,
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
+    tx.commit().await.map_err(AppError::from)?;
+    db.try_into()
+}
+
+struct TransitionAttribution {
+    reason: TaskTransitionReason,
+    actor_kind: TaskTransitionActorKind,
+    actor_id: Option<Uuid>,
+    approval_id: Option<Uuid>,
+    outreach_id: Option<Uuid>,
+}
+
+async fn resume_task_on(
+    pool: &sqlx::PgPool,
+    id: Uuid,
+    attribution: Option<TransitionAttribution>,
+) -> AppResult<BackgroundTask> {
+    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    if let Some(attribution) = attribution {
+        set_task_transition_context(
+            &mut tx,
+            attribution.reason,
+            attribution.actor_kind,
+            attribution.actor_id,
+        )
+        .await?;
+        set_task_transition_source(&mut tx, attribution.approval_id, attribution.outreach_id)
+            .await?;
+    }
+    let db = sqlx::query_as::<_, BackgroundTaskDb>(
+        r#"UPDATE background_tasks
+           SET status = 'pending', run_at = CURRENT_TIMESTAMP, worker_id = NULL,
+               execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $1
+             AND status IN ('stopped', 'pending_approval',
+                            'waiting_for_third_party_reply', 'failed', 'dead_letter')
+           RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status,
+                     payload, retry_count, max_retries, last_error, worker_id,
+                     execution_generation, locked_at, lock_expires_at, run_at, created_at,
+                     updated_at"#,
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
+    tx.commit().await.map_err(AppError::from)?;
+    db.try_into()
 }
 
 fn required_response_count(target_count: i64, threshold_percent: f64) -> usize {
@@ -2257,6 +3064,314 @@ mod tests {
         assert_eq!(required_response_count(3, 50.0), 2);
         assert_eq!(required_response_count(4, 50.0), 2);
         assert_eq!(required_response_count(10, 20.0), 2);
+    }
+
+    #[tokio::test]
+    async fn task_chain_board_groups_by_correlation_and_keeps_complete_chain_under_channel_filter()
+    {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("board_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Board Test".into(),
+                slug: format!("board-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let first_channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "First Channel".into(),
+                slug: "first".into(),
+                enabled: false,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let second_channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Second Channel".into(),
+                slug: "second".into(),
+                enabled: false,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let participant = crate::entities::value_objects::EmailAddress::from(email);
+        let thread = persistence
+            .create_thread(
+                first_channel.id,
+                "Root chain subject",
+                std::slice::from_ref(&participant),
+            )
+            .await
+            .unwrap();
+        let root = persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                company.id,
+                first_channel.id,
+                Some(thread.id),
+                "root_task",
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+        let nested = persistence
+            .enqueue_task(NewTask {
+                company_id: company.id,
+                channel_id: second_channel.id,
+                thread_id: None,
+                task_type: "nested_task".into(),
+                payload: serde_json::json!({}),
+                correlation_id: root.correlation_id,
+            })
+            .await
+            .unwrap();
+        let unrelated = persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                company.id,
+                first_channel.id,
+                Some(thread.id),
+                "unrelated_same_thread",
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        let filter = TaskBoardFilter::new(Some(second_channel.id), Utc::now());
+        let board = persistence
+            .list_task_chain_board(company.id, filter)
+            .await
+            .unwrap();
+        assert_eq!(board.total(ChainStage::Queued), 1);
+        let card = &board.cards(ChainStage::Queued)[0];
+        assert_eq!(card.correlation_id, root.correlation_id);
+        assert_eq!(card.counts.total_tasks, 2);
+        assert_eq!(card.title, "Root chain subject");
+        assert_eq!(
+            card.channel_names,
+            vec!["First Channel".to_string(), "Second Channel".to_string()]
+        );
+
+        let detail = persistence
+            .get_task_chain_detail(company.id, root.correlation_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            detail
+                .tasks
+                .iter()
+                .map(|item| item.task.id)
+                .collect::<Vec<_>>(),
+            vec![root.id, nested.id]
+        );
+        assert_eq!(detail.events.len(), 2);
+        assert!(
+            detail
+                .events
+                .iter()
+                .all(|event| event.reason == TaskTransitionReason::Enqueued)
+        );
+        assert!(
+            persistence
+                .get_task_chain_detail(Uuid::new_v4(), root.correlation_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_ne!(unrelated.correlation_id, root.correlation_id);
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn status_event_constraints_reject_cross_company_rows_and_duplicate_sequences() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("event_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Event Test".into(),
+                slug: format!("event-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Events".into(),
+                slug: "events".into(),
+                enabled: false,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let task = persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                company.id,
+                channel.id,
+                None,
+                "event_test",
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        let insert = |company_id: Uuid, sequence: i32| {
+            sqlx::query(
+                r#"INSERT INTO task_status_events (
+                       id, company_id, task_id, correlation_id, sequence, from_status, to_status,
+                       reason, actor_kind, retry_count, run_at, transitioned_at
+                   ) VALUES ($1, $2, $3, $4, $5, 'pending', 'pending',
+                             'operator_resumed', 'operator', 0, CURRENT_TIMESTAMP,
+                             CURRENT_TIMESTAMP)"#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(company_id)
+            .bind(task.id)
+            .bind(task.correlation_id.as_uuid())
+            .bind(sequence)
+            .execute(&pool)
+        };
+        assert!(insert(Uuid::new_v4(), 2).await.is_err());
+        assert!(insert(company.id, 1).await.is_err());
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn guarded_transitions_emit_only_on_success_and_operator_actions_record_the_user() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("actor_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Actor Test".into(),
+                slug: format!("actor-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Actors".into(),
+                slug: "actors".into(),
+                enabled: false,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let task = persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                company.id,
+                channel.id,
+                None,
+                "actor_test",
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+        let worker = Uuid::new_v4();
+        let expires = Utc::now() + chrono::Duration::minutes(5);
+        assert!(
+            persistence
+                .claim_task(task.id, worker, expires)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !persistence
+                .claim_task(task.id, Uuid::new_v4(), expires)
+                .await
+                .unwrap()
+        );
+        let before_stop = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 20)
+            .await
+            .unwrap();
+        assert_eq!(before_stop.len(), 2, "the failed guard must emit no event");
+
+        persistence.stop_task_as(task.id, owner.id).await.unwrap();
+        persistence.resume_task_as(task.id, owner.id).await.unwrap();
+        let events = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 20)
+            .await
+            .unwrap();
+        for reason in [
+            TaskTransitionReason::OperatorStopped,
+            TaskTransitionReason::OperatorResumed,
+        ] {
+            let event = events.iter().find(|event| event.reason == reason).unwrap();
+            assert_eq!(event.actor_kind, TaskTransitionActorKind::Operator);
+            assert_eq!(event.actor_id, Some(owner.id));
+        }
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -3164,6 +4279,18 @@ mod tests {
             1,
             "a pending task must be claimed by exactly one worker"
         );
+        let events = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 20)
+            .await
+            .unwrap();
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event.reason == TaskTransitionReason::Claimed)
+                .count(),
+            1,
+            "competing claimants must produce one claimed transition event"
+        );
 
         // Two claims, one of which is ours by construction — so the other necessarily took someone
         // else's task, and it now holds a five-minute lease on it. Hand it straight back: whichever
@@ -3987,6 +5114,14 @@ mod tests {
                 .status,
             TaskStatus::WaitingForThirdPartyReply
         );
+        let started = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 20)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|event| event.reason == TaskTransitionReason::OutreachStarted)
+            .expect("outreach suspension records its source");
+        assert_eq!(started.related_outreach_id, Some(outreach_id));
 
         let outbound_message_id = "<outreach-vendor@mailagents.test>";
         sqlx::query(
@@ -4045,6 +5180,14 @@ mod tests {
                 .status,
             TaskStatus::Pending
         );
+        let replied = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 20)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|event| event.reason == TaskTransitionReason::OutreachReplyReceived)
+            .expect("outreach reply records the exact resumption reason");
+        assert_eq!(replied.related_outreach_id, Some(outreach_id));
 
         CompanyPersistence::delete(&persistence, company.id)
             .await
@@ -4094,6 +5237,159 @@ mod tests {
         .await
         .unwrap();
         (company, channel)
+    }
+
+    #[tokio::test]
+    async fn task_chain_notifications_contain_identifiers_only() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let mut listener = sqlx::postgres::PgListener::connect_with(&pool)
+            .await
+            .unwrap();
+        listener.listen("task_chain_changed").await.unwrap();
+
+        let task = persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                company.id,
+                channel.id,
+                None,
+                "notification-test",
+                serde_json::json!({"body": "must never be notified", "token": "secret"}),
+            ))
+            .await
+            .unwrap();
+        let payload = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let notification = listener.recv().await.unwrap();
+                let payload: serde_json::Value =
+                    serde_json::from_str(notification.payload()).unwrap();
+                if payload["company_id"] == company.id.to_string()
+                    && payload["correlation_id"] == task.correlation_id.to_string()
+                {
+                    break payload;
+                }
+            }
+        })
+        .await
+        .expect("task-chain notification arrives");
+        assert_eq!(payload.as_object().unwrap().len(), 2);
+        assert_eq!(payload["company_id"], company.id.to_string());
+        assert_eq!(payload["correlation_id"], task.correlation_id.to_string());
+        assert!(payload.get("body").is_none());
+        assert!(payload.get("token").is_none());
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn worker_outcomes_record_exact_transition_reasons() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let cases = [
+            (TaskStopReason::RetryableFailure, false),
+            (TaskStopReason::TimedOut, false),
+            (TaskStopReason::Shutdown, false),
+            (TaskStopReason::TerminalFailure, true),
+        ];
+        for (stop_reason, dead_letter) in cases {
+            let task = persistence
+                .enqueue_task(NewTask::starting_new_chain(
+                    company.id,
+                    channel.id,
+                    None,
+                    format!("reason-{}", stop_reason.as_str()),
+                    serde_json::json!({}),
+                ))
+                .await
+                .unwrap();
+            let worker_id = Uuid::new_v4();
+            assert!(
+                persistence
+                    .claim_task(
+                        task.id,
+                        worker_id,
+                        Utc::now() + chrono::Duration::minutes(5),
+                    )
+                    .await
+                    .unwrap()
+            );
+            let claimed = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+            let lease = TaskLeaseRef::of(&claimed).unwrap();
+            assert!(
+                persistence
+                    .mark_task_failed_with_reason(
+                        lease,
+                        "bounded test failure",
+                        Utc::now() + chrono::Duration::minutes(1),
+                        dead_letter,
+                        stop_reason,
+                    )
+                    .await
+                    .unwrap()
+            );
+            let expected = match stop_reason {
+                TaskStopReason::RetryableFailure => TaskTransitionReason::RetryableFailure,
+                TaskStopReason::TimedOut => TaskTransitionReason::TimedOut,
+                TaskStopReason::Shutdown => TaskTransitionReason::Shutdown,
+                TaskStopReason::TerminalFailure => TaskTransitionReason::TerminalFailure,
+                _ => unreachable!(),
+            };
+            let events = persistence
+                .list_task_status_events(company.id, task.correlation_id, None, 20)
+                .await
+                .unwrap();
+            assert!(events.iter().any(|event| event.reason == expected));
+        }
+
+        let completed = persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                company.id,
+                channel.id,
+                None,
+                "reason-completed",
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+        let worker_id = Uuid::new_v4();
+        persistence
+            .claim_task(
+                completed.id,
+                worker_id,
+                Utc::now() + chrono::Duration::minutes(5),
+            )
+            .await
+            .unwrap();
+        let claimed = persistence
+            .get_task_by_id(completed.id)
+            .await
+            .unwrap()
+            .unwrap();
+        persistence
+            .mark_task_completed(TaskLeaseRef::of(&claimed).unwrap())
+            .await
+            .unwrap();
+        let events = persistence
+            .list_task_status_events(company.id, completed.correlation_id, None, 20)
+            .await
+            .unwrap();
+        assert!(
+            events
+                .iter()
+                .any(|event| event.reason == TaskTransitionReason::Completed)
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

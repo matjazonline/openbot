@@ -27,6 +27,9 @@ const MESSAGE_CHANNEL: &str = "thread_message";
 /// changes on.
 const ACTIVITY_CHANNEL: &str = "thread_activity";
 
+/// Correlation-chain changes used by the Tasks board.
+const TASK_CHAIN_CHANNEL: &str = "task_chain_changed";
+
 /// How many events a slow subscriber may fall behind before it is marked lagged. Lag is not data
 /// loss here — a lagged subscriber re-queries from its cursor and catches up in one round trip —
 /// so this only needs to be large enough that lag is rare.
@@ -45,6 +48,12 @@ pub struct ThreadScope {
     pub company_id: Uuid,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub struct TaskChainScope {
+    pub company_id: Uuid,
+    pub correlation_id: Uuid,
+}
+
 /// Something a connected mailbox may need to redraw.
 ///
 /// The two kinds are handled very differently downstream and must not be conflated: a committed
@@ -55,12 +64,16 @@ pub struct ThreadScope {
 pub enum MailboxEvent {
     MessageCommitted(ThreadScope),
     ActivityChanged(ThreadScope),
+    TaskChainChanged(TaskChainScope),
 }
 
 impl MailboxEvent {
-    pub fn scope(&self) -> ThreadScope {
+    pub fn thread_scope(&self) -> Option<ThreadScope> {
         match self {
-            MailboxEvent::MessageCommitted(scope) | MailboxEvent::ActivityChanged(scope) => *scope,
+            MailboxEvent::MessageCommitted(scope) | MailboxEvent::ActivityChanged(scope) => {
+                Some(*scope)
+            }
+            MailboxEvent::TaskChainChanged(_) => None,
         }
     }
 
@@ -82,6 +95,14 @@ impl MailboxEvent {
     /// True for a task status change anywhere in `channel_id`.
     pub fn is_activity_in_channel(&self, channel_id: Uuid) -> bool {
         matches!(self, MailboxEvent::ActivityChanged(scope) if scope.channel_id == channel_id)
+    }
+
+    pub fn is_task_chain_in_company(&self, company_id: Uuid) -> bool {
+        matches!(self, MailboxEvent::TaskChainChanged(scope) if scope.company_id == company_id)
+    }
+
+    pub fn is_task_chain(&self, correlation_id: Uuid) -> bool {
+        matches!(self, MailboxEvent::TaskChainChanged(scope) if scope.correlation_id == correlation_id)
     }
 }
 
@@ -150,33 +171,33 @@ async fn listen_until_error(pool: &PgPool, events: &MailboxEvents) -> Result<(),
     let mut listener = PgListener::connect_with(pool).await?;
     // One connection serves both channels; `PgListener` re-issues every LISTEN on reconnect.
     listener
-        .listen_all([MESSAGE_CHANNEL, ACTIVITY_CHANNEL])
+        .listen_all([MESSAGE_CHANNEL, ACTIVITY_CHANNEL, TASK_CHAIN_CHANNEL])
         .await?;
     info!("Listening for mailbox notifications");
 
     loop {
         let notification = listener.recv().await?;
-        let scope = match serde_json::from_str::<ThreadScope>(notification.payload()) {
-            Ok(scope) => scope,
-            // A payload we cannot read means a trigger and this struct have drifted apart. Skip it
-            // rather than tearing down the listener over one bad row.
-            Err(err) => {
+        let parsed = match notification.channel() {
+            MESSAGE_CHANNEL => serde_json::from_str::<ThreadScope>(notification.payload())
+                .map(MailboxEvent::MessageCommitted),
+            ACTIVITY_CHANNEL => serde_json::from_str::<ThreadScope>(notification.payload())
+                .map(MailboxEvent::ActivityChanged),
+            TASK_CHAIN_CHANNEL => serde_json::from_str::<TaskChainScope>(notification.payload())
+                .map(MailboxEvent::TaskChainChanged),
+            other => {
                 warn!(
-                    error = %err,
-                    channel = notification.channel(),
-                    payload = notification.payload(),
-                    "Ignoring unparseable mailbox notification"
+                    channel = other,
+                    "Ignoring notification on an unknown channel"
                 );
                 continue;
             }
         };
-
-        match notification.channel() {
-            MESSAGE_CHANNEL => events.publish(MailboxEvent::MessageCommitted(scope)),
-            ACTIVITY_CHANNEL => events.publish(MailboxEvent::ActivityChanged(scope)),
-            other => warn!(
-                channel = other,
-                "Ignoring notification on an unknown channel"
+        match parsed {
+            Ok(event) => events.publish(event),
+            Err(err) => warn!(
+                error = %err,
+                channel = notification.channel(),
+                "Ignoring unparseable mailbox notification"
             ),
         }
     }
@@ -212,6 +233,18 @@ mod tests {
             serde_json::from_str::<ThreadScope>(payload).unwrap(),
             scope()
         );
+
+        let chain_payload = r#"{
+            "company_id": "0a8f5f5e-0000-4000-8000-000000000003",
+            "correlation_id": "0a8f5f5e-0000-4000-8000-000000000004"
+        }"#;
+        assert_eq!(
+            serde_json::from_str::<TaskChainScope>(chain_payload).unwrap(),
+            TaskChainScope {
+                company_id: id(3),
+                correlation_id: id(4),
+            }
+        );
     }
 
     #[test]
@@ -227,6 +260,10 @@ mod tests {
     fn the_two_event_kinds_are_matched_separately() {
         let message = MailboxEvent::MessageCommitted(scope());
         let activity = MailboxEvent::ActivityChanged(scope());
+        let chain = MailboxEvent::TaskChainChanged(TaskChainScope {
+            company_id: id(3),
+            correlation_id: id(4),
+        });
 
         assert!(message.is_message_in_thread(id(1)));
         assert!(!activity.is_message_in_thread(id(1)));
@@ -240,6 +277,9 @@ mod tests {
         // Another thread's or channel's event is never ours.
         assert!(!message.is_message_in_thread(id(9)));
         assert!(!activity.is_activity_in_channel(id(9)));
+        assert!(chain.is_task_chain_in_company(id(3)));
+        assert!(chain.is_task_chain(id(4)));
+        assert!(!chain.is_message_in_channel(id(2)));
     }
 
     #[tokio::test]

@@ -643,7 +643,7 @@ impl TaskWorker {
 
         let outcome = self
             .task_persistence
-            .mark_task_failed(lease, &err_msg, next_run, is_dead_letter)
+            .mark_task_failed_with_reason(lease, &err_msg, next_run, is_dead_letter, stop_reason)
             .await;
         report_outcome("Task", task_id, "failure", outcome);
         self.record_task_metric(task, duration_ms, TaskStatusMetric::Failed, stop_reason);
@@ -1464,12 +1464,20 @@ impl TaskWorker {
         }
     }
 
-    pub async fn stop_task_and_notify(&self, task_id: uuid::Uuid) -> Result<(), String> {
-        let task = self
-            .task_persistence
-            .stop_task(task_id)
-            .await
-            .map_err(|e| e.to_string())?;
+    pub async fn stop_task_and_notify(
+        &self,
+        task_id: uuid::Uuid,
+        operator_id: Option<Uuid>,
+    ) -> Result<(), String> {
+        let task = match operator_id {
+            Some(operator_id) => {
+                self.task_persistence
+                    .stop_task_as(task_id, operator_id)
+                    .await
+            }
+            None => self.task_persistence.stop_task(task_id).await,
+        }
+        .map_err(|error| error.to_string())?;
 
         // Parse payload to notify participants
         if let Ok(ingest) = serde_json::from_value::<InboundIngestResult>(task.payload) {
@@ -1531,11 +1539,20 @@ impl TaskWorker {
         Ok(())
     }
 
-    pub async fn resume_task(&self, task_id: uuid::Uuid) -> Result<(), String> {
-        self.task_persistence
-            .resume_task(task_id)
-            .await
-            .map_err(|e| e.to_string())?;
+    pub async fn resume_task(
+        &self,
+        task_id: uuid::Uuid,
+        operator_id: Option<Uuid>,
+    ) -> Result<(), String> {
+        match operator_id {
+            Some(operator_id) => {
+                self.task_persistence
+                    .resume_task_as(task_id, operator_id)
+                    .await
+            }
+            None => self.task_persistence.resume_task(task_id).await,
+        }
+        .map_err(|error| error.to_string())?;
         Ok(())
     }
 }
@@ -2558,7 +2575,7 @@ mod tests {
         assert_eq!(task.status, TaskStatus::Pending);
 
         // Stop task
-        worker.stop_task_and_notify(task.id).await.unwrap();
+        worker.stop_task_and_notify(task.id, None).await.unwrap();
         let stopped_task = task_persistence
             .get_task_by_id(task.id)
             .await
@@ -2567,7 +2584,7 @@ mod tests {
         assert_eq!(stopped_task.status, TaskStatus::Stopped);
 
         // Resume task
-        worker.resume_task(task.id).await.unwrap();
+        worker.resume_task(task.id, None).await.unwrap();
         let resumed_task = task_persistence
             .get_task_by_id(task.id)
             .await

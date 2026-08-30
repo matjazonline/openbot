@@ -305,7 +305,7 @@ async fn stop_company_task(
     }
     let worker = TaskWorker::new(task_persistence.clone(), thread_use_cases.clone(), config);
 
-    if let Err(error) = worker.stop_task_and_notify(task_id).await {
+    if let Err(error) = worker.stop_task_and_notify(task_id, Some(_user.id)).await {
         return Html(pages::error_alert(&format!("Failed to stop task: {error}")));
     }
 
@@ -337,7 +337,7 @@ async fn resume_company_task(
     }
     let worker = TaskWorker::new(task_persistence.clone(), thread_use_cases.clone(), config);
 
-    if let Err(error) = worker.resume_task(task_id).await {
+    if let Err(error) = worker.resume_task(task_id, Some(_user.id)).await {
         return Html(pages::error_alert(&format!(
             "Failed to resume task: {error}"
         )));

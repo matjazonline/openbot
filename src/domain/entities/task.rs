@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 use uuid::Uuid;
 
 use crate::entities::correlation::CorrelationId;
@@ -534,6 +534,359 @@ impl BackgroundTask {
     }
 }
 
+/// Why a task moved between two durable queue states.
+///
+/// Detailed provider and message text deliberately does not belong here; the event ledger is an
+/// operational index into the existing attempt/approval/outreach records, not a second payload
+/// store.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskTransitionReason {
+    Enqueued,
+    Claimed,
+    Completed,
+    RetryableFailure,
+    TerminalFailure,
+    TimedOut,
+    Shutdown,
+    LeaseLost,
+    ApprovalRequested,
+    ApprovalAccepted,
+    OutreachStarted,
+    OutreachReplyReceived,
+    OutreachTimedOut,
+    OutreachExtended,
+    OperatorStopped,
+    OperatorResumed,
+}
+
+impl TaskTransitionReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Enqueued => "enqueued",
+            Self::Claimed => "claimed",
+            Self::Completed => "completed",
+            Self::RetryableFailure => "retryable_failure",
+            Self::TerminalFailure => "terminal_failure",
+            Self::TimedOut => "timed_out",
+            Self::Shutdown => "shutdown",
+            Self::LeaseLost => "lease_lost",
+            Self::ApprovalRequested => "approval_requested",
+            Self::ApprovalAccepted => "approval_accepted",
+            Self::OutreachStarted => "outreach_started",
+            Self::OutreachReplyReceived => "outreach_reply_received",
+            Self::OutreachTimedOut => "outreach_timed_out",
+            Self::OutreachExtended => "outreach_extended",
+            Self::OperatorStopped => "operator_stopped",
+            Self::OperatorResumed => "operator_resumed",
+        }
+    }
+}
+
+impl FromStr for TaskTransitionReason {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "enqueued" => Ok(Self::Enqueued),
+            "claimed" => Ok(Self::Claimed),
+            "completed" => Ok(Self::Completed),
+            "retryable_failure" => Ok(Self::RetryableFailure),
+            "terminal_failure" => Ok(Self::TerminalFailure),
+            "timed_out" => Ok(Self::TimedOut),
+            "shutdown" => Ok(Self::Shutdown),
+            "lease_lost" => Ok(Self::LeaseLost),
+            "approval_requested" => Ok(Self::ApprovalRequested),
+            "approval_accepted" => Ok(Self::ApprovalAccepted),
+            "outreach_started" => Ok(Self::OutreachStarted),
+            "outreach_reply_received" => Ok(Self::OutreachReplyReceived),
+            "outreach_timed_out" => Ok(Self::OutreachTimedOut),
+            "outreach_extended" => Ok(Self::OutreachExtended),
+            "operator_stopped" => Ok(Self::OperatorStopped),
+            "operator_resumed" => Ok(Self::OperatorResumed),
+            other => Err(format!("Unknown task transition reason: {other}")),
+        }
+    }
+}
+
+impl std::fmt::Display for TaskTransitionReason {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskTransitionActorKind {
+    System,
+    Worker,
+    Operator,
+    Approval,
+    Outreach,
+}
+
+impl TaskTransitionActorKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::System => "system",
+            Self::Worker => "worker",
+            Self::Operator => "operator",
+            Self::Approval => "approval",
+            Self::Outreach => "outreach",
+        }
+    }
+}
+
+impl FromStr for TaskTransitionActorKind {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "system" => Ok(Self::System),
+            "worker" => Ok(Self::Worker),
+            "operator" => Ok(Self::Operator),
+            "approval" => Ok(Self::Approval),
+            "outreach" => Ok(Self::Outreach),
+            other => Err(format!("Unknown task transition actor kind: {other}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskStatusEvent {
+    pub id: Uuid,
+    pub company_id: Uuid,
+    pub task_id: Uuid,
+    pub correlation_id: CorrelationId,
+    pub sequence: i32,
+    pub from_status: Option<TaskStatus>,
+    pub to_status: TaskStatus,
+    pub reason: TaskTransitionReason,
+    pub actor_kind: TaskTransitionActorKind,
+    pub actor_id: Option<Uuid>,
+    pub related_approval_id: Option<Uuid>,
+    pub related_outreach_id: Option<Uuid>,
+    pub retry_count: i32,
+    pub run_at: chrono::DateTime<chrono::Utc>,
+    pub execution_generation: Option<Uuid>,
+    pub transitioned_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// A stable cursor for the globally chronological chain timeline. Task id and sequence preserve
+/// task-local ordering when two transitions share one database timestamp.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TaskStatusEventCursor {
+    pub transitioned_at: chrono::DateTime<chrono::Utc>,
+    pub task_id: Uuid,
+    pub sequence: i32,
+    pub id: Uuid,
+}
+
+impl From<&TaskStatusEvent> for TaskStatusEventCursor {
+    fn from(event: &TaskStatusEvent) -> Self {
+        Self {
+            transitioned_at: event.transitioned_at,
+            task_id: event.task_id,
+            sequence: event.sequence,
+            id: event.id,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ChainStage {
+    Queued,
+    Running,
+    WaitingApproval,
+    WaitingReply,
+    Completed,
+    NeedsAttention,
+}
+
+impl ChainStage {
+    pub const ALL: [Self; 6] = [
+        Self::Queued,
+        Self::Running,
+        Self::WaitingApproval,
+        Self::WaitingReply,
+        Self::Completed,
+        Self::NeedsAttention,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Queued => "queued",
+            Self::Running => "running",
+            Self::WaitingApproval => "waiting_approval",
+            Self::WaitingReply => "waiting_reply",
+            Self::Completed => "completed",
+            Self::NeedsAttention => "needs_attention",
+        }
+    }
+
+    /// The board's precedence in one pure decision, shared by unit tests and non-SQL callers.
+    pub fn derive(counts: &TaskChainCounts) -> Self {
+        if counts.failed > 0
+            || counts.dead_letter > 0
+            || counts.stopped > 0
+            || counts.expired_processing > 0
+            || counts.delivery_failed > 0
+        {
+            Self::NeedsAttention
+        } else if counts.pending_approval > 0 {
+            Self::WaitingApproval
+        } else if counts.processing > 0 || counts.delivery_sending > 0 {
+            Self::Running
+        } else if counts.waiting_reply > 0 {
+            Self::WaitingReply
+        } else if counts.pending > 0 || counts.delivery_pending > 0 {
+            Self::Queued
+        } else if counts.total_tasks > 0
+            && counts.completed == counts.total_tasks
+            && counts.delivery_sent == counts.total_deliveries
+        {
+            Self::Completed
+        } else {
+            Self::NeedsAttention
+        }
+    }
+}
+
+impl FromStr for ChainStage {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "queued" => Ok(Self::Queued),
+            "running" => Ok(Self::Running),
+            "waiting_approval" => Ok(Self::WaitingApproval),
+            "waiting_reply" => Ok(Self::WaitingReply),
+            "completed" => Ok(Self::Completed),
+            "needs_attention" => Ok(Self::NeedsAttention),
+            other => Err(format!("Unknown task chain stage: {other}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TaskChainCounts {
+    pub total_tasks: i64,
+    pub pending: i64,
+    pub processing: i64,
+    pub expired_processing: i64,
+    pub pending_approval: i64,
+    pub waiting_reply: i64,
+    pub completed: i64,
+    pub failed: i64,
+    pub dead_letter: i64,
+    pub stopped: i64,
+    pub total_deliveries: i64,
+    pub delivery_pending: i64,
+    pub delivery_sending: i64,
+    pub delivery_sent: i64,
+    pub delivery_failed: i64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskChainCard {
+    pub correlation_id: CorrelationId,
+    pub stage: ChainStage,
+    pub title: String,
+    pub channel_names: Vec<String>,
+    pub agent_names: Vec<String>,
+    pub counts: TaskChainCounts,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub last_activity_at: chrono::DateTime<chrono::Utc>,
+    pub next_action_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub retry_count: i64,
+    pub failure_summary: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskChainBoard {
+    pub cards: HashMap<ChainStage, Vec<TaskChainCard>>,
+    pub totals: HashMap<ChainStage, i64>,
+    pub per_column_limit: usize,
+}
+
+impl TaskChainBoard {
+    pub fn cards(&self, stage: ChainStage) -> &[TaskChainCard] {
+        self.cards.get(&stage).map(Vec::as_slice).unwrap_or(&[])
+    }
+
+    pub fn total(&self, stage: ChainStage) -> i64 {
+        self.totals.get(&stage).copied().unwrap_or(0)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TaskBoardFilter {
+    pub channel_id: Option<Uuid>,
+    pub terminal_since: chrono::DateTime<chrono::Utc>,
+    pub per_column_limit: usize,
+}
+
+impl TaskBoardFilter {
+    pub const DEFAULT_PER_COLUMN: usize = 50;
+    pub const MAX_PER_COLUMN: usize = 50;
+
+    pub fn new(channel_id: Option<Uuid>, now: chrono::DateTime<chrono::Utc>) -> Self {
+        Self {
+            channel_id,
+            terminal_since: now - chrono::Duration::days(7),
+            per_column_limit: Self::DEFAULT_PER_COLUMN,
+        }
+    }
+
+    pub fn with_limit(mut self, limit: usize) -> Self {
+        self.per_column_limit = limit.clamp(1, Self::MAX_PER_COLUMN);
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskChainTaskDetail {
+    pub task: BackgroundTask,
+    pub attempts: Vec<TaskAttemptRecord>,
+    pub deliveries: Vec<crate::entities::outbox::OutboxEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskApprovalContext {
+    pub id: Uuid,
+    pub task_id: Uuid,
+    pub status: String,
+    pub action_title: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskOutreachContext {
+    pub id: Uuid,
+    pub task_id: Uuid,
+    pub status: String,
+    pub required_threshold_percent: f64,
+    pub target_count: i64,
+    pub response_count: i64,
+    pub expires_at: chrono::DateTime<chrono::Utc>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskChainDetail {
+    pub company_id: Uuid,
+    pub correlation_id: CorrelationId,
+    pub title: String,
+    pub channel_names: Vec<String>,
+    pub agent_names: Vec<String>,
+    pub tasks: Vec<TaskChainTaskDetail>,
+    pub events: Vec<TaskStatusEvent>,
+    pub approvals: Vec<TaskApprovalContext>,
+    pub outreaches: Vec<TaskOutreachContext>,
+}
+
 /// One page of a company's background tasks: which ones, in what order, and how far in.
 ///
 /// Both the classic tasks page and the `/ui` Tasks workspace page the same list, so the clamping
@@ -700,5 +1053,100 @@ mod tests {
             // Every state a thread can be in says something in the column.
             assert!(!activity.label().is_empty());
         }
+    }
+
+    #[test]
+    fn every_individual_chain_state_maps_to_its_operational_stage() {
+        let cases = [
+            (
+                TaskChainCounts {
+                    total_tasks: 1,
+                    pending: 1,
+                    ..Default::default()
+                },
+                ChainStage::Queued,
+            ),
+            (
+                TaskChainCounts {
+                    total_tasks: 1,
+                    processing: 1,
+                    ..Default::default()
+                },
+                ChainStage::Running,
+            ),
+            (
+                TaskChainCounts {
+                    total_tasks: 1,
+                    pending_approval: 1,
+                    ..Default::default()
+                },
+                ChainStage::WaitingApproval,
+            ),
+            (
+                TaskChainCounts {
+                    total_tasks: 1,
+                    waiting_reply: 1,
+                    ..Default::default()
+                },
+                ChainStage::WaitingReply,
+            ),
+            (
+                TaskChainCounts {
+                    total_tasks: 1,
+                    completed: 1,
+                    total_deliveries: 1,
+                    delivery_sent: 1,
+                    ..Default::default()
+                },
+                ChainStage::Completed,
+            ),
+        ];
+        for (counts, expected) in cases {
+            assert_eq!(ChainStage::derive(&counts), expected);
+        }
+    }
+
+    #[test]
+    fn chain_stage_precedence_surfaces_mixed_work_and_delivery_failures() {
+        let counts = TaskChainCounts {
+            total_tasks: 4,
+            pending: 1,
+            processing: 1,
+            pending_approval: 1,
+            waiting_reply: 1,
+            ..Default::default()
+        };
+        assert_eq!(ChainStage::derive(&counts), ChainStage::WaitingApproval);
+
+        let attention = TaskChainCounts {
+            delivery_failed: 1,
+            ..counts.clone()
+        };
+        assert_eq!(ChainStage::derive(&attention), ChainStage::NeedsAttention);
+
+        let expired = TaskChainCounts {
+            expired_processing: 1,
+            ..counts
+        };
+        assert_eq!(ChainStage::derive(&expired), ChainStage::NeedsAttention);
+    }
+
+    #[test]
+    fn completed_chains_require_every_task_and_delivery_to_succeed() {
+        let incomplete_delivery = TaskChainCounts {
+            total_tasks: 2,
+            completed: 2,
+            total_deliveries: 1,
+            delivery_pending: 1,
+            ..Default::default()
+        };
+        assert_eq!(ChainStage::derive(&incomplete_delivery), ChainStage::Queued);
+
+        let stopped = TaskChainCounts {
+            total_tasks: 1,
+            stopped: 1,
+            ..Default::default()
+        };
+        assert_eq!(ChainStage::derive(&stopped), ChainStage::NeedsAttention);
     }
 }

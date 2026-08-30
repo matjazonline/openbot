@@ -2631,6 +2631,73 @@ fn task_monitor_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
 }
 
 #[test]
+fn task_board_renders_six_columns_toggle_overflow_and_live_chain_pane() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let correlation_id = CorrelationId::new();
+    let now = Utc::now();
+    let counts = TaskChainCounts {
+        total_tasks: 2,
+        pending: 1,
+        processing: 1,
+        ..Default::default()
+    };
+    let card = TaskChainCard {
+        correlation_id,
+        stage: ChainStage::Running,
+        title: "Cross-channel rollout".into(),
+        channel_names: vec!["Inbox".into(), "Support".into()],
+        agent_names: vec!["Triage".into(), "Responder".into()],
+        counts,
+        created_at: now,
+        last_activity_at: now,
+        next_action_at: Some(now),
+        retry_count: 1,
+        failure_summary: None,
+    };
+    let mut cards = std::collections::HashMap::new();
+    cards.insert(ChainStage::Running, vec![card]);
+    let mut totals = std::collections::HashMap::new();
+    totals.insert(ChainStage::Running, 51);
+    let board = TaskChainBoard {
+        cards,
+        totals,
+        per_column_limit: 50,
+    };
+    let email = mailbox_account_email();
+    let pane = task_chain_empty_pane("Select a chain.");
+    let html = task_board_page(&TaskBoardPage {
+        user: &mailbox_user(&email),
+        companies: std::slice::from_ref(&company),
+        company: &company,
+        channels: std::slice::from_ref(&channel),
+        board: &board,
+        filter: TaskBoardFilter::new(None, now),
+        selected_correlation_id: Some(correlation_id),
+        pane_html: &pane,
+    });
+
+    for label in [
+        "Queued",
+        "Running",
+        "Waiting Approval",
+        "Waiting Reply",
+        "Completed",
+        "Needs Attention",
+    ] {
+        assert!(html.contains(label), "missing board column {label}");
+    }
+    assert!(html.contains("view=list"));
+    assert!(html.contains("View all 51 in List"));
+    assert!(html.contains("2 Running") || html.contains("1 Running"));
+    assert!(html.contains("1 Queued"));
+    assert!(html.contains("hx-ext=\"sse\""));
+    assert!(html.contains("sse-connect=\"/ui/tasks/events?company_id="));
+    assert!(html.contains("sse-swap=\"task-board\""));
+    assert!(html.contains(&format!("/ui/tasks/chains/{correlation_id}")));
+}
+
+#[test]
 fn task_monitor_list_targets_the_pane_and_swaps_out_of_band() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
@@ -2654,7 +2721,10 @@ fn task_monitor_list_targets_the_pane_and_swaps_out_of_band() {
     assert!(inline.contains("165 tokens"));
     assert!(!inline.contains("hx-swap-oob"));
     // Paging keeps the filters it was made under, and stays on the list alone.
-    assert!(inline.contains(&format!("/ui/tasks/list?company_id={}&page=3", company.id)));
+    assert!(inline.contains(&format!(
+        "/ui/tasks/list?company_id={}&view=list&page=3",
+        company.id
+    )));
     // Newest-first, so "back" is towards the newer end -- and the arrow leads the word.
     assert!(inline.contains("</svg> Newer"));
 

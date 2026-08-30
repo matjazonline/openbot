@@ -7,16 +7,20 @@
 //! Which page of tasks a request means is one [`TaskFilter`], the same value the classic tasks page
 //! pages by, so the two UIs cannot disagree about what `?page=2` contains.
 
-use std::sync::Arc;
+use std::{convert::Infallible, sync::Arc, time::Duration};
 
 use axum::{
     Router,
-    extract::{FromRequestParts, Path, Query},
+    extract::{FromRequestParts, Path, Query, State},
     http::request::Parts,
-    response::{Html, IntoResponse, Response},
+    response::{
+        Html, IntoResponse, Response, Sse,
+        sse::{Event, KeepAlive},
+    },
     routing::{get, post},
 };
 use serde::Deserialize;
+use tokio_stream::{Stream, StreamExt};
 use tracing::{instrument, warn};
 use uuid::Uuid;
 
@@ -30,10 +34,11 @@ use crate::{
     entities::{
         channel::Channel,
         company::Company,
-        task::{BackgroundTask, TaskFilter},
+        correlation::CorrelationId,
+        task::{BackgroundTask, TaskBoardFilter, TaskChainBoard, TaskChainDetail, TaskFilter},
         value_objects::EmailAddress,
     },
-    infra::config::AppConfig,
+    infra::{config::AppConfig, events::MailboxEvents},
     services::task_worker::TaskWorker,
     use_cases::{
         channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases,
@@ -42,6 +47,7 @@ use crate::{
 };
 
 use super::{
+    live_updates::task_chain_wake_ups,
     task::deserialize_empty_string_as_none,
     ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
 };
@@ -49,7 +55,10 @@ use super::{
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/ui/tasks", get(tasks_page))
+        .route("/ui/tasks/board", get(task_board_fragment))
         .route("/ui/tasks/list", get(task_list_fragment))
+        .route("/ui/tasks/events", get(task_board_stream))
+        .route("/ui/tasks/chains/{correlation_id}", get(task_chain_pane))
         .route("/ui/tasks/{task_id}", get(task_pane))
         .route("/ui/tasks/{task_id}/stop", post(stop_task))
         .route("/ui/tasks/{task_id}/resume", post(resume_task))
@@ -64,6 +73,9 @@ pub fn router() -> Router<AppState> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct TasksQuery {
     pub company_id: Option<Uuid>,
+    pub view: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub correlation_id: Option<Uuid>,
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub task_id: Option<Uuid>,
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
@@ -88,6 +100,10 @@ impl TasksQuery {
             self.page,
             self.limit,
         )
+    }
+
+    fn board_filter(&self) -> TaskBoardFilter {
+        TaskBoardFilter::new(self.channel_id, chrono::Utc::now())
     }
 }
 
@@ -169,8 +185,31 @@ async fn tasks_page(
         .with_company_membership(managed_company_membership(&company, workspace.user_id));
 
     let view = workspace.view(&company);
-    let filter = query.filter();
     let channels = view.channels().await?;
+    if query.view.as_deref() != Some("list") {
+        let board_filter = query.board_filter();
+        let board = view.board(board_filter).await?;
+        let selected = query.correlation_id.map(CorrelationId::from);
+        let pane_html = match selected {
+            Some(correlation_id) => match view.chain(correlation_id).await? {
+                Some(detail) => pages::task_chain_detail_pane(&detail, None),
+                None => pages::task_chain_empty_pane("Task chain not found."),
+            },
+            None => pages::task_chain_empty_pane("Select a chain to inspect its full timeline."),
+        };
+        return Ok(Html(pages::task_board_page(&pages::TaskBoardPage {
+            user: &workspace_user,
+            companies: &companies,
+            company: &company,
+            channels: &channels,
+            board: &board,
+            filter: board_filter,
+            selected_correlation_id: selected,
+            pane_html: &pane_html,
+        })));
+    }
+
+    let filter = query.filter();
     let (tasks, has_next) = view.page(&filter).await?;
 
     // A task the filters exclude is still worth showing: the URL named it, and it may well be on
@@ -221,6 +260,111 @@ async fn task_list_fragment(
         .into_response())
 }
 
+/// GET /ui/tasks/board - Reconcile the bounded six-column board.
+#[instrument(skip(workspace))]
+async fn task_board_fragment(
+    workspace: Workspace,
+    Query(query): Query<TasksQuery>,
+) -> AppResult<Response> {
+    let company = workspace.scoped_company(query.company_id).await?;
+    let view = workspace.view(&company);
+    let filter = query.board_filter();
+    let board = view.board(filter).await?;
+    let selected = query.correlation_id.map(CorrelationId::from);
+    let push_url = format!(
+        "/ui/tasks?{}",
+        pages::task_board_query(company.id, filter.channel_id, selected)
+    );
+    Ok((
+        [("HX-Push-Url", push_url)],
+        Html(pages::task_board_fragment(
+            company.id,
+            &board,
+            filter,
+            selected,
+            pages::FragmentSwap::Inline,
+        )),
+    )
+        .into_response())
+}
+
+/// GET /ui/tasks/chains/{correlation_id} - Complete company-scoped chain detail.
+#[instrument(skip(workspace))]
+async fn task_chain_pane(
+    workspace: Workspace,
+    Path(correlation_id): Path<Uuid>,
+    Query(query): Query<TasksQuery>,
+) -> AppResult<Html<String>> {
+    let company = workspace.scoped_company(query.company_id).await?;
+    let view = workspace.view(&company);
+    let detail = view
+        .chain(correlation_id.into())
+        .await?
+        .ok_or_else(|| AppError::NotFound("Task chain not found".into()))?;
+    Ok(Html(pages::task_chain_detail_pane(&detail, None)))
+}
+
+/// GET /ui/tasks/events - Company-filtered board wake-ups.
+///
+/// Notifications carry identifiers only. They are coalesced and every emitted fragment is a
+/// fresh bounded database projection, including the selected pane when that chain changed.
+#[instrument(skip(workspace, events))]
+async fn task_board_stream(
+    workspace: Workspace,
+    State(events): State<MailboxEvents>,
+    Query(query): Query<TasksQuery>,
+) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
+    let company = workspace.scoped_company(query.company_id).await?;
+    let company_id = company.id;
+    let filter = query.board_filter();
+    let selected = query.correlation_id.map(CorrelationId::from);
+    let mut changes = Box::pin(task_chain_wake_ups(&events, "task-board", company_id));
+
+    let stream = async_stream::stream! {
+        loop {
+            match workspace.view(&company).board(filter).await {
+                Ok(board) => yield Ok(Event::default().event("task-board").data(
+                    pages::task_board_fragment(
+                        company_id,
+                        &board,
+                        filter,
+                        selected,
+                        pages::FragmentSwap::Inline,
+                    )
+                )),
+                Err(error) => {
+                    warn!(%error, %company_id, "Task board stream query failed");
+                    return;
+                }
+            }
+            if let Some(correlation_id) = selected {
+                match workspace.view(&company).chain(correlation_id).await {
+                    Ok(Some(detail)) => yield Ok(Event::default().event("task-chain").data(
+                        pages::task_chain_detail_pane(&detail, None)
+                    )),
+                    Ok(None) => yield Ok(Event::default().event("task-chain").data(
+                        pages::task_chain_empty_pane("Task chain not found.")
+                    )),
+                    Err(error) => {
+                        warn!(%error, %correlation_id, "Task chain stream query failed");
+                        return;
+                    }
+                }
+            }
+
+            if changes.next().await.is_none() {
+                return;
+            }
+            // Absorb a burst of task/outbox/approval rows from one logical transaction.
+            while matches!(
+                tokio::time::timeout(Duration::from_millis(75), changes.next()).await,
+                Ok(Some(_))
+            ) {}
+        }
+    };
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+}
+
 /// GET /ui/tasks/{task_id} - One task's detail for the pane (Protected).
 #[instrument(skip(workspace))]
 async fn task_pane(
@@ -246,10 +390,14 @@ async fn stop_task(
     let view = workspace.view(&company);
     let task = view.require_task(task_id).await?;
 
-    let stopped = view.worker().await.stop_task_and_notify(task.id).await;
+    let stopped = view
+        .worker()
+        .await
+        .stop_task_and_notify(task.id, Some(workspace.user_id))
+        .await;
     view.after_write(
         &task,
-        &query.filter(),
+        &query,
         stopped
             .err()
             .map(|err| format!("Failed to stop task: {err}")),
@@ -269,10 +417,14 @@ async fn resume_task(
     let view = workspace.view(&company);
     let task = view.require_task(task_id).await?;
 
-    let resumed = view.worker().await.resume_task(task.id).await;
+    let resumed = view
+        .worker()
+        .await
+        .resume_task(task.id, Some(workspace.user_id))
+        .await;
     view.after_write(
         &task,
-        &query.filter(),
+        &query,
         resumed
             .err()
             .map(|err| format!("Failed to resume task: {err}")),
@@ -311,6 +463,22 @@ impl TaskMonitorView<'_> {
             .await?;
 
         Ok(filter.split_probe(probed))
+    }
+
+    async fn board(&self, filter: TaskBoardFilter) -> AppResult<TaskChainBoard> {
+        self.thread_use_cases
+            .get_task_persistence()
+            .await
+            .list_task_chain_board(self.company.id, filter)
+            .await
+    }
+
+    async fn chain(&self, correlation_id: CorrelationId) -> AppResult<Option<TaskChainDetail>> {
+        self.thread_use_cases
+            .get_task_persistence()
+            .await
+            .get_task_chain_detail(self.company.id, correlation_id)
+            .await
     }
 
     /// One task, but only when it really belongs to the company the request is scoped to — the id
@@ -418,15 +586,38 @@ impl TaskMonitorView<'_> {
     async fn after_write(
         &self,
         task: &BackgroundTask,
-        filter: &TaskFilter,
+        query: &TasksQuery,
         error: Option<String>,
     ) -> AppResult<Response> {
+        if query.view.as_deref() != Some("list") {
+            let correlation_id = query
+                .correlation_id
+                .map(CorrelationId::from)
+                .unwrap_or(task.correlation_id);
+            let detail = self
+                .chain(correlation_id)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Task chain not found".into()))?;
+            let pane = pages::task_chain_detail_pane(&detail, error.as_deref());
+            let board_filter = query.board_filter();
+            let board = self.board(board_filter).await?;
+            let board = pages::task_board_fragment(
+                self.company.id,
+                &board,
+                board_filter,
+                Some(correlation_id),
+                pages::FragmentSwap::OutOfBand,
+            );
+            return Ok(Html(format!("{pane}{board}")).into_response());
+        }
+
+        let filter = query.filter();
         let refreshed = self.require_task(task.id).await?;
         let pane = self.pane(&refreshed, error.as_deref()).await?;
 
-        let (tasks, has_next) = self.page(filter).await?;
+        let (tasks, has_next) = self.page(&filter).await?;
         let list = pages::task_monitor_list(
-            &self.list(&tasks, has_next, filter, Some(refreshed.id)),
+            &self.list(&tasks, has_next, &filter, Some(refreshed.id)),
             pages::FragmentSwap::OutOfBand,
         );
 

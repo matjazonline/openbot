@@ -15,6 +15,7 @@ use crate::entities::{
     company::{Company, CompanyModelConnection},
     company_invite::CompanyInvite,
     company_member::{CompanyAccessRole, CompanyMember, CompanyMembership},
+    correlation::CorrelationId,
     memory::{
         MEMORY_READINESS_TIMEOUT_ERROR, MemoryConnection, MemoryConnectionReadiness,
         MemoryProviderKind, MemoryProvisioningPhase,
@@ -22,8 +23,9 @@ use crate::entities::{
     message::{AttachmentMetadata, Message, MessageDirection, MessageRole},
     outbox::{OutboxEntry, OutboxFilter, OutboxStatus},
     task::{
-        BackgroundTask, TaskAttemptRecord, TaskAttemptRecordStatus, TaskFilter, TaskStatus,
-        ThreadActivity,
+        BackgroundTask, ChainStage, TaskAttemptRecord, TaskAttemptRecordStatus, TaskBoardFilter,
+        TaskChainBoard, TaskChainCard, TaskChainCounts, TaskChainDetail, TaskChainTaskDetail,
+        TaskFilter, TaskStatus, ThreadActivity,
     },
     thread::Thread,
     user::User,
@@ -60,6 +62,7 @@ mod profile;
 mod schedules;
 mod simulation;
 mod skeleton;
+mod task_board;
 mod task_monitor;
 mod tasks;
 mod team_settings;
@@ -91,6 +94,7 @@ pub(crate) use skeleton::{
     LIST_SKELETON, PANE_SKELETON, PANELS_SKELETON, THREAD_COLUMN_SKELETON, THREAD_ROWS_SKELETON,
     panels_placeholder, skeleton_script,
 };
+pub use task_board::*;
 pub use task_monitor::*;
 pub use tasks::*;
 pub use team_settings::*;

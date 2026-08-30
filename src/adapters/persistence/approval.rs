@@ -1,4 +1,4 @@
-use crate::entities::task::TaskSuspension;
+use crate::entities::task::{TaskSuspension, TaskTransitionActorKind, TaskTransitionReason};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -6,7 +6,10 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::PostgresPersistence,
+    adapters::persistence::{
+        PostgresPersistence,
+        task::{set_task_transition_context, set_task_transition_source},
+    },
     app_error::{AppError, AppResult},
     entities::approval::{ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval},
 };
@@ -210,6 +213,14 @@ impl ApprovalPersistence for PostgresPersistence {
                 // lease for anyone to match. A caller with no lease gets NULL binds, which makes
                 // the first branch unsatisfiable -- so it can only ever act on the second.
                 let lease = suspension.lease();
+                set_task_transition_context(
+                    &mut tx,
+                    TaskTransitionReason::ApprovalRequested,
+                    TaskTransitionActorKind::Approval,
+                    None,
+                )
+                .await?;
+                set_task_transition_source(&mut tx, Some(db.id), None).await?;
                 let paused = sqlx::query(
                     r#"UPDATE background_tasks
                        SET status = 'pending_approval', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
@@ -363,6 +374,20 @@ impl ApprovalPersistence for PostgresPersistence {
         let task_id = approval.task_id.ok_or_else(|| {
             AppError::Internal("Quorum timeout approval is missing its task".into())
         })?;
+        let transition_reason = match action {
+            "proceed_partial" => TaskTransitionReason::ApprovalAccepted,
+            "extend_24h" | "extend_48h" | "extend" => TaskTransitionReason::OutreachExtended,
+            "reject" => TaskTransitionReason::OperatorStopped,
+            _ => TaskTransitionReason::ApprovalAccepted,
+        };
+        set_task_transition_context(
+            &mut tx,
+            transition_reason,
+            TaskTransitionActorKind::Approval,
+            None,
+        )
+        .await?;
+        set_task_transition_source(&mut tx, Some(approval.id), None).await?;
 
         let task_updated = match action {
             "proceed_partial" => {
@@ -524,7 +549,7 @@ mod tests {
     use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::test_pool;
     use crate::entities::correlation::CorrelationId;
-    use crate::entities::task::NewTask;
+    use crate::entities::task::{NewTask, TaskTransitionReason};
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
         company::{CompanyPersistence, CompanyWrite},
@@ -699,6 +724,15 @@ mod tests {
             parked.worker_id.is_none() && parked.execution_generation.is_none(),
             "a parked task releases its lease"
         );
+        let events = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 20)
+            .await
+            .unwrap();
+        let requested = events
+            .iter()
+            .find(|event| event.reason == TaskTransitionReason::ApprovalRequested)
+            .expect("parking records the exact approval transition");
+        assert_eq!(requested.related_approval_id.is_some(), true);
 
         // Once parked there is no owner left to fence against, so the unleased sweep may act --
         // this is the quorum-timeout path.

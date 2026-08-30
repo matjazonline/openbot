@@ -223,7 +223,10 @@ impl ApprovalUseCases {
             }
             LinkAction::Approve => {
                 if let Some(task_id) = approval.task_id {
-                    let _ = self.task_persistence.resume_task(task_id).await;
+                    let _ = self
+                        .task_persistence
+                        .resume_task_after_approval(task_id, approval.id)
+                        .await;
                 }
                 self.record_decision_note(
                     approval,
