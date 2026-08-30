@@ -7,12 +7,92 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        company::{Company, CompanyAccess},
+        company::{Company, CompanyAccess, CompanyModelConnection},
         company_member::CompanyMembership,
         memory::MemoryProviderKind,
-        value_objects::AvatarUrl,
+        value_objects::{AvatarUrl, ModelName, ModelProvider},
     },
 };
+
+pub const MAX_COMPANY_MODEL_CONNECTIONS: usize = 8;
+pub const MAX_MODELS_PER_CONNECTION: usize = 32;
+const MAX_MODEL_IDENTIFIER_BYTES: usize = 200;
+const MAX_PROVIDER_IDENTIFIER_BYTES: usize = 64;
+const MAX_MODEL_API_KEY_BYTES: usize = 8 * 1024;
+
+/// One provider credential and the exact models a company permits its agents to select.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompanyModelConnectionWrite {
+    pub provider: ModelProvider,
+    /// `None` preserves the stored key for an existing provider. A new provider requires a key.
+    pub api_key: Option<String>,
+    pub models: Vec<ModelName>,
+    pub is_default: bool,
+}
+
+impl CompanyModelConnectionWrite {
+    pub fn new(
+        provider: impl Into<String>,
+        api_key: Option<String>,
+        models: Vec<String>,
+        is_default: bool,
+    ) -> AppResult<Self> {
+        let provider = provider.into().trim().to_ascii_lowercase();
+        if provider.is_empty() || provider.len() > MAX_PROVIDER_IDENTIFIER_BYTES {
+            return Err(AppError::BadRequest(
+                "A model provider is missing or too long.".into(),
+            ));
+        }
+        if !matches!(
+            provider.as_str(),
+            "google" | "openai" | "anthropic" | "groq"
+        ) {
+            return Err(AppError::BadRequest(format!(
+                "Unsupported model provider '{provider}'."
+            )));
+        }
+
+        let mut normalized_models = Vec::with_capacity(models.len());
+        for model in models {
+            let model = model.trim();
+            if model.is_empty() || model.len() > MAX_MODEL_IDENTIFIER_BYTES {
+                return Err(AppError::BadRequest(
+                    "A model name is missing or too long.".into(),
+                ));
+            }
+            if !normalized_models
+                .iter()
+                .any(|existing: &ModelName| existing.as_str() == model)
+            {
+                normalized_models.push(ModelName::from(model));
+            }
+        }
+        if normalized_models.is_empty() || normalized_models.len() > MAX_MODELS_PER_CONNECTION {
+            return Err(AppError::BadRequest(format!(
+                "Each provider must enable between 1 and {MAX_MODELS_PER_CONNECTION} models."
+            )));
+        }
+
+        let api_key = api_key
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty());
+        if api_key
+            .as_ref()
+            .is_some_and(|key| key.len() > MAX_MODEL_API_KEY_BYTES)
+        {
+            return Err(AppError::BadRequest(
+                "The model API key is too long.".into(),
+            ));
+        }
+
+        Ok(Self {
+            provider: provider.into(),
+            api_key,
+            models: normalized_models,
+            is_default,
+        })
+    }
+}
 
 /// Everything one company write sets, so create and update cannot drift apart and so a caller
 /// cannot transpose two same-typed arguments in a seven-parameter list.
@@ -23,9 +103,6 @@ use crate::{
 pub struct CompanyWrite {
     pub name: String,
     pub slug: String,
-    pub api_key: Option<String>,
-    pub provider: Option<String>,
-    pub model: Option<String>,
     pub enable_llm_spam_guardrail: Option<bool>,
     pub memory_provider: Option<MemoryProviderKind>,
     /// The company's picture, already parsed as a URL a page may render.
@@ -43,15 +120,6 @@ impl CompanyWrite {
             return Err(AppError::Internal(
                 "Company name and slug cannot be empty.".into(),
             ));
-        }
-
-        for field in [&mut self.api_key, &mut self.provider, &mut self.model] {
-            if let Some(value) = field.as_mut() {
-                *value = value.trim().to_string();
-                if value.is_empty() {
-                    *field = None;
-                }
-            }
         }
 
         Ok(())
@@ -124,6 +192,31 @@ pub trait CompanyPersistence: Send + Sync {
         email: &str,
     ) -> AppResult<CompanyMembership>;
     async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>>;
+
+    /// Required rather than defaulted, like the two below it. A default returning an empty list
+    /// reads as "this company has configured no providers", which is a real state with real
+    /// consequences -- every agent stops resolving -- and no implementation should be able to
+    /// assert it by saying nothing.
+    async fn list_model_connections(
+        &self,
+        company_id: Uuid,
+    ) -> AppResult<Vec<CompanyModelConnection>>;
+
+    /// Credential-only read used immediately before a provider call. Never defaulted: `Ok(None)`
+    /// is a claim that the company holds no key for this provider, and a double that made that
+    /// claim by omission would send an unauthenticated call at a provider.
+    async fn model_api_key(
+        &self,
+        company_id: Uuid,
+        provider: &ModelProvider,
+    ) -> AppResult<Option<String>>;
+
+    async fn replace_model_connections_for_user(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        connections: Vec<CompanyModelConnectionWrite>,
+    ) -> AppResult<()>;
 }
 
 /// Resolve a company the caller owns.
@@ -191,6 +284,39 @@ pub struct CompanyUseCases {
 }
 
 impl CompanyUseCases {
+    pub fn validate_model_connections(
+        connections: &[CompanyModelConnectionWrite],
+    ) -> AppResult<()> {
+        if connections.len() > MAX_COMPANY_MODEL_CONNECTIONS {
+            return Err(AppError::BadRequest(format!(
+                "A company may configure at most {MAX_COMPANY_MODEL_CONNECTIONS} model providers."
+            )));
+        }
+        // A replace is wholesale, so an empty set is a request to delete every stored credential
+        // -- which reads to the caller as an ordinary save and leaves every agent unable to run.
+        // Clearing the last provider is not something a save is allowed to mean.
+        if connections.is_empty() {
+            return Err(AppError::BadRequest(
+                "A company must keep at least one model provider configured.".into(),
+            ));
+        }
+        if connections.iter().filter(|item| item.is_default).count() != 1 {
+            return Err(AppError::BadRequest(
+                "Exactly one configured model provider must be the company default.".into(),
+            ));
+        }
+        let mut providers = std::collections::HashSet::new();
+        if connections
+            .iter()
+            .any(|item| !providers.insert(item.provider.as_str()))
+        {
+            return Err(AppError::BadRequest(
+                "Each model provider may be configured only once.".into(),
+            ));
+        }
+        Ok(())
+    }
+
     pub fn new(persistence: Arc<dyn CompanyPersistence>) -> Self {
         Self { persistence }
     }
@@ -298,6 +424,28 @@ impl CompanyUseCases {
     pub async fn delete_company_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
         self.persistence.delete_for_user(user_id, id).await
     }
+
+    pub async fn list_model_connections(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<Vec<CompanyModelConnection>> {
+        owned_company(self.persistence.as_ref(), user_id, company_id).await?;
+        self.persistence.list_model_connections(company_id).await
+    }
+
+    pub async fn replace_model_connections(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        connections: Vec<CompanyModelConnectionWrite>,
+    ) -> AppResult<()> {
+        owned_company(self.persistence.as_ref(), user_id, company_id).await?;
+        Self::validate_model_connections(&connections)?;
+        self.persistence
+            .replace_model_connections_for_user(user_id, company_id, connections)
+            .await
+    }
 }
 
 #[cfg(test)]
@@ -321,9 +469,6 @@ mod tests {
                 user_id,
                 name: write.name,
                 slug: write.slug.into(),
-                api_key: write.api_key,
-                provider: write.provider,
-                model: write.model,
                 enable_llm_spam_guardrail: write.enable_llm_spam_guardrail,
                 avatar_url: write.avatar_url,
                 memory_provider: None,
@@ -398,9 +543,6 @@ mod tests {
 
             company.name = write.name;
             company.slug = write.slug.into();
-            company.api_key = write.api_key;
-            company.provider = write.provider;
-            company.model = write.model;
             company.enable_llm_spam_guardrail = write.enable_llm_spam_guardrail;
             company.avatar_url = write.avatar_url;
             Ok(company.clone())
@@ -422,6 +564,77 @@ mod tests {
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
         }
+
+        /// Model connections are not part of what these tests drive; a call here is a wiring mistake
+        /// rather than a state worth simulating.
+        async fn list_model_connections(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
+            unimplemented!("this double is not exercised on the model-connection path")
+        }
+
+        async fn model_api_key(
+            &self,
+            _company_id: Uuid,
+            _provider: &crate::entities::value_objects::ModelProvider,
+        ) -> AppResult<Option<String>> {
+            unimplemented!("this double is not exercised on the model-connection path")
+        }
+
+        async fn replace_model_connections_for_user(
+            &self,
+            _user_id: Uuid,
+            _company_id: Uuid,
+            _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
+        ) -> AppResult<()> {
+            unimplemented!("this double is not exercised on the model-connection path")
+        }
+    }
+
+    #[test]
+    fn a_wholesale_replace_never_means_delete_every_credential() {
+        // An empty set reaches the validator as an ordinary save -- a form whose provider rows
+        // were all left unset -- and would delete every stored key, leaving every agent in the
+        // company unable to resolve a provider. That is not something a save may mean.
+        let empty = CompanyUseCases::validate_model_connections(&[])
+            .expect_err("an empty replace is refused");
+        assert!(
+            empty
+                .to_string()
+                .contains("must keep at least one model provider"),
+            "unexpected error: {empty}"
+        );
+
+        let one = CompanyModelConnectionWrite::new(
+            "openai",
+            Some("key".into()),
+            vec!["gpt-4o".into()],
+            true,
+        )
+        .unwrap();
+        CompanyUseCases::validate_model_connections(std::slice::from_ref(&one))
+            .expect("a single default provider is a valid set");
+
+        let no_default = CompanyModelConnectionWrite::new(
+            "anthropic",
+            Some("key".into()),
+            vec!["claude-a".into()],
+            false,
+        )
+        .unwrap();
+        assert!(
+            CompanyUseCases::validate_model_connections(&[no_default.clone()]).is_err(),
+            "a set with no default has no answer for what an agent inherits"
+        );
+        assert!(
+            CompanyUseCases::validate_model_connections(&[one.clone(), one]).is_err(),
+            "a provider may only be configured once"
+        );
+        assert!(
+            CompanyUseCases::validate_model_connections(&[no_default]).is_err(),
+            "and still needs exactly one default"
+        );
     }
 
     #[tokio::test]
@@ -440,9 +653,6 @@ mod tests {
                 CompanyWrite {
                     name: "Acme Corp".to_string(),
                     slug: "acme-corp".to_string(),
-                    api_key: Some("key123".to_string()),
-                    provider: Some("google".to_string()),
-                    model: Some("gemini-2.5-flash".to_string()),
                     enable_llm_spam_guardrail: Some(true),
                     memory_provider: None,
                     avatar_url: Some(AvatarUrl::from("https://cdn.example.com/acme.png")),
@@ -452,9 +662,6 @@ mod tests {
             .unwrap();
         assert_eq!(company.name, "Acme Corp");
         assert_eq!(company.slug, "acme-corp");
-        assert_eq!(company.api_key.as_deref(), Some("key123"));
-        assert_eq!(company.provider.as_deref(), Some("google"));
-        assert_eq!(company.model.as_deref(), Some("gemini-2.5-flash"));
         assert_eq!(company.enable_llm_spam_guardrail, Some(true));
         assert_eq!(
             company.avatar_url,
@@ -500,9 +707,6 @@ mod tests {
             user_id: owner,
             name: "Acme".into(),
             slug: "acme".into(),
-            api_key: None,
-            provider: None,
-            model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
@@ -542,9 +746,6 @@ mod tests {
             user_id: owner,
             name: "Acme".into(),
             slug: "acme".into(),
-            api_key: None,
-            provider: None,
-            model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,

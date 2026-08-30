@@ -119,15 +119,21 @@ pub struct CompanySettingsPage<'a> {
 pub struct CompanyDraft<'a> {
     pub name: &'a str,
     pub slug: &'a str,
-    pub provider: &'a str,
-    pub model: &'a str,
-    pub api_key: &'a str,
     pub spam_guardrail: SpamGuardrail,
     /// The picture as the picker is holding it, blank for the letter bubble. Kept as the
     /// submitted text so a rejected save comes back showing what was picked -- see
     /// [`company_fields`], which is where it becomes an [`AvatarUrl`] again.
     pub avatar_url: &'a str,
     pub memory_provider: &'a str,
+    pub model_connections: Vec<CompanyModelConnectionDraft>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CompanyModelConnectionDraft {
+    pub provider: String,
+    pub models: String,
+    pub api_key: String,
+    pub is_default: bool,
 }
 
 impl Default for CompanyDraft<'_> {
@@ -135,12 +141,10 @@ impl Default for CompanyDraft<'_> {
         Self {
             name: "",
             slug: "",
-            provider: "",
-            model: "",
-            api_key: "",
             spam_guardrail: SpamGuardrail::ServerDefault,
             avatar_url: "",
             memory_provider: "",
+            model_connections: Vec::new(),
         }
     }
 }
@@ -148,6 +152,7 @@ impl Default for CompanyDraft<'_> {
 /// The settings pane for a company that already exists.
 pub struct CompanyEditPane<'a> {
     pub company: &'a Company,
+    pub model_connections: &'a [CompanyModelConnection],
     /// Domain the channel addresses are built on, e.g. `mailagents.com`.
     pub app_domain_name: &'a str,
     /// How much the company holds, for the summary above the form.
@@ -348,7 +353,7 @@ fn company_settings_body(
         );
     }
 
-    let stored = stored_draft(pane.company);
+    let stored = stored_draft(pane.company, pane.model_connections);
     let draft = pane.draft.unwrap_or(&stored);
     let company_id = pane.company.id;
 
@@ -462,23 +467,16 @@ fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
 
 /// Everything about a company except which URL its form submits to.
 fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProviders) -> String {
-    let overrides_open =
-        if draft.provider.is_empty() && draft.model.is_empty() && draft.api_key.is_empty() {
-            ""
-        } else {
-            " open"
-        };
+    let overrides_open = if draft.model_connections.is_empty() {
+        ""
+    } else {
+        " open"
+    };
 
     // Taken as text and parsed here rather than carried as a URL, so a tampered hidden field
     // cannot reach the `<img src>` the bubble draws.
     let picture = AvatarUrl::parse(draft.avatar_url).ok().flatten();
-    let model_connection_fields = model_connection_fields(&ModelConnectionFields {
-        agent_id_suffix: None,
-        provider: draft.provider,
-        model: draft.model,
-        api_key: draft.api_key,
-        api_key_placeholder: "Overrides the server key",
-    });
+    let company_model_connections = company_model_connections(draft);
 
     format!(
         r##"
@@ -514,10 +512,10 @@ fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProvide
                         <div class="label"><span class="text-[11px] opacity-60">Disabling suspends memory immediately but retains the provider connection and channel memory choices. Company deletion removes the remote memory. Hindsight extracts facts in the background, so a memory becomes recallable shortly after the reply rather than at once.</span></div>
                     </label>
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
-                        <summary class="collapse-title text-sm font-medium">Default model &amp; key</summary>
+                        <summary class="collapse-title text-sm font-medium">Model providers</summary>
                         <div class="collapse-content space-y-4">
-                            <p class="text-[11px] opacity-60">What every channel and agent in this company falls back to when it sets nothing of its own.</p>
-                            {model_connection_fields}
+                            <p class="text-[11px] opacity-60">Enable provider credentials and the models agents may select. Leave an existing API key blank to keep it. The default provider's first model is inherited by agents with no explicit selection.</p>
+                            {company_model_connections}
                         </div>
                     </details>
         "##,
@@ -540,6 +538,56 @@ fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProvide
         },
         memory_provider_options = memory_provider_options(draft.memory_provider, configured),
     )
+}
+
+fn company_model_connections(draft: &CompanyDraft<'_>) -> String {
+    let mut rows = draft.model_connections.clone();
+    if rows.len() < crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS {
+        rows.push(CompanyModelConnectionDraft {
+            is_default: rows.is_empty(),
+            ..CompanyModelConnectionDraft::default()
+        });
+    }
+    rows.into_iter()
+        .enumerate()
+        .map(|(index, connection)| {
+            let default_checked = if connection.is_default { " checked" } else { "" };
+            let key_placeholder = if connection.provider.is_empty() {
+                "Required for a new provider"
+            } else {
+                "Leave blank to keep the stored key"
+            };
+            format!(
+                r##"<fieldset class="rounded-box border border-base-300 p-3">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_2fr_2fr_auto]">
+                        <label class="form-control"><span class="text-xs opacity-70">Provider</span>
+                            <select name="connection_{index}_provider" class="select w-full font-mono text-sm">
+                                <option value="">Unused</option>
+                                {provider_options}
+                            </select>
+                        </label>
+                        <label class="form-control"><span class="text-xs opacity-70">Enabled models</span>
+                            <input name="connection_{index}_models" value="{models}" placeholder="model-a, model-b" class="input w-full font-mono text-sm">
+                        </label>
+                        <label class="form-control"><span class="text-xs opacity-70">API key</span>
+                            <input type="password" name="connection_{index}_api_key" value="{api_key}" placeholder="{key_placeholder}" autocomplete="new-password" class="input w-full font-mono text-sm">
+                        </label>
+                        <label class="label cursor-pointer gap-2 self-end pb-3"><input type="radio" name="default_model_provider" value="{index}" class="radio radio-sm"{default_checked}><span class="text-xs">Default</span></label>
+                    </div>
+                </fieldset>"##,
+                provider_options = ["google", "openai", "anthropic", "groq"]
+                    .into_iter()
+                    .map(|provider| format!(
+                        r#"<option value="{provider}"{}>{provider}</option>"#,
+                        if connection.provider == provider { " selected" } else { "" }
+                    ))
+                    .collect::<String>(),
+                models = escape_html_attr(&connection.models),
+                api_key = escape_html_attr(&connection.api_key),
+                key_placeholder = escape_html_attr(key_placeholder),
+            )
+        })
+        .collect()
 }
 
 /// One option per known provider, disabled unless this deployment can actually run it. Rendering
@@ -633,18 +681,32 @@ fn selected_attr(draft: SpamGuardrail, option: SpamGuardrail) -> &'static str {
 }
 
 /// A stored company as the form sees it.
-fn stored_draft(company: &Company) -> CompanyDraft<'_> {
+fn stored_draft<'a>(
+    company: &'a Company,
+    connections: &[CompanyModelConnection],
+) -> CompanyDraft<'a> {
     CompanyDraft {
         name: &company.name,
         slug: &company.slug,
-        provider: company.provider.as_deref().unwrap_or(""),
-        model: company.model.as_deref().unwrap_or(""),
-        api_key: company.api_key.as_deref().unwrap_or(""),
         spam_guardrail: SpamGuardrail::from_stored(company.enable_llm_spam_guardrail),
         avatar_url: company.avatar_url.as_deref().unwrap_or(""),
         memory_provider: company
             .memory_provider
             .map(MemoryProviderKind::as_str)
             .unwrap_or(""),
+        model_connections: connections
+            .iter()
+            .map(|connection| CompanyModelConnectionDraft {
+                provider: connection.provider.to_string(),
+                models: connection
+                    .models
+                    .iter()
+                    .map(ModelName::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                api_key: String::new(),
+                is_default: connection.is_default,
+            })
+            .collect(),
     }
 }

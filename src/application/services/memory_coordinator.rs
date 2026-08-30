@@ -11,8 +11,8 @@ use crate::{
         channel::Channel,
         company::Company,
         memory::{
-            MemoryPersistenceMode, MemoryScope, deduplicate_chunks, resolve_scopes,
-            stable_memory_id,
+            MemoryPersistenceMode, MemoryRecallMode, MemoryScope, deduplicate_chunks,
+            resolve_scopes, stable_memory_id,
         },
     },
     services::memory_provider::{
@@ -130,20 +130,23 @@ impl MemoryCoordinator {
         if additional_context.was_truncated() {
             self.record_truncation("recall", "additional_context");
         }
+        // Resolved once: the request's limit and the bound the reply is checked against have to
+        // be the same number, or the guard below polices a limit nobody asked for.
+        let recall_mode = input
+            .agent
+            .map_or_else(MemoryRecallMode::default, |agent| agent.memory_recall_mode);
+        let max_results = input.agent.map_or_else(
+            crate::entities::memory::default_memory_max_results,
+            |agent| agent.memory_max_results,
+        );
         let started = Instant::now();
         let recalled = provider
             .recall(
                 &database_id,
                 &query,
                 &resolution.resolved,
-                input.agent.map_or(
-                    crate::entities::memory::MemoryRecallMode::default(),
-                    |agent| agent.memory_recall_mode,
-                ),
-                input.agent.map_or_else(
-                    crate::entities::memory::default_memory_max_results,
-                    |agent| agent.memory_max_results,
-                ),
+                recall_mode,
+                max_results,
                 Some(&additional_context),
             )
             .await;
@@ -154,11 +157,7 @@ impl MemoryCoordinator {
         );
         let chunks = match recalled {
             Ok(chunks) => {
-                if chunks.len()
-                    > input.agent.map_or_else(
-                        crate::entities::memory::default_memory_max_results,
-                        |agent| agent.memory_max_results,
-                    ) as usize
+                if chunks.len() > max_results as usize
                     || chunks.len() > crate::entities::memory::MAX_MEMORY_RETURNED_ROWS
                 {
                     let error = crate::entities::memory::MemoryProviderError::TooManyResults;
@@ -559,9 +558,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Stale queued company".into(),
             slug: "stale-company".into(),
-            api_key: None,
-            provider: None,
-            model: None,
             enable_llm_spam_guardrail: None,
             memory_provider: Some(MemoryProviderKind::Hydradb),
             avatar_url: None,

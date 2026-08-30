@@ -74,6 +74,17 @@ impl ChannelWrite {
     /// Trim and lower-case the fields that have canonical forms, and drop the blanks. Runs once,
     /// in the use case, so every entry point stores the same shape.
     pub(crate) fn normalize(&mut self) -> AppResult<()> {
+        self.normalize_with(ActiveAgent::InWrite)
+    }
+
+    /// [`normalize`](Self::normalize), told where the position-0 agent is coming from.
+    ///
+    /// The distinction exists because a caller creating the channel and its agent in one
+    /// transaction has no agent id to put in `agent_ids` yet -- the write is still valid, the
+    /// assignment just arrives with it. Saying that in an argument keeps the rule in one place;
+    /// the alternative -- flipping `enabled` off around the call -- silently skips every future
+    /// `enabled`-dependent check as well as this one.
+    pub(crate) fn normalize_with(&mut self, active_agent: ActiveAgent) -> AppResult<()> {
         self.name = self.name.trim().to_string();
         self.slug = self.slug.trim().to_lowercase().replace(' ', "-");
 
@@ -97,7 +108,10 @@ impl ChannelWrite {
             });
         }
 
-        if self.enabled && self.agent_ids.as_ref().is_none_or(Vec::is_empty) {
+        if matches!(active_agent, ActiveAgent::InWrite)
+            && self.enabled
+            && self.agent_ids.as_ref().is_none_or(Vec::is_empty)
+        {
             return Err(AppError::BadRequest(
                 "An enabled channel must have an active agent at position 0.".into(),
             ));
@@ -135,6 +149,17 @@ impl ChannelWrite {
             .as_ref()
             .is_some_and(|emails| emails.iter().any(|e| e == PUBLIC_PARTICIPANT))
     }
+}
+
+/// Where a channel write's position-0 agent comes from, for [`ChannelWrite::normalize_with`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ActiveAgent {
+    /// `agent_ids` is the whole story: an enabled channel with none is rejected.
+    InWrite,
+    /// The caller creates the agent alongside the channel in one transaction, so an empty
+    /// `agent_ids` is not yet a missing agent. The database's deferred
+    /// `enabled_channel_active_agent_check` is what holds the invariant on this path.
+    SuppliedByCaller,
 }
 
 /// A channel belonging to another company is reported exactly like a missing one, so an id probe
@@ -248,12 +273,7 @@ impl ChannelUseCases {
         channel.created_by = Some(provenance);
         agent.normalize()?;
 
-        // The transaction supplies the new agent at position 0. Validate all other channel
-        // fields without pretending that a persisted assignment already exists.
-        let enabled = channel.enabled;
-        channel.enabled = false;
-        channel.normalize()?;
-        channel.enabled = enabled;
+        channel.normalize_with(ActiveAgent::SuppliedByCaller)?;
         self.check_spam_interlock(&channel, confirm_spam_disabled)?;
         self.check_memory_interlock(user_id, company_id, &channel)
             .await?;
@@ -1080,6 +1100,32 @@ mod tests {
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
         }
+
+        /// Model connections are not part of what these tests drive; a call here is a wiring mistake
+        /// rather than a state worth simulating.
+        async fn list_model_connections(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
+            unimplemented!("this double is not exercised on the model-connection path")
+        }
+
+        async fn model_api_key(
+            &self,
+            _company_id: Uuid,
+            _provider: &crate::entities::value_objects::ModelProvider,
+        ) -> AppResult<Option<String>> {
+            unimplemented!("this double is not exercised on the model-connection path")
+        }
+
+        async fn replace_model_connections_for_user(
+            &self,
+            _user_id: Uuid,
+            _company_id: Uuid,
+            _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
+        ) -> AppResult<()> {
+            unimplemented!("this double is not exercised on the model-connection path")
+        }
     }
 
     struct MockChannelPersistence {
@@ -1220,9 +1266,6 @@ mod tests {
             user_id: owner_id,
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            api_key: None,
-            provider: None,
-            model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
@@ -1325,9 +1368,6 @@ mod tests {
                 user_id: owner_id,
                 name: "Acme Corp".into(),
                 slug: "acme".into(),
-                api_key: None,
-                provider: None,
-                model: None,
                 enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,
@@ -1421,9 +1461,6 @@ mod tests {
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
-                api_key: None,
-                provider: None,
-                model: None,
                 enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,
@@ -1744,9 +1781,6 @@ mod tests {
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
-                api_key: None,
-                provider: None,
-                model: None,
                 enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,
@@ -1863,9 +1897,6 @@ mod tests {
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
-                api_key: None,
-                provider: None,
-                model: None,
                 enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,

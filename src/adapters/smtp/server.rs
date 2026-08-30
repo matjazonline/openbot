@@ -1062,6 +1062,32 @@ mod tests {
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
         }
+
+        /// This double never reaches a provider call: the tests around it assert on ingestion and
+        /// threading, and an agent run that gets this far fails at parameter resolution by design.
+        async fn list_model_connections(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
+            Ok(Vec::new())
+        }
+
+        async fn model_api_key(
+            &self,
+            _company_id: Uuid,
+            _provider: &crate::entities::value_objects::ModelProvider,
+        ) -> AppResult<Option<String>> {
+            Ok(None)
+        }
+
+        async fn replace_model_connections_for_user(
+            &self,
+            _user_id: Uuid,
+            _company_id: Uuid,
+            _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
+        ) -> AppResult<()> {
+            unimplemented!("this double is not exercised on the model-connection write path")
+        }
     }
 
     struct MockChannelPersistence {
@@ -1448,9 +1474,6 @@ mod tests {
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
-                api_key: None,
-                provider: None,
-                model: None,
                 enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,
@@ -1681,9 +1704,6 @@ regis";
                 user_id: Uuid::new_v4(),
                 name: "Populus Network".to_string(),
                 slug: "populus".into(),
-                api_key: None,
-                provider: None,
-                model: None,
                 enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,

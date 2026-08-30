@@ -129,9 +129,6 @@ CREATE TABLE companies (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     name TEXT NOT NULL,
     slug CITEXT NOT NULL UNIQUE,
-    api_key TEXT,
-    provider TEXT,
-    model TEXT,
     enable_llm_spam_guardrail BOOLEAN,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- A company gets a picture of its own, on the same terms as a user's or an agent's: an
@@ -154,6 +151,40 @@ CREATE TABLE companies (
 
 CREATE INDEX companies_user_created_idx
     ON companies (user_id, created_at DESC, id DESC);
+
+-- One credential per provider per company, plus the exact models that company's agents may
+-- select. Credentials live here and nowhere else: an agent picks a provider and a model, never a
+-- key, so a leaked agent or channel row carries nothing usable.
+CREATE TABLE company_model_connections (
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    -- Stored in the envelope form `enc:v1:<key version>:<ciphertext>`; the key version travels
+    -- inside the envelope, so there is no separate column to keep in step with it.
+    api_key TEXT NOT NULL,
+    models TEXT[] NOT NULL,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (company_id, provider),
+    CONSTRAINT company_model_connections_provider_check CHECK (
+        provider IN ('google', 'openai', 'anthropic', 'groq')
+        AND length(provider) <= 64
+    ),
+    CONSTRAINT company_model_connections_api_key_check CHECK (
+        btrim(api_key) <> '' AND octet_length(api_key) <= 16384
+    ),
+    CONSTRAINT company_model_connections_models_count_check CHECK (
+        cardinality(models) BETWEEN 1 AND 32
+    ),
+    CONSTRAINT company_model_connections_models_have_no_nulls CHECK (
+        array_position(models, NULL) IS NULL AND array_position(models, '') IS NULL
+    )
+);
+
+-- At most one default per company, so "which provider does an agent inherit" has one answer.
+CREATE UNIQUE INDEX company_model_connections_one_default_idx
+    ON company_model_connections (company_id)
+    WHERE is_default;
 
 CREATE TABLE company_invites (
     id UUID PRIMARY KEY,

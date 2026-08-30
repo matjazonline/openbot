@@ -174,6 +174,7 @@ async fn agents_page(
 
     let view = workspace.view(&company);
     let agents = view.agents().await?;
+    let model_connections = view.model_connections().await?;
     // Landing on `/ui/agents` with no `agent_id` opens the first agent rather than an empty pane,
     // so the workspace is never a blank screen when there is something to show.
     let selected = query
@@ -183,7 +184,7 @@ async fn agents_page(
 
     let creating = matches!(query.new.as_deref(), Some("1") | Some("true"));
     let pane_html = match (creating, selected) {
-        (true, _) => view.create_pane(&pages::AgentDraft::default(), None),
+        (true, _) => view.create_pane(&pages::AgentDraft::default(), None, &model_connections),
         (false, Some(agent)) => view.edit_pane(agent, None, None).await?,
         (false, None) => {
             pages::agent_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline)
@@ -209,8 +210,13 @@ async fn create_pane(
 ) -> AppResult<Html<String>> {
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company);
+    let model_connections = view.model_connections().await?;
 
-    Ok(Html(view.create_pane(&pages::AgentDraft::default(), None)))
+    Ok(Html(view.create_pane(
+        &pages::AgentDraft::default(),
+        None,
+        &model_connections,
+    )))
 }
 
 /// GET /ui/agents/{agent_id} - One agent's settings for the pane (Protected).
@@ -278,10 +284,14 @@ async fn create_agent(
 ) -> AppResult<Response> {
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company);
+    let model_connections = view.model_connections().await?;
     let submitted = SubmittedAgent::new(form);
 
     let rejected = |message: String| {
-        Ok(Html(view.create_pane(&submitted.draft(), Some(&message))).into_response())
+        Ok(
+            Html(view.create_pane(&submitted.draft(), Some(&message), &model_connections))
+                .into_response(),
+        )
     };
 
     let avatar_url = match &submitted.avatar_url {
@@ -444,6 +454,14 @@ struct AgentSettingsView<'a> {
 }
 
 impl AgentSettingsView<'_> {
+    async fn model_connections(
+        &self,
+    ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
+        self.agent_use_cases
+            .list_company_model_connections(self.user_id, self.company.id)
+            .await
+    }
+
     async fn agents(&self) -> AppResult<Vec<Agent>> {
         self.agent_use_cases
             .list_company_agents(self.user_id, self.company.id)
@@ -488,9 +506,15 @@ impl AgentSettingsView<'_> {
         }
     }
 
-    fn create_pane(&self, draft: &pages::AgentDraft<'_>, error: Option<&str>) -> String {
+    fn create_pane(
+        &self,
+        draft: &pages::AgentDraft<'_>,
+        error: Option<&str>,
+        model_connections: &[crate::entities::company::CompanyModelConnection],
+    ) -> String {
         pages::agent_create_pane(&pages::AgentCreatePane {
             company: self.company,
+            model_connections,
             draft,
             error,
         })
@@ -504,9 +528,11 @@ impl AgentSettingsView<'_> {
     ) -> AppResult<String> {
         let used_by = self.used_by(agent.id).await?;
         let used_by: Vec<&Channel> = used_by.iter().collect();
+        let model_connections = self.model_connections().await?;
 
         Ok(pages::agent_edit_pane(&pages::AgentEditPane {
             company: self.company,
+            model_connections: &model_connections,
             agent,
             used_by: &used_by,
             draft,

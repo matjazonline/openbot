@@ -158,9 +158,6 @@ pub fn company_row_fragment(company: &Company) -> String {
 }
 
 pub fn company_edit_fragment(company: &Company, configured: &ConfiguredMemoryProviders) -> String {
-    let api_key_val = company.api_key.as_deref().unwrap_or("");
-    let provider_val = company.provider.as_deref().unwrap_or("");
-    let model_val = company.model.as_deref().unwrap_or("");
     let memory_disabled_selected = if company.memory_provider.is_none() {
         "selected"
     } else {
@@ -173,7 +170,7 @@ pub fn company_edit_fragment(company: &Company, configured: &ConfiguredMemoryPro
             <!-- A save sets every column, so the picture -- which is picked in `/ui`, not here --
                  rides along rather than being cleared by a rename. -->
             <input type="hidden" name="avatar_url" value="{avatar_url}">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Company Name</label>
                     <input type="text" name="name" value="{name}" required
@@ -184,26 +181,6 @@ pub fn company_edit_fragment(company: &Company, configured: &ConfiguredMemoryPro
                     <label class="block text-xs font-medium text-slate-300 mb-1">Slug (Indexed)</label>
                     <input type="text" name="slug" value="{slug}" required
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional)</label>
-                    <input type="password" name="api_key" value="{api_key}"
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                        placeholder="AIzaSy... / sk-...">
-                </div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional)</label>
-                    <input type="text" name="provider" value="{provider}"
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        placeholder="e.g. google, openai">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional)</label>
-                    <input type="text" name="model" value="{model}"
-                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                        placeholder="e.g. gemini-2.5-flash">
                 </div>
             </div>
             <div>
@@ -229,9 +206,6 @@ pub fn company_edit_fragment(company: &Company, configured: &ConfiguredMemoryPro
         id = company.id,
         name = escape_html_attr(&company.name),
         slug = escape_html_attr(&company.slug),
-        api_key = escape_html_attr(api_key_val),
-        provider = escape_html_attr(provider_val),
-        model = escape_html_attr(model_val),
         avatar_url = escape_html_attr(company.avatar_url.as_deref().unwrap_or("")),
         memory_disabled_selected = memory_disabled_selected,
         memory_provider_options = memory_provider_options(

@@ -12,7 +12,7 @@ use crate::entities::{
     agent::Agent,
     approval::{ApprovalStatus, HumanApproval},
     channel::Channel,
-    company::Company,
+    company::{Company, CompanyModelConnection},
     company_invite::CompanyInvite,
     company_member::{CompanyAccessRole, CompanyMember, CompanyMembership},
     memory::{
@@ -27,7 +27,7 @@ use crate::entities::{
     },
     thread::Thread,
     user::User,
-    value_objects::{AvatarUrl, EmailAddress},
+    value_objects::{AvatarUrl, EmailAddress, ModelName},
 };
 use crate::services::memory_provider::ConfiguredMemoryProviders;
 use crate::use_cases::{

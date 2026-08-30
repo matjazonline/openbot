@@ -6,6 +6,7 @@ use crate::entities::company::Company;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::message::{Message, MessageRole};
 use crate::entities::task::TokenUsage;
+use crate::entities::value_objects::{ModelName, ModelProvider};
 use crate::services::agent_channel_tool::{
     AgentChannelProvisioning, AgentChannelToolContext, CreateAgentChannelTool,
 };
@@ -257,9 +258,34 @@ pub struct ResolvedAgentParams {
 }
 
 impl ResolvedAgentParams {
+    #[cfg(test)]
+    fn new(company: Option<&Company>, agent: Option<&AgentEntity>) -> anyhow::Result<Self> {
+        let provider = ModelProvider::canonical(
+            agent
+                .and_then(|agent| agent.provider.as_deref())
+                .unwrap_or("google"),
+        );
+        let model = ModelName::canonical(
+            agent
+                .and_then(|agent| agent.model.as_deref())
+                .unwrap_or("gemini-2.5-flash"),
+        );
+        Self::from_connection(company, agent, &provider, &model, "company-api-key")
+    }
+
     /// Resolve executable agent settings. Credentials always come from the company's encrypted
     /// model connection; an agent may select a model only for that same provider.
-    pub fn new(company: Option<&Company>, agent: Option<&AgentEntity>) -> anyhow::Result<Self> {
+    ///
+    /// `provider` and `model` are newtypes rather than two adjacent `&str`: they are the pair
+    /// `src/AGENTS.md` names as the classic argument-swap bug, and swapping them here would send
+    /// a model name to a provider lookup with a real credential attached.
+    fn from_connection(
+        company: Option<&Company>,
+        agent: Option<&AgentEntity>,
+        provider: &ModelProvider,
+        model: &ModelName,
+        api_key: &str,
+    ) -> anyhow::Result<Self> {
         let mut config = base_agent_config();
 
         if let Some(agent_cfg) = agent.and_then(|a| a.config_json.as_ref()) {
@@ -270,24 +296,9 @@ impl ResolvedAgentParams {
             }
         }
 
-        let company_provider = company
-            .and_then(|c| c.provider.as_deref())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_lowercase)
-            .ok_or_else(|| anyhow::anyhow!("Company model connection provider is missing"))?;
-        let provider = agent
-            .and_then(|a| a.provider.as_deref())
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(str::to_lowercase)
-            .unwrap_or_else(|| company_provider.clone());
-
-        if provider != company_provider {
-            anyhow::bail!(
-                "Agent provider '{provider}' does not match company model connection provider '{company_provider}'"
-            );
-        }
+        // Already folded by `ModelProvider::canonical`; this only re-reads it as a `String` for
+        // the config payload below.
+        let provider = provider.as_str().to_string();
 
         if !matches!(
             provider.as_str(),
@@ -299,22 +310,12 @@ impl ResolvedAgentParams {
             );
         }
 
-        let model = agent
-            .and_then(|a| a.model.as_deref())
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .or_else(|| {
-                company
-                    .and_then(|c| c.model.as_deref())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-            })
-            .map(|s| s.to_string())
+        let model = Some(model.as_str())
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
             .ok_or_else(|| anyhow::anyhow!("Agent model is missing"))?;
 
-        let api_key = company
-            .and_then(|c| c.api_key.as_deref())
-            .map(str::trim)
+        let api_key = Some(api_key.trim())
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string())
             .ok_or_else(|| {
@@ -366,6 +367,46 @@ impl ResolvedAgentParams {
     pub fn into_tuple(self) -> (String, String, String, serde_json::Value) {
         (self.provider, self.model, self.api_key, self.config)
     }
+}
+
+/// Load exactly the credential selected by this agent, then discard the persistence boundary
+/// before constructing the provider configuration.
+pub async fn resolve_agent_params(
+    persistence: &dyn crate::use_cases::company::CompanyPersistence,
+    company: &Company,
+    agent: Option<&AgentEntity>,
+) -> anyhow::Result<ResolvedAgentParams> {
+    let connections = persistence.list_model_connections(company.id).await?;
+    let default = connections
+        .iter()
+        .find(|connection| connection.is_default)
+        .ok_or_else(|| anyhow::anyhow!("Company default model connection is missing"))?;
+    let provider = ModelProvider::canonical(
+        agent
+            .and_then(|agent| agent.provider.as_deref())
+            .unwrap_or(default.provider.as_str()),
+    );
+    let connection = connections
+        .iter()
+        .find(|connection| connection.provider == provider)
+        .ok_or_else(|| anyhow::anyhow!("Provider '{provider}' is not enabled for this company"))?;
+    let model = ModelName::canonical(
+        agent
+            .and_then(|agent| agent.model.as_deref())
+            .or_else(|| connection.models.first().map(|model| model.as_str()))
+            .ok_or_else(|| anyhow::anyhow!("Provider '{provider}' has no enabled models"))?,
+    );
+    if !connection.models.contains(&model) {
+        anyhow::bail!("Model '{model}' is not enabled for provider '{provider}' in this company");
+    }
+    let api_key = persistence.model_api_key(company.id, &provider).await?;
+    ResolvedAgentParams::from_connection(
+        Some(company),
+        agent,
+        &provider,
+        &model,
+        api_key.as_deref().unwrap_or_default(),
+    )
 }
 
 fn append_base_context_prompt(config: &mut serde_json::Value) {
@@ -1428,10 +1469,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_runner_returns_error_when_provider_missing() -> anyhow::Result<()> {
-        let result = ResolvedAgentParams::new(None, None);
+        let result = ResolvedAgentParams::from_connection(
+            None,
+            None,
+            &ModelProvider::canonical(""),
+            &ModelName::canonical("model"),
+            "key",
+        );
         assert!(result.is_err());
         let err_str = result.unwrap_err().to_string();
-        assert!(err_str.contains("Company model connection provider is missing"));
+        assert!(err_str.contains("Unsupported agent provider"));
         Ok(())
     }
 
@@ -1442,15 +1489,18 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
             slug: "test".into(),
-            api_key: Some("key".to_string()),
-            provider: Some("google".to_string()),
-            model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: chrono::Utc::now(),
         };
-        let result = ResolvedAgentParams::new(Some(&company), None);
+        let result = ResolvedAgentParams::from_connection(
+            Some(&company),
+            None,
+            &ModelProvider::canonical("google"),
+            &ModelName::canonical(""),
+            "key",
+        );
         assert!(result.is_err());
         let err_str = result.unwrap_err().to_string();
         assert!(err_str.contains("Agent model is missing"));
@@ -1464,15 +1514,18 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
             slug: "test".into(),
-            api_key: None,
-            provider: Some("google".to_string()),
-            model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: chrono::Utc::now(),
         };
-        let result = ResolvedAgentParams::new(Some(&company), None);
+        let result = ResolvedAgentParams::from_connection(
+            Some(&company),
+            None,
+            &ModelProvider::canonical("google"),
+            &ModelName::canonical("gemini-2.5-flash"),
+            "",
+        );
         assert!(result.is_err());
         let err_str = result.unwrap_err().to_string();
         assert!(err_str.contains("API key is missing"));
@@ -1486,9 +1539,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
             slug: "test".into(),
-            api_key: Some("runtime_key".to_string()),
-            provider: Some("openai".to_string()),
-            model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
@@ -1507,9 +1557,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
             slug: "test".into(),
-            api_key: Some("fake_key_123".to_string()),
-            provider: Some("google".to_string()),
-            model: Some("invalid-custom-model-xyz".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
@@ -1565,9 +1612,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            api_key: Some("company-api-key".to_string()),
-            provider: Some("google".to_string()),
-            model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
@@ -1595,6 +1639,262 @@ mod tests {
         assert_eq!(resolved.config(), &expected);
     }
 
+    /// A company whose model connections and stored credential are stated outright, so each test
+    /// below says exactly which of them it is exercising.
+    struct StubCompanyPersistence {
+        connections: Vec<crate::entities::company::CompanyModelConnection>,
+        api_key: Option<String>,
+    }
+
+    impl StubCompanyPersistence {
+        fn with(connections: Vec<crate::entities::company::CompanyModelConnection>) -> Self {
+            Self {
+                connections,
+                api_key: Some("stored-company-key".into()),
+            }
+        }
+    }
+
+    fn connection(
+        provider: &str,
+        models: &[&str],
+        is_default: bool,
+    ) -> crate::entities::company::CompanyModelConnection {
+        crate::entities::company::CompanyModelConnection {
+            provider: ModelProvider::canonical(provider),
+            models: models.iter().map(ModelName::canonical).collect(),
+            is_default,
+            has_api_key: true,
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl crate::use_cases::company::CompanyPersistence for StubCompanyPersistence {
+        async fn create(
+            &self,
+            _user_id: Uuid,
+            _write: crate::use_cases::company::CompanyWrite,
+        ) -> crate::app_error::AppResult<Company> {
+            unimplemented!()
+        }
+        async fn get_by_id(&self, _id: Uuid) -> crate::app_error::AppResult<Option<Company>> {
+            unimplemented!()
+        }
+        async fn get_by_slug(&self, _slug: &str) -> crate::app_error::AppResult<Option<Company>> {
+            unimplemented!()
+        }
+        async fn list_by_user_id(
+            &self,
+            _user_id: Uuid,
+        ) -> crate::app_error::AppResult<Vec<Company>> {
+            unimplemented!()
+        }
+        async fn update(
+            &self,
+            _id: Uuid,
+            _write: crate::use_cases::company::CompanyWrite,
+        ) -> crate::app_error::AppResult<Company> {
+            unimplemented!()
+        }
+        async fn delete(&self, _id: Uuid) -> crate::app_error::AppResult<()> {
+            unimplemented!()
+        }
+        async fn update_for_user(
+            &self,
+            _user_id: Uuid,
+            _id: Uuid,
+            _write: crate::use_cases::company::CompanyWrite,
+        ) -> crate::app_error::AppResult<Company> {
+            unimplemented!()
+        }
+        async fn delete_for_user(
+            &self,
+            _user_id: Uuid,
+            _id: Uuid,
+        ) -> crate::app_error::AppResult<()> {
+            unimplemented!()
+        }
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> crate::app_error::AppResult<crate::entities::company_member::CompanyMembership>
+        {
+            unimplemented!()
+        }
+        async fn list_company_team_emails(
+            &self,
+            _company_id: Uuid,
+        ) -> crate::app_error::AppResult<Vec<String>> {
+            unimplemented!()
+        }
+        async fn list_model_connections(
+            &self,
+            _company_id: Uuid,
+        ) -> crate::app_error::AppResult<Vec<crate::entities::company::CompanyModelConnection>>
+        {
+            Ok(self.connections.clone())
+        }
+        async fn model_api_key(
+            &self,
+            _company_id: Uuid,
+            _provider: &ModelProvider,
+        ) -> crate::app_error::AppResult<Option<String>> {
+            Ok(self.api_key.clone())
+        }
+        async fn replace_model_connections_for_user(
+            &self,
+            _user_id: Uuid,
+            _company_id: Uuid,
+            _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
+        ) -> crate::app_error::AppResult<()> {
+            unimplemented!()
+        }
+    }
+
+    fn agent_selecting(provider: Option<&str>, model: Option<&str>) -> AgentEntity {
+        AgentEntity {
+            id: Uuid::new_v4(),
+            company_id: None,
+            name: "Selector".into(),
+            slug: "selector".into(),
+            provider: provider.map(str::to_string),
+            model: model.map(str::to_string),
+            run_timeout_secs: None,
+            system_prompt: Some("Answer the question.".into()),
+            description: None,
+            config_json: None,
+            memory_persistence_mode: Default::default(),
+            memory_recall_mode: Default::default(),
+            memory_max_results: crate::entities::memory::default_memory_max_results(),
+            avatar_url: None,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    fn resolving_company() -> Company {
+        Company {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".into(),
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn an_agent_that_selects_nothing_inherits_the_default_connection_and_its_first_model() {
+        let persistence = StubCompanyPersistence::with(vec![
+            connection("anthropic", &["claude-a"], false),
+            connection("openai", &["gpt-first", "gpt-second"], true),
+        ]);
+        let company = resolving_company();
+
+        let resolved = resolve_agent_params(&persistence, &company, None)
+            .await
+            .expect("the default connection resolves");
+
+        assert_eq!(resolved.provider(), "openai");
+        assert_eq!(resolved.model(), "gpt-first");
+        // The credential comes from the company's stored connection, never from the agent.
+        assert_eq!(resolved.api_key(), "stored-company-key");
+    }
+
+    #[tokio::test]
+    async fn a_company_with_no_default_connection_cannot_resolve_an_agent() {
+        let persistence =
+            StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], false)]);
+
+        let error = resolve_agent_params(&persistence, &resolving_company(), None)
+            .await
+            .expect_err("a company with no default cannot run an agent");
+
+        assert!(
+            error
+                .to_string()
+                .contains("Company default model connection is missing"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_agent_cannot_select_a_provider_its_company_has_not_enabled() {
+        let persistence =
+            StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], true)]);
+        let agent = agent_selecting(Some("anthropic"), Some("claude-a"));
+
+        let error = resolve_agent_params(&persistence, &resolving_company(), Some(&agent))
+            .await
+            .expect_err("a provider the company never configured is not usable");
+
+        assert!(
+            error
+                .to_string()
+                .contains("Provider 'anthropic' is not enabled for this company"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_agent_cannot_select_a_model_outside_its_providers_allow_list() {
+        let persistence =
+            StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], true)]);
+        let agent = agent_selecting(Some("openai"), Some("gpt-unlisted"));
+
+        let error = resolve_agent_params(&persistence, &resolving_company(), Some(&agent))
+            .await
+            .expect_err("the allow-list is the whole set of models an agent may pick");
+
+        assert!(
+            error.to_string().contains(
+                "Model 'gpt-unlisted' is not enabled for provider 'openai' in this company"
+            ),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn provider_selection_folds_case_while_model_selection_does_not() {
+        let persistence =
+            StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], true)]);
+        let company = resolving_company();
+
+        let shouting = agent_selecting(Some("OpenAI"), Some("gpt-first"));
+        let resolved = resolve_agent_params(&persistence, &company, Some(&shouting))
+            .await
+            .expect("providers are matched case-insensitively");
+        assert_eq!(resolved.provider(), "openai");
+
+        // Model ids are provider-assigned and case-sensitive, so this one is genuinely absent.
+        let miscased = agent_selecting(Some("openai"), Some("GPT-First"));
+        assert!(
+            resolve_agent_params(&persistence, &company, Some(&miscased))
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_connection_without_a_stored_credential_refuses_to_build_provider_params() {
+        let persistence = StubCompanyPersistence {
+            api_key: None,
+            ..StubCompanyPersistence::with(vec![connection("openai", &["gpt-first"], true)])
+        };
+
+        let error = resolve_agent_params(&persistence, &resolving_company(), None)
+            .await
+            .expect_err("no credential means no provider call");
+
+        assert!(
+            error.to_string().contains("API key is missing"),
+            "unexpected error: {error}"
+        );
+    }
+
     #[test]
     fn test_resolve_agent_params_validates_provider() {
         let company = Company {
@@ -1602,26 +1902,33 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            api_key: Some("company-key".to_string()),
-            provider: Some("unsupported_provider".to_string()),
-            model: Some("some-model".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
             created_at: chrono::Utc::now(),
         };
 
-        let err = ResolvedAgentParams::new(Some(&company), None).unwrap_err();
+        let err = ResolvedAgentParams::from_connection(
+            Some(&company),
+            None,
+            &ModelProvider::canonical("unsupported_provider"),
+            &ModelName::canonical("model"),
+            "key",
+        )
+        .unwrap_err();
         assert!(
             err.to_string()
                 .contains("Unsupported agent provider 'unsupported_provider'")
         );
 
-        let company_groq = Company {
-            provider: Some("groq".to_string()),
-            ..company
-        };
-        let resolved = ResolvedAgentParams::new(Some(&company_groq), None).unwrap();
+        let resolved = ResolvedAgentParams::from_connection(
+            Some(&company),
+            None,
+            &ModelProvider::canonical("groq"),
+            &ModelName::canonical("llama-3.3-70b-versatile"),
+            "key",
+        )
+        .unwrap();
         assert_eq!(resolved.provider(), "groq");
     }
 
@@ -1632,9 +1939,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            api_key: Some("company-key".to_string()),
-            provider: Some("openai".to_string()),
-            model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
@@ -1669,12 +1973,8 @@ mod tests {
 
         let mut mismatched = agent;
         mismatched.provider = Some("anthropic".into());
-        let error = ResolvedAgentParams::new(Some(&company), Some(&mismatched)).unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("does not match company model connection")
-        );
+        let resolved = ResolvedAgentParams::new(Some(&company), Some(&mismatched)).unwrap();
+        assert_eq!(resolved.provider(), "anthropic");
     }
 
     #[test]
@@ -1684,9 +1984,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
-            api_key: Some("company-key".to_string()),
-            provider: Some("openai".to_string()),
-            model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
@@ -2206,9 +2503,6 @@ system_prompt: Hello
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
             slug: "test".into(),
-            api_key: Some("key".to_string()),
-            provider: Some("openai".to_string()),
-            model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,

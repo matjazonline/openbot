@@ -193,30 +193,17 @@ pub struct LlmInfo {
     pub api_key_status: String,
 }
 
-const DEFAULT_PROVIDER_LABEL: &str = "google (default)";
-const DEFAULT_MODEL_LABEL: &str = "gemini-2.5-flash (default)";
-
 /// Resolve the effective provider, model and key source for a channel.
 ///
 /// Settings cascade channel → company → the channel's own `llm` config block, so this reports what
 /// a run would really use rather than what any single record says.
 pub fn resolve_llm_info(_channel: Option<&Channel>, company: Option<&Company>) -> LlmInfo {
     match company {
-        Some(company) => LlmInfo {
-            provider: company
-                .provider
-                .as_deref()
-                .unwrap_or(DEFAULT_PROVIDER_LABEL)
+        Some(_) => LlmInfo {
+            provider: "Selected by agent".to_string(),
+            model: "Selected by agent".to_string(),
+            api_key_status: "<span class=\"text-slate-400\">Managed in company settings</span>"
                 .to_string(),
-            model: company
-                .model
-                .as_deref()
-                .unwrap_or(DEFAULT_MODEL_LABEL)
-                .to_string(),
-            api_key_status: match non_blank(company.api_key.as_deref()) {
-                Some(_) => configured_badge("Company"),
-                None => missing_badge(),
-            },
         },
         None => LlmInfo {
             provider: "N/A".to_string(),
@@ -224,21 +211,6 @@ pub fn resolve_llm_info(_channel: Option<&Channel>, company: Option<&Company>) -
             api_key_status: "<span class=\"text-slate-400\">Unknown</span>".to_string(),
         },
     }
-}
-
-fn configured_badge(source: &str) -> String {
-    format!("<span class=\"text-emerald-400 font-bold\">Configured ({source})</span>")
-}
-
-fn missing_badge() -> String {
-    format!(
-        r##"<span class="inline-flex items-center gap-1.5 text-rose-400 font-bold">{glyph} Missing / Unset</span>"##,
-        glyph = icon(Icon::Alert, BUTTON_ICON),
-    )
-}
-
-fn non_blank(value: Option<&str>) -> Option<&str> {
-    value.filter(|value| !value.trim().is_empty())
 }
 
 pub fn channel_simulation_failure_fragment(
@@ -883,13 +855,10 @@ pub(crate) fn simulate_reply_form(fields: &ReplyFormFields<'_>) -> String {
 
 /// The channel configuration an agent reply would have used, for messages with no recorded task.
 pub(crate) fn resolved_agent_config(
-    company: Option<&Company>,
+    _company: Option<&Company>,
     _channel: Option<&Channel>,
 ) -> serde_json::Value {
-    crate::services::agent_runner::ResolvedAgentParams::new(company, None)
-        .map(|p| p.config().clone())
-        .ok()
-        .unwrap_or_else(|| serde_json::json!({}))
+    crate::services::agent_runner::base_agent_config()
 }
 
 /// Wrap a simulated thread view in its own live connection.

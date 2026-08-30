@@ -76,6 +76,7 @@ pub struct AgentDraft<'a> {
 /// The settings pane for an agent that already exists.
 pub struct AgentEditPane<'a> {
     pub company: &'a Company,
+    pub model_connections: &'a [CompanyModelConnection],
     pub agent: &'a Agent,
     /// The channels currently running this agent — nothing stops one being deleted out from
     /// under them, so the pane has to say who would notice.
@@ -88,6 +89,7 @@ pub struct AgentEditPane<'a> {
 /// The pane for an agent that does not exist yet.
 pub struct AgentCreatePane<'a> {
     pub company: &'a Company,
+    pub model_connections: &'a [CompanyModelConnection],
     pub draft: &'a AgentDraft<'a>,
     pub error: Option<&'a str>,
 }
@@ -270,6 +272,7 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
             scope: AgentFormScope::Company(company_id),
             agent_id: Some(agent_id),
             draft,
+            model_connections: pane.model_connections,
         }),
     )
 }
@@ -356,6 +359,7 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
             scope: AgentFormScope::Company(pane.company.id),
             agent_id: None,
             draft: pane.draft,
+            model_connections: pane.model_connections,
         }),
     )
 }
@@ -367,6 +371,7 @@ struct AgentFields<'a> {
     /// the create pane's two forms do not collide.
     agent_id: Option<Uuid>,
     draft: &'a AgentDraft<'a>,
+    model_connections: &'a [CompanyModelConnection],
 }
 
 #[derive(Clone, Copy)]
@@ -380,6 +385,7 @@ pub fn library_agent_fields(draft: &AgentDraft<'_>, agent_id: Option<Uuid>) -> S
         scope: AgentFormScope::Library,
         agent_id,
         draft,
+        model_connections: &[],
     })
 }
 
@@ -403,17 +409,21 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         AgentFormScope::Company(_) => "Shown to other agents in this company",
         AgentFormScope::Library => "Shown to agents in companies that select it",
     };
-    let model_connection_fields = format!(
-        r##"
+    let model_connection_fields = if matches!(fields.scope, AgentFormScope::Library) {
+        format!(
+            r##"
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Provider</span></div>
                 <input id="agent-provider-{id_prefix}" name="provider" value="{provider}" class="input w-full" placeholder="Inherit company provider"></label>
             <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Model</span></div>
                 <input id="agent-model-{id_prefix}" name="model" value="{model}" class="input w-full" placeholder="Inherit company model"></label>
         </div>"##,
-        provider = escape_html_attr(draft.provider),
-        model = escape_html_attr(draft.model),
-    );
+            provider = escape_html_attr(draft.provider),
+            model = escape_html_attr(draft.model),
+        )
+    } else {
+        company_model_selection(fields.model_connections, draft, &id_prefix)
+    };
     let run_timeout_value = draft
         .run_timeout_secs
         .map(|seconds| seconds.to_string())
@@ -522,6 +532,66 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
             ""
         },
         memory_max_results = draft.memory_max_results,
+    )
+}
+
+fn company_model_selection(
+    connections: &[CompanyModelConnection],
+    draft: &AgentDraft<'_>,
+    id_prefix: &str,
+) -> String {
+    let provider_options: String = connections
+        .iter()
+        .map(|connection| {
+            format!(
+                r#"<option value="{provider}"{selected}>{provider}{default}</option>"#,
+                provider = escape_html_attr(connection.provider.as_str()),
+                selected = if connection.provider.as_str() == draft.provider {
+                    " selected"
+                } else {
+                    ""
+                },
+                default = if connection.is_default {
+                    " (default)"
+                } else {
+                    ""
+                },
+            )
+        })
+        .collect();
+    let model_options: String = connections
+        .iter()
+        .flat_map(|connection| {
+            connection.models.iter().map(move |model| {
+                format!(
+                    r#"<option value="{model}" data-provider="{provider}"{selected}>{provider} / {model}</option>"#,
+                    provider = escape_html_attr(connection.provider.as_str()),
+                    model = escape_html_attr(model.as_str()),
+                    selected = if connection.provider.as_str() == draft.provider
+                        && model.as_str() == draft.model
+                    {
+                        " selected"
+                    } else {
+                        ""
+                    },
+                )
+            })
+        })
+        .collect();
+    format!(
+        r##"<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Provider</span></div>
+                <select id="agent-provider-{id_prefix}" name="provider" class="select w-full font-mono text-sm">
+                    <option value="">Inherit company default</option>{provider_options}
+                </select>
+            </label>
+            <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Model</span></div>
+                <select id="agent-model-{id_prefix}" name="model" class="select w-full font-mono text-sm">
+                    <option value="">Inherit company default</option>{model_options}
+                </select>
+                <div class="label"><span class="text-[11px] opacity-60">Select a model belonging to the provider; invalid pairs are refused on save.</span></div>
+            </label>
+        </div>"##
     )
 }
 

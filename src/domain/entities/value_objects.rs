@@ -97,6 +97,31 @@ macro_rules! string_newtype {
 // A company's URL slug, e.g. the `acme` in `support@acme.mailagents.com`.
 string_newtype!(CompanySlug);
 
+// A model vendor selected independently from the model name it offers.
+string_newtype!(ModelProvider);
+
+impl ModelProvider {
+    /// Providers are matched case-insensitively wherever they are compared, so the fold happens
+    /// once, here. Scattering `trim().to_ascii_lowercase()` across call sites is how the two
+    /// halves of a comparison drift apart.
+    pub fn canonical(value: impl AsRef<str>) -> Self {
+        Self(value.as_ref().trim().to_ascii_lowercase())
+    }
+}
+
+// One provider-specific model identifier. Kept distinct from `ModelProvider` because the two are
+// submitted and persisted beside each other throughout model-connection configuration.
+string_newtype!(ModelName);
+
+impl ModelName {
+    /// Trims but does not fold case: model identifiers are assigned by the provider and are
+    /// case-sensitive (`gpt-4o` is not `GPT-4o`). The asymmetry with [`ModelProvider::canonical`]
+    /// is deliberate, and stating it once here is what stops each comparison re-deciding it.
+    pub fn canonical(value: impl AsRef<str>) -> Self {
+        Self(value.as_ref().trim().to_string())
+    }
+}
+
 // A channel's URL slug, e.g. the `support` in `support@acme.mailagents.com`.
 string_newtype!(ChannelSlug);
 

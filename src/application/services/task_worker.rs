@@ -30,7 +30,7 @@ use crate::{
     },
     infra::config::AppConfig,
     services::{
-        agent_runner::{AgentRunner, ResolvedAgentParams},
+        agent_runner::{AgentRunner, resolve_agent_params},
         memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
         outbound_dispatcher::{OutboundEmail, agent_response_email_body},
         runtime_metrics::ActiveTaskExecutions,
@@ -1219,8 +1219,15 @@ impl TaskWorker {
             .await
             .map_err(|e| e.to_string())?;
 
-        let params = ResolvedAgentParams::new(Some(&context.company), Some(&context.agent))
-            .map_err(|e| format!("Failed to resolve agent parameters: {e}"))?;
+        // Box the provider-facing credential read at this deep worker seam; see the async stack
+        // budget rule in `src/AGENTS.md`.
+        let params = Box::pin(resolve_agent_params(
+            self.thread_use_cases.company_persistence().as_ref(),
+            &context.company,
+            Some(&context.agent),
+        ))
+        .await
+        .map_err(|e| format!("Failed to resolve agent parameters: {e}"))?;
 
         let mut prompt = payload.prompt.clone();
         if let Some(memory) = self.thread_use_cases.memory_coordinator()
@@ -1650,6 +1657,37 @@ mod tests {
         }
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
+        }
+
+        async fn list_model_connections(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
+            Ok(vec![crate::entities::company::CompanyModelConnection {
+                provider: "google".into(),
+                models: vec!["gemini-2.5-flash".into()],
+                is_default: true,
+                has_api_key: false,
+            }])
+        }
+
+        /// Matches the `has_api_key: false` above: the connection exists, the credential does not, so
+        /// a run reaching this point fails at parameter resolution instead of calling a provider.
+        async fn model_api_key(
+            &self,
+            _company_id: Uuid,
+            _provider: &crate::entities::value_objects::ModelProvider,
+        ) -> AppResult<Option<String>> {
+            Ok(None)
+        }
+
+        async fn replace_model_connections_for_user(
+            &self,
+            _user_id: Uuid,
+            _company_id: Uuid,
+            _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
+        ) -> AppResult<()> {
+            unimplemented!("the worker never writes model connections")
         }
     }
 
@@ -2556,9 +2594,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test Corp".to_string(),
             slug: "test".into(),
-            api_key: None,
-            provider: Some("google".to_string()),
-            model: Some("gemini-2.5-flash".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
@@ -2737,9 +2772,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test Company".to_string(),
             slug: "test-co".into(),
-            api_key: None,
-            provider: Some("openai".to_string()),
-            model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
@@ -2881,9 +2913,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Test Company".to_string(),
             slug: "test-co".into(),
-            api_key: None,
-            provider: Some("openai".to_string()),
-            model: Some("gpt-4o".to_string()),
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,

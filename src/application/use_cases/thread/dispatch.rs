@@ -35,7 +35,9 @@ use crate::{
     },
     services::{
         agent_channel_tool::AgentChannelToolContext,
-        agent_runner::{AgentExecutionDisposition, AgentRunner, ResolvedAgentParams},
+        agent_runner::{
+            AgentExecutionDisposition, AgentRunner, ResolvedAgentParams, resolve_agent_params,
+        },
         email_parser::ParsedEmail,
         memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
         outbound_dispatcher::{OutboundEmail, SentEmailResult, agent_response_email_body},
@@ -247,7 +249,14 @@ impl ThreadUseCases {
                 self.first_agent_for(channel_match, &mut agent_cache)
                     .await?,
             );
-            let params = ResolvedAgentParams::new(Some(&channel_match.company), agent.as_ref());
+            // Box the credential-resolution seam so this already-deep dispatch future does not
+            // absorb another provider-facing async frame.
+            let params = Box::pin(resolve_agent_params(
+                self.company_persistence.as_ref(),
+                &channel_match.company,
+                agent.as_ref(),
+            ))
+            .await;
             if index == 0 {
                 run.primary_params = params.as_ref().ok().cloned();
                 run.primary_agent = agent.clone();
@@ -456,16 +465,17 @@ impl ThreadUseCases {
                 channel_match.channel.slug
             )));
         };
-        if let Some(cached) = cache.get(&agent_id) {
-            return cached.clone().ok_or_else(|| {
-                AppError::Internal(format!(
-                    "Active agent {agent_id} for channel '{}' was not found.",
-                    channel_match.channel.slug
-                ))
-            });
-        }
-        let loaded = persistence.get_by_id(agent_id).await?;
-        cache.insert(agent_id, loaded.clone());
+        // A miss is cached too, so a channel pointing at a deleted agent costs one lookup per
+        // dispatch rather than one per matched channel. Both paths converge before the agent is
+        // unwrapped, so "was not found" is stated once.
+        let loaded = match cache.get(&agent_id).cloned() {
+            Some(cached) => cached,
+            None => {
+                let loaded = persistence.get_by_id(agent_id).await?;
+                cache.insert(agent_id, loaded.clone());
+                loaded
+            }
+        };
         loaded.ok_or_else(|| {
             AppError::Internal(format!(
                 "Active agent {agent_id} for channel '{}' was not found.",

@@ -11,7 +11,7 @@
 //! [`super::ui_team`] renders into it — a team is only ever the team *of* a company, so it is
 //! shown inside the one it belongs to rather than in a workspace of its own.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use axum::{
     Form, Router,
@@ -41,7 +41,7 @@ use crate::{
     use_cases::{
         agent::AgentUseCases,
         channel::ChannelUseCases,
-        company::{CompanyUseCases, CompanyWrite},
+        company::{CompanyModelConnectionWrite, CompanyUseCases, CompanyWrite},
         company_invite::CompanyInviteUseCases,
         memory::MemoryUseCases,
         user::UserUseCases,
@@ -95,13 +95,13 @@ pub struct WorkspaceQuery {
 pub struct CompanyForm {
     pub name: String,
     pub slug: Option<String>,
-    pub provider: Option<String>,
-    pub model: Option<String>,
-    pub api_key: Option<String>,
     pub enable_llm_spam_guardrail: Option<String>,
     /// What the pane's picker is holding: an uploaded picture's URL, or blank for the letter.
     pub avatar_url: Option<String>,
     pub memory_provider: Option<String>,
+    pub default_model_provider: Option<usize>,
+    #[serde(flatten)]
+    pub connection_fields: HashMap<String, String>,
 }
 
 const NO_SELECTION: &str = "Select a company to configure it, or create a new one.";
@@ -213,9 +213,17 @@ impl Workspace {
         } else {
             None
         };
+        let model_connections = if editable {
+            self.company_use_cases
+                .list_model_connections(self.user_id, company.id)
+                .await?
+        } else {
+            Vec::new()
+        };
         Ok(pages::company_edit_pane_with_memory(
             &pages::CompanyEditPane {
                 company,
+                model_connections: &model_connections,
                 app_domain_name: &self.config.app_domain_name,
                 counts,
                 draft,
@@ -236,6 +244,7 @@ impl Workspace {
 
         Ok(pages::company_edit_pane(&pages::CompanyEditPane {
             company,
+            model_connections: &[],
             app_domain_name: &self.config.app_domain_name,
             counts,
             draft: None,
@@ -437,6 +446,24 @@ async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> 
 
     let created = match submitted.write().and_then(|write| {
         submitted.selected_memory(workspace.memory_use_cases.configured())?;
+        let connections = submitted
+            .model_connections()
+            .map_err(|error| error.to_string())?;
+        // A company may be created before any provider is configured. Only an *update* to an
+        // empty set is a wipe, and `validate_model_connections` refuses that one.
+        if !connections.is_empty() {
+            CompanyUseCases::validate_model_connections(&connections)
+                .map_err(|error| error.to_string())?;
+            if connections
+                .iter()
+                .any(|connection| connection.api_key.is_none())
+            {
+                return Err(
+                    "An API key is required for every provider when creating a company."
+                        .to_string(),
+                );
+            }
+        }
         Ok(write)
     }) {
         Ok(write) => {
@@ -450,7 +477,14 @@ async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> 
 
     match created {
         Ok(company) => {
-            let response = match workspace.apply_memory(&submitted, company.id).await {
+            let applied = match workspace
+                .apply_submitted_model_connections(&submitted, company.id)
+                .await
+            {
+                Ok(()) => workspace.apply_memory(&submitted, company.id).await,
+                Err(err) => Err(err),
+            };
+            let response = match applied {
                 Ok(()) => {
                     workspace
                         .saved_response(&company, ChromeRefresh::OtherCompany)
@@ -487,6 +521,11 @@ async fn update_company(
 
     let saved = match submitted.write().and_then(|write| {
         submitted.selected_memory(workspace.memory_use_cases.configured())?;
+        let connections = submitted
+            .model_connections()
+            .map_err(|error| error.to_string())?;
+        CompanyUseCases::validate_model_connections(&connections)
+            .map_err(|error| error.to_string())?;
         Ok(write)
     }) {
         Ok(write) => {
@@ -498,9 +537,25 @@ async fn update_company(
         Err(refusal) => Err(AppError::BadRequest(refusal)),
     };
 
+    // The company row is already written by this point, so a failure below leaves the two halves
+    // out of step. Everything that could be checked before that write already has been, so what
+    // is left is reported through the pane the way a rejected save is -- not as a bare 500.
+    let saved = match saved {
+        Ok(company) => match workspace
+            .apply_model_connections(&submitted, company.id)
+            .await
+        {
+            Ok(()) => workspace
+                .apply_memory(&submitted, company.id)
+                .await
+                .map(|()| company),
+            Err(err) => Err(err),
+        },
+        Err(err) => Err(err),
+    };
+
     match saved {
         Ok(company) => {
-            workspace.apply_memory(&submitted, company.id).await?;
             workspace
                 .saved_response(&company, ChromeRefresh::SameCompany)
                 .await
@@ -584,12 +639,29 @@ impl SubmittedCompany {
         pages::CompanyDraft {
             name: &self.form.name,
             slug: &self.slug,
-            provider: self.form.provider.as_deref().unwrap_or(""),
-            model: self.form.model.as_deref().unwrap_or(""),
-            api_key: self.form.api_key.as_deref().unwrap_or(""),
             spam_guardrail: self.spam_guardrail,
             avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
             memory_provider: self.form.memory_provider.as_deref().unwrap_or(""),
+            model_connections: self
+                .model_connections()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|connection| pages::CompanyModelConnectionDraft {
+                    provider: connection.provider.to_string(),
+                    // Deliberately dropped: a rejected save re-renders this draft, and painting
+                    // the submitted key back into the HTML puts it in the page, the browser's
+                    // cache and any proxy in between. The field comes back blank, which the
+                    // stored-key placeholder already explains.
+                    api_key: String::new(),
+                    models: connection
+                        .models
+                        .into_iter()
+                        .map(|model| model.into_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    is_default: connection.is_default,
+                })
+                .collect(),
         }
     }
 
@@ -599,13 +671,68 @@ impl SubmittedCompany {
         Ok(CompanyWrite {
             name: self.form.name.clone(),
             slug: self.slug.clone(),
-            api_key: self.form.api_key.clone(),
-            provider: self.form.provider.clone(),
-            model: self.form.model.clone(),
             enable_llm_spam_guardrail: self.spam_guardrail.stored(),
             memory_provider: None,
             avatar_url: AvatarUrl::parse(self.form.avatar_url.as_deref().unwrap_or(""))?,
         })
+    }
+
+    fn model_connections(&self) -> AppResult<Vec<CompanyModelConnectionWrite>> {
+        // `connection_fields` is a flattened catch-all, so an input named `connection_0_modles`
+        // would otherwise be dropped in silence and read as "this provider enabled no models".
+        // Anything claiming to be a connection field has to be one this loop actually reads.
+        for key in self.form.connection_fields.keys() {
+            let Some(rest) = key.strip_prefix("connection_") else {
+                continue;
+            };
+            let recognized = rest.split_once('_').is_some_and(|(index, field)| {
+                index.parse::<usize>().is_ok_and(|index| {
+                    index < crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS
+                }) && matches!(field, "provider" | "models" | "api_key")
+            });
+            if !recognized {
+                return Err(AppError::BadRequest(format!(
+                    "Unrecognized model connection field '{key}'."
+                )));
+            }
+        }
+
+        let mut connections = Vec::new();
+        for index in 0..crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS {
+            let provider = self
+                .form
+                .connection_fields
+                .get(&format!("connection_{index}_provider"))
+                .map(String::as_str)
+                .unwrap_or_default()
+                .trim();
+            if provider.is_empty() {
+                continue;
+            }
+            let models = self
+                .form
+                .connection_fields
+                .get(&format!("connection_{index}_models"))
+                .map(String::as_str)
+                .unwrap_or_default()
+                .split([',', '\n'])
+                .map(str::trim)
+                .filter(|model| !model.is_empty())
+                .map(String::from)
+                .collect();
+            let api_key = self
+                .form
+                .connection_fields
+                .get(&format!("connection_{index}_api_key"))
+                .cloned();
+            connections.push(CompanyModelConnectionWrite::new(
+                provider,
+                api_key,
+                models,
+                self.form.default_model_provider == Some(index),
+            )?);
+        }
+        Ok(connections)
     }
 
     fn selected_memory(
@@ -617,6 +744,32 @@ impl SubmittedCompany {
 }
 
 impl Workspace {
+    async fn apply_model_connections(
+        &self,
+        submitted: &SubmittedCompany,
+        company_id: Uuid,
+    ) -> AppResult<()> {
+        self.company_use_cases
+            .replace_model_connections(self.user_id, company_id, submitted.model_connections()?)
+            .await
+    }
+
+    /// Creation counterpart to [`Self::apply_model_connections`]: a company with nothing submitted
+    /// simply starts without providers, rather than being refused for an empty replace.
+    async fn apply_submitted_model_connections(
+        &self,
+        submitted: &SubmittedCompany,
+        company_id: Uuid,
+    ) -> AppResult<()> {
+        let connections = submitted.model_connections()?;
+        if connections.is_empty() {
+            return Ok(());
+        }
+        self.company_use_cases
+            .replace_model_connections(self.user_id, company_id, connections)
+            .await
+    }
+
     async fn apply_memory(&self, submitted: &SubmittedCompany, company_id: Uuid) -> AppResult<()> {
         match submitted
             .selected_memory(self.memory_use_cases.configured())

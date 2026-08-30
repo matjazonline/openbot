@@ -331,9 +331,6 @@ fn mailbox_company() -> Company {
         user_id: Uuid::new_v4(),
         name: "Acme".to_string(),
         slug: "acme".into(),
-        api_key: None,
-        provider: None,
-        model: None,
         enable_llm_spam_guardrail: None,
         avatar_url: None,
         memory_provider: None,
@@ -1119,9 +1116,16 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         config_json: Some(serde_json::json!({ "temperature": 0.2 })),
         ..settings_agent(company.id, "Triage <bot>", "triage")
     };
+    let model_connections = [CompanyModelConnection {
+        provider: "openai".into(),
+        models: vec![ModelName::from("gpt-4o")],
+        is_default: true,
+        has_api_key: true,
+    }];
 
     let html = agent_edit_pane(&AgentEditPane {
         company: &company,
+        model_connections: &model_connections,
         agent: &agent,
         used_by: &[],
         draft: None,
@@ -1154,6 +1158,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     let plain = settings_agent(company.id, "Plain", "plain");
     let plain_html = agent_edit_pane(&AgentEditPane {
         company: &company,
+        model_connections: &[],
         agent: &plain,
         used_by: &[],
         draft: None,
@@ -1173,6 +1178,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
 
     let html = agent_edit_pane(&AgentEditPane {
         company: &company,
+        model_connections: &[],
         agent: &pictured,
         used_by: &[],
         draft: None,
@@ -1186,6 +1192,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
 
     let plain_html = agent_edit_pane(&AgentEditPane {
         company: &company,
+        model_connections: &[],
         agent: &plain,
         used_by: &[],
         draft: None,
@@ -1215,6 +1222,7 @@ fn agent_edit_pane_lists_the_channels_running_the_agent() {
 
     let html = agent_edit_pane(&AgentEditPane {
         company: &company,
+        model_connections: &[],
         agent: &agent,
         used_by: &[&channel],
         draft: None,
@@ -1245,6 +1253,7 @@ fn agent_edit_pane_keeps_a_rejected_save_in_the_form() {
 
     let html = agent_edit_pane(&AgentEditPane {
         company: &company,
+        model_connections: &[],
         agent: &agent,
         used_by: &[],
         draft: Some(&draft),
@@ -1267,6 +1276,7 @@ fn prompt_generator_names_the_pane_it_answers_into() {
 
     let edit = agent_edit_pane(&AgentEditPane {
         company: &company,
+        model_connections: &[],
         agent: &agent,
         used_by: &[],
         draft: None,
@@ -1291,6 +1301,7 @@ fn prompt_generator_names_the_pane_it_answers_into() {
     // The create pane has no agent to name; an absent id is what tells the handler so.
     let create = agent_create_pane(&AgentCreatePane {
         company: &company,
+        model_connections: &[],
         draft: &AgentDraft::default(),
         error: None,
     });
@@ -1328,6 +1339,7 @@ fn agent_create_pane_opens_on_the_tab_that_was_submitted() {
     let pane = |advanced| {
         agent_create_pane(&AgentCreatePane {
             company: &company,
+            model_connections: &[],
             draft: &AgentDraft {
                 name: "Triage",
                 advanced,
@@ -2950,14 +2962,19 @@ fn company_settings_list_saves_selection_in_the_url_and_swaps_out_of_band() {
 #[test]
 fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
     let company = Company {
-        provider: Some("openai".into()),
-        model: Some("gpt-4o".into()),
         enable_llm_spam_guardrail: Some(true),
         ..settings_company("Acme & Co", "acme")
     };
+    let model_connections = [CompanyModelConnection {
+        provider: "openai".into(),
+        models: vec![ModelName::from("gpt-4o")],
+        is_default: true,
+        has_api_key: true,
+    }];
 
     let html = company_edit_pane(&CompanyEditPane {
         company: &company,
+        model_connections: &model_connections,
         app_domain_name: "example.com",
         counts: CompanyCounts {
             channels: 3,
@@ -3001,12 +3018,12 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
 #[test]
 fn company_member_can_open_company_without_edit_controls_or_api_key() {
     let company = Company {
-        api_key: Some("owner-secret".into()),
         ..settings_company("Acme", "acme")
     };
 
     let html = company_edit_pane(&CompanyEditPane {
         company: &company,
+        model_connections: &[],
         app_domain_name: "example.com",
         counts: CompanyCounts {
             channels: 3,
@@ -3032,6 +3049,7 @@ fn the_company_form_picks_a_picture_and_saves_it_with_the_rest_of_the_settings()
 
     let html = company_edit_pane(&CompanyEditPane {
         company: &company,
+        model_connections: &[],
         app_domain_name: "example.com",
         counts: CompanyCounts::default(),
         draft: None,
@@ -3070,6 +3088,7 @@ fn a_rejected_company_save_keeps_the_picture_that_was_picked() {
 
     let html = company_edit_pane(&CompanyEditPane {
         company: &company,
+        model_connections: &[],
         app_domain_name: "example.com",
         counts: CompanyCounts::default(),
         draft: Some(&draft),
@@ -3102,16 +3121,15 @@ fn company_edit_pane_keeps_a_rejected_save_in_the_form() {
     let draft = CompanyDraft {
         name: "Acme Renamed",
         slug: "acme-renamed",
-        provider: "",
-        model: "",
-        api_key: "",
         spam_guardrail: SpamGuardrail::Disabled,
         avatar_url: "",
         memory_provider: "",
+        model_connections: Vec::new(),
     };
 
     let html = company_edit_pane(&CompanyEditPane {
         company: &company,
+        model_connections: &[],
         app_domain_name: "example.com",
         counts: CompanyCounts::default(),
         draft: Some(&draft),
@@ -3233,6 +3251,7 @@ fn the_team_tab_sits_inside_its_company_pane_and_lights_the_company_rail_icon() 
     );
     let html = company_edit_pane(&CompanyEditPane {
         company: &company,
+        model_connections: &[],
         app_domain_name: "example.com",
         counts: CompanyCounts::default(),
         draft: None,
@@ -3454,6 +3473,7 @@ fn each_agent_form_owns_its_own_picker() {
     // not swap each other when a file is picked.
     let create = agent_create_pane(&AgentCreatePane {
         company: &company,
+        model_connections: &[],
         draft: &AgentDraft::default(),
         error: None,
     });
@@ -3467,6 +3487,7 @@ fn each_agent_form_owns_its_own_picker() {
     };
     let edit = agent_edit_pane(&AgentEditPane {
         company: &company,
+        model_connections: &[],
         agent: &agent,
         used_by: &[],
         draft: None,

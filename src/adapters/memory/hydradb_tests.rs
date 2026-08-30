@@ -7,7 +7,9 @@ use super::*;
 use crate::{
     adapters::memory::{
         http::classify_status,
-        test_support::{concurrent_server, mock_server, raw_response_server},
+        test_support::{
+            concurrent_server, mock_server, raw_response_server, request_body, request_line,
+        },
     },
     entities::memory::{
         MAX_MEMORY_PROVIDER_IDENTIFIER_BYTES, MAX_MEMORY_PROVIDER_RESPONSE_BYTES,
@@ -32,7 +34,7 @@ fn company_scope() -> ResolvedMemoryScope {
 async fn concurrent_ingest_server() -> (String, tokio::sync::mpsc::Receiver<usize>) {
     concurrent_server(
         MAX_MEMORY_TARGET_COLLECTIONS,
-        r#"{"results":[{"success":true}]}"#,
+        r#"{"success":true,"data":{"results":[{"id":"stable-id","status":"queued"}],"success_count":1,"failed_count":0}}"#,
     )
     .await
 }
@@ -107,7 +109,7 @@ async fn activity_wraps_successful_calls_and_bounded_failures() {
 
 #[tokio::test]
 async fn persist_surfaces_per_item_rejection_without_echoing_the_response() {
-    let (base_url, _) = mock_server(200, r#"{"results":[{"success":false}]}"#).await;
+    let (base_url, _) = mock_server(200, r#"{"success":true,"data":{"results":[{"id":"stable-id","status":"failed","error":"the provider said something we must not echo"}],"success_count":0,"failed_count":1}}"#).await;
     let provider = HydraDbProvider::new(
         base_url,
         SecretString::from("test-key"),
@@ -131,7 +133,7 @@ async fn persist_surfaces_per_item_rejection_without_echoing_the_response() {
 
 #[tokio::test]
 async fn persist_sends_scope_instructions_and_accepts_empty_extraction() {
-    let (base_url, request) = mock_server(200, r#"{"results":[{"success":true}]}"#).await;
+    let (base_url, request) = mock_server(200, r#"{"success":true,"data":{"results":[{"id":"stable-id","status":"queued"}],"success_count":1,"failed_count":0}}"#).await;
     let provider = HydraDbProvider::new(
         base_url,
         SecretString::from("test-key"),
@@ -154,8 +156,24 @@ async fn persist_sends_scope_instructions_and_accepts_empty_extraction() {
 
     assert_eq!(results, vec![Ok(())]);
     let request = request.await.unwrap();
-    assert!(request.contains("name=\"custom_instructions\""));
-    assert!(request.contains(instructions));
+
+    // The v2 ingest contract: the tenant is `database`, the item kind is a form-level `type`, and
+    // the payload is `memories`. The pre-v2 spellings (`database_id`, `items`) are not aliases —
+    // they are simply unknown to the server — so their absence is the assertion that matters.
+    assert!(request.contains("name=\"database\""), "{request}");
+    assert!(request.contains("name=\"collection\""), "{request}");
+    assert!(request.contains("name=\"type\""), "{request}");
+    assert!(request.contains("name=\"memories\""), "{request}");
+    assert!(!request.contains("name=\"database_id\""), "{request}");
+    assert!(!request.contains("name=\"items\""), "{request}");
+
+    // `custom_instructions` is a field of the memory item in v2, not of the request.
+    assert!(
+        !request.contains("name=\"custom_instructions\""),
+        "{request}"
+    );
+    assert!(request.contains("user_assistant_pairs"), "{request}");
+    assert!(request.contains(instructions), "{request}");
 }
 
 #[tokio::test]
@@ -167,7 +185,7 @@ async fn recall_requires_expected_collection_attribution() {
     };
     let (base_url, _) = mock_server(
         200,
-        r#"{"results":[{"chunk_id":"one","content":"policy","collection":"company"}]}"#,
+        r#"{"success":true,"data":{"chunks":[{"chunk_uuid":"one","chunk_content":"policy","collection":"company"}]}}"#,
     )
     .await;
     let provider = HydraDbProvider::new(
@@ -192,7 +210,7 @@ async fn recall_requires_expected_collection_attribution() {
 
     let (base_url, _) = mock_server(
         200,
-        r#"{"results":[{"chunk_id":"one","content":"policy"}]}"#,
+        r#"{"success":true,"data":{"chunks":[{"chunk_uuid":"one","chunk_content":"policy"}]}}"#,
     )
     .await;
     let provider = HydraDbProvider::new(
@@ -220,12 +238,12 @@ async fn recall_requires_expected_collection_attribution() {
 #[test]
 fn multipart_request_enforces_exact_byte_boundary_before_allocation() {
     let boundary = "fixed-boundary";
-    let empty = HydraDbProvider::multipart_body_with_boundary(&[("items", "")], boundary)
+    let empty = HydraDbProvider::multipart_body_with_boundary(&[("memories", "")], boundary)
         .unwrap()
         .len();
     let exact_payload = "x".repeat(MAX_MEMORY_PROVIDER_REQUEST_BODY_BYTES - empty);
     let exact = HydraDbProvider::multipart_body_with_boundary(
-        &[("items", exact_payload.as_str())],
+        &[("memories", exact_payload.as_str())],
         boundary,
     )
     .unwrap();
@@ -234,7 +252,7 @@ fn multipart_request_enforces_exact_byte_boundary_before_allocation() {
     let over_payload = "x".repeat(MAX_MEMORY_PROVIDER_REQUEST_BODY_BYTES - empty + 1);
     assert_eq!(
         HydraDbProvider::multipart_body_with_boundary(
-            &[("items", over_payload.as_str())],
+            &[("memories", over_payload.as_str())],
             boundary,
         ),
         Err(MemoryProviderError::RequestTooLarge)
@@ -243,14 +261,18 @@ fn multipart_request_enforces_exact_byte_boundary_before_allocation() {
 
 #[tokio::test]
 async fn response_accepts_absent_and_valid_content_length() {
-    let absent = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"status\":\"ready_for_ingestion\"}".to_vec();
+    let absent = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"success\":true,\"data\":{\"infra\":{\"ready_for_ingestion\":true}}}".to_vec();
     let provider = test_provider(
         raw_response_server(absent, None).await,
         Duration::from_secs(2),
     );
     assert!(provider.is_ready("company-memory").await.unwrap());
 
-    let (base_url, _) = mock_server(200, r#"{"status":"ready_for_ingestion"}"#).await;
+    let (base_url, _) = mock_server(
+        200,
+        r#"{"success":true,"data":{"infra":{"ready_for_ingestion":true}}}"#,
+    )
+    .await;
     assert!(
         test_provider(base_url, Duration::from_secs(2))
             .is_ready("company-memory")
@@ -278,7 +300,9 @@ async fn oversized_content_length_is_rejected_without_reading_body() {
 
 #[tokio::test]
 async fn response_body_at_exact_byte_cap_is_accepted() {
-    let mut body = b"{}".to_vec();
+    // A well-formed v2 envelope, padded with the trailing whitespace JSON permits, so this
+    // exercises the byte cap rather than tripping over a body `v2_data` would reject anyway.
+    let mut body = br#"{"data":{"infra":{"ready_for_ingestion":false}}}"#.to_vec();
     body.resize(MAX_MEMORY_PROVIDER_RESPONSE_BYTES, b' ');
     let mut response = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -328,10 +352,10 @@ async fn recall_rejects_excess_rows_and_caps_one_huge_unicode_chunk() {
     let scope = company_scope();
     let rows = (0..2)
         .map(
-            |index| json!({"chunk_id": index.to_string(), "content": "x", "collection": "company"}),
+            |index| json!({"chunk_uuid": index.to_string(), "chunk_content": "x", "collection": "company"}),
         )
         .collect::<Vec<_>>();
-    let body = serde_json::to_string(&json!({"results": rows})).unwrap();
+    let body = serde_json::to_string(&json!({"success": true, "data": {"chunks": rows}})).unwrap();
     let leaked_body: &'static str = Box::leak(body.into_boxed_str());
     let (base_url, _) = mock_server(200, leaked_body).await;
     assert_eq!(
@@ -350,7 +374,8 @@ async fn recall_rejects_excess_rows_and_caps_one_huge_unicode_chunk() {
 
     let content = "🦀".repeat(MAX_MEMORY_CHUNK_CHARS + 1);
     let body = serde_json::to_string(&json!({
-        "results": [{"chunk_id": "one", "content": content, "collection": "company"}]
+        "success": true,
+        "data": {"chunks": [{"chunk_uuid": "one", "chunk_content": content, "collection": "company"}]}
     }))
     .unwrap();
     let leaked_body: &'static str = Box::leak(body.into_boxed_str());
@@ -429,6 +454,103 @@ async fn three_collection_persistence_is_concurrent_and_aggregate_bounded() {
             <= MAX_MEMORY_TARGET_COLLECTIONS
                 * crate::entities::memory::MAX_MEMORY_PROVIDER_REQUEST_BYTES
     );
+}
+
+/// The v2 contract names the tenant `database` everywhere. `database_id` — what this adapter sent
+/// before — is not a deprecated alias in the v2 schema, it is simply absent, so these three routes
+/// would have been reaching the server with no tenant at all. Pin the spelling on every one.
+#[tokio::test]
+async fn every_route_names_the_tenant_the_way_v2_does() {
+    let (base_url, request) = mock_server(
+        200,
+        r#"{"success":true,"data":{"infra":{"ready_for_ingestion":true}}}"#,
+    )
+    .await;
+    assert!(
+        test_provider(base_url, Duration::from_secs(2))
+            .is_ready("company-memory")
+            .await
+            .unwrap()
+    );
+    let status = request.await.unwrap();
+    assert!(
+        request_line(&status).starts_with("GET /databases/status?database=company-memory "),
+        "{status}"
+    );
+
+    let (base_url, request) = mock_server(200, r#"{"success":true,"data":{"chunks":[]}}"#).await;
+    test_provider(base_url, Duration::from_secs(2))
+        .recall(
+            "company-memory",
+            &MemoryRecallQuery::new("query"),
+            &[company_scope()],
+            MemoryRecallMode::Fast,
+            5,
+            None,
+        )
+        .await
+        .unwrap();
+    let query = request.await.unwrap();
+    let body = request_body(&query);
+    assert_eq!(body["database"], "company-memory");
+    assert!(body.get("database_id").is_none(), "{body}");
+
+    let (base_url, request) = mock_server(200, r#"{"success":true,"data":{}}"#).await;
+    test_provider(base_url, Duration::from_secs(2))
+        .delete("company-memory")
+        .await
+        .unwrap();
+    let deleted = request.await.unwrap();
+    assert!(
+        request_line(&deleted).starts_with("DELETE /databases?database=company-memory "),
+        "{deleted}"
+    );
+}
+
+/// Readiness is a boolean inside `data.infra`, not a top-level status string. Reading the old
+/// shape against a v2 server would report every database as never ready, and provisioning would
+/// spin until its deadline.
+#[tokio::test]
+async fn readiness_comes_from_the_v2_infrastructure_block() {
+    let (base_url, _) = mock_server(
+        200,
+        r#"{"success":true,"data":{"infra":{"ready_for_ingestion":false,"graph_status":true}}}"#,
+    )
+    .await;
+    assert!(
+        !test_provider(base_url, Duration::from_secs(2))
+            .is_ready("company-memory")
+            .await
+            .unwrap()
+    );
+
+    // The pre-v2 body must not read as ready either — it carries no `data` at all.
+    let (base_url, _) = mock_server(200, r#"{"status":"ready_for_ingestion"}"#).await;
+    assert_eq!(
+        test_provider(base_url, Duration::from_secs(2))
+            .is_ready("company-memory")
+            .await,
+        Err(MemoryProviderError::MalformedResponse)
+    );
+}
+
+/// A 200 that carries `success: false` is a refusal, and nothing from its `error` object may reach
+/// the caller — the message can name a database or a credential.
+#[tokio::test]
+async fn an_unsuccessful_envelope_is_refused_without_echoing_its_error() {
+    let (base_url, _) = mock_server(
+        200,
+        r#"{"success":false,"data":null,"error":{"code":"FORBIDDEN","message":"key sk-live-secret cannot touch acme-db"}}"#,
+    )
+    .await;
+    let error = test_provider(base_url, Duration::from_secs(2))
+        .is_ready("company-memory")
+        .await
+        .expect_err("an unsuccessful envelope");
+    assert_eq!(error, MemoryProviderError::RejectedItem);
+    let rendered = error.to_string();
+    assert!(!rendered.contains("sk-live-secret"), "{rendered}");
+    assert!(!rendered.contains("acme-db"), "{rendered}");
 }
 
 #[tokio::test]

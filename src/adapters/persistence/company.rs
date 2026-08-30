@@ -7,12 +7,12 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
-        company::{Company, CompanyAccess},
+        company::{Company, CompanyAccess, CompanyModelConnection},
         company_member::CompanyMembership,
         memory::{MEMORY_DELETION_QUIESCENCE_SECONDS, MemoryProviderKind},
-        value_objects::{AvatarUrl, CompanySlug},
+        value_objects::{AvatarUrl, CompanySlug, ModelName, ModelProvider},
     },
-    use_cases::company::{CompanyPersistence, CompanyWrite},
+    use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence, CompanyWrite},
 };
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
@@ -21,9 +21,6 @@ pub struct CompanyDb {
     pub user_id: Uuid,
     pub name: String,
     pub slug: String,
-    pub api_key: Option<String>,
-    pub provider: Option<String>,
-    pub model: Option<String>,
     pub enable_llm_spam_guardrail: Option<bool>,
     pub memory_provider: Option<String>,
     pub avatar_url: Option<String>,
@@ -37,9 +34,6 @@ impl From<CompanyDb> for Company {
             user_id: db.user_id,
             name: db.name,
             slug: CompanySlug::from(db.slug),
-            api_key: db.api_key,
-            provider: db.provider,
-            model: db.model,
             enable_llm_spam_guardrail: db.enable_llm_spam_guardrail,
             // `none` is accepted only as a legacy stored representation, and an unknown value
             // reads as "no provider" rather than failing the row: memory is optional, and a
@@ -78,12 +72,9 @@ impl From<AccessibleCompanyDb> for CompanyAccess {
     }
 }
 
-impl PostgresPersistence {
-    fn decode_company(&self, mut db: CompanyDb) -> AppResult<Company> {
-        db.api_key = self.decrypt_credential(db.api_key)?;
-        Ok(db.into())
-    }
-}
+/// How many dependent agents a rejected model-connection change names before it stops listing
+/// them. The message is for a person reading a form, not an inventory.
+const MAX_REPORTED_ORPHANED_AGENTS: usize = 20;
 
 async fn delete_company_with_cleanup(
     persistence: &PostgresPersistence,
@@ -176,21 +167,17 @@ impl CompanyPersistence for PostgresPersistence {
     async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company> {
         let uuid = Uuid::new_v4();
 
-        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"INSERT INTO companies (id, user_id, name, slug, api_key, provider, model,
+            r#"INSERT INTO companies (id, user_id, name, slug,
                                       enable_llm_spam_guardrail, memory_provider, avatar_url)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-               RETURNING id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
+               VALUES ($1, $2, $3, $4, $5, $6, $7)
+               RETURNING id, user_id, name, slug, enable_llm_spam_guardrail, memory_provider,
                       avatar_url, created_at"#,
         )
         .bind(uuid)
         .bind(user_id)
         .bind(&write.name)
         .bind(&write.slug)
-        .bind(encrypted_api_key)
-        .bind(&write.provider)
-        .bind(&write.model)
         .bind(write.enable_llm_spam_guardrail)
         .bind(write.memory_provider.map(MemoryProviderKind::as_str))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
@@ -198,12 +185,12 @@ impl CompanyPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        self.decode_company(db)
+        Ok(db.into())
     }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, api_key, provider, model,
+            r#"SELECT id, user_id, name, slug,
                       enable_llm_spam_guardrail, memory_provider, avatar_url, created_at
                FROM companies WHERE id = $1"#,
         )
@@ -212,12 +199,12 @@ impl CompanyPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        db.map(|db| self.decode_company(db)).transpose()
+        Ok(db.map(Into::into))
     }
 
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, api_key, provider, model,
+            r#"SELECT id, user_id, name, slug,
                       enable_llm_spam_guardrail, memory_provider, avatar_url, created_at
                FROM companies WHERE slug = $1"#,
         )
@@ -226,12 +213,12 @@ impl CompanyPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        db.map(|db| self.decode_company(db)).transpose()
+        Ok(db.map(Into::into))
     }
 
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         let db_list = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, NULL::text AS api_key, provider, model,
+            r#"SELECT id, user_id, name, slug,
                       enable_llm_spam_guardrail, memory_provider, avatar_url, created_at
                FROM companies WHERE user_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
@@ -250,7 +237,6 @@ impl CompanyPersistence for PostgresPersistence {
         // and both need to know *which* of the two the caller is.
         let db_list = sqlx::query_as::<_, AccessibleCompanyDb>(
             r#"SELECT company.id, company.user_id, company.name, company.slug,
-                      NULL::text AS api_key, company.provider, company.model,
                       company.enable_llm_spam_guardrail, company.memory_provider,
                       company.avatar_url, company.created_at,
                       (company.user_id = $1) AS is_owner,
@@ -276,20 +262,16 @@ impl CompanyPersistence for PostgresPersistence {
     }
 
     async fn update(&self, id: Uuid, write: CompanyWrite) -> AppResult<Company> {
-        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"UPDATE companies SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5,
-                      enable_llm_spam_guardrail = $6,
-                      memory_provider = COALESCE($7, memory_provider), avatar_url = $8
-               WHERE id = $9
-               RETURNING id, user_id, name, slug, api_key, provider, model, enable_llm_spam_guardrail, memory_provider,
+            r#"UPDATE companies SET name = $1, slug = $2,
+                      enable_llm_spam_guardrail = $3,
+                      memory_provider = COALESCE($4, memory_provider), avatar_url = $5
+               WHERE id = $6
+               RETURNING id, user_id, name, slug, enable_llm_spam_guardrail, memory_provider,
                       avatar_url, created_at"#,
         )
         .bind(&write.name)
         .bind(&write.slug)
-        .bind(encrypted_api_key)
-        .bind(&write.provider)
-        .bind(&write.model)
         .bind(write.enable_llm_spam_guardrail)
         .bind(write.memory_provider.map(MemoryProviderKind::as_str))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
@@ -298,7 +280,7 @@ impl CompanyPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        self.decode_company(db)
+        Ok(db.into())
     }
 
     async fn delete(&self, id: Uuid) -> AppResult<()> {
@@ -312,21 +294,16 @@ impl CompanyPersistence for PostgresPersistence {
         id: Uuid,
         write: CompanyWrite,
     ) -> AppResult<Company> {
-        let encrypted_api_key = self.encrypt_credential(write.api_key.as_deref())?;
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"UPDATE companies
-               SET name = $1, slug = $2, api_key = $3, provider = $4, model = $5,
-                   enable_llm_spam_guardrail = $6,
-                   memory_provider = COALESCE($7, memory_provider), avatar_url = $8
-               WHERE id = $9 AND user_id = $10
-               RETURNING id, user_id, name, slug, api_key, provider, model,
+               SET name = $1, slug = $2, enable_llm_spam_guardrail = $3,
+                   memory_provider = COALESCE($4, memory_provider), avatar_url = $5
+               WHERE id = $6 AND user_id = $7
+               RETURNING id, user_id, name, slug,
                          enable_llm_spam_guardrail, memory_provider, avatar_url, created_at"#,
         )
         .bind(&write.name)
         .bind(&write.slug)
-        .bind(encrypted_api_key)
-        .bind(&write.provider)
-        .bind(&write.model)
         .bind(write.enable_llm_spam_guardrail)
         .bind(write.memory_provider.map(MemoryProviderKind::as_str))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
@@ -336,7 +313,7 @@ impl CompanyPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?
         .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
-        self.decode_company(db)
+        Ok(db.into())
     }
 
     async fn delete_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
@@ -408,6 +385,176 @@ impl CompanyPersistence for PostgresPersistence {
 
         Ok(rows)
     }
+
+    async fn list_model_connections(
+        &self,
+        company_id: Uuid,
+    ) -> AppResult<Vec<CompanyModelConnection>> {
+        let rows = sqlx::query_as::<_, (String, Vec<String>, bool, bool)>(
+            r#"SELECT provider, models, is_default, (api_key IS NOT NULL) AS has_api_key
+               FROM company_model_connections
+               WHERE company_id = $1
+               ORDER BY is_default DESC, provider"#,
+        )
+        .bind(company_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(rows
+            .into_iter()
+            .map(
+                |(provider, models, is_default, has_api_key)| CompanyModelConnection {
+                    provider: ModelProvider::from(provider),
+                    models: models.into_iter().map(ModelName::from).collect(),
+                    is_default,
+                    has_api_key,
+                },
+            )
+            .collect())
+    }
+
+    async fn model_api_key(
+        &self,
+        company_id: Uuid,
+        provider: &ModelProvider,
+    ) -> AppResult<Option<String>> {
+        // Folded by `ModelProvider::canonical` before it gets here, so the column is compared as
+        // stored rather than through a function that would also hide a miscased write.
+        let stored: Option<String> = sqlx::query_scalar(
+            r#"SELECT api_key FROM company_model_connections
+               WHERE company_id = $1 AND provider = $2"#,
+        )
+        .bind(company_id)
+        .bind(provider.as_str())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        self.decrypt_credential(stored)
+    }
+
+    async fn replace_model_connections_for_user(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        connections: Vec<CompanyModelConnectionWrite>,
+    ) -> AppResult<()> {
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        let owned = sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM companies WHERE id = $1 AND user_id = $2 FOR UPDATE",
+        )
+        .bind(company_id)
+        .bind(user_id)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        if owned.is_none() {
+            return Err(crate::use_cases::company::company_not_found());
+        }
+
+        sqlx::query(
+            "UPDATE company_model_connections SET is_default = FALSE WHERE company_id = $1 AND is_default",
+        )
+        .bind(company_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+
+        for connection in &connections {
+            let encrypted_api_key = self.encrypt_credential(connection.api_key.as_deref())?;
+            let models: Vec<String> = connection
+                .models
+                .iter()
+                .map(|model| model.as_str().to_string())
+                .collect();
+            let changed = match encrypted_api_key {
+                Some(api_key) => sqlx::query(
+                    r#"INSERT INTO company_model_connections
+                           (company_id, provider, api_key, models, is_default)
+                       VALUES ($1, $2, $3, $4, $5)
+                       ON CONFLICT (company_id, provider) DO UPDATE
+                       SET api_key = EXCLUDED.api_key, models = EXCLUDED.models,
+                           is_default = EXCLUDED.is_default, updated_at = CURRENT_TIMESTAMP"#,
+                )
+                .bind(company_id)
+                .bind(connection.provider.as_str())
+                .bind(api_key)
+                .bind(&models)
+                .bind(connection.is_default)
+                .execute(&mut *transaction)
+                .await
+                .map_err(AppError::from)?
+                .rows_affected(),
+                None => sqlx::query(
+                    r#"UPDATE company_model_connections
+                       SET models = $3, is_default = $4, updated_at = CURRENT_TIMESTAMP
+                       WHERE company_id = $1 AND provider = $2"#,
+                )
+                .bind(company_id)
+                .bind(connection.provider.as_str())
+                .bind(&models)
+                .bind(connection.is_default)
+                .execute(&mut *transaction)
+                .await
+                .map_err(AppError::from)?
+                .rows_affected(),
+            };
+            if changed == 0 {
+                return Err(AppError::BadRequest(format!(
+                    "An API key is required when adding provider '{}'.",
+                    connection.provider
+                )));
+            }
+        }
+
+        let retained: Vec<String> = connections
+            .iter()
+            .map(|connection| connection.provider.as_str().to_string())
+            .collect();
+        sqlx::query(
+            "DELETE FROM company_model_connections WHERE company_id = $1 AND NOT (provider = ANY($2))",
+        )
+        .bind(company_id)
+        .bind(&retained)
+        .execute(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+
+        // Agents are validated against the connections when *they* are written; this is the other
+        // direction. Narrowing a `models` list or dropping a provider out from under a pinned
+        // agent would otherwise commit cleanly and only surface much later, per run, as
+        // "Model 'x' is not enabled for provider 'y'" on a task that had been working. The check
+        // runs inside the transaction, so a refusal rolls the whole replace back.
+        let orphaned: Vec<String> = sqlx::query_scalar(
+            r#"SELECT agent.name
+               FROM agents AS agent
+               WHERE agent.company_id = $1
+                 AND agent.provider IS NOT NULL
+                 AND NOT EXISTS (
+                     SELECT 1 FROM company_model_connections AS connection
+                     WHERE connection.company_id = agent.company_id
+                       AND connection.provider = lower(btrim(agent.provider))
+                       AND agent.model = ANY(connection.models)
+                 )
+               ORDER BY agent.name
+               LIMIT $2"#,
+        )
+        .bind(company_id)
+        .bind(i64::try_from(MAX_REPORTED_ORPHANED_AGENTS).unwrap_or(i64::MAX))
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        if !orphaned.is_empty() {
+            return Err(AppError::BadRequest(format!(
+                "{} still {} a model this change removes. Point {} at an enabled model first.",
+                orphaned.join(", "),
+                if orphaned.len() == 1 { "uses" } else { "use" },
+                if orphaned.len() == 1 { "it" } else { "them" },
+            )));
+        }
+
+        transaction.commit().await.map_err(AppError::from)
+    }
 }
 
 #[cfg(test)]
@@ -442,26 +589,16 @@ mod tests {
                 CompanyWrite {
                     name: "Acme".to_string(),
                     slug: format!("acme-{}", Uuid::new_v4().simple()),
-                    api_key: Some("sk-company-secret".to_string()),
                     ..CompanyWrite::default()
                 },
             )
             .await
             .expect("a company");
-        assert_eq!(company.api_key.as_deref(), Some("sk-company-secret"));
-        let stored: String = sqlx::query_scalar("SELECT api_key FROM companies WHERE id = $1")
-            .bind(company.id)
-            .fetch_one(&pool)
-            .await
-            .expect("the stored credential");
-        assert!(stored.starts_with("enc:v1:1:"));
-        assert!(!stored.contains("sk-company-secret"));
-
         let listed = persistence
             .list_by_user_id(owner.0)
             .await
             .expect("the ordinary company list");
-        assert_eq!(listed[0].api_key, None);
+        assert_eq!(listed[0].id, company.id);
 
         // Before the invite is accepted, the member is a stranger to it.
         assert!(accessible_ids(&persistence, member.0).await.is_empty());
@@ -567,6 +704,216 @@ mod tests {
         persistence.remove_member(company.id, admin.0).await.ok();
         persistence.delete_invite(invite.id).await.ok();
         persistence.delete_invite(admin_invite.id).await.ok();
+        persistence.delete(company.id).await.ok();
+    }
+
+    #[tokio::test]
+    async fn a_company_can_replace_multiple_encrypted_model_connections_without_resending_keys() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::with_credential_cipher(
+            pool.clone(),
+            crate::adapters::persistence::credentials::CredentialCipher::for_test(),
+        );
+        let owner = create_account(&persistence, "model_connections").await;
+        let stranger = create_account(&persistence, "model_connections_stranger").await;
+        let company = persistence
+            .create(
+                owner.0,
+                CompanyWrite {
+                    name: "Model Connections".into(),
+                    slug: format!("models-{}", Uuid::new_v4().simple()),
+                    ..CompanyWrite::default()
+                },
+            )
+            .await
+            .expect("a company");
+
+        let denied = persistence
+            .replace_model_connections_for_user(
+                stranger.0,
+                company.id,
+                vec![
+                    CompanyModelConnectionWrite::new(
+                        "openai",
+                        Some("stolen-secret".into()),
+                        vec!["gpt-a".into()],
+                        true,
+                    )
+                    .unwrap(),
+                ],
+            )
+            .await;
+        assert!(denied.is_err());
+
+        persistence
+            .replace_model_connections_for_user(
+                owner.0,
+                company.id,
+                vec![
+                    CompanyModelConnectionWrite::new(
+                        "openai",
+                        Some("openai-secret".into()),
+                        vec!["gpt-a".into(), "gpt-b".into()],
+                        true,
+                    )
+                    .unwrap(),
+                    CompanyModelConnectionWrite::new(
+                        "anthropic",
+                        Some("anthropic-secret".into()),
+                        vec!["claude-a".into()],
+                        false,
+                    )
+                    .unwrap(),
+                ],
+            )
+            .await
+            .expect("both providers save");
+
+        let metadata = persistence
+            .list_model_connections(company.id)
+            .await
+            .expect("connection metadata");
+        assert_eq!(metadata.len(), 2);
+        assert!(metadata.iter().all(|connection| connection.has_api_key));
+        assert_eq!(
+            persistence
+                .model_api_key(company.id, &ModelProvider::canonical("anthropic"))
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("anthropic-secret")
+        );
+        let stored: Vec<String> = sqlx::query_scalar(
+            "SELECT api_key FROM company_model_connections WHERE company_id = $1 ORDER BY provider",
+        )
+        .bind(company.id)
+        .fetch_all(&pool)
+        .await
+        .expect("stored credentials");
+        assert!(stored.iter().all(|key| key.starts_with("enc:v1:1:")));
+        assert!(stored.iter().all(|key| !key.contains("secret")));
+
+        // Browsers never receive stored keys. A blank key on an existing row retains its secret
+        // while the model allow-list and default selection can still change.
+        persistence
+            .replace_model_connections_for_user(
+                owner.0,
+                company.id,
+                vec![
+                    CompanyModelConnectionWrite::new("openai", None, vec!["gpt-b".into()], false)
+                        .unwrap(),
+                    CompanyModelConnectionWrite::new(
+                        "anthropic",
+                        None,
+                        vec!["claude-a".into()],
+                        true,
+                    )
+                    .unwrap(),
+                ],
+            )
+            .await
+            .expect("metadata changes without key material");
+        assert_eq!(
+            persistence
+                .model_api_key(company.id, &ModelProvider::canonical("openai"))
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("openai-secret")
+        );
+        let connections = CompanyPersistence::list_model_connections(&persistence, company.id)
+            .await
+            .unwrap();
+        let default = connections
+            .iter()
+            .find(|connection| connection.is_default)
+            .expect("default connection remains");
+        assert_eq!(default.provider.as_ref(), "anthropic");
+        assert_eq!(default.models[0].as_ref(), "claude-a");
+
+        persistence.delete(company.id).await.ok();
+    }
+
+    #[tokio::test]
+    async fn a_replace_that_would_strand_a_pinned_agent_is_refused_whole() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::with_credential_cipher(
+            pool.clone(),
+            crate::adapters::persistence::credentials::CredentialCipher::for_test(),
+        );
+        let owner = create_account(&persistence, "orphan_guard").await;
+        let company = persistence
+            .create(
+                owner.0,
+                CompanyWrite {
+                    name: "Orphan Guard".into(),
+                    slug: format!("orphan-{}", Uuid::new_v4().simple()),
+                    ..CompanyWrite::default()
+                },
+            )
+            .await
+            .expect("a company");
+
+        persistence
+            .replace_model_connections_for_user(
+                owner.0,
+                company.id,
+                vec![
+                    CompanyModelConnectionWrite::new(
+                        "openai",
+                        Some("openai-secret".into()),
+                        vec!["gpt-a".into(), "gpt-b".into()],
+                        true,
+                    )
+                    .unwrap(),
+                ],
+            )
+            .await
+            .expect("the initial connection saves");
+
+        crate::use_cases::agent::AgentPersistence::create(
+            &persistence,
+            company.id,
+            crate::use_cases::agent::AgentWrite {
+                name: "Pinned".into(),
+                slug: "pinned".into(),
+                provider: Some("openai".into()),
+                model: Some("gpt-b".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("an agent pinned to gpt-b");
+
+        // Narrowing the allow-list out from under the agent would leave it unable to run, so the
+        // whole replace is refused rather than committing half a configuration.
+        let refused = persistence
+            .replace_model_connections_for_user(
+                owner.0,
+                company.id,
+                vec![
+                    CompanyModelConnectionWrite::new("openai", None, vec!["gpt-a".into()], true)
+                        .unwrap(),
+                ],
+            )
+            .await
+            .expect_err("the pinned agent blocks the narrowing");
+        assert!(
+            refused.to_string().contains("Pinned"),
+            "the refusal should name the agent: {refused}"
+        );
+
+        // ... and nothing was written: gpt-b is still enabled.
+        let connections = CompanyPersistence::list_model_connections(&persistence, company.id)
+            .await
+            .expect("connections survive the rolled-back replace");
+        assert_eq!(connections.len(), 1);
+        assert!(connections[0].models.iter().any(|model| model == "gpt-b"));
+
         persistence.delete(company.id).await.ok();
     }
 

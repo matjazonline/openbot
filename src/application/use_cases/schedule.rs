@@ -875,6 +875,32 @@ mod tests {
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec!["admin@example.com".into()])
         }
+
+        /// Model connections are not part of what these tests drive; a call here is a wiring mistake
+        /// rather than a state worth simulating.
+        async fn list_model_connections(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
+            unimplemented!("this double is not exercised on the model-connection path")
+        }
+
+        async fn model_api_key(
+            &self,
+            _company_id: Uuid,
+            _provider: &crate::entities::value_objects::ModelProvider,
+        ) -> AppResult<Option<String>> {
+            unimplemented!("this double is not exercised on the model-connection path")
+        }
+
+        async fn replace_model_connections_for_user(
+            &self,
+            _user_id: Uuid,
+            _company_id: Uuid,
+            _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
+        ) -> AppResult<()> {
+            unimplemented!("this double is not exercised on the model-connection path")
+        }
     }
 
     struct MockChannelPersistence {
@@ -1191,9 +1217,6 @@ mod tests {
             user_id,
             name: slug.into(),
             slug: slug.into(),
-            api_key: None,
-            provider: None,
-            model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
@@ -1336,9 +1359,6 @@ mod tests {
             user_id: owner_id,
             name: "Acme Corp".into(),
             slug: "acme".into(),
-            api_key: None,
-            provider: None,
-            model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,

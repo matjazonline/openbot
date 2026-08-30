@@ -18,7 +18,7 @@ use crate::{
     use_cases::{
         agent::AgentUseCases,
         channel::{ChannelUseCases, ChannelWrite},
-        company::{CompanyUseCases, CompanyWrite},
+        company::{CompanyModelConnectionWrite, CompanyUseCases, CompanyWrite},
         user::UserUseCases,
     },
 };
@@ -109,25 +109,56 @@ async fn create_company(
         return Ok(Redirect::to("/ui").into_response());
     }
 
+    let connection = match (
+        form.provider
+            .as_deref()
+            .filter(|value| !value.trim().is_empty()),
+        form.model
+            .as_deref()
+            .filter(|value| !value.trim().is_empty()),
+        form.api_key
+            .as_deref()
+            .filter(|value| !value.trim().is_empty()),
+    ) {
+        (None, None, None) => None,
+        (Some(provider), Some(model), Some(api_key)) => Some(CompanyModelConnectionWrite::new(
+            provider,
+            Some(api_key.to_string()),
+            vec![model.to_string()],
+            true,
+        )?),
+        _ => {
+            return Ok(Html(pages::onboarding_company_page(
+                &mailbox_user,
+                &config.app_domain_name,
+                Some("Provider, model, and API key must be supplied together."),
+            ))
+            .into_response());
+        }
+    };
+
     match company_use_cases
         .create_company(
             user.id,
             CompanyWrite {
                 name: form.name.clone(),
                 slug: form.slug.clone(),
-                api_key: form.api_key.clone(),
-                provider: form.provider.clone(),
-                model: form.model.clone(),
                 ..CompanyWrite::default()
             },
         )
         .await
     {
-        Ok(company) => Ok(Redirect::to(&format!(
-            "/ui/onboarding/companies/{}/channel",
-            company.id
-        ))
-        .into_response()),
+        Ok(company) => {
+            if let Some(connection) = connection {
+                company_use_cases
+                    .replace_model_connections(user.id, company.id, vec![connection])
+                    .await?;
+            }
+            Ok(
+                Redirect::to(&format!("/ui/onboarding/companies/{}/channel", company.id))
+                    .into_response(),
+            )
+        }
         Err(err) => Ok(Html(pages::onboarding_company_page(
             &mailbox_user,
             &config.app_domain_name,
@@ -377,9 +408,6 @@ mod tests {
             user_id: Uuid::new_v4(),
             name: "Acme".to_string(),
             slug: "acme".into(),
-            api_key: None,
-            provider: None,
-            model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,

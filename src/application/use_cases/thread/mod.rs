@@ -819,13 +819,7 @@ impl ChannelMatch {
 }
 
 fn durable_ingest_payload(ingest: &InboundIngestResult) -> serde_json::Value {
-    let mut durable = ingest.clone();
-    if let Some(company) = durable.company.as_mut() {
-        company.api_key = None;
-    }
-    for channel_match in &mut durable.channel_matches {
-        channel_match.company.api_key = None;
-    }
+    let durable = ingest.clone();
     serde_json::to_value(durable).unwrap_or_default()
 }
 

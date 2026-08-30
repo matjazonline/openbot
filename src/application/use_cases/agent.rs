@@ -12,7 +12,7 @@ use crate::{
         creation::CreationProvenance,
         memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
         user::Viewer,
-        value_objects::AvatarUrl,
+        value_objects::{AvatarUrl, ModelName, ModelProvider},
     },
     use_cases::{
         channel::{SlugKind, validate_slug},
@@ -214,6 +214,49 @@ impl AgentUseCases {
         Ok(())
     }
 
+    async fn validate_model_selection(
+        &self,
+        company_id: Uuid,
+        write: &AgentWrite,
+    ) -> AppResult<()> {
+        let (Some(provider), Some(model)) = (write.provider.as_deref(), write.model.as_deref())
+        else {
+            if write.provider.is_some() || write.model.is_some() {
+                return Err(AppError::BadRequest(
+                    "Select both a provider and one of its enabled models, or inherit the company default."
+                        .into(),
+                ));
+            }
+            return Ok(());
+        };
+        let connections = self
+            .company_persistence
+            .list_model_connections(company_id)
+            .await?;
+        let provider = ModelProvider::canonical(provider);
+        let model = ModelName::canonical(model);
+        let allowed = connections.iter().any(|connection| {
+            connection.provider == provider && connection.models.contains(&model)
+        });
+        if !allowed {
+            return Err(AppError::BadRequest(format!(
+                "Model '{model}' is not enabled for provider '{provider}' in this company."
+            )));
+        }
+        Ok(())
+    }
+
+    pub async fn list_company_model_connections(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
+        self.verify_company_manager(user_id, company_id).await?;
+        self.company_persistence
+            .list_model_connections(company_id)
+            .await
+    }
+
     #[instrument(skip(self))]
     pub async fn create_agent(
         &self,
@@ -224,6 +267,7 @@ impl AgentUseCases {
         self.verify_company_manager(user_id, company_id).await?;
         write.created_by = Some(CreationProvenance::user(user_id));
         write.normalize()?;
+        self.validate_model_selection(company_id, &write).await?;
 
         info!(
             "Creating agent '{}' ({}) for company {}",
@@ -376,6 +420,7 @@ impl AgentUseCases {
         }
 
         write.normalize()?;
+        self.validate_model_selection(company_id, &write).await?;
 
         info!(
             "Updating agent {} for company {}: {} ({})",
@@ -421,13 +466,44 @@ impl AgentUseCases {
     ) -> AppResult<String> {
         self.verify_company_manager(user_id, company_id).await?;
 
-        let company = self
+        let connections = self
             .company_persistence
-            .get_by_id(company_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
-
-        let llm = PromptGeneratorLlm::resolve(&company, provider_override, model_override)?;
+            .list_model_connections(company_id)
+            .await?;
+        let default = connections
+            .iter()
+            .find(|connection| connection.is_default)
+            .ok_or_else(|| {
+                AppError::BadRequest("Configure a default company model provider first.".into())
+            })?;
+        let provider = ModelProvider::canonical(
+            non_empty(provider_override).unwrap_or(default.provider.as_str()),
+        );
+        let connection = connections
+            .iter()
+            .find(|connection| connection.provider == provider)
+            .ok_or_else(|| {
+                AppError::BadRequest(format!(
+                    "Provider '{provider}' is not enabled for this company."
+                ))
+            })?;
+        let model = ModelName::canonical(
+            non_empty(model_override)
+                .or_else(|| connection.models.first().map(|model| model.as_ref()))
+                .ok_or_else(|| {
+                    AppError::BadRequest("Configure at least one model first.".into())
+                })?,
+        );
+        if !connection.models.contains(&model) {
+            return Err(AppError::BadRequest(format!(
+                "Model '{model}' is not enabled for provider '{provider}' in this company."
+            )));
+        }
+        let api_key = self
+            .company_persistence
+            .model_api_key(company_id, &provider)
+            .await?;
+        let llm = PromptGeneratorLlm::resolve_explicit(&provider, &model, api_key.as_deref())?;
 
         generate_prompt_with(llm, instructions).await
     }
@@ -515,37 +591,19 @@ impl PromptGeneratorLlm {
         })
     }
 
-    fn resolve(
-        company: &crate::entities::company::Company,
-        provider_override: Option<&str>,
-        model_override: Option<&str>,
+    fn resolve_explicit(
+        provider: &ModelProvider,
+        model: &ModelName,
+        api_key: Option<&str>,
     ) -> AppResult<Self> {
-        let company_provider = non_empty(company.provider.as_deref())
-            .map(|provider| provider.to_lowercase())
-            .ok_or_else(|| {
-                AppError::Internal(
-                    "LLM provider is missing. Please configure the company model connection."
-                        .into(),
-                )
-            })?;
-        let provider = non_empty(provider_override)
-            .map(str::to_lowercase)
-            .unwrap_or_else(|| company_provider.clone());
-        if provider != company_provider {
-            return Err(AppError::BadRequest(format!(
-                "Agent provider '{provider}' does not match company model connection provider '{company_provider}'."
-            )));
-        }
+        let provider = provider.as_str().to_string();
+        let model = model.as_str().to_string();
 
-        let model = non_empty(model_override)
-            .or_else(|| non_empty(company.model.as_deref()))
-            .unwrap_or_else(|| default_model_for(&provider))
-            .to_string();
-
-        let api_key = non_empty(company.api_key.as_deref())
-            .ok_or_else(|| AppError::Internal(format!(
-                "API key is missing for provider '{}'. Please configure the company model connection.",
-                provider
+        // A company that has not finished configuring its provider is a caller problem, not a
+        // server fault -- every sibling check in `generate_system_prompt` says so with a 400.
+        let api_key = non_empty(api_key)
+            .ok_or_else(|| AppError::BadRequest(format!(
+                "API key is missing for provider '{provider}'. Please configure the company model connection."
             )))?
             .to_string();
 
@@ -783,6 +841,35 @@ mod tests {
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
         }
+
+        async fn list_model_connections(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
+            Ok(vec![crate::entities::company::CompanyModelConnection {
+                provider: "openai".into(),
+                models: vec!["gpt-4o".into()],
+                is_default: true,
+                has_api_key: true,
+            }])
+        }
+
+        async fn model_api_key(
+            &self,
+            _company_id: Uuid,
+            _provider: &crate::entities::value_objects::ModelProvider,
+        ) -> AppResult<Option<String>> {
+            Ok(Some("test-key".into()))
+        }
+
+        async fn replace_model_connections_for_user(
+            &self,
+            _user_id: Uuid,
+            _company_id: Uuid,
+            _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
+        ) -> AppResult<()> {
+            unimplemented!("agent use cases read connections, they do not write them")
+        }
     }
 
     struct MockAgentPersistence {
@@ -889,9 +976,6 @@ mod tests {
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
-                api_key: None,
-                provider: None,
-                model: None,
                 enable_llm_spam_guardrail: None,
                 avatar_url: None,
                 memory_provider: None,
@@ -970,7 +1054,7 @@ mod tests {
 
         // 4. Update agent
         let updated_config = json!({ "temperature": 0.2 });
-        let updated = use_cases
+        let invalid_model = use_cases
             .update_agent(
                 owner_id,
                 company_id,
@@ -980,6 +1064,22 @@ mod tests {
                     slug: "updated-bot".to_string(),
                     provider: Some("anthropic".to_string()),
                     model: Some("claude-3-5-sonnet".to_string()),
+                    ..AgentWrite::default()
+                },
+            )
+            .await;
+        assert!(invalid_model.is_err());
+
+        let updated = use_cases
+            .update_agent(
+                owner_id,
+                company_id,
+                agent.id,
+                AgentWrite {
+                    name: "Updated Bot".to_string(),
+                    slug: "updated-bot".to_string(),
+                    provider: Some("openai".to_string()),
+                    model: Some("gpt-4o".to_string()),
                     config_json: Some(updated_config.clone()),
                     ..AgentWrite::default()
                 },
@@ -988,8 +1088,8 @@ mod tests {
             .unwrap();
         assert_eq!(updated.name, "Updated Bot");
         assert_eq!(updated.slug, "updated-bot");
-        assert_eq!(updated.provider.as_deref(), Some("anthropic"));
-        assert_eq!(updated.model.as_deref(), Some("claude-3-5-sonnet"));
+        assert_eq!(updated.provider.as_deref(), Some("openai"));
+        assert_eq!(updated.model.as_deref(), Some("gpt-4o"));
         assert_eq!(updated.system_prompt, None);
         assert_eq!(updated.config_json, Some(updated_config));
 
@@ -1038,23 +1138,13 @@ Guidelines:
 
     #[test]
     fn prompt_generation_requires_explicitly_owned_credentials() {
-        let company = Company {
-            id: Uuid::new_v4(),
-            user_id: Uuid::new_v4(),
-            name: "Acme Corp".to_string(),
-            slug: "acme".into(),
-            api_key: None,
-            provider: Some("openai".to_string()),
-            model: None,
-            enable_llm_spam_guardrail: None,
-            avatar_url: None,
-            memory_provider: None,
-            created_at: Utc::now(),
-        };
-
-        let company_error = PromptGeneratorLlm::resolve(&company, None, None)
-            .err()
-            .expect("a company without its own key must be rejected");
+        let company_error = PromptGeneratorLlm::resolve_explicit(
+            &ModelProvider::canonical("google"),
+            &ModelName::canonical("gemini-2.5-flash"),
+            None,
+        )
+        .err()
+        .expect("a company without its own key must be rejected");
         assert!(company_error.to_string().contains("API key is missing"));
 
         let global_provider_error = PromptGeneratorLlm::resolve_global(None, None, Some("key"))
@@ -1088,9 +1178,6 @@ Guidelines:
             user_id,
             name: "Acme Corp".to_string(),
             slug: slug.into(),
-            api_key: None,
-            provider: None,
-            model: None,
             enable_llm_spam_guardrail: None,
             avatar_url: None,
             memory_provider: None,
