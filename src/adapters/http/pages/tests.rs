@@ -1,6 +1,9 @@
 use super::*;
 use crate::entities::correlation::CorrelationId;
-use crate::entities::task::{TaskAttemptRecord, TaskAttemptRecordStatus, TaskStopReason};
+use crate::entities::task::{
+    TaskAttemptRecord, TaskAttemptRecordStatus, TaskStatusEvent, TaskStopReason,
+    TaskTransitionActorKind, TaskTransitionReason,
+};
 use crate::use_cases::user::LoginMethods;
 use chrono::Utc;
 use serde_json::json;
@@ -4836,6 +4839,73 @@ fn dump_application_javascript() {
         application_javascript(),
     )
     .expect("write bundle");
+}
+
+#[test]
+fn a_chain_timeline_orders_by_kind_rather_than_by_a_synthetic_sequence_offset() {
+    // The timeline used to sort attempts at `10_000 + attempt_number`, chosen to sit above the
+    // real `task_status_events.sequence` space. A chain busy enough to reach sequence 10_000 walks
+    // into that offset and starts drawing its attempts before the events that caused them, which
+    // is the one thing a chronological pane must not do.
+    let company = mailbox_company();
+    let task = monitored_task(company.id, Uuid::new_v4(), TaskStatus::Processing);
+    let at = Utc::now();
+
+    let event = TaskStatusEvent {
+        id: Uuid::new_v4(),
+        company_id: company.id,
+        task_id: task.id,
+        correlation_id: task.correlation_id,
+        sequence: 10_500,
+        from_status: Some(TaskStatus::Pending),
+        to_status: TaskStatus::Processing,
+        reason: TaskTransitionReason::Claimed,
+        actor_kind: TaskTransitionActorKind::Worker,
+        actor_id: Some(Uuid::new_v4()),
+        related_approval_id: None,
+        related_outreach_id: None,
+        retry_count: 0,
+        run_at: at,
+        execution_generation: None,
+        transitioned_at: at,
+    };
+    let attempt = TaskAttemptRecord {
+        attempt_number: 1,
+        status: TaskAttemptRecordStatus::Processing,
+        error: None,
+        stop_reason: None,
+        prompt_tokens: None,
+        completion_tokens: None,
+        result: None,
+        started_at: at,
+        finished_at: Some(at),
+        execution_generation: Uuid::new_v4(),
+    };
+
+    let detail = TaskChainDetail {
+        company_id: company.id,
+        correlation_id: task.correlation_id,
+        title: "Busy chain".into(),
+        channel_names: vec!["Inbox".into()],
+        agent_names: vec!["Triage".into()],
+        tasks: vec![TaskChainTaskDetail {
+            task,
+            attempts: vec![attempt],
+            deliveries: Vec::new(),
+        }],
+        events: vec![event],
+        approvals: Vec::new(),
+        outreaches: Vec::new(),
+        truncated: false,
+    };
+
+    let html = task_chain_detail_pane(&detail, None);
+    let transition = html.find("claimed").expect("the status event is drawn");
+    let attempt_started = html.find("Attempt started").expect("the attempt is drawn");
+    assert!(
+        transition < attempt_started,
+        "the status event must precede the attempt it caused, whatever its sequence number"
+    );
 }
 
 #[test]

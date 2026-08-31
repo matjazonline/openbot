@@ -979,7 +979,6 @@ pub struct TaskBoardFilter {
 
 impl TaskBoardFilter {
     pub const DEFAULT_PER_COLUMN: usize = 50;
-    pub const MAX_PER_COLUMN: usize = 50;
 
     pub fn new(channel_id: Option<Uuid>, now: chrono::DateTime<chrono::Utc>) -> Self {
         Self {
@@ -987,11 +986,6 @@ impl TaskBoardFilter {
             terminal_since: now - chrono::Duration::days(7),
             per_column_limit: Self::DEFAULT_PER_COLUMN,
         }
-    }
-
-    pub fn with_limit(mut self, limit: usize) -> Self {
-        self.per_column_limit = limit.clamp(1, Self::MAX_PER_COLUMN);
-        self
     }
 }
 

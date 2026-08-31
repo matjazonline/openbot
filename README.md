@@ -329,7 +329,7 @@ Migrations are automatically executed on server startup via `sqlx::migrate!()`.
 To run migrations manually using `psql`:
 
 ```bash
-/opt/homebrew/opt/postgresql@16/bin/psql -d <database_name> -f migrations/20250819195936_create_users.sql
+/opt/homebrew/opt/postgresql@16/bin/psql -d <database_name> -f migrations/20260817000000_init_schema.sql
 ```
 
 Alternatively, install `sqlx-cli` to run migrations:

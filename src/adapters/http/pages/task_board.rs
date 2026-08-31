@@ -312,18 +312,50 @@ fn chain_truncation_notice(truncated: bool) -> &'static str {
     }
 }
 
+/// One row of the merged chain timeline.
+///
+/// `kind` orders entries that share a task and timestamp, so the ordering comes from the enum's
+/// declaration order rather than from synthetic sort offsets stacked above the real
+/// `task_status_events.sequence` space.
+struct TimelineEntry {
+    at: DateTime<Utc>,
+    task_id: Uuid,
+    kind: TimelineKind,
+    /// The row's own position within its kind: a real event sequence or attempt number where one
+    /// exists, otherwise the index the batched read already returned the row at. Every source is
+    /// ordered deterministically by the query, so this is stable across renders.
+    sequence: i32,
+    html: String,
+}
+
+/// What a timeline row is, in the order rows of the same task and instant should read.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum TimelineKind {
+    StatusEvent,
+    Attempt,
+    Delivery,
+    Approval,
+    Outreach,
+}
+
 fn chain_timeline(detail: &TaskChainDetail) -> String {
-    let mut entries: Vec<(DateTime<Utc>, Uuid, i32, String)> = Vec::new();
+    let mut entries: Vec<TimelineEntry> = Vec::new();
     for event in &detail.events {
         let from = event
             .from_status
             .map(task_status_label)
             .unwrap_or("Created");
-        entries.push((event.transitioned_at, event.task_id, event.sequence, format!(
-            r##"<li class="border-l-2 border-primary pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>{}</strong> → <strong>{}</strong></div><div class="font-mono text-[11px] opacity-65">{}</div></li>"##,
-            format_time(event.transitioned_at), &event.task_id.to_string()[..8],
-            from, task_status_label(event.to_status), escape_html_text(&event.reason.to_string())
-        )));
+        entries.push(TimelineEntry {
+            at: event.transitioned_at,
+            task_id: event.task_id,
+            kind: TimelineKind::StatusEvent,
+            sequence: event.sequence,
+            html: format!(
+                r##"<li class="border-l-2 border-primary pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>{}</strong> → <strong>{}</strong></div><div class="font-mono text-[11px] opacity-65">{}</div></li>"##,
+                format_time(event.transitioned_at), &event.task_id.to_string()[..8],
+                from, task_status_label(event.to_status), escape_html_text(&event.reason.to_string())
+            ),
+        });
     }
     for item in &detail.tasks {
         for attempt in &item.attempts {
@@ -332,26 +364,39 @@ fn chain_timeline(detail: &TaskChainDetail) -> String {
                 TaskAttemptRecordStatus::Completed => "Attempt completed",
                 TaskAttemptRecordStatus::Failed => "Attempt failed",
             };
-            entries.push((attempt.finished_at.unwrap_or(attempt.started_at), item.task.id, 10_000 + attempt.attempt_number, format!(
-                r##"<li class="border-l-2 border-base-300 pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>{label}</strong> #{}</div><div class="text-[11px] opacity-65">{} · {} tokens</div></li>"##,
-                format_time(attempt.finished_at.unwrap_or(attempt.started_at)), &item.task.id.to_string()[..8], attempt.attempt_number,
-                attempt.duration_ms().map(|ms| format!("{ms} ms")).unwrap_or_else(|| "in progress".into()),
-                attempt.total_tokens().unwrap_or(0)
-            )));
+            entries.push(TimelineEntry {
+                at: attempt.finished_at.unwrap_or(attempt.started_at),
+                task_id: item.task.id,
+                kind: TimelineKind::Attempt,
+                sequence: attempt.attempt_number,
+                html: format!(
+                    r##"<li class="border-l-2 border-base-300 pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>{label}</strong> #{}</div><div class="text-[11px] opacity-65">{} · {} tokens</div></li>"##,
+                    format_time(attempt.finished_at.unwrap_or(attempt.started_at)), &item.task.id.to_string()[..8], attempt.attempt_number,
+                    attempt.duration_ms().map(|ms| format!("{ms} ms")).unwrap_or_else(|| "in progress".into()),
+                    attempt.total_tokens().unwrap_or(0)
+                ),
+            });
         }
-        for delivery in &item.deliveries {
-            entries.push((delivery.updated_at, item.task.id, 20_000, format!(
-                r##"<li class="border-l-2 border-base-300 pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>Delivery {}</strong></div><div class="text-[11px] opacity-65">{} retries</div></li>"##,
-                format_time(delivery.updated_at), &item.task.id.to_string()[..8], delivery.status.label(), delivery.retry_count
-            )));
+        for (index, delivery) in item.deliveries.iter().enumerate() {
+            entries.push(TimelineEntry {
+                at: delivery.updated_at,
+                task_id: item.task.id,
+                kind: TimelineKind::Delivery,
+                sequence: index as i32,
+                html: format!(
+                    r##"<li class="border-l-2 border-base-300 pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>Delivery {}</strong></div><div class="text-[11px] opacity-65">{} retries</div></li>"##,
+                    format_time(delivery.updated_at), &item.task.id.to_string()[..8], delivery.status.label(), delivery.retry_count
+                ),
+            });
         }
     }
-    for approval in &detail.approvals {
-        entries.push((
-            approval.updated_at,
-            approval.task_id,
-            30_000,
-            format!(
+    for (index, approval) in detail.approvals.iter().enumerate() {
+        entries.push(TimelineEntry {
+            at: approval.updated_at,
+            task_id: approval.task_id,
+            kind: TimelineKind::Approval,
+            sequence: index as i32,
+            html: format!(
                 r##"<li class="border-l-2 border-accent pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>Approval {}</strong></div><div class="text-[11px] opacity-65">{} · approval {}</div></li>"##,
                 format_time(approval.updated_at),
                 &approval.task_id.to_string()[..8],
@@ -359,14 +404,15 @@ fn chain_timeline(detail: &TaskChainDetail) -> String {
                 escape_html_text(&approval.action_title),
                 &approval.id.to_string()[..8]
             ),
-        ));
+        });
     }
-    for outreach in &detail.outreaches {
-        entries.push((
-            outreach.created_at,
-            outreach.task_id,
-            40_000,
-            format!(
+    for (index, outreach) in detail.outreaches.iter().enumerate() {
+        entries.push(TimelineEntry {
+            at: outreach.created_at,
+            task_id: outreach.task_id,
+            kind: TimelineKind::Outreach,
+            sequence: index as i32,
+            html: format!(
                 r##"<li class="border-l-2 border-info pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>Outreach {}</strong></div><div class="text-[11px] opacity-65">{} of {} replies · {:.0}% required · deadline {} · outreach {}</div></li>"##,
                 format_time(outreach.created_at),
                 &outreach.task_id.to_string()[..8],
@@ -377,10 +423,13 @@ fn chain_timeline(detail: &TaskChainDetail) -> String {
                 format_time(outreach.expires_at),
                 &outreach.id.to_string()[..8]
             ),
-        ));
+        });
     }
-    entries.sort_by_key(|entry| (entry.0, entry.1, entry.2));
-    let body = entries.into_iter().map(|entry| entry.3).collect::<String>();
+    entries.sort_by_key(|entry| (entry.at, entry.task_id, entry.kind, entry.sequence));
+    let body = entries
+        .into_iter()
+        .map(|entry| entry.html)
+        .collect::<String>();
     format!(r##"<ol class="space-y-3">{body}</ol>"##)
 }
 
