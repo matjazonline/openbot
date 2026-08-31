@@ -870,7 +870,12 @@ impl ChainStage {
         }
     }
 
-    /// The board's precedence in one pure decision, shared by unit tests and non-SQL callers.
+    /// The Rust representation of the board's stage precedence.
+    ///
+    /// The board query derives the same rule in SQL, because `stage` has to be a column there
+    /// for the window functions to partition on. Neither copy is generated from the other;
+    /// `chain_stage_sql_matches_rust_derivation` is the equivalence test that keeps them
+    /// identical.
     pub fn derive(counts: &TaskChainCounts) -> Self {
         if counts.failed > 0
             || counts.dead_letter > 0

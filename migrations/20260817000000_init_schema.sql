@@ -1066,6 +1066,13 @@ ALTER TABLE background_tasks
 -- ledger row is assembled from the same tuple that changed the status. The deterministic mapping
 -- below is the fallback for the writes that genuinely have nothing to add -- an INSERT, and status
 -- changes whose cause is fully determined by the pair of statuses.
+--
+-- Lease loss is deliberately absent from that mapping. It used to be recognised by matching
+-- `NEW.last_error` against a copy of the Rust `LEASE_EXPIRED_ERROR` string, so editing the
+-- constant would silently have reclassified every future lease loss as `retryable_failure`. The
+-- sweep now names itself: it sets `transition_reason = 'lease_lost'` and copies each row's own
+-- `worker_id` into `transition_actor_id`, so the event records the worker that actually lost that
+-- lease and the duplicated string is gone rather than kept in sync.
 CREATE FUNCTION record_task_status_event() RETURNS TRIGGER AS $$
 DECLARE
     transition_reason TEXT;
@@ -1089,12 +1096,6 @@ BEGIN
             WHEN TG_OP = 'INSERT' THEN 'enqueued'
             WHEN OLD.status = 'pending' AND NEW.status = 'processing' THEN 'claimed'
             WHEN OLD.status = 'processing' AND NEW.status = 'completed' THEN 'completed'
-            WHEN OLD.status = 'processing' AND NEW.status = 'pending'
-                 AND NEW.last_error = 'Task lease expired without the run reporting a result'
-                THEN 'lease_lost'
-            WHEN OLD.status = 'processing' AND NEW.status = 'dead_letter'
-                 AND NEW.last_error = 'Task lease expired without the run reporting a result'
-                THEN 'lease_lost'
             WHEN OLD.status = 'processing' AND NEW.status = 'pending' THEN 'retryable_failure'
             WHEN OLD.status = 'processing' AND NEW.status = 'dead_letter' THEN 'terminal_failure'
             WHEN OLD.status = 'processing' AND NEW.status = 'pending_approval' THEN 'approval_requested'

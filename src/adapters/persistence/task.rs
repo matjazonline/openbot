@@ -374,7 +374,6 @@ impl TryFrom<TaskChainCardDb> for (TaskChainCard, i64) {
             delivery_sent: db.delivery_sent,
             delivery_failed: db.delivery_failed,
         };
-        debug_assert_eq!(stage, ChainStage::derive(&counts));
         Ok((
             TaskChainCard {
                 correlation_id: db.correlation_id.into(),
@@ -442,6 +441,27 @@ const BOARD_ELIGIBLE_EVERY_CHAIN: &str = r#"
                            AND filtered_task.correlation_id = task.correlation_id
                            AND filtered_task.channel_id = $2
                      ))"#;
+
+/// The SQL representation of the board's stage precedence.
+///
+/// The board needs `stage` as a real column -- `PARTITION BY stage` drives both the per-column
+/// `ROW_NUMBER()` limit and the `stage_total` count -- so the rule cannot move wholesale into Rust,
+/// and SQL on the domain type would point the dependency the wrong way. So it exists twice, once
+/// in each owning layer. `chain_stage_sql_matches_rust_derivation` pushes a matrix of counts
+/// through this expression and compares it with [`ChainStage::derive`]; that test, not a
+/// `debug_assert`, is what keeps the two rung-for-rung identical in a release build.
+const CHAIN_STAGE_SQL_CASE: &str = r#"CASE
+                              WHEN failed > 0 OR dead_letter > 0 OR stopped > 0
+                                   OR expired_processing > 0 OR delivery_failed > 0
+                                  THEN 'needs_attention'
+                              WHEN pending_approval > 0 THEN 'waiting_approval'
+                              WHEN processing > 0 OR delivery_sending > 0 THEN 'running'
+                              WHEN waiting_reply > 0 THEN 'waiting_reply'
+                              WHEN pending > 0 OR delivery_pending > 0 THEN 'queued'
+                              WHEN total_tasks > 0 AND completed = total_tasks
+                                   AND delivery_sent = total_deliveries THEN 'completed'
+                              ELSE 'needs_attention'
+                          END"#;
 
 /// The board projection over whichever chain selection it is given.
 ///
@@ -573,18 +593,7 @@ fn board_query_sql(eligible: &str) -> String {
                ),
                staged AS (
                    SELECT combined.*,
-                          CASE
-                              WHEN failed > 0 OR dead_letter > 0 OR stopped > 0
-                                   OR expired_processing > 0 OR delivery_failed > 0
-                                  THEN 'needs_attention'
-                              WHEN pending_approval > 0 THEN 'waiting_approval'
-                              WHEN processing > 0 OR delivery_sending > 0 THEN 'running'
-                              WHEN waiting_reply > 0 THEN 'waiting_reply'
-                              WHEN pending > 0 OR delivery_pending > 0 THEN 'queued'
-                              WHEN total_tasks > 0 AND completed = total_tasks
-                                   AND delivery_sent = total_deliveries THEN 'completed'
-                              ELSE 'needs_attention'
-                          END AS stage
+                          {CHAIN_STAGE_SQL_CASE} AS stage
                    FROM combined
                    -- Redundant with the row-level pushdown in `eligible`, and deliberately so:
                    -- the two select the same set, which is what makes the pushdown testable and
@@ -6298,6 +6307,232 @@ mod tests {
             .unwrap();
     }
 
+    /// Every count field on its own, then the crossings where precedence is what actually
+    /// decides. One query per case rather than one batched query: a mismatch has to be able to
+    /// name the counts that produced it.
+    fn stage_matrix() -> Vec<TaskChainCounts> {
+        vec![
+            // Nothing at all: no arm matches, so both sides must fall to the `ELSE`.
+            TaskChainCounts::default(),
+            // Each field alone, so no arm is only ever reached alongside another.
+            TaskChainCounts {
+                total_tasks: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                pending: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                processing: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                expired_processing: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                pending_approval: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                waiting_reply: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                completed: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                failed: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                dead_letter: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                stopped: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                total_deliveries: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                delivery_pending: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                delivery_sending: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                delivery_sent: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                delivery_failed: 1,
+                ..Default::default()
+            },
+            // Needs-attention outranks everything below it, by each of its five triggers.
+            TaskChainCounts {
+                total_tasks: 4,
+                failed: 1,
+                pending_approval: 1,
+                processing: 1,
+                pending: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                total_tasks: 2,
+                dead_letter: 1,
+                waiting_reply: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                total_tasks: 2,
+                stopped: 1,
+                pending: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                total_tasks: 1,
+                expired_processing: 1,
+                processing: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                total_tasks: 1,
+                completed: 1,
+                total_deliveries: 1,
+                delivery_failed: 1,
+                pending_approval: 1,
+                ..Default::default()
+            },
+            // Then each remaining rung against the ones it outranks.
+            TaskChainCounts {
+                total_tasks: 4,
+                pending_approval: 1,
+                processing: 1,
+                waiting_reply: 1,
+                pending: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                total_tasks: 3,
+                processing: 1,
+                waiting_reply: 1,
+                pending: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                total_tasks: 1,
+                waiting_reply: 1,
+                total_deliveries: 1,
+                delivery_sending: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                total_tasks: 2,
+                waiting_reply: 1,
+                pending: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                total_tasks: 1,
+                completed: 1,
+                total_deliveries: 1,
+                delivery_pending: 1,
+                ..Default::default()
+            },
+            // Completed needs every task *and* every delivery to have landed.
+            TaskChainCounts {
+                total_tasks: 2,
+                completed: 2,
+                total_deliveries: 1,
+                delivery_sent: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                total_tasks: 1,
+                completed: 1,
+                ..Default::default()
+            },
+            // ...and short of that, with nothing live left, both sides fall through to `ELSE`.
+            TaskChainCounts {
+                total_tasks: 2,
+                completed: 1,
+                ..Default::default()
+            },
+            TaskChainCounts {
+                total_tasks: 1,
+                completed: 1,
+                total_deliveries: 2,
+                delivery_sent: 1,
+                ..Default::default()
+            },
+        ]
+    }
+
+    /// Ask Postgres for the stage the board would assign one set of counts, using the board's own
+    /// expression rather than a paraphrase of it.
+    async fn stage_from_sql(pool: &sqlx::PgPool, counts: &TaskChainCounts) -> ChainStage {
+        let stage: String = sqlx::query_scalar(&format!(
+            "SELECT {CHAIN_STAGE_SQL_CASE} FROM (
+                 SELECT $1::bigint AS total_tasks, $2::bigint AS pending,
+                        $3::bigint AS processing, $4::bigint AS expired_processing,
+                        $5::bigint AS pending_approval, $6::bigint AS waiting_reply,
+                        $7::bigint AS completed, $8::bigint AS failed,
+                        $9::bigint AS dead_letter, $10::bigint AS stopped,
+                        $11::bigint AS total_deliveries, $12::bigint AS delivery_pending,
+                        $13::bigint AS delivery_sending, $14::bigint AS delivery_sent,
+                        $15::bigint AS delivery_failed
+             ) AS combined"
+        ))
+        .bind(counts.total_tasks)
+        .bind(counts.pending)
+        .bind(counts.processing)
+        .bind(counts.expired_processing)
+        .bind(counts.pending_approval)
+        .bind(counts.waiting_reply)
+        .bind(counts.completed)
+        .bind(counts.failed)
+        .bind(counts.dead_letter)
+        .bind(counts.stopped)
+        .bind(counts.total_deliveries)
+        .bind(counts.delivery_pending)
+        .bind(counts.delivery_sending)
+        .bind(counts.delivery_sent)
+        .bind(counts.delivery_failed)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        ChainStage::from_str(&stage).unwrap()
+    }
+
+    /// The release-build guard on the two stage representations.
+    ///
+    /// `ChainStage::derive` and `CHAIN_STAGE_SQL_CASE` are one rule written twice, because the
+    /// board needs `stage` as a column to partition on and the domain may not carry SQL. Nothing
+    /// in a release build compared them: the conversion carried a `debug_assert_eq!`, which only
+    /// fired in debug builds and then panicked on whatever a production row happened to hold
+    /// rather than on the drift itself. This pushes a matrix of counts through the real
+    /// expression instead, so a rung edited on one side fails here.
+    #[tokio::test]
+    async fn chain_stage_sql_matches_rust_derivation() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        for counts in stage_matrix() {
+            assert_eq!(
+                stage_from_sql(&pool, &counts).await,
+                ChainStage::derive(&counts),
+                "SQL and Rust disagree for {counts:?}"
+            );
+        }
+    }
+
     async fn queue_one_email(
         persistence: &PostgresPersistence,
         task: &BackgroundTask,
@@ -6800,6 +7035,83 @@ mod tests {
         assert_eq!(payload["correlation_id"], task.correlation_id.to_string());
         assert!(payload.get("body").is_none());
         assert!(payload.get("token").is_none());
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// The sweep names the worker that lost each lease, without the trigger reading `last_error`.
+    ///
+    /// The trigger used to recognise lease loss by comparing `NEW.last_error` against a copy of
+    /// `LEASE_EXPIRED_ERROR`, so editing that Rust constant would have silently refiled every
+    /// later lease loss as `retryable_failure`. Those arms are gone; this is what proves deleting
+    /// them was safe. The sweep is one statement over rows held by different workers, so the
+    /// per-row attribution is the part worth pinning: `transition_actor_id = worker_id` is read
+    /// from the old row version, and each event must therefore carry *its own* worker.
+    #[tokio::test]
+    async fn a_reaped_lease_records_lease_lost_against_the_worker_that_held_it() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+
+        // Two chains leased by two different workers, expiring in the same sweep: a shared batch
+        // actor would pass with one and fail here.
+        let mut leased = Vec::new();
+        for _ in 0..2 {
+            let task = enqueue_chain(&persistence, company.id, channel.id, "reaped").await;
+            let worker_id = Uuid::new_v4();
+            claim_as(&persistence, task.id, worker_id).await;
+            leased.push((task, worker_id));
+        }
+
+        // The runs vanish: both leases lapse with nothing reported.
+        for (task, _) in &leased {
+            sqlx::query(
+                "UPDATE background_tasks
+                 SET locked_at = CURRENT_TIMESTAMP - interval '20 minutes',
+                     lock_expires_at = CURRENT_TIMESTAMP - interval '1 second'
+                 WHERE id = $1",
+            )
+            .bind(task.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        // The sweep is global, so a test running beside this one may reap these rows first. What
+        // matters is the ledger they end up with, not whose call got there.
+        persistence.reap_expired_task_leases().await.unwrap();
+
+        for (task, worker_id) in &leased {
+            let events = persistence
+                .list_task_status_events(company.id, task.correlation_id, None, 20)
+                .await
+                .unwrap();
+            let lost = events
+                .iter()
+                .find(|event| event.reason == TaskTransitionReason::LeaseLost)
+                .expect("a reaped lease records why the run ended");
+            assert_eq!(lost.task_id, task.id);
+            assert_eq!(lost.from_status, Some(TaskStatus::Processing));
+            assert_eq!(lost.to_status, TaskStatus::Pending);
+            assert_eq!(lost.actor_kind, TaskTransitionActorKind::Worker);
+            assert_eq!(
+                lost.actor_id,
+                Some(*worker_id),
+                "each event must name the worker whose lease that row lost"
+            );
+            assert_eq!(lost.related_approval_id, None);
+            assert_eq!(lost.related_outreach_id, None);
+            assert!(
+                !events
+                    .iter()
+                    .any(|event| event.reason == TaskTransitionReason::RetryableFailure),
+                "lease loss must not fall through to the retryable-failure arm"
+            );
+        }
 
         CompanyPersistence::delete(&persistence, company.id)
             .await
