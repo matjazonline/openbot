@@ -286,6 +286,7 @@ pub fn task_chain_detail_pane(detail: &TaskChainDetail, error: Option<&str>) -> 
             </header>
             <div class="flex-1 space-y-5 overflow-y-auto p-4">
                 {error}
+                {truncation}
                 <section><h3 class="mb-2 text-xs font-bold uppercase opacity-60">Chronological timeline</h3>{timeline}</section>
                 <section><h3 class="mb-2 text-xs font-bold uppercase opacity-60">Tasks in chain</h3><div class="space-y-2">{tasks}</div></section>
             </div>
@@ -295,7 +296,20 @@ pub fn task_chain_detail_pane(detail: &TaskChainDetail, error: Option<&str>) -> 
         participants = escape_html_text(&participants),
         company_id = detail.company_id,
         error = form_error_banner(error),
+        truncation = chain_truncation_notice(detail.truncated),
     )
+}
+
+/// Say plainly that the pane is showing part of a chain.
+///
+/// Without this a truncated timeline is indistinguishable from a complete one, and an operator
+/// reading it would conclude that nothing happened after the last row drawn.
+fn chain_truncation_notice(truncated: bool) -> &'static str {
+    if truncated {
+        r##"<div class="alert alert-warning text-xs"><span>This chain is larger than the pane shows. Some tasks, attempts, deliveries or events are omitted.</span></div>"##
+    } else {
+        ""
+    }
 }
 
 fn chain_timeline(detail: &TaskChainDetail) -> String {

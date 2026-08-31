@@ -6,7 +6,8 @@ use sqlx::{Postgres, QueryBuilder};
 use std::collections::HashMap;
 use std::future::Future;
 use std::str::FromStr;
-use std::time::Duration;
+use std::sync::LazyLock;
+use std::time::{Duration, Instant};
 use tracing::{error, warn};
 use uuid::Uuid;
 
@@ -241,6 +242,17 @@ struct TaskAttemptRecordDb {
     execution_generation: Uuid,
 }
 
+/// One attempt as read by a chain-wide batch, carrying the task it belongs to.
+///
+/// The flattened row is the same shape the per-task read uses, so the two cannot drift into
+/// selecting different columns.
+#[derive(sqlx::FromRow, Debug)]
+struct ChainAttemptDb {
+    task_id: Uuid,
+    #[sqlx(flatten)]
+    record: TaskAttemptRecordDb,
+}
+
 #[derive(sqlx::FromRow, Debug)]
 struct TaskStatusEventDb {
     id: Uuid,
@@ -368,6 +380,350 @@ impl TryFrom<TaskChainCardDb> for (TaskChainCard, i64) {
             db.stage_total,
         ))
     }
+}
+
+/// Which chains the board considers, selected one row at a time.
+///
+/// Every predicate in `staged` is an aggregate over `GROUP BY correlation_id`, and Postgres cannot
+/// push an aggregate predicate below its own grouping — so on its own the window filter runs
+/// *after* the scan it was meant to bound, over every task the company has ever run. These are the
+/// same three conditions written at row level, where an index can serve them: unfinished work,
+/// unresolved work, or anything touched since the cutoff. The outbox arm also closes a real gap —
+/// a chain whose only recent activity is a delivery was previously selected only incidentally.
+const BOARD_ELIGIBLE_RECENT: &str = r#"
+                   SELECT correlation_id FROM (
+                       SELECT correlation_id
+                       FROM background_tasks
+                       WHERE company_id = $1
+                         AND (status IN ('pending', 'processing', 'pending_approval',
+                                         'waiting_for_third_party_reply', 'failed', 'dead_letter')
+                              OR updated_at >= $3)
+                       UNION
+                       SELECT correlation_id
+                       FROM email_outbox
+                       WHERE company_id = $1
+                         AND (status IN ('pending', 'sending', 'failed')
+                              OR updated_at >= $3)
+                   ) AS recent
+                   WHERE $2::uuid IS NULL OR EXISTS (
+                       SELECT 1
+                       FROM background_tasks AS filtered_task
+                       WHERE filtered_task.company_id = $1
+                         AND filtered_task.correlation_id = recent.correlation_id
+                         AND filtered_task.channel_id = $2
+                   )"#;
+
+/// The pre-pushdown selection: every chain in the company, filtered only by channel.
+///
+/// Kept as the control the equivalence test runs the same projection over. It is the definition of
+/// "correct" that [`BOARD_ELIGIBLE_RECENT`] has to keep matching, and the only thing standing
+/// between a faster query and a quietly different one.
+#[cfg(test)]
+const BOARD_ELIGIBLE_EVERY_CHAIN: &str = r#"
+                   SELECT DISTINCT task.correlation_id
+                   FROM background_tasks AS task
+                   WHERE task.company_id = $1
+                     AND ($2::uuid IS NULL OR EXISTS (
+                         SELECT 1
+                         FROM background_tasks AS filtered_task
+                         WHERE filtered_task.company_id = task.company_id
+                           AND filtered_task.correlation_id = task.correlation_id
+                           AND filtered_task.channel_id = $2
+                     ))"#;
+
+/// The board projection over whichever chain selection it is given.
+///
+/// The selection is a parameter so the equivalence test can drive the identical projection from
+/// [`BOARD_ELIGIBLE_EVERY_CHAIN`]; production always assembles it once from
+/// [`BOARD_ELIGIBLE_RECENT`], in [`BOARD_QUERY`].
+fn board_query_sql(eligible: &str) -> String {
+    format!(
+        r#"WITH eligible AS ({eligible}
+               ),
+               task_rollup AS (
+                   SELECT task.correlation_id,
+                          (array_agg(
+                              COALESCE(NULLIF(thread.subject, ''), task.task_type)
+                              ORDER BY task.created_at, task.id
+                          ))[1] AS title,
+                          COUNT(*)::bigint AS total_tasks,
+                          COUNT(*) FILTER (WHERE task.status = 'pending')::bigint AS pending,
+                          COUNT(*) FILTER (WHERE task.status = 'processing')::bigint AS processing,
+                          COUNT(*) FILTER (
+                              WHERE task.status = 'processing'
+                                AND task.lock_expires_at <= CURRENT_TIMESTAMP
+                          )::bigint AS expired_processing,
+                          COUNT(*) FILTER (WHERE task.status = 'pending_approval')::bigint
+                              AS pending_approval,
+                          COUNT(*) FILTER (
+                              WHERE task.status = 'waiting_for_third_party_reply'
+                          )::bigint AS waiting_reply,
+                          COUNT(*) FILTER (WHERE task.status = 'completed')::bigint AS completed,
+                          COUNT(*) FILTER (WHERE task.status = 'failed')::bigint AS failed,
+                          COUNT(*) FILTER (WHERE task.status = 'dead_letter')::bigint
+                              AS dead_letter,
+                          COUNT(*) FILTER (WHERE task.status = 'stopped')::bigint AS stopped,
+                          SUM(task.retry_count)::bigint AS retry_count,
+                          MIN(task.created_at) AS created_at,
+                          MAX(task.updated_at) AS task_last_activity,
+                          LEAST(
+                              MIN(task.run_at) FILTER (WHERE task.status = 'pending'),
+                              MIN(task.wait_expires_at) FILTER (
+                                  WHERE task.status = 'waiting_for_third_party_reply'
+                              )
+                          ) AS task_next_action,
+                          CASE
+                              WHEN COUNT(*) FILTER (
+                                  WHERE task.status IN ('failed', 'dead_letter')
+                              ) > 0 THEN 'One or more tasks failed'
+                              WHEN COUNT(*) FILTER (WHERE task.status = 'stopped') > 0
+                                  THEN 'Stopped by an operator'
+                              ELSE NULL
+                          END AS failure_summary
+                   FROM background_tasks AS task
+                   JOIN eligible ON eligible.correlation_id = task.correlation_id
+                   LEFT JOIN threads AS thread
+                     ON thread.company_id = task.company_id
+                    AND thread.channel_id = task.channel_id
+                    AND thread.id = task.thread_id
+                   WHERE task.company_id = $1
+                   GROUP BY task.correlation_id
+               ),
+               participant_rollup AS (
+                   SELECT task.correlation_id,
+                          array_agg(DISTINCT channel.name ORDER BY channel.name) AS channel_names,
+                          COALESCE(
+                              array_agg(DISTINCT agent.name ORDER BY agent.name)
+                                  FILTER (WHERE agent.id IS NOT NULL),
+                              ARRAY[]::text[]
+                          ) AS agent_names
+                   FROM background_tasks AS task
+                   JOIN eligible ON eligible.correlation_id = task.correlation_id
+                   JOIN channels AS channel
+                     ON channel.company_id = task.company_id AND channel.id = task.channel_id
+                   LEFT JOIN channel_agents AS assignment
+                     ON assignment.company_id = channel.company_id
+                    AND assignment.channel_id = channel.id
+                   LEFT JOIN agents AS agent ON agent.id = assignment.agent_id
+                   WHERE task.company_id = $1
+                   GROUP BY task.correlation_id
+               ),
+               delivery_rollup AS (
+                   SELECT outbox.correlation_id,
+                          COUNT(*)::bigint AS total_deliveries,
+                          COUNT(*) FILTER (WHERE outbox.status = 'pending')::bigint
+                              AS delivery_pending,
+                          COUNT(*) FILTER (WHERE outbox.status = 'sending')::bigint
+                              AS delivery_sending,
+                          COUNT(*) FILTER (WHERE outbox.status = 'sent')::bigint AS delivery_sent,
+                          COUNT(*) FILTER (WHERE outbox.status = 'failed')::bigint
+                              AS delivery_failed,
+                          MAX(outbox.updated_at) AS delivery_last_activity,
+                          MIN(outbox.available_at) FILTER (WHERE outbox.status = 'pending')
+                              AS delivery_next_action
+                   FROM email_outbox AS outbox
+                   JOIN eligible ON eligible.correlation_id = outbox.correlation_id
+                   WHERE outbox.company_id = $1
+                   GROUP BY outbox.correlation_id
+               ),
+               combined AS (
+                   SELECT task_rollup.correlation_id, task_rollup.title,
+                          participant_rollup.channel_names, participant_rollup.agent_names,
+                          task_rollup.total_tasks, task_rollup.pending, task_rollup.processing,
+                          task_rollup.expired_processing, task_rollup.pending_approval,
+                          task_rollup.waiting_reply, task_rollup.completed, task_rollup.failed,
+                          task_rollup.dead_letter, task_rollup.stopped,
+                          COALESCE(delivery_rollup.total_deliveries, 0) AS total_deliveries,
+                          COALESCE(delivery_rollup.delivery_pending, 0) AS delivery_pending,
+                          COALESCE(delivery_rollup.delivery_sending, 0) AS delivery_sending,
+                          COALESCE(delivery_rollup.delivery_sent, 0) AS delivery_sent,
+                          COALESCE(delivery_rollup.delivery_failed, 0) AS delivery_failed,
+                          task_rollup.created_at,
+                          GREATEST(
+                              task_rollup.task_last_activity,
+                              COALESCE(delivery_rollup.delivery_last_activity, '-infinity')
+                          ) AS last_activity_at,
+                          LEAST(task_rollup.task_next_action, delivery_rollup.delivery_next_action)
+                              AS next_action_at,
+                          task_rollup.retry_count, task_rollup.failure_summary,
+                          (task_rollup.pending + task_rollup.processing
+                              + task_rollup.pending_approval + task_rollup.waiting_reply
+                              + COALESCE(delivery_rollup.delivery_pending, 0)
+                              + COALESCE(delivery_rollup.delivery_sending, 0)) > 0 AS is_active,
+                          (task_rollup.failed + task_rollup.dead_letter
+                              + task_rollup.expired_processing
+                              + COALESCE(delivery_rollup.delivery_failed, 0)) > 0 AS is_unresolved
+                   FROM task_rollup
+                   JOIN participant_rollup
+                     ON participant_rollup.correlation_id = task_rollup.correlation_id
+                   LEFT JOIN delivery_rollup
+                     ON delivery_rollup.correlation_id = task_rollup.correlation_id
+               ),
+               staged AS (
+                   SELECT combined.*,
+                          CASE
+                              WHEN failed > 0 OR dead_letter > 0 OR stopped > 0
+                                   OR expired_processing > 0 OR delivery_failed > 0
+                                  THEN 'needs_attention'
+                              WHEN pending_approval > 0 THEN 'waiting_approval'
+                              WHEN processing > 0 OR delivery_sending > 0 THEN 'running'
+                              WHEN waiting_reply > 0 THEN 'waiting_reply'
+                              WHEN pending > 0 OR delivery_pending > 0 THEN 'queued'
+                              WHEN total_tasks > 0 AND completed = total_tasks
+                                   AND delivery_sent = total_deliveries THEN 'completed'
+                              ELSE 'needs_attention'
+                          END AS stage
+                   FROM combined
+                   -- Redundant with the row-level pushdown in `eligible`, and deliberately so:
+                   -- the two select the same set, which is what makes the pushdown testable and
+                   -- keeps this aggregate as the readable specification of what the board shows.
+                   WHERE is_active OR is_unresolved OR last_activity_at >= $3
+               ),
+               ranked AS (
+                   SELECT staged.*,
+                          COUNT(*) OVER (PARTITION BY stage)::bigint AS stage_total,
+                          ROW_NUMBER() OVER (
+                              PARTITION BY stage
+                              ORDER BY last_activity_at DESC, correlation_id
+                          ) AS stage_rank
+                   FROM staged
+               )
+               SELECT correlation_id, stage, title, channel_names, agent_names,
+                      total_tasks, pending, processing, expired_processing, pending_approval,
+                      waiting_reply, completed, failed, dead_letter, stopped,
+                      total_deliveries, delivery_pending, delivery_sending, delivery_sent,
+                      delivery_failed, created_at, last_activity_at, next_action_at, retry_count,
+                      failure_summary, stage_total
+               FROM ranked
+               WHERE stage_rank <= $4
+               ORDER BY CASE stage
+                            WHEN 'queued' THEN 1
+                            WHEN 'running' THEN 2
+                            WHEN 'waiting_approval' THEN 3
+                            WHEN 'waiting_reply' THEN 4
+                            WHEN 'completed' THEN 5
+                            ELSE 6
+                        END,
+                        last_activity_at DESC, correlation_id"#
+    )
+}
+
+/// The board query as production runs it, assembled once rather than per render.
+static BOARD_QUERY: LazyLock<String> = LazyLock::new(|| board_query_sql(BOARD_ELIGIBLE_RECENT));
+
+/// The most status events one page of the chain timeline may carry. Public and documented on
+/// [`crate::use_cases::thread::TaskPersistence::list_task_status_events`]; the detail loader keeps
+/// its own limit rather than widening this one.
+const MAX_STATUS_EVENT_PAGE: usize = 200;
+
+/// A chain detail pane is an operational view, not an export: past these the pane truncates and
+/// says so rather than projecting an unbounded ledger into one HTML response.
+const CHAIN_DETAIL_MAX_TASKS: i64 = 200;
+const CHAIN_DETAIL_MAX_ATTEMPTS: i64 = 1_000;
+const CHAIN_DETAIL_MAX_DELIVERIES: i64 = 1_000;
+const CHAIN_DETAIL_MAX_EVENTS: i64 = 200;
+const CHAIN_DETAIL_MAX_APPROVALS: i64 = 200;
+const CHAIN_DETAIL_MAX_OUTREACHES: i64 = 200;
+
+/// What a bounded read actually asks the database for: one row past the limit.
+///
+/// That sentinel is the whole difference between "there are exactly `limit` of these" and "there
+/// are more than `limit` of these" — a result that merely happens to be `limit` long is not
+/// truncation, and must not be reported as such.
+fn probe_limit(limit: i64) -> i64 {
+    limit + 1
+}
+
+/// Drop the sentinel row [`probe_limit`] fetched, answering whether it was there.
+fn trim_to_limit<T>(rows: &mut Vec<T>, limit: i64) -> bool {
+    let limit = limit as usize;
+    let truncated = rows.len() > limit;
+    rows.truncate(limit);
+    truncated
+}
+
+/// Redistribute one batched result set back onto the tasks its rows belong to.
+///
+/// Synchronous on purpose: the chain-detail path is already several `await`s deep, and grouping
+/// rows in memory never waits on anything, so an `async fn` here would be a future frame bought
+/// for nothing.
+fn group_by_task<T>(rows: impl IntoIterator<Item = (Uuid, T)>) -> HashMap<Uuid, Vec<T>> {
+    let mut grouped: HashMap<Uuid, Vec<T>> = HashMap::new();
+    for (task_id, item) in rows {
+        grouped.entry(task_id).or_default().push(item);
+    }
+    grouped
+}
+
+/// The company-scoped chain timeline, built in one place so the public page and the detail pane
+/// cannot disagree about what a page of it contains.
+///
+/// `limit` is passed through unclamped: the port clamps to [`MAX_STATUS_EVENT_PAGE`] before
+/// calling, and the detail loader deliberately asks for one row more than its own limit.
+fn chain_status_events_query<'a>(
+    company_id: Uuid,
+    correlation_id: CorrelationId,
+    cursor: Option<TaskStatusEventCursor>,
+    limit: i64,
+) -> QueryBuilder<'a, Postgres> {
+    let mut query = QueryBuilder::<Postgres>::new(
+        r#"SELECT id, company_id, task_id, correlation_id, sequence, from_status, to_status,
+                  reason, actor_kind, actor_id, related_approval_id, related_outreach_id,
+                  retry_count, run_at, execution_generation, transitioned_at
+           FROM task_status_events
+           WHERE company_id = "#,
+    );
+    query
+        .push_bind(company_id)
+        .push(" AND correlation_id = ")
+        .push_bind(correlation_id.as_uuid());
+    if let Some(cursor) = cursor {
+        query
+            .push(" AND (transitioned_at, task_id, sequence, id) > (")
+            .push_bind(cursor.transitioned_at)
+            .push(", ")
+            .push_bind(cursor.task_id)
+            .push(", ")
+            .push_bind(cursor.sequence)
+            .push(", ")
+            .push_bind(cursor.id)
+            .push(")");
+    }
+    query
+        .push(" ORDER BY transitioned_at, task_id, sequence, id LIMIT ")
+        .push_bind(limit);
+    query
+}
+
+/// Past this, the per-render board projection is worth looking at. Not an SLO — a tripwire for the
+/// question `plan/kanban_denormalized_rollup_table_optimization.md` defers, so that the decision to
+/// build a denormalized rollup table rests on a measurement rather than on a hunch.
+const BOARD_QUERY_WARN_THRESHOLD: Duration = Duration::from_millis(500);
+
+/// Log the board projection when it runs long, with the number that actually decides whether the
+/// query needs rethinking.
+///
+/// `returned_cards` is capped by the per-column display limit, so it plateaus and says nothing
+/// about cost. Every row of a non-empty stage carries that stage's shared total, so summing one
+/// total per stage recovers the working set the query really aggregated over — the value to watch
+/// grow.
+fn warn_if_board_projection_is_slow(company_id: Uuid, elapsed: Duration, rows: &[TaskChainCardDb]) {
+    if elapsed <= BOARD_QUERY_WARN_THRESHOLD {
+        return;
+    }
+    let eligible_chains: i64 = rows
+        .iter()
+        .map(|row| (row.stage.as_str(), row.stage_total))
+        .collect::<HashMap<_, _>>()
+        .into_values()
+        .sum();
+    warn!(
+        ?elapsed,
+        %company_id,
+        returned_cards = rows.len(),
+        eligible_chains,
+        "Task board projection is slow"
+    );
 }
 
 impl TryFrom<TaskAttemptRecordDb> for TaskAttemptRecord {
@@ -1865,194 +2221,27 @@ impl TaskPersistence for PostgresPersistence {
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
+    /// The board's six columns, projected fresh on every render.
+    ///
+    /// `eligible` selects at row level — "unfinished, or touched since the cutoff" — before any
+    /// aggregate runs. That matters because every predicate in `staged` is an aggregate over a
+    /// `GROUP BY correlation_id` that Postgres cannot push below its own grouping, so on its own it
+    /// prunes only *after* scanning every task the company has ever run.
     async fn list_task_chain_board(
         &self,
         company_id: Uuid,
         filter: TaskBoardFilter,
     ) -> AppResult<TaskChainBoard> {
-        let rows = sqlx::query_as::<_, TaskChainCardDb>(
-            r#"WITH eligible AS (
-                   SELECT DISTINCT task.correlation_id
-                   FROM background_tasks AS task
-                   WHERE task.company_id = $1
-                     AND ($2::uuid IS NULL OR EXISTS (
-                         SELECT 1
-                         FROM background_tasks AS filtered_task
-                         WHERE filtered_task.company_id = task.company_id
-                           AND filtered_task.correlation_id = task.correlation_id
-                           AND filtered_task.channel_id = $2
-                     ))
-               ),
-               task_rollup AS (
-                   SELECT task.correlation_id,
-                          (array_agg(
-                              COALESCE(NULLIF(thread.subject, ''), task.task_type)
-                              ORDER BY task.created_at, task.id
-                          ))[1] AS title,
-                          COUNT(*)::bigint AS total_tasks,
-                          COUNT(*) FILTER (WHERE task.status = 'pending')::bigint AS pending,
-                          COUNT(*) FILTER (WHERE task.status = 'processing')::bigint AS processing,
-                          COUNT(*) FILTER (
-                              WHERE task.status = 'processing'
-                                AND task.lock_expires_at <= CURRENT_TIMESTAMP
-                          )::bigint AS expired_processing,
-                          COUNT(*) FILTER (WHERE task.status = 'pending_approval')::bigint
-                              AS pending_approval,
-                          COUNT(*) FILTER (
-                              WHERE task.status = 'waiting_for_third_party_reply'
-                          )::bigint AS waiting_reply,
-                          COUNT(*) FILTER (WHERE task.status = 'completed')::bigint AS completed,
-                          COUNT(*) FILTER (WHERE task.status = 'failed')::bigint AS failed,
-                          COUNT(*) FILTER (WHERE task.status = 'dead_letter')::bigint
-                              AS dead_letter,
-                          COUNT(*) FILTER (WHERE task.status = 'stopped')::bigint AS stopped,
-                          SUM(task.retry_count)::bigint AS retry_count,
-                          MIN(task.created_at) AS created_at,
-                          MAX(task.updated_at) AS task_last_activity,
-                          LEAST(
-                              MIN(task.run_at) FILTER (WHERE task.status = 'pending'),
-                              MIN(task.wait_expires_at) FILTER (
-                                  WHERE task.status = 'waiting_for_third_party_reply'
-                              )
-                          ) AS task_next_action,
-                          CASE
-                              WHEN COUNT(*) FILTER (
-                                  WHERE task.status IN ('failed', 'dead_letter')
-                              ) > 0 THEN 'One or more tasks failed'
-                              WHEN COUNT(*) FILTER (WHERE task.status = 'stopped') > 0
-                                  THEN 'Stopped by an operator'
-                              ELSE NULL
-                          END AS failure_summary
-                   FROM background_tasks AS task
-                   JOIN eligible ON eligible.correlation_id = task.correlation_id
-                   LEFT JOIN threads AS thread
-                     ON thread.company_id = task.company_id
-                    AND thread.channel_id = task.channel_id
-                    AND thread.id = task.thread_id
-                   WHERE task.company_id = $1
-                   GROUP BY task.correlation_id
-               ),
-               participant_rollup AS (
-                   SELECT task.correlation_id,
-                          array_agg(DISTINCT channel.name ORDER BY channel.name) AS channel_names,
-                          COALESCE(
-                              array_agg(DISTINCT agent.name ORDER BY agent.name)
-                                  FILTER (WHERE agent.id IS NOT NULL),
-                              ARRAY[]::text[]
-                          ) AS agent_names
-                   FROM background_tasks AS task
-                   JOIN eligible ON eligible.correlation_id = task.correlation_id
-                   JOIN channels AS channel
-                     ON channel.company_id = task.company_id AND channel.id = task.channel_id
-                   LEFT JOIN channel_agents AS assignment
-                     ON assignment.company_id = channel.company_id
-                    AND assignment.channel_id = channel.id
-                   LEFT JOIN agents AS agent ON agent.id = assignment.agent_id
-                   WHERE task.company_id = $1
-                   GROUP BY task.correlation_id
-               ),
-               delivery_rollup AS (
-                   SELECT outbox.correlation_id,
-                          COUNT(*)::bigint AS total_deliveries,
-                          COUNT(*) FILTER (WHERE outbox.status = 'pending')::bigint
-                              AS delivery_pending,
-                          COUNT(*) FILTER (WHERE outbox.status = 'sending')::bigint
-                              AS delivery_sending,
-                          COUNT(*) FILTER (WHERE outbox.status = 'sent')::bigint AS delivery_sent,
-                          COUNT(*) FILTER (WHERE outbox.status = 'failed')::bigint
-                              AS delivery_failed,
-                          MAX(outbox.updated_at) AS delivery_last_activity,
-                          MIN(outbox.available_at) FILTER (WHERE outbox.status = 'pending')
-                              AS delivery_next_action
-                   FROM email_outbox AS outbox
-                   JOIN eligible ON eligible.correlation_id = outbox.correlation_id
-                   WHERE outbox.company_id = $1
-                   GROUP BY outbox.correlation_id
-               ),
-               combined AS (
-                   SELECT task_rollup.correlation_id, task_rollup.title,
-                          participant_rollup.channel_names, participant_rollup.agent_names,
-                          task_rollup.total_tasks, task_rollup.pending, task_rollup.processing,
-                          task_rollup.expired_processing, task_rollup.pending_approval,
-                          task_rollup.waiting_reply, task_rollup.completed, task_rollup.failed,
-                          task_rollup.dead_letter, task_rollup.stopped,
-                          COALESCE(delivery_rollup.total_deliveries, 0) AS total_deliveries,
-                          COALESCE(delivery_rollup.delivery_pending, 0) AS delivery_pending,
-                          COALESCE(delivery_rollup.delivery_sending, 0) AS delivery_sending,
-                          COALESCE(delivery_rollup.delivery_sent, 0) AS delivery_sent,
-                          COALESCE(delivery_rollup.delivery_failed, 0) AS delivery_failed,
-                          task_rollup.created_at,
-                          GREATEST(
-                              task_rollup.task_last_activity,
-                              COALESCE(delivery_rollup.delivery_last_activity, '-infinity')
-                          ) AS last_activity_at,
-                          LEAST(task_rollup.task_next_action, delivery_rollup.delivery_next_action)
-                              AS next_action_at,
-                          task_rollup.retry_count, task_rollup.failure_summary,
-                          (task_rollup.pending + task_rollup.processing
-                              + task_rollup.pending_approval + task_rollup.waiting_reply
-                              + COALESCE(delivery_rollup.delivery_pending, 0)
-                              + COALESCE(delivery_rollup.delivery_sending, 0)) > 0 AS is_active,
-                          (task_rollup.failed + task_rollup.dead_letter
-                              + task_rollup.expired_processing
-                              + COALESCE(delivery_rollup.delivery_failed, 0)) > 0 AS is_unresolved
-                   FROM task_rollup
-                   JOIN participant_rollup
-                     ON participant_rollup.correlation_id = task_rollup.correlation_id
-                   LEFT JOIN delivery_rollup
-                     ON delivery_rollup.correlation_id = task_rollup.correlation_id
-               ),
-               staged AS (
-                   SELECT combined.*,
-                          CASE
-                              WHEN failed > 0 OR dead_letter > 0 OR stopped > 0
-                                   OR expired_processing > 0 OR delivery_failed > 0
-                                  THEN 'needs_attention'
-                              WHEN pending_approval > 0 THEN 'waiting_approval'
-                              WHEN processing > 0 OR delivery_sending > 0 THEN 'running'
-                              WHEN waiting_reply > 0 THEN 'waiting_reply'
-                              WHEN pending > 0 OR delivery_pending > 0 THEN 'queued'
-                              WHEN total_tasks > 0 AND completed = total_tasks
-                                   AND delivery_sent = total_deliveries THEN 'completed'
-                              ELSE 'needs_attention'
-                          END AS stage
-                   FROM combined
-                   WHERE is_active OR is_unresolved OR last_activity_at >= $3
-               ),
-               ranked AS (
-                   SELECT staged.*,
-                          COUNT(*) OVER (PARTITION BY stage)::bigint AS stage_total,
-                          ROW_NUMBER() OVER (
-                              PARTITION BY stage
-                              ORDER BY last_activity_at DESC, correlation_id
-                          ) AS stage_rank
-                   FROM staged
-               )
-               SELECT correlation_id, stage, title, channel_names, agent_names,
-                      total_tasks, pending, processing, expired_processing, pending_approval,
-                      waiting_reply, completed, failed, dead_letter, stopped,
-                      total_deliveries, delivery_pending, delivery_sending, delivery_sent,
-                      delivery_failed, created_at, last_activity_at, next_action_at, retry_count,
-                      failure_summary, stage_total
-               FROM ranked
-               WHERE stage_rank <= $4
-               ORDER BY CASE stage
-                            WHEN 'queued' THEN 1
-                            WHEN 'running' THEN 2
-                            WHEN 'waiting_approval' THEN 3
-                            WHEN 'waiting_reply' THEN 4
-                            WHEN 'completed' THEN 5
-                            ELSE 6
-                        END,
-                        last_activity_at DESC, correlation_id"#,
-        )
-        .bind(company_id)
-        .bind(filter.channel_id)
-        .bind(filter.terminal_since)
-        .bind(filter.per_column_limit as i64)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(AppError::from)?;
+        let started = Instant::now();
+        let rows = sqlx::query_as::<_, TaskChainCardDb>(&BOARD_QUERY)
+            .bind(company_id)
+            .bind(filter.channel_id)
+            .bind(filter.terminal_since)
+            .bind(filter.per_column_limit as i64)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        warn_if_board_projection_is_slow(company_id, started.elapsed(), &rows);
 
         let mut board = TaskChainBoard {
             cards: ChainStage::ALL
@@ -2080,41 +2269,24 @@ impl TaskPersistence for PostgresPersistence {
         cursor: Option<TaskStatusEventCursor>,
         limit: usize,
     ) -> AppResult<Vec<TaskStatusEvent>> {
-        let mut query = QueryBuilder::<Postgres>::new(
-            r#"SELECT id, company_id, task_id, correlation_id, sequence, from_status, to_status,
-                      reason, actor_kind, actor_id, related_approval_id, related_outreach_id,
-                      retry_count, run_at, execution_generation, transitioned_at
-               FROM task_status_events
-               WHERE company_id = "#,
-        );
-        query
-            .push_bind(company_id)
-            .push(" AND correlation_id = ")
-            .push_bind(correlation_id.as_uuid());
-        if let Some(cursor) = cursor {
-            query
-                .push(" AND (transitioned_at, task_id, sequence, id) > (")
-                .push_bind(cursor.transitioned_at)
-                .push(", ")
-                .push_bind(cursor.task_id)
-                .push(", ")
-                .push_bind(cursor.sequence)
-                .push(", ")
-                .push_bind(cursor.id)
-                .push(")");
-        }
-        query
-            .push(" ORDER BY transitioned_at, task_id, sequence, id LIMIT ")
-            .push_bind(limit.clamp(1, 200) as i64);
-
-        let rows = query
-            .build_query_as::<TaskStatusEventDb>()
-            .fetch_all(&self.pool)
-            .await
-            .map_err(AppError::from)?;
+        let rows = chain_status_events_query(
+            company_id,
+            correlation_id,
+            cursor,
+            limit.clamp(1, MAX_STATUS_EVENT_PAGE) as i64,
+        )
+        .build_query_as::<TaskStatusEventDb>()
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
+    /// One chain, whole, in a fixed number of queries.
+    ///
+    /// Every collection is read in one batched, bounded statement rather than per task: the
+    /// per-task loop this replaced cost roughly `1 + 1 + 2n + 3` round trips, so a 200-task chain
+    /// spent ~405 sequential trips to the database on a pane a viewer opens live.
     async fn get_task_chain_detail(
         &self,
         company_id: Uuid,
@@ -2154,7 +2326,9 @@ impl TaskPersistence for PostgresPersistence {
             return Ok(None);
         };
 
-        let task_rows = sqlx::query_as::<_, BackgroundTaskDb>(
+        let mut truncated = false;
+
+        let mut task_rows = sqlx::query_as::<_, BackgroundTaskDb>(
             r#"SELECT id, company_id, channel_id, thread_id, correlation_id, task_type, status,
                       payload, retry_count, max_retries, last_error, worker_id,
                       execution_generation, locked_at, lock_expires_at, run_at, created_at,
@@ -2162,40 +2336,111 @@ impl TaskPersistence for PostgresPersistence {
                FROM background_tasks
                WHERE company_id = $1 AND correlation_id = $2
                ORDER BY created_at, id
-               LIMIT 200"#,
+               LIMIT $3"#,
         )
         .bind(company_id)
         .bind(correlation_id.as_uuid())
+        .bind(probe_limit(CHAIN_DETAIL_MAX_TASKS))
         .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)?;
+        truncated |= trim_to_limit(&mut task_rows, CHAIN_DETAIL_MAX_TASKS);
+        let task_ids = task_rows.iter().map(|row| row.id).collect::<Vec<_>>();
 
-        let mut tasks = Vec::with_capacity(task_rows.len());
-        for row in task_rows {
-            let task: BackgroundTask = row.try_into()?;
-            let attempts = self.list_task_attempts(company_id, task.id).await?;
-            let deliveries = self.list_task_deliveries(task.id).await?;
-            tasks.push(TaskChainTaskDetail {
-                task,
-                attempts,
-                deliveries,
-            });
-        }
+        let mut attempt_rows = sqlx::query_as::<_, ChainAttemptDb>(
+            r#"SELECT attempt.task_id, attempt.attempt_number, attempt.status, attempt.error,
+                      attempt.stop_reason, attempt.prompt_tokens, attempt.completion_tokens,
+                      attempt.result, attempt.started_at, attempt.finished_at,
+                      attempt.execution_generation
+               FROM task_attempts AS attempt
+               JOIN background_tasks AS task ON task.id = attempt.task_id
+               WHERE task.company_id = $1 AND attempt.task_id = ANY($2)
+               ORDER BY attempt.task_id, attempt.attempt_number
+               LIMIT $3"#,
+        )
+        .bind(company_id)
+        .bind(&task_ids)
+        .bind(probe_limit(CHAIN_DETAIL_MAX_ATTEMPTS))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        truncated |= trim_to_limit(&mut attempt_rows, CHAIN_DETAIL_MAX_ATTEMPTS);
+        let mut attempts = group_by_task(
+            attempt_rows
+                .into_iter()
+                .map(|row| Ok((row.task_id, TaskAttemptRecord::try_from(row.record)?)))
+                .collect::<AppResult<Vec<_>>>()?,
+        );
 
-        let events = self
-            .list_task_status_events(company_id, correlation_id, None, 200)
-            .await?;
-        let approvals =
+        let mut delivery_rows = sqlx::query_as::<_, OutboxEntryDb>(&format!(
+            "SELECT {OUTBOX_COLUMNS} FROM email_outbox
+              WHERE company_id = $1 AND task_id = ANY($2)
+              ORDER BY task_id, created_at, id
+              LIMIT $3"
+        ))
+        .bind(company_id)
+        .bind(&task_ids)
+        .bind(probe_limit(CHAIN_DETAIL_MAX_DELIVERIES))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        truncated |= trim_to_limit(&mut delivery_rows, CHAIN_DETAIL_MAX_DELIVERIES);
+        let mut deliveries = group_by_task(
+            delivery_rows
+                .into_iter()
+                .map(|row| {
+                    // `task_id = ANY($2)` is what selected these rows, so the column cannot be
+                    // null here; the entry carries it as an `Option` because an outbox row in
+                    // general need not belong to a task.
+                    let entry = OutboxEntry::try_from(row)?;
+                    Ok(entry.task_id.map(|task_id| (task_id, entry)))
+                })
+                .collect::<AppResult<Vec<_>>>()?
+                .into_iter()
+                .flatten(),
+        );
+
+        let tasks = task_rows
+            .into_iter()
+            .map(|row| {
+                let task: BackgroundTask = row.try_into()?;
+                Ok(TaskChainTaskDetail {
+                    attempts: attempts.remove(&task.id).unwrap_or_default(),
+                    deliveries: deliveries.remove(&task.id).unwrap_or_default(),
+                    task,
+                })
+            })
+            .collect::<AppResult<Vec<_>>>()?;
+
+        let mut event_rows = chain_status_events_query(
+            company_id,
+            correlation_id,
+            None,
+            probe_limit(CHAIN_DETAIL_MAX_EVENTS),
+        )
+        .build_query_as::<TaskStatusEventDb>()
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        truncated |= trim_to_limit(&mut event_rows, CHAIN_DETAIL_MAX_EVENTS);
+        let events = event_rows
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<AppResult<Vec<_>>>()?;
+
+        let mut approvals =
             sqlx::query_as::<_, (Uuid, Uuid, String, String, DateTime<Utc>, DateTime<Utc>)>(
                 r#"SELECT approval.id, approval.task_id, approval.status, approval.action_title,
                       approval.created_at, approval.updated_at
                FROM human_approvals AS approval
                JOIN background_tasks AS task ON task.id = approval.task_id
                WHERE task.company_id = $1 AND task.correlation_id = $2
-               ORDER BY approval.created_at, approval.id"#,
+               ORDER BY approval.created_at, approval.id
+               LIMIT $3"#,
             )
             .bind(company_id)
             .bind(correlation_id.as_uuid())
+            .bind(probe_limit(CHAIN_DETAIL_MAX_APPROVALS))
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?
@@ -2208,9 +2453,10 @@ impl TaskPersistence for PostgresPersistence {
                 created_at: row.4,
                 updated_at: row.5,
             })
-            .collect();
+            .collect::<Vec<_>>();
+        truncated |= trim_to_limit(&mut approvals, CHAIN_DETAIL_MAX_APPROVALS);
 
-        let outreaches = sqlx::query_as::<
+        let mut outreaches = sqlx::query_as::<
             _,
             (
                 Uuid,
@@ -2233,10 +2479,12 @@ impl TaskPersistence for PostgresPersistence {
                LEFT JOIN task_outreach_targets AS target ON target.outreach_id = outreach.id
                WHERE task.company_id = $1 AND task.correlation_id = $2
                GROUP BY outreach.id
-               ORDER BY outreach.created_at, outreach.id"#,
+               ORDER BY outreach.created_at, outreach.id
+               LIMIT $3"#,
         )
         .bind(company_id)
         .bind(correlation_id.as_uuid())
+        .bind(probe_limit(CHAIN_DETAIL_MAX_OUTREACHES))
         .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)?
@@ -2251,7 +2499,8 @@ impl TaskPersistence for PostgresPersistence {
             expires_at: row.6,
             created_at: row.7,
         })
-        .collect();
+        .collect::<Vec<_>>();
+        truncated |= trim_to_limit(&mut outreaches, CHAIN_DETAIL_MAX_OUTREACHES);
 
         Ok(Some(TaskChainDetail {
             company_id,
@@ -2263,6 +2512,7 @@ impl TaskPersistence for PostgresPersistence {
             events,
             approvals,
             outreaches,
+            truncated,
         }))
     }
 
@@ -5237,6 +5487,665 @@ mod tests {
         .await
         .unwrap();
         (company, channel)
+    }
+
+    /// Move a chain's tasks back beyond the board's window.
+    ///
+    /// Only `updated_at` moves. The status-event trigger fires on `status`, so the rows end up
+    /// looking exactly like work that has genuinely been idle for a fortnight, with no ledger
+    /// entry claiming something happened to them.
+    async fn age_chain_tasks(pool: &sqlx::PgPool, correlation_id: CorrelationId) {
+        sqlx::query("UPDATE background_tasks SET updated_at = $1 WHERE correlation_id = $2")
+            .bind(Utc::now() - chrono::Duration::days(30))
+            .bind(correlation_id.as_uuid())
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    async fn age_chain_deliveries(pool: &sqlx::PgPool, correlation_id: CorrelationId) {
+        sqlx::query("UPDATE email_outbox SET updated_at = $1 WHERE correlation_id = $2")
+            .bind(Utc::now() - chrono::Duration::days(30))
+            .bind(correlation_id.as_uuid())
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    /// The board's cards as one chain-selection produces them, in an order two runs can be
+    /// compared in.
+    async fn board_cards(
+        pool: &sqlx::PgPool,
+        sql: &str,
+        company_id: Uuid,
+        filter: TaskBoardFilter,
+    ) -> Vec<TaskChainCard> {
+        let mut cards = sqlx::query_as::<_, TaskChainCardDb>(sql)
+            .bind(company_id)
+            .bind(filter.channel_id)
+            .bind(filter.terminal_since)
+            .bind(filter.per_column_limit as i64)
+            .fetch_all(pool)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| <(TaskChainCard, i64)>::try_from(row).unwrap().0)
+            .collect::<Vec<_>>();
+        cards.sort_by_key(|card| card.correlation_id.as_uuid());
+        cards
+    }
+
+    async fn enqueue_chain(
+        persistence: &PostgresPersistence,
+        company_id: Uuid,
+        channel_id: Uuid,
+        task_type: &str,
+    ) -> BackgroundTask {
+        persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                company_id,
+                channel_id,
+                None,
+                task_type,
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap()
+    }
+
+    /// Take the lease a fenced write needs, the way the worker does.
+    async fn claim(persistence: &PostgresPersistence, task_id: Uuid) -> TaskLeaseRef {
+        assert!(
+            persistence
+                .claim_task(
+                    task_id,
+                    Uuid::new_v4(),
+                    Utc::now() + chrono::Duration::minutes(5)
+                )
+                .await
+                .unwrap()
+        );
+        let claimed = persistence.get_task_by_id(task_id).await.unwrap().unwrap();
+        TaskLeaseRef::of(&claimed).unwrap()
+    }
+
+    #[tokio::test]
+    async fn board_window_pushdown_selects_the_same_chains_as_the_aggregate_filter() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+
+        // Every branch the board's selection has, each on its own chain.
+        let active = enqueue_chain(&persistence, company.id, channel.id, "active").await;
+
+        let unresolved = enqueue_chain(&persistence, company.id, channel.id, "unresolved").await;
+        let lease = claim(&persistence, unresolved.id).await;
+        persistence
+            .mark_task_failed(lease, "gave up", Utc::now(), true)
+            .await
+            .unwrap();
+        // Unresolved work is selected however old it is — that is the point of the status arm.
+        age_chain_tasks(&pool, unresolved.correlation_id).await;
+
+        let stopped_recent =
+            enqueue_chain(&persistence, company.id, channel.id, "stopped-in").await;
+        persistence.stop_task(stopped_recent.id).await.unwrap();
+
+        let stopped_old = enqueue_chain(&persistence, company.id, channel.id, "stopped-out").await;
+        persistence.stop_task(stopped_old.id).await.unwrap();
+        age_chain_tasks(&pool, stopped_old.correlation_id).await;
+
+        let completed_recent =
+            enqueue_chain(&persistence, company.id, channel.id, "completed-in").await;
+        let lease = claim(&persistence, completed_recent.id).await;
+        persistence.mark_task_completed(lease).await.unwrap();
+
+        let completed_old =
+            enqueue_chain(&persistence, company.id, channel.id, "completed-out").await;
+        let lease = claim(&persistence, completed_old.id).await;
+        persistence.mark_task_completed(lease).await.unwrap();
+        age_chain_tasks(&pool, completed_old.correlation_id).await;
+
+        // Finished, aged-out work whose only recent trace is a delivery. The pre-pushdown query
+        // caught this one only incidentally, through the aggregate.
+        let delivery_recent =
+            enqueue_chain(&persistence, company.id, channel.id, "delivery-in").await;
+        let lease = claim(&persistence, delivery_recent.id).await;
+        persistence.mark_task_completed(lease).await.unwrap();
+        let delivered_recently =
+            queue_one_email(&persistence, &delivery_recent, "delivery-in").await;
+        mark_delivered(&pool, delivered_recently).await;
+        age_chain_tasks(&pool, delivery_recent.correlation_id).await;
+
+        // The control for that arm: same shape, but the delivery is old too.
+        let delivery_old =
+            enqueue_chain(&persistence, company.id, channel.id, "delivery-out").await;
+        let lease = claim(&persistence, delivery_old.id).await;
+        persistence.mark_task_completed(lease).await.unwrap();
+        let delivered_long_ago = queue_one_email(&persistence, &delivery_old, "delivery-out").await;
+        mark_delivered(&pool, delivered_long_ago).await;
+        age_chain_tasks(&pool, delivery_old.correlation_id).await;
+        age_chain_deliveries(&pool, delivery_old.correlation_id).await;
+
+        let filter = TaskBoardFilter::new(None, Utc::now());
+        let pushdown = board_cards(&pool, &BOARD_QUERY, company.id, filter).await;
+        let control = board_cards(
+            &pool,
+            &board_query_sql(BOARD_ELIGIBLE_EVERY_CHAIN),
+            company.id,
+            filter,
+        )
+        .await;
+        assert_eq!(
+            pushdown, control,
+            "the row-level selection and the aggregate filter must pick the same chains"
+        );
+
+        // Agreement alone would also be satisfied by both being wrong, so pin the membership too.
+        let mut selected = pushdown
+            .iter()
+            .map(|card| card.correlation_id)
+            .collect::<Vec<_>>();
+        selected.sort_by_key(|id| id.as_uuid());
+        let mut expected = vec![
+            active.correlation_id,
+            unresolved.correlation_id,
+            stopped_recent.correlation_id,
+            completed_recent.correlation_id,
+            delivery_recent.correlation_id,
+        ];
+        expected.sort_by_key(|id| id.as_uuid());
+        assert_eq!(selected, expected);
+        assert!(!selected.contains(&stopped_old.correlation_id));
+        assert!(!selected.contains(&completed_old.correlation_id));
+        assert!(!selected.contains(&delivery_old.correlation_id));
+
+        // The channel filter is applied on top of the row-level selection, not instead of it.
+        let other_channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Elsewhere".into(),
+                slug: "elsewhere".into(),
+                enabled: false,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let filtered = TaskBoardFilter::new(Some(other_channel.id), Utc::now());
+        assert!(
+            board_cards(&pool, &BOARD_QUERY, company.id, filtered)
+                .await
+                .is_empty()
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    async fn queue_one_email(
+        persistence: &PostgresPersistence,
+        task: &BackgroundTask,
+        key: &str,
+    ) -> Uuid {
+        persistence
+            .enqueue_outbound_send(OutboundSend {
+                company_id: task.company_id,
+                channel_id: task.channel_id,
+                task_id: Some(task.id),
+                correlation_id: task.correlation_id,
+                idempotency_key: format!("{key}-{}", Uuid::new_v4()),
+                payload: serde_json::json!({"to": ["someone@example.com"]}),
+            })
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
+    /// Land one queued email as delivered.
+    ///
+    /// Written directly rather than through `claim_outbox_emails`, which claims from the whole
+    /// table: these tests share a database with everything else running in parallel, and a claim
+    /// would take rows they do not own.
+    async fn mark_delivered(pool: &sqlx::PgPool, outbox_id: Uuid) {
+        let updated = sqlx::query(
+            "UPDATE email_outbox
+                SET status = 'sent', sent_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+              WHERE id = $1",
+        )
+        .bind(outbox_id)
+        .execute(pool)
+        .await
+        .unwrap();
+        assert_eq!(updated.rows_affected(), 1);
+    }
+
+    #[tokio::test]
+    async fn chain_detail_attaches_every_attempt_and_delivery_to_its_own_task() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+
+        let first = enqueue_chain(&persistence, company.id, channel.id, "grouped-first").await;
+        let mut tasks = vec![first.clone()];
+        for index in 1..3 {
+            tasks.push(
+                persistence
+                    .enqueue_task(NewTask {
+                        company_id: company.id,
+                        channel_id: channel.id,
+                        thread_id: None,
+                        task_type: format!("grouped-{index}"),
+                        payload: serde_json::json!({}),
+                        correlation_id: first.correlation_id,
+                    })
+                    .await
+                    .unwrap(),
+            );
+        }
+
+        // Task n gets n attempts and n deliveries, so a grouping that loses the association shows
+        // up as a wrong count rather than only as a wrong order.
+        for (index, task) in tasks.iter().enumerate() {
+            let expected = index + 1;
+            for attempt_number in 1..=expected as i32 {
+                let attempt = TaskAttemptRef {
+                    task_id: task.id,
+                    attempt_number,
+                    execution_generation: Uuid::new_v4(),
+                };
+                persistence.begin_task_attempt(attempt).await.unwrap();
+            }
+            for _ in 0..expected {
+                queue_one_email(&persistence, task, "grouped").await;
+            }
+        }
+
+        let detail = persistence
+            .get_task_chain_detail(company.id, first.correlation_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!detail.truncated);
+        assert_eq!(detail.tasks.len(), 3);
+        for (index, item) in detail.tasks.iter().enumerate() {
+            let expected = index + 1;
+            assert_eq!(item.task.id, tasks[index].id);
+            assert_eq!(item.attempts.len(), expected, "attempts for task {index}");
+            assert_eq!(
+                item.deliveries.len(),
+                expected,
+                "deliveries for task {index}"
+            );
+            assert!(
+                item.deliveries
+                    .iter()
+                    .all(|delivery| delivery.task_id == Some(item.task.id))
+            );
+            assert_eq!(
+                item.attempts
+                    .iter()
+                    .map(|attempt| attempt.attempt_number)
+                    .collect::<Vec<_>>(),
+                (1..=expected as i32).collect::<Vec<_>>()
+            );
+        }
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// One chain with `count` extra tasks alongside the one it starts from.
+    ///
+    /// Bulk-inserted in a single statement: these fixtures cross limits in the low thousands, and
+    /// a round trip per row would make the test slower than everything else in the suite put
+    /// together.
+    async fn bulk_tasks(pool: &sqlx::PgPool, task: &BackgroundTask, count: i32) {
+        sqlx::query(
+            "INSERT INTO background_tasks (id, company_id, channel_id, correlation_id, task_type)
+             SELECT gen_random_uuid(), $1, $2, $3, 'bulk-' || series
+               FROM generate_series(1, $4::int) AS series",
+        )
+        .bind(task.company_id)
+        .bind(task.channel_id)
+        .bind(task.correlation_id.as_uuid())
+        .bind(count)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn bulk_attempts(pool: &sqlx::PgPool, task_id: Uuid, count: i32) {
+        sqlx::query(
+            "INSERT INTO task_attempts (id, task_id, attempt_number, status, execution_generation)
+             SELECT gen_random_uuid(), $1, series, 'completed', gen_random_uuid()
+               FROM generate_series(1, $2::int) AS series",
+        )
+        .bind(task_id)
+        .bind(count)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn bulk_deliveries(pool: &sqlx::PgPool, task: &BackgroundTask, count: i32) {
+        sqlx::query(
+            "INSERT INTO email_outbox
+                 (id, company_id, task_id, correlation_id, idempotency_key, payload, status)
+             SELECT gen_random_uuid(), $1, $2, $3, $4 || '-' || series, '{}'::jsonb, 'sent'
+               FROM generate_series(1, $5::int) AS series",
+        )
+        .bind(task.company_id)
+        .bind(task.id)
+        .bind(task.correlation_id.as_uuid())
+        .bind(Uuid::new_v4().to_string())
+        .bind(count)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// Extra ledger rows past the one the enqueue already wrote, hence the sequence offset.
+    async fn bulk_status_events(pool: &sqlx::PgPool, task: &BackgroundTask, count: i32) {
+        sqlx::query(
+            "INSERT INTO task_status_events
+                 (id, company_id, task_id, correlation_id, sequence, to_status, reason,
+                  actor_kind, retry_count, run_at)
+             SELECT gen_random_uuid(), $1, $2, $3, series + 100, 'pending', 'enqueued',
+                    'system', 0, CURRENT_TIMESTAMP
+               FROM generate_series(1, $4::int) AS series",
+        )
+        .bind(task.company_id)
+        .bind(task.id)
+        .bind(task.correlation_id.as_uuid())
+        .bind(count)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn bulk_approvals(pool: &sqlx::PgPool, task: &BackgroundTask, count: i32) {
+        sqlx::query(
+            "INSERT INTO human_approvals
+                 (id, company_id, channel_id, task_id, step_key, approver_email, action_type,
+                  action_title, action_summary, token, expires_at)
+             SELECT gen_random_uuid(), $1, $2, $3, $4 || '-' || series, 'approver@example.com',
+                    'send', 'Bulk approval', 'Bulk summary', gen_random_uuid(),
+                    CURRENT_TIMESTAMP + interval '1 day'
+               FROM generate_series(1, $5::int) AS series",
+        )
+        .bind(task.company_id)
+        .bind(task.channel_id)
+        .bind(task.id)
+        .bind(Uuid::new_v4().to_string())
+        .bind(count)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn bulk_outreaches(pool: &sqlx::PgPool, task_id: Uuid, count: i32) {
+        sqlx::query(
+            "INSERT INTO task_outreaches
+                 (id, task_id, status, required_threshold_percent, expires_at, outreach_key,
+                  subject, body)
+             SELECT gen_random_uuid(), $1, 'waiting', 50,
+                    CURRENT_TIMESTAMP + interval '1 day', $2 || '-' || series, 'Subject', 'Body'
+               FROM generate_series(1, $3::int) AS series",
+        )
+        .bind(task_id)
+        .bind(Uuid::new_v4().to_string())
+        .bind(count)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn chain_detail_bounds_every_collection_and_reports_the_truncation() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let detail_of = async |correlation_id| {
+            persistence
+                .get_task_chain_detail(company.id, correlation_id)
+                .await
+                .unwrap()
+                .unwrap()
+        };
+
+        // Tasks. The 201st task also pushes the chain past the event limit, since every enqueue
+        // writes one ledger row — which is exactly why `truncated` is one flag and not six.
+        let many_tasks = enqueue_chain(&persistence, company.id, channel.id, "limit-tasks").await;
+        bulk_tasks(&pool, &many_tasks, CHAIN_DETAIL_MAX_TASKS as i32).await;
+        let detail = detail_of(many_tasks.correlation_id).await;
+        assert!(detail.truncated);
+        assert_eq!(detail.tasks.len(), CHAIN_DETAIL_MAX_TASKS as usize);
+
+        // Attempts, one past the limit.
+        let many_attempts =
+            enqueue_chain(&persistence, company.id, channel.id, "limit-attempts").await;
+        bulk_attempts(
+            &pool,
+            many_attempts.id,
+            CHAIN_DETAIL_MAX_ATTEMPTS as i32 + 1,
+        )
+        .await;
+        let detail = detail_of(many_attempts.correlation_id).await;
+        assert!(detail.truncated);
+        assert_eq!(
+            detail.tasks[0].attempts.len(),
+            CHAIN_DETAIL_MAX_ATTEMPTS as usize
+        );
+
+        // Attempts, exactly at the limit. A full page is not a truncated one, and only the
+        // sentinel row can tell the two apart.
+        let full_attempts =
+            enqueue_chain(&persistence, company.id, channel.id, "limit-attempts-exact").await;
+        bulk_attempts(&pool, full_attempts.id, CHAIN_DETAIL_MAX_ATTEMPTS as i32).await;
+        let detail = detail_of(full_attempts.correlation_id).await;
+        assert!(!detail.truncated);
+        assert_eq!(
+            detail.tasks[0].attempts.len(),
+            CHAIN_DETAIL_MAX_ATTEMPTS as usize
+        );
+
+        // Deliveries.
+        let many_deliveries =
+            enqueue_chain(&persistence, company.id, channel.id, "limit-deliveries").await;
+        bulk_deliveries(
+            &pool,
+            &many_deliveries,
+            CHAIN_DETAIL_MAX_DELIVERIES as i32 + 1,
+        )
+        .await;
+        let detail = detail_of(many_deliveries.correlation_id).await;
+        assert!(detail.truncated);
+        assert_eq!(
+            detail.tasks[0].deliveries.len(),
+            CHAIN_DETAIL_MAX_DELIVERIES as usize
+        );
+
+        // Events: the enqueue wrote one, so the limit is crossed by the limit's worth on top.
+        let many_events = enqueue_chain(&persistence, company.id, channel.id, "limit-events").await;
+        bulk_status_events(&pool, &many_events, CHAIN_DETAIL_MAX_EVENTS as i32).await;
+        let detail = detail_of(many_events.correlation_id).await;
+        assert!(detail.truncated);
+        assert_eq!(detail.events.len(), CHAIN_DETAIL_MAX_EVENTS as usize);
+
+        // Approvals.
+        let many_approvals =
+            enqueue_chain(&persistence, company.id, channel.id, "limit-approvals").await;
+        bulk_approvals(
+            &pool,
+            &many_approvals,
+            CHAIN_DETAIL_MAX_APPROVALS as i32 + 1,
+        )
+        .await;
+        let detail = detail_of(many_approvals.correlation_id).await;
+        assert!(detail.truncated);
+        assert_eq!(detail.approvals.len(), CHAIN_DETAIL_MAX_APPROVALS as usize);
+
+        // Outreaches.
+        let many_outreaches =
+            enqueue_chain(&persistence, company.id, channel.id, "limit-outreaches").await;
+        bulk_outreaches(
+            &pool,
+            many_outreaches.id,
+            CHAIN_DETAIL_MAX_OUTREACHES as i32 + 1,
+        )
+        .await;
+        let detail = detail_of(many_outreaches.correlation_id).await;
+        assert!(detail.truncated);
+        assert_eq!(
+            detail.outreaches.len(),
+            CHAIN_DETAIL_MAX_OUTREACHES as usize
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    #[test]
+    fn a_full_page_is_not_a_truncated_one() {
+        let mut exactly_full = (0..3).collect::<Vec<_>>();
+        assert!(!trim_to_limit(&mut exactly_full, 3));
+        assert_eq!(exactly_full.len(), 3);
+
+        let mut one_over = (0..probe_limit(3)).collect::<Vec<_>>();
+        assert!(trim_to_limit(&mut one_over, 3));
+        assert_eq!(one_over, vec![0, 1, 2]);
+    }
+
+    #[tokio::test]
+    async fn a_status_write_that_changes_nothing_wakes_no_board() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+
+        // Everything is in place before the listener attaches, so the only notifications it can
+        // see are the ones this test provokes.
+        let quiet = enqueue_chain(&persistence, company.id, channel.id, "quiet").await;
+        let outbox_id = queue_one_email(&persistence, &quiet, "quiet").await;
+        bulk_approvals(&pool, &quiet, 1).await;
+        bulk_outreaches(&pool, quiet.id, 1).await;
+        let fence = enqueue_chain(&persistence, company.id, channel.id, "fence").await;
+        let fence_outbox = queue_one_email(&persistence, &fence, "fence").await;
+
+        let mut listener = sqlx::postgres::PgListener::connect_with(&pool)
+            .await
+            .unwrap();
+        listener.listen("task_chain_changed").await.unwrap();
+
+        // `UPDATE OF status` fires whenever the column is in the SET list, value unchanged or not.
+        for statement in [
+            "UPDATE email_outbox SET status = status, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+            "UPDATE human_approvals SET status = status, updated_at = CURRENT_TIMESTAMP
+              WHERE task_id = $1",
+            "UPDATE task_outreaches SET status = status, updated_at = CURRENT_TIMESTAMP
+              WHERE task_id = $1",
+        ] {
+            let target = if statement.contains("email_outbox") {
+                outbox_id
+            } else {
+                quiet.id
+            };
+            let affected = sqlx::query(statement)
+                .bind(target)
+                .execute(&pool)
+                .await
+                .unwrap();
+            assert_eq!(affected.rows_affected(), 1, "no-op write must hit its row");
+        }
+
+        // A real change on another chain, committed after all three no-ops. Notifications arrive
+        // in commit order on one connection, so reaching this one means the no-ops sent nothing.
+        mark_delivered(&pool, fence_outbox).await;
+
+        let quiet_wakes =
+            drain_chain_notifications(&mut listener, company.id, fence.correlation_id)
+                .await
+                .into_iter()
+                .filter(|id| *id == quiet.correlation_id.as_uuid())
+                .count();
+        assert_eq!(
+            quiet_wakes, 0,
+            "no-op status writes must not wake the board"
+        );
+
+        // The same three tables, actually changing status, still do wake it.
+        mark_delivered(&pool, outbox_id).await;
+        for statement in [
+            "UPDATE human_approvals SET status = 'approved' WHERE task_id = $1",
+            "UPDATE task_outreaches SET status = 'completed' WHERE task_id = $1",
+        ] {
+            sqlx::query(statement)
+                .bind(quiet.id)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        mark_delivered(
+            &pool,
+            queue_one_email(&persistence, &fence, "fence-2").await,
+        )
+        .await;
+        let real_wakes = drain_chain_notifications(&mut listener, company.id, fence.correlation_id)
+            .await
+            .into_iter()
+            .filter(|id| *id == quiet.correlation_id.as_uuid())
+            .count();
+        assert_eq!(
+            real_wakes, 3,
+            "outbox, approval and outreach each moved status"
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// Every chain notification this company emitted up to and including `until`.
+    ///
+    /// The fence is what makes a negative assertion possible: waiting for a notification that
+    /// should never arrive can only ever be a timeout, whereas waiting for one that must arrive
+    /// after it proves the earlier writes had their chance.
+    async fn drain_chain_notifications(
+        listener: &mut sqlx::postgres::PgListener,
+        company_id: Uuid,
+        until: CorrelationId,
+    ) -> Vec<Uuid> {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            let mut seen = Vec::new();
+            loop {
+                let notification = listener.recv().await.unwrap();
+                let payload: serde_json::Value =
+                    serde_json::from_str(notification.payload()).unwrap();
+                if payload["company_id"] != company_id.to_string() {
+                    continue;
+                }
+                let correlation_id =
+                    Uuid::parse_str(payload["correlation_id"].as_str().unwrap()).unwrap();
+                if correlation_id == until.as_uuid() {
+                    return seen;
+                }
+                seen.push(correlation_id);
+            }
+        })
+        .await
+        .expect("the fencing notification arrives")
     }
 
     #[tokio::test]

@@ -651,6 +651,11 @@ CREATE INDEX background_tasks_thread_idx
 CREATE INDEX background_tasks_waiting_due_idx
     ON background_tasks (wait_expires_at, id)
     WHERE status = 'waiting_for_third_party_reply' AND wait_expires_at IS NOT NULL;
+-- The Kanban board selects chains that are unfinished *or* touched recently. The unfinished arm is
+-- served by background_tasks_company_status_created_idx; this is the recency arm, so the two
+-- resolve as a BitmapOr instead of a full scan of every task the company has ever run.
+CREATE INDEX background_tasks_company_updated_idx
+    ON background_tasks (company_id, updated_at DESC);
 
 CREATE TABLE agent_channel_provisions (
     task_id UUID NOT NULL REFERENCES background_tasks(id) ON DELETE CASCADE,
@@ -872,6 +877,14 @@ CREATE INDEX email_outbox_task_idx
     ON email_outbox (task_id) WHERE task_id IS NOT NULL;
 CREATE INDEX email_outbox_company_channel_created_idx
     ON email_outbox (company_id, channel_id, created_at DESC, id DESC);
+-- The board's delivery-side recency arm; see background_tasks_company_updated_idx.
+CREATE INDEX email_outbox_company_updated_idx
+    ON email_outbox (company_id, updated_at DESC);
+-- Its unfinished arm. Added on measurement rather than symmetry: over 10k chains the board's
+-- `status IN (...) OR updated_at >= cutoff` still sequentially scanned the outbox without it, and
+-- only with both is the disjunction a BitmapOr of two index scans.
+CREATE INDEX email_outbox_company_status_idx
+    ON email_outbox (company_id, status);
 
 CREATE TABLE task_outreaches (
     id UUID PRIMARY KEY,
@@ -1080,6 +1093,28 @@ DECLARE
     notified_company_id UUID;
     notified_correlation_id UUID;
 BEGIN
+    -- `UPDATE OF status` fires whenever the column appears in a SET list, whether or not the value
+    -- moved. A write that leaves the status alone changes nothing the board draws, so it must not
+    -- wake every connected viewer of the company. This suppresses no real transition:
+    -- `pending -> sending -> sent` is three material changes and still emits three notifications,
+    -- which the stream coalesces on its own. The checks are per table because these are the only
+    -- notifying tables that have a `status` column at all.
+    IF TG_OP = 'UPDATE' THEN
+        IF TG_TABLE_NAME = 'email_outbox' THEN
+            IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+                RETURN NULL;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'human_approvals' THEN
+            IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+                RETURN NULL;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'task_outreaches' THEN
+            IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+                RETURN NULL;
+            END IF;
+        END IF;
+    END IF;
+
     IF TG_TABLE_NAME = 'task_status_events' THEN
         notified_company_id := NEW.company_id;
         notified_correlation_id := NEW.correlation_id;

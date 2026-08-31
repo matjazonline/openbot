@@ -47,7 +47,7 @@ use crate::{
 };
 
 use super::{
-    live_updates::task_chain_wake_ups,
+    live_updates::{Wake, task_chain_wake_ups},
     task::deserialize_empty_string_as_none,
     ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
 };
@@ -304,6 +304,73 @@ async fn task_chain_pane(
     Ok(Html(pages::task_chain_detail_pane(&detail, None)))
 }
 
+/// How long one logical transaction's burst of task/outbox/approval rows is absorbed before the
+/// board is redrawn once for all of them.
+const WAKE_COALESCE_WINDOW: Duration = Duration::from_millis(75);
+
+/// How often the board is redrawn with no event to prompt it.
+///
+/// The board's cutoff is "now minus seven days", and a connection that only recomputed it on an
+/// event would keep answering with the cutoff it opened with — a mailbox left open overnight would
+/// still be showing chains that aged out hours ago.
+const BOARD_WINDOW_REFRESH: Duration = Duration::from_secs(60);
+
+/// Whether a wake-up means the *selected* chain pane has to be rebuilt.
+///
+/// The board itself is redrawn on every wake, because any chain in the company can move its column
+/// counts. The pane is a much more expensive projection of one chain, so it is rebuilt only when
+/// the event names that chain — or when lag means we cannot tell what we missed and have to
+/// reconcile everything, which is the same contract the thread streams keep.
+fn wake_touches(wake: &Wake, selected: Option<CorrelationId>) -> bool {
+    match (wake, selected) {
+        (Wake::Lagged, _) => true,
+        (Wake::Event(event), Some(correlation_id)) => event.is_task_chain(correlation_id.as_uuid()),
+        (Wake::Event(_), None) => false,
+    }
+}
+
+/// Why the board stream is about to redraw, and how much of it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BoardRedraw {
+    /// Something in the company changed. The selected pane comes with the board only when one of
+    /// the coalesced wake-ups was about that chain.
+    Changed { refresh_selected: bool },
+    /// Nothing happened; the window simply slid, so the board's cutoff moves and the pane does not.
+    WindowSlid,
+    /// The event source is gone, and with it the connection.
+    Closed,
+}
+
+/// Wait for the next reason to redraw, absorbing a burst of wake-ups into one answer.
+///
+/// A single logical transaction commits task, outbox and approval rows together, so the wake-ups
+/// arrive in a clump; redrawing per row would send the client several fragments describing the
+/// same instant. Returning the decision rather than taking it inline is also what lets a
+/// paused-time test drive the timer and the coalescing window with no HTTP request or database
+/// behind them.
+async fn next_board_redraw<Changes>(
+    changes: &mut Changes,
+    selected: Option<CorrelationId>,
+    window_tick: &mut tokio::time::Interval,
+) -> BoardRedraw
+where
+    Changes: Stream<Item = Wake> + Unpin,
+{
+    tokio::select! {
+        first = changes.next() => {
+            let Some(first) = first else { return BoardRedraw::Closed };
+            let mut refresh_selected = wake_touches(&first, selected);
+            while let Ok(Some(wake)) =
+                tokio::time::timeout(WAKE_COALESCE_WINDOW, changes.next()).await
+            {
+                refresh_selected |= wake_touches(&wake, selected);
+            }
+            BoardRedraw::Changed { refresh_selected }
+        }
+        _ = window_tick.tick() => BoardRedraw::WindowSlid,
+    }
+}
+
 /// GET /ui/tasks/events - Company-filtered board wake-ups.
 ///
 /// Notifications carry identifiers only. They are coalesced and every emitted fragment is a
@@ -316,12 +383,20 @@ async fn task_board_stream(
 ) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
     let company = workspace.scoped_company(query.company_id).await?;
     let company_id = company.id;
-    let filter = query.board_filter();
     let selected = query.correlation_id.map(CorrelationId::from);
     let mut changes = Box::pin(task_chain_wake_ups(&events, "task-board", company_id));
 
     let stream = async_stream::stream! {
+        // The first pass always paints the pane: the client has nothing yet.
+        let mut refresh_selected = true;
+        let mut window_tick = tokio::time::interval_at(
+            tokio::time::Instant::now() + BOARD_WINDOW_REFRESH,
+            BOARD_WINDOW_REFRESH,
+        );
         loop {
+            // Recomputed every pass so the seven-day window slides with the connection rather than
+            // freezing at whatever it was when the mailbox was opened.
+            let filter = query.board_filter();
             match workspace.view(&company).board(filter).await {
                 Ok(board) => yield Ok(Event::default().event("task-board").data(
                     pages::task_board_fragment(
@@ -337,7 +412,7 @@ async fn task_board_stream(
                     return;
                 }
             }
-            if let Some(correlation_id) = selected {
+            if refresh_selected && let Some(correlation_id) = selected {
                 match workspace.view(&company).chain(correlation_id).await {
                     Ok(Some(detail)) => yield Ok(Event::default().event("task-chain").data(
                         pages::task_chain_detail_pane(&detail, None)
@@ -352,14 +427,15 @@ async fn task_board_stream(
                 }
             }
 
-            if changes.next().await.is_none() {
-                return;
-            }
-            // Absorb a burst of task/outbox/approval rows from one logical transaction.
-            while matches!(
-                tokio::time::timeout(Duration::from_millis(75), changes.next()).await,
-                Ok(Some(_))
-            ) {}
+            refresh_selected = match
+                next_board_redraw(&mut changes, selected, &mut window_tick).await
+            {
+                BoardRedraw::Changed { refresh_selected } => refresh_selected,
+                // The window slid; nothing about the selected chain changed, so redrawing its
+                // pane would only cost a query and blink the operator's scroll position.
+                BoardRedraw::WindowSlid => false,
+                BoardRedraw::Closed => return,
+            };
         }
     };
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
@@ -622,5 +698,148 @@ impl TaskMonitorView<'_> {
         );
 
         Ok(Html(format!("{pane}{list}")).into_response())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::infra::events::{MailboxEvent, TaskChainScope, ThreadScope};
+
+    fn chain_event(company_id: Uuid, correlation_id: Uuid) -> Wake {
+        Wake::Event(MailboxEvent::TaskChainChanged(TaskChainScope {
+            company_id,
+            correlation_id,
+        }))
+    }
+
+    #[test]
+    fn only_the_selected_chain_or_an_unknown_gap_rebuilds_the_pane() {
+        let company_id = Uuid::new_v4();
+        let selected = CorrelationId::from(Uuid::new_v4());
+        let other = Uuid::new_v4();
+
+        assert!(wake_touches(&Wake::Lagged, Some(selected)));
+        assert!(
+            wake_touches(&Wake::Lagged, None),
+            "lag means we cannot tell what was missed, so everything is redrawn"
+        );
+        assert!(wake_touches(
+            &chain_event(company_id, selected.as_uuid()),
+            Some(selected)
+        ));
+        assert!(!wake_touches(
+            &chain_event(company_id, other),
+            Some(selected)
+        ));
+        assert!(!wake_touches(
+            &chain_event(company_id, selected.as_uuid()),
+            None
+        ));
+
+        // A thread event reaching this stream at all would be a filter bug, but it is not a reason
+        // to re-project a chain.
+        let thread = Wake::Event(MailboxEvent::ActivityChanged(ThreadScope {
+            thread_id: Uuid::new_v4(),
+            channel_id: Uuid::new_v4(),
+            company_id,
+        }));
+        assert!(!wake_touches(&thread, Some(selected)));
+    }
+
+    /// The window has to keep sliding on a connection nobody is writing to: a board left open
+    /// overnight would otherwise still be answering with the cutoff it was opened with.
+    #[tokio::test(start_paused = true)]
+    async fn a_quiet_connection_still_slides_its_window_without_touching_the_pane() {
+        let events = MailboxEvents::new();
+        let company_id = Uuid::new_v4();
+        let selected = CorrelationId::from(Uuid::new_v4());
+        let mut changes = Box::pin(task_chain_wake_ups(&events, "test", company_id));
+        let mut window_tick = tokio::time::interval_at(
+            tokio::time::Instant::now() + BOARD_WINDOW_REFRESH,
+            BOARD_WINDOW_REFRESH,
+        );
+
+        assert_eq!(
+            next_board_redraw(&mut changes, Some(selected), &mut window_tick).await,
+            BoardRedraw::WindowSlid
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_burst_redraws_the_pane_only_when_one_of_its_wake_ups_names_that_chain() {
+        let events = MailboxEvents::new();
+        let company_id = Uuid::new_v4();
+        let selected = CorrelationId::from(Uuid::new_v4());
+        let mut changes = Box::pin(task_chain_wake_ups(&events, "test", company_id));
+        let mut window_tick = tokio::time::interval_at(
+            tokio::time::Instant::now() + BOARD_WINDOW_REFRESH,
+            BOARD_WINDOW_REFRESH,
+        );
+
+        for _ in 0..3 {
+            events.publish(MailboxEvent::TaskChainChanged(TaskChainScope {
+                company_id,
+                correlation_id: Uuid::new_v4(),
+            }));
+        }
+        assert_eq!(
+            next_board_redraw(&mut changes, Some(selected), &mut window_tick).await,
+            BoardRedraw::Changed {
+                refresh_selected: false
+            },
+            "other chains move the board's counts, not the open pane"
+        );
+
+        // The selected chain arrives last in the burst, so a decision taken on the first wake-up
+        // alone would miss it.
+        for correlation_id in [Uuid::new_v4(), Uuid::new_v4(), selected.as_uuid()] {
+            events.publish(MailboxEvent::TaskChainChanged(TaskChainScope {
+                company_id,
+                correlation_id,
+            }));
+        }
+        assert_eq!(
+            next_board_redraw(&mut changes, Some(selected), &mut window_tick).await,
+            BoardRedraw::Changed {
+                refresh_selected: true
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn a_closed_event_source_ends_the_connection() {
+        let events = MailboxEvents::new();
+        let mut changes = Box::pin(tokio_stream::iter(Vec::<Wake>::new()));
+        let mut window_tick = tokio::time::interval_at(
+            tokio::time::Instant::now() + BOARD_WINDOW_REFRESH,
+            BOARD_WINDOW_REFRESH,
+        );
+        drop(events);
+
+        assert_eq!(
+            next_board_redraw(&mut changes, None, &mut window_tick).await,
+            BoardRedraw::Closed
+        );
+    }
+
+    /// The cutoff is computed per pass, not captured once — which is the whole reason the stream
+    /// calls this inside its loop rather than before it.
+    #[test]
+    fn the_board_cutoff_moves_with_the_clock() {
+        let query = TasksQuery {
+            company_id: None,
+            view: None,
+            correlation_id: None,
+            task_id: None,
+            channel_id: None,
+            status: None,
+            sort: None,
+            page: None,
+            limit: None,
+        };
+        let first = query.board_filter();
+        std::thread::sleep(Duration::from_millis(2));
+        assert!(query.board_filter().terminal_since > first.terminal_since);
     }
 }

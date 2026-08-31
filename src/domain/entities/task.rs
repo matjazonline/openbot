@@ -885,6 +885,11 @@ pub struct TaskChainDetail {
     pub events: Vec<TaskStatusEvent>,
     pub approvals: Vec<TaskApprovalContext>,
     pub outreaches: Vec<TaskOutreachContext>,
+    /// Set when any of the pane's bounded reads had more rows to give.
+    ///
+    /// The pane says so rather than drawing a partial timeline that reads as a complete one — a
+    /// chain that silently stops halfway is worse than one that admits where it was cut.
+    pub truncated: bool,
 }
 
 /// One page of a company's background tasks: which ones, in what order, and how far in.

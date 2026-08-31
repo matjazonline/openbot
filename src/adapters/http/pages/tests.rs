@@ -4837,3 +4837,35 @@ fn dump_application_javascript() {
     )
     .expect("write bundle");
 }
+
+#[test]
+fn a_truncated_chain_pane_says_so_and_a_complete_one_does_not() {
+    // A partial timeline that looks complete is the failure worth guarding against: an operator
+    // reading it would conclude the chain simply stopped where the pane ran out of room.
+    let company = mailbox_company();
+    let detail = TaskChainDetail {
+        company_id: company.id,
+        correlation_id: CorrelationId::new(),
+        title: "Long chain".into(),
+        channel_names: vec!["Inbox".into()],
+        agent_names: vec!["Triage".into()],
+        tasks: Vec::new(),
+        events: Vec::new(),
+        approvals: Vec::new(),
+        outreaches: Vec::new(),
+        truncated: true,
+    };
+
+    let notice = "This chain is larger than the pane shows.";
+    assert!(task_chain_detail_pane(&detail, None).contains(notice));
+    assert!(
+        !task_chain_detail_pane(
+            &TaskChainDetail {
+                truncated: false,
+                ..detail
+            },
+            None
+        )
+        .contains(notice)
+    );
+}
