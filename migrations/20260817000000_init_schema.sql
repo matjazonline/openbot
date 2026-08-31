@@ -649,7 +649,7 @@ CREATE TABLE background_tasks (
             'retryable_failure', 'terminal_failure', 'timed_out', 'shutdown',
             'lease_lost', 'approval_requested', 'approval_accepted', 'approval_rejected',
             'outreach_started', 'outreach_reply_received', 'outreach_timed_out',
-            'outreach_extended', 'operator_stopped', 'operator_resumed'
+            'outreach_extended', 'operator_stopped', 'operator_resumed', 'unknown'
         )
     ),
     CONSTRAINT background_tasks_transition_actor_kind_check CHECK (
@@ -1038,7 +1038,7 @@ CREATE TABLE task_status_events (
         'retryable_failure', 'terminal_failure', 'timed_out', 'shutdown',
         'lease_lost', 'approval_requested', 'approval_accepted', 'approval_rejected',
         'outreach_started', 'outreach_reply_received', 'outreach_timed_out',
-        'outreach_extended', 'operator_stopped', 'operator_resumed'
+        'outreach_extended', 'operator_stopped', 'operator_resumed', 'unknown'
     )),
     CONSTRAINT task_status_events_actor_kind_check CHECK (actor_kind IN (
         'system', 'worker', 'operator', 'approval', 'outreach'
@@ -1109,7 +1109,12 @@ BEGIN
                  AND NEW.status = 'waiting_for_third_party_reply' THEN 'outreach_extended'
             WHEN NEW.status = 'stopped' THEN 'operator_stopped'
             WHEN OLD.status = 'stopped' AND NEW.status = 'pending' THEN 'operator_resumed'
-            ELSE 'retryable_failure'
+            -- Nothing above established a cause, so none is claimed. `retryable_failure` used to
+            -- stand here, which turned every unattributed transition into a fabricated worker
+            -- failure -- an operator resuming a dead-lettered task was filed as the worker failing
+            -- it again. A row that says "unclassified" is greppable; a row that says the wrong
+            -- thing is not.
+            ELSE 'unknown'
         END;
     END IF;
 

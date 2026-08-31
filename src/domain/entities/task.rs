@@ -560,6 +560,17 @@ pub enum TaskTransitionReason {
     OutreachExtended,
     OperatorStopped,
     OperatorResumed,
+    /// The transition happened, but nothing on the write said why.
+    ///
+    /// Every caller that knows its cause states it, so this reason means a status changed through
+    /// a path that does not -- which is a gap in the write contract, not a kind of failure. It is
+    /// recorded rather than guessed so the gap can be found:
+    ///
+    /// ```sql
+    /// SELECT from_status, to_status, count(*) FROM task_status_events
+    ///  WHERE reason = 'unknown' GROUP BY 1, 2;
+    /// ```
+    Unknown,
 }
 
 impl TaskTransitionReason {
@@ -582,6 +593,7 @@ impl TaskTransitionReason {
             Self::OutreachExtended => "outreach_extended",
             Self::OperatorStopped => "operator_stopped",
             Self::OperatorResumed => "operator_resumed",
+            Self::Unknown => "unknown",
         }
     }
 }
@@ -608,6 +620,7 @@ impl FromStr for TaskTransitionReason {
             "outreach_extended" => Ok(Self::OutreachExtended),
             "operator_stopped" => Ok(Self::OperatorStopped),
             "operator_resumed" => Ok(Self::OperatorResumed),
+            "unknown" => Ok(Self::Unknown),
             other => Err(format!("Unknown task transition reason: {other}")),
         }
     }

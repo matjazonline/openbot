@@ -121,3 +121,67 @@ impl ApprovalAction {
 
 /// The `action_type` that asks a human what to do about an outreach that never reached quorum.
 pub const QUORUM_TIMEOUT_ACTION: &str = "quorum_timeout";
+
+/// What a human chose about an outreach that never reached quorum.
+///
+/// The choice arrives as a string in a one-click link, so it is parsed once here and travels as a
+/// value from there on. Matching the string again further in is how `reject` came to be recorded
+/// as an operator stop, and how an unrecognised verb came to be recorded as consent: a `_` arm has
+/// to guess, and the guess it makes is invisible. With the verbs named, adding one is a compile
+/// error at every place that has to handle it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuorumTimeoutAction {
+    /// Continue with whatever responses arrived.
+    ProceedPartial,
+    /// Wait longer for the outstanding responses.
+    Extend { hours: i64 },
+    /// Abandon the outreach and stop the task waiting on it.
+    Reject,
+}
+
+impl FromStr for QuorumTimeoutAction {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "proceed_partial" => Ok(Self::ProceedPartial),
+            "extend_48h" => Ok(Self::Extend { hours: 48 }),
+            "extend_24h" | "extend" => Ok(Self::Extend { hours: 24 }),
+            "reject" => Ok(Self::Reject),
+            other => Err(format!("Unknown quorum timeout action: {other}")),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The verbs are the ones the decision links are built with, so the parser and the mail body
+    /// have to agree on all of them -- including the two spellings of a 24-hour extension, which
+    /// exist because the link predates the explicit variant.
+    #[test]
+    fn every_quorum_timeout_verb_the_links_offer_parses_to_its_decision() {
+        for (verb, expected) in [
+            ("proceed_partial", QuorumTimeoutAction::ProceedPartial),
+            ("extend_48h", QuorumTimeoutAction::Extend { hours: 48 }),
+            ("extend_24h", QuorumTimeoutAction::Extend { hours: 24 }),
+            ("extend", QuorumTimeoutAction::Extend { hours: 24 }),
+            ("reject", QuorumTimeoutAction::Reject),
+        ] {
+            assert_eq!(verb.parse(), Ok(expected), "verb {verb}");
+        }
+    }
+
+    /// The point of parsing once. An unrecognised verb is an error here rather than a `_` arm
+    /// further in, which is what used to record a typo as consent the human never gave.
+    #[test]
+    fn an_unrecognised_verb_is_an_error_rather_than_a_default_decision() {
+        for verb in ["", "approve", "confirm", "rejected", "extend_72h", "REJECT"] {
+            assert!(
+                verb.parse::<QuorumTimeoutAction>().is_err(),
+                "verb {verb} must not resolve to a decision"
+            );
+        }
+    }
+}

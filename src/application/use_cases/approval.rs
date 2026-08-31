@@ -10,7 +10,10 @@ use crate::{
     },
     app_error::{AppError, AppResult},
     entities::{
-        approval::{ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval},
+        approval::{
+            ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval, QUORUM_TIMEOUT_ACTION,
+            QuorumTimeoutAction,
+        },
         message::{Message, MessageDirection, MessageRole},
         task::{ResumeActor, StopActor},
     },
@@ -158,9 +161,12 @@ impl ApprovalUseCases {
         }
 
         let normalized_action = action.to_lowercase();
+        // The verb comes off a link someone clicked, so an unrecognised one is bad input rather
+        // than a fault on this side. It is also the last place a string is inspected: everything
+        // below matches on the parsed value.
         let decision =
             LinkAction::parse(&normalized_action, &approval.action_type).ok_or_else(|| {
-                AppError::Internal(format!(
+                AppError::BadRequest(format!(
                     "Action '{}' is not valid for approval type '{}'.",
                     action, approval.action_type
                 ))
@@ -169,14 +175,17 @@ impl ApprovalUseCases {
         let now = Utc::now();
         // Quorum timeouts carry the chosen option through to the paused task; everything else is a
         // plain approve/reject state transition.
-        let consumed = if approval.action_type == "quorum_timeout" && approval.task_id.is_some() {
-            self.approval_persistence
-                .consume_quorum_timeout_action(token, &normalized_action, now)
-                .await?
-        } else {
-            self.approval_persistence
-                .consume_pending_approval(token, decision.status(), now)
-                .await?
+        let consumed = match decision {
+            LinkAction::QuorumTimeout(quorum_action) if approval.task_id.is_some() => {
+                self.approval_persistence
+                    .consume_quorum_timeout_action(token, quorum_action, now)
+                    .await?
+            }
+            _ => {
+                self.approval_persistence
+                    .consume_pending_approval(token, decision.status(), now)
+                    .await?
+            }
         };
         // Losing the race to consume means someone (or the expiry sweep) got there first.
         let Some(updated) = consumed else {
@@ -198,7 +207,7 @@ impl ApprovalUseCases {
         decision: LinkAction,
     ) -> AppResult<String> {
         match decision {
-            LinkAction::ProceedPartial => {
+            LinkAction::QuorumTimeout(QuorumTimeoutAction::ProceedPartial) => {
                 self.record_decision_note(
                     approval,
                     "quorum-partial",
@@ -214,7 +223,7 @@ impl ApprovalUseCases {
                     approval.action_title
                 ))
             }
-            LinkAction::Extend { hours } => {
+            LinkAction::QuorumTimeout(QuorumTimeoutAction::Extend { hours }) => {
                 self.record_decision_note(
                     approval,
                     "quorum-extended",
@@ -259,11 +268,15 @@ impl ApprovalUseCases {
                     approval.action_title
                 ))
             }
+            LinkAction::QuorumTimeout(QuorumTimeoutAction::Reject) => {
+                // The transaction that consumed this approval also cancelled the outreach and
+                // stopped the task, so there is no transition left to order here. The old
+                // `action_type != "quorum_timeout"` guard on the shared arm below said the same
+                // thing by re-reading a string; separate arms say it by construction.
+                Ok(self.record_rejection(approval).await)
+            }
             LinkAction::Reject => {
-                // A rejected quorum timeout leaves the task paused for its own timeout handling.
-                if let Some(task_id) = approval.task_id
-                    && approval.action_type != "quorum_timeout"
-                {
+                if let Some(task_id) = approval.task_id {
                     self.task_persistence
                         .stop_task(task_id, StopActor::Approval(approval.id))
                         .await
@@ -276,22 +289,29 @@ impl ApprovalUseCases {
                             )
                         })?;
                 }
-                self.record_decision_note(
-                    approval,
-                    "approval-rejected",
-                    "HITL Rejected",
-                    format!(
-                        "Human approval REJECTED by {} for action '{}'.",
-                        approval.approver_email, approval.action_title
-                    ),
-                )
-                .await;
-                Ok(format!(
-                    "✗ Action '{}' has been REJECTED. The automated channel task has been cancelled.",
-                    approval.action_title
-                ))
+                Ok(self.record_rejection(approval).await)
             }
         }
+    }
+
+    /// Record a rejection on the originating thread and describe it for the human who clicked.
+    ///
+    /// Both rejection paths end here; they differ only in who stopped the task.
+    async fn record_rejection(&self, approval: &HumanApproval) -> String {
+        self.record_decision_note(
+            approval,
+            "approval-rejected",
+            "HITL Rejected",
+            format!(
+                "Human approval REJECTED by {} for action '{}'.",
+                approval.approver_email, approval.action_title
+            ),
+        )
+        .await;
+        format!(
+            "✗ Action '{}' has been REJECTED. The automated channel task has been cancelled.",
+            approval.action_title
+        )
     }
 
     /// Append the decision to the originating thread so the conversation records who decided what.
@@ -382,14 +402,14 @@ impl ApprovalUseCases {
 }
 
 /// What a one-click approval link asks for, once validated against the approval it belongs to.
+///
+/// The two kinds of approval offer disjoint verbs, and this is where that stops being a runtime
+/// question: a quorum timeout carries [`QuorumTimeoutAction`], and everything else is the plain
+/// confirm/reject pair. Nothing downstream re-reads the query string to work out which it got.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LinkAction {
-    /// Quorum timeout: continue with whatever responses arrived.
-    ProceedPartial,
-    /// Quorum timeout: wait longer.
-    Extend {
-        hours: u32,
-    },
+    /// A quorum timeout's own decision, parsed once and passed on as a value.
+    QuorumTimeout(QuorumTimeoutAction),
     Approve,
     Reject,
 }
@@ -397,22 +417,22 @@ enum LinkAction {
 impl LinkAction {
     /// Parse the query-string action, rejecting verbs that don't belong to this approval type.
     fn parse(normalized_action: &str, approval_action_type: &str) -> Option<Self> {
-        let is_quorum_timeout = approval_action_type == "quorum_timeout";
+        if approval_action_type == QUORUM_TIMEOUT_ACTION {
+            return normalized_action.parse().ok().map(Self::QuorumTimeout);
+        }
         match normalized_action {
-            "proceed_partial" if is_quorum_timeout => Some(Self::ProceedPartial),
-            "extend_48h" if is_quorum_timeout => Some(Self::Extend { hours: 48 }),
-            "extend_24h" | "extend" if is_quorum_timeout => Some(Self::Extend { hours: 24 }),
-            "confirm" | "approved" | "approve" if !is_quorum_timeout => Some(Self::Approve),
-            "reject" => Some(Self::Reject),
-            "rejected" if !is_quorum_timeout => Some(Self::Reject),
+            "confirm" | "approved" | "approve" => Some(Self::Approve),
+            "reject" | "rejected" => Some(Self::Reject),
             _ => None,
         }
     }
 
     fn status(self) -> ApprovalStatus {
         match self {
-            Self::Reject => ApprovalStatus::Rejected,
-            _ => ApprovalStatus::Approved,
+            Self::Reject | Self::QuorumTimeout(QuorumTimeoutAction::Reject) => {
+                ApprovalStatus::Rejected
+            }
+            Self::Approve | Self::QuorumTimeout(_) => ApprovalStatus::Approved,
         }
     }
 }
@@ -427,6 +447,66 @@ fn already_processed_message(approval: &HumanApproval) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The two approval kinds offer disjoint verbs, and a verb borrowed from the other kind is
+    /// refused rather than reinterpreted. `reject` is the only one both accept, and it resolves to
+    /// a different decision on each side: a quorum rejection is settled inside the transaction
+    /// that consumes the approval, a plain one still has to stop its task.
+    #[test]
+    fn link_verbs_are_accepted_only_for_the_approval_kind_that_offers_them() {
+        use LinkAction::{Approve, QuorumTimeout, Reject};
+        use QuorumTimeoutAction::{Extend, ProceedPartial};
+
+        let quorum = |verb| LinkAction::parse(verb, QUORUM_TIMEOUT_ACTION);
+        assert_eq!(
+            quorum("proceed_partial"),
+            Some(QuorumTimeout(ProceedPartial))
+        );
+        assert_eq!(
+            quorum("extend_48h"),
+            Some(QuorumTimeout(Extend { hours: 48 }))
+        );
+        assert_eq!(
+            quorum("extend_24h"),
+            Some(QuorumTimeout(Extend { hours: 24 }))
+        );
+        assert_eq!(quorum("extend"), Some(QuorumTimeout(Extend { hours: 24 })));
+        assert_eq!(
+            quorum("reject"),
+            Some(QuorumTimeout(QuorumTimeoutAction::Reject))
+        );
+        for borrowed in ["confirm", "approve", "approved", "rejected"] {
+            assert_eq!(quorum(borrowed), None, "verb {borrowed}");
+        }
+
+        let plain = |verb| LinkAction::parse(verb, "tool");
+        for accepted in ["confirm", "approve", "approved"] {
+            assert_eq!(plain(accepted), Some(Approve), "verb {accepted}");
+        }
+        for accepted in ["reject", "rejected"] {
+            assert_eq!(plain(accepted), Some(Reject), "verb {accepted}");
+        }
+        for borrowed in ["proceed_partial", "extend_24h", "extend"] {
+            assert_eq!(plain(borrowed), None, "verb {borrowed}");
+        }
+    }
+
+    /// A quorum rejection consumes its approval as rejected like any other. It reaches
+    /// `consume_quorum_timeout_action` rather than `consume_pending_approval`, but the status it
+    /// records is not the thing that differs.
+    #[test]
+    fn a_rejection_records_the_rejected_status_whichever_kind_it_came_from() {
+        assert_eq!(LinkAction::Reject.status(), ApprovalStatus::Rejected);
+        assert_eq!(
+            LinkAction::QuorumTimeout(QuorumTimeoutAction::Reject).status(),
+            ApprovalStatus::Rejected
+        );
+        assert_eq!(LinkAction::Approve.status(), ApprovalStatus::Approved);
+        assert_eq!(
+            LinkAction::QuorumTimeout(QuorumTimeoutAction::ProceedPartial).status(),
+            ApprovalStatus::Approved
+        );
+    }
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::correlation::CorrelationId;
     use crate::entities::task::NewTask;

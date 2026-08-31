@@ -8,7 +8,9 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::{PostgresPersistence, task::TransitionAttribution},
     app_error::{AppError, AppResult},
-    entities::approval::{ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval},
+    entities::approval::{
+        ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval, QuorumTimeoutAction,
+    },
 };
 
 /// One approval to write, and the notification to queue alongside it.
@@ -111,7 +113,7 @@ pub trait ApprovalPersistence: Send + Sync {
     async fn consume_quorum_timeout_action(
         &self,
         _token: &str,
-        _action: &str,
+        _action: QuorumTimeoutAction,
         _now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>> {
         Err(AppError::Internal(
@@ -343,7 +345,7 @@ impl ApprovalPersistence for PostgresPersistence {
     async fn consume_quorum_timeout_action(
         &self,
         token: &str,
-        action: &str,
+        action: QuorumTimeoutAction,
         now: DateTime<Utc>,
     ) -> AppResult<Option<HumanApproval>> {
         let Ok(token) = Uuid::parse_str(token) else {
@@ -368,17 +370,19 @@ impl ApprovalPersistence for PostgresPersistence {
         let task_id = approval.task_id.ok_or_else(|| {
             AppError::Internal("Quorum timeout approval is missing its task".into())
         })?;
+        // Every arm names the decision the human actually made. `reject` used to borrow
+        // `operator_stopped`, which contradicted its own `approval` actor kind, and the `_` arm
+        // filed anything it did not recognise as consent.
         let transition_reason = match action {
-            "proceed_partial" => TaskTransitionReason::ApprovalAccepted,
-            "extend_24h" | "extend_48h" | "extend" => TaskTransitionReason::OutreachExtended,
-            "reject" => TaskTransitionReason::OperatorStopped,
-            _ => TaskTransitionReason::ApprovalAccepted,
+            QuorumTimeoutAction::ProceedPartial => TaskTransitionReason::ApprovalAccepted,
+            QuorumTimeoutAction::Extend { .. } => TaskTransitionReason::OutreachExtended,
+            QuorumTimeoutAction::Reject => TaskTransitionReason::ApprovalRejected,
         };
         let attribution =
             TransitionAttribution::new(transition_reason, TransitionActor::Approval(approval.id));
 
         let task_updated = match action {
-            "proceed_partial" => {
+            QuorumTimeoutAction::ProceedPartial => {
                 let outreach = sqlx::query(
                     r#"UPDATE task_outreaches SET status = 'proceed_partial',
                            updated_at = CURRENT_TIMESTAMP
@@ -400,8 +404,7 @@ impl ApprovalPersistence for PostgresPersistence {
                 .map_err(AppError::from)?;
                 outreach.rows_affected() == 1 && task.rows_affected() == 1
             }
-            "extend_24h" | "extend_48h" | "extend" => {
-                let hours = if action == "extend_48h" { 48 } else { 24 };
+            QuorumTimeoutAction::Extend { hours } => {
                 let expires_at = now + chrono::Duration::hours(hours);
                 let outreach = sqlx::query(
                     r#"UPDATE task_outreaches SET status = 'waiting', expires_at = $2,
@@ -426,7 +429,7 @@ impl ApprovalPersistence for PostgresPersistence {
                 .map_err(AppError::from)?;
                 outreach.rows_affected() == 1 && task.rows_affected() == 1
             }
-            "reject" => {
+            QuorumTimeoutAction::Reject => {
                 let outreach = sqlx::query(
                     r#"UPDATE task_outreaches SET status = 'cancelled',
                            updated_at = CURRENT_TIMESTAMP
@@ -458,7 +461,6 @@ impl ApprovalPersistence for PostgresPersistence {
                 .map_err(AppError::from)?;
                 outreach.rows_affected() == 1 && task.rows_affected() == 1
             }
-            _ => false,
         };
         if !task_updated {
             tx.rollback().await.map_err(AppError::from)?;
@@ -466,10 +468,11 @@ impl ApprovalPersistence for PostgresPersistence {
                 "Outreach is no longer awaiting this timeout decision".into(),
             ));
         }
-        let status = if action == "reject" {
-            ApprovalStatus::Rejected
-        } else {
-            ApprovalStatus::Approved
+        let status = match action {
+            QuorumTimeoutAction::Reject => ApprovalStatus::Rejected,
+            QuorumTimeoutAction::ProceedPartial | QuorumTimeoutAction::Extend { .. } => {
+                ApprovalStatus::Approved
+            }
         };
         let updated = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"UPDATE human_approvals SET status = $2, updated_at = CURRENT_TIMESTAMP
@@ -539,7 +542,9 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::test_pool;
+    use crate::entities::approval::QUORUM_TIMEOUT_ACTION;
     use crate::entities::correlation::CorrelationId;
+    use crate::entities::outreach::CreateOutreachRequest;
     use crate::entities::task::{NewTask, TaskTransitionReason};
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
@@ -833,6 +838,181 @@ mod tests {
                 .filter(Option::is_some)
                 .count(),
             1
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// A rejected quorum timeout is an approval acting, and the ledger has to say so.
+    ///
+    /// It used to record `operator_stopped` against an `approval` actor kind -- a row that
+    /// contradicted itself, and that the trigger's own reason-to-actor mapping disagreed with. The
+    /// sibling arms are covered by the type: the match is exhaustive over
+    /// [`QuorumTimeoutAction`], so there is no longer a `_` arm able to file an unrecognised verb
+    /// as consent.
+    #[tokio::test]
+    async fn a_rejected_quorum_timeout_is_recorded_as_the_approval_that_rejected_it() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("quorum_owner_{suffix}");
+        let email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Quorum Test".to_string(),
+                slug: format!("quorum-test-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Quorum".into(),
+                slug: "quorum".into(),
+                enabled: false,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let email_addr = crate::entities::value_objects::EmailAddress::from(email.clone());
+        let thread = persistence
+            .create_thread(channel.id, "Quorum", std::slice::from_ref(&email_addr))
+            .await
+            .unwrap();
+        let task = persistence
+            .enqueue_task(NewTask::starting_new_chain(
+                company.id,
+                channel.id,
+                Some(thread.id),
+                "quorum_reject",
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        // Park the task behind an outreach, then let that outreach time out unanswered -- the one
+        // state a quorum-timeout decision is allowed to act on.
+        let worker_id = Uuid::new_v4();
+        assert!(
+            persistence
+                .claim_task(
+                    task.id,
+                    worker_id,
+                    Utc::now() + chrono::Duration::minutes(5)
+                )
+                .await
+                .unwrap()
+        );
+        let outreach_id = Uuid::new_v4();
+        persistence
+            .create_outreach_and_pause(CreateOutreachRequest {
+                correlation_id: task.correlation_id,
+                id: outreach_id,
+                task_id: task.id,
+                company_id: company.id,
+                channel_id: channel.id,
+                worker_id,
+                outreach_key: "quorum-reject".into(),
+                required_threshold_percent: 100.0,
+                expires_at: Utc::now() + chrono::Duration::hours(1),
+                subject: "Question".into(),
+                body: "Please respond".into(),
+                targets: Vec::new(),
+            })
+            .await
+            .unwrap();
+        // The schema refuses an outreach that expires before it was created, so the whole row is
+        // backdated rather than only its deadline.
+        sqlx::query(
+            "UPDATE task_outreaches
+                SET created_at = CURRENT_TIMESTAMP - interval '2 hours',
+                    expires_at = CURRENT_TIMESTAMP - interval '1 hour'
+              WHERE id = $1",
+        )
+        .bind(outreach_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(
+            persistence
+                .mark_outreach_timeout_pending(outreach_id)
+                .await
+                .unwrap()
+        );
+
+        let token = Uuid::new_v4();
+        let (approval, created) = persistence
+            .create_approval(NewApproval {
+                subject: &ApprovalSubject {
+                    suspension: Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
+                    ..approval_subject(&company, &channel, thread.id, &email)
+                },
+                action: &ApprovalAction {
+                    step_key: format!("quorum-{suffix}"),
+                    action_type: QUORUM_TIMEOUT_ACTION.to_string(),
+                    title: "Outreach timed out".to_string(),
+                    summary: "Received 1/4 responses.".to_string(),
+                    payload: serde_json::json!({}),
+                },
+                notification: serde_json::json!({}),
+                token,
+                expires_at: Utc::now() + chrono::Duration::hours(1),
+            })
+            .await
+            .unwrap();
+        assert!(created);
+
+        let consumed = persistence
+            .consume_quorum_timeout_action(
+                &token.to_string(),
+                QuorumTimeoutAction::Reject,
+                Utc::now(),
+            )
+            .await
+            .unwrap()
+            .expect("the pending quorum approval is the one consumed");
+        assert_eq!(consumed.status, ApprovalStatus::Rejected);
+
+        let events = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 50)
+            .await
+            .unwrap();
+        let rejection = events
+            .iter()
+            .find(|event| event.reason == TaskTransitionReason::ApprovalRejected)
+            .expect("the rejection stopped the task");
+        assert_eq!(
+            rejection.actor_kind,
+            crate::entities::task::TaskTransitionActorKind::Approval
+        );
+        assert_eq!(rejection.related_approval_id, Some(approval.id));
+        assert_eq!(
+            rejection.to_status,
+            crate::entities::task::TaskStatus::Stopped
+        );
+        assert!(
+            !events
+                .iter()
+                .any(|event| event.reason == TaskTransitionReason::OperatorStopped),
+            "no operator was involved: {events:#?}"
         );
 
         CompanyPersistence::delete(&persistence, company.id)

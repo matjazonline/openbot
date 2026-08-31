@@ -2988,6 +2988,47 @@ async fn stop_task_on(
     db.try_into()
 }
 
+/// Which states each resume cause may act on.
+///
+/// The two causes reach the same status from opposite directions and must not share a predicate.
+/// An operator picks up work that has stopped or run out of road. An approval releases the one
+/// task it parked -- letting it act on `failed` or `dead_letter` would have a stale link resurrect
+/// abandoned work, and letting an operator act on `pending_approval` or
+/// `waiting_for_third_party_reply` would walk a task straight through the gate it is parked on.
+/// Either mismatch matches no row, which is the existing not-found error and no ledger event.
+fn resumable_statuses(actor: ResumeActor) -> &'static str {
+    match actor {
+        ResumeActor::Operator(_) => "'stopped', 'failed', 'dead_letter'",
+        ResumeActor::Approval(_) => "'pending_approval'",
+    }
+}
+
+/// The `retry_count` assignment a resume contributes, written to follow the rest of the `SET`
+/// list -- hence the leading comma, and the empty string when there is nothing to assign.
+///
+/// An operator pressing Resume on a dead-lettered task means "try this again", and a task whose
+/// budget is already spent re-dead-letters on the first failure of the very run it was resumed
+/// for. Without this the button moves the row to `pending` and changes nothing that outlives one
+/// attempt. The `stopped` arm covers the same task after an operator stopped it first, which is
+/// the shape the Tasks page actually offers.
+///
+/// A continuation is not a retry: an approval releasing a parked task is the same attempt
+/// carrying on, so it leaves the budget where the attempts left it.
+///
+/// Postgres evaluates the right-hand side against the pre-update row, so one statement decides
+/// this from the status it is replacing without first reading the task.
+fn retry_budget_clause(actor: ResumeActor) -> &'static str {
+    match actor {
+        ResumeActor::Operator(_) => {
+            ", retry_count = CASE \
+                 WHEN status IN ('failed', 'dead_letter') THEN 0 \
+                 WHEN status = 'stopped' AND retry_count >= max_retries THEN 0 \
+                 ELSE retry_count END"
+        }
+        ResumeActor::Approval(_) => "",
+    }
+}
+
 async fn resume_task_on(
     pool: &sqlx::PgPool,
     id: Uuid,
@@ -2997,15 +3038,16 @@ async fn resume_task_on(
         r#"UPDATE background_tasks
            SET status = 'pending', run_at = CURRENT_TIMESTAMP, worker_id = NULL,
                execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
-               updated_at = CURRENT_TIMESTAMP, {attribution}
+               updated_at = CURRENT_TIMESTAMP, {attribution}{retry_budget}
            WHERE id = $1
-             AND status IN ('stopped', 'pending_approval',
-                            'waiting_for_third_party_reply', 'failed', 'dead_letter')
+             AND status IN ({statuses})
            RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status,
                      payload, retry_count, max_retries, last_error, worker_id,
                      execution_generation, locked_at, lock_expires_at, run_at, created_at,
                      updated_at"#,
         attribution = TransitionAttribution::resumed(actor).set_clause(),
+        retry_budget = retry_budget_clause(actor),
+        statuses = resumable_statuses(actor),
     ))
     .bind(id)
     .fetch_one(pool)
@@ -3192,6 +3234,11 @@ mod tests {
 
     /// What a fixture that forces a status writes instead of an attribution. It has no cause to
     /// state, and leaving the columns out would carry the previous transition's into the event.
+    ///
+    /// The ledger row it produces falls to the trigger's deterministic mapping, and lands on
+    /// `unknown` for any status pair that mapping does not cover -- which is the honest record of
+    /// a fixture reaching into the table. Production callers all state their cause, so a scoped
+    /// lifecycle assertion still expects no `unknown` rows of its own.
     const CLEAR_TRANSITION: &str = "transition_reason = NULL, transition_actor_kind = NULL, \
          transition_actor_id = NULL, transition_approval_id = NULL, transition_outreach_id = NULL";
     use crate::services::outbound_dispatcher::OutboundEmail;
@@ -3631,6 +3678,245 @@ mod tests {
             assert_eq!(event.related_approval_id, approval, "{event:#?}");
             assert_eq!(event.related_outreach_id, outreach, "{event:#?}");
         }
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// Spend the whole retry budget and land the task in `dead_letter`, the way the worker does:
+    /// one failure per claim until the next one has nowhere left to go.
+    async fn exhaust_retry_budget(persistence: &PostgresPersistence, task: &BackgroundTask) {
+        for attempt in 1..=task.max_retries {
+            let lease = claim(persistence, task.id).await;
+            let outcome = if attempt == task.max_retries {
+                TaskFailureOutcome::DeadLetter
+            } else {
+                TaskFailureOutcome::Retry
+            };
+            assert!(
+                persistence
+                    .mark_task_failed(TaskFailure {
+                        lease,
+                        error: "budget check",
+                        next_run_at: Utc::now(),
+                        outcome,
+                        reason: TaskStopReason::RetryableFailure,
+                    })
+                    .await
+                    .unwrap()
+            );
+        }
+        let exhausted = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        assert_eq!(exhausted.status, TaskStatus::DeadLetter);
+        assert!(
+            exhausted.retry_count >= exhausted.max_retries,
+            "the budget is spent: {exhausted:#?}"
+        );
+    }
+
+    /// Every transition this chain made named its own cause. `unknown` is what the trigger records
+    /// when none did, so finding one here means a status write in the path under test is still
+    /// silent -- scoped to this chain, because the test database is shared and runs in parallel.
+    fn assert_no_unclassified_transitions(events: &[TaskStatusEvent]) {
+        let unclassified: Vec<_> = events
+            .iter()
+            .filter(|event| event.reason == TaskTransitionReason::Unknown)
+            .collect();
+        assert!(
+            unclassified.is_empty(),
+            "transitions recorded no cause: {unclassified:#?}"
+        );
+    }
+
+    /// Resume on a dead-lettered task has to hand back the retry budget, or it is theatre: the row
+    /// moves to `pending`, the worker claims it, the first failure computes
+    /// `retry_count + 1 >= max_retries` against a count that is already spent, and the task
+    /// dead-letters again having achieved nothing durable.
+    #[tokio::test]
+    async fn operator_resume_of_a_dead_lettered_task_restores_its_retry_budget() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let operator = Uuid::new_v4();
+        let task = enqueue_chain(&persistence, company.id, channel.id, "dead_letter_resume").await;
+        exhaust_retry_budget(&persistence, &task).await;
+
+        let resumed = persistence
+            .resume_task(task.id, ResumeActor::Operator(operator))
+            .await
+            .unwrap();
+
+        assert_eq!(resumed.status, TaskStatus::Pending);
+        assert_eq!(resumed.retry_count, 0, "the budget is fresh: {resumed:#?}");
+        let events = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 50)
+            .await
+            .unwrap();
+        let resume_event = events
+            .iter()
+            .find(|event| event.reason == TaskTransitionReason::OperatorResumed)
+            .expect("the resume is attributed to the operator, not guessed from the status pair");
+        assert_eq!(resume_event.actor_kind, TaskTransitionActorKind::Operator);
+        assert_eq!(resume_event.actor_id, Some(operator));
+        assert_eq!(resume_event.from_status, Some(TaskStatus::DeadLetter));
+        assert_no_unclassified_transitions(&events);
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// The Tasks page offers Resume on `stopped` as well as `dead_letter`, so an operator who stops
+    /// an exhausted task before resuming it reaches the same intent by a different route. Keying
+    /// the reset on the status alone would miss this one; keying it on the spent budget catches it.
+    #[tokio::test]
+    async fn operator_resume_of_a_stopped_exhausted_task_restores_its_retry_budget() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let operator = Uuid::new_v4();
+        let task = enqueue_chain(&persistence, company.id, channel.id, "stopped_resume").await;
+        exhaust_retry_budget(&persistence, &task).await;
+        let stopped = persistence
+            .stop_task(task.id, StopActor::Operator(operator))
+            .await
+            .unwrap();
+        assert_eq!(stopped.status, TaskStatus::Stopped);
+        assert!(stopped.retry_count >= stopped.max_retries);
+
+        let resumed = persistence
+            .resume_task(task.id, ResumeActor::Operator(operator))
+            .await
+            .unwrap();
+
+        assert_eq!(resumed.status, TaskStatus::Pending);
+        assert_eq!(resumed.retry_count, 0, "the budget is fresh: {resumed:#?}");
+        let events = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 50)
+            .await
+            .unwrap();
+        assert_no_unclassified_transitions(&events);
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// An approval releasing a parked task is the same attempt carrying on, not a retry. Resetting
+    /// here would hand a task an unlimited budget for the price of one approval round trip.
+    #[tokio::test]
+    async fn approval_resume_continues_the_attempt_without_refunding_the_budget() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let task = enqueue_chain(&persistence, company.id, channel.id, "approval_resume").await;
+        let lease = claim(&persistence, task.id).await;
+        assert!(
+            persistence
+                .mark_task_failed(TaskFailure {
+                    lease,
+                    error: "one attempt already spent",
+                    next_run_at: Utc::now(),
+                    outcome: TaskFailureOutcome::Retry,
+                    reason: TaskStopReason::RetryableFailure,
+                })
+                .await
+                .unwrap()
+        );
+        let lease = claim(&persistence, task.id).await;
+        let approval_id = park_for_approval(&persistence, &company, &channel, lease).await;
+        let parked = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
+        assert_eq!(parked.status, TaskStatus::PendingApproval);
+
+        let resumed = persistence
+            .resume_task(task.id, ResumeActor::Approval(approval_id))
+            .await
+            .unwrap();
+
+        assert_eq!(resumed.status, TaskStatus::Pending);
+        assert_eq!(
+            resumed.retry_count, parked.retry_count,
+            "a continuation spends nothing and refunds nothing: {resumed:#?}"
+        );
+        let events = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 50)
+            .await
+            .unwrap();
+        let resume_event = events
+            .iter()
+            .find(|event| event.reason == TaskTransitionReason::ApprovalAccepted)
+            .expect("the approval is what released the task");
+        assert_eq!(resume_event.actor_kind, TaskTransitionActorKind::Approval);
+        assert_eq!(resume_event.related_approval_id, Some(approval_id));
+        assert_no_unclassified_transitions(&events);
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// Each resume cause may only act on the states it can answer for. An approval must not
+    /// resurrect a task that was abandoned after exhausting its retries, and an operator must not
+    /// walk a task past the approval gate it is parked behind. Both mismatches match no row.
+    #[tokio::test]
+    async fn a_resume_cause_used_against_the_wrong_state_changes_nothing() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let operator = Uuid::new_v4();
+
+        let abandoned = enqueue_chain(&persistence, company.id, channel.id, "wrong_state").await;
+        exhaust_retry_budget(&persistence, &abandoned).await;
+        assert!(
+            persistence
+                .resume_task(abandoned.id, ResumeActor::Approval(Uuid::new_v4()))
+                .await
+                .is_err(),
+            "an approval cannot resume work it never parked"
+        );
+        let still_dead = persistence
+            .get_task_by_id(abandoned.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(still_dead.status, TaskStatus::DeadLetter);
+
+        let parked = enqueue_chain(&persistence, company.id, channel.id, "wrong_state").await;
+        let lease = claim(&persistence, parked.id).await;
+        park_for_approval(&persistence, &company, &channel, lease).await;
+        assert!(
+            persistence
+                .resume_task(parked.id, ResumeActor::Operator(operator))
+                .await
+                .is_err(),
+            "an operator resume must not bypass the approval the task is waiting on"
+        );
+        let still_parked = persistence
+            .get_task_by_id(parked.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(still_parked.status, TaskStatus::PendingApproval);
+
+        let events = persistence
+            .list_task_status_events(company.id, parked.correlation_id, None, 50)
+            .await
+            .unwrap();
+        assert!(
+            !events
+                .iter()
+                .any(|event| event.reason == TaskTransitionReason::OperatorResumed),
+            "a resume that matched no row writes no event: {events:#?}"
+        );
 
         CompanyPersistence::delete(&persistence, company.id)
             .await
