@@ -35,7 +35,10 @@ use crate::{
         channel::Channel,
         company::Company,
         correlation::CorrelationId,
-        task::{BackgroundTask, TaskBoardFilter, TaskChainBoard, TaskChainDetail, TaskFilter},
+        task::{
+            BackgroundTask, ResumeActor, StopActor, TaskBoardFilter, TaskChainBoard,
+            TaskChainDetail, TaskFilter,
+        },
         value_objects::EmailAddress,
     },
     infra::{config::AppConfig, events::MailboxEvents},
@@ -469,7 +472,7 @@ async fn stop_task(
     let stopped = view
         .worker()
         .await
-        .stop_task_and_notify(task.id, Some(workspace.user_id))
+        .stop_task_and_notify(task.id, StopActor::Operator(workspace.user_id))
         .await;
     view.after_write(
         &task,
@@ -496,7 +499,7 @@ async fn resume_task(
     let resumed = view
         .worker()
         .await
-        .resume_task(task.id, Some(workspace.user_id))
+        .resume_task(task.id, ResumeActor::Operator(workspace.user_id))
         .await;
     view.after_write(
         &task,

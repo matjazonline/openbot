@@ -1,6 +1,6 @@
 use chrono::Utc;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::{
@@ -12,6 +12,7 @@ use crate::{
     entities::{
         approval::{ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval},
         message::{Message, MessageDirection, MessageRole},
+        task::{ResumeActor, StopActor},
     },
     infra::config::AppConfig,
     services::outbound_dispatcher::OutboundEmail,
@@ -182,12 +183,20 @@ impl ApprovalUseCases {
             return self.report_unavailable(token, now).await;
         };
 
-        let message_text = self.apply_decision(&approval, decision).await;
+        let message_text = self.apply_decision(&approval, decision).await?;
         Ok((updated, message_text))
     }
 
     /// Carry out the side effects of a decision and describe them for the human who clicked.
-    async fn apply_decision(&self, approval: &HumanApproval, decision: LinkAction) -> String {
+    ///
+    /// The approval row is already consumed by the time this runs, so a failed task transition
+    /// cannot be undone by rolling anything back -- but it must not be reported as success either.
+    /// It propagates with both ids logged, which is what a reconciliation starts from.
+    async fn apply_decision(
+        &self,
+        approval: &HumanApproval,
+        decision: LinkAction,
+    ) -> AppResult<String> {
         match decision {
             LinkAction::ProceedPartial => {
                 self.record_decision_note(
@@ -200,10 +209,10 @@ impl ApprovalUseCases {
                     ),
                 )
                 .await;
-                format!(
+                Ok(format!(
                     "✓ Action '{}' confirmed: Proceeding with partial data. Channels resumed.",
                     approval.action_title
-                )
+                ))
             }
             LinkAction::Extend { hours } => {
                 self.record_decision_note(
@@ -216,17 +225,24 @@ impl ApprovalUseCases {
                     ),
                 )
                 .await;
-                format!(
+                Ok(format!(
                     "✓ Action '{}' confirmed: Outreach timeout extended by {} hours.",
                     approval.action_title, hours
-                )
+                ))
             }
             LinkAction::Approve => {
                 if let Some(task_id) = approval.task_id {
-                    let _ = self
-                        .task_persistence
-                        .resume_task_after_approval(task_id, approval.id)
-                        .await;
+                    self.task_persistence
+                        .resume_task(task_id, ResumeActor::Approval(approval.id))
+                        .await
+                        .inspect_err(|error| {
+                            error!(
+                                approval_id = %approval.id,
+                                task_id = %task_id,
+                                %error,
+                                "Approval was consumed but its task could not be resumed"
+                            )
+                        })?;
                 }
                 self.record_decision_note(
                     approval,
@@ -238,17 +254,27 @@ impl ApprovalUseCases {
                     ),
                 )
                 .await;
-                format!(
+                Ok(format!(
                     "✓ Action '{}' has been CONFIRMED successfully. Associated automated channels have been resumed.",
                     approval.action_title
-                )
+                ))
             }
             LinkAction::Reject => {
                 // A rejected quorum timeout leaves the task paused for its own timeout handling.
                 if let Some(task_id) = approval.task_id
                     && approval.action_type != "quorum_timeout"
                 {
-                    let _ = self.task_persistence.stop_task(task_id).await;
+                    self.task_persistence
+                        .stop_task(task_id, StopActor::Approval(approval.id))
+                        .await
+                        .inspect_err(|error| {
+                            error!(
+                                approval_id = %approval.id,
+                                task_id = %task_id,
+                                %error,
+                                "Approval was consumed but its task could not be stopped"
+                            )
+                        })?;
                 }
                 self.record_decision_note(
                     approval,
@@ -260,10 +286,10 @@ impl ApprovalUseCases {
                     ),
                 )
                 .await;
-                format!(
+                Ok(format!(
                     "✗ Action '{}' has been REJECTED. The automated channel task has been cancelled.",
                     approval.action_title
-                )
+                ))
             }
         }
     }
@@ -404,7 +430,9 @@ mod tests {
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::correlation::CorrelationId;
     use crate::entities::task::NewTask;
-    use crate::entities::task::{TaskLeaseRef, TaskSuspension};
+    use crate::entities::task::{
+        ResumeActor, StopActor, TaskFailure, TaskLeaseRef, TaskSuspension,
+    };
     use crate::entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress};
     use crate::entities::{
         cursor::{MessageCursor, ThreadCursor},
@@ -631,19 +659,21 @@ mod tests {
         async fn mark_task_completed(&self, _lease: TaskLeaseRef) -> AppResult<bool> {
             unimplemented!()
         }
-        async fn mark_task_failed(
-            &self,
-            _lease: TaskLeaseRef,
-            _error_msg: &str,
-            _next_run_at: chrono::DateTime<chrono::Utc>,
-            _is_dead_letter: bool,
-        ) -> AppResult<bool> {
+        async fn mark_task_failed(&self, _failure: TaskFailure<'_>) -> AppResult<bool> {
             Ok(true)
         }
-        async fn stop_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
+        async fn stop_task(
+            &self,
+            _id: Uuid,
+            _actor: StopActor,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
             unimplemented!()
         }
-        async fn resume_task(&self, _id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
+        async fn resume_task(
+            &self,
+            _id: Uuid,
+            _actor: ResumeActor,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
             unimplemented!()
         }
         async fn list_company_tasks(

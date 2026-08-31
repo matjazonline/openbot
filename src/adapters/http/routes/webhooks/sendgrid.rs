@@ -293,7 +293,7 @@ mod tests {
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::company_member::CompanyMembership;
     use crate::entities::task::NewTask;
-    use crate::entities::task::TaskLeaseRef;
+    use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
     use async_trait::async_trait;
     use axum::body::Body;
     use axum::http::Request;
@@ -839,29 +839,19 @@ mod tests {
             }
         }
 
-        async fn mark_task_failed(
-            &self,
-            lease: TaskLeaseRef,
-            error_msg: &str,
-            next_run_at: chrono::DateTime<chrono::Utc>,
-            is_dead_letter: bool,
-        ) -> AppResult<bool> {
+        async fn mark_task_failed(&self, failure: TaskFailure<'_>) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
             let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
-                t.id == lease.task_id
+                t.id == failure.lease.task_id
                     && t.status == crate::entities::task::TaskStatus::Processing
-                    && t.worker_id == Some(lease.worker_id)
+                    && t.worker_id == Some(failure.lease.worker_id)
                     && t.lock_expires_at.is_some_and(|expires| expires > now)
             }) {
-                t.last_error = Some(error_msg.to_string());
+                t.last_error = Some(failure.error.to_string());
                 t.retry_count += 1;
-                t.run_at = next_run_at;
-                t.status = if is_dead_letter {
-                    crate::entities::task::TaskStatus::DeadLetter
-                } else {
-                    crate::entities::task::TaskStatus::Pending
-                };
+                t.run_at = failure.next_run_at;
+                t.status = failure.outcome.status();
                 t.worker_id = None;
                 t.locked_at = None;
                 t.lock_expires_at = None;
@@ -871,14 +861,22 @@ mod tests {
             }
         }
 
-        async fn stop_task(&self, id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
+        async fn stop_task(
+            &self,
+            id: Uuid,
+            _actor: StopActor,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
             let t = list.iter_mut().find(|t| t.id == id).unwrap();
             t.status = crate::entities::task::TaskStatus::Stopped;
             Ok(t.clone())
         }
 
-        async fn resume_task(&self, id: Uuid) -> AppResult<crate::entities::task::BackgroundTask> {
+        async fn resume_task(
+            &self,
+            id: Uuid,
+            _actor: ResumeActor,
+        ) -> AppResult<crate::entities::task::BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
             let t = list.iter_mut().find(|t| t.id == id).unwrap();
             t.status = crate::entities::task::TaskStatus::Pending;

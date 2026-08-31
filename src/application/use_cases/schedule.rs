@@ -541,7 +541,7 @@ impl ScheduleUseCases {
 mod tests {
     use super::*;
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
-    use crate::entities::task::TaskLeaseRef;
+    use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
     use crate::entities::{
         channel::Channel,
         company::{Company, CompanyAccess},
@@ -1140,19 +1140,13 @@ mod tests {
         async fn mark_task_completed(&self, _lease: TaskLeaseRef) -> AppResult<bool> {
             unimplemented!()
         }
-        async fn mark_task_failed(
-            &self,
-            _lease: TaskLeaseRef,
-            _error_msg: &str,
-            _next_run_at: chrono::DateTime<Utc>,
-            _is_dead_letter: bool,
-        ) -> AppResult<bool> {
+        async fn mark_task_failed(&self, _failure: TaskFailure<'_>) -> AppResult<bool> {
             unimplemented!()
         }
-        async fn stop_task(&self, _id: Uuid) -> AppResult<BackgroundTask> {
+        async fn stop_task(&self, _id: Uuid, _actor: StopActor) -> AppResult<BackgroundTask> {
             unimplemented!()
         }
-        async fn resume_task(&self, _id: Uuid) -> AppResult<BackgroundTask> {
+        async fn resume_task(&self, _id: Uuid, _actor: ResumeActor) -> AppResult<BackgroundTask> {
             unimplemented!()
         }
         async fn list_company_tasks(

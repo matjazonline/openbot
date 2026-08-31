@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
-    entities::task::{TaskFilter, TaskStatus},
+    entities::task::{ResumeActor, StopActor, TaskFilter, TaskStatus},
     services::task_worker::TaskWorker,
     use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
 };
@@ -305,7 +305,10 @@ async fn stop_company_task(
     }
     let worker = TaskWorker::new(task_persistence.clone(), thread_use_cases.clone(), config);
 
-    if let Err(error) = worker.stop_task_and_notify(task_id, Some(_user.id)).await {
+    if let Err(error) = worker
+        .stop_task_and_notify(task_id, StopActor::Operator(_user.id))
+        .await
+    {
         return Html(pages::error_alert(&format!("Failed to stop task: {error}")));
     }
 
@@ -337,7 +340,10 @@ async fn resume_company_task(
     }
     let worker = TaskWorker::new(task_persistence.clone(), thread_use_cases.clone(), config);
 
-    if let Err(error) = worker.resume_task(task_id, Some(_user.id)).await {
+    if let Err(error) = worker
+        .resume_task(task_id, ResumeActor::Operator(_user.id))
+        .await
+    {
         return Html(pages::error_alert(&format!(
             "Failed to resume task: {error}"
         )));

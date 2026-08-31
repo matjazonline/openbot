@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 use uuid::Uuid;
@@ -552,6 +553,7 @@ pub enum TaskTransitionReason {
     LeaseLost,
     ApprovalRequested,
     ApprovalAccepted,
+    ApprovalRejected,
     OutreachStarted,
     OutreachReplyReceived,
     OutreachTimedOut,
@@ -573,6 +575,7 @@ impl TaskTransitionReason {
             Self::LeaseLost => "lease_lost",
             Self::ApprovalRequested => "approval_requested",
             Self::ApprovalAccepted => "approval_accepted",
+            Self::ApprovalRejected => "approval_rejected",
             Self::OutreachStarted => "outreach_started",
             Self::OutreachReplyReceived => "outreach_reply_received",
             Self::OutreachTimedOut => "outreach_timed_out",
@@ -598,6 +601,7 @@ impl FromStr for TaskTransitionReason {
             "lease_lost" => Ok(Self::LeaseLost),
             "approval_requested" => Ok(Self::ApprovalRequested),
             "approval_accepted" => Ok(Self::ApprovalAccepted),
+            "approval_rejected" => Ok(Self::ApprovalRejected),
             "outreach_started" => Ok(Self::OutreachStarted),
             "outreach_reply_received" => Ok(Self::OutreachReplyReceived),
             "outreach_timed_out" => Ok(Self::OutreachTimedOut),
@@ -650,6 +654,134 @@ impl FromStr for TaskTransitionActorKind {
             other => Err(format!("Unknown task transition actor kind: {other}")),
         }
     }
+}
+
+/// Who is stopping a task, and therefore why. A stop is never anonymous: the two callers that can
+/// order one are an operator pressing the button and a rejected approval, and the ledger has to
+/// tell them apart afterwards.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StopActor {
+    Operator(Uuid),
+    Approval(Uuid),
+}
+
+impl StopActor {
+    pub fn reason(self) -> TaskTransitionReason {
+        match self {
+            Self::Operator(_) => TaskTransitionReason::OperatorStopped,
+            Self::Approval(_) => TaskTransitionReason::ApprovalRejected,
+        }
+    }
+
+    pub fn transition_actor(self) -> TransitionActor {
+        match self {
+            Self::Operator(id) => TransitionActor::Operator(id),
+            Self::Approval(id) => TransitionActor::Approval(id),
+        }
+    }
+}
+
+/// Who is resuming a task. An operator retrying failed work and an approval releasing a parked
+/// task reach the same status, so only the actor separates "someone decided to try again" from
+/// "the thing it was waiting for arrived".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResumeActor {
+    Operator(Uuid),
+    Approval(Uuid),
+}
+
+impl ResumeActor {
+    pub fn reason(self) -> TaskTransitionReason {
+        match self {
+            Self::Operator(_) => TaskTransitionReason::OperatorResumed,
+            Self::Approval(_) => TaskTransitionReason::ApprovalAccepted,
+        }
+    }
+
+    pub fn transition_actor(self) -> TransitionActor {
+        match self {
+            Self::Operator(id) => TransitionActor::Operator(id),
+            Self::Approval(id) => TransitionActor::Approval(id),
+        }
+    }
+}
+
+/// Every actor and related-source shape a status transition may carry, as one value.
+///
+/// The database stores this split across an actor kind, an actor id, and two nullable source ids,
+/// with a CHECK constraint tying them together. Keeping the valid combinations in a single enum is
+/// what makes that constraint unreachable from Rust: there is no way to name an actor kind without
+/// also naming the id it requires.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransitionActor {
+    System,
+    Worker(Uuid),
+    Operator(Uuid),
+    Approval(Uuid),
+    Outreach(Uuid),
+}
+
+impl TransitionActor {
+    pub fn kind(self) -> TaskTransitionActorKind {
+        match self {
+            Self::System => TaskTransitionActorKind::System,
+            Self::Worker(_) => TaskTransitionActorKind::Worker,
+            Self::Operator(_) => TaskTransitionActorKind::Operator,
+            Self::Approval(_) => TaskTransitionActorKind::Approval,
+            Self::Outreach(_) => TaskTransitionActorKind::Outreach,
+        }
+    }
+
+    /// The id of the actor itself, which only a worker or an operator has. An approval or an
+    /// outreach is a *source*: it is identified by its row, reported below.
+    pub fn actor_id(self) -> Option<Uuid> {
+        match self {
+            Self::Worker(id) | Self::Operator(id) => Some(id),
+            Self::System | Self::Approval(_) | Self::Outreach(_) => None,
+        }
+    }
+
+    pub fn approval_id(self) -> Option<Uuid> {
+        match self {
+            Self::Approval(id) => Some(id),
+            Self::System | Self::Worker(_) | Self::Operator(_) | Self::Outreach(_) => None,
+        }
+    }
+
+    pub fn outreach_id(self) -> Option<Uuid> {
+        match self {
+            Self::Outreach(id) => Some(id),
+            Self::System | Self::Worker(_) | Self::Operator(_) | Self::Approval(_) => None,
+        }
+    }
+}
+
+/// Which side of the retry budget a failure lands on. A bool here reads as `is_dead_letter: false`
+/// at the call site and says nothing about why.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskFailureOutcome {
+    Retry,
+    DeadLetter,
+}
+
+impl TaskFailureOutcome {
+    pub fn status(self) -> TaskStatus {
+        match self {
+            Self::Retry => TaskStatus::Pending,
+            Self::DeadLetter => TaskStatus::DeadLetter,
+        }
+    }
+}
+
+/// One fenced failure write: which run failed, what it said, when it may run again, and why it
+/// stopped. The lease carries the worker, so a failure cannot be attributed to anyone else.
+#[derive(Debug, Clone, Copy)]
+pub struct TaskFailure<'a> {
+    pub lease: TaskLeaseRef,
+    pub error: &'a str,
+    pub next_run_at: DateTime<Utc>,
+    pub outcome: TaskFailureOutcome,
+    pub reason: TaskStopReason,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1153,5 +1285,109 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(ChainStage::derive(&stopped), ChainStage::NeedsAttention);
+    }
+
+    #[test]
+    fn a_transition_actor_carries_exactly_the_one_id_its_kind_requires() {
+        let worker = Uuid::new_v4();
+        let operator = Uuid::new_v4();
+        let approval = Uuid::new_v4();
+        let outreach = Uuid::new_v4();
+
+        let cases = [
+            (
+                TransitionActor::System,
+                TaskTransitionActorKind::System,
+                None,
+                None,
+                None,
+            ),
+            (
+                TransitionActor::Worker(worker),
+                TaskTransitionActorKind::Worker,
+                Some(worker),
+                None,
+                None,
+            ),
+            (
+                TransitionActor::Operator(operator),
+                TaskTransitionActorKind::Operator,
+                Some(operator),
+                None,
+                None,
+            ),
+            (
+                TransitionActor::Approval(approval),
+                TaskTransitionActorKind::Approval,
+                None,
+                Some(approval),
+                None,
+            ),
+            (
+                TransitionActor::Outreach(outreach),
+                TaskTransitionActorKind::Outreach,
+                None,
+                None,
+                Some(outreach),
+            ),
+        ];
+
+        for (actor, kind, actor_id, approval_id, outreach_id) in cases {
+            assert_eq!(actor.kind(), kind, "{actor:?}");
+            assert_eq!(actor.actor_id(), actor_id, "{actor:?}");
+            assert_eq!(actor.approval_id(), approval_id, "{actor:?}");
+            assert_eq!(actor.outreach_id(), outreach_id, "{actor:?}");
+        }
+    }
+
+    #[test]
+    fn stop_and_resume_causes_name_their_own_reason_and_actor() {
+        let operator = Uuid::new_v4();
+        let approval = Uuid::new_v4();
+
+        assert_eq!(
+            StopActor::Operator(operator).reason(),
+            TaskTransitionReason::OperatorStopped
+        );
+        assert_eq!(
+            StopActor::Operator(operator).transition_actor(),
+            TransitionActor::Operator(operator)
+        );
+        // A rejection is an approval acting, not an operator: the ledger's actor kind has to agree
+        // with its reason, and `operator_stopped` here would contradict it.
+        assert_eq!(
+            StopActor::Approval(approval).reason(),
+            TaskTransitionReason::ApprovalRejected
+        );
+        assert_eq!(
+            StopActor::Approval(approval).transition_actor(),
+            TransitionActor::Approval(approval)
+        );
+
+        assert_eq!(
+            ResumeActor::Operator(operator).reason(),
+            TaskTransitionReason::OperatorResumed
+        );
+        assert_eq!(
+            ResumeActor::Operator(operator).transition_actor(),
+            TransitionActor::Operator(operator)
+        );
+        assert_eq!(
+            ResumeActor::Approval(approval).reason(),
+            TaskTransitionReason::ApprovalAccepted
+        );
+        assert_eq!(
+            ResumeActor::Approval(approval).transition_actor(),
+            TransitionActor::Approval(approval)
+        );
+    }
+
+    #[test]
+    fn a_failure_outcome_names_the_status_it_lands_on() {
+        assert_eq!(TaskFailureOutcome::Retry.status(), TaskStatus::Pending);
+        assert_eq!(
+            TaskFailureOutcome::DeadLetter.status(),
+            TaskStatus::DeadLetter
+        );
     }
 }

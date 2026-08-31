@@ -1,4 +1,4 @@
-use crate::entities::task::{TaskSuspension, TaskTransitionActorKind, TaskTransitionReason};
+use crate::entities::task::{TaskSuspension, TaskTransitionReason, TransitionActor};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -6,10 +6,7 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::{
-        PostgresPersistence,
-        task::{set_task_transition_context, set_task_transition_source},
-    },
+    adapters::persistence::{PostgresPersistence, task::TransitionAttribution},
     app_error::{AppError, AppResult},
     entities::approval::{ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval},
 };
@@ -213,18 +210,14 @@ impl ApprovalPersistence for PostgresPersistence {
                 // lease for anyone to match. A caller with no lease gets NULL binds, which makes
                 // the first branch unsatisfiable -- so it can only ever act on the second.
                 let lease = suspension.lease();
-                set_task_transition_context(
-                    &mut tx,
+                let attribution = TransitionAttribution::new(
                     TaskTransitionReason::ApprovalRequested,
-                    TaskTransitionActorKind::Approval,
-                    None,
-                )
-                .await?;
-                set_task_transition_source(&mut tx, Some(db.id), None).await?;
-                let paused = sqlx::query(
+                    TransitionActor::Approval(db.id),
+                );
+                let paused = sqlx::query(&format!(
                     r#"UPDATE background_tasks
                        SET status = 'pending_approval', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
-                           lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+                           lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
                        WHERE id = $1 AND company_id = $2
                          AND (
                              ($3::uuid IS NOT NULL
@@ -234,7 +227,8 @@ impl ApprovalPersistence for PostgresPersistence {
                               AND lock_expires_at > CURRENT_TIMESTAMP)
                              OR status IN ('waiting_for_third_party_reply', 'pending_approval')
                          )"#,
-                )
+                    attribution = attribution.set_clause(),
+                ))
                 .bind(suspension.task_id())
                 .bind(subject.company_id)
                 .bind(lease.map(|lease| lease.worker_id))
@@ -380,14 +374,8 @@ impl ApprovalPersistence for PostgresPersistence {
             "reject" => TaskTransitionReason::OperatorStopped,
             _ => TaskTransitionReason::ApprovalAccepted,
         };
-        set_task_transition_context(
-            &mut tx,
-            transition_reason,
-            TaskTransitionActorKind::Approval,
-            None,
-        )
-        .await?;
-        set_task_transition_source(&mut tx, Some(approval.id), None).await?;
+        let attribution =
+            TransitionAttribution::new(transition_reason, TransitionActor::Approval(approval.id));
 
         let task_updated = match action {
             "proceed_partial" => {
@@ -400,11 +388,12 @@ impl ApprovalPersistence for PostgresPersistence {
                 .execute(&mut *tx)
                 .await
                 .map_err(AppError::from)?;
-                let task = sqlx::query(
+                let task = sqlx::query(&format!(
                     r#"UPDATE background_tasks SET status = 'pending', run_at = CURRENT_TIMESTAMP,
-                           wait_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+                           wait_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
                        WHERE id = $1 AND status = 'pending_approval'"#,
-                )
+                    attribution = attribution.set_clause(),
+                ))
                 .bind(task_id)
                 .execute(&mut *tx)
                 .await
@@ -424,11 +413,12 @@ impl ApprovalPersistence for PostgresPersistence {
                 .execute(&mut *tx)
                 .await
                 .map_err(AppError::from)?;
-                let task = sqlx::query(
+                let task = sqlx::query(&format!(
                     r#"UPDATE background_tasks SET status = 'waiting_for_third_party_reply',
-                           wait_expires_at = $2, updated_at = CURRENT_TIMESTAMP
+                           wait_expires_at = $2, updated_at = CURRENT_TIMESTAMP, {attribution}
                        WHERE id = $1 AND status = 'pending_approval'"#,
-                )
+                    attribution = attribution.set_clause(),
+                ))
                 .bind(task_id)
                 .bind(expires_at)
                 .execute(&mut *tx)
@@ -455,12 +445,13 @@ impl ApprovalPersistence for PostgresPersistence {
                 .execute(&mut *tx)
                 .await
                 .map_err(AppError::from)?;
-                let task = sqlx::query(
+                let task = sqlx::query(&format!(
                     r#"UPDATE background_tasks SET status = 'stopped', wait_expires_at = NULL,
                            worker_id = NULL, execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
-                           updated_at = CURRENT_TIMESTAMP
+                           updated_at = CURRENT_TIMESTAMP, {attribution}
                        WHERE id = $1 AND status = 'pending_approval'"#,
-                )
+                    attribution = attribution.set_clause(),
+                ))
                 .bind(task_id)
                 .execute(&mut *tx)
                 .await

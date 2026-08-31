@@ -24,12 +24,13 @@ use crate::{
         },
         stuck_work::{StuckWorkCensus, StuckWorkThresholds},
         task::{
-            BackgroundTask, ChainStage, NewTask, TaskApprovalContext, TaskAttemptOutcome,
-            TaskAttemptRecord, TaskAttemptRecordStatus, TaskAttemptRef, TaskAttemptStatus,
-            TaskBoardFilter, TaskChainBoard, TaskChainCard, TaskChainCounts, TaskChainDetail,
-            TaskChainTaskDetail, TaskLeaseRef, TaskOutreachContext, TaskStatus, TaskStatusEvent,
-            TaskStatusEventCursor, TaskStopReason, TaskTransitionActorKind, TaskTransitionReason,
-            ThreadActivity, TokenUsage,
+            BackgroundTask, ChainStage, NewTask, ResumeActor, StopActor, TaskApprovalContext,
+            TaskAttemptOutcome, TaskAttemptRecord, TaskAttemptRecordStatus, TaskAttemptRef,
+            TaskAttemptStatus, TaskBoardFilter, TaskChainBoard, TaskChainCard, TaskChainCounts,
+            TaskChainDetail, TaskChainTaskDetail, TaskFailure, TaskLeaseRef, TaskOutreachContext,
+            TaskStatus, TaskStatusEvent, TaskStatusEventCursor, TaskStopReason,
+            TaskTransitionActorKind, TaskTransitionReason, ThreadActivity, TokenUsage,
+            TransitionActor,
         },
         value_objects::MessageId,
     },
@@ -42,7 +43,9 @@ pub const TASK_LEASE_SECONDS: i64 = 15 * 60;
 const CLAIM_TASK_SQL: &str = r#"UPDATE background_tasks
    SET status = 'processing', worker_id = $2, execution_generation = gen_random_uuid(),
        locked_at = CURRENT_TIMESTAMP,
-       lock_expires_at = $3, updated_at = CURRENT_TIMESTAMP
+       lock_expires_at = $3, updated_at = CURRENT_TIMESTAMP,
+       transition_reason = 'claimed', transition_actor_kind = 'worker',
+       transition_actor_id = $2, transition_approval_id = NULL, transition_outreach_id = NULL
    WHERE id = $1 AND status = 'pending' AND run_at <= CURRENT_TIMESTAMP"#;
 
 /// Open the ledger row for one attempt.
@@ -72,45 +75,54 @@ const FINISH_ATTEMPT_SQL: &str = r#"UPDATE task_attempts
 /// and the attempt ledger, which must agree on why the run vanished.
 const LEASE_EXPIRED_ERROR: &str = "Task lease expired without the run reporting a result";
 
-pub(crate) async fn set_task_transition_context(
-    tx: &mut sqlx::Transaction<'_, Postgres>,
+/// What a status change says about itself: why it happened and who caused it.
+///
+/// Written into the task row by the same statement that changes the status, which is what the
+/// ledger trigger reads. Constructed only from the typed cause enums, so the shape the database
+/// CHECK constraint enforces -- an actor kind together with exactly the id that kind requires --
+/// is not expressible any other way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct TransitionAttribution {
     reason: TaskTransitionReason,
-    actor_kind: TaskTransitionActorKind,
-    actor_id: Option<Uuid>,
-) -> AppResult<()> {
-    sqlx::query(
-        r#"SELECT set_config('mail_agents.task_transition_reason', $1, TRUE),
-                  set_config('mail_agents.task_transition_actor_kind', $2, TRUE),
-                  set_config('mail_agents.task_transition_actor_id', COALESCE($3::text, ''), TRUE)"#,
-    )
-    .bind(reason.as_str())
-    .bind(actor_kind.as_str())
-    .bind(actor_id)
-    .execute(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
-    Ok(())
+    actor: TransitionActor,
 }
 
-pub(crate) async fn set_task_transition_source(
-    tx: &mut sqlx::Transaction<'_, Postgres>,
-    approval_id: Option<Uuid>,
-    outreach_id: Option<Uuid>,
-) -> AppResult<()> {
-    sqlx::query(
-        r#"SELECT set_config(
-                      'mail_agents.task_transition_approval_id', COALESCE($1::text, ''), TRUE
-                  ),
-                  set_config(
-                      'mail_agents.task_transition_outreach_id', COALESCE($2::text, ''), TRUE
-                  )"#,
-    )
-    .bind(approval_id)
-    .bind(outreach_id)
-    .execute(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
-    Ok(())
+impl TransitionAttribution {
+    pub(crate) fn new(reason: TaskTransitionReason, actor: TransitionActor) -> Self {
+        Self { reason, actor }
+    }
+
+    pub(crate) fn stopped(actor: StopActor) -> Self {
+        Self::new(actor.reason(), actor.transition_actor())
+    }
+
+    pub(crate) fn resumed(actor: ResumeActor) -> Self {
+        Self::new(actor.reason(), actor.transition_actor())
+    }
+
+    /// The `SET` fragment naming all five columns.
+    ///
+    /// Rendered rather than bound: every part is a `&'static str` from an enum or a `Uuid`, whose
+    /// `Display` can only emit hex and dashes, so there is nothing here a placeholder would
+    /// protect. Rendering keeps the fragment self-contained -- a statement splices it in without
+    /// renumbering its own parameters, which is what makes writing it everywhere cheap enough to
+    /// be unconditional.
+    pub(crate) fn set_clause(self) -> String {
+        format!(
+            "transition_reason = '{reason}', transition_actor_kind = '{kind}', \
+             transition_actor_id = {actor_id}, transition_approval_id = {approval_id}, \
+             transition_outreach_id = {outreach_id}",
+            reason = self.reason.as_str(),
+            kind = self.actor.kind().as_str(),
+            actor_id = sql_uuid_literal(self.actor.actor_id()),
+            approval_id = sql_uuid_literal(self.actor.approval_id()),
+            outreach_id = sql_uuid_literal(self.actor.outreach_id()),
+        )
+    }
+}
+
+fn sql_uuid_literal(id: Option<Uuid>) -> String {
+    id.map_or_else(|| "NULL".to_owned(), |id| format!("'{id}'::uuid"))
 }
 
 /// Log when a lease-guarded state change was ignored because the lease or status moved on.
@@ -1201,48 +1213,21 @@ pub trait TaskPersistence: Send + Sync {
 
     async fn mark_task_completed(&self, lease: TaskLeaseRef) -> AppResult<bool>;
 
-    async fn mark_task_failed(
-        &self,
-        lease: TaskLeaseRef,
-        error_msg: &str,
-        next_run_at: DateTime<Utc>,
-        is_dead_letter: bool,
-    ) -> AppResult<bool>;
+    /// The fenced failure transition, carrying why the run stopped and which side of the retry
+    /// budget it lands on.
+    ///
+    /// No default: a double that silently forwards to some other write records a failure the
+    /// ledger cannot attribute, and attribution is the only thing this write adds over a status
+    /// change anyone could make.
+    async fn mark_task_failed(&self, failure: TaskFailure<'_>) -> AppResult<bool>;
 
-    /// The same fenced failure transition with its bounded operational reason attached to the
-    /// status event. Older in-memory doubles may keep implementing [`Self::mark_task_failed`].
-    async fn mark_task_failed_with_reason(
-        &self,
-        lease: TaskLeaseRef,
-        error_msg: &str,
-        next_run_at: DateTime<Utc>,
-        is_dead_letter: bool,
-        _reason: TaskStopReason,
-    ) -> AppResult<bool> {
-        self.mark_task_failed(lease, error_msg, next_run_at, is_dead_letter)
-            .await
-    }
+    /// Stop a task on someone's authority. No default, and no anonymous variant: an operator and a
+    /// rejected approval reach the same status for different reasons, and only the caller knows
+    /// which.
+    async fn stop_task(&self, id: Uuid, actor: StopActor) -> AppResult<BackgroundTask>;
 
-    async fn stop_task(&self, id: Uuid) -> AppResult<BackgroundTask>;
-
-    async fn resume_task(&self, id: Uuid) -> AppResult<BackgroundTask>;
-
-    /// Operator-attributed variants used by authenticated UI mutations.
-    async fn stop_task_as(&self, id: Uuid, _operator_id: Uuid) -> AppResult<BackgroundTask> {
-        self.stop_task(id).await
-    }
-
-    async fn resume_task_as(&self, id: Uuid, _operator_id: Uuid) -> AppResult<BackgroundTask> {
-        self.resume_task(id).await
-    }
-
-    async fn resume_task_after_approval(
-        &self,
-        id: Uuid,
-        _approval_id: Uuid,
-    ) -> AppResult<BackgroundTask> {
-        self.resume_task(id).await
-    }
+    /// Resume a task on someone's authority. See [`Self::stop_task`] for why there is no default.
+    async fn resume_task(&self, id: Uuid, actor: ResumeActor) -> AppResult<BackgroundTask>;
 
     /// The six-column correlation-chain read model. Defaults keep narrow test doubles small.
     async fn list_task_chain_board(
@@ -1441,23 +1426,20 @@ impl TaskPersistence for PostgresPersistence {
             .map_err(|error| AppError::Internal(error.to_string()))?;
         let suspended = status == OutreachStatus::Waiting;
         if suspended {
-            set_task_transition_context(
-                &mut tx,
+            let attribution = TransitionAttribution::new(
                 TaskTransitionReason::OutreachStarted,
-                TaskTransitionActorKind::Outreach,
-                None,
-            )
-            .await?;
-            set_task_transition_source(&mut tx, None, Some(outreach.id)).await?;
-            let paused = sqlx::query(
+                TransitionActor::Outreach(outreach.id),
+            );
+            let paused = sqlx::query(&format!(
                 r#"UPDATE background_tasks
                    SET status = 'waiting_for_third_party_reply', wait_expires_at = $1,
                        worker_id = NULL, execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
-                       updated_at = CURRENT_TIMESTAMP
+                       updated_at = CURRENT_TIMESTAMP, {attribution}
                    WHERE id = $2 AND company_id = $3
                      AND status = 'processing' AND worker_id = $4
                      AND lock_expires_at > CURRENT_TIMESTAMP"#,
-            )
+                attribution = attribution.set_clause(),
+            ))
             .bind(outreach.expires_at)
             .bind(request.task_id)
             .bind(request.company_id)
@@ -1587,14 +1569,10 @@ impl TaskPersistence for PostgresPersistence {
                 OutreachStatus::Waiting | OutreachStatus::TimeoutPendingApproval
             )
         {
-            set_task_transition_context(
-                &mut tx,
+            let attribution = TransitionAttribution::new(
                 TaskTransitionReason::OutreachReplyReceived,
-                TaskTransitionActorKind::Outreach,
-                None,
-            )
-            .await?;
-            set_task_transition_source(&mut tx, None, Some(outreach.id)).await?;
+                TransitionActor::Outreach(outreach.id),
+            );
             sqlx::query(
                 r#"UPDATE task_outreaches SET status = 'threshold_met',
                        updated_at = CURRENT_TIMESTAMP WHERE id = $1"#,
@@ -1603,14 +1581,15 @@ impl TaskPersistence for PostgresPersistence {
             .execute(&mut *tx)
             .await
             .map_err(AppError::from)?;
-            sqlx::query(
+            sqlx::query(&format!(
                 r#"UPDATE background_tasks SET status = 'pending', run_at = CURRENT_TIMESTAMP,
                        wait_expires_at = NULL, worker_id = NULL, execution_generation = NULL, locked_at = NULL,
-                       lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+                       lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
                    WHERE id = $1 AND status IN (
                        'waiting_for_third_party_reply', 'pending_approval'
                    )"#,
-            )
+                attribution = attribution.set_clause(),
+            ))
             .bind(outreach.task_id)
             .execute(&mut *tx)
             .await
@@ -1722,21 +1701,18 @@ impl TaskPersistence for PostgresPersistence {
             tx.rollback().await.map_err(AppError::from)?;
             return Ok(false);
         };
-        set_task_transition_context(
-            &mut tx,
+        let attribution = TransitionAttribution::new(
             TaskTransitionReason::OutreachTimedOut,
-            TaskTransitionActorKind::Outreach,
-            None,
-        )
-        .await?;
-        set_task_transition_source(&mut tx, None, Some(outreach_id)).await?;
-        let updated = sqlx::query(
+            TransitionActor::Outreach(outreach_id),
+        );
+        let updated = sqlx::query(&format!(
             r#"UPDATE background_tasks
                SET status = 'pending_approval', wait_expires_at = NULL,
                    worker_id = NULL, execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
-                   updated_at = CURRENT_TIMESTAMP
+                   updated_at = CURRENT_TIMESTAMP, {attribution}
                WHERE id = $1 AND status = 'waiting_for_third_party_reply'"#,
-        )
+            attribution = attribution.set_clause(),
+        ))
         .bind(task_id)
         .execute(&mut *tx)
         .await
@@ -1757,20 +1733,17 @@ impl TaskPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
         if let Some((task_id, expires_at)) = row {
-            set_task_transition_context(
-                &mut tx,
+            let attribution = TransitionAttribution::new(
                 TaskTransitionReason::OutreachExtended,
-                TaskTransitionActorKind::Outreach,
-                None,
-            )
-            .await?;
-            set_task_transition_source(&mut tx, None, Some(outreach_id)).await?;
-            sqlx::query(
+                TransitionActor::Outreach(outreach_id),
+            );
+            sqlx::query(&format!(
                 r#"UPDATE background_tasks
                    SET status = 'waiting_for_third_party_reply', wait_expires_at = $2,
-                       updated_at = CURRENT_TIMESTAMP
+                       updated_at = CURRENT_TIMESTAMP, {attribution}
                    WHERE id = $1 AND status = 'pending_approval'"#,
-            )
+                attribution = attribution.set_clause(),
+            ))
             .bind(task_id)
             .bind(expires_at)
             .execute(&mut *tx)
@@ -2055,9 +2028,17 @@ impl TaskPersistence for PostgresPersistence {
 
         // Hits `background_tasks_processing_lease_idx`. No worker guard: the lease is expired, so
         // by definition no run still holds it.
+        // The sweep is one statement over rows held by different workers, so the attribution
+        // cannot come from a value the caller knows. `worker_id` on the right-hand side is read
+        // from the old row version, which makes each event name the worker that lost *that* lease.
         let reaped = sqlx::query_as::<_, (Uuid, i32)>(
             r#"UPDATE background_tasks
-               SET retry_count = retry_count + 1,
+               SET transition_reason = 'lease_lost',
+                   transition_actor_kind = 'worker',
+                   transition_actor_id = worker_id,
+                   transition_approval_id = NULL,
+                   transition_outreach_id = NULL,
+                   retry_count = retry_count + 1,
                    status = CASE
                        WHEN retry_count + 1 >= max_retries THEN 'dead_letter'
                        ELSE 'pending'
@@ -2719,7 +2700,12 @@ impl TaskPersistence for PostgresPersistence {
                    execution_generation = gen_random_uuid(),
                    locked_at = CURRENT_TIMESTAMP,
                    lock_expires_at = $3,
-                   updated_at = CURRENT_TIMESTAMP
+                   updated_at = CURRENT_TIMESTAMP,
+                   transition_reason = 'claimed',
+                   transition_actor_kind = 'worker',
+                   transition_actor_id = $2,
+                   transition_approval_id = NULL,
+                   transition_outreach_id = NULL
                FROM claimable
                WHERE task.id = claimable.id
                RETURNING task.id, task.company_id, task.channel_id, task.thread_id,
@@ -2763,7 +2749,10 @@ impl TaskPersistence for PostgresPersistence {
         let result = sqlx::query(
             r#"UPDATE background_tasks
                SET status = 'completed', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
-                   lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+                   lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP,
+                   transition_reason = 'completed', transition_actor_kind = 'worker',
+                   transition_actor_id = $2, transition_approval_id = NULL,
+                   transition_outreach_id = NULL
                WHERE id = $1 AND status = 'processing' AND worker_id = $2
                  AND execution_generation = $3
                  AND lock_expires_at > CURRENT_TIMESTAMP"#,
@@ -2778,87 +2767,16 @@ impl TaskPersistence for PostgresPersistence {
         Ok(result.rows_affected() > 0)
     }
 
-    async fn mark_task_failed(
-        &self,
-        lease: TaskLeaseRef,
-        error_msg: &str,
-        next_run_at: DateTime<Utc>,
-        is_dead_letter: bool,
-    ) -> AppResult<bool> {
-        mark_task_failed_on(
-            &self.pool,
-            lease,
-            error_msg,
-            next_run_at,
-            is_dead_letter,
-            TaskStopReason::RetryableFailure,
-        )
-        .await
+    async fn mark_task_failed(&self, failure: TaskFailure<'_>) -> AppResult<bool> {
+        mark_task_failed_on(&self.pool, failure).await
     }
 
-    async fn mark_task_failed_with_reason(
-        &self,
-        lease: TaskLeaseRef,
-        error_msg: &str,
-        next_run_at: DateTime<Utc>,
-        is_dead_letter: bool,
-        reason: TaskStopReason,
-    ) -> AppResult<bool> {
-        mark_task_failed_on(
-            &self.pool,
-            lease,
-            error_msg,
-            next_run_at,
-            is_dead_letter,
-            reason,
-        )
-        .await
+    async fn stop_task(&self, id: Uuid, actor: StopActor) -> AppResult<BackgroundTask> {
+        stop_task_on(&self.pool, id, actor).await
     }
 
-    async fn stop_task(&self, id: Uuid) -> AppResult<BackgroundTask> {
-        stop_task_on(&self.pool, id, None).await
-    }
-
-    async fn stop_task_as(&self, id: Uuid, operator_id: Uuid) -> AppResult<BackgroundTask> {
-        stop_task_on(&self.pool, id, Some(operator_id)).await
-    }
-
-    async fn resume_task(&self, id: Uuid) -> AppResult<BackgroundTask> {
-        resume_task_on(&self.pool, id, None).await
-    }
-
-    async fn resume_task_as(&self, id: Uuid, operator_id: Uuid) -> AppResult<BackgroundTask> {
-        resume_task_on(
-            &self.pool,
-            id,
-            Some(TransitionAttribution {
-                reason: TaskTransitionReason::OperatorResumed,
-                actor_kind: TaskTransitionActorKind::Operator,
-                actor_id: Some(operator_id),
-                approval_id: None,
-                outreach_id: None,
-            }),
-        )
-        .await
-    }
-
-    async fn resume_task_after_approval(
-        &self,
-        id: Uuid,
-        approval_id: Uuid,
-    ) -> AppResult<BackgroundTask> {
-        resume_task_on(
-            &self.pool,
-            id,
-            Some(TransitionAttribution {
-                reason: TaskTransitionReason::ApprovalAccepted,
-                actor_kind: TaskTransitionActorKind::Approval,
-                actor_id: None,
-                approval_id: Some(approval_id),
-                outreach_id: None,
-            }),
-        )
-        .await
+    async fn resume_task(&self, id: Uuid, actor: ResumeActor) -> AppResult<BackgroundTask> {
+        resume_task_on(&self.pool, id, actor).await
     }
 
     async fn list_company_tasks(
@@ -2977,20 +2895,8 @@ impl TaskPersistence for PostgresPersistence {
     }
 }
 
-async fn mark_task_failed_on(
-    pool: &sqlx::PgPool,
-    lease: TaskLeaseRef,
-    error_msg: &str,
-    next_run_at: DateTime<Utc>,
-    is_dead_letter: bool,
-    stop_reason: TaskStopReason,
-) -> AppResult<bool> {
-    let status = if is_dead_letter {
-        "dead_letter"
-    } else {
-        "pending"
-    };
-    let reason = match stop_reason {
+async fn mark_task_failed_on(pool: &sqlx::PgPool, failure: TaskFailure<'_>) -> AppResult<bool> {
+    let reason = match failure.reason {
         TaskStopReason::RetryableFailure => TaskTransitionReason::RetryableFailure,
         TaskStopReason::TerminalFailure => TaskTransitionReason::TerminalFailure,
         TaskStopReason::TimedOut => TaskTransitionReason::TimedOut,
@@ -2998,63 +2904,65 @@ async fn mark_task_failed_on(
         TaskStopReason::LeaseLost => TaskTransitionReason::LeaseLost,
         TaskStopReason::Completed => TaskTransitionReason::Completed,
     };
-    let mut tx = pool.begin().await.map_err(AppError::from)?;
-    set_task_transition_context(
-        &mut tx,
-        reason,
-        TaskTransitionActorKind::Worker,
-        Some(lease.worker_id),
-    )
-    .await?;
-    let result = sqlx::query(
+    // The lease names the run that failed, so the failure cannot be attributed to anyone else.
+    let attribution =
+        TransitionAttribution::new(reason, TransitionActor::Worker(failure.lease.worker_id));
+    let result = sqlx::query(&format!(
         r#"UPDATE background_tasks
            SET status = $1, retry_count = retry_count + 1, last_error = $2,
                run_at = $3, worker_id = NULL, execution_generation = NULL, locked_at = NULL,
-               lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+               lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
            WHERE id = $4 AND status = 'processing' AND worker_id = $5
              AND execution_generation = $6
              AND lock_expires_at > CURRENT_TIMESTAMP"#,
-    )
-    .bind(status)
-    .bind(error_msg)
-    .bind(next_run_at)
-    .bind(lease.task_id)
-    .bind(lease.worker_id)
-    .bind(lease.execution_generation)
-    .execute(&mut *tx)
+        attribution = attribution.set_clause(),
+    ))
+    .bind(failure.outcome.status().as_str())
+    .bind(failure.error)
+    .bind(failure.next_run_at)
+    .bind(failure.lease.task_id)
+    .bind(failure.lease.worker_id)
+    .bind(failure.lease.execution_generation)
+    .execute(pool)
     .await
     .map_err(AppError::from)?;
-    tx.commit().await.map_err(AppError::from)?;
     Ok(result.rows_affected() == 1)
+}
+
+/// Which states each stop cause may act on.
+///
+/// An operator may stop anything still in flight or recoverable. A rejected approval may only stop
+/// the task that approval parked -- a rejection is an answer to one question, not a licence to end
+/// unrelated work that has since moved on.
+fn stoppable_statuses(actor: StopActor) -> &'static str {
+    match actor {
+        StopActor::Operator(_) => {
+            "'pending', 'processing', 'pending_approval', \
+             'waiting_for_third_party_reply', 'failed', 'dead_letter'"
+        }
+        StopActor::Approval(_) => "'pending_approval'",
+    }
 }
 
 async fn stop_task_on(
     pool: &sqlx::PgPool,
     id: Uuid,
-    operator_id: Option<Uuid>,
+    actor: StopActor,
 ) -> AppResult<BackgroundTask> {
     let mut tx = pool.begin().await.map_err(AppError::from)?;
-    if let Some(operator_id) = operator_id {
-        set_task_transition_context(
-            &mut tx,
-            TaskTransitionReason::OperatorStopped,
-            TaskTransitionActorKind::Operator,
-            Some(operator_id),
-        )
-        .await?;
-    }
-    let db = sqlx::query_as::<_, BackgroundTaskDb>(
+    let db = sqlx::query_as::<_, BackgroundTaskDb>(&format!(
         r#"UPDATE background_tasks
            SET status = 'stopped', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
-               lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+               lock_expires_at = NULL, updated_at = CURRENT_TIMESTAMP, {attribution}
            WHERE id = $1
-             AND status IN ('pending', 'processing', 'pending_approval',
-                            'waiting_for_third_party_reply', 'failed', 'dead_letter')
+             AND status IN ({statuses})
            RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status,
                      payload, retry_count, max_retries, last_error, worker_id,
                      execution_generation, locked_at, lock_expires_at, run_at, created_at,
                      updated_at"#,
-    )
+        attribution = TransitionAttribution::stopped(actor).set_clause(),
+        statuses = stoppable_statuses(actor),
+    ))
     .bind(id)
     .fetch_one(&mut *tx)
     .await
@@ -3080,36 +2988,16 @@ async fn stop_task_on(
     db.try_into()
 }
 
-struct TransitionAttribution {
-    reason: TaskTransitionReason,
-    actor_kind: TaskTransitionActorKind,
-    actor_id: Option<Uuid>,
-    approval_id: Option<Uuid>,
-    outreach_id: Option<Uuid>,
-}
-
 async fn resume_task_on(
     pool: &sqlx::PgPool,
     id: Uuid,
-    attribution: Option<TransitionAttribution>,
+    actor: ResumeActor,
 ) -> AppResult<BackgroundTask> {
-    let mut tx = pool.begin().await.map_err(AppError::from)?;
-    if let Some(attribution) = attribution {
-        set_task_transition_context(
-            &mut tx,
-            attribution.reason,
-            attribution.actor_kind,
-            attribution.actor_id,
-        )
-        .await?;
-        set_task_transition_source(&mut tx, attribution.approval_id, attribution.outreach_id)
-            .await?;
-    }
-    let db = sqlx::query_as::<_, BackgroundTaskDb>(
+    let db = sqlx::query_as::<_, BackgroundTaskDb>(&format!(
         r#"UPDATE background_tasks
            SET status = 'pending', run_at = CURRENT_TIMESTAMP, worker_id = NULL,
                execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL,
-               updated_at = CURRENT_TIMESTAMP
+               updated_at = CURRENT_TIMESTAMP, {attribution}
            WHERE id = $1
              AND status IN ('stopped', 'pending_approval',
                             'waiting_for_third_party_reply', 'failed', 'dead_letter')
@@ -3117,12 +3005,12 @@ async fn resume_task_on(
                      payload, retry_count, max_retries, last_error, worker_id,
                      execution_generation, locked_at, lock_expires_at, run_at, created_at,
                      updated_at"#,
-    )
+        attribution = TransitionAttribution::resumed(actor).set_clause(),
+    ))
     .bind(id)
-    .fetch_one(&mut *tx)
+    .fetch_one(pool)
     .await
     .map_err(AppError::from)?;
-    tx.commit().await.map_err(AppError::from)?;
     db.try_into()
 }
 
@@ -3300,6 +3188,12 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool};
     use crate::entities::message::{Message, MessageDirection, MessageRole};
+    use crate::entities::task::TaskFailureOutcome;
+
+    /// What a fixture that forces a status writes instead of an attribution. It has no cause to
+    /// state, and leaving the columns out would carry the previous transition's into the event.
+    const CLEAR_TRANSITION: &str = "transition_reason = NULL, transition_actor_kind = NULL, \
+         transition_actor_id = NULL, transition_approval_id = NULL, transition_outreach_id = NULL";
     use crate::services::outbound_dispatcher::OutboundEmail;
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
@@ -3604,8 +3498,14 @@ mod tests {
             .unwrap();
         assert_eq!(before_stop.len(), 2, "the failed guard must emit no event");
 
-        persistence.stop_task_as(task.id, owner.id).await.unwrap();
-        persistence.resume_task_as(task.id, owner.id).await.unwrap();
+        persistence
+            .stop_task(task.id, StopActor::Operator(owner.id))
+            .await
+            .unwrap();
+        persistence
+            .resume_task(task.id, ResumeActor::Operator(owner.id))
+            .await
+            .unwrap();
         let events = persistence
             .list_task_status_events(company.id, task.correlation_id, None, 20)
             .await
@@ -3617,6 +3517,349 @@ mod tests {
             let event = events.iter().find(|event| event.reason == reason).unwrap();
             assert_eq!(event.actor_kind, TaskTransitionActorKind::Operator);
             assert_eq!(event.actor_id, Some(owner.id));
+        }
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// Row-local attribution is a write contract: every status-changing statement states all five
+    /// columns. The failure it guards against is silent -- a statement that omits one carries the
+    /// previous transition's value into the new row version, and the ledger records an actor that
+    /// had nothing to do with the change. This walks a task through the actor kinds in the order
+    /// most likely to expose that, and checks the boundaries where the kind changes.
+    #[tokio::test]
+    async fn consecutive_transitions_never_inherit_the_previous_actor_or_source() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let operator = Uuid::new_v4();
+        let task = enqueue_chain(&persistence, company.id, channel.id, "inheritance").await;
+
+        // worker -> approval.
+        let first_worker = Uuid::new_v4();
+        let lease = claim_as(&persistence, task.id, first_worker).await;
+        let approval_id = park_for_approval(&persistence, &company, &channel, lease).await;
+
+        // approval -> worker: the claim must not carry the approval id that parked the task.
+        persistence
+            .resume_task(task.id, ResumeActor::Approval(approval_id))
+            .await
+            .unwrap();
+        let second_worker = Uuid::new_v4();
+        let lease = claim_as(&persistence, task.id, second_worker).await;
+
+        // worker -> operator.
+        persistence
+            .mark_task_failed(TaskFailure {
+                lease,
+                error: "inheritance check",
+                next_run_at: Utc::now(),
+                outcome: TaskFailureOutcome::Retry,
+                reason: TaskStopReason::RetryableFailure,
+            })
+            .await
+            .unwrap();
+        persistence
+            .stop_task(task.id, StopActor::Operator(operator))
+            .await
+            .unwrap();
+
+        let events = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 50)
+            .await
+            .unwrap();
+        let expected = [
+            (
+                TaskTransitionReason::Enqueued,
+                TaskTransitionActorKind::System,
+                None,
+                None,
+                None,
+            ),
+            (
+                TaskTransitionReason::Claimed,
+                TaskTransitionActorKind::Worker,
+                Some(first_worker),
+                None,
+                None,
+            ),
+            (
+                TaskTransitionReason::ApprovalRequested,
+                TaskTransitionActorKind::Approval,
+                None,
+                Some(approval_id),
+                None,
+            ),
+            (
+                TaskTransitionReason::ApprovalAccepted,
+                TaskTransitionActorKind::Approval,
+                None,
+                Some(approval_id),
+                None,
+            ),
+            (
+                TaskTransitionReason::Claimed,
+                TaskTransitionActorKind::Worker,
+                Some(second_worker),
+                None,
+                None,
+            ),
+            (
+                TaskTransitionReason::RetryableFailure,
+                TaskTransitionActorKind::Worker,
+                Some(second_worker),
+                None,
+                None,
+            ),
+            (
+                TaskTransitionReason::OperatorStopped,
+                TaskTransitionActorKind::Operator,
+                Some(operator),
+                None,
+                None,
+            ),
+        ];
+        assert_eq!(events.len(), expected.len(), "{events:#?}");
+        for (event, (reason, kind, actor_id, approval, outreach)) in events.iter().zip(expected) {
+            assert_eq!(event.reason, reason, "{event:#?}");
+            assert_eq!(event.actor_kind, kind, "{event:#?}");
+            assert_eq!(event.actor_id, actor_id, "{event:#?}");
+            assert_eq!(event.related_approval_id, approval, "{event:#?}");
+            assert_eq!(event.related_outreach_id, outreach, "{event:#?}");
+        }
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// The outreach -> operator boundary, which the sequence above does not reach: an outreach
+    /// names its own row as the transition's source, and the operator stop that follows must not
+    /// inherit it.
+    #[tokio::test]
+    async fn an_operator_stop_after_an_outreach_drops_the_outreach_source() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let operator = Uuid::new_v4();
+        let task = enqueue_chain(&persistence, company.id, channel.id, "outreach-operator").await;
+        let worker_id = Uuid::new_v4();
+        claim_as(&persistence, task.id, worker_id).await;
+
+        let outreach_id = Uuid::new_v4();
+        let progress = persistence
+            .create_outreach_and_pause(CreateOutreachRequest {
+                correlation_id: task.correlation_id,
+                id: outreach_id,
+                task_id: task.id,
+                company_id: company.id,
+                channel_id: channel.id,
+                worker_id,
+                outreach_key: "attribution-outreach".into(),
+                required_threshold_percent: 100.0,
+                expires_at: Utc::now() + chrono::Duration::hours(24),
+                subject: "Question".into(),
+                body: "Please respond".into(),
+                targets: Vec::new(),
+            })
+            .await
+            .unwrap();
+        assert!(progress.suspended);
+
+        persistence
+            .stop_task(task.id, StopActor::Operator(operator))
+            .await
+            .unwrap();
+
+        let events = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 50)
+            .await
+            .unwrap();
+        let started = events
+            .iter()
+            .find(|event| event.reason == TaskTransitionReason::OutreachStarted)
+            .expect("the outreach parked the task");
+        assert_eq!(started.actor_kind, TaskTransitionActorKind::Outreach);
+        assert_eq!(started.related_outreach_id, Some(outreach_id));
+        assert_eq!(started.actor_id, None);
+
+        let stopped = events
+            .iter()
+            .find(|event| event.reason == TaskTransitionReason::OperatorStopped)
+            .expect("the operator stopped the task");
+        assert_eq!(stopped.actor_kind, TaskTransitionActorKind::Operator);
+        assert_eq!(stopped.actor_id, Some(operator));
+        assert_eq!(
+            stopped.related_outreach_id, None,
+            "the operator stop must not inherit the outreach that parked the task"
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// A rejected approval is an approval acting, and it may only end the task that approval
+    /// parked. Against any other state it must change nothing rather than reaching for work that
+    /// has since moved on.
+    #[tokio::test]
+    async fn an_approval_rejection_stops_only_the_task_it_parked() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let task = enqueue_chain(&persistence, company.id, channel.id, "approval-reject").await;
+        let lease = claim_as(&persistence, task.id, Uuid::new_v4()).await;
+        let approval_id = park_for_approval(&persistence, &company, &channel, lease).await;
+
+        persistence
+            .stop_task(task.id, StopActor::Approval(approval_id))
+            .await
+            .unwrap();
+        let events = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 50)
+            .await
+            .unwrap();
+        let rejected = events
+            .iter()
+            .find(|event| event.reason == TaskTransitionReason::ApprovalRejected)
+            .expect("the rejection stopped the task");
+        assert_eq!(rejected.actor_kind, TaskTransitionActorKind::Approval);
+        assert_eq!(rejected.related_approval_id, Some(approval_id));
+        assert_eq!(rejected.actor_id, None);
+
+        // The task is `stopped` now, which an approval rejection may not act on.
+        let before = events.len();
+        assert!(
+            persistence
+                .stop_task(task.id, StopActor::Approval(approval_id))
+                .await
+                .is_err(),
+            "a rejection must not stop a task it did not park"
+        );
+        let after = persistence
+            .list_task_status_events(company.id, task.correlation_id, None, 50)
+            .await
+            .unwrap();
+        assert_eq!(
+            after.len(),
+            before,
+            "a matched-nothing stop writes no event"
+        );
+
+        CompanyPersistence::delete(&persistence, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// The database refuses attribution whose actor kind and ids disagree, so a call site cannot
+    /// record an approval-driven change as an operator's, or name two sources at once.
+    #[tokio::test]
+    async fn the_task_row_rejects_attribution_whose_shape_contradicts_its_actor_kind() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let (company, channel) = seed_company_and_channel(&persistence).await;
+        let task = enqueue_chain(&persistence, company.id, channel.id, "shape-check").await;
+
+        // (what is wrong with it, reason, actor kind, actor id, approval id, outreach id)
+        let refused = [
+            (
+                "an approval without the approval it names",
+                "'approval_rejected'",
+                "'approval'",
+                "NULL",
+                "NULL",
+                "NULL",
+            ),
+            (
+                "an outreach without the outreach it names",
+                "'outreach_started'",
+                "'outreach'",
+                "NULL",
+                "NULL",
+                "NULL",
+            ),
+            (
+                "an operator with no id",
+                "'operator_stopped'",
+                "'operator'",
+                "NULL",
+                "NULL",
+                "NULL",
+            ),
+            (
+                "a worker with no id",
+                "'retryable_failure'",
+                "'worker'",
+                "NULL",
+                "NULL",
+                "NULL",
+            ),
+            (
+                "the system claiming an actor",
+                "'operator_stopped'",
+                "'system'",
+                "gen_random_uuid()",
+                "NULL",
+                "NULL",
+            ),
+            (
+                "an operator carrying an approval",
+                "'operator_stopped'",
+                "'operator'",
+                "gen_random_uuid()",
+                "gen_random_uuid()",
+                "NULL",
+            ),
+            (
+                "two sources at once",
+                "'approval_rejected'",
+                "'approval'",
+                "NULL",
+                "gen_random_uuid()",
+                "gen_random_uuid()",
+            ),
+            (
+                "a reason with no actor kind at all",
+                "'operator_stopped'",
+                "NULL",
+                "NULL",
+                "NULL",
+                "NULL",
+            ),
+            (
+                "an actor with no reason",
+                "NULL",
+                "'operator'",
+                "gen_random_uuid()",
+                "NULL",
+                "NULL",
+            ),
+        ];
+        for (case, reason, kind, actor_id, approval_id, outreach_id) in refused {
+            let outcome = sqlx::query(&format!(
+                "UPDATE background_tasks
+                    SET status = 'stopped',
+                        transition_reason = {reason},
+                        transition_actor_kind = {kind},
+                        transition_actor_id = {actor_id},
+                        transition_approval_id = {approval_id},
+                        transition_outreach_id = {outreach_id}
+                  WHERE id = $1"
+            ))
+            .bind(task.id)
+            .execute(&pool)
+            .await;
+            assert!(outcome.is_err(), "{case} must be refused");
         }
 
         CompanyPersistence::delete(&persistence, company.id)
@@ -3810,9 +4053,10 @@ mod tests {
         // `background_tasks_lease_check` gives the lease columns to `processing` rows and to no
         // other status, so they move together here exactly as the worker moves them.
         let set_status = async |id: Uuid, status: &str, lease: Option<DateTime<Utc>>| {
-            sqlx::query(
+            sqlx::query(&format!(
                 "UPDATE background_tasks
-                 SET status = $2,
+                 SET {CLEAR_TRANSITION},
+                     status = $2,
                      lock_expires_at = $3,
                      worker_id = CASE WHEN $3::timestamptz IS NULL THEN NULL ELSE gen_random_uuid() END,
                      execution_generation =
@@ -3821,8 +4065,8 @@ mod tests {
                      -- lock_expires_at > locked_at, and an expired lease is set in the past.
                      locked_at = $3::timestamptz - interval '10 minutes',
                      updated_at = CURRENT_TIMESTAMP
-                 WHERE id = $1",
-            )
+                 WHERE id = $1"
+            ))
             .bind(id)
             .bind(status)
             .bind(lease)
@@ -4192,7 +4436,13 @@ mod tests {
         assert!(!persistence.mark_task_completed(stale).await.unwrap());
         assert!(
             !persistence
-                .mark_task_failed(stale, "stale", Utc::now(), false)
+                .mark_task_failed(TaskFailure {
+                    lease: stale,
+                    error: "stale",
+                    next_run_at: Utc::now(),
+                    outcome: TaskFailureOutcome::Retry,
+                    reason: TaskStopReason::RetryableFailure,
+                })
                 .await
                 .unwrap()
         );
@@ -4552,12 +4802,12 @@ mod tests {
             .filter(|id| *id != task.id)
             .collect();
         if !borrowed.is_empty() {
-            sqlx::query(
+            sqlx::query(&format!(
                 "UPDATE background_tasks
-                    SET status = 'pending', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
-                        lock_expires_at = NULL
-                  WHERE id = ANY($1)",
-            )
+                    SET {CLEAR_TRANSITION}, status = 'pending', worker_id = NULL,
+                        execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL
+                  WHERE id = ANY($1)"
+            ))
             .bind(&borrowed)
             .execute(&pool)
             .await
@@ -4575,12 +4825,13 @@ mod tests {
             TaskLeaseRef::of(claimed_task).expect("a claimed task records its lease");
         assert!(
             persistence
-                .mark_task_failed(
-                    claimed_lease,
-                    "poison task",
-                    Utc::now() + chrono::Duration::minutes(1),
-                    false,
-                )
+                .mark_task_failed(TaskFailure {
+                    lease: claimed_lease,
+                    error: "poison task",
+                    next_run_at: Utc::now() + chrono::Duration::minutes(1),
+                    outcome: TaskFailureOutcome::Retry,
+                    reason: TaskStopReason::RetryableFailure,
+                })
                 .await
                 .unwrap()
         );
@@ -4600,12 +4851,12 @@ mod tests {
         );
         let immediate_borrowed: Vec<Uuid> = immediate.iter().map(|claim| claim.id).collect();
         if !immediate_borrowed.is_empty() {
-            sqlx::query(
+            sqlx::query(&format!(
                 "UPDATE background_tasks
-                    SET status = 'pending', worker_id = NULL, execution_generation = NULL, locked_at = NULL,
-                        lock_expires_at = NULL
-                  WHERE id = ANY($1) AND worker_id = $2",
-            )
+                    SET {CLEAR_TRANSITION}, status = 'pending', worker_id = NULL,
+                        execution_generation = NULL, locked_at = NULL, lock_expires_at = NULL
+                  WHERE id = ANY($1) AND worker_id = $2"
+            ))
             .bind(&immediate_borrowed)
             .bind(immediate_worker)
             .execute(&pool)
@@ -5554,6 +5805,68 @@ mod tests {
     }
 
     /// Take the lease a fenced write needs, the way the worker does.
+    /// Claim on behalf of a named worker, so a test can assert which one the ledger recorded.
+    async fn claim_as(
+        persistence: &PostgresPersistence,
+        task_id: Uuid,
+        worker_id: Uuid,
+    ) -> TaskLeaseRef {
+        assert!(
+            persistence
+                .claim_task(
+                    task_id,
+                    worker_id,
+                    Utc::now() + chrono::Duration::minutes(5)
+                )
+                .await
+                .unwrap()
+        );
+        let claimed = persistence.get_task_by_id(task_id).await.unwrap().unwrap();
+        TaskLeaseRef::of(&claimed).unwrap()
+    }
+
+    /// Park a leased task behind an approval, returning the approval that now owns its state.
+    async fn park_for_approval(
+        persistence: &PostgresPersistence,
+        company: &crate::entities::company::Company,
+        channel: &crate::entities::channel::Channel,
+        lease: TaskLeaseRef,
+    ) -> Uuid {
+        use crate::adapters::persistence::approval::{ApprovalPersistence, NewApproval};
+        use crate::entities::approval::{ApprovalAction, ApprovalSubject};
+        use crate::entities::task::TaskSuspension;
+
+        let subject = ApprovalSubject {
+            company_id: company.id,
+            channel_id: channel.id,
+            channel_name: channel.name.clone(),
+            channel_slug: channel.slug.clone(),
+            company_slug: company.slug.clone(),
+            thread_id: None,
+            suspension: Some(TaskSuspension::Leased(lease)),
+            correlation_id: CorrelationId::new(),
+            approver_email: "approver@example.com".into(),
+        };
+        let (approval, created) = persistence
+            .create_approval(NewApproval {
+                subject: &subject,
+                action: &ApprovalAction {
+                    step_key: format!("step-{}", Uuid::new_v4().simple()),
+                    action_type: "generic".into(),
+                    title: "Approve".into(),
+                    summary: "Please approve".into(),
+                    payload: serde_json::json!({}),
+                },
+                notification: serde_json::json!({}),
+                token: Uuid::new_v4(),
+                expires_at: Utc::now() + chrono::Duration::hours(24),
+            })
+            .await
+            .unwrap();
+        assert!(created, "the approval is new");
+        approval.id
+    }
+
     async fn claim(persistence: &PostgresPersistence, task_id: Uuid) -> TaskLeaseRef {
         assert!(
             persistence
@@ -5583,7 +5896,13 @@ mod tests {
         let unresolved = enqueue_chain(&persistence, company.id, channel.id, "unresolved").await;
         let lease = claim(&persistence, unresolved.id).await;
         persistence
-            .mark_task_failed(lease, "gave up", Utc::now(), true)
+            .mark_task_failed(TaskFailure {
+                lease,
+                error: "gave up",
+                next_run_at: Utc::now(),
+                outcome: TaskFailureOutcome::DeadLetter,
+                reason: TaskStopReason::TerminalFailure,
+            })
             .await
             .unwrap();
         // Unresolved work is selected however old it is — that is the point of the status arm.
@@ -5591,10 +5910,16 @@ mod tests {
 
         let stopped_recent =
             enqueue_chain(&persistence, company.id, channel.id, "stopped-in").await;
-        persistence.stop_task(stopped_recent.id).await.unwrap();
+        persistence
+            .stop_task(stopped_recent.id, StopActor::Operator(Uuid::new_v4()))
+            .await
+            .unwrap();
 
         let stopped_old = enqueue_chain(&persistence, company.id, channel.id, "stopped-out").await;
-        persistence.stop_task(stopped_old.id).await.unwrap();
+        persistence
+            .stop_task(stopped_old.id, StopActor::Operator(Uuid::new_v4()))
+            .await
+            .unwrap();
         age_chain_tasks(&pool, stopped_old.correlation_id).await;
 
         let completed_recent =
@@ -6203,10 +6528,13 @@ mod tests {
         let persistence = PostgresPersistence::new(pool);
         let (company, channel) = seed_company_and_channel(&persistence).await;
         let cases = [
-            (TaskStopReason::RetryableFailure, false),
-            (TaskStopReason::TimedOut, false),
-            (TaskStopReason::Shutdown, false),
-            (TaskStopReason::TerminalFailure, true),
+            (TaskStopReason::RetryableFailure, TaskFailureOutcome::Retry),
+            (TaskStopReason::TimedOut, TaskFailureOutcome::Retry),
+            (TaskStopReason::Shutdown, TaskFailureOutcome::Retry),
+            (
+                TaskStopReason::TerminalFailure,
+                TaskFailureOutcome::DeadLetter,
+            ),
         ];
         for (stop_reason, dead_letter) in cases {
             let task = persistence
@@ -6234,13 +6562,13 @@ mod tests {
             let lease = TaskLeaseRef::of(&claimed).unwrap();
             assert!(
                 persistence
-                    .mark_task_failed_with_reason(
+                    .mark_task_failed(TaskFailure {
                         lease,
-                        "bounded test failure",
-                        Utc::now() + chrono::Duration::minutes(1),
-                        dead_letter,
-                        stop_reason,
-                    )
+                        error: "bounded test failure",
+                        next_run_at: Utc::now() + chrono::Duration::minutes(1),
+                        outcome: dead_letter,
+                        reason: stop_reason,
+                    })
                     .await
                     .unwrap()
             );
@@ -6545,11 +6873,13 @@ mod tests {
             ))
             .await
             .unwrap();
-        sqlx::query("UPDATE background_tasks SET status = 'dead_letter' WHERE id = $1")
-            .bind(dead.id)
-            .execute(&pool)
-            .await
-            .unwrap();
+        sqlx::query(&format!(
+            "UPDATE background_tasks SET {CLEAR_TRANSITION}, status = 'dead_letter' WHERE id = $1"
+        ))
+        .bind(dead.id)
+        .execute(&pool)
+        .await
+        .unwrap();
 
         let overdue = persistence
             .enqueue_task(NewTask::starting_new_chain(

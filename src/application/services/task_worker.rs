@@ -23,8 +23,9 @@ use crate::{
         schedule::ScheduledRunPayload,
         stuck_work::StuckWorkThresholds,
         task::{
-            BackgroundTask, TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus,
-            TaskExecutionOutcome, TaskLeaseRef, TaskStopReason, TaskSuspension,
+            BackgroundTask, ResumeActor, StopActor, TaskAttemptOutcome, TaskAttemptRef,
+            TaskAttemptStatus, TaskExecutionOutcome, TaskFailure, TaskFailureOutcome, TaskLeaseRef,
+            TaskStopReason, TaskSuspension,
         },
         value_objects::{EmailAddress, MessageId},
     },
@@ -240,18 +241,18 @@ fn reply_subject(subject: &str) -> String {
 
 /// Why one task run stopped, and whether running it again could ever end differently.
 ///
-/// `From<String>` yields [`TaskFailure::Retryable`], so the many `?` sites that surface a
+/// `From<String>` yields [`RunFailure::Retryable`], so the many `?` sites that surface a
 /// stringly error keep the retry behaviour they already had; a terminal failure must be stated.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum TaskFailure {
+enum RunFailure {
     Retryable(String),
     TimedOut(String),
     Terminal(String),
 }
 
-impl From<String> for TaskFailure {
+impl From<String> for RunFailure {
     fn from(message: String) -> Self {
-        TaskFailure::Retryable(message)
+        RunFailure::Retryable(message)
     }
 }
 
@@ -636,14 +637,24 @@ impl TaskWorker {
         )
         .await;
         let next_retry = task.retry_count + 1;
-        let is_dead_letter = dead_letter_now || next_retry >= task.max_retries;
+        let outcome_side = if dead_letter_now || next_retry >= task.max_retries {
+            TaskFailureOutcome::DeadLetter
+        } else {
+            TaskFailureOutcome::Retry
+        };
         // Exponential backoff: 30s * 2^retry, capped so the shift can't overflow.
         let backoff_secs = 30 * (1 << next_retry.min(10));
         let next_run = chrono::Utc::now() + chrono::Duration::seconds(backoff_secs);
 
         let outcome = self
             .task_persistence
-            .mark_task_failed_with_reason(lease, &err_msg, next_run, is_dead_letter, stop_reason)
+            .mark_task_failed(TaskFailure {
+                lease,
+                error: &err_msg,
+                next_run_at: next_run,
+                outcome: outcome_side,
+                reason: stop_reason,
+            })
             .await;
         report_outcome("Task", task_id, "failure", outcome);
         self.record_task_metric(task, duration_ms, TaskStatusMetric::Failed, stop_reason);
@@ -1005,7 +1016,7 @@ impl TaskWorker {
         &self,
         task: &crate::entities::task::BackgroundTask,
         lease: TaskLeaseRef,
-    ) -> Result<TaskExecutionOutcome, TaskFailure> {
+    ) -> Result<TaskExecutionOutcome, RunFailure> {
         if task.task_type == SCHEDULED_AGENT_RUN_TASK {
             Box::pin(self.execute_scheduled_task(task)).await?;
             return Ok(TaskExecutionOutcome::Replied);
@@ -1013,7 +1024,7 @@ impl TaskWorker {
 
         // A payload that will not parse will not parse on the next attempt either.
         let mut ingest: InboundIngestResult = serde_json::from_value(task.payload.clone())
-            .map_err(|e| TaskFailure::Terminal(format!("Invalid task payload JSON: {e}")))?;
+            .map_err(|e| RunFailure::Terminal(format!("Invalid task payload JSON: {e}")))?;
 
         self.thread_use_cases
             .hydrate_ingest_configuration(&mut ingest)
@@ -1025,7 +1036,7 @@ impl TaskWorker {
         }
 
         let inbound_msg = ingest.inbound_message.as_ref().ok_or_else(|| {
-            TaskFailure::Terminal("Missing inbound message in task payload".to_string())
+            RunFailure::Terminal("Missing inbound message in task payload".to_string())
         })?;
 
         // Idempotency Guard: Check if an outbound email for this triggering message was already sent
@@ -1095,8 +1106,8 @@ impl TaskWorker {
         )
         .await
         .map_err(|error| match error {
-            crate::app_error::AppError::Timeout(message) => TaskFailure::TimedOut(message),
-            other => TaskFailure::Retryable(other.to_string()),
+            crate::app_error::AppError::Timeout(message) => RunFailure::TimedOut(message),
+            other => RunFailure::Retryable(other.to_string()),
         })?;
 
         Ok(match dispatch {
@@ -1110,7 +1121,7 @@ impl TaskWorker {
     ///
     /// Split from the inbound path because a scheduled run has no inbound message to ingest, but
     /// it shares the guard that matters — a retry must not run the agent, or reply, twice.
-    async fn execute_scheduled_task(&self, task: &BackgroundTask) -> Result<(), TaskFailure> {
+    async fn execute_scheduled_task(&self, task: &BackgroundTask) -> Result<(), RunFailure> {
         let payload: ScheduledRunPayload = serde_json::from_value(task.payload.clone())
             .map_err(|e| format!("Invalid scheduled task payload: {e}"))?;
         let context = self.load_scheduled_run_context(&payload).await?;
@@ -1158,7 +1169,7 @@ impl TaskWorker {
 
         self.deliver_scheduled_reply(task, &payload, &context, &answer)
             .await
-            .map_err(TaskFailure::from)
+            .map_err(RunFailure::from)
     }
 
     /// Everything a scheduled run needs loaded before the agent can be built.
@@ -1211,7 +1222,7 @@ impl TaskWorker {
         correlation_id: CorrelationId,
         payload: &ScheduledRunPayload,
         context: &ScheduledRunContext,
-    ) -> Result<String, TaskFailure> {
+    ) -> Result<String, RunFailure> {
         let history = self
             .thread_use_cases
             .thread_persistence()
@@ -1265,12 +1276,12 @@ impl TaskWorker {
         let output = tokio::time::timeout(run_timeout, Box::pin(runner.execute()))
             .await
             .map_err(|_| {
-                TaskFailure::TimedOut(format!(
+                RunFailure::TimedOut(format!(
                     "agent run exceeded the {}s limit",
                     run_timeout.as_secs()
                 ))
             })?
-            .map_err(|error| TaskFailure::Retryable(error.to_string()))?;
+            .map_err(|error| RunFailure::Retryable(error.to_string()))?;
 
         Ok(output.content)
     }
@@ -1446,13 +1457,13 @@ impl TaskWorker {
         );
         match supervised.await {
             Leased::Finished(Ok(outcome)) => outcome,
-            Leased::Finished(Err(TaskFailure::Retryable(message))) => {
+            Leased::Finished(Err(RunFailure::Retryable(message))) => {
                 TaskExecutionOutcome::RetryableFailure(message)
             }
-            Leased::Finished(Err(TaskFailure::TimedOut(message))) => {
+            Leased::Finished(Err(RunFailure::TimedOut(message))) => {
                 TaskExecutionOutcome::TimedOut(message)
             }
-            Leased::Finished(Err(TaskFailure::Terminal(message))) => {
+            Leased::Finished(Err(RunFailure::Terminal(message))) => {
                 TaskExecutionOutcome::TerminalFailure(message)
             }
             // This run is no longer the one of record, so it must not report a result. Reporting
@@ -1467,17 +1478,13 @@ impl TaskWorker {
     pub async fn stop_task_and_notify(
         &self,
         task_id: uuid::Uuid,
-        operator_id: Option<Uuid>,
+        actor: StopActor,
     ) -> Result<(), String> {
-        let task = match operator_id {
-            Some(operator_id) => {
-                self.task_persistence
-                    .stop_task_as(task_id, operator_id)
-                    .await
-            }
-            None => self.task_persistence.stop_task(task_id).await,
-        }
-        .map_err(|error| error.to_string())?;
+        let task = self
+            .task_persistence
+            .stop_task(task_id, actor)
+            .await
+            .map_err(|error| error.to_string())?;
 
         // Parse payload to notify participants
         if let Ok(ingest) = serde_json::from_value::<InboundIngestResult>(task.payload)
@@ -1538,20 +1545,11 @@ impl TaskWorker {
         Ok(())
     }
 
-    pub async fn resume_task(
-        &self,
-        task_id: uuid::Uuid,
-        operator_id: Option<Uuid>,
-    ) -> Result<(), String> {
-        match operator_id {
-            Some(operator_id) => {
-                self.task_persistence
-                    .resume_task_as(task_id, operator_id)
-                    .await
-            }
-            None => self.task_persistence.resume_task(task_id).await,
-        }
-        .map_err(|error| error.to_string())?;
+    pub async fn resume_task(&self, task_id: uuid::Uuid, actor: ResumeActor) -> Result<(), String> {
+        self.task_persistence
+            .resume_task(task_id, actor)
+            .await
+            .map_err(|error| error.to_string())?;
         Ok(())
     }
 }
@@ -2060,29 +2058,19 @@ mod tests {
             }
         }
 
-        async fn mark_task_failed(
-            &self,
-            lease: TaskLeaseRef,
-            error_msg: &str,
-            next_run_at: chrono::DateTime<chrono::Utc>,
-            is_dead_letter: bool,
-        ) -> AppResult<bool> {
+        async fn mark_task_failed(&self, failure: TaskFailure<'_>) -> AppResult<bool> {
             let mut list = self.tasks.lock().unwrap();
             let now = Utc::now();
             if let Some(t) = list.iter_mut().find(|t| {
-                t.id == lease.task_id
+                t.id == failure.lease.task_id
                     && t.status == TaskStatus::Processing
-                    && t.worker_id == Some(lease.worker_id)
+                    && t.worker_id == Some(failure.lease.worker_id)
                     && t.lock_expires_at.is_some_and(|expires| expires > now)
             }) {
-                t.last_error = Some(error_msg.to_string());
+                t.last_error = Some(failure.error.to_string());
                 t.retry_count += 1;
-                t.run_at = next_run_at;
-                t.status = if is_dead_letter {
-                    TaskStatus::DeadLetter
-                } else {
-                    TaskStatus::Pending
-                };
+                t.run_at = failure.next_run_at;
+                t.status = failure.outcome.status();
                 t.worker_id = None;
                 t.locked_at = None;
                 t.lock_expires_at = None;
@@ -2092,7 +2080,7 @@ mod tests {
             }
         }
 
-        async fn stop_task(&self, id: Uuid) -> AppResult<BackgroundTask> {
+        async fn stop_task(&self, id: Uuid, _actor: StopActor) -> AppResult<BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
             let t = list
                 .iter_mut()
@@ -2115,7 +2103,7 @@ mod tests {
             Ok(t.clone())
         }
 
-        async fn resume_task(&self, id: Uuid) -> AppResult<BackgroundTask> {
+        async fn resume_task(&self, id: Uuid, _actor: ResumeActor) -> AppResult<BackgroundTask> {
             let mut list = self.tasks.lock().unwrap();
             let t = list
                 .iter_mut()
@@ -2574,7 +2562,10 @@ mod tests {
         assert_eq!(task.status, TaskStatus::Pending);
 
         // Stop task
-        worker.stop_task_and_notify(task.id, None).await.unwrap();
+        worker
+            .stop_task_and_notify(task.id, StopActor::Operator(Uuid::new_v4()))
+            .await
+            .unwrap();
         let stopped_task = task_persistence
             .get_task_by_id(task.id)
             .await
@@ -2583,7 +2574,10 @@ mod tests {
         assert_eq!(stopped_task.status, TaskStatus::Stopped);
 
         // Resume task
-        worker.resume_task(task.id, None).await.unwrap();
+        worker
+            .resume_task(task.id, ResumeActor::Operator(Uuid::new_v4()))
+            .await
+            .unwrap();
         let resumed_task = task_persistence
             .get_task_by_id(task.id)
             .await

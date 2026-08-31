@@ -592,6 +592,21 @@ CREATE TABLE background_tasks (
     lock_expires_at TIMESTAMPTZ,
     wait_expires_at TIMESTAMPTZ,
     run_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Why the row's current status was written, and by whom. Carried on the row rather than in
+    -- transaction-local settings so that a status change and its attribution are the same write:
+    -- one statement, one round trip, and no pooled-session state for a later query to inherit.
+    -- Every status-changing UPDATE sets all five, binding NULL where a value is absent -- a column
+    -- left out of a SET list would keep the previous transition's value, which the trigger below
+    -- cannot tell from deliberate reuse. An INSERT leaves all five NULL: a new row has no prior
+    -- transition, and `enqueued` is derivable without being told.
+    --
+    -- These describe the latest intended transition, not history: `task_status_events` is the
+    -- ledger. They are deliberately unindexed -- nothing queries by them.
+    transition_reason TEXT,
+    transition_actor_kind TEXT,
+    transition_actor_id UUID,
+    transition_approval_id UUID,
+    transition_outreach_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT background_tasks_company_id_id_key UNIQUE (company_id, id),
@@ -627,6 +642,46 @@ CREATE TABLE background_tasks (
          AND execution_generation IS NULL
          AND locked_at IS NULL
          AND lock_expires_at IS NULL)
+    ),
+    CONSTRAINT background_tasks_transition_reason_check CHECK (
+        transition_reason IS NULL OR transition_reason IN (
+            'enqueued', 'claimed', 'completed',
+            'retryable_failure', 'terminal_failure', 'timed_out', 'shutdown',
+            'lease_lost', 'approval_requested', 'approval_accepted', 'approval_rejected',
+            'outreach_started', 'outreach_reply_received', 'outreach_timed_out',
+            'outreach_extended', 'operator_stopped', 'operator_resumed'
+        )
+    ),
+    CONSTRAINT background_tasks_transition_actor_kind_check CHECK (
+        transition_actor_kind IS NULL OR transition_actor_kind IN (
+            'system', 'worker', 'operator', 'approval', 'outreach'
+        )
+    ),
+    -- An actor kind names exactly one shape, and the shape is what the ledger reads. `worker` and
+    -- `operator` are identified by `transition_actor_id`; `approval` and `outreach` are identified
+    -- by the row that caused the transition; `system` is identified by nothing. Stating a kind
+    -- without its id, or two sources at once, is the corruption this table refuses to store.
+    CONSTRAINT background_tasks_transition_shape_check CHECK (
+        (transition_reason IS NULL
+         AND transition_actor_kind IS NULL
+         AND transition_actor_id IS NULL
+         AND transition_approval_id IS NULL
+         AND transition_outreach_id IS NULL)
+        OR
+        (transition_reason IS NOT NULL
+         AND CASE transition_actor_kind
+             WHEN 'system' THEN transition_actor_id IS NULL
+                 AND transition_approval_id IS NULL AND transition_outreach_id IS NULL
+             WHEN 'worker' THEN transition_actor_id IS NOT NULL
+                 AND transition_approval_id IS NULL AND transition_outreach_id IS NULL
+             WHEN 'operator' THEN transition_actor_id IS NOT NULL
+                 AND transition_approval_id IS NULL AND transition_outreach_id IS NULL
+             WHEN 'approval' THEN transition_actor_id IS NULL
+                 AND transition_approval_id IS NOT NULL AND transition_outreach_id IS NULL
+             WHEN 'outreach' THEN transition_actor_id IS NULL
+                 AND transition_approval_id IS NULL AND transition_outreach_id IS NOT NULL
+             ELSE FALSE
+         END)
     )
 );
 
@@ -981,7 +1036,7 @@ CREATE TABLE task_status_events (
     CONSTRAINT task_status_events_reason_check CHECK (reason IN (
         'enqueued', 'claimed', 'completed',
         'retryable_failure', 'terminal_failure', 'timed_out', 'shutdown',
-        'lease_lost', 'approval_requested', 'approval_accepted',
+        'lease_lost', 'approval_requested', 'approval_accepted', 'approval_rejected',
         'outreach_started', 'outreach_reply_received', 'outreach_timed_out',
         'outreach_extended', 'operator_stopped', 'operator_resumed'
     )),
@@ -998,8 +1053,19 @@ CREATE INDEX task_status_events_task_history_idx
 CREATE INDEX task_status_events_company_correlation_timeline_idx
     ON task_status_events (company_id, correlation_id, transitioned_at, task_id, sequence, id);
 
--- A persistence operation may set these transaction-local values when old/new status alone is
--- not expressive enough. Empty/missing settings fall back to the deterministic mapping below.
+-- The row-local attribution columns declared with `background_tasks` above, tied to the tables
+-- they name now that those exist. No cascade action: the only way either row disappears is with
+-- the task that owns it, and that deletion takes the referencing row with it.
+ALTER TABLE background_tasks
+    ADD CONSTRAINT background_tasks_transition_approval_fk
+        FOREIGN KEY (transition_approval_id) REFERENCES human_approvals(id),
+    ADD CONSTRAINT background_tasks_transition_outreach_fk
+        FOREIGN KEY (transition_outreach_id) REFERENCES task_outreaches(id);
+
+-- The transition that produced this row wrote its own attribution into `NEW.transition_*`, so the
+-- ledger row is assembled from the same tuple that changed the status. The deterministic mapping
+-- below is the fallback for the writes that genuinely have nothing to add -- an INSERT, and status
+-- changes whose cause is fully determined by the pair of statuses.
 CREATE FUNCTION record_task_status_event() RETURNS TRIGGER AS $$
 DECLARE
     transition_reason TEXT;
@@ -1012,11 +1078,11 @@ BEGIN
         RETURN NULL;
     END IF;
 
-    transition_reason := NULLIF(current_setting('mail_agents.task_transition_reason', TRUE), '');
-    transition_actor_kind := NULLIF(current_setting('mail_agents.task_transition_actor_kind', TRUE), '');
-    transition_actor_id := NULLIF(current_setting('mail_agents.task_transition_actor_id', TRUE), '')::uuid;
-    approval_id := NULLIF(current_setting('mail_agents.task_transition_approval_id', TRUE), '')::uuid;
-    outreach_id := NULLIF(current_setting('mail_agents.task_transition_outreach_id', TRUE), '')::uuid;
+    transition_reason := NEW.transition_reason;
+    transition_actor_kind := NEW.transition_actor_kind;
+    transition_actor_id := NEW.transition_actor_id;
+    approval_id := NEW.transition_approval_id;
+    outreach_id := NEW.transition_outreach_id;
 
     IF transition_reason IS NULL THEN
         transition_reason := CASE
