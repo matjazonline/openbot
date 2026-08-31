@@ -556,7 +556,11 @@ mod tests {
             created_at: Utc::now(),
         };
 
-        let page_html = pages::company_invites_page(&company, &[invite.clone()], &[member.clone()]);
+        let page_html = pages::company_invites_page(
+            &company,
+            std::slice::from_ref(&invite),
+            std::slice::from_ref(&member),
+        );
         assert!(page_html.contains("Test Company Management"));
         assert!(page_html.contains("invited@test.com"));
         assert!(page_html.contains("member1"));

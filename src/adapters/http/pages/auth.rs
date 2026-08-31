@@ -96,12 +96,20 @@ fn provider_buttons(action: &str, verb: &str, google_enabled: bool, apple_enable
     if !google_enabled && !apple_enabled {
         return String::new();
     }
-    let google = google_enabled
-        .then(|| format!(r##"<a href="/auth/google/{action}" class="btn btn-outline w-full">{verb} with Google</a>"##))
-        .unwrap_or_default();
-    let apple = apple_enabled
-        .then(|| format!(r##"<a href="/auth/apple/{action}" class="btn btn-neutral w-full">{verb} with Apple</a>"##))
-        .unwrap_or_default();
+    let google = if google_enabled {
+        format!(
+            r##"<a href="/auth/google/{action}" class="btn btn-outline w-full">{verb} with Google</a>"##
+        )
+    } else {
+        Default::default()
+    };
+    let apple = if apple_enabled {
+        format!(
+            r##"<a href="/auth/apple/{action}" class="btn btn-neutral w-full">{verb} with Apple</a>"##
+        )
+    } else {
+        Default::default()
+    };
     format!(
         r##"<div class="space-y-2">{google}{apple}</div>
         <div class="divider text-xs text-base-content/50">OR</div>"##

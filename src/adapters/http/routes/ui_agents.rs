@@ -42,7 +42,7 @@ use crate::{
 };
 
 use super::{
-    agent::{AgentForm, ModelOverrides, create_agent_from_instructions},
+    agent::{AgentForm, AgentInstructionRequest, ModelOverrides, create_agent_from_instructions},
     channel::parse_config_form,
     ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
 };
@@ -302,14 +302,16 @@ async fn create_agent(
     let created = if submitted.is_simple() {
         create_agent_from_instructions(
             &workspace.agent_use_cases,
-            workspace.user_id,
-            company.id,
-            &submitted.form.name,
-            &submitted.slug,
-            submitted.form.system_prompt.as_deref().unwrap_or_default(),
-            submitted.overrides(),
-            submitted.form.run_timeout_secs,
-            avatar_url.as_ref(),
+            AgentInstructionRequest {
+                user_id: workspace.user_id,
+                company_id: company.id,
+                name: &submitted.form.name,
+                slug: &submitted.slug,
+                instructions: submitted.form.system_prompt.as_deref().unwrap_or_default(),
+                overrides: submitted.overrides(),
+                run_timeout_secs: submitted.form.run_timeout_secs,
+                avatar_url: avatar_url.as_ref(),
+            },
         )
         .await
     } else {

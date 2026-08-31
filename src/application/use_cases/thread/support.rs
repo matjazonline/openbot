@@ -162,14 +162,15 @@ pub(super) fn check_inbound_guards(
     }
 
     // Trusted internal transport is authenticated by channel identity, not by SPF/DKIM/DMARC.
-    if !is_inter_channel && matches!(origin, InboundOrigin::ExternalEmail) {
-        if external_dmarc_rejection(parsed.dmarc_status).is_some() {
-            tracing::warn!(sender = %parsed.sender, verdict = ?parsed.dmarc_status,
+    if !is_inter_channel
+        && matches!(origin, InboundOrigin::ExternalEmail)
+        && external_dmarc_rejection(parsed.dmarc_status).is_some()
+    {
+        tracing::warn!(sender = %parsed.sender, verdict = ?parsed.dmarc_status,
                 "External message rejected because DMARC did not pass");
-            return Some(InboundIngestResult::rejected(
-                "DMARC authentication did not pass",
-            ));
-        }
+        return Some(InboundIngestResult::rejected(
+            "DMARC authentication did not pass",
+        ));
     }
 
     if is_inter_channel && parsed.hop_count >= MAX_CHANNEL_HOPS {
@@ -244,9 +245,9 @@ pub(super) fn parsed_email_from_normalized(norm: &NormalizedInboundMessage) -> P
         channel_id_header: norm.channel_id_header,
         hop_count: norm.hop_count,
         trace_channels: norm.trace_channels.clone(),
-        spf_status: norm.spf_status.clone(),
-        dkim_status: norm.dkim_status.clone(),
-        dmarc_status: norm.dmarc_status.clone(),
+        spf_status: norm.spf_status,
+        dkim_status: norm.dkim_status,
+        dmarc_status: norm.dmarc_status,
         spam_score: norm.spam_score,
         is_context_only: norm.is_context_only,
     }

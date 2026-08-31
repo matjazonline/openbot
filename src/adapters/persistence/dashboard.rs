@@ -406,7 +406,7 @@ impl PostgresPersistence {
         company: Option<Uuid>,
         window: DashboardWindow,
     ) -> AppResult<Vec<ThroughputBucket>> {
-        let rows = sqlx::query(&*THROUGHPUT_SQL)
+        let rows = sqlx::query(&THROUGHPUT_SQL)
             .bind(company)
             .bind(window.bucket_seconds())
             .bind(window.minutes() as i32)
@@ -432,7 +432,7 @@ impl PostgresPersistence {
         company: Option<Uuid>,
         window: DashboardWindow,
     ) -> AppResult<Vec<LatencyBucket>> {
-        let rows = sqlx::query(&*LATENCY_SQL)
+        let rows = sqlx::query(&LATENCY_SQL)
             .bind(company)
             .bind(window.bucket_seconds())
             .bind(window.minutes() as i32)
@@ -468,7 +468,7 @@ impl PostgresPersistence {
         company: Option<Uuid>,
         window: DashboardWindow,
     ) -> AppResult<Vec<QueueDepthBucket>> {
-        let rows = sqlx::query(&*QUEUE_DEPTH_SQL)
+        let rows = sqlx::query(&QUEUE_DEPTH_SQL)
             .bind(company)
             .bind(window.bucket_seconds())
             .bind(window.minutes() as i32)
@@ -493,7 +493,7 @@ impl PostgresPersistence {
         company: Option<Uuid>,
         window: DashboardWindow,
     ) -> AppResult<Vec<RetryRateBucket>> {
-        let rows = sqlx::query(&*RETRY_RATE_SQL)
+        let rows = sqlx::query(&RETRY_RATE_SQL)
             .bind(company)
             .bind(window.bucket_seconds())
             .bind(window.minutes() as i32)

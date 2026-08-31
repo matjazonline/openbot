@@ -702,11 +702,9 @@ mod tests {
         let long = input(Some(100.0), Some(96));
 
         let short_key = ValidatedOutreach::from_input(&short, limits())
-            .ok()
             .expect("short form is valid")
             .idempotency_key(task_id, &targets);
         let long_key = ValidatedOutreach::from_input(&long, limits())
-            .ok()
             .expect("long form is valid")
             .idempotency_key(task_id, &targets);
 
@@ -716,9 +714,7 @@ mod tests {
     #[test]
     fn omitted_timeout_takes_the_configured_default() {
         let short = input(None, None);
-        let resolved = ValidatedOutreach::from_input(&short, limits())
-            .ok()
-            .expect("defaults are valid");
+        let resolved = ValidatedOutreach::from_input(&short, limits()).expect("defaults are valid");
         assert_eq!(resolved.timeout_hours, 96);
         assert_eq!(resolved.threshold_percent, 100.0);
     }

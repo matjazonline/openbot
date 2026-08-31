@@ -104,6 +104,15 @@ match `NULL`.
 Audit and repair existing rows before validating a new constraint. Mirror the strongest existing
 queue constraint rather than inventing subtly different semantics for each queue.
 
+When a domain decision is implemented in both Rust and SQL, keep one generated definition or add a
+database-backed equivalence matrix that exercises every case. A `debug_assert!` only checks the
+path and build modes that happen to execute it, so it is not a sufficient drift guard.
+
+Audited state transitions carry typed reason and actor data explicitly. Never recover an audit
+reason by parsing free-text errors or silently substitute a specific reason when none is known;
+unclassified transitions remain observably unknown. Notification triggers fire only for material
+state changes, not for writes that leave the notified state unchanged.
+
 # Preserve the existing correctness guards
 
 Do not weaken these patterns while refactoring adjacent persistence code:
@@ -156,6 +165,15 @@ pagination. Record the before/after plan with the change.
 Keep cursor ordering deterministic with a unique tie-breaker (normally timestamp plus UUID). Offset
 pagination is acceptable for bounded administrative pages; replace it only when observed offsets
 and plans justify the API change.
+
+A bounded result set does not imply bounded database work. Apply time and status eligibility meant
+to prune retained history before aggregation or large joins, then verify the pruning with
+representative `EXPLAIN` output. Replace per-parent query loops with bounded batch reads.
+Operational views must cap their working set and visibly report truncation rather than silently
+returning partial data.
+
+When an optimization is deliberately deferred pending production evidence, add a named duration or
+working-set metric, or a threshold log, that can supply the evidence needed to revisit it.
 
 # 1. Migration
 

@@ -751,7 +751,7 @@ pub fn channel_row_fragment(
         api_key_str = api_key_str,
         assigned_agents_str = escape_html_text(&assigned_agents_str),
         emails_str = escape_html_text(&emails_str),
-        config_str = escape_html_text(&config_str),
+        config_str = escape_html_text(config_str),
     )
 }
 

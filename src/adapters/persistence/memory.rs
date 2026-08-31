@@ -1119,14 +1119,17 @@ mod tests {
             .retry_provisioning(company_id)
             .await
             .expect("manual retry");
-        let reset: (
-            Uuid,
-            String,
-            String,
-            i32,
-            Option<DateTime<Utc>>,
-            Option<DateTime<Utc>>,
-        ) = sqlx::query_as(
+        #[derive(sqlx::FromRow)]
+        struct ResetProvisioningJob {
+            id: Uuid,
+            status: String,
+            phase: String,
+            failure_attempts: i32,
+            readiness_deadline: Option<DateTime<Utc>>,
+            next_poll_at: Option<DateTime<Utc>>,
+        }
+
+        let reset = sqlx::query_as::<_, ResetProvisioningJob>(
             "SELECT id, status, phase, failure_attempts, readiness_deadline, next_poll_at \
                  FROM memory_provisioning_jobs WHERE company_id = $1",
         )
@@ -1135,14 +1138,18 @@ mod tests {
         .await
         .expect("reset job");
         assert_eq!(
-            reset.0, original_job_id,
+            reset.id, original_job_id,
             "manual retry reuses the durable job"
         );
         assert_eq!(
-            (reset.1.as_str(), reset.2.as_str(), reset.3),
+            (
+                reset.status.as_str(),
+                reset.phase.as_str(),
+                reset.failure_attempts,
+            ),
             ("pending", "create_pending", 0)
         );
-        assert_eq!((reset.4, reset.5), (None, None));
+        assert_eq!((reset.readiness_deadline, reset.next_poll_at), (None, None));
         let connection = persistence
             .active_binding(company_id)
             .await

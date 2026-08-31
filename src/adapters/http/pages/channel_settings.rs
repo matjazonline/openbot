@@ -906,7 +906,6 @@ pub fn stored_participants(channel: &Channel) -> String {
 }
 
 /// The channel's config as the JSON text the form submits.
-
 pub fn channel_schedules_card(
     company_id: Uuid,
     channel_id: Uuid,

@@ -341,16 +341,14 @@ fn company_settings_body(
     configured: &ConfiguredMemoryProviders,
 ) -> String {
     if !pane.editable {
-        return format!(
-            r##"
+        return r##"
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 <div class="rounded-box border border-base-300 bg-base-200 p-5">
                     <h3 class="font-semibold">Company settings</h3>
                     <p class="mt-1 text-sm opacity-70">Only the company owner can edit these settings.</p>
                 </div>
             </div>
-            "##
-        );
+            "##.to_string();
     }
 
     let stored = stored_draft(pane.company, pane.model_connections);

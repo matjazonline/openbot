@@ -4506,7 +4506,7 @@ mod tests {
                 company.id,
                 ChannelWrite {
                     name: name.into(),
-                    slug: name.to_lowercase().into(),
+                    slug: name.to_lowercase(),
                     enabled: false,
                     ..ChannelWrite::default()
                 },

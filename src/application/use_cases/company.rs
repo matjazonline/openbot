@@ -624,7 +624,7 @@ mod tests {
         )
         .unwrap();
         assert!(
-            CompanyUseCases::validate_model_connections(&[no_default.clone()]).is_err(),
+            CompanyUseCases::validate_model_connections(std::slice::from_ref(&no_default)).is_err(),
             "a set with no default has no answer for what an agent inherits"
         );
         assert!(

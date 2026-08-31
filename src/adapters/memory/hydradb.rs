@@ -96,7 +96,7 @@ impl HydraDbProvider {
         fields: &[(&str, &str)],
         boundary: &str,
     ) -> Result<Vec<u8>, MemoryProviderError> {
-        if fields.iter().any(|(_, value)| value.contains(&boundary)) {
+        if fields.iter().any(|(_, value)| value.contains(boundary)) {
             return Err(MemoryProviderError::RequestTooLarge);
         }
         let mut length = format!("--{boundary}--\r\n").len();

@@ -128,10 +128,10 @@ impl CompanyInviteUseCases {
     ) -> AppResult<Option<CompanyInvite>> {
         self.verify_company_owner(user_id, company_id).await?;
         let invite = self.invite_persistence.get_invite_by_id(invite_id).await?;
-        if let Some(ref inv) = invite {
-            if inv.company_id != company_id {
-                return Ok(None);
-            }
+        if let Some(ref inv) = invite
+            && inv.company_id != company_id
+        {
+            return Ok(None);
         }
         Ok(invite)
     }

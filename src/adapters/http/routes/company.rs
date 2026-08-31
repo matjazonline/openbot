@@ -426,7 +426,8 @@ mod tests {
             created_at: Utc::now(),
         };
 
-        let page_html = pages::companies_page(&[company.clone()], &configured_providers());
+        let page_html =
+            pages::companies_page(std::slice::from_ref(&company), &configured_providers());
         assert!(page_html.contains("Test Corp"));
         assert!(page_html.contains("/test-corp"));
         assert!(page_html.contains("hx-post=\"/companies\""));

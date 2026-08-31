@@ -478,10 +478,10 @@ async fn register_form(
             .into_response();
     }
 
-    if let Some(confirm) = &form.confirm_password {
-        if form.password.expose_secret() != confirm.expose_secret() {
-            return (jar, Html(pages::error_alert("Passwords do not match."))).into_response();
-        }
+    if let Some(confirm) = &form.confirm_password
+        && form.password.expose_secret() != confirm.expose_secret()
+    {
+        return (jar, Html(pages::error_alert("Passwords do not match."))).into_response();
     }
 
     match user_use_cases

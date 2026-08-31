@@ -53,7 +53,7 @@ pub fn estimate_tokens(text: &str) -> usize {
     if trimmed.is_empty() {
         0
     } else {
-        (trimmed.len() + 3) / 4
+        trimmed.len().div_ceil(4)
     }
 }
 
@@ -1018,7 +1018,13 @@ impl<'a> AgentRunner<'a> {
                 .clone()
                 .zip(self.channel_persistence.clone())
                 .zip(self.outreach_context.clone())
-                .map(|((tasks, channels), context)| (tasks, channels, context)),
+                .map(
+                    |((task_persistence, channel_persistence), context)| AgentOutreach {
+                        task_persistence,
+                        channel_persistence,
+                        context,
+                    },
+                ),
             agent_persistence: self.agent_persistence.clone(),
             agent_channel_tool: self.agent_channel_tool.clone(),
             trace: self.trace.clone(),
@@ -1161,9 +1167,9 @@ impl<'a> AgentRunner<'a> {
             agent_id: self.agent_id,
             provider: self.params.provider.clone(),
             model: self.params.model.clone(),
-            prompt_tokens: token_usage.map_or(0, |t| t.prompt_tokens as usize),
-            completion_tokens: token_usage.map_or(0, |t| t.completion_tokens as usize),
-            total_tokens: token_usage.map_or(0, |t| t.total_tokens as usize),
+            prompt_tokens: token_usage.map_or(0, |t| t.prompt_tokens),
+            completion_tokens: token_usage.map_or(0, |t| t.completion_tokens),
+            total_tokens: token_usage.map_or(0, |t| t.total_tokens),
             duration_ms,
             success: error_type.is_none(),
             error_type,
@@ -1172,6 +1178,13 @@ impl<'a> AgentRunner<'a> {
 }
 
 /// A configured agent run, owned by the spawned task.
+#[derive(Clone)]
+struct AgentOutreach {
+    task_persistence: Arc<dyn TaskPersistence>,
+    channel_persistence: Arc<dyn ChannelPersistence>,
+    context: OutreachToolContext,
+}
+
 struct AgentTask {
     config_yaml: String,
     provider_name: String,
@@ -1181,11 +1194,7 @@ struct AgentTask {
     base_url: Option<String>,
     tool_choice: Option<ai_agents::ToolChoice>,
     approval: Option<(Arc<ApprovalUseCases>, ApprovalSubject)>,
-    outreach: Option<(
-        Arc<dyn TaskPersistence>,
-        Arc<dyn ChannelPersistence>,
-        OutreachToolContext,
-    )>,
+    outreach: Option<AgentOutreach>,
     /// Present when the run may list its sibling agent channels.
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
     agent_channel_tool: Option<(Arc<dyn AgentChannelProvisioning>, AgentChannelToolContext)>,
@@ -1295,16 +1304,16 @@ impl AgentTask {
         let mut builder = AgentBuilder::from_yaml(&self.config_yaml)?;
 
         if let Some((use_cases, context)) = self.approval.clone() {
-            let delegation =
-                self.outreach
-                    .as_ref()
-                    .map(|(_, channels, outreach)| InternalDelegationPolicy {
-                        channel_persistence: channels.clone(),
-                        app_domain_name: outreach.app_domain_name.clone(),
-                        company_id: outreach.company_id,
-                        source_channel_id: outreach.channel_id,
-                        requires_approval: self.internal_requires_approval,
-                    });
+            let delegation = self
+                .outreach
+                .as_ref()
+                .map(|outreach| InternalDelegationPolicy {
+                    channel_persistence: outreach.channel_persistence.clone(),
+                    app_domain_name: outreach.context.app_domain_name.clone(),
+                    company_id: outreach.context.company_id,
+                    source_channel_id: outreach.context.channel_id,
+                    requires_approval: self.internal_requires_approval,
+                });
             builder = builder.approval_handler(Arc::new(AgentApprovalHandler {
                 approval_use_cases: use_cases,
                 context,
@@ -1336,7 +1345,12 @@ impl AgentTask {
         &self,
         mut builder: AgentBuilder,
     ) -> anyhow::Result<ai_agents::RuntimeAgent> {
-        if let Some((task_persistence, channel_persistence, context)) = self.outreach.clone() {
+        if let Some(outreach) = self.outreach.clone() {
+            let AgentOutreach {
+                task_persistence,
+                channel_persistence,
+                context,
+            } = outreach;
             if let Some(agent_persistence) = self.agent_persistence.clone() {
                 builder = builder.tool(Arc::new(ListCompanyAgentsTool::new(
                     channel_persistence.clone(),

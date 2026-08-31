@@ -213,17 +213,29 @@ pub fn resolve_llm_info(_channel: Option<&Channel>, company: Option<&Company>) -
     }
 }
 
-pub fn channel_simulation_failure_fragment(
-    company_id: Uuid,
-    channel_id: Uuid,
-    company: Option<&Company>,
-    channel: Option<&Channel>,
-    to_str: &str,
-    from_str: &str,
-    subject_str: &str,
-    error_msg: &str,
-) -> String {
-    let llm = resolve_llm_info(channel, company);
+pub struct ChannelSimulationFailure<'a> {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub company: Option<&'a Company>,
+    pub channel: Option<&'a Channel>,
+    pub to: &'a str,
+    pub from: &'a str,
+    pub subject: &'a str,
+    pub error: &'a str,
+}
+
+pub fn channel_simulation_failure_fragment(failure: &ChannelSimulationFailure<'_>) -> String {
+    let ChannelSimulationFailure {
+        company_id,
+        channel_id,
+        company,
+        channel,
+        to: to_str,
+        from: from_str,
+        subject: subject_str,
+        error: error_msg,
+    } = failure;
+    let llm = resolve_llm_info(*channel, *company);
     let (provider_str, model_str, api_key_status) =
         (&llm.provider, &llm.model, &llm.api_key_status);
 
@@ -348,19 +360,34 @@ fn simulation_completed_banner(company_id: Uuid, channel_id: Uuid) -> String {
 
 /// Routing report for a verify run: which company/channel the address resolved to, the model that
 /// would have answered, and the payload as received.
-fn simulation_routing_report(
-    status_banner: &str,
-    provider_str: &str,
-    model_str: &str,
-    api_key_status: &str,
-    company_name: &str,
-    channel_name: &str,
-    to: &str,
-    from: &str,
-    subject_str: &str,
-    body_str: &str,
-    channel_config_str: &str,
-) -> String {
+struct SimulationRoutingReport<'a> {
+    status_banner: &'a str,
+    provider: &'a str,
+    model: &'a str,
+    api_key_status: &'a str,
+    company_name: &'a str,
+    channel_name: &'a str,
+    to: &'a str,
+    from: &'a str,
+    subject: &'a str,
+    body: &'a str,
+    channel_config: &'a str,
+}
+
+fn simulation_routing_report(report: &SimulationRoutingReport<'_>) -> String {
+    let SimulationRoutingReport {
+        status_banner,
+        provider: provider_str,
+        model: model_str,
+        api_key_status,
+        company_name,
+        channel_name,
+        to,
+        from,
+        subject: subject_str,
+        body: body_str,
+        channel_config: channel_config_str,
+    } = report;
     format!(
         r##"
         <div class="space-y-4">
@@ -509,19 +536,19 @@ pub fn channel_simulation_result_fragment(
 
     let channel_config_str = "Execution config belongs to the active agent.".to_string();
 
-    let body_fragment = simulation_routing_report(
-        &status_banner,
-        provider_str,
-        model_str,
+    let body_fragment = simulation_routing_report(&SimulationRoutingReport {
+        status_banner: &status_banner,
+        provider: provider_str,
+        model: model_str,
         api_key_status,
-        &company_name,
-        &channel_name,
-        &result.email.to,
-        &result.email.from,
-        subject_str,
-        &body_str,
-        &channel_config_str,
-    );
+        company_name: &company_name,
+        channel_name: &channel_name,
+        to: &result.email.to,
+        from: &result.email.from,
+        subject: subject_str,
+        body: body_str,
+        channel_config: &channel_config_str,
+    });
 
     format!("{oob_form_swap}\n{body_fragment}")
 }
@@ -925,8 +952,8 @@ pub fn channel_simulation_loaded_thread_fragment(
             thread_id: Some(thread.id),
             company: Some(company),
             channel: Some(channel),
-            provider: &provider_str,
-            model: &model_str,
+            provider: provider_str,
+            model: model_str,
             resolved_config: resolved_agent_config(Some(company), Some(channel)),
             agent_prompt: None,
         },

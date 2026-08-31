@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 /// cannot transpose two same-typed arguments in a nine-parameter list.
 ///
 /// Values reach persistence already normalized — see [`ChannelWrite::normalize`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ChannelWrite {
     pub name: String,
     /// What the channel is for, in one line. `None` and a blank string mean the same thing, so
@@ -46,28 +46,6 @@ pub struct ChannelWrite {
     pub persist_agent_memory: bool,
     pub persist_user_memory: bool,
     pub created_by: Option<CreationProvenance>,
-}
-
-impl Default for ChannelWrite {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            description: None,
-            slug: String::new(),
-            alias_slugs: Vec::new(),
-            participant_emails: None,
-            agent_ids: None,
-            enabled: false,
-            add_3rd_party: false,
-            created_by: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
-        }
-    }
 }
 
 impl ChannelWrite {
@@ -437,10 +415,10 @@ impl ChannelUseCases {
     ) -> AppResult<Option<Channel>> {
         self.verify_company_manager(user_id, company_id).await?;
         let channel = self.channel_persistence.get_by_id(channel_id).await?;
-        if let Some(ref ch) = channel {
-            if ch.company_id != company_id {
-                return Ok(None);
-            }
+        if let Some(ref ch) = channel
+            && ch.company_id != company_id
+        {
+            return Ok(None);
         }
         Ok(channel)
     }
@@ -972,11 +950,11 @@ pub fn levenshtein_distance(a: &str, b: &str) -> usize {
 
     let mut dp = vec![vec![0; n + 1]; m + 1];
 
-    for i in 0..=m {
-        dp[i][0] = i;
+    for (i, row) in dp.iter_mut().enumerate().take(m + 1) {
+        row[0] = i;
     }
-    for j in 0..=n {
-        dp[0][j] = j;
+    for (j, cell) in dp[0].iter_mut().enumerate().take(n + 1) {
+        *cell = j;
     }
 
     for i in 1..=m {

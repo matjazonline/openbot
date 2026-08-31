@@ -43,6 +43,19 @@ pub struct ParsedEmail {
     pub is_context_only: bool,
 }
 
+#[derive(Default)]
+struct ParsedHeaders {
+    message_id: Option<String>,
+    in_reply_to: Option<String>,
+    references: Vec<String>,
+    thread_index: Option<String>,
+    is_auto_reply: bool,
+    channel_id: Option<Uuid>,
+    hop_count: u32,
+    trace_channels: Vec<Uuid>,
+    is_context_only: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct RawInboundPayload {
     pub to: String,
@@ -123,31 +136,21 @@ impl EmailParser {
     }
 
     pub fn parse(payload: RawInboundPayload, app_domain: &str) -> ParsedEmail {
-        let (
-            extracted_msg_id,
+        let ParsedHeaders {
+            message_id: extracted_msg_id,
             in_reply_to,
             references,
             thread_index,
-            is_auto_reply_from_headers,
-            channel_id_header,
+            is_auto_reply: is_auto_reply_from_headers,
+            channel_id: channel_id_header,
             hop_count,
             trace_channels,
-            is_context_from_headers,
-        ) = if let Some(ref hdrs) = payload.headers {
-            Self::parse_headers(hdrs)
-        } else {
-            (
-                None,
-                None,
-                Vec::new(),
-                None,
-                false,
-                None,
-                0,
-                Vec::new(),
-                false,
-            )
-        };
+            is_context_only: is_context_from_headers,
+        } = payload
+            .headers
+            .as_deref()
+            .map(Self::parse_headers)
+            .unwrap_or_default();
 
         let message_id = extracted_msg_id
             .unwrap_or_else(|| format!("<{}.inbound@{}>", Uuid::new_v4(), app_domain));
@@ -263,19 +266,7 @@ impl EmailParser {
         converter.convert(html).unwrap_or_else(|_| html.to_string())
     }
 
-    pub fn parse_headers(
-        headers_str: &str,
-    ) -> (
-        Option<String>,
-        Option<String>,
-        Vec<String>,
-        Option<String>,
-        bool,
-        Option<Uuid>,
-        u32,
-        Vec<Uuid>,
-        bool,
-    ) {
+    fn parse_headers(headers_str: &str) -> ParsedHeaders {
         let mut message_id = None;
         let mut in_reply_to = None;
         let mut references = Vec::new();
@@ -355,17 +346,17 @@ impl EmailParser {
             }
         }
 
-        (
+        ParsedHeaders {
             message_id,
             in_reply_to,
             references,
             thread_index,
             is_auto_reply,
-            channel_id_header,
+            channel_id: channel_id_header,
             hop_count,
             trace_channels,
             is_context_only,
-        )
+        }
     }
 
     pub fn is_auto_reply_subject(subject: &str) -> bool {
@@ -471,10 +462,10 @@ impl EmailParser {
 }
 
 pub fn extract_email(input: &str) -> String {
-    if let (Some(start), Some(end)) = (input.find('<'), input.rfind('>')) {
-        if start < end {
-            return input[start + 1..end].trim().to_lowercase();
-        }
+    if let (Some(start), Some(end)) = (input.find('<'), input.rfind('>'))
+        && start < end
+    {
+        return input[start + 1..end].trim().to_lowercase();
     }
     input.trim().to_lowercase()
 }
@@ -504,20 +495,28 @@ X-MailAgents-Hop-Count: 2
 Subject: Test Email
 "#;
 
-        let (msg_id, in_reply, refs, thread_idx, is_auto, wf_id, hop, trace, is_context) =
-            EmailParser::parse_headers(headers);
-        assert_eq!(msg_id.as_deref(), Some("<CAGX123@mail.gmail.com>"));
-        assert_eq!(in_reply.as_deref(), Some("<ORIGINAL456@mailagents.com>"));
-        assert_eq!(refs, vec!["<REF1@mailagents.com>", "<REF2@mailagents.com>"]);
-        assert!(thread_idx.is_none());
-        assert!(is_auto);
+        let parsed = EmailParser::parse_headers(headers);
         assert_eq!(
-            wf_id,
+            parsed.message_id.as_deref(),
+            Some("<CAGX123@mail.gmail.com>")
+        );
+        assert_eq!(
+            parsed.in_reply_to.as_deref(),
+            Some("<ORIGINAL456@mailagents.com>")
+        );
+        assert_eq!(
+            parsed.references,
+            vec!["<REF1@mailagents.com>", "<REF2@mailagents.com>"]
+        );
+        assert!(parsed.thread_index.is_none());
+        assert!(parsed.is_auto_reply);
+        assert_eq!(
+            parsed.channel_id,
             Some(Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap())
         );
-        assert_eq!(hop, 2);
-        assert!(trace.is_empty());
-        assert!(!is_context);
+        assert_eq!(parsed.hop_count, 2);
+        assert!(parsed.trace_channels.is_empty());
+        assert!(!parsed.is_context_only);
     }
 
     #[test]
@@ -538,8 +537,7 @@ Subject: Test Email
         assert_eq!(clean3, "Normal message to agent.");
 
         let headers = "X-MailAgents-Context-Only: true\n";
-        let (_, _, _, _, _, _, _, _, is_ctx_hdr) = EmailParser::parse_headers(headers);
-        assert!(is_ctx_hdr);
+        assert!(EmailParser::parse_headers(headers).is_context_only);
     }
 
     #[test]

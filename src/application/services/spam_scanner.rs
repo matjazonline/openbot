@@ -125,10 +125,11 @@ impl HeuristicScanner {
         }
 
         // Sender address sanity
-        if let Some(from_addr) = from {
-            if from_addr.contains("noreply@") && combined_body.contains("click here to reply") {
-                result.add(1.0, "No-reply sender with reply request link");
-            }
+        if let Some(from_addr) = from
+            && from_addr.contains("noreply@")
+            && combined_body.contains("click here to reply")
+        {
+            result.add(1.0, "No-reply sender with reply request link");
         }
 
         result
@@ -204,10 +205,10 @@ impl ExternalSpamScanner {
                 .push(format!("Rspamd evaluation score: {:.2}", score));
         }
 
-        if let Some(action) = json.get("action").and_then(|v| v.as_str()) {
-            if action == "reject" {
-                result.add(5.0, "Rspamd action flag: reject");
-            }
+        if let Some(action) = json.get("action").and_then(|v| v.as_str())
+            && action == "reject"
+        {
+            result.add(5.0, "Rspamd action flag: reject");
         }
 
         Ok(result)

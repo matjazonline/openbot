@@ -75,11 +75,11 @@ impl RegistrationPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        if user.is_some() {
+        if let Some(user) = &user {
             sqlx::query(
                 "INSERT INTO user_login_methods (user_id, provider) VALUES ($1, 'password')",
             )
-            .bind(user.as_ref().expect("checked above").id)
+            .bind(user.id)
             .execute(&mut *transaction)
             .await
             .map_err(AppError::from)?;

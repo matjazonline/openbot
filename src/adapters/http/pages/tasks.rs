@@ -276,10 +276,10 @@ pub(crate) fn sanitize_json_mut(value: &mut serde_json::Value) {
                     || k.eq_ignore_ascii_case("apikey")
                     || k.eq_ignore_ascii_case("secret")
                 {
-                    if let serde_json::Value::String(s) = v {
-                        if !s.is_empty() {
-                            *v = serde_json::Value::String("***masked***".to_string());
-                        }
+                    if let serde_json::Value::String(s) = v
+                        && !s.is_empty()
+                    {
+                        *v = serde_json::Value::String("***masked***".to_string());
                     }
                 } else {
                     sanitize_json_mut(v);
@@ -304,10 +304,11 @@ pub fn find_task_for_message<'a>(
     let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
 
     for task in tasks {
-        if let Some(tid) = thread_id {
-            if task.thread_id.is_some() && task.thread_id != Some(tid) {
-                continue;
-            }
+        if let Some(tid) = thread_id
+            && task.thread_id.is_some()
+            && task.thread_id != Some(tid)
+        {
+            continue;
         }
 
         let payload = &task.payload;
@@ -318,10 +319,9 @@ pub fn find_task_for_message<'a>(
                 .and_then(|r| r.get("outbound_message_id"))
                 .and_then(|v| v.as_str())
                 .or_else(|| payload.get("outbound_message_id").and_then(|v| v.as_str()))
+                && outbound_id == msg.message_id.as_str()
             {
-                if outbound_id == msg.message_id.as_str() {
-                    return Some(task);
-                }
+                return Some(task);
             }
 
             if let Some(resp) = payload
@@ -329,10 +329,10 @@ pub fn find_task_for_message<'a>(
                 .and_then(|r| r.get("response"))
                 .and_then(|v| v.as_str())
                 .or_else(|| payload.get("response").and_then(|v| v.as_str()))
+                && !resp.is_empty()
+                && resp == msg.clean_text_body
             {
-                if !resp.is_empty() && resp == msg.clean_text_body {
-                    return Some(task);
-                }
+                return Some(task);
             }
         } else {
             if let Some(inbound_msg_id) = payload
@@ -346,28 +346,26 @@ pub fn find_task_for_message<'a>(
                         .and_then(|v| v.as_str())
                 })
                 .or_else(|| payload.get("inbound_message_id").and_then(|v| v.as_str()))
+                && inbound_msg_id == msg.message_id.as_str()
             {
-                if inbound_msg_id == msg.message_id.as_str() {
-                    return Some(task);
-                }
+                return Some(task);
             }
 
             if let Some(inbound_id_str) = payload
                 .get("inbound_message")
                 .and_then(|m| m.get("id"))
                 .and_then(|v| v.as_str())
+                && inbound_id_str == msg.id.to_string()
             {
-                if inbound_id_str == msg.id.to_string() {
-                    return Some(task);
-                }
+                return Some(task);
             }
         }
     }
 
-    if let Some(pref_id) = preferred_task_id {
-        if let Some(task) = tasks.iter().find(|t| t.id == pref_id) {
-            return Some(task);
-        }
+    if let Some(pref_id) = preferred_task_id
+        && let Some(task) = tasks.iter().find(|t| t.id == pref_id)
+    {
+        return Some(task);
     }
 
     if let Some(tid) = thread_id {

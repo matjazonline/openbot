@@ -462,16 +462,15 @@ impl ScheduleUseCases {
             task.id, schedule.name
         );
 
-        if let Some((run_id, _, worker_id, generation)) = durable_run {
-            if !self
+        if let Some((run_id, _, worker_id, generation)) = durable_run
+            && !self
                 .schedule_persistence
                 .record_run_task(run_id, worker_id, generation, task.id)
                 .await?
-            {
-                return Err(AppError::Internal(
-                    "Schedule-run materialization lease was lost before completion".into(),
-                ));
-            }
+        {
+            return Err(AppError::Internal(
+                "Schedule-run materialization lease was lost before completion".into(),
+            ));
         }
 
         Ok(task.id)
@@ -1511,22 +1510,21 @@ mod tests {
         assert_eq!(triggered.id, created.id);
 
         // Verify thread, message, and background task were created
-        let threads = thread_persistence.threads.lock().unwrap();
-        assert_eq!(threads.len(), 1);
-        assert!(threads[0].subject.contains("[Daily] Digest"));
+        {
+            let threads = thread_persistence.threads.lock().unwrap();
+            assert_eq!(threads.len(), 1);
+            assert!(threads[0].subject.contains("[Daily] Digest"));
 
-        let messages = thread_persistence.messages.lock().unwrap();
-        assert_eq!(messages.len(), 1);
-        assert_eq!(messages[0].thread_id, threads[0].id);
-        assert!(messages[0].clean_text_body.contains("Analyze tickets for"));
+            let messages = thread_persistence.messages.lock().unwrap();
+            assert_eq!(messages.len(), 1);
+            assert_eq!(messages[0].thread_id, threads[0].id);
+            assert!(messages[0].clean_text_body.contains("Analyze tickets for"));
 
-        let tasks = task_persistence.tasks.lock().unwrap();
-        assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].task_type, "scheduled_agent_run");
-        assert_eq!(tasks[0].thread_id, Some(threads[0].id));
-        drop(tasks);
-        drop(messages);
-        drop(threads);
+            let tasks = task_persistence.tasks.lock().unwrap();
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(tasks[0].task_type, "scheduled_agent_run");
+            assert_eq!(tasks[0].thread_id, Some(threads[0].id));
+        }
 
         use_cases
             .delete_schedule(admin_id, company_id, created.id)

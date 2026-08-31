@@ -59,7 +59,7 @@ async fn sendgrid_inbound_webhook(
     let body = to_bytes(body, 21 * 1024 * 1024)
         .await
         .map_err(|_| StatusCode::PAYLOAD_TOO_LARGE)?;
-    verify_sendgrid_signature(&headers, &body, sendgrid_config).map_err(|status| status)?;
+    verify_sendgrid_signature(&headers, &body, sendgrid_config)?;
     let req = axum::extract::Request::from_parts(parts, axum::body::Body::from(body));
 
     let content_type = headers
@@ -120,10 +120,10 @@ async fn sendgrid_inbound_webhook(
                         "spam_score" => raw_payload.spam_score = value.parse().ok(),
                         "envelope" => {
                             if let Ok(env) = serde_json::from_str::<SendGridEnvelope>(&value) {
-                                if let Some(recipients) = env.to {
-                                    if let Some(first) = recipients.first() {
-                                        raw_payload.to = first.clone();
-                                    }
+                                if let Some(recipients) = env.to
+                                    && let Some(first) = recipients.first()
+                                {
+                                    raw_payload.to = first.clone();
                                 }
                                 if let Some(sender) = env.from {
                                     raw_payload.from = sender;
@@ -162,7 +162,7 @@ async fn sendgrid_inbound_webhook(
         &raw_mime,
         Some(&envelope_from),
         Some(&envelope_to),
-        &[envelope_to.clone()],
+        std::slice::from_ref(&envelope_to),
         auth.spf,
         auth.dkim,
         auth.dmarc,
@@ -171,7 +171,7 @@ async fn sendgrid_inbound_webhook(
     // Synchronous Ingestion: Parse MIME into normalized message, resolve thread, verify ACL, and save inbound message
     let norm_payload = EmailIngressAdapter::parse_and_store(
         raw_payload,
-        &thread_use_cases.config(),
+        thread_use_cases.config(),
         thread_use_cases.file_storage(),
     )
     .await;
@@ -210,29 +210,29 @@ fn extract_from_payload(payload: SendGridPayload, raw: &mut RawInboundPayload) {
     raw.cc = payload.cc;
     raw.spam_score = payload.spam_score;
 
-    if let Some(ref env_str) = payload.envelope {
-        if let Ok(env) = serde_json::from_str::<SendGridEnvelope>(env_str) {
-            if let Some(recipients) = env.to {
-                if let Some(first) = recipients.first() {
-                    raw.to = first.clone();
-                }
-            }
-            if let Some(sender) = env.from {
-                raw.from = sender;
-            }
+    if let Some(ref env_str) = payload.envelope
+        && let Ok(env) = serde_json::from_str::<SendGridEnvelope>(env_str)
+    {
+        if let Some(recipients) = env.to
+            && let Some(first) = recipients.first()
+        {
+            raw.to = first.clone();
+        }
+        if let Some(sender) = env.from {
+            raw.from = sender;
         }
     }
 
-    if raw.to.is_empty() {
-        if let Some(t) = payload.to {
-            raw.to = t;
-        }
+    if raw.to.is_empty()
+        && let Some(t) = payload.to
+    {
+        raw.to = t;
     }
 
-    if raw.from.is_empty() {
-        if let Some(f) = payload.from {
-            raw.from = f;
-        }
+    if raw.from.is_empty()
+        && let Some(f) = payload.from
+    {
+        raw.from = f;
     }
 }
 

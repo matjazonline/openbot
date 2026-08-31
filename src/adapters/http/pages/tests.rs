@@ -1753,7 +1753,7 @@ fn channel_create_pane_opens_on_the_tab_that_was_submitted() {
     let easy_retry = channel_create_pane(&ChannelCreatePane {
         company: &company,
         app_domain_name: "example.com",
-        agents: &[scheduler.clone()],
+        agents: std::slice::from_ref(&scheduler),
         spam_scan_enabled: true,
         draft: &easy_draft,
         easy: true,
@@ -2695,6 +2695,59 @@ fn task_board_renders_six_columns_toggle_overflow_and_live_chain_pane() {
     assert!(html.contains("sse-connect=\"/ui/tasks/events?company_id="));
     assert!(html.contains("sse-swap=\"task-board\""));
     assert!(html.contains(&format!("/ui/tasks/chains/{correlation_id}")));
+}
+
+#[test]
+fn board_cards_escape_operator_supplied_channel_and_agent_names() {
+    // Channel and agent names are free text an operator types into the UI, and a board card is the
+    // one place they reach every other operator's browser. Escaping them is the whole test: the
+    // negative assertion is what fails if the escape is ever dropped at the interpolation.
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let correlation_id = CorrelationId::new();
+    let now = Utc::now();
+    let card = TaskChainCard {
+        correlation_id,
+        stage: ChainStage::Running,
+        title: "Cross-channel rollout".into(),
+        channel_names: vec!["<script>alert(1)</script>".into()],
+        agent_names: vec!["Ops & \"Friends\"".into()],
+        counts: TaskChainCounts {
+            total_tasks: 1,
+            processing: 1,
+            ..Default::default()
+        },
+        created_at: now,
+        last_activity_at: now,
+        next_action_at: None,
+        retry_count: 0,
+        failure_summary: Some("<img src=x onerror=alert(2)>".into()),
+    };
+    let mut cards = std::collections::HashMap::new();
+    cards.insert(ChainStage::Running, vec![card]);
+    let board = TaskChainBoard {
+        cards,
+        totals: std::collections::HashMap::new(),
+        per_column_limit: 50,
+    };
+    let email = mailbox_account_email();
+    let pane = task_chain_empty_pane("Select a chain.");
+    let html = task_board_page(&TaskBoardPage {
+        user: &mailbox_user(&email),
+        companies: std::slice::from_ref(&company),
+        company: &company,
+        channels: std::slice::from_ref(&channel),
+        board: &board,
+        filter: TaskBoardFilter::new(None, now),
+        selected_correlation_id: None,
+        pane_html: &pane,
+    });
+
+    assert!(!html.contains("<script>alert(1)</script>"));
+    assert!(!html.contains("<img src=x onerror=alert(2)>"));
+    assert!(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
+    assert!(html.contains("&lt;img src=x onerror=alert(2)&gt;"));
+    assert!(html.contains("Ops &amp; &quot;Friends&quot;"));
 }
 
 #[test]

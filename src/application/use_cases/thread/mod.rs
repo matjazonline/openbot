@@ -503,27 +503,12 @@ impl ThreadUseCases {
             .create_message(&Message {
                 id: Uuid::new_v4(),
                 thread_id,
-                message_id: MessageId::from(sent.outbound_message_id.clone()),
-                in_reply_to: Some(MessageId::from(sent.in_reply_to.clone())),
-                references_list: sent
-                    .references
-                    .iter()
-                    .cloned()
-                    .map(MessageId::from)
-                    .collect(),
-                sender: EmailAddress::from(sent.from_address.clone()),
-                recipients_to: sent
-                    .recipients_to
-                    .iter()
-                    .cloned()
-                    .map(EmailAddress::from)
-                    .collect(),
-                recipients_cc: sent
-                    .recipients_cc
-                    .iter()
-                    .cloned()
-                    .map(EmailAddress::from)
-                    .collect(),
+                message_id: sent.outbound_message_id.clone(),
+                in_reply_to: Some(sent.in_reply_to.clone()),
+                references_list: sent.references.to_vec(),
+                sender: sent.from_address.clone(),
+                recipients_to: sent.recipients_to.to_vec(),
+                recipients_cc: sent.recipients_cc.to_vec(),
                 subject: sent.subject.clone(),
                 clean_text_body: sent.body_text.clone(),
                 // Must match what `ingest_prepared_internal_message` stores for the very same

@@ -148,36 +148,6 @@ impl Workspace {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use axum::{
-        body::Body,
-        extract::{Form, FromRequest},
-        http::{Request, header},
-    };
-
-    use super::*;
-
-    #[tokio::test]
-    async fn obsolete_channel_memory_tuning_is_ignored_by_the_form() {
-        let request = Request::builder()
-            .method("POST")
-            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(Body::from(
-                "name=Support&slug=support&memory_max_results=0&memory_recall_mode=fast",
-            ))
-            .unwrap();
-        let form = Form::<ChannelForm>::from_request(request, &())
-            .await
-            .unwrap()
-            .0;
-        let submitted = SubmittedChannel::new(form);
-
-        assert!(submitted.write(None).is_ok());
-        assert_eq!(submitted.draft().name, "Support");
-    }
-}
-
 /// GET /ui/channels - The Channels workspace for the selected company / channel (Protected).
 #[instrument(skip(workspace))]
 async fn channels_page(
@@ -710,5 +680,35 @@ impl SubmittedChannel {
             persist_user_memory: memory.persist_user,
             created_by: None,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{
+        body::Body,
+        extract::{Form, FromRequest},
+        http::{Request, header},
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn obsolete_channel_memory_tuning_is_ignored_by_the_form() {
+        let request = Request::builder()
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from(
+                "name=Support&slug=support&memory_max_results=0&memory_recall_mode=fast",
+            ))
+            .unwrap();
+        let form = Form::<ChannelForm>::from_request(request, &())
+            .await
+            .unwrap()
+            .0;
+        let submitted = SubmittedChannel::new(form);
+
+        assert!(submitted.write(None).is_ok());
+        assert_eq!(submitted.draft().name, "Support");
     }
 }

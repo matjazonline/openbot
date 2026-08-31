@@ -124,6 +124,26 @@ struct OutboundDelivery {
     email_sent: bool,
 }
 
+struct AgentDelivery<'a> {
+    matches: &'a [ChannelMatch],
+    parsed: &'a ParsedEmail,
+    ingest: &'a InboundIngestResult,
+    lease: TaskLeaseRef,
+    response: &'a str,
+    send_email: bool,
+    correlation_id: CorrelationId,
+}
+
+struct DispatchCommitInput<'a, 'run> {
+    ingest: &'a InboundIngestResult,
+    parsed: &'a ParsedEmail,
+    lease: TaskLeaseRef,
+    run: &'a AgentRun<'run>,
+    commit: PreparedDispatch,
+    response: &'a str,
+    metadata: &'a Option<serde_json::Value>,
+}
+
 impl ThreadUseCases {
     /// `correlation_id` comes from the claimed task row rather than from the ingest payload it
     /// carries. Both describe the same chain, but the row is the durable one: it is `NOT NULL`,
@@ -180,33 +200,33 @@ impl ThreadUseCases {
         let response = self.combine_responses(&run.outputs);
         let metadata = combine_metadata(&run.outputs);
         let (delivery, outbound) = self
-            .deliver_agent_response(
-                &matches,
+            .deliver_agent_response(AgentDelivery {
+                matches: &matches,
                 parsed,
                 ingest,
                 lease,
-                &response,
+                response: &response,
                 send_email,
                 correlation_id,
-            )
+            })
             .await?;
         let messages = Self::outbound_messages(&matches, &delivery, &response);
 
         let outbound_message_id = delivery.message_id.clone();
         let email_sent = delivery.email_sent;
-        self.commit_dispatch(
+        self.commit_dispatch(DispatchCommitInput {
             ingest,
             parsed,
             lease,
-            &run,
-            PreparedDispatch {
+            run: &run,
+            commit: PreparedDispatch {
                 delivery,
                 outbound,
                 messages,
             },
-            &response,
-            &metadata,
-        )
+            response: &response,
+            metadata: &metadata,
+        })
         .await?;
         self.persist_memories(ingest, parsed, &run).await;
 
@@ -631,14 +651,17 @@ impl ThreadUseCases {
 
     async fn deliver_agent_response(
         &self,
-        matches: &[ChannelMatch],
-        parsed: &ParsedEmail,
-        ingest: &InboundIngestResult,
-        lease: TaskLeaseRef,
-        response: &str,
-        send_email: bool,
-        correlation_id: CorrelationId,
+        delivery: AgentDelivery<'_>,
     ) -> AppResult<(OutboundDelivery, Option<OutboundSend>)> {
+        let AgentDelivery {
+            matches,
+            parsed,
+            ingest,
+            lease,
+            response,
+            send_email,
+            correlation_id,
+        } = delivery;
         let primary = &matches[0];
         if !send_email {
             return Ok((self.simulated_delivery(primary, parsed).await?, None));
@@ -960,16 +983,16 @@ impl ThreadUseCases {
     ///
     /// A failed run never reaches here -- it is rejected before delivery -- so this only ever
     /// commits a run that produced a real reply.
-    async fn commit_dispatch(
-        &self,
-        ingest: &InboundIngestResult,
-        parsed: &ParsedEmail,
-        lease: TaskLeaseRef,
-        run: &AgentRun<'_>,
-        commit: PreparedDispatch,
-        response: &str,
-        metadata: &Option<serde_json::Value>,
-    ) -> AppResult<()> {
+    async fn commit_dispatch(&self, input: DispatchCommitInput<'_, '_>) -> AppResult<()> {
+        let DispatchCommitInput {
+            ingest,
+            parsed,
+            lease,
+            run,
+            commit,
+            response,
+            metadata,
+        } = input;
         let PreparedDispatch {
             delivery,
             outbound,

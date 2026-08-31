@@ -31,7 +31,7 @@ use crate::{
     },
 };
 
-use super::agent::{ModelOverrides, agent_write_from_instructions};
+use super::agent::{AgentInstructionRequest, ModelOverrides, agent_write_from_instructions};
 use super::live_updates::thread_wake_ups;
 
 pub fn router() -> Router<AppState> {
@@ -565,14 +565,16 @@ pub(super) async fn simple_channel_agent_write(
     };
     agent_write_from_instructions(
         agent_use_cases,
-        user_id,
-        company_id,
-        &form.name,
-        slug,
-        instructions,
-        ModelOverrides::default(),
-        None,
-        None,
+        AgentInstructionRequest {
+            user_id,
+            company_id,
+            name: &form.name,
+            slug,
+            instructions,
+            overrides: ModelOverrides::default(),
+            run_timeout_secs: None,
+            avatar_url: None,
+        },
     )
     .await
     .map(Some)
@@ -776,6 +778,10 @@ pub struct OpenThreadParams {
     config,
     user
 ))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn simulate_channel_page(
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(company_use_cases): State<Arc<CompanyUseCases>>,
@@ -917,6 +923,10 @@ fn simulation_thread_url(company_id: Uuid, channel_id: Uuid, thread_id: Uuid) ->
     user,
     form
 ))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn simulate_channel_handler(
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(company_use_cases): State<Arc<CompanyUseCases>>,
@@ -962,14 +972,16 @@ async fn simulate_channel_handler(
 
     let failure_fragment = |sender: &str, message: String| {
         Html(pages::channel_simulation_failure_fragment(
-            company_id,
-            channel_id,
-            Some(&company),
-            Some(&channel),
-            &form.to,
-            sender,
-            form.subject.as_deref().unwrap_or("(No subject)"),
-            &message,
+            &pages::ChannelSimulationFailure {
+                company_id,
+                channel_id,
+                company: Some(&company),
+                channel: Some(&channel),
+                to: &form.to,
+                from: sender,
+                subject: form.subject.as_deref().unwrap_or("(No subject)"),
+                error: &message,
+            },
         ))
         .into_response()
     };
@@ -1177,7 +1189,7 @@ pub(crate) fn reply_headers(in_reply_to: Option<&str>) -> Option<String> {
     ))
 }
 
-async fn open_simulated_thread_logic(
+struct OpenSimulatedThreadContext {
     company_use_cases: Arc<CompanyUseCases>,
     channel_use_cases: Arc<ChannelUseCases>,
     thread_use_cases: Arc<ThreadUseCases>,
@@ -1185,14 +1197,23 @@ async fn open_simulated_thread_logic(
     user: AuthenticatedUser,
     company_id: Uuid,
     channel_id: Uuid,
+}
+
+async fn open_simulated_thread_logic(
+    context: OpenSimulatedThreadContext,
     thread_id_input: &str,
 ) -> axum::response::Response {
-    let company = match company_use_cases.get_company(company_id).await {
+    let company = match context
+        .company_use_cases
+        .get_company(context.company_id)
+        .await
+    {
         Ok(Some(c)) => c,
         _ => return Html(pages::error_alert("Company not found.")).into_response(),
     };
-    let channel = match channel_use_cases
-        .get_company_channel(user.id, company_id, channel_id)
+    let channel = match context
+        .channel_use_cases
+        .get_company_channel(context.user.id, context.company_id, context.channel_id)
         .await
     {
         Ok(Some(wf)) => wf,
@@ -1200,10 +1221,10 @@ async fn open_simulated_thread_logic(
     };
 
     match load_simulation_thread_fragment(
-        &thread_use_cases,
+        &context.thread_use_cases,
         &company,
         &channel,
-        &config.app_domain_name,
+        &context.config.app_domain_name,
         thread_id_input,
         true,
     )
@@ -1212,10 +1233,13 @@ async fn open_simulated_thread_logic(
         Ok((thread, fragment)) => (
             [(
                 "HX-Push-Url",
-                simulation_thread_url(company_id, channel_id, thread.id),
+                simulation_thread_url(context.company_id, context.channel_id, thread.id),
             )],
             Html(pages::simulation_live_view(
-                company_id, channel_id, thread.id, &fragment,
+                context.company_id,
+                context.channel_id,
+                thread.id,
+                &fragment,
             )),
         )
             .into_response(),
@@ -1235,13 +1259,15 @@ async fn open_simulated_thread_get(
 ) -> impl IntoResponse {
     let tid_str = params.thread_id.as_deref().unwrap_or("");
     open_simulated_thread_logic(
-        company_use_cases,
-        channel_use_cases,
-        thread_use_cases,
-        config,
-        user,
-        company_id,
-        channel_id,
+        OpenSimulatedThreadContext {
+            company_use_cases,
+            channel_use_cases,
+            thread_use_cases,
+            config,
+            user,
+            company_id,
+            channel_id,
+        },
         tid_str,
     )
     .await
@@ -1259,13 +1285,15 @@ async fn open_simulated_thread_post(
 ) -> impl IntoResponse {
     let tid_str = params.thread_id.as_deref().unwrap_or("");
     open_simulated_thread_logic(
-        company_use_cases,
-        channel_use_cases,
-        thread_use_cases,
-        config,
-        user,
-        company_id,
-        channel_id,
+        OpenSimulatedThreadContext {
+            company_use_cases,
+            channel_use_cases,
+            thread_use_cases,
+            config,
+            user,
+            company_id,
+            channel_id,
+        },
         tid_str,
     )
     .await
@@ -1731,16 +1759,17 @@ mod tests {
             created_at: Utc::now(),
         };
 
-        let fail_html = pages::channel_simulation_failure_fragment(
-            company.id,
-            channel.id,
-            Some(&company),
-            Some(&channel),
-            "test@recip.com",
-            "sender@test.com",
-            "Test Subject",
-            "Anthropic API key is missing",
-        );
+        let fail_html =
+            pages::channel_simulation_failure_fragment(&pages::ChannelSimulationFailure {
+                company_id: company.id,
+                channel_id: channel.id,
+                company: Some(&company),
+                channel: Some(&channel),
+                to: "test@recip.com",
+                from: "sender@test.com",
+                subject: "Test Subject",
+                error: "Anthropic API key is missing",
+            });
         assert!(fail_html.contains("Simulation Execution Error"));
         assert!(fail_html.contains("Anthropic API key is missing"));
         assert!(fail_html.contains("LLM Provider:"));

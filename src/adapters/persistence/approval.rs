@@ -732,7 +732,7 @@ mod tests {
             .iter()
             .find(|event| event.reason == TaskTransitionReason::ApprovalRequested)
             .expect("parking records the exact approval transition");
-        assert_eq!(requested.related_approval_id.is_some(), true);
+        assert!(requested.related_approval_id.is_some());
 
         // Once parked there is no owner left to fence against, so the unleased sweep may act --
         // this is the quorum-timeout path.

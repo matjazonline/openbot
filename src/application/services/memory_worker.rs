@@ -359,10 +359,10 @@ impl MemoryWorker {
         let terminal =
             !error.retryable() || job.failure_attempts + 1 >= MAX_PROVIDER_FAILURE_ATTEMPTS;
         let mut retry_at = retry_at(job.failure_attempts + 1);
-        if job.phase == MemoryProvisioningPhase::WaitingReady {
-            if let Some(deadline) = job.readiness_deadline {
-                retry_at = retry_at.min(deadline);
-            }
+        if job.phase == MemoryProvisioningPhase::WaitingReady
+            && let Some(deadline) = job.readiness_deadline
+        {
+            retry_at = retry_at.min(deadline);
         }
         let accepted = self
             .persistence

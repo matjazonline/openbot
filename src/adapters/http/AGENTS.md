@@ -50,6 +50,12 @@ Treat SSE events as wake-ups, never as state. Subscribe before querying, reconci
 on every connect/reconnect, and use a durable cursor for append-only streams. Keep the element that
 owns `sse-connect` mounted; swap a child, and preserve live attributes in every OOB replacement.
 
+Scope expensive detail reconciliation to wake events that name that resource. A broad summary may
+refresh for company-wide events while an open detail pane remains unchanged for unrelated
+resources. Treat event-stream lag as uncertainty and perform a full reconciliation. Recompute
+relative-time filters on every refresh rather than retaining one cutoff for the lifetime of an SSE
+connection.
+
 Read-only htmx controls that can issue competing requests to one target must use
 `hx-sync="#target:replace"`, so the last user intent wins. Do not abort accepted writes: disable or
 queue them instead. Tests must cover an event between render and subscribe and two reads completing

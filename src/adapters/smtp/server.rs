@@ -52,13 +52,13 @@ pub struct ConnGuard {
 
 impl Drop for ConnGuard {
     fn drop(&mut self) {
-        if let Ok(mut lock) = self.conns.write() {
-            if let Some(count) = lock.get_mut(&self.ip) {
-                if *count > 1 {
-                    *count -= 1;
-                } else {
-                    lock.remove(&self.ip);
-                }
+        if let Ok(mut lock) = self.conns.write()
+            && let Some(count) = lock.get_mut(&self.ip)
+        {
+            if *count > 1 {
+                *count -= 1;
+            } else {
+                lock.remove(&self.ip);
             }
         }
     }
@@ -79,10 +79,10 @@ pub async fn check_dnsbl(ip: IpAddr, dnsbl_servers: &[String]) -> Option<String>
 
     for server in dnsbl_servers {
         let lookup_host = format!("{}.{}", ip_reversed, server);
-        if let Ok(mut addrs) = tokio::net::lookup_host((lookup_host.as_str(), 80)).await {
-            if addrs.next().is_some() {
-                return Some(server.clone());
-            }
+        if let Ok(mut addrs) = tokio::net::lookup_host((lookup_host.as_str(), 80)).await
+            && addrs.next().is_some()
+        {
+            return Some(server.clone());
         }
     }
 
@@ -276,7 +276,7 @@ impl SmtpServer {
                         match timeout(
                             DATA_TIMEOUT,
                             self.finish_data_transaction(
-                                &mut session,
+                                &session,
                                 &mut writer,
                                 peer_addr,
                                 start_time,
@@ -900,13 +900,13 @@ pub fn parse_raw_mime_to_payload(
                     hdrs.push_str(": ");
                     hdrs.push_str(val_str);
                     hdrs.push('\n');
-                } else if let Some(addr) = header.value().as_address() {
-                    if let Some(addr_str) = extract_address_str(addr) {
-                        hdrs.push_str(name);
-                        hdrs.push_str(": ");
-                        hdrs.push_str(&addr_str);
-                        hdrs.push('\n');
-                    }
+                } else if let Some(addr) = header.value().as_address()
+                    && let Some(addr_str) = extract_address_str(addr)
+                {
+                    hdrs.push_str(name);
+                    hdrs.push_str(": ");
+                    hdrs.push_str(&addr_str);
+                    hdrs.push('\n');
                 }
             }
             if hdrs.is_empty() { None } else { Some(hdrs) }
@@ -995,8 +995,10 @@ mod tests {
             Some(MAX_INBOUND_MESSAGE_BYTES + 1)
         );
 
-        let mut session = SmtpSession::default();
-        session.data_buffer = vec![b'x'; MAX_INBOUND_MESSAGE_BYTES - 1];
+        let mut session = SmtpSession {
+            data_buffer: vec![b'x'; MAX_INBOUND_MESSAGE_BYTES - 1],
+            ..Default::default()
+        };
         assert!(session.push_data_line(b"x"));
         assert!(!session.push_data_line(b"y"));
     }

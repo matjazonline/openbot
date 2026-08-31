@@ -571,9 +571,9 @@ impl TaskMonitorView<'_> {
             task,
             channel: channel.as_ref(),
             deliveries: &deliveries,
-            delivery_error: delivery_error.as_deref(),
+            delivery_error,
             attempts: &attempts,
-            attempts_error: attempts_error.as_deref(),
+            attempts_error,
             error,
         }))
     }

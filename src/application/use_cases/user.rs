@@ -543,7 +543,7 @@ impl UserUseCases {
         }
         if self
             .persistence
-            .get_by_email(&identity.email)
+            .get_by_email(identity.email)
             .await?
             .is_some()
             || self
@@ -1118,7 +1118,7 @@ mod test {
         }
 
         fn verify_password(&self, password: &str, hash: &str) -> AppResult<bool> {
-            Ok(hash == &format!("{}_hash", password)
+            Ok(hash == format!("{}_hash", password)
                 || hash == "secret_hash" && password == "secret")
         }
     }
@@ -1148,9 +1148,17 @@ mod test {
     /// It records the *hash* rather than the code, exactly as Postgres does, so the tests below
     /// confirm the same way a browser does: by presenting a code that has to hash to what was
     /// stored.
+    struct StoredAccountChange {
+        user_id: Uuid,
+        kind: AccountChangeKind,
+        payload: String,
+        confirmation_code_hash: String,
+        live: bool,
+    }
+
     #[derive(Default)]
     struct MockAccountChanges {
-        stored: std::sync::Mutex<Vec<(Uuid, AccountChangeKind, String, String, bool)>>,
+        stored: std::sync::Mutex<Vec<StoredAccountChange>>,
     }
 
     #[async_trait]
@@ -1165,14 +1173,14 @@ mod test {
                 AccountChange::Password(hash) => hash.to_string(),
             };
             let mut stored = self.stored.lock().unwrap();
-            stored.retain(|(id, existing, ..)| !(*id == pending.user_id && *existing == kind));
-            stored.push((
-                pending.user_id,
+            stored.retain(|change| !(change.user_id == pending.user_id && change.kind == kind));
+            stored.push(StoredAccountChange {
+                user_id: pending.user_id,
                 kind,
                 payload,
-                pending.confirmation_code_hash.to_string(),
-                pending.expires_at > chrono::Utc::now(),
-            ));
+                confirmation_code_hash: pending.confirmation_code_hash.to_string(),
+                live: pending.expires_at > chrono::Utc::now(),
+            });
             Ok(())
         }
 
@@ -1183,11 +1191,14 @@ mod test {
             confirmation_code_hash: &str,
         ) -> AppResult<Option<User>> {
             let mut stored = self.stored.lock().unwrap();
-            let found = stored.iter().position(|(id, existing, _, hash, live)| {
-                *id == user_id && *existing == kind && hash == confirmation_code_hash && *live
+            let found = stored.iter().position(|change| {
+                change.user_id == user_id
+                    && change.kind == kind
+                    && change.confirmation_code_hash == confirmation_code_hash
+                    && change.live
             });
             let Some(found) = found else { return Ok(None) };
-            let (_, _, payload, ..) = stored.remove(found);
+            let payload = stored.remove(found).payload;
 
             Ok(Some(User {
                 id: user_id,
@@ -1214,10 +1225,10 @@ mod test {
                 .lock()
                 .unwrap()
                 .iter()
-                .filter(|(id, _, _, _, live)| *id == user_id && *live)
-                .map(|(_, kind, payload, ..)| match kind {
+                .filter(|change| change.user_id == user_id && change.live)
+                .map(|change| match change.kind {
                     AccountChangeKind::Email => PendingChange::Email {
-                        new_email: EmailAddress::from(payload.as_str()),
+                        new_email: EmailAddress::from(change.payload.as_str()),
                         expires_at: chrono::Utc::now() + chrono::Duration::minutes(15),
                     },
                     AccountChangeKind::Password => PendingChange::Password {
@@ -1235,7 +1246,7 @@ mod test {
             self.stored
                 .lock()
                 .unwrap()
-                .retain(|(id, existing, ..)| !(*id == user_id && *existing == kind));
+                .retain(|change| !(change.user_id == user_id && change.kind == kind));
             Ok(())
         }
     }

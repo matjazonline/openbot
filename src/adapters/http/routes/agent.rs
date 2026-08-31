@@ -176,6 +176,18 @@ pub(super) struct ModelOverrides<'a> {
     pub model: Option<&'a str>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(super) struct AgentInstructionRequest<'a> {
+    pub user_id: Uuid,
+    pub company_id: Uuid,
+    pub name: &'a str,
+    pub slug: &'a str,
+    pub instructions: &'a str,
+    pub overrides: ModelOverrides<'a>,
+    pub run_timeout_secs: Option<u32>,
+    pub avatar_url: Option<&'a AvatarUrl>,
+}
+
 /// An agent built from plain-language instructions rather than a written system prompt.
 ///
 /// Shared by the `/ui` Agents workspace's Simple tab and by
@@ -183,59 +195,40 @@ pub(super) struct ModelOverrides<'a> {
 /// one thing wherever it is offered.
 pub(super) async fn create_agent_from_instructions(
     agent_use_cases: &AgentUseCases,
-    user_id: Uuid,
-    company_id: Uuid,
-    name: &str,
-    slug: &str,
-    instructions: &str,
-    overrides: ModelOverrides<'_>,
-    run_timeout_secs: Option<u32>,
-    avatar_url: Option<&AvatarUrl>,
+    request: AgentInstructionRequest<'_>,
 ) -> Result<Agent, String> {
-    let write = agent_write_from_instructions(
-        agent_use_cases,
-        user_id,
-        company_id,
-        name,
-        slug,
-        instructions,
-        overrides,
-        run_timeout_secs,
-        avatar_url,
-    )
-    .await?;
+    let write = agent_write_from_instructions(agent_use_cases, request).await?;
     agent_use_cases
-        .create_agent(user_id, company_id, write)
+        .create_agent(request.user_id, request.company_id, write)
         .await
         .map_err(|err| format!("Failed to create agent: {err}"))
 }
 
 pub(super) async fn agent_write_from_instructions(
     agent_use_cases: &AgentUseCases,
-    user_id: Uuid,
-    company_id: Uuid,
-    name: &str,
-    slug: &str,
-    instructions: &str,
-    overrides: ModelOverrides<'_>,
-    run_timeout_secs: Option<u32>,
-    avatar_url: Option<&AvatarUrl>,
+    request: AgentInstructionRequest<'_>,
 ) -> Result<AgentWrite, String> {
     // Expansion runs on the company's own credentials: the overrides are what the *agent* will
     // answer with, not necessarily a model that can write its prompt.
     let system_prompt = agent_use_cases
-        .generate_system_prompt(user_id, company_id, instructions, None, None)
+        .generate_system_prompt(
+            request.user_id,
+            request.company_id,
+            request.instructions,
+            None,
+            None,
+        )
         .await
         .map_err(|err| format!("Failed to generate agent prompt: {err}"))?;
 
     Ok(AgentWrite {
-        name: name.to_string(),
-        slug: slug.to_string(),
-        provider: overrides.provider.map(str::to_string),
-        model: overrides.model.map(str::to_string),
-        run_timeout_secs,
+        name: request.name.to_string(),
+        slug: request.slug.to_string(),
+        provider: request.overrides.provider.map(str::to_string),
+        model: request.overrides.model.map(str::to_string),
+        run_timeout_secs: request.run_timeout_secs,
         system_prompt: Some(system_prompt),
-        avatar_url: avatar_url.cloned(),
+        avatar_url: request.avatar_url.cloned(),
         ..AgentWrite::default()
     })
 }
@@ -865,15 +858,19 @@ mod tests {
         assert!(edit_html.contains("hx-put="));
         assert!(edit_html.contains("value=\"Support Agent\""));
 
-        let page_html = pages::agents_page(&company, &[agent.clone()]);
+        let page_html = pages::agents_page(&company, std::slice::from_ref(&agent));
         assert!(page_html.contains("Acme Corp Agents"));
         assert!(page_html.contains("Add New Agent"));
         assert!(page_html.contains("id=\"agent-form-toggle\""));
         assert!(page_html.contains("id=\"agent-form-card\" class=\"hidden"));
         assert!(page_html.contains("aria-controls=\"agent-form-card\""));
 
-        let selection_html =
-            pages::render_agents_selection(company.id, &[agent.clone()], Some(&[agent.id]), "new");
+        let selection_html = pages::render_agents_selection(
+            company.id,
+            std::slice::from_ref(&agent),
+            Some(&[agent.id]),
+            "new",
+        );
         assert!(selection_html.contains("agents-selection-new"));
         assert!(selection_html.contains("inline-agent-form-new"));
         assert!(selection_html.contains("/companies/"));

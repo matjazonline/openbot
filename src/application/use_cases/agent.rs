@@ -362,10 +362,10 @@ impl AgentUseCases {
     ) -> AppResult<Option<Agent>> {
         self.verify_company_manager(user_id, company_id).await?;
         let agent = self.agent_persistence.get_by_id(agent_id).await?;
-        if let Some(ref ag) = agent {
-            if ag.company_id != Some(company_id) {
-                return Ok(None);
-            }
+        if let Some(ref ag) = agent
+            && ag.company_id != Some(company_id)
+        {
+            return Ok(None);
         }
         Ok(agent)
     }

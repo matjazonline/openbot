@@ -193,6 +193,10 @@ async fn channel_step(
     .into_response())
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn create_channel(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
@@ -478,8 +482,12 @@ mod tests {
         assert!(company_page.contains("/ui/profile"));
 
         let library_agent = library_agent("Scheduler", "scheduler");
-        let channel_page =
-            pages::onboarding_channel_page(&user, &company, &[library_agent.clone()], None);
+        let channel_page = pages::onboarding_channel_page(
+            &user,
+            &company,
+            std::slice::from_ref(&library_agent),
+            None,
+        );
         assert!(channel_page.contains("Step 2 of 3"));
         assert!(channel_page.contains(&format!(
             "action=\"/ui/onboarding/companies/{}/channel\"",

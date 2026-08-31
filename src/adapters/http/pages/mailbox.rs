@@ -1360,11 +1360,11 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
             {company_badge}
         </nav>
         "##,
-        company_badge = user
-            .company_membership
-            .is_team()
-            .then(|| rail_company_badge(company, FragmentSwap::Inline))
-            .unwrap_or_default(),
+        company_badge = if user.company_membership.is_team() {
+            rail_company_badge(company, FragmentSwap::Inline)
+        } else {
+            Default::default()
+        },
     )
 }
 

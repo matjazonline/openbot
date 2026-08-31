@@ -353,6 +353,10 @@ async fn render_message_pane(
     config,
     user
 ))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn mailbox_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
@@ -875,6 +879,10 @@ async fn compose_form(
     viewer,
     form
 ))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn create_thread(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
@@ -1015,6 +1023,10 @@ async fn reply_form(
     viewer,
     form
 ))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn send_reply(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,

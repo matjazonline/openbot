@@ -1480,59 +1480,58 @@ impl TaskWorker {
         .map_err(|error| error.to_string())?;
 
         // Parse payload to notify participants
-        if let Ok(ingest) = serde_json::from_value::<InboundIngestResult>(task.payload) {
-            if let (Some(channel), Some(company), Some(parsed)) =
+        if let Ok(ingest) = serde_json::from_value::<InboundIngestResult>(task.payload)
+            && let (Some(channel), Some(company), Some(parsed)) =
                 (ingest.channel, ingest.company, ingest.parsed_email)
-            {
-                let stop_email = OutboundEmail {
-                    channel_id: channel.id,
-                    channel_name: channel.name.clone(),
-                    channel_slug: channel.slug.clone(),
-                    company_slug: company.slug.clone(),
-                    trigger_message_id: parsed.message_id.clone().into(),
-                    thread_references: parsed
-                        .references
-                        .iter()
-                        .cloned()
-                        .map(crate::entities::value_objects::MessageId::from)
-                        .collect(),
-                    recipient_to: parsed.sender.clone().into(),
-                    recipients_cc: parsed
-                        .recipients_cc
-                        .iter()
-                        .cloned()
-                        .map(crate::entities::value_objects::EmailAddress::from)
-                        .collect(),
-                    subject: format!("[STOPPED] Re: {}", parsed.subject),
-                    body_text: format!(
-                        "Notice: The automated channel processing for thread '{}' has been manually stopped by the system administrator.",
-                        parsed.subject
-                    ),
-                    hop_count: parsed.hop_count,
-                    trace_channels: parsed.trace_channels,
-                    correlation_id: task.correlation_id,
-                };
+        {
+            let stop_email = OutboundEmail {
+                channel_id: channel.id,
+                channel_name: channel.name.clone(),
+                channel_slug: channel.slug.clone(),
+                company_slug: company.slug.clone(),
+                trigger_message_id: parsed.message_id.clone().into(),
+                thread_references: parsed
+                    .references
+                    .iter()
+                    .cloned()
+                    .map(crate::entities::value_objects::MessageId::from)
+                    .collect(),
+                recipient_to: parsed.sender.clone().into(),
+                recipients_cc: parsed
+                    .recipients_cc
+                    .iter()
+                    .cloned()
+                    .map(crate::entities::value_objects::EmailAddress::from)
+                    .collect(),
+                subject: format!("[STOPPED] Re: {}", parsed.subject),
+                body_text: format!(
+                    "Notice: The automated channel processing for thread '{}' has been manually stopped by the system administrator.",
+                    parsed.subject
+                ),
+                hop_count: parsed.hop_count,
+                trace_channels: parsed.trace_channels,
+                correlation_id: task.correlation_id,
+            };
 
-                match self
-                    .thread_use_cases
-                    .prepare_internal_channel_delivery(stop_email.clone(), None)
-                    .await
-                {
-                    Ok(Some(prepared)) => {
-                        let _ = self
-                            .thread_use_cases
-                            .ingest_prepared_internal_message(&prepared)
-                            .await;
-                    }
-                    Ok(None) => {
-                        let _ = self
-                            .thread_use_cases
-                            .mail_dispatcher()
-                            .send(stop_email)
-                            .await;
-                    }
-                    Err(error) => warn!("Failed to prepare stop notification: {error}"),
+            match self
+                .thread_use_cases
+                .prepare_internal_channel_delivery(stop_email.clone(), None)
+                .await
+            {
+                Ok(Some(prepared)) => {
+                    let _ = self
+                        .thread_use_cases
+                        .ingest_prepared_internal_message(&prepared)
+                        .await;
                 }
+                Ok(None) => {
+                    let _ = self
+                        .thread_use_cases
+                        .mail_dispatcher()
+                        .send(stop_email)
+                        .await;
+                }
+                Err(error) => warn!("Failed to prepare stop notification: {error}"),
             }
         }
 

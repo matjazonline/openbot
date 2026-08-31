@@ -771,8 +771,8 @@ impl TaskPersistence for MockTaskPersistence {
             .unwrap()
             .iter()
             .filter(|t| t.company_id == company_id)
-            .filter(|t| channel_id.map_or(true, |w_id| t.channel_id == w_id))
-            .filter(|t| status.as_ref().map_or(true, |s| t.status == *s))
+            .filter(|t| channel_id.is_none_or(|w_id| t.channel_id == w_id))
+            .filter(|t| status.as_ref().is_none_or(|s| t.status == *s))
             .cloned()
             .collect())
     }
@@ -2517,11 +2517,12 @@ async fn test_sender_verification_and_delegation_target_check() {
         .await
         .unwrap();
 
-    let mut list = task_persistence.tasks.lock().unwrap();
-    if let Some(t) = list.iter_mut().find(|t| t.id == task.id) {
-        t.status = crate::entities::task::TaskStatus::WaitingForThirdPartyReply;
+    {
+        let mut list = task_persistence.tasks.lock().unwrap();
+        if let Some(t) = list.iter_mut().find(|t| t.id == task.id) {
+            t.status = crate::entities::task::TaskStatus::WaitingForThirdPartyReply;
+        }
     }
-    drop(list);
 
     // 3. Unauthorized third-party attacker tries to inject message into thread using In-Reply-To
     let res_attacker = thread_use_cases

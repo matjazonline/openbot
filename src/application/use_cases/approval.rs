@@ -945,11 +945,12 @@ mod tests {
         assert!(res1.is_rejected()); // Turn paused
 
         // Verify pending record created in shared DB
-        let db_list1 = shared_db.approvals.lock().unwrap();
-        assert_eq!(db_list1.len(), 1);
-        assert_eq!(db_list1[0].status, ApprovalStatus::Pending);
-        let token = db_list1[0].token.clone();
-        drop(db_list1);
+        let token = {
+            let db_list1 = shared_db.approvals.lock().unwrap();
+            assert_eq!(db_list1.len(), 1);
+            assert_eq!(db_list1[0].status, ApprovalStatus::Pending);
+            db_list1[0].token.clone()
+        };
 
         // =========================================================================
         // SIMULATED SERVER CRASH / RESTART: Server 1 is completely dropped!
