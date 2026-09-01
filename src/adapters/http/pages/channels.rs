@@ -534,11 +534,18 @@ pub fn channel_list_fragment(
 pub fn channel_threads_page(
     company: &Company,
     channel: &Channel,
+    app_domain_name: &str,
     threads: &[Thread],
     next_cursor: Option<&str>,
 ) -> String {
-    let list_html =
-        channel_thread_list_fragment(company.id, channel.id, threads, next_cursor, false);
+    let list_html = channel_thread_list_fragment(
+        company.id,
+        channel.id,
+        app_domain_name,
+        threads,
+        next_cursor,
+        false,
+    );
     let content = format!(
         r##"
         <div class="mb-6">
@@ -559,9 +566,58 @@ pub fn channel_threads_page(
     base_layout(&format!("{} Threads", channel.name), &content)
 }
 
+/// One thread card in the admin channel list.
+///
+/// Extracted from the list body so the glyph has somewhere to live that is not another level of
+/// closure inside an already long function.
+fn channel_thread_card(
+    company_id: Uuid,
+    channel_id: Uuid,
+    app_domain_name: &str,
+    thread: &Thread,
+) -> String {
+    let participants = if thread.participant_emails.is_empty() {
+        "No participants".to_string()
+    } else {
+        escape_html_text(&thread.participant_emails.join(", "))
+    };
+
+    format!(
+        r##"
+                    <article class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 hover:border-indigo-700/70 transition shadow-sm">
+                        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                            <div class="min-w-0">
+                                <h3 class="flex items-center gap-1.5 font-semibold text-white break-words">{channel_glyph}{subject}</h3>
+                                <p class="text-xs text-slate-400 mt-1 break-words">{participants}</p>
+                                <p class="text-[11px] font-mono text-slate-500 mt-2">{thread_id}</p>
+                            </div>
+                            <div class="sm:text-right shrink-0">
+                                <p class="text-xs text-slate-400">Updated {updated_at}</p>
+                                <a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={thread_id}"
+                                    class="inline-block mt-2 px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
+                                    Open Thread
+                                </a>
+                            </div>
+                        </div>
+                    </article>
+                    "##,
+        channel_glyph = other_channel_glyph(
+            opened_by_another_channel(thread, app_domain_name),
+            "Opened by an agent in another channel",
+        ),
+        subject = escape_html_text(&thread.subject),
+        participants = participants,
+        thread_id = thread.id,
+        updated_at = super::format_date_time(thread.updated_at),
+        company_id = company_id,
+        channel_id = channel_id,
+    )
+}
+
 pub fn channel_thread_list_fragment(
     company_id: Uuid,
     channel_id: Uuid,
+    app_domain_name: &str,
     threads: &[Thread],
     next_cursor: Option<&str>,
     out_of_band_pagination: bool,
@@ -576,39 +632,7 @@ pub fn channel_thread_list_fragment(
     } else {
         threads
             .iter()
-            .map(|thread| {
-                let participants = if thread.participant_emails.is_empty() {
-                    "No participants".to_string()
-                } else {
-                    escape_html_text(&thread.participant_emails.join(", "))
-                };
-                format!(
-                    r##"
-                    <article class="bg-slate-900/80 border border-slate-700/70 rounded-xl p-4 md:p-5 hover:border-indigo-700/70 transition shadow-sm">
-                        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                            <div class="min-w-0">
-                                <h3 class="font-semibold text-white break-words">{subject}</h3>
-                                <p class="text-xs text-slate-400 mt-1 break-words">{participants}</p>
-                                <p class="text-[11px] font-mono text-slate-500 mt-2">{thread_id}</p>
-                            </div>
-                            <div class="sm:text-right shrink-0">
-                                <p class="text-xs text-slate-400">Updated {updated_at}</p>
-                                <a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={thread_id}"
-                                    class="inline-block mt-2 px-3 py-1.5 text-xs font-medium bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-lg transition">
-                                    Open Thread
-                                </a>
-                            </div>
-                        </div>
-                    </article>
-                    "##,
-                    subject = escape_html_text(&thread.subject),
-                    participants = participants,
-                    thread_id = thread.id,
-                    updated_at = super::format_date_time(thread.updated_at),
-                    company_id = company_id,
-                    channel_id = channel_id,
-                )
-            })
+            .map(|thread| channel_thread_card(company_id, channel_id, app_domain_name, thread))
             .collect()
     };
 

@@ -33,7 +33,7 @@ use crate::entities::{
 };
 use crate::services::memory_provider::ConfiguredMemoryProviders;
 use crate::use_cases::{
-    channel::InboundEmailResult,
+    channel::{InboundEmailResult, parse_platform_address},
     user::{AccountChangeKind, PendingChange},
 };
 

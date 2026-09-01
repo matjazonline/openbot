@@ -444,10 +444,11 @@ async fn mailbox_page(
 }
 
 /// GET /ui/threads - The thread column for a channel, clearing the detail pane (Protected).
-#[instrument(skip(channel_use_cases, thread_use_cases, viewer))]
+#[instrument(skip(channel_use_cases, thread_use_cases, config, viewer))]
 async fn thread_column_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
     Query(query): Query<ChannelQuery>,
 ) -> AppResult<Html<String>> {
@@ -462,6 +463,7 @@ async fn thread_column_fragment(
     let column = pages::thread_column(&pages::ThreadColumn {
         company_id: query.company_id,
         channel: &channel,
+        app_domain_name: &config.app_domain_name,
         threads: &page.threads,
         next_cursor: page.next_cursor.as_deref(),
         selected_thread_id: None,
@@ -481,10 +483,11 @@ async fn thread_column_fragment(
 }
 
 /// GET /ui/threads/list - One older page of threads, appended to the open column (Protected).
-#[instrument(skip(channel_use_cases, thread_use_cases, viewer))]
+#[instrument(skip(channel_use_cases, thread_use_cases, config, viewer))]
 async fn thread_page_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
     Query(query): Query<ThreadPageQuery>,
 ) -> AppResult<Html<String>> {
@@ -508,6 +511,7 @@ async fn thread_page_fragment(
         &pages::ThreadColumn {
             company_id: query.company_id,
             channel: &channel,
+            app_domain_name: &config.app_domain_name,
             threads: &page.threads,
             next_cursor: page.next_cursor.as_deref(),
             selected_thread_id: None,
@@ -696,11 +700,12 @@ async fn thread_message_stream(
 /// receives a message is bumped to the top of the column, so "insert at top, drop the stale copy"
 /// is the whole reordering — and it leaves any older pages the reader loaded on demand in place,
 /// which re-rendering the first page would not.
-#[instrument(skip(channel_use_cases, thread_use_cases, events, viewer, headers))]
+#[instrument(skip(channel_use_cases, thread_use_cases, events, config, viewer, headers))]
 async fn thread_column_stream(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(events): State<MailboxEvents>,
+    State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
     headers: HeaderMap,
     Query(query): Query<ChannelStreamQuery>,
@@ -712,6 +717,8 @@ async fn thread_column_stream(
         .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
 
     let company_id = query.company_id;
+    // Owned, because the stream outlives this handler's borrow of the config.
+    let app_domain_name = config.app_domain_name.clone();
     let mut cursor = resume_cursor(&headers, query.after.as_deref());
     let channel_id = channel.id;
     let mut wake_ups = Box::pin(channel_wake_ups(&events, "threads", channel_id));
@@ -786,8 +793,14 @@ async fn thread_column_stream(
                                     &channel,
                                     thread,
                                     false,
-                                    activity.get(&thread.id).copied(),
-                                    last_roles.get(&thread.id).copied(),
+                                    pages::ThreadRowMarks {
+                                        activity: activity.get(&thread.id).copied(),
+                                        last_role: last_roles.get(&thread.id).copied(),
+                                        from_other_channel: pages::opened_by_another_channel(
+                                            thread,
+                                            &app_domain_name,
+                                        ),
+                                    },
                                 )));
                         }
                         pending_rows = threads.len() == STREAM_BATCH_LIMIT;
@@ -958,6 +971,7 @@ async fn create_thread(
         &thread_use_cases,
         company.id,
         &channel,
+        &config.app_domain_name,
         &thread,
         agent.as_ref(),
         &viewer.email,
@@ -1108,6 +1122,7 @@ async fn send_reply(
         &thread_use_cases,
         company.id,
         &channel,
+        &config.app_domain_name,
         &sent_thread,
         agent.as_ref(),
         &viewer.email,
@@ -1120,6 +1135,7 @@ async fn sent_message_response(
     thread_use_cases: &ThreadUseCases,
     company_id: Uuid,
     channel: &Channel,
+    app_domain_name: &str,
     thread: &Thread,
     agent: Option<&Agent>,
     viewer_email: &EmailAddress,
@@ -1138,6 +1154,7 @@ async fn sent_message_response(
     let refreshed_list = pages::thread_list_oob(&pages::ThreadColumn {
         company_id,
         channel,
+        app_domain_name,
         threads: &page.threads,
         next_cursor: page.next_cursor.as_deref(),
         selected_thread_id: Some(thread.id),

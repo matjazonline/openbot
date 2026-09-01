@@ -328,6 +328,10 @@ fn no_activity() -> &'static HashMap<Uuid, ThreadActivity> {
     EMPTY.get_or_init(HashMap::new)
 }
 
+/// The domain the fixtures' channel addresses are built on, so a participant that is another
+/// channel is distinguishable from one that is a person.
+const MAILBOX_APP_DOMAIN: &str = "mailagents.test";
+
 fn mailbox_company() -> Company {
     Company {
         id: Uuid::new_v4(),
@@ -701,6 +705,7 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
     let column = thread_column(&ThreadColumn {
         company_id: company.id,
         channel: &channel,
+        app_domain_name: MAILBOX_APP_DOMAIN,
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
@@ -1823,6 +1828,7 @@ fn appended_thread_page_swaps_pagination_out_of_band() {
         &ThreadColumn {
             company_id: company.id,
             channel: &channel,
+            app_domain_name: MAILBOX_APP_DOMAIN,
             threads: std::slice::from_ref(&thread),
             next_cursor: None,
             selected_thread_id: None,
@@ -2007,6 +2013,7 @@ fn thread_column_streams_touched_threads_from_where_it_was_rendered() {
     let html = thread_column(&ThreadColumn {
         company_id: company.id,
         channel: &channel,
+        app_domain_name: MAILBOX_APP_DOMAIN,
         // The column is newest-first, so the resume cursor is the *first* row, not the last.
         threads: &[newest.clone(), older],
         next_cursor: None,
@@ -2039,6 +2046,7 @@ fn the_out_of_band_thread_list_stays_live() {
     let oob = thread_list_oob(&ThreadColumn {
         company_id: company.id,
         channel: &channel,
+        app_domain_name: MAILBOX_APP_DOMAIN,
         threads: std::slice::from_ref(&thread),
         next_cursor: None,
         selected_thread_id: Some(thread.id),
@@ -2059,6 +2067,7 @@ fn thread_column_omits_the_resume_cursor_for_an_empty_channel() {
     let html = thread_column(&ThreadColumn {
         company_id: company.id,
         channel: &channel,
+        app_domain_name: MAILBOX_APP_DOMAIN,
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
@@ -2084,6 +2093,7 @@ fn a_streamed_thread_row_is_identical_to_one_rendered_with_the_column() {
     let column = thread_column(&ThreadColumn {
         company_id: company.id,
         channel: &channel,
+        app_domain_name: MAILBOX_APP_DOMAIN,
         threads: std::slice::from_ref(&thread),
         next_cursor: None,
         selected_thread_id: None,
@@ -2091,8 +2101,16 @@ fn a_streamed_thread_row_is_identical_to_one_rendered_with_the_column() {
     });
 
     assert!(
-        column
-            .contains(thread_row_fragment(company.id, &channel, &thread, false, None, None).trim())
+        column.contains(
+            thread_row_fragment(
+                company.id,
+                &channel,
+                &thread,
+                false,
+                ThreadRowMarks::default()
+            )
+            .trim()
+        )
     );
 }
 
@@ -2105,12 +2123,24 @@ fn thread_row_marks_only_the_selected_thread() {
     let thread = mailbox_thread(channel.id);
 
     assert!(
-        thread_row_fragment(company.id, &channel, &thread, true, None, None)
-            .contains("bg-base-300")
+        thread_row_fragment(
+            company.id,
+            &channel,
+            &thread,
+            true,
+            ThreadRowMarks::default()
+        )
+        .contains("bg-base-300")
     );
     assert!(
-        !thread_row_fragment(company.id, &channel, &thread, false, None, None)
-            .contains("bg-base-300")
+        !thread_row_fragment(
+            company.id,
+            &channel,
+            &thread,
+            false,
+            ThreadRowMarks::default()
+        )
+        .contains("bg-base-300")
     );
 }
 
@@ -2120,14 +2150,22 @@ fn a_thread_row_carries_its_own_activity_slot() {
     let channel = mailbox_channel(company.id);
     let thread = mailbox_thread(channel.id);
 
-    let idle = thread_row_fragment(company.id, &channel, &thread, false, None, None);
+    let idle = thread_row_fragment(
+        company.id,
+        &channel,
+        &thread,
+        false,
+        ThreadRowMarks::default(),
+    );
     let working = thread_row_fragment(
         company.id,
         &channel,
         &thread,
         false,
-        Some(ThreadActivity::Working),
-        None,
+        ThreadRowMarks {
+            activity: Some(ThreadActivity::Working),
+            ..ThreadRowMarks::default()
+        },
     );
 
     // Its own event name, so a status change redraws just this badge. Sharing the column's
@@ -2161,8 +2199,10 @@ fn a_thread_row_carries_its_own_activity_slot() {
         &channel,
         &thread,
         false,
-        Some(ThreadActivity::Queued),
-        None,
+        ThreadRowMarks {
+            activity: Some(ThreadActivity::Queued),
+            ..ThreadRowMarks::default()
+        },
     );
     assert!(queued.contains(&icon(Icon::DotFill, BUTTON_ICON)));
     assert!(queued.contains(r#"title="Queued""#));
@@ -2174,8 +2214,10 @@ fn a_thread_row_carries_its_own_activity_slot() {
         &channel,
         &thread,
         false,
-        Some(ThreadActivity::WaitingApproval),
-        None,
+        ThreadRowMarks {
+            activity: Some(ThreadActivity::WaitingApproval),
+            ..ThreadRowMarks::default()
+        },
     );
     assert!(blocked.contains(&icon(Icon::Hourglass, BUTTON_ICON)));
     assert!(blocked.contains(r#"title="Waiting for approval""#));
@@ -2190,7 +2232,13 @@ fn only_streamed_rows_say_who_spoke_last() {
     let channel = mailbox_channel(company.id);
     let thread = mailbox_thread(channel.id);
 
-    let from_page = thread_row_fragment(company.id, &channel, &thread, false, None, None);
+    let from_page = thread_row_fragment(
+        company.id,
+        &channel,
+        &thread,
+        false,
+        ThreadRowMarks::default(),
+    );
     assert!(!from_page.contains("data-last-role"));
     assert!(from_page.contains(r#"<span class="thread-mark"#));
 
@@ -2199,8 +2247,10 @@ fn only_streamed_rows_say_who_spoke_last() {
         &channel,
         &thread,
         false,
-        None,
-        Some(MessageRole::Agent),
+        ThreadRowMarks {
+            last_role: Some(MessageRole::Agent),
+            ..ThreadRowMarks::default()
+        },
     );
     assert!(streamed.contains(r#"data-last-role="agent""#));
 
@@ -2209,8 +2259,10 @@ fn only_streamed_rows_say_who_spoke_last() {
         &channel,
         &thread,
         false,
-        None,
-        Some(MessageRole::Human),
+        ThreadRowMarks {
+            last_role: Some(MessageRole::Human),
+            ..ThreadRowMarks::default()
+        },
     );
     assert!(from_person.contains(r#"data-last-role="human""#));
 }
@@ -2354,6 +2406,130 @@ fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
     // Who wrote it is on the bubble, because only the agent's reply quiets the thread's row.
     assert!(html.contains(r#"data-role="agent""#));
     assert!(inbound_html.contains(r#"data-role="human""#));
+}
+
+/// A message that came in over the internal transport was written by an agent in *another*
+/// channel. Drawing it as this channel's agent would put the wrong name and face on someone else's
+/// work, which is what this pins.
+#[test]
+fn a_message_from_another_channel_is_marked_and_keeps_its_own_sender() {
+    let company = mailbox_company();
+    let thread = mailbox_thread(mailbox_channel(company.id).id);
+    let agent = Agent {
+        avatar_url: Some(AvatarUrl::from("https://example.com/triage.png")),
+        ..settings_agent(company.id, "Triage", "triage")
+    };
+    let scope = MessageScope {
+        company_id: Uuid::new_v4(),
+        channel_id: Uuid::new_v4(),
+    };
+
+    // Inbound *and* agent: only the internal delivery path writes that pair.
+    let delegated = Message {
+        role: MessageRole::Agent,
+        direction: MessageDirection::Inbound,
+        sender: EmailAddress::from("legal@acme.mailagents.test"),
+        ..mailbox_message(thread.id, "Here is the contract review.")
+    };
+    let html = message_bubble_chat(&delegated, Some(&agent), None, scope);
+
+    assert!(html.contains(&icon(Icon::Hubot, BUTTON_ICON)));
+    assert!(html.contains(r#"title="From an agent in another channel""#));
+    // The sending channel's address, not the local agent's name or face.
+    assert!(html.contains("legal@acme.mailagents.test"));
+    assert!(!html.contains("Triage"));
+    assert!(!html.contains("<img"));
+    // Still agent-authored, so the body is rendered as markdown and the row's mark still settles.
+    assert!(html.contains(r#"data-role="agent""#));
+
+    // This channel's own reply is unchanged: the agent's name and face, and no mark.
+    let own_reply = Message {
+        direction: MessageDirection::Outbound,
+        ..delegated.clone()
+    };
+    let own_html = message_bubble_chat(&own_reply, Some(&agent), None, scope);
+    assert!(!own_html.contains(&icon(Icon::Hubot, BUTTON_ICON)));
+    assert!(own_html.contains("Triage"));
+    assert!(own_html.contains(r#"src="https://example.com/triage.png""#));
+
+    // And an ordinary person's message carries no mark either.
+    let from_person = message_bubble_chat(
+        &mailbox_message(thread.id, "The question."),
+        Some(&agent),
+        None,
+        scope,
+    );
+    assert!(!from_person.contains(&icon(Icon::Hubot, BUTTON_ICON)));
+}
+
+/// A thread whose participant is a channel address was opened by that channel's agent delegating
+/// work in -- a platform address reaches `thread_participants` no other way.
+#[test]
+fn a_thread_opened_by_another_channel_is_marked_and_one_from_a_person_is_not() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+
+    let delegated = Thread {
+        participant_emails: vec![EmailAddress::from(format!(
+            "research@acme.{MAILBOX_APP_DOMAIN}"
+        ))],
+        ..mailbox_thread(channel.id)
+    };
+    let row = thread_row_fragment(
+        company.id,
+        &channel,
+        &delegated,
+        false,
+        ThreadRowMarks {
+            from_other_channel: opened_by_another_channel(&delegated, MAILBOX_APP_DOMAIN),
+            ..ThreadRowMarks::default()
+        },
+    );
+    assert!(row.contains(&icon(Icon::Hubot, BUTTON_ICON)));
+    assert!(row.contains(r#"title="Opened by an agent in another channel""#));
+    // The subject still truncates beside the glyph rather than being replaced by it.
+    assert!(row.contains(r#"<span class="truncate font-semibold">Question &lt;script&gt;</span>"#));
+
+    // `mailbox_thread` is a person's, on a domain this platform does not answer for.
+    let from_person = mailbox_thread(channel.id);
+    assert!(!opened_by_another_channel(&from_person, MAILBOX_APP_DOMAIN));
+    assert!(
+        !thread_row_fragment(
+            company.id,
+            &channel,
+            &from_person,
+            false,
+            ThreadRowMarks::default(),
+        )
+        .contains(&icon(Icon::Hubot, BUTTON_ICON))
+    );
+}
+
+/// The column derives the mark itself, so a row rendered with the page says the same thing as one
+/// the stream sends -- the guarantee `a_streamed_thread_row_is_identical_to_one_rendered_with_the_column`
+/// makes for every other mark on the row.
+#[test]
+fn the_column_marks_a_delegated_thread_without_being_told() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let delegated = Thread {
+        participant_emails: vec![EmailAddress::from(format!(
+            "research@acme.{MAILBOX_APP_DOMAIN}"
+        ))],
+        ..mailbox_thread(channel.id)
+    };
+
+    let column = thread_column(&ThreadColumn {
+        company_id: company.id,
+        channel: &channel,
+        app_domain_name: MAILBOX_APP_DOMAIN,
+        threads: std::slice::from_ref(&delegated),
+        next_cursor: None,
+        selected_thread_id: None,
+        activity: no_activity(),
+    });
+
+    assert!(column.contains(&icon(Icon::Hubot, BUTTON_ICON)));
 }
 
 /// An agent's reply is the answer its row's dot was promising, so the row stops repeating it --

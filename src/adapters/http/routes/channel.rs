@@ -1304,6 +1304,7 @@ async fn list_channel_threads_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Html<String>> {
@@ -1328,6 +1329,7 @@ async fn list_channel_threads_page(
     Ok(Html(pages::channel_threads_page(
         &company,
         &channel,
+        &config.app_domain_name,
         &page.threads,
         page.next_cursor.as_deref(),
     )))
@@ -1337,6 +1339,7 @@ async fn list_channel_threads_page(
 async fn list_channel_threads_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
     Query(query): Query<ThreadListQuery>,
@@ -1350,6 +1353,7 @@ async fn list_channel_threads_fragment(
     Ok(Html(pages::channel_thread_list_fragment(
         company_id,
         channel_id,
+        &config.app_domain_name,
         &page.threads,
         page.next_cursor.as_deref(),
         true,
@@ -1640,6 +1644,7 @@ mod tests {
         let threads_page = pages::channel_threads_page(
             &company,
             &channel,
+            "example.com",
             std::slice::from_ref(&thread),
             Some("next_cursor"),
         );
@@ -1649,8 +1654,14 @@ mod tests {
         assert!(threads_page.contains("hx-swap=\"beforeend\""));
         assert!(threads_page.contains("threads/list?cursor=next_cursor"));
 
-        let next_threads =
-            pages::channel_thread_list_fragment(company.id, channel.id, &[thread], None, true);
+        let next_threads = pages::channel_thread_list_fragment(
+            company.id,
+            channel.id,
+            "example.com",
+            &[thread],
+            None,
+            true,
+        );
         assert!(next_threads.contains("hx-swap-oob=\"outerHTML\""));
 
         let edit_html = pages::channel_edit_fragment(&company, "example.com", &channel, &[], true);

@@ -140,6 +140,9 @@ pub struct MailboxPage<'a> {
 pub struct ThreadColumn<'a> {
     pub company_id: Uuid,
     pub channel: &'a Channel,
+    /// Domain the channel addresses are built on, e.g. `mailagents.com` -- what tells a
+    /// participant that is another channel apart from one that is a person.
+    pub app_domain_name: &'a str,
     pub threads: &'a [Thread],
     pub next_cursor: Option<&'a str>,
     pub selected_thread_id: Option<Uuid>,
@@ -809,6 +812,7 @@ pub fn mailbox_page(page: &MailboxPage<'_>) -> String {
         Some(channel) => thread_column(&ThreadColumn {
             company_id: page.company.id,
             channel,
+            app_domain_name: page.app_domain_name,
             threads: page.threads,
             next_cursor: page.next_cursor,
             selected_thread_id: page.selected_thread_id,
@@ -1757,9 +1761,59 @@ fn thread_row(column: &ThreadColumn<'_>, thread: &Thread) -> String {
         column.channel,
         thread,
         column.selected_thread_id == Some(thread.id),
-        column.activity.get(&thread.id).copied(),
-        None,
+        ThreadRowMarks {
+            activity: column.activity.get(&thread.id).copied(),
+            from_other_channel: opened_by_another_channel(thread, column.app_domain_name),
+            ..ThreadRowMarks::default()
+        },
     )
+}
+
+/// Whether another channel's agent opened this thread.
+///
+/// A platform address reaches `thread_participants` only as the sender of an internal message:
+/// [`is_third_party_address`] keeps platform addresses out of the third parties a thread pulls in,
+/// a channel is never a participant of its own thread (self-outreach is rejected), and outbound
+/// recipients are never added at all. So the address form is the whole test, and it needs no
+/// company lookup -- cross-company internal delivery is rejected at ingest.
+///
+/// [`is_third_party_address`]: crate::use_cases::thread::ThreadUseCases
+pub fn opened_by_another_channel(thread: &Thread, app_domain_name: &str) -> bool {
+    thread
+        .participant_emails
+        .iter()
+        .any(|email| parse_platform_address(email, app_domain_name).is_some())
+}
+
+/// The mark on anything that came from another channel in this company.
+///
+/// One helper, so the thread row, the message bubble and the admin thread card cannot drift into
+/// three glyphs for one fact. [`icon`] renders `aria-hidden`, so the wrapper carries the title --
+/// the same arrangement [`thread_activity_mark`] uses.
+pub fn other_channel_glyph(from_other_channel: bool, title: &str) -> String {
+    if !from_other_channel {
+        return String::new();
+    }
+    format!(
+        r##"<span class="shrink-0 leading-none opacity-60" title="{title}">{glyph}</span>"##,
+        title = escape_html_text(title),
+        glyph = icon(Icon::Hubot, BUTTON_ICON),
+    )
+}
+
+/// The marks one thread row carries beyond the thread itself.
+///
+/// A struct rather than three more positional arguments: `Option<ThreadActivity>`,
+/// `Option<MessageRole>` and a `bool` in a row are exactly the arguments a call site can swap
+/// without the compiler noticing.
+#[derive(Clone, Copy, Default)]
+pub struct ThreadRowMarks {
+    /// What this thread is doing. Threads with nothing in flight leave it `None`.
+    pub activity: Option<ThreadActivity>,
+    /// Who spoke last. Only rows arriving over the stream carry this -- see [`thread_row_fragment`].
+    pub last_role: Option<MessageRole>,
+    /// This thread was opened by an agent in another channel.
+    pub from_other_channel: bool,
 }
 
 /// One thread card on its own, for the live column stream.
@@ -1771,8 +1825,7 @@ pub fn thread_row_fragment(
     channel: &Channel,
     thread: &Thread,
     selected: bool,
-    activity: Option<ThreadActivity>,
-    last_role: Option<MessageRole>,
+    marks: ThreadRowMarks,
 ) -> String {
     let participants = if thread.participant_emails.is_empty() {
         "No participants".to_string()
@@ -1791,7 +1844,7 @@ pub fn thread_row_fragment(
                     hx-push-url="/ui?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
                     data-action="select-thread-row">
                     <div class="flex items-baseline justify-between gap-2">
-                        <span class="truncate font-semibold">{subject}</span>
+                        <span class="flex min-w-0 items-center gap-1.5">{channel_glyph}<span class="truncate font-semibold">{subject}</span></span>
                         <span class="flex shrink-0 items-center gap-1.5">
                             <span class="thread-mark text-sm leading-none text-success"></span>
                             {activity_slot}
@@ -1807,10 +1860,14 @@ pub fn thread_row_fragment(
         channel_id = channel_id,
         thread_id = thread.id,
         subject = escape_html_text(&thread.subject),
-        activity_slot = thread_activity_slot(thread.id, activity),
+        channel_glyph = other_channel_glyph(
+            marks.from_other_channel,
+            "Opened by an agent in another channel",
+        ),
+        activity_slot = thread_activity_slot(thread.id, marks.activity),
         // Only rows arriving over the stream carry this: the reply mark means "while you were
         // watching", so a freshly rendered page has nothing to mark and needs no lookup.
-        last_role = match last_role {
+        last_role = match marks.last_role {
             Some(role) => format!(r##" data-last-role="{}""##, role.as_str()),
             None => String::new(),
         },
@@ -1992,6 +2049,11 @@ pub fn message_bubble_chat(
 ) -> String {
     let is_agent =
         message.role == MessageRole::Agent || message.direction == MessageDirection::Outbound;
+    // Written by an agent in *another* channel: an inbound message only carries the agent role
+    // when it came in over the internal delivery path, which validates the sender against its
+    // source channel. Nothing arriving from the wire can reach this combination.
+    let from_other_channel =
+        message.direction == MessageDirection::Inbound && message.role == MessageRole::Agent;
     let is_viewer =
         viewer_email.is_some_and(|email| message.sender.eq_ignore_ascii_case(email.as_ref()));
     let body = if is_agent {
@@ -2006,7 +2068,9 @@ pub fn message_bubble_chat(
         )
     };
 
-    let (writer, avatar_url) = match (is_agent, agent) {
+    // The passed agent is *this* channel's. Attributing a sibling channel's message to it would
+    // put the wrong name and face on work a different agent did, so that one keeps its address.
+    let (writer, avatar_url) = match (is_agent && !from_other_channel, agent) {
         (true, Some(agent)) => (agent.name.as_str(), agent.avatar_url.as_ref()),
         _ => (message.sender.as_str(), None),
     };
@@ -2016,7 +2080,7 @@ pub fn message_bubble_chat(
                 <div class="chat {side}" data-role="{role}">
                     <div class="chat-image">{avatar}</div>
                     <div class="chat-header gap-1 opacity-70">
-                        {writer}
+                        {channel_glyph}{writer}
                         <time class="text-xs opacity-60">{created_at}</time>
                     </div>
                     <div class="chat-bubble {bubble_class} max-w-2xl text-sm">{body}{attachments}</div>
@@ -2028,6 +2092,7 @@ pub fn message_bubble_chat(
         // question its row's activity mark was asking.
         role = if is_agent { "agent" } else { "human" },
         bubble_class = if is_viewer { "chat-bubble-primary" } else { "" },
+        channel_glyph = other_channel_glyph(from_other_channel, "From an agent in another channel"),
         avatar = avatar_bubble(avatar_url, writer, AvatarSize::Row),
         writer = escape_html_text(writer),
         created_at = super::format_date_time(message.created_at),
