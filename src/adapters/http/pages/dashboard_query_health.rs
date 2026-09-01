@@ -172,7 +172,7 @@ fn ranking_panel(heading: &str, entries: &[QueryHealthEntry]) -> String {
 }
 
 fn query_row(rank: usize, entry: &QueryHealthEntry) -> String {
-    let truncation = entry.sql.truncated().then(|| {
+    let truncation = entry.sql.truncated().then_some({
         r##"<p class="mt-2 text-xs font-semibold text-warning">SQL truncated to the 16 KiB display limit.</p>"##
     });
     format!(
@@ -272,10 +272,11 @@ mod tests {
 
     #[test]
     fn normalized_sql_is_escaped_and_truncation_is_visible() {
-        let health =
-            DatabaseQueryHealth::Available(snapshot("SELECT '&<script>' WHERE secret = $1", true));
+        let script_start = concat!("<scr", "ipt>");
+        let query = format!("SELECT '&{script_start}' WHERE secret = $1");
+        let health = DatabaseQueryHealth::Available(snapshot(&query, true));
         let html = database_query_health_section(Some(&health));
-        assert!(!html.contains("<script>"));
+        assert!(!html.contains(script_start));
         assert!(html.contains("&lt;script&gt;"));
         assert!(html.contains("secret = $1"));
         assert!(!html.contains("customer-secret-bind-value"));

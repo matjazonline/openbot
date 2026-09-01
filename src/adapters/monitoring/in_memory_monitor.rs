@@ -155,7 +155,10 @@ impl MonitoringService for InMemoryMonitor {
 
     fn increment_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
         if let Ok(mut lock) = self.custom_counters.write() {
-            *lock.entry(counter_key(name, labels)).or_insert(0) += value;
+            *lock.entry(name.to_string()).or_insert(0) += value;
+            if !labels.is_empty() {
+                *lock.entry(counter_key(name, labels)).or_insert(0) += value;
+            }
         }
     }
 
@@ -263,6 +266,7 @@ mod tests {
             counters["pagination_observed{endpoint=tasks,offset_bucket=1000+}"],
             2
         );
-        assert_eq!(counters.len(), 2);
+        assert_eq!(counters["pagination_observed"], 3);
+        assert_eq!(counters.len(), 3);
     }
 }

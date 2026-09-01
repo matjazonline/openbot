@@ -832,6 +832,67 @@ pub(super) fn chart_footer(note: &str) -> String {
 
 /// This process's own counters, fenced off and labelled so they are not read as system-wide truth.
 pub(super) fn process_panel(process: &ProcessGauges) -> String {
+    let activity = stat_row(
+        "SMTP and model calls",
+        &format!(
+            "{conns}{rejected}{ai}{ai_failed}{tokens}{latency}",
+            conns = stat(Stat::new(
+                "SMTP in",
+                &thousands(process.smtp_total as i64),
+                "connections",
+            )),
+            rejected = stat(Stat::new(
+                "Turned away",
+                &thousands(process.smtp_rejected() as i64),
+                "blocked or rejected",
+            )),
+            ai = stat(Stat::new(
+                "Model calls",
+                &thousands(process.ai_total as i64),
+                "executions",
+            )),
+            ai_failed = stat(
+                Stat::new(
+                    "Model failures",
+                    &thousands(process.ai_failed as i64),
+                    "errored",
+                )
+                .alarming(process.ai_failed > 0)
+            ),
+            tokens = stat(Stat::new(
+                "Tokens",
+                &thousands(process.ai_total_tokens as i64),
+                "since boot",
+            )),
+            latency = stat(Stat::new(
+                "Avg call",
+                &format!("{} ms", process.ai_avg_latency_ms),
+                "mean latency",
+            )),
+        ),
+    );
+    let evidence = stat_row(
+        "Operator evidence signals",
+        &format!(
+            "{tasks}{outbox}{connections}",
+            tasks = stat(Stat::new(
+                "Deep task pages",
+                &thousands(process.deep_task_pagination as i64),
+                "1000+ offset observations since boot",
+            )),
+            outbox = stat(Stat::new(
+                "Deep outbox pages",
+                &thousands(process.deep_outbox_pagination as i64),
+                "1000+ offset observations since boot",
+            )),
+            connections = stat(Stat::new(
+                "Dashboard streams",
+                &thousands(process.active_dashboard_sse_connections as i64),
+                "active now on this process",
+            )),
+        ),
+    );
+    let rows = format!("{activity}{evidence}");
     format!(
         r##"
         <div>
@@ -843,69 +904,7 @@ pub(super) fn process_panel(process: &ProcessGauges) -> String {
             {row}
         </div>
         "##,
-        row = format!(
-            "{}{}",
-            stat_row(
-                "SMTP and model calls",
-                &format!(
-                    "{conns}{rejected}{ai}{ai_failed}{tokens}{latency}",
-                    conns = stat(Stat::new(
-                        "SMTP in",
-                        &thousands(process.smtp_total as i64),
-                        "connections",
-                    )),
-                    rejected = stat(Stat::new(
-                        "Turned away",
-                        &thousands(process.smtp_rejected() as i64),
-                        "blocked or rejected",
-                    )),
-                    ai = stat(Stat::new(
-                        "Model calls",
-                        &thousands(process.ai_total as i64),
-                        "executions",
-                    )),
-                    ai_failed = stat(
-                        Stat::new(
-                            "Model failures",
-                            &thousands(process.ai_failed as i64),
-                            "errored",
-                        )
-                        .alarming(process.ai_failed > 0)
-                    ),
-                    tokens = stat(Stat::new(
-                        "Tokens",
-                        &thousands(process.ai_total_tokens as i64),
-                        "since boot",
-                    )),
-                    latency = stat(Stat::new(
-                        "Avg call",
-                        &format!("{} ms", process.ai_avg_latency_ms),
-                        "mean latency",
-                    )),
-                ),
-            ),
-            stat_row(
-                "Operator evidence signals",
-                &format!(
-                    "{tasks}{outbox}{connections}",
-                    tasks = stat(Stat::new(
-                        "Deep task pages",
-                        &thousands(process.deep_task_pagination as i64),
-                        "1000+ offset observations since boot",
-                    )),
-                    outbox = stat(Stat::new(
-                        "Deep outbox pages",
-                        &thousands(process.deep_outbox_pagination as i64),
-                        "1000+ offset observations since boot",
-                    )),
-                    connections = stat(Stat::new(
-                        "Dashboard streams",
-                        &thousands(process.active_dashboard_sse_connections as i64),
-                        "active now on this process",
-                    )),
-                ),
-            ),
-        ),
+        row = rows,
     )
 }
 
