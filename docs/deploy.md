@@ -111,7 +111,9 @@ fly secrets set \
   DATABASE_URL="postgres://mail_agents:<POSTGRES_PASSWORD>@mail-agents-db.internal:5432/mail_agents" \
   JWT_SECRET="<random-64-chars>" \
   SMTP_USERNAME="<relay-user>" \
-  SMTP_PASSWORD="<relay-password>"
+  SMTP_PASSWORD="<relay-password>" \
+  CREDENTIAL_ENCRYPTION_KEYS="1:<base64-32-byte-key>" \
+  CREDENTIAL_ENCRYPTION_ACTIVE_VERSION="1"
 
 fly deploy
 ```
@@ -132,16 +134,73 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 | `SMTP_HOST` / `SMTP_FROM_ADDRESS` | Outbound TLS relay and sender; when both are configured with a non-local host, new accounts must confirm a six-digit code sent by email. Remote relay certificates are validated. If outbound SMTP is not configured, registration skips confirmation. |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Optional Google registration/login. Set both and register `https://<APP_DOMAIN_NAME>/auth/google/callback` as an authorized redirect URI in Google Cloud. |
 | `APPLE_OAUTH_CLIENT_ID` / `APPLE_OAUTH_TEAM_ID` / `APPLE_OAUTH_KEY_ID` / `APPLE_OAUTH_PRIVATE_KEY_BASE64` | Optional Sign in with Apple. Set all four, use the Services ID as the client ID, base64-encode the `.p8` private key, and register `https://<APP_DOMAIN_NAME>/auth/apple/callback` as the return URL. Apple requires a real HTTPS domain and does not accept localhost. Register the outbound mail domain and sender with Apple's private email relay so confirmation codes reach relay addresses. |
-| `CREDENTIAL_ENCRYPTION_KEYS` | Versioned AES-256-GCM keys (`1:<base64-32-bytes>,2:<base64-32-bytes>`). Keep prior versions during rotation; the highest version is active. |
+| `CREDENTIAL_ENCRYPTION_KEYS` | Versioned AES-256-GCM keys (`1:<base64-32-bytes>,2:<base64-32-bytes>`). This is the read key ring; keep prior versions during rotation. |
+| `CREDENTIAL_ENCRYPTION_ACTIVE_VERSION` | Positive version in `CREDENTIAL_ENCRYPTION_KEYS` used for new writes. It is intentionally independent of the highest readable version. |
 | `HYDRA_DB_API_KEY` | Optional deployment-wide HydraDB credential. Set with all three `HYDRA_DB_*` settings below or leave all four absent. |
 | `HINDSIGHT_API_KEY` | Optional deployment-wide Hindsight credential. Set with all three `HINDSIGHT_*` settings below or leave all four absent. |
 | `GCS_SERVICE_ACCOUNT_JSON_BASE64` | The Cloud Storage service account key, base64-encoded — see [Picture uploads](#picture-uploads) |
 
-Credential encryption keys are rotated additively: append a higher version, deploy, and let startup
-re-encrypt stored provider credentials before removing the old version in a later deploy. After the
-first encrypted deployment, rotate the credentials themselves with each model provider and save the
-replacement values through the application; database encryption limits storage exposure but cannot
-invalidate provider keys that may already have been copied from an older dump.
+Startup validates both credential-encryption settings but never mutates stored credentials. Use the
+explicit operational commands below to inspect or rotate rows. After the first encrypted deployment,
+rotate the credentials themselves with each model provider and save the replacement values through
+the application; database encryption limits storage exposure but cannot invalidate provider keys
+that may already have been copied from an older dump.
+
+### Multi-Machine credential-key rotation
+
+Never replace bytes under an existing version number: authenticated decryption of data written with
+the earlier bytes will fail. Escrow every key version in the deployment's designated secret manager;
+Fly secret values cannot be retrieved later. Restore operations must restore the key versions needed
+by the selected database backup.
+
+For a version 1 to version 2 rotation, keep both versions through two separate rolling deployments:
+
+1. Back up/escrow both key versions and verify the current database:
+
+   ```sh
+   fly ssh console --app mail-agents-server \
+     --command "/app/mail_agents credentials status --require-version 1"
+   ```
+
+2. **Distribute** version 2 without activating it. Set
+   `CREDENTIAL_ENCRYPTION_KEYS=1:OLD,2:NEW` and keep
+   `CREDENTIAL_ENCRYPTION_ACTIVE_VERSION=1`, then finish the rolling deployment. Abort if any
+   Machine is unhealthy or remains on the earlier release.
+3. **Activate** version 2 in a second rolling deployment, without removing version 1. Wait until no
+   active-version-1 Machine remains.
+4. **Converge** and require database-backed proof:
+
+   ```sh
+   fly ssh console --app mail-agents-server \
+     --command "/app/mail_agents credentials rotate"
+   fly ssh console --app mail-agents-server \
+     --command "/app/mail_agents credentials status --require-version 2"
+   ```
+
+   Output is JSON containing versions and counts only. `status` exits nonzero for malformed or
+   unavailable envelopes or failed `--require-version`; `rotate` exits nonzero on lock contention,
+   invalid data, database errors, or incomplete convergence.
+5. Retain version 1 for the documented backup/recovery window and record the decision. Before
+   retirement, repeat status and confirm that no old Machine, old-version row, malformed envelope,
+   unavailable version, or backup requiring version 1 remains.
+6. Remove version 1, complete the rolling deployment, and run status once more.
+
+`scripts/credential-key-rotation.sh` performs these checks and rollouts in order. It requires a
+key ring containing both versions in `CREDENTIAL_ENCRYPTION_KEYS` and uses `jq` to verify every
+Machine is started, healthy, and on the same image:
+
+```sh
+CREDENTIAL_ENCRYPTION_KEYS='1:OLD,2:NEW' \
+  scripts/credential-key-rotation.sh 1 2
+```
+
+After the retention window, retirement is a separate invocation and requires both the retained
+key ring and an explicit recovery decision:
+
+```sh
+RETAINED_CREDENTIAL_ENCRYPTION_KEYS='2:NEW' \
+  scripts/credential-key-rotation.sh 1 2 --retire --backup-retention-confirmed
+```
 
 Non-secret settings live in the `[env]` block of `fly.toml`. `.env.example`
 documents the full set.

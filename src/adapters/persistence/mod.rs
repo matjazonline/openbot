@@ -9,6 +9,7 @@ pub mod approval;
 pub mod channel;
 pub mod company;
 pub mod company_invite;
+pub mod credential_rotation;
 pub mod credentials;
 pub mod dashboard;
 pub mod database_query_health;
@@ -71,40 +72,6 @@ impl PostgresPersistence {
                 None => Ok(value),
             })
             .transpose()
-    }
-
-    /// Encrypts legacy plaintext and re-wraps values written with an older configured key.
-    pub async fn rotate_credentials(&self) -> Result<u64, AppError> {
-        let Some(cipher) = &self.credential_cipher else {
-            return Ok(0);
-        };
-        let mut rotated = 0;
-        let model_connections: Vec<(uuid::Uuid, String, String)> =
-            sqlx::query_as("SELECT company_id, provider, api_key FROM company_model_connections")
-                .fetch_all(&self.pool)
-                .await
-                .map_err(AppError::from)?;
-        for (company_id, provider, stored) in model_connections {
-            if !cipher.needs_rotation(&stored) {
-                continue;
-            }
-            let plaintext = cipher.decrypt(&stored)?;
-            let encrypted = cipher.encrypt(&plaintext)?;
-            rotated += sqlx::query(
-                r#"UPDATE company_model_connections
-                   SET api_key = $3, updated_at = CURRENT_TIMESTAMP
-                   WHERE company_id = $1 AND provider = $2 AND api_key = $4"#,
-            )
-            .bind(company_id)
-            .bind(provider)
-            .bind(encrypted)
-            .bind(stored)
-            .execute(&self.pool)
-            .await
-            .map_err(AppError::from)?
-            .rows_affected();
-        }
-        Ok(rotated)
     }
 }
 

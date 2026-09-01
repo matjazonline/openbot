@@ -17,7 +17,7 @@ enum DrainOutcome {
 }
 
 use mail_agents::{
-    adapters::smtp::SmtpServer,
+    adapters::{persistence::PostgresPersistence, smtp::SmtpServer},
     infra::{
         app::create_app,
         config::{
@@ -25,6 +25,7 @@ use mail_agents::{
             task_worker_concurrency_from_env,
         },
         events::run_mailbox_event_listener,
+        postgres_persistence,
         runtime_metrics::LinuxRuntimeMetricSource,
         setup::{init_app_state, init_tracing},
     },
@@ -34,17 +35,115 @@ use mail_agents::{
     },
 };
 
+#[derive(Debug, PartialEq, Eq)]
+enum ProcessCommand {
+    Serve,
+    CredentialStatus { required_version: Option<u32> },
+    CredentialRotate,
+    Help,
+}
+
 /// Build the runtime by hand rather than through `#[tokio::main]`, which offers no way to widen
 /// the worker stacks -- see `DEFAULT_RUNTIME_THREAD_STACK_BYTES` for why 2 MiB is not enough here.
 fn main() -> anyhow::Result<()> {
     dotenv().ok();
     init_tracing();
+    match parse_process_command(std::env::args().skip(1))? {
+        ProcessCommand::Serve => tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .thread_stack_size(runtime_thread_stack_bytes_from_env())
+            .build()?
+            .block_on(serve()),
+        ProcessCommand::CredentialStatus { required_version } => {
+            operational_runtime()?.block_on(run_credential_status(required_version))
+        }
+        ProcessCommand::CredentialRotate => {
+            operational_runtime()?.block_on(run_credential_rotation())
+        }
+        ProcessCommand::Help => {
+            println!("{}", command_usage());
+            Ok(())
+        }
+    }
+}
 
-    tokio::runtime::Builder::new_multi_thread()
+fn operational_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
+    Ok(tokio::runtime::Builder::new_current_thread()
         .enable_all()
-        .thread_stack_size(runtime_thread_stack_bytes_from_env())
-        .build()?
-        .block_on(serve())
+        .build()?)
+}
+
+fn parse_process_command(args: impl IntoIterator<Item = String>) -> anyhow::Result<ProcessCommand> {
+    let args = args.into_iter().collect::<Vec<_>>();
+    match args.as_slice() {
+        [] => Ok(ProcessCommand::Serve),
+        [help] if help == "--help" || help == "-h" => Ok(ProcessCommand::Help),
+        [credentials, status] if credentials == "credentials" && status == "status" => {
+            Ok(ProcessCommand::CredentialStatus {
+                required_version: None,
+            })
+        }
+        [credentials, status, require, version]
+            if credentials == "credentials"
+                && status == "status"
+                && require == "--require-version" =>
+        {
+            let required_version = parse_required_version(version)?;
+            Ok(ProcessCommand::CredentialStatus {
+                required_version: Some(required_version),
+            })
+        }
+        [credentials, rotate] if credentials == "credentials" && rotate == "rotate" => {
+            Ok(ProcessCommand::CredentialRotate)
+        }
+        _ => anyhow::bail!("Invalid command.\n\n{}", command_usage()),
+    }
+}
+
+fn parse_required_version(value: &str) -> anyhow::Result<u32> {
+    let version = value
+        .parse::<u32>()
+        .map_err(|_| anyhow::anyhow!("--require-version must be a positive integer"))?;
+    if version == 0 {
+        anyhow::bail!("--require-version must be a positive integer");
+    }
+    Ok(version)
+}
+
+fn command_usage() -> &'static str {
+    "Usage:\n  mail_agents\n  mail_agents credentials status [--require-version <N>]\n  mail_agents credentials rotate"
+}
+
+async fn run_credential_status(required_version: Option<u32>) -> anyhow::Result<()> {
+    let persistence = postgres_persistence().await?;
+    let status = persistence.credential_status().await?;
+    println!("{}", serde_json::to_string(&status)?);
+    ensure_credential_status(&status, required_version)
+}
+
+fn ensure_credential_status(
+    status: &mail_agents::adapters::persistence::credential_rotation::CredentialStatus,
+    required_version: Option<u32>,
+) -> anyhow::Result<()> {
+    if !status.is_valid() {
+        anyhow::bail!("Credential status found malformed or unavailable rows");
+    }
+    if let Some(required_version) = required_version
+        && !status.satisfies_required_version(required_version)
+    {
+        anyhow::bail!("Credential rows have not converged on required version {required_version}");
+    }
+    Ok(())
+}
+
+async fn run_credential_rotation() -> anyhow::Result<()> {
+    let persistence: PostgresPersistence = postgres_persistence().await?;
+    let report = persistence.rotate_credentials().await?;
+    println!("{}", serde_json::to_string(&report)?);
+    if !report.complete {
+        anyhow::bail!("Credential rotation did not converge");
+    }
+    Ok(())
 }
 
 async fn serve() -> anyhow::Result<()> {
@@ -223,6 +322,46 @@ mod tests {
     use super::*;
     use std::future::pending;
     use tokio::time::Instant;
+
+    #[test]
+    fn operational_commands_are_parsed_before_server_startup() {
+        assert_eq!(
+            parse_process_command(["credentials".into(), "status".into()]).unwrap(),
+            ProcessCommand::CredentialStatus {
+                required_version: None
+            }
+        );
+        assert_eq!(
+            parse_process_command([
+                "credentials".into(),
+                "status".into(),
+                "--require-version".into(),
+                "2".into(),
+            ])
+            .unwrap(),
+            ProcessCommand::CredentialStatus {
+                required_version: Some(2)
+            }
+        );
+        assert_eq!(
+            parse_process_command(["credentials".into(), "rotate".into()]).unwrap(),
+            ProcessCommand::CredentialRotate
+        );
+    }
+
+    #[test]
+    fn operational_command_rejects_zero_and_unknown_arguments() {
+        assert!(
+            parse_process_command([
+                "credentials".into(),
+                "status".into(),
+                "--require-version".into(),
+                "0".into(),
+            ])
+            .is_err()
+        );
+        assert!(parse_process_command(["credentials".into(), "unknown".into()]).is_err());
+    }
 
     #[tokio::test(start_paused = true)]
     async fn drain_deadline_expires_when_no_second_interrupt_arrives() {

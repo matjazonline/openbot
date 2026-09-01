@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use base64::{Engine, engine::general_purpose::STANDARD_NO_PAD};
+use base64::{
+    Engine,
+    engine::general_purpose::{STANDARD, STANDARD_NO_PAD},
+};
 use ring::{
     aead::{AES_256_GCM, Aad, LessSafeKey, Nonce, UnboundKey},
     rand::{SecureRandom, SystemRandom},
@@ -9,6 +12,8 @@ use ring::{
 use crate::app_error::{AppError, AppResult};
 
 const PREFIX: &str = "enc:v1";
+const KEYS_ENV: &str = "CREDENTIAL_ENCRYPTION_KEYS";
+const ACTIVE_VERSION_ENV: &str = "CREDENTIAL_ENCRYPTION_ACTIVE_VERSION";
 
 pub struct CredentialCipher {
     active_version: u32,
@@ -16,31 +21,54 @@ pub struct CredentialCipher {
     random: SystemRandom,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CredentialState {
+    Active { version: u32 },
+    Old { version: u32 },
+    Unavailable { version: u32 },
+    Malformed,
+}
+
+struct CredentialEnvelope {
+    version: u32,
+    nonce: [u8; 12],
+    ciphertext: Vec<u8>,
+}
+
 impl CredentialCipher {
     pub fn from_env() -> AppResult<Self> {
-        let encoded = std::env::var("CREDENTIAL_ENCRYPTION_KEYS").map_err(|_| {
-            AppError::Internal(
-                "CREDENTIAL_ENCRYPTION_KEYS must contain version:base64-key entries".into(),
-            )
+        let encoded = std::env::var(KEYS_ENV).map_err(|_| {
+            AppError::Internal(format!(
+                "{KEYS_ENV} must contain version:base64-key entries"
+            ))
         })?;
-        Self::parse(&encoded)
+        let active_version = std::env::var(ACTIVE_VERSION_ENV).map_err(|_| {
+            AppError::Internal(format!(
+                "{ACTIVE_VERSION_ENV} must name a configured positive key version"
+            ))
+        })?;
+        Self::parse(&encoded, &active_version)
     }
 
-    fn parse(encoded: &str) -> AppResult<Self> {
+    fn parse(encoded: &str, active_version: &str) -> AppResult<Self> {
+        let active_version = parse_positive_version(active_version, ACTIVE_VERSION_ENV)?;
         let mut keys = HashMap::new();
-        for entry in encoded
-            .split(',')
-            .map(str::trim)
-            .filter(|entry| !entry.is_empty())
-        {
-            let (version, key) = entry.split_once(':').ok_or_else(|| {
+        if encoded.trim().is_empty() {
+            return Err(AppError::Internal(format!("{KEYS_ENV} contains no keys")));
+        }
+
+        for entry in encoded.split(',') {
+            let entry = entry.trim();
+            if entry.is_empty() {
+                return Err(AppError::Internal(format!(
+                    "{KEYS_ENV} contains an empty key entry"
+                )));
+            }
+            let (version, encoded_key) = entry.split_once(':').ok_or_else(|| {
                 AppError::Internal("Credential key entries must be version:base64-key".into())
             })?;
-            let version = version.parse::<u32>().map_err(|_| {
-                AppError::Internal("Credential key version must be an integer".into())
-            })?;
-            let bytes = STANDARD_NO_PAD
-                .decode(key)
+            let version = parse_positive_version(version, "Credential key version")?;
+            let bytes = decode_base64(encoded_key)
                 .map_err(|_| AppError::Internal("Credential key must be base64".into()))?;
             let key = UnboundKey::new(&AES_256_GCM, &bytes).map_err(|_| {
                 AppError::Internal("Credential encryption keys must be 32 bytes".into())
@@ -51,9 +79,11 @@ impl CredentialCipher {
                 ));
             }
         }
-        let active_version = keys.keys().copied().max().ok_or_else(|| {
-            AppError::Internal("CREDENTIAL_ENCRYPTION_KEYS contains no keys".into())
-        })?;
+        if !keys.contains_key(&active_version) {
+            return Err(AppError::Internal(format!(
+                "{ACTIVE_VERSION_ENV} must refer to a version present in {KEYS_ENV}"
+            )));
+        }
         Ok(Self {
             active_version,
             keys,
@@ -63,8 +93,28 @@ impl CredentialCipher {
 
     #[cfg(test)]
     pub(crate) fn for_test() -> Self {
-        Self::parse(&format!("1:{}", STANDARD_NO_PAD.encode([42_u8; 32])))
-            .expect("the fixed test credential key is valid")
+        Self::for_test_with_keys(&[(1, [42_u8; 32])], 1)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test_with_keys(keys: &[(u32, [u8; 32])], active_version: u32) -> Self {
+        let encoded = keys
+            .iter()
+            .map(|(version, key)| format!("{version}:{}", STANDARD_NO_PAD.encode(key)))
+            .collect::<Vec<_>>()
+            .join(",");
+        Self::parse(&encoded, &active_version.to_string())
+            .expect("the fixed test credential key ring is valid")
+    }
+
+    pub fn active_version(&self) -> u32 {
+        self.active_version
+    }
+
+    pub fn available_versions(&self) -> Vec<u32> {
+        let mut versions = self.keys.keys().copied().collect::<Vec<_>>();
+        versions.sort_unstable();
+        versions
     }
 
     pub fn encrypt(&self, plaintext: &str) -> AppResult<String> {
@@ -92,31 +142,42 @@ impl CredentialCipher {
         if !stored.starts_with("enc:") {
             return Ok(stored.to_string());
         }
-        let mut parts = stored.split(':');
-        let valid_prefix = parts.next() == Some("enc") && parts.next() == Some("v1");
-        let version = parts.next().and_then(|value| value.parse::<u32>().ok());
-        let nonce = parts
-            .next()
-            .and_then(|value| STANDARD_NO_PAD.decode(value).ok());
-        let ciphertext = parts
-            .next()
-            .and_then(|value| STANDARD_NO_PAD.decode(value).ok());
-        if !valid_prefix || parts.next().is_some() {
-            return Err(AppError::Internal("Malformed encrypted credential".into()));
+        self.decrypt_parsed(parse_envelope(stored)?)
+    }
+
+    pub(crate) fn inspect(&self, stored: &str) -> CredentialState {
+        let Ok(envelope) = parse_envelope(stored) else {
+            return CredentialState::Malformed;
+        };
+        let version = envelope.version;
+        if !self.keys.contains_key(&version) {
+            return CredentialState::Unavailable { version };
         }
-        let version =
-            version.ok_or_else(|| AppError::Internal("Malformed credential version".into()))?;
-        let key = self.keys.get(&version).ok_or_else(|| {
-            AppError::Internal(format!("Credential key version {version} is unavailable"))
+        if self.decrypt_parsed(envelope).is_err() {
+            return CredentialState::Malformed;
+        }
+        if version == self.active_version {
+            CredentialState::Active { version }
+        } else {
+            CredentialState::Old { version }
+        }
+    }
+
+    pub(crate) fn decrypt_envelope(&self, stored: &str) -> AppResult<String> {
+        self.decrypt_parsed(parse_envelope(stored)?)
+    }
+
+    fn decrypt_parsed(&self, envelope: CredentialEnvelope) -> AppResult<String> {
+        let key = self.keys.get(&envelope.version).ok_or_else(|| {
+            AppError::Internal(format!(
+                "Credential key version {} is unavailable",
+                envelope.version
+            ))
         })?;
-        let nonce: [u8; 12] = nonce
-            .and_then(|bytes| bytes.try_into().ok())
-            .ok_or_else(|| AppError::Internal("Malformed credential nonce".into()))?;
-        let mut ciphertext = ciphertext
-            .ok_or_else(|| AppError::Internal("Malformed credential ciphertext".into()))?;
+        let mut ciphertext = envelope.ciphertext;
         let plaintext = key
             .open_in_place(
-                Nonce::assume_unique_for_key(nonce),
+                Nonce::assume_unique_for_key(envelope.nonce),
                 Aad::empty(),
                 &mut ciphertext,
             )
@@ -124,25 +185,132 @@ impl CredentialCipher {
         String::from_utf8(plaintext.to_vec())
             .map_err(|_| AppError::Internal("Decrypted credential is not UTF-8".into()))
     }
+}
 
-    pub fn needs_rotation(&self, stored: &str) -> bool {
-        !stored.starts_with(&format!("{PREFIX}:{}:", self.active_version))
+fn parse_positive_version(value: &str, name: &str) -> AppResult<u32> {
+    let version = value
+        .trim()
+        .parse::<u32>()
+        .map_err(|_| AppError::Internal(format!("{name} must be a positive integer")))?;
+    if version == 0 {
+        return Err(AppError::Internal(format!(
+            "{name} must be a positive integer"
+        )));
     }
+    Ok(version)
+}
+
+fn decode_base64(value: &str) -> Result<Vec<u8>, base64::DecodeError> {
+    STANDARD
+        .decode(value)
+        .or_else(|_| STANDARD_NO_PAD.decode(value))
+}
+
+fn parse_envelope(stored: &str) -> AppResult<CredentialEnvelope> {
+    let mut parts = stored.split(':');
+    let valid_prefix = parts.next() == Some("enc") && parts.next() == Some("v1");
+    let version = parts.next().and_then(|value| value.parse::<u32>().ok());
+    let nonce = parts.next().and_then(|value| decode_base64(value).ok());
+    let ciphertext = parts.next().and_then(|value| decode_base64(value).ok());
+    if !valid_prefix || parts.next().is_some() {
+        return Err(AppError::Internal("Malformed encrypted credential".into()));
+    }
+    let version = version
+        .filter(|version| *version > 0)
+        .ok_or_else(|| AppError::Internal("Malformed credential version".into()))?;
+    let nonce = nonce
+        .and_then(|bytes| bytes.try_into().ok())
+        .ok_or_else(|| AppError::Internal("Malformed credential nonce".into()))?;
+    let ciphertext = ciphertext
+        .filter(|bytes| bytes.len() >= AES_256_GCM.tag_len())
+        .ok_or_else(|| AppError::Internal("Malformed credential ciphertext".into()))?;
+    Ok(CredentialEnvelope {
+        version,
+        nonce,
+        ciphertext,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn encoded_key(byte: u8) -> String {
+        STANDARD_NO_PAD.encode([byte; 32])
+    }
+
     #[test]
-    fn ciphertext_round_trips_and_old_versions_can_rotate() {
-        let first = STANDARD_NO_PAD.encode([7_u8; 32]);
-        let second = STANDARD_NO_PAD.encode([8_u8; 32]);
-        let old = CredentialCipher::parse(&format!("1:{first}")).unwrap();
-        let ciphertext = old.encrypt("sk-secret").unwrap();
-        let rotating = CredentialCipher::parse(&format!("1:{first},2:{second}")).unwrap();
-        assert_eq!(rotating.decrypt(&ciphertext).unwrap(), "sk-secret");
-        assert!(rotating.needs_rotation(&ciphertext));
-        assert_ne!(ciphertext, rotating.encrypt("sk-secret").unwrap());
+    fn explicit_active_version_is_required_and_must_be_available() {
+        let key = encoded_key(7);
+        assert!(CredentialCipher::parse(&format!("1:{key}"), "").is_err());
+        assert!(CredentialCipher::parse(&format!("1:{key}"), "0").is_err());
+        assert!(CredentialCipher::parse(&format!("1:{key}"), "2").is_err());
+        assert!(CredentialCipher::parse(&format!("0:{key}"), "0").is_err());
+    }
+
+    #[test]
+    fn adding_a_higher_key_does_not_activate_it() {
+        let cipher =
+            CredentialCipher::parse(&format!("1:{},2:{}", encoded_key(7), encoded_key(8)), "1")
+                .unwrap();
+
+        assert_eq!(cipher.active_version(), 1);
+        assert!(cipher.encrypt("secret").unwrap().starts_with("enc:v1:1:"));
+    }
+
+    #[test]
+    fn machines_on_either_active_version_decrypt_both_versions() {
+        let keys = [(1, [7_u8; 32]), (2, [8_u8; 32])];
+        let old_writer = CredentialCipher::for_test_with_keys(&keys, 1);
+        let new_writer = CredentialCipher::for_test_with_keys(&keys, 2);
+        let old_ciphertext = old_writer.encrypt("old-write").unwrap();
+        let new_ciphertext = new_writer.encrypt("new-write").unwrap();
+
+        assert_eq!(old_writer.decrypt(&new_ciphertext).unwrap(), "new-write");
+        assert_eq!(new_writer.decrypt(&old_ciphertext).unwrap(), "old-write");
+    }
+
+    #[test]
+    fn reusing_a_version_with_different_key_bytes_cannot_decrypt_existing_data() {
+        let original = CredentialCipher::for_test_with_keys(&[(1, [7_u8; 32])], 1);
+        let ciphertext = original.encrypt("secret").unwrap();
+        let replacement = CredentialCipher::for_test_with_keys(&[(1, [8_u8; 32])], 1);
+
+        assert!(replacement.decrypt(&ciphertext).is_err());
+        assert_eq!(replacement.inspect(&ciphertext), CredentialState::Malformed);
+    }
+
+    #[test]
+    fn inspection_authenticates_and_categorizes_without_returning_values() {
+        let old = CredentialCipher::for_test_with_keys(&[(1, [7_u8; 32])], 1);
+        let old_ciphertext = old.encrypt("secret").unwrap();
+        let rotating = CredentialCipher::for_test_with_keys(&[(1, [7_u8; 32]), (2, [8_u8; 32])], 2);
+        let unavailable = old_ciphertext.replacen("enc:v1:1:", "enc:v1:3:", 1);
+
+        assert_eq!(
+            rotating.inspect(&old_ciphertext),
+            CredentialState::Old { version: 1 }
+        );
+        assert_eq!(
+            rotating.inspect(&rotating.encrypt("secret").unwrap()),
+            CredentialState::Active { version: 2 }
+        );
+        assert_eq!(
+            rotating.inspect(&unavailable),
+            CredentialState::Unavailable { version: 3 }
+        );
+        assert_eq!(rotating.inspect("plaintext"), CredentialState::Malformed);
+        assert_eq!(
+            rotating.inspect("enc:v1:2:not-a-nonce:not-ciphertext"),
+            CredentialState::Malformed
+        );
+    }
+
+    #[test]
+    fn duplicate_and_empty_key_entries_are_rejected() {
+        let key = encoded_key(7);
+        assert!(CredentialCipher::parse(&format!("1:{key},1:{key}"), "1").is_err());
+        assert!(CredentialCipher::parse(&format!("1:{key},"), "1").is_err());
+        assert!(CredentialCipher::parse("", "1").is_err());
     }
 }

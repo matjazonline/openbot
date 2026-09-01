@@ -5,6 +5,7 @@ use crate::{
     },
     infra::db::init_db,
 };
+use tracing::info;
 
 pub mod app;
 pub mod config;
@@ -15,10 +16,16 @@ pub mod setup;
 
 pub async fn postgres_persistence() -> anyhow::Result<PostgresPersistence> {
     let pool = init_db().await?;
-    let persistence =
-        PostgresPersistence::with_credential_cipher(pool, CredentialCipher::from_env()?);
-    persistence.rotate_credentials().await?;
-    Ok(persistence)
+    let credential_cipher = CredentialCipher::from_env()?;
+    info!(
+        active_version = credential_cipher.active_version(),
+        available_versions = ?credential_cipher.available_versions(),
+        "Credential encryption configuration validated"
+    );
+    Ok(PostgresPersistence::with_credential_cipher(
+        pool,
+        credential_cipher,
+    ))
 }
 
 pub fn argon2_password_hasher() -> ArgonPasswordHasher {

@@ -13,7 +13,7 @@
 # POSTGRES_PASSWORD, before deploying; for the app target it creates the
 # mail-agents-server app, allocates a dedicated IPv4 (required for inbound
 # SMTP on port 25), and prompts for its secrets (DATABASE_URL, JWT_SECRET,
-# SMTP_USERNAME/PASSWORD) before deploying. It's a no-op
+# SMTP_USERNAME/PASSWORD and credential-encryption keys) before deploying. It's a no-op
 # (skipped with a message) once the app already exists, so it's safe to
 # leave on. Remember to edit fly.toml (APP_DOMAIN_NAME,
 # CORS_ALLOWED_ORIGINS, primary_region) before the app's first deploy; see
@@ -96,8 +96,9 @@ bootstrap_app() {
   fi
 
   echo "==> Generating JWT_SECRET"
-  local jwt_secret
+  local jwt_secret credential_key
   jwt_secret="$(openssl rand -base64 48)"
+  credential_key="$(openssl rand -base64 32 | tr -d '\n')"
 
   local smtp_username smtp_password
   read -rp "SMTP relay username: " smtp_username
@@ -110,10 +111,34 @@ bootstrap_app() {
     "JWT_SECRET=$jwt_secret"
     "SMTP_USERNAME=$smtp_username"
     "SMTP_PASSWORD=$smtp_password"
+    "CREDENTIAL_ENCRYPTION_KEYS=1:$credential_key"
+    "CREDENTIAL_ENCRYPTION_ACTIVE_VERSION=1"
   )
   fly secrets set "${secrets_args[@]}" --app mail-agents-server
 
   echo "==> Before deploying, edit fly.toml: APP_DOMAIN_NAME, CORS_ALLOWED_ORIGINS, primary_region"
+}
+
+validate_app_secrets() {
+  local secret_list
+  if ! secret_list="$(fly secrets list --app mail-agents-server --json)"; then
+    echo "Unable to inspect mail-agents-server secrets; refusing to deploy." >&2
+    exit 1
+  fi
+  secret_list="$(printf '%s' "$secret_list" | tr -d '[:space:]')"
+
+  local missing=()
+  local required
+  for required in DATABASE_URL JWT_SECRET CREDENTIAL_ENCRYPTION_KEYS CREDENTIAL_ENCRYPTION_ACTIVE_VERSION; do
+    if [[ "$secret_list" != *"\"Name\":\"$required\""* && "$secret_list" != *"\"name\":\"$required\""* ]]; then
+      missing+=("$required")
+    fi
+  done
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "mail-agents-server is missing required secret names: ${missing[*]}" >&2
+    echo "Set them with 'fly secrets set' before deploying. Secret values cannot be recovered from Fly." >&2
+    exit 1
+  fi
 }
 
 deploy_db() {
@@ -128,6 +153,9 @@ deploy_app() {
   if [[ "$BOOTSTRAP" == true ]]; then
     bootstrap_app
   fi
+
+  echo "==> Verifying required production secret names"
+  validate_app_secrets
 
   echo "==> Verifying .sqlx/ is up to date (offline build check)"
   (cd "$ROOT_DIR" && env -u DATABASE_URL SQLX_OFFLINE=true cargo check --locked) || {

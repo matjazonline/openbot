@@ -38,6 +38,10 @@ jobs:
         run: npm ci
       - name: Generated CSS is current
         run: npm run check:css
+      - name: Deployment script tests
+        run: |
+          scripts/tests/deploy.sh
+          scripts/tests/credential-key-rotation.sh
       - name: Formatting
         run: cargo fmt --all -- --check
       - name: Offline compilation

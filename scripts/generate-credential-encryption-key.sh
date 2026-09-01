@@ -7,3 +7,4 @@ set -euo pipefail
 key="$(openssl rand -base64 32 | tr -d '=\n')"
 
 printf 'CREDENTIAL_ENCRYPTION_KEYS=1:%s\n' "$key"
+printf 'CREDENTIAL_ENCRYPTION_ACTIVE_VERSION=1\n'
