@@ -312,6 +312,11 @@ Inbound Email (SMTP / Webhook)
 - **Compose (New Thread):** Enabled only once a channel is selected. The composed message is fed through the normal inbound path addressed to `channel-slug@company-slug.domain` as the signed-in user, so participant rules, spam checks and agents apply unchanged. The "deliver agent reply by email" toggle selects `SimulationMode::Run` (real dispatch) over the default `RunTest` (in-app only); a rejected message re-renders the form with the channel's rejection reason.
 - **Coexistence:** All existing pages (channels, agents, tasks, simulator) are untouched and reachable from the icon rail; the mailbox is an additional read/compose surface over the same use cases.
 
+### 3.10 Credential Encryption & Rotation
+- **Versioned encryption:** Provider credentials use versioned AES-256-GCM keys. `CREDENTIAL_ENCRYPTION_KEYS` defines the keys available for reads, while `CREDENTIAL_ENCRYPTION_ACTIVE_VERSION` selects the key used for new writes. The active version currently comes from deployment configuration, not PostgreSQL.
+- **Explicit operations:** Startup validates the encryption configuration but never rotates database rows automatically. Operators inspect and converge rows with `credentials status` and `credentials rotate`; rotation uses authenticated encryption, bounded batches, a PostgreSQL advisory lock, and compare-and-swap updates.
+- **Multi-instance rollout:** Rotate keys in separate distribute, activate, converge, retention, and retirement phases. See the [multi-machine credential-key rotation runbook](docs/deploy.md#multi-machine-credential-key-rotation) for the complete procedure.
+
 ## Development Setup
 
 ### Database Setup
