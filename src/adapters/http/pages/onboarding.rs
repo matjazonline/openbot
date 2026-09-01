@@ -58,8 +58,6 @@ pub fn onboarding_company_page(
         agent_id_suffix: None,
         provider: "",
         model: "",
-        api_key: "",
-        api_key_placeholder: "API key",
     });
     let pane = format!(
         r##"<div><h1 class="card-title text-2xl">Create your workspace</h1><p class="mt-2 opacity-70">Your company groups its email channels, agents, teammates, and model settings.</p></div>

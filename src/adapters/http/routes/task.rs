@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
+    domain::monitoring::{MonitoringService, record_pagination_observation},
     entities::task::{ResumeActor, StopActor, TaskFilter, TaskStatus},
     services::task_worker::TaskWorker,
     use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
@@ -76,11 +77,18 @@ impl TaskFilterQuery {
     }
 }
 
-#[instrument(skip(company_use_cases, channel_use_cases, thread_use_cases, _user))]
+#[instrument(skip(
+    company_use_cases,
+    channel_use_cases,
+    thread_use_cases,
+    monitoring,
+    _user
+))]
 async fn list_company_tasks_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(monitoring): State<Arc<dyn MonitoringService>>,
     _user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
     Query(query): Query<TaskFilterQuery>,
@@ -106,13 +114,15 @@ async fn list_company_tasks_page(
 
     let page = query.page();
     let limit = query.limit();
+    let offset = task_page_offset(page, limit);
+    record_pagination_observation(monitoring.as_ref(), "tasks", offset);
     let mut tasks = thread_use_cases
         .list_company_tasks_page(
             company_id,
             query.channel_id,
             status_enum,
             sort_asc,
-            task_page_offset(page, limit),
+            offset,
             (limit + 1) as i64,
         )
         .await
@@ -219,9 +229,10 @@ fn build_task_pagination(
     }
 }
 
-#[instrument(skip(thread_use_cases, company_use_cases, _user))]
+#[instrument(skip(thread_use_cases, company_use_cases, monitoring, _user))]
 async fn filter_company_tasks(
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(monitoring): State<Arc<dyn MonitoringService>>,
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     _user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
@@ -245,13 +256,15 @@ async fn filter_company_tasks(
 
     let page = query.page();
     let limit = query.limit();
+    let offset = task_page_offset(page, limit);
+    record_pagination_observation(monitoring.as_ref(), "tasks", offset);
     let mut tasks = thread_use_cases
         .list_company_tasks_page(
             company_id,
             query.channel_id,
             status_enum,
             sort_asc,
-            task_page_offset(page, limit),
+            offset,
             (limit + 1) as i64,
         )
         .await

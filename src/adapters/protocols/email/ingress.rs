@@ -4,7 +4,7 @@ use crate::{
         channel::{ChannelType, ParticipantIdentity},
         correlation::{CORRELATION_HEADER, CorrelationId},
         message_contract::NormalizedInboundMessage,
-        value_objects::{MessageId, ThreadIndex},
+        value_objects::MessageId,
     },
     infra::config::AppConfig,
     services::{
@@ -64,7 +64,7 @@ impl EmailIngressAdapter {
             message_id: MessageId::from(parsed.message_id),
             thread_ref: parsed.in_reply_to.map(MessageId::from),
             references: parsed.references.into_iter().map(MessageId::from).collect(),
-            thread_index: parsed.thread_index.map(ThreadIndex::from),
+            thread_index: parsed.thread_index,
             sender,
             recipients_to,
             recipients_cc,

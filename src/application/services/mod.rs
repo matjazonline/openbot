@@ -3,6 +3,7 @@ pub mod agent_directory_tool;
 pub mod agent_runner;
 pub mod agent_trace_hooks;
 pub mod attachment_store;
+pub mod database_query_health;
 pub mod email_parser;
 pub mod llm_guardrail;
 pub mod memory_coordinator;

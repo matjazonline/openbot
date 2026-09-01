@@ -30,6 +30,7 @@ use crate::{
         pages,
     },
     app_error::{AppError, AppResult},
+    domain::monitoring::{MonitoringService, record_pagination_observation},
     entities::{
         channel::Channel,
         company::Company,
@@ -100,6 +101,7 @@ struct Workspace {
     thread_use_cases: Arc<ThreadUseCases>,
     user_use_cases: Arc<UserUseCases>,
     config: Arc<AppConfig>,
+    monitoring: Arc<dyn MonitoringService>,
     user_id: Uuid,
 }
 
@@ -118,6 +120,7 @@ impl FromRequestParts<AppState> for Workspace {
             thread_use_cases: state.thread_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             config: state.config.clone(),
+            monitoring: state.monitoring.clone(),
             user_id: user.id,
         })
     }
@@ -136,6 +139,7 @@ impl Workspace {
         OutboxView {
             channel_use_cases: &self.channel_use_cases,
             thread_use_cases: &self.thread_use_cases,
+            monitoring: self.monitoring.as_ref(),
             user_id: self.user_id,
             company,
         }
@@ -239,6 +243,7 @@ async fn outbox_pane(
 struct OutboxView<'a> {
     channel_use_cases: &'a ChannelUseCases,
     thread_use_cases: &'a Arc<ThreadUseCases>,
+    monitoring: &'a dyn MonitoringService,
     user_id: Uuid,
     company: &'a Company,
 }
@@ -252,6 +257,7 @@ impl OutboxView<'_> {
 
     /// One filtered page of the outbox, plus whether another follows it.
     async fn page(&self, filter: &OutboxFilter) -> AppResult<(Vec<OutboxEntry>, bool)> {
+        record_pagination_observation(self.monitoring, "outbox", filter.offset());
         let probed = self
             .thread_use_cases
             .get_task_persistence()

@@ -6,8 +6,6 @@ pub(crate) struct ModelConnectionFields<'a> {
     pub agent_id_suffix: Option<&'a str>,
     pub provider: &'a str,
     pub model: &'a str,
-    pub api_key: &'a str,
-    pub api_key_placeholder: &'a str,
 }
 
 pub(crate) fn model_connection_fields(fields: &ModelConnectionFields<'_>) -> String {
@@ -17,8 +15,8 @@ pub(crate) fn model_connection_fields(fields: &ModelConnectionFields<'_>) -> Str
             .map(|suffix| {
                 format!(
                     r#" id="agent-{}-{}""#,
-                    escape_html_text(name),
-                    escape_html_text(suffix)
+                    escape_html_attr(name),
+                    escape_html_attr(suffix)
                 )
             })
             .unwrap_or_default()
@@ -89,7 +87,7 @@ pub(crate) fn model_connection_fields(fields: &ModelConnectionFields<'_>) -> Str
             </label>
             <label class="form-control w-full">
                 <div class="label"><span class="text-xs opacity-70">LLM API Key</span></div>
-                <input type="password"{api_key_id} name="api_key" value="{api_key}" placeholder="{api_key_placeholder}" class="input w-full font-mono text-sm">
+                <input type="password"{api_key_id} name="api_key" value="" placeholder="API key" autocomplete="new-password" class="input w-full font-mono text-sm">
             </label>
         </div>"##,
         provider_id = field_id("provider"),
@@ -103,10 +101,8 @@ pub(crate) fn model_connection_fields(fields: &ModelConnectionFields<'_>) -> Str
         model_select_disabled = model_select_disabled,
         model_prompt = model_prompt,
         model_options = model_options,
-        provider = escape_html_text(fields.provider),
-        model = escape_html_text(fields.model),
-        api_key = escape_html_text(fields.api_key),
-        api_key_placeholder = escape_html_text(fields.api_key_placeholder),
+        provider = escape_html_attr(fields.provider),
+        model = escape_html_attr(fields.model),
     )
 }
 
@@ -120,19 +116,16 @@ mod tests {
             agent_id_suffix: None,
             provider: "google",
             model: "gemini-3.7-flash",
-            api_key: "",
-            api_key_placeholder: "API key",
         });
         assert!(google.contains(r#"value="gemini-3.6-flash""#));
         assert!(google.contains(r#"value="gemini-3.7-flash" selected"#));
         assert!(!google.contains(r#"<option value="gpt-5.6-sol""#));
+        assert!(google.contains(r#"name="api_key" value="""#));
 
         let custom = model_connection_fields(&ModelConnectionFields {
             agent_id_suffix: None,
             provider: "local&lt;provider",
             model: "local/model",
-            api_key: "",
-            api_key_placeholder: "API key",
         });
         assert!(custom.contains(r#"value="__custom__" selected"#));
         assert!(custom.contains(r#"value="local&amp;lt;provider""#));

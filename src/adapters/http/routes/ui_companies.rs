@@ -642,27 +642,44 @@ impl SubmittedCompany {
             spam_guardrail: self.spam_guardrail,
             avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
             memory_provider: self.form.memory_provider.as_deref().unwrap_or(""),
-            model_connections: self
-                .model_connections()
-                .unwrap_or_default()
-                .into_iter()
-                .map(|connection| pages::CompanyModelConnectionDraft {
-                    provider: connection.provider.to_string(),
-                    // Deliberately dropped: a rejected save re-renders this draft, and painting
-                    // the submitted key back into the HTML puts it in the page, the browser's
-                    // cache and any proxy in between. The field comes back blank, which the
-                    // stored-key placeholder already explains.
-                    api_key: String::new(),
-                    models: connection
-                        .models
-                        .into_iter()
-                        .map(|model| model.into_string())
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    is_default: connection.is_default,
-                })
-                .collect(),
+            // This view model deliberately has no credential field. Preserve only safe submitted
+            // metadata so even a rejected request cannot echo its API key into the response.
+            model_connections: self.model_connection_drafts(),
         }
+    }
+
+    fn model_connection_drafts(&self) -> Vec<pages::CompanyModelConnectionDraft> {
+        (0..crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS)
+            .filter_map(|index| {
+                let provider = self
+                    .form
+                    .connection_fields
+                    .get(&format!("connection_{index}_provider"))?
+                    .trim();
+                if provider.is_empty() {
+                    return None;
+                }
+                Some(pages::CompanyModelConnectionDraft {
+                    provider: provider.to_string(),
+                    models: self
+                        .form
+                        .connection_fields
+                        .get(&format!("connection_{index}_models"))
+                        .cloned()
+                        .unwrap_or_default(),
+                    is_default: self.form.default_model_provider == Some(index),
+                    has_api_key: false,
+                    remove: self.connection_removed(index),
+                })
+            })
+            .collect()
+    }
+
+    fn connection_removed(&self, index: usize) -> bool {
+        self.form
+            .connection_fields
+            .get(&format!("connection_{index}_remove"))
+            .is_some_and(|value| matches!(value.as_str(), "true" | "on"))
     }
 
     /// The submitted company as a write. The picture is parsed rather than taken as typed: it
@@ -688,7 +705,7 @@ impl SubmittedCompany {
             let recognized = rest.split_once('_').is_some_and(|(index, field)| {
                 index.parse::<usize>().is_ok_and(|index| {
                     index < crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS
-                }) && matches!(field, "provider" | "models" | "api_key")
+                }) && matches!(field, "provider" | "models" | "api_key" | "remove")
             });
             if !recognized {
                 return Err(AppError::BadRequest(format!(
@@ -699,6 +716,9 @@ impl SubmittedCompany {
 
         let mut connections = Vec::new();
         for index in 0..crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS {
+            if self.connection_removed(index) {
+                continue;
+            }
             let provider = self
                 .form
                 .connection_fields
@@ -787,5 +807,87 @@ impl Workspace {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn form(fields: &[(&str, &str)], default_model_provider: Option<usize>) -> CompanyForm {
+        CompanyForm {
+            name: "Acme".into(),
+            slug: Some("acme".into()),
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            default_model_provider,
+            connection_fields: fields
+                .iter()
+                .map(|(name, value)| ((*name).to_string(), (*value).to_string()))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn a_blank_submitted_key_becomes_preserve_at_the_form_boundary() {
+        let submitted = SubmittedCompany::new(form(
+            &[
+                ("connection_0_provider", "openai"),
+                ("connection_0_models", "gpt-5.6-terra"),
+                ("connection_0_api_key", "   "),
+            ],
+            Some(0),
+        ));
+
+        let connections = submitted.model_connections().unwrap();
+        assert_eq!(connections.len(), 1);
+        assert_eq!(connections[0].provider.as_str(), "openai");
+        assert_eq!(connections[0].api_key, None);
+    }
+
+    #[test]
+    fn an_explicit_remove_omits_only_that_provider_from_the_replacement() {
+        let submitted = SubmittedCompany::new(form(
+            &[
+                ("connection_0_provider", "openai"),
+                ("connection_0_models", "gpt-5.6-terra"),
+                ("connection_0_api_key", ""),
+                ("connection_0_remove", "true"),
+                ("connection_1_provider", "anthropic"),
+                ("connection_1_models", "claude-sonnet-4-5"),
+                ("connection_1_api_key", ""),
+            ],
+            Some(1),
+        ));
+
+        let connections = submitted.model_connections().unwrap();
+        assert_eq!(connections.len(), 1);
+        assert_eq!(connections[0].provider.as_str(), "anthropic");
+        assert!(connections[0].is_default);
+
+        let draft = submitted.draft();
+        assert!(draft.model_connections[0].remove);
+    }
+
+    #[test]
+    fn a_rejected_form_never_renders_its_submitted_api_key() {
+        let submitted = SubmittedCompany::new(form(
+            &[
+                ("connection_0_provider", "openai"),
+                ("connection_0_models", "gpt-5.6-terra"),
+                ("connection_0_api_key", "sk-do-not-render"),
+            ],
+            Some(0),
+        ));
+        let draft = submitted.draft();
+        let html = pages::company_create_pane(&pages::CompanyCreatePane {
+            draft: &draft,
+            error: Some("save refused"),
+        });
+
+        assert!(!html.contains("sk-do-not-render"));
+        assert!(html.contains(r#"name="connection_0_api_key" value="""#));
+        assert!(html.contains("Required for a new provider"));
     }
 }

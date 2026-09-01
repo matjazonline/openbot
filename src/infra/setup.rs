@@ -16,6 +16,7 @@ use crate::{
         postgres_persistence,
     },
     services::{
+        database_query_health::DatabaseQueryHealthService,
         memory_coordinator::MemoryCoordinator,
         memory_provider::{ConfiguredMemoryProviders, MemoryProviderRegistry},
         memory_worker::MemoryWorker,
@@ -62,6 +63,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     };
 
     let postgres_arc = Arc::new(postgres_persistence().await?);
+    let database_query_health = Arc::new(DatabaseQueryHealthService::new(postgres_arc.clone()));
     let memory_provider_activity = MemoryProviderActivity::default();
     // One registry entry and one configured-set entry per provider this deployment carries
     // credentials for. The activity handle is shared: the runtime panel is a machine-level
@@ -184,6 +186,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         memory_use_cases,
         memory_worker,
         dashboard_persistence: postgres_arc.clone(),
+        database_query_health,
+        dashboard_sse_connections: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         runtime_metrics: postgres_arc.clone(),
         runtime_identity,
         memory_provider_activity,

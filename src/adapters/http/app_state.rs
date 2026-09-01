@@ -12,6 +12,7 @@ use crate::{
     entities::runtime_metrics::MachineIdentity,
     infra::{config::AppConfig, events::MailboxEvents},
     services::{
+        database_query_health::DatabaseQueryHealthService,
         memory_worker::MemoryWorker,
         runtime_metrics::{MemoryProviderActivity, RuntimeMetricPersistence},
     },
@@ -39,6 +40,10 @@ pub struct AppState {
     pub memory_worker: Arc<MemoryWorker>,
     /// Read-only aggregates behind `/ui/dashboard`.
     pub dashboard_persistence: Arc<dyn DashboardPersistence>,
+    /// Shared across tabs so the operator query-statistics cache is process-wide.
+    pub database_query_health: Arc<DatabaseQueryHealthService>,
+    /// Current dashboard streams on this process; the stream guard updates it on disconnect too.
+    pub dashboard_sse_connections: Arc<std::sync::atomic::AtomicU64>,
     /// Deployment-wide runtime history; handlers must authorize operators before reading it.
     pub runtime_metrics: Arc<dyn RuntimeMetricPersistence>,
     pub runtime_identity: MachineIdentity,

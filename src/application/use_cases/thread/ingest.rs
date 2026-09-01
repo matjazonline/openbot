@@ -12,7 +12,12 @@
 //! Each phase returns [`ControlFlow::Break`] carrying the rejection it decided on, so the top
 //! level reads as the list of phases rather than as nested conditionals.
 
-use std::{collections::HashMap, ops::ControlFlow};
+use std::{
+    collections::HashMap,
+    ops::ControlFlow,
+    sync::atomic::{AtomicU64, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use tracing::{info, instrument, warn};
 use uuid::Uuid;
@@ -27,7 +32,9 @@ use crate::{
         outreach::OutreachReplyMatch,
         task::NewTask,
         thread::Thread,
-        value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
+        value_objects::{
+            ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex, ThreadIndexParseError,
+        },
     },
     services::email_parser::{ParsedEmail, RawInboundPayload},
     use_cases::channel::{
@@ -49,6 +56,26 @@ use super::{
 
 /// The one task type this pipeline produces.
 const AGENT_DISPATCH_TASK: &str = "email_agent_dispatch";
+const THREAD_INDEX_WARNING_INTERVAL_SECS: u64 = 60;
+static LAST_THREAD_INDEX_WARNING_WINDOWS: [AtomicU64; 6] = [
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+];
+
+fn should_warn_about_thread_index(error: ThreadIndexParseError) -> bool {
+    let window = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        / THREAD_INDEX_WARNING_INTERVAL_SECS
+        + 1;
+    LAST_THREAD_INDEX_WARNING_WINDOWS[error.warning_slot()].swap(window, Ordering::Relaxed)
+        != window
+}
 
 /// Why a message that only named a reserved address produced no thread.
 ///
@@ -189,6 +216,37 @@ struct MaterializedMatch {
 }
 
 impl ThreadUseCases {
+    pub(super) fn canonicalize_thread_index(&self, parsed: &mut ParsedEmail) {
+        let raw_length = parsed.thread_index.as_ref().map_or(0, |index| index.len());
+        match thread_index_of(parsed) {
+            Ok(index) => parsed.thread_index = index,
+            Err(error) => {
+                parsed.thread_index = None;
+                let reason = error.metric_reason();
+                if let Some(monitoring) = self.monitoring.as_ref() {
+                    monitoring.increment_counter(
+                        "thread_index_rejected_total",
+                        1,
+                        &[("reason", reason)],
+                    );
+                    monitoring.record_gauge(
+                        "thread_index_rejected_encoded_bytes",
+                        raw_length as f64,
+                        &[("reason", reason)],
+                    );
+                }
+                if should_warn_about_thread_index(error) {
+                    warn!(
+                        target: "mail_agents::thread_index",
+                        reason,
+                        encoded_length = raw_length,
+                        "Ignoring malformed Thread-Index header"
+                    );
+                }
+            }
+        }
+    }
+
     pub async fn ingest_and_save_inbound_message(
         &self,
         raw_payload: RawInboundPayload,
@@ -239,6 +297,7 @@ impl ThreadUseCases {
         delivery: ReplyDelivery,
     ) -> AppResult<InboundIngestResult> {
         let mut parsed = parsed_email_from_normalized(&norm);
+        self.canonicalize_thread_index(&mut parsed);
         info!(
             "Ingesting email Message-ID: {}, From: {}, To: {:?}",
             parsed.message_id, parsed.sender, parsed.recipients_to
@@ -772,7 +831,7 @@ impl ThreadUseCases {
     ) -> AppResult<ThreadAccess> {
         let references = reference_ids(parsed);
         let Some(thread) = self
-            .find_existing_thread(channel.id, &references, thread_index_of(parsed))
+            .find_existing_thread(channel.id, &references, parsed.thread_index.clone())
             .await?
         else {
             return Ok(ThreadAccess::Denied);
@@ -858,7 +917,7 @@ impl ThreadUseCases {
             .find_existing_thread(
                 channel.id,
                 &thread_lookup_ids(parsed),
-                thread_index_of(parsed),
+                parsed.thread_index.clone(),
             )
             .await?
             .filter(|thread| thread.channel_id == channel.id);
@@ -1306,7 +1365,7 @@ fn build_inbound_message(
         } else {
             MessageRole::Human
         },
-        thread_index: parsed.thread_index.clone().map(ThreadIndex::from),
+        thread_index: parsed.thread_index.clone(),
         created_at: chrono::Utc::now(),
     }
 }

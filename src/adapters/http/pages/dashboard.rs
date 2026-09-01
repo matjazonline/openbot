@@ -11,6 +11,7 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use super::dashboard_query_health::database_query_health_section;
 use super::dashboard_runtime::machine_section;
 use super::{
     PANELS_SKELETON,
@@ -30,6 +31,7 @@ use crate::entities::{
     runtime_metrics::{MachineIdentity, RuntimeMetricSnapshot},
     task::TaskStatus,
 };
+use crate::services::database_query_health::DatabaseQueryHealth;
 
 /// The id the SSE tick swaps, and the id the page renders it into.
 pub const DASHBOARD_PANELS_ID: &str = "dashboard-panels";
@@ -94,6 +96,8 @@ pub struct DashboardPage<'a> {
     pub snapshot: &'a DashboardSnapshot,
     pub window: DashboardWindow,
     pub process: Option<&'a ProcessGauges>,
+    /// `None` hides the operator-only section; `Some(Unavailable)` shows a collection warning.
+    pub query_health: Option<&'a DatabaseQueryHealth>,
     /// Present only after an operator-authorized runtime query.
     pub runtime: Option<&'a RuntimeMetricSnapshot>,
     pub machine: &'a MachineIdentity,
@@ -197,6 +201,7 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
                 </div>
             </div>
             {machine}
+            {query_health}
         </div>
         "##,
         chart_style = chart::STYLE,
@@ -211,6 +216,7 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
         latency = latency_panel(page.snapshot, page.window),
         queue_depth = queue_depth_panel(page.snapshot, page.window),
         machine = machine_section(page),
+        query_health = database_query_health_section(page.query_health),
     )
 }
 
@@ -826,6 +832,67 @@ pub(super) fn chart_footer(note: &str) -> String {
 
 /// This process's own counters, fenced off and labelled so they are not read as system-wide truth.
 pub(super) fn process_panel(process: &ProcessGauges) -> String {
+    let activity = stat_row(
+        "SMTP and model calls",
+        &format!(
+            "{conns}{rejected}{ai}{ai_failed}{tokens}{latency}",
+            conns = stat(Stat::new(
+                "SMTP in",
+                &thousands(process.smtp_total as i64),
+                "connections",
+            )),
+            rejected = stat(Stat::new(
+                "Turned away",
+                &thousands(process.smtp_rejected() as i64),
+                "blocked or rejected",
+            )),
+            ai = stat(Stat::new(
+                "Model calls",
+                &thousands(process.ai_total as i64),
+                "executions",
+            )),
+            ai_failed = stat(
+                Stat::new(
+                    "Model failures",
+                    &thousands(process.ai_failed as i64),
+                    "errored",
+                )
+                .alarming(process.ai_failed > 0)
+            ),
+            tokens = stat(Stat::new(
+                "Tokens",
+                &thousands(process.ai_total_tokens as i64),
+                "since boot",
+            )),
+            latency = stat(Stat::new(
+                "Avg call",
+                &format!("{} ms", process.ai_avg_latency_ms),
+                "mean latency",
+            )),
+        ),
+    );
+    let evidence = stat_row(
+        "Operator evidence signals",
+        &format!(
+            "{tasks}{outbox}{connections}",
+            tasks = stat(Stat::new(
+                "Deep task pages",
+                &thousands(process.deep_task_pagination as i64),
+                "1000+ offset observations since boot",
+            )),
+            outbox = stat(Stat::new(
+                "Deep outbox pages",
+                &thousands(process.deep_outbox_pagination as i64),
+                "1000+ offset observations since boot",
+            )),
+            connections = stat(Stat::new(
+                "Dashboard streams",
+                &thousands(process.active_dashboard_sse_connections as i64),
+                "active now on this process",
+            )),
+        ),
+    );
+    let rows = format!("{activity}{evidence}");
     format!(
         r##"
         <div>
@@ -837,45 +904,7 @@ pub(super) fn process_panel(process: &ProcessGauges) -> String {
             {row}
         </div>
         "##,
-        row = stat_row(
-            "SMTP and model calls",
-            &format!(
-                "{conns}{rejected}{ai}{ai_failed}{tokens}{latency}",
-                conns = stat(Stat::new(
-                    "SMTP in",
-                    &thousands(process.smtp_total as i64),
-                    "connections",
-                )),
-                rejected = stat(Stat::new(
-                    "Turned away",
-                    &thousands(process.smtp_rejected() as i64),
-                    "blocked or rejected",
-                )),
-                ai = stat(Stat::new(
-                    "Model calls",
-                    &thousands(process.ai_total as i64),
-                    "executions",
-                )),
-                ai_failed = stat(
-                    Stat::new(
-                        "Model failures",
-                        &thousands(process.ai_failed as i64),
-                        "errored",
-                    )
-                    .alarming(process.ai_failed > 0)
-                ),
-                tokens = stat(Stat::new(
-                    "Tokens",
-                    &thousands(process.ai_total_tokens as i64),
-                    "since boot",
-                )),
-                latency = stat(Stat::new(
-                    "Avg call",
-                    &format!("{} ms", process.ai_avg_latency_ms),
-                    "mean latency",
-                )),
-            ),
-        ),
+        row = rows,
     )
 }
 
@@ -1040,7 +1069,7 @@ impl<'a> Stat<'a> {
         }
     }
 
-    fn alarming(mut self, alarming: bool) -> Self {
+    pub(super) fn alarming(mut self, alarming: bool) -> Self {
         self.alarming = alarming;
         self
     }
@@ -1357,6 +1386,7 @@ mod tests {
             snapshot,
             window: DashboardWindow::last_hour(),
             process: Some(&process),
+            query_health: None,
             runtime: None,
             machine: &machine,
         })
@@ -1395,6 +1425,7 @@ mod tests {
             snapshot: &snapshot,
             window: DashboardWindow::last_hour(),
             process: None,
+            query_health: None,
             runtime: None,
             machine: &machine,
         });
@@ -1408,6 +1439,7 @@ mod tests {
             snapshot: &snapshot,
             window: DashboardWindow::last_hour(),
             process: Some(&process),
+            query_health: None,
             runtime: Some(&runtime),
             machine: &machine,
         });

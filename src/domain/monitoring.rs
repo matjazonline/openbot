@@ -103,3 +103,61 @@ pub trait MonitoringService: Send + Sync {
     fn record_histogram(&self, name: &str, duration_ms: f64, labels: &[(&str, &str)]);
     fn get_stats_json(&self) -> serde_json::Value;
 }
+
+/// Fixed, low-cardinality pagination classes. PostgreSQL normalizes the actual offset away, so
+/// this is the evidence that says whether an offset-based list is reaching expensive depths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PaginationOffsetBucket {
+    Shallow,
+    Medium,
+    Deep,
+}
+
+impl PaginationOffsetBucket {
+    pub const fn from_offset(offset: i64) -> Self {
+        match offset {
+            0..=99 => Self::Shallow,
+            100..=999 => Self::Medium,
+            _ => Self::Deep,
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Shallow => "0-99",
+            Self::Medium => "100-999",
+            Self::Deep => "1000+",
+        }
+    }
+}
+
+/// `endpoint` is an internal fixed label supplied by each list route, never request data.
+pub fn record_pagination_observation(
+    monitoring: &dyn MonitoringService,
+    endpoint: &'static str,
+    offset: i64,
+) {
+    let bucket = PaginationOffsetBucket::from_offset(offset);
+    monitoring.increment_counter(
+        "pagination_observed",
+        1,
+        &[("endpoint", endpoint), ("offset_bucket", bucket.label())],
+    );
+    if bucket == PaginationOffsetBucket::Deep {
+        monitoring.increment_counter("deep_pagination_observed", 1, &[("endpoint", endpoint)]);
+    }
+}
+
+#[cfg(test)]
+mod pagination_tests {
+    use super::*;
+
+    #[test]
+    fn pagination_buckets_are_bounded_at_both_edges() {
+        assert_eq!(PaginationOffsetBucket::from_offset(0).label(), "0-99");
+        assert_eq!(PaginationOffsetBucket::from_offset(99).label(), "0-99");
+        assert_eq!(PaginationOffsetBucket::from_offset(100).label(), "100-999");
+        assert_eq!(PaginationOffsetBucket::from_offset(999).label(), "100-999");
+        assert_eq!(PaginationOffsetBucket::from_offset(1000).label(), "1000+");
+    }
+}
