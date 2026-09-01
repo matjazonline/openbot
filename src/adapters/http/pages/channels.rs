@@ -61,9 +61,7 @@ fn inline_agent_form(
         &format!("inline_prompt_gen_box_{container_id}"),
         &format!("inline_prompt_gen_input_{container_id}"),
         &format!("inline_prompt_gen_status_{container_id}"),
-        &format!(
-            ", #inline_agent_provider_{container_id}, #inline_agent_model_{container_id}, #inline_agent_api_key_{container_id}"
-        ),
+        &format!(", #inline_agent_provider_{container_id}, #inline_agent_model_{container_id}"),
     );
     let hx_post_val = format!("/companies/{company_id}/agents/inline?container_id={container_id}");
     // Pre-built so the literals below stay clear of `"#`, which would close the raw string.
@@ -93,7 +91,7 @@ fn inline_agent_form(
                             placeholder="support-specialist">
                     </div>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                         <label class="block text-[11px] font-medium text-slate-300 mb-0.5">Provider (Optional)</label>
                         <input type="text" id="inline_agent_provider_{container_id}" name="inline_agent_provider"
@@ -105,12 +103,6 @@ fn inline_agent_form(
                         <input type="text" id="inline_agent_model_{container_id}" name="inline_agent_model"
                             class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs font-mono placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                             placeholder="gemini-2.5-flash">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-300 mb-0.5">API Key (Optional)</label>
-                        <input type="password" id="inline_agent_api_key_{container_id}" name="inline_agent_api_key"
-                            class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs font-mono placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            placeholder="Key override">
                     </div>
                 </div>
                 <div>

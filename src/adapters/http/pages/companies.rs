@@ -28,7 +28,7 @@ pub fn companies_page(companies: &[Company], configured: &ConfiguredMemoryProvid
             </h3>
             <form hx-post="/companies" hx-target="#company-list" hx-swap="innerHTML" class="space-y-4"
                 data-after-request="reset-and-collapse" data-card="company-form-card" data-toggle="company-form-toggle">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label for="company_name" class="block text-xs font-medium text-slate-300 mb-1">Company Name</label>
                         <input type="text" id="company_name" name="name" required
@@ -41,26 +41,6 @@ pub fn companies_page(companies: &[Company], configured: &ConfiguredMemoryProvid
                         <input type="text" id="company_slug" name="slug" required
                             class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                             placeholder="acme-corporation">
-                    </div>
-                    <div>
-                        <label for="company_api_key" class="block text-xs font-medium text-slate-300 mb-1">LLM API Key (Optional)</label>
-                        <input type="password" id="company_api_key" name="api_key"
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                            placeholder="AIzaSy... / sk-...">
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="company_provider" class="block text-xs font-medium text-slate-300 mb-1">LLM Provider (Optional)</label>
-                        <input type="text" id="company_provider" name="provider"
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder="e.g. google, openai, anthropic">
-                    </div>
-                    <div>
-                        <label for="company_model" class="block text-xs font-medium text-slate-300 mb-1">LLM Model (Optional)</label>
-                        <input type="text" id="company_model" name="model"
-                            class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                            placeholder="e.g. gemini-2.5-flash, gpt-4o">
                     </div>
                 </div>
                 <div>

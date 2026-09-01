@@ -833,6 +833,35 @@ mod tests {
         assert_eq!(default.provider.as_ref(), "anthropic");
         assert_eq!(default.models[0].as_ref(), "claude-a");
 
+        // The form's explicit remove operation becomes omission from this wholesale replacement.
+        // The omitted provider and its encrypted credential are deleted together.
+        persistence
+            .replace_model_connections_for_user(
+                owner.0,
+                company.id,
+                vec![
+                    CompanyModelConnectionWrite::new("openai", None, vec!["gpt-b".into()], true)
+                        .unwrap(),
+                ],
+            )
+            .await
+            .expect("one provider is deliberately removed");
+        assert_eq!(
+            persistence
+                .model_api_key(company.id, &ModelProvider::canonical("anthropic"))
+                .await
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            persistence
+                .list_model_connections(company.id)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+
         persistence.delete(company.id).await.ok();
     }
 

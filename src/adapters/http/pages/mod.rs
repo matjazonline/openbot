@@ -49,6 +49,7 @@ mod chart;
 mod companies;
 mod company_settings;
 mod dashboard;
+mod dashboard_query_health;
 mod dashboard_runtime;
 mod fragment;
 mod icon;

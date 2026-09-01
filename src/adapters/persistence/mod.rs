@@ -11,6 +11,7 @@ pub mod company;
 pub mod company_invite;
 pub mod credentials;
 pub mod dashboard;
+pub mod database_query_health;
 pub mod memory;
 pub mod runtime_metrics;
 pub mod schedule;

@@ -3,7 +3,11 @@ use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::entities::{auth::AuthVerdict, message::AttachmentMetadata, value_objects::ObjectKey};
+use crate::entities::{
+    auth::AuthVerdict,
+    message::AttachmentMetadata,
+    value_objects::{ObjectKey, ThreadIndex},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +25,7 @@ pub struct ParsedEmail {
     pub message_id: String,
     pub in_reply_to: Option<String>,
     pub references: Vec<String>,
-    pub thread_index: Option<String>,
+    pub thread_index: Option<ThreadIndex>,
     pub sender: String,
     pub recipients_to: Vec<String>,
     pub recipients_cc: Vec<String>,
@@ -140,7 +144,7 @@ impl EmailParser {
             message_id: extracted_msg_id,
             in_reply_to,
             references,
-            thread_index,
+            thread_index: raw_thread_index,
             is_auto_reply: is_auto_reply_from_headers,
             channel_id: channel_id_header,
             hop_count,
@@ -154,6 +158,7 @@ impl EmailParser {
 
         let message_id = extracted_msg_id
             .unwrap_or_else(|| format!("<{}.inbound@{}>", Uuid::new_v4(), app_domain));
+        let thread_index = raw_thread_index.map(ThreadIndex::from);
 
         let sender = extract_email(&payload.from);
         let recipients_to = parse_email_list(&payload.to);
@@ -270,15 +275,27 @@ impl EmailParser {
         let mut message_id = None;
         let mut in_reply_to = None;
         let mut references = Vec::new();
-        let mut thread_index = None;
+        let mut thread_index: Option<String> = None;
         let mut is_auto_reply = false;
         let mut channel_id_header = None;
         let mut hop_count = 0u32;
         let mut trace_channels = Vec::new();
         let mut is_context_only = false;
 
-        for line in headers_str.lines() {
-            let line = line.trim();
+        let mut collecting_thread_index = false;
+        for raw_line in headers_str.split('\n') {
+            if raw_line.starts_with(' ') || raw_line.starts_with('\t') {
+                if collecting_thread_index && let Some(value) = thread_index.as_mut() {
+                    // Preserve folding whitespace for `ThreadIndex::parse`: its raw-length guard
+                    // must run before RFC 2045 whitespace is removed.
+                    value.push('\n');
+                    value.push_str(raw_line);
+                }
+                continue;
+            }
+
+            collecting_thread_index = false;
+            let line = raw_line.trim();
             if line.is_empty() {
                 continue;
             }
@@ -297,7 +314,10 @@ impl EmailParser {
                     .filter(|s| !s.is_empty())
                     .collect();
             } else if lower.starts_with("thread-index:") {
-                thread_index = Some(line["thread-index:".len()..].trim().to_string());
+                // Keep the untouched field body. Its protocol parser owns both the raw bound and
+                // RFC 2045 whitespace removal, in that order.
+                thread_index = Some(raw_line["thread-index:".len()..].to_string());
+                collecting_thread_index = true;
             } else if lower.starts_with("x-mailagents-channel-id:") {
                 let val = line["x-mailagents-channel-id:".len()..].trim();
                 channel_id_header = Uuid::from_str(val).ok();
@@ -517,6 +537,28 @@ Subject: Test Email
         assert_eq!(parsed.hop_count, 2);
         assert!(parsed.trace_channels.is_empty());
         assert!(!parsed.is_context_only);
+    }
+
+    #[test]
+    fn thread_index_header_preserves_folding_for_bounded_canonicalization() {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+
+        let mut bytes: Vec<u8> = (0..27).map(|value| value as u8).collect();
+        bytes[0] = 0x01;
+        let canonical = STANDARD.encode(bytes);
+        let headers = format!(
+            "Thread-Index: {}\r\n\t{}  \r\nSubject: reply",
+            &canonical[..20],
+            &canonical[20..]
+        );
+        let parsed = EmailParser::parse_headers(&headers);
+        let raw = parsed.thread_index.unwrap();
+
+        assert!(raw.contains("\r\n\t"));
+        assert_eq!(
+            ThreadIndex::parse(raw.as_str()).unwrap().as_str(),
+            canonical
+        );
     }
 
     #[test]

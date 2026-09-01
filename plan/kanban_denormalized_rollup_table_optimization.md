@@ -2,20 +2,21 @@
 
 **Status: deferred. Do not build until the trigger condition below is met and measured.**
 
-Prerequisite: `plan/fix_kanban.md` Phase 3a has shipped and its `EXPLAIN` baseline is recorded.
+Prerequisite: **Stage 0** below. The window pushdown this document builds on has shipped; its
+baseline has not been captured yet, and Stage 0 is how to capture it.
 
 ---
 
 ## Context
 
-The Tasks board (`list_task_chain_board`, `src/adapters/persistence/task.rs`) computes a six-column
-Kanban by aggregating `background_tasks` and `email_outbox` per `correlation_id` on every render.
-Renders are driven by SSE wake-ups, which are driven by writes, so cost scales with concurrent
-viewers.
+The Tasks board (`list_task_chain_board`, forwarding to `chain_board_on` in
+`src/adapters/persistence/task/board.rs`) computes a six-column Kanban by aggregating
+`background_tasks` and `email_outbox` per `correlation_id` on every render. Renders are driven by
+SSE wake-ups, which are driven by writes, so cost scales with concurrent viewers.
 
-Phase 3a bounded that aggregate by **working set** — unresolved chains plus chains active in the
-window — instead of by total history, which is unbounded because `background_tasks` is never pruned
-(`dashboard.rs:186`).
+The window pushdown (`BOARD_ELIGIBLE_RECENT`, same file) bounds that aggregate by **working set** —
+unresolved chains plus chains active in the window — instead of by total history, which is
+unbounded because `background_tasks` is never pruned (`dashboard.rs:186`).
 
 This document covers the next step *if* the working set itself grows large enough that aggregating
 it per render costs real time. It was deliberately not done first, for a reason worth restating:
@@ -29,26 +30,29 @@ skipped.
 
 ## Build it when
 
-The board query is slow **after** Phase 3a — i.e. a single company's working set is large enough
-that per-render aggregation is measurably expensive at the concurrency the board actually sees.
+The board query is slow **with the pushdown in place** — i.e. a single company's working set is
+large enough that per-render aggregation is measurably expensive at the concurrency the board
+actually sees.
 
-Compare against the `EXPLAIN (ANALYZE, BUFFERS)` baseline recorded in the Phase 3a commit. Growth in
-*total history* does not justify this; Phase 3a already handles that. Only growth in the working set
-does.
+Compare against the Stage 0 baseline. Growth in *total history* does not justify this; the pushdown
+already handles that. Only growth in the working set does.
 
-**The concrete signal.** Phase 3a adds a tripwire to `list_task_chain_board`:
+**The concrete signal.** `warn_if_board_projection_is_slow`
+(`src/adapters/persistence/task/board.rs`) logs past `BOARD_QUERY_WARN_THRESHOLD` (500 ms):
 
 ```
-WARN Task board projection is slow  elapsed=… company_id=… chains=…
+WARN Task board projection is slow  elapsed=… company_id=… returned_cards=… eligible_chains=…
 ```
 
-`chains` is the size of the set the pushdown selected — the working set. Read the line as:
+`eligible_chains` is the size of the set the pushdown selected — the working set, recovered by
+summing one `stage_total` per stage. `returned_cards` is capped by the per-column display limit, so
+it plateaus and is diagnostic only; never read it as cost. Read the line as:
 
 | Observation | Reading |
 |---|---|
-| Line never appears | Phase 3a is sufficient. Do not build this. |
-| Appears, `chains` small, `elapsed` high | Not a working-set problem. Check pool contention (`database_acquire_duration_ms`) and viewer concurrency first. |
-| Appears, `chains` large and rising | This is the case this document exists for. Build it. |
+| Line never appears | The pushdown is sufficient. Do not build this. |
+| Appears, `eligible_chains` small, `elapsed` high | Not a working-set problem. Check pool contention (`database_acquire_duration_ms`) and viewer concurrency first. |
+| Appears, `eligible_chains` large and rising | This is the case this document exists for. Build it. |
 
 If the line is absent because nobody deployed the tripwire, that is not evidence of health — verify
 it is present before concluding anything.
@@ -59,6 +63,80 @@ it is present before concluding anything.
   hot write path to save work on a read nobody is making.
 - The channel-filter semantics are still unsettled (see "Open question" below). A stored key freezes
   them; the live query does not.
+
+---
+
+## Stage 0 — measure before building
+
+**There is no recorded baseline.** The pushdown shipped without one: the intent was to put
+`EXPLAIN` numbers in its commit message, and the commit went out as a bare one-liner. Nothing in
+the repo carries them. So the first work of this document is not building anything — it is
+producing the number the rest of it compares against.
+
+Do this before touching the design below. If the pushdown already keeps the projection well under
+the 500 ms tripwire at a realistic working set, this document stays deferred no matter how much
+total history accumulates.
+
+### Seed a scratch database
+
+Not `mail_agents_test`. DB tests share that database and run in parallel, so 50k seeded tasks
+would break unrelated suites and the seed would be fighting them for the same rows.
+
+```sh
+createdb mail_agents_bench
+DATABASE_URL="postgres://mac03@localhost:5432/mail_agents_bench" cargo sqlx migrate run
+```
+
+### What to seed
+
+~50k tasks across ~10k chains, the large majority `completed` and aged past the 7-day window, plus
+`email_outbox` rows on a slice of them. That is the shape where the pushdown should prune nearly
+everything, and the shape where a pre-pushdown plan has to scan the company's whole history.
+
+Reuse the fixtures in `src/adapters/persistence/task/tests.rs` rather than writing fresh seed SQL —
+they already produce rows the board query accepts:
+
+| Fixture | Use |
+|---|---|
+| `seed_company_and_channel` | one company + channel to hang everything off |
+| `enqueue_chain` | a chain with its correlation id |
+| `bulk_tasks` | fan a chain out to many tasks |
+| `bulk_deliveries` | outbox rows against a task |
+| `age_chain_tasks` | push a chain's `updated_at` outside the window |
+| `age_chain_deliveries` | the same for its deliveries |
+
+### What to run
+
+Both halves of the comparison already exist as constants — keeping the pre-pushdown selection is
+exactly why this measurement is still possible:
+
+```
+EXPLAIN (ANALYZE, BUFFERS) board_query_sql(BOARD_ELIGIBLE_EVERY_CHAIN)   -- before
+EXPLAIN (ANALYZE, BUFFERS) board_query_sql(BOARD_ELIGIBLE_RECENT)        -- after
+```
+
+Both in `src/adapters/persistence/task/board.rs`. `BOARD_ELIGIBLE_EVERY_CHAIN` is `#[cfg(test)]`:
+it is the pre-pushdown selection retained as the equivalence oracle for
+`board_window_pushdown_selects_the_same_chains_as_the_aggregate_filter`, and it doubles as the
+"before" arm here. Bind the same three parameters to both (`company_id`, a null channel filter, and
+the seven-day cutoff) so the only difference is the selection.
+
+### What to record
+
+Per arm: the `task_rollup` and `delivery_rollup` **actual** row counts, shared buffer hits and
+reads, and total execution time. Write them into this document as a dated `### Stage 0 baseline`
+subsection below this section — **not** into a commit message. A commit body is where the first
+attempt lost them, and this document is the only thing that ever reads them.
+
+### What the "after" plan should show
+
+A BitmapOr over `background_tasks_company_status_created_idx` and
+`background_tasks_company_updated_idx`, with `task_rollup` bounded by the working set rather than
+by total history.
+
+If the `email_outbox` status arm seq-scans, that — and only that — is the evidence for adding
+`email_outbox (company_id, status)`. The pushdown deliberately shipped without that index rather
+than adding one speculatively; Stage 0 is where the question gets settled.
 
 ---
 
@@ -122,7 +200,7 @@ COUNT(*) FILTER (WHERE status = 'processing' AND lock_expires_at <= CURRENT_TIME
 ```
 
 — it changes with **no write at all**, as a lease simply lapses. And `ChainStage::derive`
-(`src/domain/entities/task.rs:729`) routes `expired_processing > 0` straight to **Needs Attention**.
+(`src/domain/entities/task.rs:879`) routes `expired_processing > 0` straight to **Needs Attention**.
 A stored count would leave a chain sitting in "Running" until `reap_expired_task_leases` happens to
 rewrite the row: a stale-board bug the current live query does not have.
 
@@ -178,7 +256,8 @@ than an O(1) counter update — a trade worth making for a derived table that mu
 ### Share the SQL between board and trigger
 
 The board body and the trigger body are the same aggregate with a different `WHERE`. Compose them
-from one constant, following the pattern already used at `src/adapters/persistence/dashboard.rs:222-228`:
+from one constant, following the pattern already used at
+`src/adapters/persistence/dashboard.rs:199-227`:
 
 ```rust
 const CHAIN_ROLLUP_SELECT: &str = r#"SELECT company_id, correlation_id, ... FROM background_tasks"#;
@@ -206,30 +285,38 @@ alter a chain's rollup:
 `task_chain_channels` is maintained from the `background_tasks` trigger (insert the channel on first
 task, and on `AFTER DELETE` remove channels no task still references).
 
-Note the interaction with `plan/fix_kanban.md` Phase 3c: the trigger that refreshes the row is the
-natural place to fire `pg_notify('task_chain_changed', ...)` from, replacing the current
-`task_status_events` trigger for that purpose — one notify per rollup change instead of one per
-underlying row.
+Note the interaction with the SSE path: the trigger that refreshes the rollup row is the natural
+place to fire `pg_notify('task_chain_changed', ...)` from, replacing `notify_task_chain_changed()`'s
+per-underlying-row notifications with one notify per rollup change. That subsumes the no-op
+suppression those triggers currently do by hand, since a write that changes no count changes no
+rollup row.
 
 ---
 
-## Absorbs Phase 6
+## Absorbs the stage-parity test
 
-If `stage` becomes a stored column with one writer, `plan/fix_kanban.md` **Phase 6** (one source of
-truth for stage derivation) largely dissolves:
+The board's stage precedence exists twice today, once in each owning layer: `CHAIN_STAGE_SQL_CASE`
+(`src/adapters/persistence/task/board.rs`) and `ChainStage::derive`
+(`src/domain/entities/task.rs:879`). The SQL copy exists because `PARTITION BY stage` drives both
+the per-column `ROW_NUMBER()` limit and the `stage_total` count, so the rule cannot move wholesale
+into Rust. They are kept rung-for-rung identical by a DB-backed matrix test,
+`chain_stage_sql_matches_rust_derivation` (`src/adapters/persistence/task/tests.rs`).
 
-- The SQL `CASE` in `staged` and `ChainStage::derive` stop being two independent implementations.
-- The `debug_assert_eq!` at `task.rs:353` goes away.
+If `stage` becomes a stored column with one writer, that duplication dissolves:
+
+- `CHAIN_STAGE_SQL_CASE` and its matrix test retire — there is no second implementation left to
+  drift against.
 - `ChainStage::derive` keeps exactly one production role under option B1: computing the stored value
-  inside the trigger, or the read-time `needs_attention` override.
+  inside the trigger, plus the read-time `needs_attention` override.
 
-Revisit Phase 6's scope if this document is ever executed. Do **not** do both independently.
+Revisit the parity test's scope if this document is ever executed. Do **not** build both the rollup
+and a second parity mechanism independently.
 
 ---
 
 ## Reconciliation
 
-The retained Phase 3a aggregate is the oracle:
+The retained live aggregate is the oracle:
 
 ```sql
 -- must return zero rows
@@ -273,16 +360,17 @@ that channel's tasks.
   stored, `task_chain_channels` handles selection and names. This is the design above.
 - **Channel-scoped:** rollup key becomes `(company_id, correlation_id, channel_id)`, the
   all-channels view sums across rows, and `stage` must be derived at read time from the summed
-  counts — giving back most of the Phase 6 absorption.
+  counts — giving back most of the parity-test absorption.
 
 The live query changes this in a few lines. A stored key does not. **Settle it before executing this
-document, not before Phase 3a.**
+document, not before Stage 0.**
 
 ---
 
 ## Done when
 
-- [ ] Working-set growth measured against the Phase 3a baseline justifies the change.
+- [ ] Stage 0 run and its baseline recorded in this document.
+- [ ] Working-set growth measured against that baseline justifies the change.
 - [ ] Channel-filter semantics settled.
 - [ ] `task_chains` + `task_chain_channels` in the init migration; both DBs recreated.
 - [ ] Aggregate SQL shared between board and trigger via one `LazyLock` composition.
@@ -290,4 +378,5 @@ document, not before Phase 3a.**
 - [ ] No channel/agent/title text stored; all joined at read time.
 - [ ] Reconciliation test green across every transition the queue supports.
 - [ ] Live aggregate retained as the oracle, with a comment saying why it is not dead code.
-- [ ] `plan/fix_kanban.md` Phase 6 re-scoped or closed as absorbed.
+- [ ] `CHAIN_STAGE_SQL_CASE` and `chain_stage_sql_matches_rust_derivation` re-scoped or removed as
+      absorbed.

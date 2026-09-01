@@ -922,6 +922,7 @@ fn the_ui_shell_reports_live_update_interruptions_without_replacing_sse_retries(
     assert!(script.contains("htmx:sseOpen"));
     assert!(script.contains("Live updates restored."));
     assert!(!script.contains("new EventSource"));
+    assert!(!script.contains("data.get('api_key')"));
 }
 
 #[test]
@@ -1795,6 +1796,7 @@ fn channels_page_opens_the_form_the_mailbox_asked_for() {
     });
     assert!(!creating.contains("id=\"channel-form-card\" class=\"hidden"));
     assert!(creating.contains("aria-expanded=\"true\""));
+    assert!(!creating.contains("inline_agent_api_key"));
 
     let editing = page(ChannelsPageFocus {
         create_form_open: false,
@@ -3055,6 +3057,15 @@ fn company_settings_page_without_a_company_still_offers_the_create_form() {
 }
 
 #[test]
+fn legacy_company_form_does_not_collect_ignored_model_credentials() {
+    let html = companies_page(&[], &ConfiguredMemoryProviders::default());
+
+    assert!(!html.contains("company_api_key"));
+    assert!(!html.contains("company_provider"));
+    assert!(!html.contains("company_model"));
+}
+
+#[test]
 fn company_settings_list_saves_selection_in_the_url_and_swaps_out_of_band() {
     let company = settings_company("Acme", "acme");
     let other = settings_company("Globex", "globex");
@@ -3115,6 +3126,10 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
     assert!(html.contains(r##"value="Acme &amp; Co""##));
     assert!(html.contains(r##"value="acme""##));
     assert!(html.contains(r##"value="openai""##));
+    assert!(html.contains(
+        r##"name="connection_0_api_key" value="" placeholder="Leave blank to keep the stored key""##
+    ));
+    assert!(html.contains(r##"name="connection_0_remove" value="true""##));
     assert!(html.contains("acme.example.com"));
     // The overrides are set, so the collapse opens on them rather than hiding a live setting.
     assert!(html.contains(r##"bg-base-200" open>"##));
@@ -3139,6 +3154,44 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
         r##"href="/ui/companies?company_id={}&tab=team">Team</a>"##,
         company.id
     )));
+}
+
+#[test]
+fn rejected_company_edit_gets_key_status_only_from_stored_metadata() {
+    let company = settings_company("Acme", "acme");
+    let stored_connections = [CompanyModelConnection {
+        provider: "openai".into(),
+        models: vec![ModelName::from("gpt-5.6-terra")],
+        is_default: true,
+        has_api_key: true,
+    }];
+    let draft = CompanyDraft {
+        model_connections: vec![CompanyModelConnectionDraft {
+            provider: "openai".into(),
+            models: "gpt-5.6-terra".into(),
+            is_default: true,
+            // Rejected submissions do not get to claim a key is stored. The pane must derive this
+            // bit from `stored_connections`, not from the browser.
+            has_api_key: false,
+            remove: false,
+        }],
+        ..CompanyDraft::default()
+    };
+
+    let html = company_edit_pane(&CompanyEditPane {
+        company: &company,
+        model_connections: &stored_connections,
+        app_domain_name: "example.com",
+        counts: CompanyCounts::default(),
+        draft: Some(&draft),
+        error: Some("save refused"),
+        editable: true,
+        body: CompanyPaneBody::Settings,
+    });
+
+    assert!(html.contains("Leave blank to keep the stored key"));
+    assert!(html.contains(r#"name="connection_0_api_key" value="""#));
+    assert!(html.contains(r#"name="connection_0_remove" value="true""#));
 }
 
 #[test]

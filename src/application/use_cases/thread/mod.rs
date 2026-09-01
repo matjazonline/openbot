@@ -145,7 +145,7 @@ pub trait ThreadPersistence: Send + Sync {
     async fn find_thread_by_thread_index(
         &self,
         channel_id: Uuid,
-        thread_index_prefix: &ThreadIndex,
+        thread_index: &ThreadIndex,
     ) -> AppResult<Option<Thread>>;
 
     async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize>;

@@ -9,12 +9,19 @@
 //! depth has no "changed" moment to subscribe to — so re-reading on an interval is both simpler and
 //! a more honest description of what the page shows.
 
-use std::{convert::Infallible, sync::Arc, time::Duration};
+use std::{
+    convert::Infallible,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
+};
 
 use axum::{
     Router,
     extract::{FromRequestParts, Query},
-    http::request::Parts,
+    http::{HeaderValue, header::CACHE_CONTROL, request::Parts},
     response::{
         Html, IntoResponse, Response,
         sse::{Event, KeepAlive, Sse},
@@ -22,7 +29,6 @@ use axum::{
     routing::get,
 };
 use serde::Deserialize;
-use tokio_stream::Stream;
 use tracing::{instrument, warn};
 use uuid::Uuid;
 
@@ -45,6 +51,7 @@ use crate::{
         value_objects::EmailAddress,
     },
     infra::config::AppConfig,
+    services::database_query_health::{DatabaseQueryHealth, DatabaseQueryHealthService},
     services::runtime_metrics::RuntimeMetricPersistence,
     use_cases::{company::CompanyUseCases, user::UserUseCases},
 };
@@ -54,6 +61,7 @@ use super::ui::{load_account, load_managed_company, workspace_user};
 /// How often a connected dashboard re-reads. Slow enough that a room full of open tabs is not a
 /// load generator, fast enough that a queue draining is visibly a queue draining.
 const TICK: Duration = Duration::from_secs(5);
+const PRIVATE_NO_STORE: &str = "private, no-store";
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -103,6 +111,8 @@ struct Dashboard {
     company_use_cases: Arc<CompanyUseCases>,
     user_use_cases: Arc<UserUseCases>,
     dashboard_persistence: Arc<dyn DashboardPersistence>,
+    database_query_health: Arc<DatabaseQueryHealthService>,
+    dashboard_sse_connections: Arc<AtomicU64>,
     runtime_metrics: Arc<dyn RuntimeMetricPersistence>,
     runtime_identity: MachineIdentity,
     monitoring: Arc<dyn MonitoringService>,
@@ -123,6 +133,8 @@ impl FromRequestParts<AppState> for Dashboard {
             company_use_cases: state.company_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             dashboard_persistence: state.dashboard_persistence.clone(),
+            database_query_health: state.database_query_health.clone(),
+            dashboard_sse_connections: state.dashboard_sse_connections.clone(),
             runtime_metrics: state.runtime_metrics.clone(),
             runtime_identity: state.runtime_identity.clone(),
             monitoring: state.monitoring.clone(),
@@ -230,6 +242,7 @@ struct Reading {
     snapshot: DashboardSnapshot,
     process: Option<ProcessGauges>,
     runtime: Option<RuntimeMetricSnapshot>,
+    query_health: Option<DatabaseQueryHealth>,
     machine: MachineIdentity,
 }
 
@@ -254,9 +267,24 @@ impl Dashboard {
                 operator,
             )
             .await?,
+            query_health: load_query_health(self.database_query_health.as_ref(), operator, company)
+                .await,
             machine: self.runtime_identity.clone(),
         })
     }
+}
+
+/// Query SQL only for the one authorized view that can render it. An operator looking at a
+/// company dashboard is intentionally no different from that company's own administrator here.
+async fn load_query_health(
+    service: &DatabaseQueryHealthService,
+    operator: bool,
+    company: Option<Uuid>,
+) -> Option<DatabaseQueryHealth> {
+    if !operator || company.is_some() {
+        return None;
+    }
+    Some(service.snapshot().await)
 }
 
 /// Keep the authorization branch outside the persistence implementation. A company user does not
@@ -290,6 +318,7 @@ fn render(
         snapshot: &reading.snapshot,
         window,
         process: reading.process.as_ref(),
+        query_health: reading.query_health.as_ref(),
         runtime: reading.runtime.as_ref(),
         machine: &reading.machine,
     })
@@ -300,7 +329,7 @@ fn render(
 async fn dashboard_page(
     dashboard: Dashboard,
     Query(query): Query<DashboardQuery>,
-) -> AppResult<Html<String>> {
+) -> AppResult<Response> {
     let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
     let user = workspace_user(&account, &account_email, &dashboard.config);
@@ -311,18 +340,23 @@ async fn dashboard_page(
     // A user with no company and no operator grant has nothing to show; the shell's own empty
     // state says so rather than rendering a page of zeroes.
     if scope.company.is_none() && !scope.operator {
-        return Ok(Html(pages::mailbox_no_company_page(&user)));
+        return Ok(no_store(
+            Html(pages::mailbox_no_company_page(&user)).into_response(),
+        ));
     }
 
     // No reading here: the shell carries a placeholder and asks for the panels itself, so the page
     // is not held open for the rollup's aggregates.
-    Ok(Html(pages::dashboard_page(&pages::DashboardShell {
-        user: &user,
-        scope: scope.view(),
-        selected_company: scope.selected_company.as_ref(),
-        companies: &scope.companies,
-        window: query.window(),
-    })))
+    Ok(no_store(
+        Html(pages::dashboard_page(&pages::DashboardShell {
+            user: &user,
+            scope: scope.view(),
+            selected_company: scope.selected_company.as_ref(),
+            companies: &scope.companies,
+            window: query.window(),
+        }))
+        .into_response(),
+    ))
 }
 
 /// GET /ui/dashboard/panels - The panels alone, for a client that is not streaming (Protected).
@@ -340,7 +374,9 @@ async fn dashboard_panels_fragment(
     let window = query.window();
     let reading = dashboard.read(company, window, scope.operator).await?;
 
-    Ok(Html(render(&scope, &reading, &user, window)).into_response())
+    Ok(no_store(
+        Html(render(&scope, &reading, &user, window)).into_response(),
+    ))
 }
 
 /// GET /ui/dashboard/events - The panels, re-rendered on a tick (Protected).
@@ -348,7 +384,7 @@ async fn dashboard_panels_fragment(
 async fn dashboard_stream(
     dashboard: Dashboard,
     Query(query): Query<DashboardQuery>,
-) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
+) -> AppResult<Response> {
     // Authorize once, here: the loop that follows re-reads under the scope decided now and never
     // re-checks it, exactly as the thread streams do.
     let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
@@ -359,6 +395,10 @@ async fn dashboard_stream(
     let window = query.window();
 
     let stream = async_stream::stream! {
+        let _connection = DashboardSseConnection::new(
+            dashboard.dashboard_sse_connections.clone(),
+            dashboard.monitoring.clone(),
+        );
         let user = workspace_user(&account, &account_email, &dashboard.config);
         let mut ticker = tokio::time::interval(TICK);
         // The first tick is immediate. Spend it: a reader that just connected wants the current
@@ -368,7 +408,7 @@ async fn dashboard_stream(
 
             match dashboard.read(company, window, operator).await {
                 Ok(reading) => {
-                    yield Ok(Event::default()
+                    yield Ok::<Event, Infallible>(Event::default()
                         .event(pages::DASHBOARD_EVENT)
                         .data(render(&scope, &reading, &user, window)));
                 }
@@ -381,7 +421,47 @@ async fn dashboard_stream(
 
     // Without the heartbeat an idle stream looks dead to the proxy in front of the app. The ticker
     // alone would carry it, but only while reads keep succeeding.
-    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+    Ok(no_store(
+        Sse::new(stream)
+            .keep_alive(KeepAlive::default())
+            .into_response(),
+    ))
+}
+
+fn no_store(mut response: Response) -> Response {
+    response
+        .headers_mut()
+        .insert(CACHE_CONTROL, HeaderValue::from_static(PRIVATE_NO_STORE));
+    response
+}
+
+struct DashboardSseConnection {
+    active: Arc<AtomicU64>,
+    monitoring: Arc<dyn MonitoringService>,
+}
+
+impl DashboardSseConnection {
+    fn new(active: Arc<AtomicU64>, monitoring: Arc<dyn MonitoringService>) -> Self {
+        let current = active.fetch_add(1, Ordering::AcqRel) + 1;
+        monitoring.record_gauge("active_dashboard_sse_connections", current as f64, &[]);
+        Self { active, monitoring }
+    }
+}
+
+impl Drop for DashboardSseConnection {
+    fn drop(&mut self) {
+        let previous = self
+            .active
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
+                Some(value.saturating_sub(1))
+            })
+            .unwrap_or(0);
+        self.monitoring.record_gauge(
+            "active_dashboard_sse_connections",
+            previous.saturating_sub(1) as f64,
+            &[],
+        );
+    }
 }
 
 #[cfg(test)]
@@ -392,10 +472,17 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use crate::{
+        adapters::monitoring::InMemoryMonitor,
         entities::runtime_metrics::{
             MachineId, RuntimeMetricObservation, RuntimeMetricSample, RuntimeMetricSnapshot,
         },
-        services::runtime_metrics::RuntimeMetricProbeError,
+        services::{
+            database_query_health::{
+                DatabaseQueryHealthError, DatabaseQueryHealthPersistence,
+                DatabaseQueryHealthSnapshot, QueryHealthFailureCategory,
+            },
+            runtime_metrics::RuntimeMetricProbeError,
+        },
     };
 
     #[derive(Default)]
@@ -425,6 +512,21 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct QueryReads(AtomicUsize);
+
+    #[async_trait]
+    impl DatabaseQueryHealthPersistence for QueryReads {
+        async fn database_query_health(
+            &self,
+        ) -> Result<DatabaseQueryHealthSnapshot, DatabaseQueryHealthError> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Err(DatabaseQueryHealthError {
+                category: QueryHealthFailureCategory::ExtensionUnavailable,
+            })
+        }
+    }
+
     #[tokio::test]
     async fn infrastructure_is_not_queried_until_operator_authorization_succeeds() {
         let persistence = RuntimeReads::default();
@@ -446,6 +548,57 @@ mod tests {
                 .unwrap();
         assert!(visible.is_some());
         assert_eq!(persistence.0.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn query_health_is_read_only_for_an_operator_in_system_scope() {
+        let persistence = Arc::new(QueryReads::default());
+        let service = DatabaseQueryHealthService::new(persistence.clone());
+
+        assert!(load_query_health(&service, false, None).await.is_none());
+        assert!(
+            load_query_health(&service, true, Some(Uuid::new_v4()))
+                .await
+                .is_none()
+        );
+        assert_eq!(persistence.0.load(Ordering::SeqCst), 0);
+
+        assert!(matches!(
+            load_query_health(&service, true, None).await,
+            Some(DatabaseQueryHealth::Unavailable(
+                QueryHealthFailureCategory::ExtensionUnavailable
+            ))
+        ));
+        assert_eq!(persistence.0.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn dashboard_responses_are_private_and_not_stored() {
+        let response = no_store(Html("dashboard".to_string()).into_response());
+        assert_eq!(
+            response.headers().get(CACHE_CONTROL).unwrap(),
+            PRIVATE_NO_STORE
+        );
+    }
+
+    #[test]
+    fn dashboard_connection_gauge_increments_and_cleans_up_on_drop() {
+        let active = Arc::new(AtomicU64::new(0));
+        let monitor = Arc::new(InMemoryMonitor::new());
+        {
+            let _first = DashboardSseConnection::new(active.clone(), monitor.clone());
+            let _second = DashboardSseConnection::new(active.clone(), monitor.clone());
+            assert_eq!(active.load(Ordering::SeqCst), 2);
+            assert_eq!(
+                monitor.get_stats_json()["gauges"]["active_dashboard_sse_connections"],
+                2.0
+            );
+        }
+        assert_eq!(active.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            monitor.get_stats_json()["gauges"]["active_dashboard_sse_connections"],
+            0.0
+        );
     }
 
     #[test]

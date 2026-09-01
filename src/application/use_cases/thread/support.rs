@@ -17,7 +17,7 @@ use crate::{
         company_member::CompanyMembership,
         message::{AttachmentMetadata, Message},
         message_contract::NormalizedInboundMessage,
-        value_objects::{CompanySlug, MessageId, ThreadIndex},
+        value_objects::{CompanySlug, MessageId, ThreadIndex, ThreadIndexParseError},
     },
     services::email_parser::{
         EmailParser, MAX_CHANNEL_HOPS, ParsedEmail, SMALL_INLINE_IMAGE_BYTES,
@@ -139,8 +139,14 @@ pub(super) fn thread_lookup_ids(parsed: &ParsedEmail) -> Vec<MessageId> {
     ids
 }
 
-pub(super) fn thread_index_of(parsed: &ParsedEmail) -> Option<ThreadIndex> {
-    parsed.thread_index.clone().map(ThreadIndex::from)
+pub(super) fn thread_index_of(
+    parsed: &ParsedEmail,
+) -> Result<Option<ThreadIndex>, ThreadIndexParseError> {
+    parsed
+        .thread_index
+        .as_deref()
+        .map(ThreadIndex::parse)
+        .transpose()
 }
 
 /// Cheap rejections that need no I/O: identity, authentication, and loop protection.
@@ -222,7 +228,7 @@ pub(super) fn parsed_email_from_normalized(norm: &NormalizedInboundMessage) -> P
             .cloned()
             .map(MessageId::into_string)
             .collect(),
-        thread_index: norm.thread_index.clone().map(ThreadIndex::into_string),
+        thread_index: norm.thread_index.clone(),
         sender: norm.sender.identity.clone(),
         recipients_to: norm
             .recipients_to

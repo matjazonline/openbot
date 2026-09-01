@@ -115,7 +115,7 @@ pub struct CompanySettingsPage<'a> {
 ///
 /// The create form and the edit form take exactly these fields, which is why they share one
 /// renderer; only the URL they submit to differs.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompanyDraft<'a> {
     pub name: &'a str,
     pub slug: &'a str,
@@ -132,8 +132,11 @@ pub struct CompanyDraft<'a> {
 pub struct CompanyModelConnectionDraft {
     pub provider: String,
     pub models: String,
-    pub api_key: String,
     pub is_default: bool,
+    /// Safe metadata only. The renderer has no field capable of carrying the credential itself.
+    pub has_api_key: bool,
+    /// A deliberate request to remove this provider connection when the form is saved.
+    pub remove: bool,
 }
 
 impl Default for CompanyDraft<'_> {
@@ -352,7 +355,15 @@ fn company_settings_body(
     }
 
     let stored = stored_draft(pane.company, pane.model_connections);
-    let draft = pane.draft.unwrap_or(&stored);
+    let mut draft = pane.draft.cloned().unwrap_or(stored);
+    // A rejected form contains only safe submitted metadata. Re-attach the stored/not-stored bit
+    // from the server-side projection so a newly typed provider is never described as stored.
+    for connection in &mut draft.model_connections {
+        connection.has_api_key = pane
+            .model_connections
+            .iter()
+            .any(|stored| stored.has_api_key && stored.provider.as_str() == connection.provider);
+    }
     let company_id = pane.company.id;
 
     format!(
@@ -385,7 +396,7 @@ fn company_settings_body(
         name = escape_html_text(&pane.company.name),
         error_html = form_error_banner(pane.error),
         workspace_links = workspace_links(company_id, pane.counts),
-        fields = company_fields(draft, configured),
+        fields = company_fields(&draft, configured),
         memory_status = memory_status(pane.company.id, memory, configured),
     )
 }
@@ -512,7 +523,7 @@ fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProvide
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
                         <summary class="collapse-title text-sm font-medium">Model providers</summary>
                         <div class="collapse-content space-y-4">
-                            <p class="text-[11px] opacity-60">Enable provider credentials and the models agents may select. Leave an existing API key blank to keep it. The default provider's first model is inherited by agents with no explicit selection.</p>
+                            <p class="text-[11px] opacity-60">Enable provider credentials and the models agents may select. Leave an existing API key blank to keep it; use Remove provider to delete that credential deliberately. The default provider's first model is inherited by agents with no explicit selection.</p>
                             {company_model_connections}
                         </div>
                     </details>
@@ -550,17 +561,30 @@ fn company_model_connections(draft: &CompanyDraft<'_>) -> String {
         .enumerate()
         .map(|(index, connection)| {
             let default_checked = if connection.is_default { " checked" } else { "" };
-            let key_placeholder = if connection.provider.is_empty() {
-                "Required for a new provider"
-            } else {
+            let key_placeholder = if connection.has_api_key {
                 "Leave blank to keep the stored key"
+            } else {
+                "Required for a new provider"
+            };
+            let unused_option = if connection.has_api_key {
+                ""
+            } else {
+                r#"<option value="">Unused</option>"#
+            };
+            let remove_control = if connection.has_api_key || connection.remove {
+                format!(
+                    r#"<label class="label cursor-pointer gap-2 self-end pb-3 text-error"><input type="checkbox" name="connection_{index}_remove" value="true" class="checkbox checkbox-error checkbox-sm"{}><span class="text-xs">Remove provider</span></label>"#,
+                    if connection.remove { " checked" } else { "" },
+                )
+            } else {
+                String::new()
             };
             format!(
                 r##"<fieldset class="rounded-box border border-base-300 p-3">
-                    <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_2fr_2fr_auto]">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_2fr_2fr_auto_auto]">
                         <label class="form-control"><span class="text-xs opacity-70">Provider</span>
                             <select name="connection_{index}_provider" class="select w-full font-mono text-sm">
-                                <option value="">Unused</option>
+                                {unused_option}
                                 {provider_options}
                             </select>
                         </label>
@@ -568,11 +592,13 @@ fn company_model_connections(draft: &CompanyDraft<'_>) -> String {
                             <input name="connection_{index}_models" value="{models}" placeholder="model-a, model-b" class="input w-full font-mono text-sm">
                         </label>
                         <label class="form-control"><span class="text-xs opacity-70">API key</span>
-                            <input type="password" name="connection_{index}_api_key" value="{api_key}" placeholder="{key_placeholder}" autocomplete="new-password" class="input w-full font-mono text-sm">
+                            <input type="password" name="connection_{index}_api_key" value="" placeholder="{key_placeholder}" autocomplete="new-password" class="input w-full font-mono text-sm">
                         </label>
                         <label class="label cursor-pointer gap-2 self-end pb-3"><input type="radio" name="default_model_provider" value="{index}" class="radio radio-sm"{default_checked}><span class="text-xs">Default</span></label>
+                        {remove_control}
                     </div>
                 </fieldset>"##,
+                unused_option = unused_option,
                 provider_options = ["google", "openai", "anthropic", "groq"]
                     .into_iter()
                     .map(|provider| format!(
@@ -581,8 +607,8 @@ fn company_model_connections(draft: &CompanyDraft<'_>) -> String {
                     ))
                     .collect::<String>(),
                 models = escape_html_attr(&connection.models),
-                api_key = escape_html_attr(&connection.api_key),
                 key_placeholder = escape_html_attr(key_placeholder),
+                remove_control = remove_control,
             )
         })
         .collect()
@@ -702,8 +728,9 @@ fn stored_draft<'a>(
                     .map(ModelName::as_str)
                     .collect::<Vec<_>>()
                     .join(", "),
-                api_key: String::new(),
                 is_default: connection.is_default,
+                has_api_key: connection.has_api_key,
+                remove: false,
             })
             .collect(),
     }

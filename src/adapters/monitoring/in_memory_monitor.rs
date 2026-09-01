@@ -20,6 +20,10 @@ fn gauge_key(name: &str, labels: &[(&str, &str)]) -> String {
     format!("{name}{{{rendered}}}")
 }
 
+fn counter_key(name: &str, labels: &[(&str, &str)]) -> String {
+    gauge_key(name, labels)
+}
+
 pub struct InMemoryMonitor {
     // AI Metrics
     ai_total_executions: AtomicU64,
@@ -149,9 +153,9 @@ impl MonitoringService for InMemoryMonitor {
             .fetch_add(metrics.duration_ms, Ordering::Relaxed);
     }
 
-    fn increment_counter(&self, name: &str, value: u64, _labels: &[(&str, &str)]) {
+    fn increment_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
         if let Ok(mut lock) = self.custom_counters.write() {
-            *lock.entry(name.to_string()).or_insert(0) += value;
+            *lock.entry(counter_key(name, labels)).or_insert(0) += value;
         }
     }
 
@@ -229,5 +233,36 @@ impl MonitoringService for InMemoryMonitor {
             "custom_counters": custom,
             "gauges": gauges
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn custom_counters_retain_fixed_labels_without_merging_buckets() {
+        let monitor = InMemoryMonitor::new();
+        monitor.increment_counter(
+            "pagination_observed",
+            1,
+            &[("endpoint", "tasks"), ("offset_bucket", "0-99")],
+        );
+        monitor.increment_counter(
+            "pagination_observed",
+            2,
+            &[("endpoint", "tasks"), ("offset_bucket", "1000+")],
+        );
+        let stats = monitor.get_stats_json();
+        let counters = stats["custom_counters"].as_object().unwrap();
+        assert_eq!(
+            counters["pagination_observed{endpoint=tasks,offset_bucket=0-99}"],
+            1
+        );
+        assert_eq!(
+            counters["pagination_observed{endpoint=tasks,offset_bucket=1000+}"],
+            2
+        );
+        assert_eq!(counters.len(), 2);
     }
 }

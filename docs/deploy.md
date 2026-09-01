@@ -76,6 +76,31 @@ machine cannot attach the volume.
 
 Do **not** allocate a public IP for this app.
 
+The database build derives from the pinned official PostgreSQL image only to install a checked
+entrypoint. It always starts with `pg_stat_statements` preloaded, query IDs enabled, top-level
+statement tracking, utility tracking disabled, and both bind-parameter log limits set to zero. The
+additive migration creates the extension.
+After the database deploy and application migration, verify activation rather than inferring it
+from the image configuration:
+
+```sql
+SHOW shared_preload_libraries;
+SHOW compute_query_id;
+SHOW pg_stat_statements.track;
+SHOW pg_stat_statements.track_utility;
+SELECT stats_reset, dealloc FROM pg_stat_statements_info;
+```
+
+Optional slow-query logs are controlled on the **database app** by
+`DATABASE_SLOW_QUERY_LOGGING_ENABLED`, which accepts only `true` or `false` and defaults to
+`false`. `true` adds a 200 ms threshold; both PostgreSQL bind-parameter log limits remain zero in
+either mode. Any other value stops database startup. Enable it only for a bounded investigation
+window and restart the database machine for the change to take effect.
+
+Local PostgreSQL must likewise include `pg_stat_statements` in `shared_preload_libraries` and be
+restarted. Creating the extension without that restart is not activation; the operator dashboard
+will correctly report the extension as unavailable.
+
 ### 2. Application
 
 ```sh
@@ -134,6 +159,30 @@ two in step. Because that also raises the ceiling at which CI would notice the c
 `scripts/stack-budget.sh` re-runs the suite at the stock 2 MiB thread stack and fails if it no
 longer fits — that is the regression alarm, and CI runs it. `scripts/stack-frames.sh` then reports
 which frames grew (arm64/macOS only).
+
+### Query-statistics investigations
+
+The operator-only System dashboard is the routine monitoring surface. For the detailed current
+database snapshot, use `scripts/db-stats.sh --local` with `DATABASE_URL`, or `scripts/db-stats.sh`
+to run through Fly SSH. Its normalized SQL output is operationally sensitive; sanitize it before
+saving or sharing it.
+
+Capture a plan only for a reviewed `SELECT`, preferably against representative staging data. If a
+production capture is necessary, use a read-only transaction with short statement and lock
+timeouts and a bounded operational window. The baseline is:
+
+```sql
+BEGIN READ ONLY;
+SET LOCAL statement_timeout = '5s';
+SET LOCAL lock_timeout = '1s';
+EXPLAIN (ANALYZE, BUFFERS, WAL, SETTINGS, TIMING OFF)
+SELECT ...;
+ROLLBACK;
+```
+
+Record the PostgreSQL version, statistics reset time, parameter classes (never sensitive values),
+row counts/selectivity, and candidate index definition with the plan. Capture multiple executions
+to distinguish cold and warm cache behavior.
 
 ### Long-term memory providers
 

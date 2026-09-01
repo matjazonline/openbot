@@ -1,12 +1,14 @@
 use super::*;
+use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
 use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit, OutboundSend};
+use crate::domain::monitoring::MonitoringService;
 use crate::entities::agent::Agent;
 use crate::entities::channel::Channel;
 use crate::entities::company_member::CompanyMembership;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::task::NewTask;
 use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
-use crate::services::email_parser::MAX_CHANNEL_HOPS;
+use crate::services::email_parser::{EmailParser, MAX_CHANNEL_HOPS};
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::CompanyWrite;
@@ -323,17 +325,19 @@ impl ThreadPersistence for MockThreadPersistence {
     async fn find_thread_by_thread_index(
         &self,
         channel_id: Uuid,
-        thread_index_prefix: &ThreadIndex,
+        thread_index: &ThreadIndex,
     ) -> AppResult<Option<Thread>> {
+        let ancestors = thread_index.ancestor_chain().unwrap_or_default();
         let thread_id = {
             let msgs = self.messages.lock().unwrap();
             msgs.iter()
-                .find(|m| {
-                    m.thread_index
-                        .as_deref()
-                        .unwrap_or_default()
-                        .starts_with(thread_index_prefix.as_str())
+                .filter(|message| {
+                    message
+                        .thread_index
+                        .as_ref()
+                        .is_some_and(|stored| ancestors.contains(stored))
                 })
+                .max_by_key(|message| message.thread_index.as_ref().map_or(0, |index| index.len()))
                 .map(|m| m.thread_id)
         };
         if let Some(tid) = thread_id {
@@ -4077,6 +4081,33 @@ fn misspelled_message_from(sender: &str) -> RawInboundPayload {
         text: Some("Can you take a look?".to_string()),
         ..Default::default()
     }
+}
+
+#[test]
+fn malformed_durable_thread_index_is_observed_and_removed_at_the_boundary() {
+    let monitor = Arc::new(InMemoryMonitor::new());
+    let use_cases =
+        use_cases_with_directory(Vec::new(), Vec::new()).with_monitoring(monitor.clone());
+    let mut parsed = EmailParser::parse(
+        RawInboundPayload {
+            headers: Some("Thread-Index: legacy-invalid".to_string()),
+            ..Default::default()
+        },
+        "mailagents.com",
+    );
+
+    // Transparent JSON remains compatible with old queued payloads.
+    let json = serde_json::to_string(&parsed.thread_index).unwrap();
+    parsed.thread_index = serde_json::from_str(&json).unwrap();
+    use_cases.canonicalize_thread_index(&mut parsed);
+
+    assert!(parsed.thread_index.is_none());
+    let stats = monitor.get_stats_json();
+    assert_eq!(stats["custom_counters"]["thread_index_rejected_total"], 1);
+    assert_eq!(
+        stats["gauges"]["thread_index_rejected_encoded_bytes{reason=invalid_base64}"],
+        15.0
+    );
 }
 
 async fn bounce_for(use_cases: &ThreadUseCases, sender: &str) -> BounceInfo {

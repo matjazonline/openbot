@@ -123,14 +123,16 @@ impl TryFrom<MessageDb> for Message {
 }
 
 const THREAD_SELECT: &str = r#"
-    SELECT t.id, t.channel_id, t.subject,
+    SELECT thread.id, thread.channel_id, thread.subject,
            COALESCE(
-               (SELECT array_agg(tp.email::text ORDER BY tp.email::text)
-                FROM thread_participants tp WHERE tp.thread_id = t.id),
+               (SELECT array_agg(thread_participant.email::text
+                                 ORDER BY thread_participant.email::text)
+                  FROM thread_participants AS thread_participant
+                 WHERE thread_participant.thread_id = thread.id),
                ARRAY[]::text[]
            ) AS participant_emails,
-           t.created_at, t.updated_at
-    FROM threads t
+           thread.created_at, thread.updated_at
+      FROM threads AS thread
 "#;
 
 const MESSAGE_SELECT: &str = r#"
@@ -144,7 +146,7 @@ const MESSAGE_SELECT: &str = r#"
 "#;
 
 async fn load_thread(pool: &PgPool, id: Uuid) -> AppResult<Option<Thread>> {
-    let query = format!("{THREAD_SELECT} WHERE t.id = $1");
+    let query = format!("{THREAD_SELECT} WHERE thread.id = $1");
     let db = sqlx::query_as::<_, ThreadDb>(&query)
         .bind(id)
         .fetch_optional(pool)
@@ -378,8 +380,9 @@ impl ThreadPersistence for PostgresPersistence {
         let db = if let Some(ThreadCursor { updated_at, id }) = before {
             let query = format!(
                 r#"{THREAD_SELECT}
-                   WHERE t.channel_id = $1 AND (t.updated_at, t.id) < ($2, $3)
-                   ORDER BY t.updated_at DESC, t.id DESC
+                   WHERE thread.channel_id = $1
+                     AND (thread.updated_at, thread.id) < ($2, $3)
+                   ORDER BY thread.updated_at DESC, thread.id DESC
                    LIMIT $4"#
             );
             sqlx::query_as::<_, ThreadDb>(&query)
@@ -392,8 +395,8 @@ impl ThreadPersistence for PostgresPersistence {
         } else {
             let query = format!(
                 r#"{THREAD_SELECT}
-                   WHERE t.channel_id = $1
-                   ORDER BY t.updated_at DESC, t.id DESC
+                   WHERE thread.channel_id = $1
+                   ORDER BY thread.updated_at DESC, thread.id DESC
                    LIMIT $2"#
             );
             sqlx::query_as::<_, ThreadDb>(&query)
@@ -448,9 +451,10 @@ impl ThreadPersistence for PostgresPersistence {
         // applied in order and the newest ends up on top.
         let query = format!(
             r#"{THREAD_SELECT}
-               WHERE t.channel_id = $1
-                 AND ($2::timestamptz IS NULL OR (t.updated_at, t.id) > ($2, $3))
-               ORDER BY t.updated_at ASC, t.id ASC
+               WHERE thread.channel_id = $1
+                 AND ($2::timestamptz IS NULL
+                      OR (thread.updated_at, thread.id) > ($2, $3))
+               ORDER BY thread.updated_at ASC, thread.id ASC
                LIMIT $4"#
         );
         let db = sqlx::query_as::<_, ThreadDb>(&query)
@@ -511,10 +515,12 @@ impl ThreadPersistence for PostgresPersistence {
 
         let query = format!(
             r#"{THREAD_SELECT}
-               JOIN thread_messages tm ON tm.thread_id = t.id
-               JOIN email_messages em ON em.id = tm.email_message_id
-               WHERE t.channel_id = $1 AND em.message_id = ANY($2)
-               ORDER BY array_position($2, em.message_id), tm.created_at DESC
+               JOIN thread_messages AS thread_message ON thread_message.thread_id = thread.id
+               JOIN email_messages AS email_message
+                 ON email_message.id = thread_message.email_message_id
+               WHERE thread.channel_id = $1 AND email_message.message_id = ANY($2)
+               ORDER BY array_position($2, email_message.message_id),
+                        thread_message.created_at DESC
                LIMIT 1"#
         );
         let db = sqlx::query_as::<_, ThreadDb>(&query)
@@ -531,24 +537,27 @@ impl ThreadPersistence for PostgresPersistence {
         channel_id: Uuid,
         thread_index: &ThreadIndex,
     ) -> AppResult<Option<Thread>> {
-        let thread_index = thread_index.trim();
-        if thread_index.is_empty() {
-            return Ok(None);
-        }
+        let candidates = match thread_index.ancestor_chain() {
+            Ok(candidates) => candidates,
+            Err(_) => return Ok(None),
+        };
+        let candidate_values: Vec<&str> = candidates.iter().map(ThreadIndex::as_str).collect();
 
         let query = format!(
             r#"{THREAD_SELECT}
-               JOIN thread_messages tm ON tm.thread_id = t.id
-               JOIN email_messages em ON em.id = tm.email_message_id
-               WHERE t.channel_id = $1
-                 AND em.thread_index IS NOT NULL
-                 AND $2 LIKE em.thread_index || '%'
-               ORDER BY length(em.thread_index) DESC, tm.created_at DESC
+               JOIN thread_messages AS thread_message ON thread_message.thread_id = thread.id
+               JOIN email_messages AS email_message
+                 ON email_message.id = thread_message.email_message_id
+               WHERE thread.channel_id = $1
+                 AND email_message.thread_index IS NOT NULL
+                 AND email_message.thread_index = ANY($2)
+               ORDER BY length(email_message.thread_index) DESC,
+                        thread_message.created_at DESC
                LIMIT 1"#
         );
         let db = sqlx::query_as::<_, ThreadDb>(&query)
             .bind(channel_id)
-            .bind(thread_index)
+            .bind(&candidate_values)
             .fetch_optional(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -703,6 +712,7 @@ mod tests {
         company::{CompanyPersistence, CompanyWrite},
         user::UserPersistence,
     };
+    use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 
     #[tokio::test]
     async fn one_email_can_be_associated_with_isolated_channel_threads() {
@@ -1129,6 +1139,156 @@ mod tests {
             company_id: company.id,
             thread,
         })
+    }
+
+    fn mapi_thread_index(response_levels: usize) -> ThreadIndex {
+        let mut bytes: Vec<u8> = (0..22).map(|index| index as u8).collect();
+        bytes[0] = 0x01;
+        for level in 0..response_levels {
+            bytes.extend((0..5).map(|offset| (22 + level * 5 + offset) as u8));
+        }
+        ThreadIndex::parse(&BASE64_STANDARD.encode(bytes)).unwrap()
+    }
+
+    fn indexed_message(thread_id: Uuid, thread_index: ThreadIndex) -> Message {
+        Message {
+            id: Uuid::new_v4(),
+            thread_id,
+            message_id: MessageId::from(format!("<{}@example.com>", Uuid::new_v4())),
+            in_reply_to: None,
+            references_list: vec![],
+            sender: EmailAddress::from("sender@example.com"),
+            recipients_to: vec!["recipient@example.com".into()],
+            recipients_cc: vec![],
+            subject: "Thread-Index lookup".into(),
+            clean_text_body: "Body".into(),
+            raw_text_body: Some("Body".into()),
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            thread_index: Some(thread_index),
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn thread_index_lookup_uses_binary_ancestors_and_channel_scope() {
+        let Some(fixture) = thread_fixture("thread_index_lookup").await else {
+            return;
+        };
+        let root = mapi_thread_index(0);
+        let direct_reply = mapi_thread_index(1);
+        let third_reply = mapi_thread_index(3);
+
+        fixture
+            .persistence
+            .create_message(&indexed_message(fixture.thread.id, root.clone()))
+            .await
+            .unwrap();
+        assert_eq!(
+            fixture
+                .persistence
+                .find_thread_by_thread_index(fixture.thread.channel_id, &direct_reply)
+                .await
+                .unwrap()
+                .unwrap()
+                .id,
+            fixture.thread.id,
+            "a 27-byte direct reply must find its padded 22-byte root"
+        );
+
+        let nearer = fixture
+            .persistence
+            .create_thread(
+                fixture.thread.channel_id,
+                "Nearer ancestor",
+                &[EmailAddress::from("sender@example.com")],
+            )
+            .await
+            .unwrap();
+        fixture
+            .persistence
+            .create_message(&indexed_message(nearer.id, direct_reply.clone()))
+            .await
+            .unwrap();
+        assert_eq!(
+            fixture
+                .persistence
+                .find_thread_by_thread_index(fixture.thread.channel_id, &third_reply)
+                .await
+                .unwrap()
+                .unwrap()
+                .id,
+            nearer.id,
+            "the longest stored ancestor wins even when the next ancestor is absent"
+        );
+        assert_eq!(
+            fixture
+                .persistence
+                .find_thread_by_thread_index(fixture.thread.channel_id, &direct_reply)
+                .await
+                .unwrap()
+                .unwrap()
+                .id,
+            nearer.id,
+            "an exact match remains eligible"
+        );
+
+        let foreign_channel = ChannelPersistence::create(
+            &fixture.persistence,
+            fixture.company_id,
+            ChannelWrite {
+                name: "Foreign channel".into(),
+                slug: format!("foreign-{}", Uuid::new_v4().simple()),
+                enabled: false,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let foreign_thread = fixture
+            .persistence
+            .create_thread(
+                foreign_channel.id,
+                "Same index, other channel",
+                &[EmailAddress::from("sender@example.com")],
+            )
+            .await
+            .unwrap();
+        fixture
+            .persistence
+            .create_message(&indexed_message(foreign_thread.id, root))
+            .await
+            .unwrap();
+        assert_eq!(
+            fixture
+                .persistence
+                .find_thread_by_thread_index(foreign_channel.id, &third_reply)
+                .await
+                .unwrap()
+                .unwrap()
+                .id,
+            foreign_thread.id
+        );
+
+        CompanyPersistence::delete(&fixture.persistence, fixture.company_id)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn invalid_thread_index_returns_before_database_access() {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://invalid:invalid@127.0.0.1:1/invalid")
+            .unwrap();
+        let persistence = PostgresPersistence::new(pool);
+
+        let found = persistence
+            .find_thread_by_thread_index(Uuid::new_v4(), &ThreadIndex::from("not-base64"))
+            .await
+            .unwrap();
+        assert!(found.is_none());
     }
 
     /// One message in `thread`, distinguishable by its body and pinned to `created_at` so the

@@ -302,8 +302,9 @@ impl OutstandingTask {
 /// [`MonitoringService::get_stats_json`](crate::domain::monitoring::MonitoringService::get_stats_json).
 ///
 /// Shown apart from everything else on the page and labelled as such, because they mean something
-/// different: they are per-process and reset on deploy, and — unlike the queue figures — SMTP
-/// intake is recorded nowhere else, so this is the only place it can be seen at all.
+/// different: they are per-process and reset on deploy. Unlike the queue figures, SMTP intake and
+/// the offset classes PostgreSQL normalizes away are recorded nowhere else, so this is the only
+/// place they can be seen at all. Active SSE connections are a current process-local gauge.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ProcessGauges {
     pub smtp_total: u64,
@@ -312,6 +313,9 @@ pub struct ProcessGauges {
     pub ai_failed: u64,
     pub ai_total_tokens: u64,
     pub ai_avg_latency_ms: u64,
+    pub deep_task_pagination: u64,
+    pub deep_outbox_pagination: u64,
+    pub active_dashboard_sse_connections: u64,
 }
 
 impl ProcessGauges {
@@ -335,6 +339,20 @@ impl ProcessGauges {
                 .and_then(serde_json::Value::as_f64)
                 .map_or(0, |value| value.round() as u64)
         };
+        let custom = |key: &str| {
+            stats
+                .get("custom_counters")
+                .and_then(|counters| counters.get(key))
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0)
+        };
+        let gauge = |key: &str| {
+            stats
+                .get("gauges")
+                .and_then(|gauges| gauges.get(key))
+                .and_then(serde_json::Value::as_f64)
+                .map_or(0, |value| value.max(0.0).round() as u64)
+        };
 
         Self {
             smtp_total: count("smtp_connections", "total"),
@@ -343,6 +361,9 @@ impl ProcessGauges {
             ai_failed: count("ai_executions", "failed"),
             ai_total_tokens: count("ai_executions", "total_tokens"),
             ai_avg_latency_ms: rounded("ai_executions", "avg_latency_ms"),
+            deep_task_pagination: custom("deep_pagination_observed{endpoint=tasks}"),
+            deep_outbox_pagination: custom("deep_pagination_observed{endpoint=outbox}"),
+            active_dashboard_sse_connections: gauge("active_dashboard_sse_connections"),
         }
     }
 

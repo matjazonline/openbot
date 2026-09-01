@@ -594,22 +594,29 @@ mod tests {
 
         async fn find_thread_by_thread_index(
             &self,
-            _channel_id: Uuid,
-            thread_index_prefix: &crate::entities::value_objects::ThreadIndex,
+            channel_id: Uuid,
+            thread_index: &crate::entities::value_objects::ThreadIndex,
         ) -> AppResult<Option<Thread>> {
+            let ancestors = thread_index.ancestor_chain().unwrap_or_default();
             let thread_id = {
                 let msgs = self.messages.lock().unwrap();
                 msgs.iter()
-                    .find(|m| {
-                        m.thread_index
-                            .as_deref()
-                            .unwrap_or_default()
-                            .starts_with(thread_index_prefix.as_str())
+                    .filter(|message| {
+                        message
+                            .thread_index
+                            .as_ref()
+                            .is_some_and(|stored| ancestors.contains(stored))
+                    })
+                    .max_by_key(|message| {
+                        message.thread_index.as_ref().map_or(0, |index| index.len())
                     })
                     .map(|m| m.thread_id)
             };
             if let Some(tid) = thread_id {
-                return self.get_thread_by_id(tid).await;
+                return Ok(self
+                    .get_thread_by_id(tid)
+                    .await?
+                    .filter(|thread| thread.channel_id == channel_id));
             }
             Ok(None)
         }
@@ -1301,6 +1308,15 @@ mod tests {
                         .expect("valid lazy pool url"),
                 ),
             ),
+            database_query_health: Arc::new(
+                crate::services::database_query_health::DatabaseQueryHealthService::new(Arc::new(
+                    crate::adapters::persistence::PostgresPersistence::new(
+                        sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                            .expect("valid lazy pool url"),
+                    ),
+                )),
+            ),
+            dashboard_sse_connections: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             runtime_metrics: Arc::new(crate::adapters::persistence::PostgresPersistence::new(
                 sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
                     .expect("valid lazy pool url"),

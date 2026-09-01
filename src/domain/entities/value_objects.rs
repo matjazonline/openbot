@@ -6,6 +6,7 @@ use std::borrow::Borrow;
 use std::fmt;
 use std::ops::Deref;
 
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use serde::{Deserialize, Serialize};
 
 macro_rules! string_newtype {
@@ -146,9 +147,119 @@ impl EmailAddress {
 // An RFC 5322 `Message-ID` (or `In-Reply-To` / one entry of `References`).
 string_newtype!(MessageId);
 
-// An opaque `Thread-Index` correlation token (e.g. the Outlook conversation
-// index header), distinct from a `MessageId`.
+// An Outlook conversation index, distinct from an RFC Message-ID. Construction and transparent
+// deserialization stay permissive so an old malformed durable payload remains readable; use
+// `parse` before storage or lookup.
 string_newtype!(ThreadIndex);
+
+const THREAD_INDEX_ROOT_BYTES: usize = 22;
+const THREAD_INDEX_RESPONSE_BYTES: usize = 5;
+pub const MAX_THREAD_INDEX_RESPONSE_LEVELS: usize = 128;
+pub const MAX_THREAD_INDEX_DECODED_BYTES: usize =
+    THREAD_INDEX_ROOT_BYTES + THREAD_INDEX_RESPONSE_BYTES * MAX_THREAD_INDEX_RESPONSE_LEVELS;
+pub const MAX_THREAD_INDEX_ENCODED_BYTES: usize = MAX_THREAD_INDEX_DECODED_BYTES.div_ceil(3) * 4;
+/// Enough room for RFC 2045 line folding while keeping work independent of the message-size cap.
+pub const THREAD_INDEX_FOLDING_ALLOWANCE_BYTES: usize = 64;
+pub const MAX_THREAD_INDEX_RAW_BYTES: usize =
+    MAX_THREAD_INDEX_ENCODED_BYTES + THREAD_INDEX_FOLDING_ALLOWANCE_BYTES;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum ThreadIndexParseError {
+    #[error("empty")]
+    Empty,
+    #[error("raw_length_limit")]
+    RawLengthLimit,
+    #[error("invalid_base64")]
+    InvalidBase64,
+    #[error("invalid_length")]
+    InvalidLength,
+    #[error("response_level_limit")]
+    ResponseLevelLimit,
+    #[error("invalid_version")]
+    InvalidVersion,
+}
+
+impl ThreadIndexParseError {
+    pub const fn metric_reason(self) -> &'static str {
+        match self {
+            Self::Empty => "empty",
+            Self::RawLengthLimit => "raw_length_limit",
+            Self::InvalidBase64 => "invalid_base64",
+            Self::InvalidLength => "invalid_length",
+            Self::ResponseLevelLimit => "response_level_limit",
+            Self::InvalidVersion => "invalid_version",
+        }
+    }
+
+    pub const fn warning_slot(self) -> usize {
+        match self {
+            Self::Empty => 0,
+            Self::RawLengthLimit => 1,
+            Self::InvalidBase64 => 2,
+            Self::InvalidLength => 3,
+            Self::ResponseLevelLimit => 4,
+            Self::InvalidVersion => 5,
+        }
+    }
+}
+
+impl ThreadIndex {
+    /// Parse the bounded Microsoft MAPI shape and return canonical padded Base64.
+    pub fn parse(raw: &str) -> Result<Self, ThreadIndexParseError> {
+        let bytes = Self::decode_and_validate(raw)?;
+        Ok(Self(BASE64_STANDARD.encode(bytes)))
+    }
+
+    /// Every binary ancestor, root first and the exact value last.
+    ///
+    /// Revalidates because the transparent newtype may have come from an old durable payload or a
+    /// permissive `From<String>` call rather than [`Self::parse`].
+    pub fn ancestor_chain(&self) -> Result<Vec<Self>, ThreadIndexParseError> {
+        let bytes = Self::decode_and_validate(&self.0)?;
+        let response_levels = (bytes.len() - THREAD_INDEX_ROOT_BYTES) / THREAD_INDEX_RESPONSE_BYTES;
+        let mut ancestors = Vec::with_capacity(response_levels + 1);
+        for level in 0..=response_levels {
+            let prefix_len = THREAD_INDEX_ROOT_BYTES + level * THREAD_INDEX_RESPONSE_BYTES;
+            ancestors.push(Self(BASE64_STANDARD.encode(&bytes[..prefix_len])));
+        }
+        Ok(ancestors)
+    }
+
+    fn decode_and_validate(raw: &str) -> Result<Vec<u8>, ThreadIndexParseError> {
+        if raw.len() > MAX_THREAD_INDEX_RAW_BYTES {
+            return Err(ThreadIndexParseError::RawLengthLimit);
+        }
+
+        let compact: Vec<u8> = raw
+            .bytes()
+            .filter(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+            .collect();
+        if compact.is_empty() {
+            return Err(ThreadIndexParseError::Empty);
+        }
+
+        let decoded = BASE64_STANDARD
+            .decode(compact)
+            .map_err(|_| ThreadIndexParseError::InvalidBase64)?;
+        if decoded.len() < THREAD_INDEX_ROOT_BYTES
+            || !(decoded.len() - THREAD_INDEX_ROOT_BYTES)
+                .is_multiple_of(THREAD_INDEX_RESPONSE_BYTES)
+        {
+            return Err(ThreadIndexParseError::InvalidLength);
+        }
+
+        let response_levels =
+            (decoded.len() - THREAD_INDEX_ROOT_BYTES) / THREAD_INDEX_RESPONSE_BYTES;
+        if response_levels > MAX_THREAD_INDEX_RESPONSE_LEVELS {
+            return Err(ThreadIndexParseError::ResponseLevelLimit);
+        }
+        if decoded[0] != 0x01 {
+            return Err(ThreadIndexParseError::InvalidVersion);
+        }
+
+        Ok(decoded)
+    }
+}
 
 // A profile picture's URL, for a user or an agent. Rendered straight into an `<img src>`, which is
 // why it is parsed rather than taken as typed -- see [`AvatarUrl::parse`].
@@ -211,6 +322,115 @@ fn starts_with_ignore_case(value: &str, prefix: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn conversation_index(response_levels: usize) -> Vec<u8> {
+        let mut bytes: Vec<u8> = (0..THREAD_INDEX_ROOT_BYTES)
+            .map(|index| index as u8)
+            .collect();
+        bytes[0] = 0x01;
+        for level in 0..response_levels {
+            bytes.extend((0..THREAD_INDEX_RESPONSE_BYTES).map(|offset| {
+                (THREAD_INDEX_ROOT_BYTES + level * THREAD_INDEX_RESPONSE_BYTES + offset) as u8
+            }));
+        }
+        bytes
+    }
+
+    fn encoded_index(response_levels: usize) -> String {
+        BASE64_STANDARD.encode(conversation_index(response_levels))
+    }
+
+    #[test]
+    fn thread_index_canonicalizes_and_derives_binary_ancestors() {
+        let root = encoded_index(0);
+        let direct_reply = encoded_index(1);
+        let second_reply = encoded_index(2);
+        let third_reply = encoded_index(3);
+
+        assert_eq!(ThreadIndex::parse(&root).unwrap().as_str(), root);
+        assert_eq!(
+            ThreadIndex::parse(&direct_reply)
+                .unwrap()
+                .ancestor_chain()
+                .unwrap(),
+            [root.clone(), direct_reply.clone()].map(ThreadIndex::from)
+        );
+        assert_eq!(
+            ThreadIndex::parse(&second_reply)
+                .unwrap()
+                .ancestor_chain()
+                .unwrap(),
+            [root.clone(), direct_reply.clone(), second_reply.clone()].map(ThreadIndex::from)
+        );
+        assert_eq!(
+            ThreadIndex::parse(&third_reply)
+                .unwrap()
+                .ancestor_chain()
+                .unwrap(),
+            [root, direct_reply, second_reply, third_reply].map(ThreadIndex::from)
+        );
+    }
+
+    #[test]
+    fn thread_index_normalizes_rfc_2045_folding() {
+        let canonical = encoded_index(3);
+        let folded = format!("{}\r\n\t{}", &canonical[..28], &canonical[28..]);
+        assert_eq!(ThreadIndex::parse(&folded).unwrap().as_str(), canonical);
+    }
+
+    #[test]
+    fn thread_index_rejects_malformed_and_unbounded_values() {
+        assert_eq!(ThreadIndex::parse(""), Err(ThreadIndexParseError::Empty));
+        assert_eq!(
+            ThreadIndex::parse("not base64!!"),
+            Err(ThreadIndexParseError::InvalidBase64)
+        );
+
+        let mut wrong_version = conversation_index(0);
+        wrong_version[0] = 0x02;
+        assert_eq!(
+            ThreadIndex::parse(&BASE64_STANDARD.encode(wrong_version)),
+            Err(ThreadIndexParseError::InvalidVersion)
+        );
+        assert_eq!(
+            ThreadIndex::parse(&BASE64_STANDARD.encode([0x01; 21])),
+            Err(ThreadIndexParseError::InvalidLength)
+        );
+        assert_eq!(
+            ThreadIndex::parse(&BASE64_STANDARD.encode([0x01; 23])),
+            Err(ThreadIndexParseError::InvalidLength)
+        );
+        assert_eq!(
+            ThreadIndex::parse(&encoded_index(MAX_THREAD_INDEX_RESPONSE_LEVELS + 1)),
+            Err(ThreadIndexParseError::ResponseLevelLimit)
+        );
+        assert_eq!(
+            ThreadIndex::parse(&"A".repeat(MAX_THREAD_INDEX_RAW_BYTES + 1)),
+            Err(ThreadIndexParseError::RawLengthLimit)
+        );
+    }
+
+    #[test]
+    fn thread_index_work_is_bounded_at_the_accepted_maximum() {
+        let raw = encoded_index(MAX_THREAD_INDEX_RESPONSE_LEVELS);
+        assert_eq!(raw.len(), MAX_THREAD_INDEX_ENCODED_BYTES);
+        let parsed = ThreadIndex::parse(&raw).unwrap();
+        let ancestors = parsed.ancestor_chain().unwrap();
+        assert_eq!(ancestors.len(), MAX_THREAD_INDEX_RESPONSE_LEVELS + 1);
+        assert_eq!(ancestors.last(), Some(&parsed));
+    }
+
+    #[test]
+    fn thread_index_json_stays_permissive_until_the_decision_boundary() {
+        let malformed: ThreadIndex = serde_json::from_str(r#""legacy-invalid""#).unwrap();
+        assert_eq!(malformed.as_str(), "legacy-invalid");
+        assert!(ThreadIndex::parse(malformed.as_str()).is_err());
+
+        let canonical = ThreadIndex::parse(&encoded_index(1)).unwrap();
+        let json = serde_json::to_string(&canonical).unwrap();
+        let restored: ThreadIndex = serde_json::from_str(&json).unwrap();
+        assert_eq!(ThreadIndex::parse(restored.as_str()).unwrap(), canonical);
+    }
 
     /// An avatar URL is rendered into an `<img src>`, so what `parse` refuses is a security
     /// boundary and not a formatting preference.
