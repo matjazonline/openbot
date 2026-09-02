@@ -28,7 +28,10 @@ use crate::{
     },
     app_error::{AppError, AppResult},
     entities::{
-        agent::Agent, channel::Channel, company::Company, schedule::ChannelSchedule,
+        agent::Agent,
+        channel::Channel,
+        company::Company,
+        schedule::{ChannelSchedule, ScheduleRunAsChoices},
         value_objects::EmailAddress,
     },
     infra::config::AppConfig,
@@ -75,6 +78,14 @@ pub struct WorkspaceQuery {
 
 /// The company scope every fragment and every write carries, in the URL rather than the body so
 /// the form itself stays exactly [`ChannelForm`].
+/// A channel's schedules and the members its runs may be attributed to, which the pane's
+/// schedules card needs together.
+#[derive(Debug, Clone, Default)]
+struct ChannelAutomation {
+    schedules: Vec<ChannelSchedule>,
+    run_as: ScheduleRunAsChoices,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct CompanyQuery {
     pub company_id: Uuid,
@@ -180,15 +191,17 @@ async fn channels_page(
         .and_then(|id| channels.iter().find(|channel| channel.id == id))
         .or_else(|| channels.first());
 
-    let selected_schedules = match selected {
-        Some(channel) => view.schedules(channel.id).await?,
-        None => vec![],
+    let selected_automation = match selected {
+        Some(channel) => view.automation(channel.id).await?,
+        None => ChannelAutomation::default(),
     };
 
     let creating = matches!(query.new.as_deref(), Some("1") | Some("true"));
     let pane_html = match (creating, selected) {
         (true, _) => view.create_pane(&agents, &pages::ChannelDraft::default(), None),
-        (false, Some(channel)) => view.edit_pane(channel, &agents, &selected_schedules, None, None),
+        (false, Some(channel)) => {
+            view.edit_pane(channel, &agents, &selected_automation, None, None)
+        }
         (false, None) => {
             pages::channel_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline)
         }
@@ -247,11 +260,15 @@ async fn edit_pane(
     let view = workspace.view(&company).await?;
     let channel = view.channel(channel_id).await?;
     let agents = view.agents().await?;
-    let schedules = view.schedules(channel.id).await?;
+    let automation = view.automation(channel.id).await?;
 
-    Ok(Html(
-        view.edit_pane(&channel, &agents, &schedules, None, None),
-    ))
+    Ok(Html(view.edit_pane(
+        &channel,
+        &agents,
+        &automation,
+        None,
+        None,
+    )))
 }
 
 /// POST /ui/channels - Create a channel from the pane's Simple or Advanced form (Protected).
@@ -408,14 +425,14 @@ async fn update_channel(
     let view = workspace.view(&company).await?;
     let stored = view.channel(channel_id).await?;
     let agents = view.agents().await?;
-    let schedules = view.schedules(channel_id).await?;
+    let automation = view.automation(channel_id).await?;
     let submitted = SubmittedChannel::new(form);
 
     let rejected = |message: String| {
         Ok(Html(view.edit_pane(
             &stored,
             &agents,
-            &schedules,
+            &automation,
             Some(&submitted.draft()),
             Some(&message),
         ))
@@ -483,10 +500,19 @@ impl ChannelSettingsView<'_> {
             .await
     }
 
-    async fn schedules(&self, channel_id: Uuid) -> AppResult<Vec<ChannelSchedule>> {
-        self.schedule_use_cases
-            .list_channel_schedules(self.user_id, self.company.id, channel_id)
-            .await
+    /// A channel's automation as its pane needs it, loaded in one step because the schedules card
+    /// renders both halves: the schedules themselves, and who their runs may be attributed to.
+    async fn automation(&self, channel_id: Uuid) -> AppResult<ChannelAutomation> {
+        Ok(ChannelAutomation {
+            schedules: self
+                .schedule_use_cases
+                .list_channel_schedules(self.user_id, self.company.id, channel_id)
+                .await?,
+            run_as: self
+                .schedule_use_cases
+                .run_as_choices(self.user_id, self.company.id)
+                .await?,
+        })
     }
 
     async fn channel(&self, channel_id: Uuid) -> AppResult<Channel> {
@@ -543,7 +569,7 @@ impl ChannelSettingsView<'_> {
         &self,
         channel: &Channel,
         agents: &[Agent],
-        schedules: &[ChannelSchedule],
+        automation: &ChannelAutomation,
         draft: Option<&pages::ChannelDraft<'_>>,
         error: Option<&str>,
     ) -> String {
@@ -553,7 +579,8 @@ impl ChannelSettingsView<'_> {
                 app_domain_name: &self.config.app_domain_name,
                 channel,
                 agents,
-                schedules,
+                schedules: &automation.schedules,
+                run_as: &automation.run_as,
                 spam_scan_enabled: self.config.is_spam_scan_enabled(),
                 draft,
                 error,
@@ -578,8 +605,8 @@ impl ChannelSettingsView<'_> {
     /// What every successful write returns: the saved channel's pane, with the sidebar list
     /// refreshed beside it so a create, rename or slug change shows up immediately.
     async fn saved_response(&self, channel: &Channel, agents: &[Agent]) -> AppResult<Response> {
-        let schedules = self.schedules(channel.id).await?;
-        let pane = self.edit_pane(channel, agents, &schedules, None, None);
+        let automation = self.automation(channel.id).await?;
+        let pane = self.edit_pane(channel, agents, &automation, None, None);
         let channels = self.channels().await?;
         let list = pages::channel_settings_list(
             &self.list(&channels, Some(channel.id)),

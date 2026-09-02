@@ -4,7 +4,10 @@ use crate::entities::{
     channel::Channel,
     company::Company,
     message::Message,
-    schedule::{ChannelSchedule, ScheduleDeliveryMode, ScheduleRun, ScheduleType},
+    schedule::{
+        ChannelSchedule, RunAsSelection, ScheduleDeliveryMode, ScheduleRun, ScheduleRunAsChoices,
+        ScheduleType,
+    },
 };
 
 pub struct SchedulesPage<'a> {
@@ -13,6 +16,8 @@ pub struct SchedulesPage<'a> {
     pub company: &'a Company,
     pub schedules: &'a [ChannelSchedule],
     pub selected_schedule_id: Option<Uuid>,
+    /// The team, so a row can name whoever its schedule runs as.
+    pub run_as: &'a ScheduleRunAsChoices,
     pub runs_html: &'a str,
     pub pane_html: &'a str,
 }
@@ -41,6 +46,7 @@ pub struct ScheduleFormPaneProps<'a> {
     pub company_id: Uuid,
     pub channels: &'a [Channel],
     pub schedule: Option<&'a ChannelSchedule>,
+    pub run_as: &'a ScheduleRunAsChoices,
     pub error: Option<&'a str>,
 }
 
@@ -50,6 +56,7 @@ pub fn schedules_page(page: &SchedulesPage<'_>) -> String {
         company.id,
         page.schedules,
         page.selected_schedule_id,
+        page.run_as,
         FragmentSwap::Inline,
     );
 
@@ -99,6 +106,7 @@ pub fn schedules_sidebar_list(
     company_id: Uuid,
     schedules: &[ChannelSchedule],
     selected_id: Option<Uuid>,
+    run_as: &ScheduleRunAsChoices,
     swap: FragmentSwap,
 ) -> String {
     let entries: String = schedules
@@ -128,8 +136,9 @@ pub fn schedules_sidebar_list(
                             <span class="min-w-0 truncate font-semibold text-sm">{name}</span>
                             {status_badge}
                         </div>
-                        <div class="flex w-full items-center justify-between text-[11px] opacity-70">
+                        <div class="flex w-full items-center justify-between gap-1 text-[11px] opacity-70">
                             <span class="font-mono">{cadence}</span>
+                            {run_as_badge}
                         </div>
                     </a>
                 </li>
@@ -140,6 +149,7 @@ pub fn schedules_sidebar_list(
                 name = escape_html_text(&schedule.name),
                 cadence = escape_html_text(&schedule.cadence_label()),
                 status_badge = status_badge,
+                run_as_badge = run_as_badge(schedule, run_as),
             )
         })
         .collect();
@@ -476,6 +486,139 @@ fn timezone_options(selected: &str) -> String {
         .collect()
 }
 
+/// Who a schedule runs as, in one line beside its cadence.
+///
+/// A run that acts as nobody says nothing: that is what every schedule did before the attribution
+/// existed, so naming it would be noise on most rows.
+pub(crate) fn run_as_badge(schedule: &ChannelSchedule, choices: &ScheduleRunAsChoices) -> String {
+    match choices.selection(schedule.run_as_user_id) {
+        RunAsSelection::System => String::new(),
+        RunAsSelection::Choosable(account) | RunAsSelection::Locked(account) => format!(
+            r#"<span class="truncate" title="Runs as {full}">as {label}</span>"#,
+            full = escape_html_text(account.email.as_str()),
+            label = escape_html_text(account.label()),
+        ),
+        RunAsSelection::Departed => {
+            r#"<span class="text-error">member has left the team</span>"#.to_string()
+        }
+    }
+}
+
+/// How much room a form has for the run-as control: the channel card's compact fields, or the
+/// full-width workspace form.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum FieldScale {
+    Compact,
+    Full,
+}
+
+impl FieldScale {
+    fn select_class(self) -> &'static str {
+        match self {
+            Self::Compact => "select select-sm w-full",
+            Self::Full => "select w-full",
+        }
+    }
+
+    fn input_class(self) -> &'static str {
+        match self {
+            Self::Compact => "input input-sm w-full",
+            Self::Full => "input w-full",
+        }
+    }
+
+    fn label_class(self) -> &'static str {
+        match self {
+            Self::Compact => "label py-1",
+            Self::Full => "label",
+        }
+    }
+}
+
+/// The "Run as" control.
+///
+/// Usually a picker of the members this caller may attribute runs to. A schedule the *owner*
+/// attributed to somebody else renders locked instead, resubmitting the stored id, so an admin
+/// saving an unrelated edit cannot silently re-point the run at themselves — the one case where
+/// leaving a value alone is allowed but choosing it is not.
+pub(crate) fn run_as_field(
+    choices: &ScheduleRunAsChoices,
+    stored: Option<Uuid>,
+    scale: FieldScale,
+) -> String {
+    let selection = choices.selection(stored);
+
+    if let RunAsSelection::Locked(account) = selection {
+        return format!(
+            r#"
+            <div class="form-control w-full">
+                <div class="{label_class}">
+                    <span class="text-xs opacity-70">Run as</span>
+                    <span class="text-xs opacity-50">Only the company owner can change this</span>
+                </div>
+                <input type="hidden" name="run_as_user_id" value="{user_id}">
+                <input type="text" class="{input_class}" value="{label}" disabled>
+            </div>
+            "#,
+            label_class = scale.label_class(),
+            input_class = scale.input_class(),
+            user_id = account.user_id,
+            label = escape_html_text(account.label()),
+        );
+    }
+
+    let selected_id = match selection {
+        RunAsSelection::Choosable(account) => Some(account.user_id),
+        _ => None,
+    };
+    let options: String = choices
+        .choosable()
+        .map(|account| {
+            format!(
+                r#"<option value="{value}" {selected}>{label} ({email})</option>"#,
+                value = account.user_id,
+                selected = if selected_id == Some(account.user_id) {
+                    "selected"
+                } else {
+                    ""
+                },
+                label = escape_html_text(account.label()),
+                email = escape_html_text(account.email.as_str()),
+            )
+        })
+        .collect();
+    let note = match selection {
+        RunAsSelection::Departed => {
+            r#"<span class="text-xs text-error">The member this ran as has left the team; pick another to start it running again.</span>"#
+        }
+        _ => r#"<span class="text-xs opacity-50">Their memory, their name on the thread</span>"#,
+    };
+
+    format!(
+        r#"
+        <label class="form-control w-full">
+            <div class="{label_class}">
+                <span class="text-xs opacity-70">Run as</span>
+                {note}
+            </div>
+            <select name="run_as_user_id" class="{select_class}">
+                <option value="" {system_selected}>Nobody — an unattributed system run</option>
+                {options}
+            </select>
+        </label>
+        "#,
+        label_class = scale.label_class(),
+        select_class = scale.select_class(),
+        system_selected = if selected_id.is_none() {
+            "selected"
+        } else {
+            ""
+        },
+        note = note,
+        options = options,
+    )
+}
+
 /// Deleting is offered only on a stored schedule, and only from its own edit form, where the name
 /// on screen is the one the confirmation names.
 fn delete_schedule_button(schedule_id: Option<Uuid>, company_id: Uuid) -> String {
@@ -637,15 +780,18 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
                         <textarea name="prompt_template" required rows="4" placeholder="Describe the task or report the agent should generate for this scheduled run..." class="textarea w-full font-mono text-xs">{prompt_template}</textarea>
                     </label>
 
-                    <label class="form-control w-full">
-                        <div class="label">
-                            <span class="text-xs opacity-70">Timezone</span>
-                            <span class="text-xs opacity-50">Templates and the cadence follow this zone</span>
-                        </div>
-                        <select name="timezone" class="select w-full">
-                            {timezone_options}
-                        </select>
-                    </label>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <label class="form-control w-full">
+                            <div class="label">
+                                <span class="text-xs opacity-70">Timezone</span>
+                                <span class="text-xs opacity-50">Templates and the cadence follow this zone</span>
+                            </div>
+                            <select name="timezone" class="select w-full">
+                                {timezone_options}
+                            </select>
+                        </label>
+                        {run_as_field}
+                    </div>
 
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <label class="form-control w-full">
@@ -711,6 +857,11 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
             ""
         },
         timezone_options = timezone_options(selected_timezone),
+        run_as_field = run_as_field(
+            props.run_as,
+            props.schedule.and_then(|schedule| schedule.run_as_user_id),
+            FieldScale::Full,
+        ),
         subject_template = escape_html_text(subject_template),
         prompt_template = escape_html_text(prompt_template),
         d_mailbox = if delivery_mode == "mailbox_only" {

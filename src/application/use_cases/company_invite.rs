@@ -419,6 +419,13 @@ mod tests {
             Ok(vec![])
         }
 
+        async fn list_company_team_accounts(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::company::CompanyTeamAccount>> {
+            unimplemented!("this double is not exercised on the team-account path")
+        }
+
         /// Model connections are not part of what these tests drive; a call here is a wiring mistake
         /// rather than a state worth simulating.
         async fn list_model_connections(

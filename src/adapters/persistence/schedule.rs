@@ -20,7 +20,8 @@ use crate::{
 pub const SCHEDULE_COLUMNS: &str = r#"
     id, company_id, channel_id, name, schedule_type, interval_seconds,
     subject_template, prompt_template, delivery_mode, recipient_emails,
-    timezone, enabled, last_run_at, next_run_at, last_error, created_at, updated_at
+    timezone, run_as_user_id, enabled, last_run_at, next_run_at, last_error,
+    created_at, updated_at
 "#;
 
 #[derive(FromRow, Debug)]
@@ -36,6 +37,7 @@ pub struct ScheduleDb {
     pub delivery_mode: String,
     pub recipient_emails: Vec<String>,
     pub timezone: String,
+    pub run_as_user_id: Option<Uuid>,
     pub enabled: bool,
     pub last_run_at: Option<DateTime<Utc>>,
     pub next_run_at: Option<DateTime<Utc>>,
@@ -71,6 +73,7 @@ impl TryFrom<ScheduleDb> for ChannelSchedule {
                 .map(EmailAddress::from)
                 .collect(),
             timezone,
+            run_as_user_id: db.run_as_user_id,
             enabled: db.enabled,
             last_run_at: db.last_run_at,
             next_run_at: db.next_run_at,
@@ -286,8 +289,8 @@ impl SchedulePersistence for PostgresPersistence {
             r#"INSERT INTO channel_schedules (
                    id, company_id, channel_id, name, schedule_type, interval_seconds,
                    subject_template, prompt_template, delivery_mode, recipient_emails,
-                   timezone, enabled, next_run_at
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                   timezone, run_as_user_id, enabled, next_run_at
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                RETURNING {SCHEDULE_COLUMNS}"#
         ))
         .bind(id)
@@ -301,6 +304,7 @@ impl SchedulePersistence for PostgresPersistence {
         .bind(write.delivery_mode.as_str())
         .bind(&recipient_strs)
         .bind(write.timezone.name())
+        .bind(write.run_as_user_id)
         .bind(write.enabled)
         .bind(next_run_at)
         .fetch_one(&self.pool)
@@ -378,9 +382,9 @@ impl SchedulePersistence for PostgresPersistence {
             r#"UPDATE channel_schedules
                SET channel_id = $1, name = $2, schedule_type = $3, interval_seconds = $4,
                    subject_template = $5, prompt_template = $6, delivery_mode = $7,
-                   recipient_emails = $8, timezone = $9, next_run_at = $10,
-                   updated_at = CURRENT_TIMESTAMP
-               WHERE id = $11
+                   recipient_emails = $8, timezone = $9, run_as_user_id = $10,
+                   next_run_at = $11, updated_at = CURRENT_TIMESTAMP
+               WHERE id = $12
                RETURNING {SCHEDULE_COLUMNS}"#
         ))
         .bind(channel_id)
@@ -392,6 +396,7 @@ impl SchedulePersistence for PostgresPersistence {
         .bind(write.delivery_mode.as_str())
         .bind(&recipient_strs)
         .bind(write.timezone.name())
+        .bind(write.run_as_user_id)
         .bind(next_run_at)
         .bind(existing.id)
         .fetch_one(&self.pool)
@@ -802,6 +807,7 @@ mod tests {
                 delivery_mode: ScheduleDeliveryMode::MailboxOnly,
                 recipient_emails: vec![],
                 timezone: ScheduleTimezone::utc(),
+                run_as_user_id: None,
                 enabled: false,
             },
         )
@@ -822,6 +828,7 @@ mod tests {
                 delivery_mode: ScheduleDeliveryMode::MailboxOnly,
                 recipient_emails: vec![],
                 timezone: ScheduleTimezone::utc(),
+                run_as_user_id: None,
                 enabled: true,
             },
         )
@@ -948,6 +955,7 @@ mod tests {
             delivery_mode: ScheduleDeliveryMode::MailboxOnly,
             recipient_emails: vec![],
             timezone: ScheduleTimezone::utc(),
+            run_as_user_id: Some(owner.id),
             enabled: true,
         };
 
@@ -956,6 +964,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(schedule.name, "Hourly Triage");
+        assert_eq!(
+            schedule.run_as_user_id,
+            Some(owner.id),
+            "the member a run acts as has to survive the round trip"
+        );
         assert_eq!(schedule.schedule_type, ScheduleType::Interval);
         assert_eq!(schedule.interval_seconds, Some(3600));
         assert_eq!(schedule.delivery_mode, ScheduleDeliveryMode::MailboxOnly);
@@ -990,6 +1003,7 @@ mod tests {
             delivery_mode: ScheduleDeliveryMode::EmailCustom,
             recipient_emails: vec![EmailAddress::from("auditor@example.com")],
             timezone: ScheduleTimezone::utc(),
+            run_as_user_id: None,
             enabled: true,
         };
 
@@ -1232,6 +1246,7 @@ mod tests {
                 delivery_mode: ScheduleDeliveryMode::EmailParticipants,
                 recipient_emails: vec![],
                 timezone: ScheduleTimezone::utc(),
+                run_as_user_id: None,
                 enabled: false,
             },
         )
@@ -1239,6 +1254,10 @@ mod tests {
         .unwrap();
 
         assert_eq!(updated.name, "Updated Triage");
+        assert_eq!(
+            updated.run_as_user_id, None,
+            "an edit that names nobody hands the schedule back to the system"
+        );
         assert_eq!(updated.channel_id, moved_channel.id);
         assert_eq!(updated.interval_seconds, Some(1800));
         assert_eq!(
@@ -1270,6 +1289,7 @@ mod tests {
                 delivery_mode: paused.delivery_mode,
                 recipient_emails: vec![],
                 timezone: paused.timezone,
+                run_as_user_id: None,
                 enabled: false,
             },
         )

@@ -8,7 +8,7 @@
 use super::*;
 use crate::entities::{
     channel::PUBLIC_PARTICIPANT,
-    schedule::{ChannelSchedule, ScheduleDeliveryMode},
+    schedule::{ChannelSchedule, ScheduleDeliveryMode, ScheduleRunAsChoices},
 };
 
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
@@ -184,6 +184,8 @@ pub struct ChannelEditPane<'a> {
     pub channel: &'a Channel,
     pub agents: &'a [Agent],
     pub schedules: &'a [ChannelSchedule],
+    /// Who this channel's scheduled runs may be attributed to.
+    pub run_as: &'a ScheduleRunAsChoices,
     pub spam_scan_enabled: bool,
     /// What the user last typed, when a save was rejected; `None` shows the stored channel.
     pub draft: Option<&'a ChannelDraft<'a>>,
@@ -403,7 +405,12 @@ pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: b
             owner,
         }),
         delete_action = delete_action,
-        schedules_html = channel_schedules_card(company_id, channel_id, pane.schedules),
+        schedules_html = channel_schedules_card(&ChannelSchedulesCard {
+            company_id,
+            channel_id,
+            schedules: pane.schedules,
+            run_as: pane.run_as,
+        }),
     )
 }
 
@@ -1027,12 +1034,22 @@ pub fn stored_participants(channel: &Channel) -> String {
     }
 }
 
-/// The channel's config as the JSON text the form submits.
-pub fn channel_schedules_card(
-    company_id: Uuid,
-    channel_id: Uuid,
-    schedules: &[ChannelSchedule],
-) -> String {
+/// What the schedules card on a channel's settings renders from.
+pub struct ChannelSchedulesCard<'a> {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub schedules: &'a [ChannelSchedule],
+    /// Who the channel's runs may be attributed to, and who the listed ones already are.
+    pub run_as: &'a ScheduleRunAsChoices,
+}
+
+pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
+    let ChannelSchedulesCard {
+        company_id,
+        channel_id,
+        schedules,
+        run_as,
+    } = *card;
     let rows_html: String = if schedules.is_empty() {
         r#"<div class="rounded-lg border border-dashed border-base-300 p-4 text-center text-xs opacity-60">No automated schedules configured for this channel yet.</div>"#.to_string()
     } else {
@@ -1076,6 +1093,7 @@ pub fn channel_schedules_card(
                                     <span class="font-medium text-primary">{cadence}</span>
                                     <span>•</span>
                                     <span>{next_run_info}</span>
+                                    {run_as_badge}
                                 </div>
                             </div>
                             <div class="flex shrink-0 items-center gap-1">
@@ -1122,6 +1140,7 @@ pub fn channel_schedules_card(
                     status_badge = status_badge,
                     delivery_badge = delivery_badge,
                     next_run_info = next_run_info,
+                    run_as_badge = schedule_run_as_row(s, run_as),
                     toggle_label = toggle_label,
                     toggle_value = toggle_value,
                 )
@@ -1195,6 +1214,8 @@ pub fn channel_schedules_card(
                             <textarea name="prompt_template" required rows="3" placeholder="Describe what the agent should analyze or generate for this scheduled run..." class="textarea textarea-sm w-full font-mono text-xs"></textarea>
                         </label>
 
+                        {run_as_field}
+
                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <label class="form-control w-full">
                                 <div class="label py-1"><span class="text-xs opacity-70">Output Delivery Mode</span></div>
@@ -1223,5 +1244,15 @@ pub fn channel_schedules_card(
         rows_html = rows_html,
         channel_id = channel_id,
         company_id = company_id,
+        run_as_field = run_as_field(run_as, None, FieldScale::Compact),
     )
+}
+
+/// The card's own wording for a schedule's attribution: the same badge the workspace sidebar
+/// shows, with the separator that only belongs on a row that has one.
+fn schedule_run_as_row(schedule: &ChannelSchedule, run_as: &ScheduleRunAsChoices) -> String {
+    match run_as_badge(schedule, run_as).as_str() {
+        "" => String::new(),
+        badge => format!("<span>•</span>{badge}"),
+    }
 }

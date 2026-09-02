@@ -6,7 +6,7 @@
 //! list along out of band, so a rename or a delete shows up immediately.
 
 use super::*;
-use crate::entities::schedule::ChannelSchedule;
+use crate::entities::schedule::{ChannelSchedule, ScheduleRunAsChoices};
 
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
 ///
@@ -183,6 +183,8 @@ impl AgentPaneBody<'_> {
 pub struct AgentChannelTab<'a> {
     pub channel: &'a Channel,
     pub schedules: &'a [ChannelSchedule],
+    /// Who this channel's scheduled runs may be attributed to.
+    pub run_as: &'a ScheduleRunAsChoices,
     pub spam_scan_enabled: bool,
     pub memory_ready: bool,
     /// What the user last typed, when a save was rejected; `None` shows the stored channel.
@@ -527,7 +529,12 @@ fn agent_channel_body(pane: &AgentEditPane<'_>, tab: &AgentChannelTab<'_>) -> St
             memory_ready: tab.memory_ready,
             owner: ChannelOwner::Existing(pane.agent),
         }),
-        schedules_html = channel_schedules_card(company_id, tab.channel.id, tab.schedules),
+        schedules_html = channel_schedules_card(&ChannelSchedulesCard {
+            company_id,
+            channel_id: tab.channel.id,
+            schedules: tab.schedules,
+            run_as: tab.run_as,
+        }),
     )
 }
 

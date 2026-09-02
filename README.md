@@ -2,6 +2,21 @@
 
 An email agent automation platform built in Rust.
 
+## Architecture Glossary
+
+- **Channel:** The company-scoped business object that owns agents, policy, memory, threads, and
+  access rules. It is not an email mailbox or chat conversation.
+- **Transport kind:** An interface family such as email or Slack.
+- **Channel binding:** One independently enabled, addressable transport interface on a channel.
+- **Principal:** A stable company-scoped actor: person, agent, external person, or system actor.
+- **Qualified identity:** The way one transport names a principal, scoped by transport, namespace,
+  and subject.
+- **Channel selector:** Transport-neutral intent to address a business channel. An email address is
+  one adapter syntax that can resolve to a selector, not the identity of the channel.
+
+The normative identity, authorization, threading, ingress, and delivery decisions are recorded in
+[Transport Architecture Contract](docs/transport_architecture.md).
+
 ## 1. System Architecture Overview
 
 The system operates as an asynchronous, event-driven pipeline mapping standard SMTP/IMAP email traffic into a stateful LLM context window, executing agentic workflows, and proxying the output back to human clients via properly threaded outbound SMTP.

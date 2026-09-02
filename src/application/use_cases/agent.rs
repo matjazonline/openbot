@@ -1203,6 +1203,13 @@ mod tests {
             Ok(vec![])
         }
 
+        async fn list_company_team_accounts(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::company::CompanyTeamAccount>> {
+            unimplemented!("this double is not exercised on the team-account path")
+        }
+
         async fn list_model_connections(
             &self,
             _company_id: Uuid,

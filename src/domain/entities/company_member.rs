@@ -85,6 +85,15 @@ impl CompanyMembership {
     pub fn manages_company_operations(self) -> bool {
         matches!(self, Self::Owner | Self::Admin)
     }
+
+    /// What a `company_members` row's access role makes somebody. The owner has no such row, so
+    /// this never answers `Owner`.
+    pub fn from_access_role(role: CompanyAccessRole) -> Self {
+        match role {
+            CompanyAccessRole::Admin => Self::Admin,
+            CompanyAccessRole::Member => Self::Member,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

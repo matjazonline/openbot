@@ -76,6 +76,10 @@ pub struct ScheduleRequest {
     pub recipient_emails: Vec<String>,
     #[serde(default)]
     pub timezone: ScheduleTimezone,
+    /// The team member the runs act as. Checked against what the caller may attribute a run to
+    /// before it is stored, so a client naming somebody else is refused rather than obeyed.
+    #[serde(default)]
+    pub run_as_user_id: Option<Uuid>,
     #[serde(default = "default_true")]
     pub enabled: bool,
 }
@@ -104,6 +108,7 @@ impl ScheduleRequest {
                 .map(EmailAddress::from)
                 .collect(),
             timezone: self.timezone,
+            run_as_user_id: self.run_as_user_id,
             enabled: self.enabled,
         }
     }
@@ -149,6 +154,9 @@ pub struct UiScheduleForm {
     pub delivery_mode: String,
     pub recipient_emails: Option<String>,
     pub timezone: Option<String>,
+    /// The picked team member, as the select submits it: their account id, or the empty string
+    /// for a run attributed to nobody.
+    pub run_as_user_id: Option<String>,
 }
 
 impl UiScheduleForm {
@@ -187,6 +195,13 @@ impl UiScheduleForm {
             _ => None,
         };
 
+        let run_as_user_id = match self.run_as_user_id.as_deref().map(str::trim) {
+            Some(picked) if !picked.is_empty() => Some(Uuid::parse_str(picked).map_err(|_| {
+                AppError::BadRequest("Run-as team member is not a valid account.".into())
+            })?),
+            _ => None,
+        };
+
         let recipient_emails = self
             .recipient_emails
             .unwrap_or_default()
@@ -206,6 +221,7 @@ impl UiScheduleForm {
             delivery_mode,
             recipient_emails,
             timezone,
+            run_as_user_id,
             // Not the form's to decide: pausing and resuming is its own action, so an edit that
             // did not ask to change it must not resume a paused schedule.
             enabled: true,
@@ -310,6 +326,31 @@ pub async fn toggle_schedule_json(
 // UI / HTMX Routes
 // ---------------------------------------------------------------------------
 
+/// The card every write below re-renders: the channel's schedules as they now stand, beside the
+/// team members this caller may attribute a new one to.
+async fn schedules_card(
+    schedule_use_cases: &ScheduleUseCases,
+    user_id: Uuid,
+    company_id: Uuid,
+    channel_id: Uuid,
+) -> AppResult<String> {
+    let schedules = schedule_use_cases
+        .list_channel_schedules(user_id, company_id, channel_id)
+        .await?;
+    let run_as = schedule_use_cases
+        .run_as_choices(user_id, company_id)
+        .await?;
+
+    Ok(pages::channel_schedules_card(
+        &pages::ChannelSchedulesCard {
+            company_id,
+            channel_id,
+            schedules: &schedules,
+            run_as: &run_as,
+        },
+    ))
+}
+
 #[instrument(skip(schedule_use_cases, user, form))]
 pub async fn ui_create_schedule(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
@@ -324,13 +365,7 @@ pub async fn ui_create_schedule(
         .create_schedule(user.id, company_id, channel_id, write)
         .await?;
 
-    let schedules = schedule_use_cases
-        .list_channel_schedules(user.id, company_id, channel_id)
-        .await?;
-
-    Ok(pages::channel_schedules_card(
-        company_id, channel_id, &schedules,
-    ))
+    schedules_card(&schedule_use_cases, user.id, company_id, channel_id).await
 }
 
 #[derive(Debug, Deserialize)]
@@ -349,15 +384,7 @@ pub async fn ui_delete_schedule(
         .delete_schedule(user.id, query.company_id, id)
         .await?;
 
-    let schedules = schedule_use_cases
-        .list_channel_schedules(user.id, query.company_id, channel_id)
-        .await?;
-
-    Ok(pages::channel_schedules_card(
-        query.company_id,
-        channel_id,
-        &schedules,
-    ))
+    schedules_card(&schedule_use_cases, user.id, query.company_id, channel_id).await
 }
 
 #[instrument(skip(schedule_use_cases, user))]
@@ -371,15 +398,7 @@ pub async fn ui_run_schedule_now(
         .trigger_schedule_now(user.id, query.company_id, id)
         .await?;
 
-    let schedules = schedule_use_cases
-        .list_channel_schedules(user.id, query.company_id, channel_id)
-        .await?;
-
-    Ok(pages::channel_schedules_card(
-        query.company_id,
-        channel_id,
-        &schedules,
-    ))
+    schedules_card(&schedule_use_cases, user.id, query.company_id, channel_id).await
 }
 
 #[derive(Debug, Deserialize)]
@@ -400,15 +419,7 @@ pub async fn ui_toggle_schedule(
         .toggle_schedule(user.id, form.company_id, id, enabled)
         .await?;
 
-    let schedules = schedule_use_cases
-        .list_channel_schedules(user.id, form.company_id, channel_id)
-        .await?;
-
-    Ok(pages::channel_schedules_card(
-        form.company_id,
-        channel_id,
-        &schedules,
-    ))
+    schedules_card(&schedule_use_cases, user.id, form.company_id, channel_id).await
 }
 
 #[cfg(test)]
@@ -428,6 +439,7 @@ mod tests {
             delivery_mode: "mailbox_only".into(),
             recipient_emails: None,
             timezone: None,
+            run_as_user_id: None,
         };
 
         let write = form.into_write().unwrap();
@@ -451,6 +463,7 @@ mod tests {
             delivery_mode: "email_custom".into(),
             recipient_emails: Some("dev@example.com, ops@example.com".into()),
             timezone: Some("Europe/Ljubljana".into()),
+            run_as_user_id: None,
         };
 
         let write = form.into_write().unwrap();

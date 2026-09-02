@@ -1747,6 +1747,13 @@ mod tests {
         ) -> crate::app_error::AppResult<Vec<String>> {
             unimplemented!()
         }
+        async fn list_company_team_accounts(
+            &self,
+            _company_id: Uuid,
+        ) -> crate::app_error::AppResult<Vec<crate::entities::company::CompanyTeamAccount>>
+        {
+            unimplemented!()
+        }
         async fn list_model_connections(
             &self,
             _company_id: Uuid,

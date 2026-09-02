@@ -71,6 +71,30 @@ pub struct CompanyAccess {
     pub membership: CompanyMembership,
 }
 
+/// One account on a company's team -- the owner included -- with the address the company knows
+/// them by.
+///
+/// `CompanyMember` is a `company_members` row and so cannot describe the owner, who has no such
+/// row. Anything that has to offer "somebody on this team" as a choice, such as the member a
+/// schedule runs as, needs the owner in the same list as everybody else.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CompanyTeamAccount {
+    pub user_id: Uuid,
+    pub email: EmailAddress,
+    pub username: Option<String>,
+    pub membership: CompanyMembership,
+}
+
+impl CompanyTeamAccount {
+    /// What to show a reader: the account's own name when it has one, and its address otherwise.
+    pub fn label(&self) -> &str {
+        match self.username.as_deref().map(str::trim) {
+            Some(username) if !username.is_empty() => username,
+            _ => self.email.as_str(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

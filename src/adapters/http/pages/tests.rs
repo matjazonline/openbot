@@ -1,5 +1,6 @@
 use super::*;
 use crate::entities::correlation::CorrelationId;
+use crate::entities::schedule::ScheduleRunAsChoices;
 use crate::entities::task::{
     TaskAttemptRecord, TaskAttemptRecordStatus, TaskStatusEvent, TaskStopReason,
     TaskTransitionActorKind, TaskTransitionReason,
@@ -1406,6 +1407,7 @@ fn the_channel_tab_renders_the_owned_channel_and_cannot_delete_it() {
     let tab = AgentChannelTab {
         channel: &personal,
         schedules: &[],
+        run_as: &ScheduleRunAsChoices::default(),
         spam_scan_enabled: true,
         memory_ready: false,
         draft: None,
@@ -1457,6 +1459,7 @@ fn the_channel_tab_keeps_a_rejected_save_in_the_form() {
     let tab = AgentChannelTab {
         channel: &personal,
         schedules: &[],
+        run_as: &ScheduleRunAsChoices::default(),
         spam_scan_enabled: false,
         memory_ready: false,
         draft: Some(&draft),
@@ -1918,6 +1921,7 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
         channel: &channel,
         agents: &[triage.clone(), unused.clone()],
         schedules: &[],
+        run_as: &ScheduleRunAsChoices::default(),
         spam_scan_enabled: true,
         draft: None,
         error: None,
@@ -1970,6 +1974,7 @@ fn owned_channel_locks_owner_and_primary_address_and_hides_delete() {
         channel: &channel,
         agents: &[owner.clone(), other],
         schedules: &[],
+        run_as: &ScheduleRunAsChoices::default(),
         spam_scan_enabled: true,
         draft: None,
         error: None,
@@ -2015,6 +2020,7 @@ fn library_agents_are_picked_from_a_modal_of_cards() {
         channel: &channel,
         agents: &[scheduler.clone(), researcher.clone()],
         schedules: &[],
+        run_as: &ScheduleRunAsChoices::default(),
         spam_scan_enabled: true,
         draft: None,
         error: None,
@@ -2057,6 +2063,7 @@ fn channel_edit_pane_reflects_the_stored_third_party_setting() {
         channel: &mailbox_channel(company.id),
         agents: &[],
         schedules: &[],
+        run_as: &ScheduleRunAsChoices::default(),
         spam_scan_enabled: true,
         draft: None,
         error: None,
@@ -2076,6 +2083,7 @@ fn channel_edit_pane_reflects_the_stored_third_party_setting() {
         channel: &closed_channel,
         agents: &[],
         schedules: &[],
+        run_as: &ScheduleRunAsChoices::default(),
         spam_scan_enabled: true,
         draft: None,
         error: None,
@@ -2104,6 +2112,7 @@ fn channel_edit_pane_keeps_a_rejected_save_in_the_form() {
         channel: &channel,
         agents: &[],
         schedules: &[],
+        run_as: &ScheduleRunAsChoices::default(),
         spam_scan_enabled: false,
         draft: Some(&draft),
         error: Some("Invalid JSON config"),
@@ -2145,6 +2154,7 @@ fn spam_confirmation_is_inert_until_the_channel_is_public() {
             channel: &channel,
             agents: &[],
             schedules: &[],
+            run_as: &ScheduleRunAsChoices::default(),
             spam_scan_enabled,
             draft: Some(&draft),
             error: None,
@@ -2184,6 +2194,7 @@ fn cancelling_a_channel_form_dismisses_the_pane() {
         channel: &channel,
         agents: &[],
         schedules: &[],
+        run_as: &ScheduleRunAsChoices::default(),
         spam_scan_enabled: true,
         draft: None,
         error: None,
@@ -4966,6 +4977,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         companies: &companies,
         schedules: &[],
         selected_schedule_id: None,
+        run_as: &ScheduleRunAsChoices::default(),
         runs_html: "",
         pane_html: "",
     });

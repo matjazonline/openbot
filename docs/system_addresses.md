@@ -7,6 +7,11 @@ prefixed with an underscore:
 _help@{company}.{application-domain}
 ```
 
+System addresses are email-adapter routes, not business channels, principals, or channel
+identities. Likewise, an ordinary platform email address is adapter syntax that resolves to a
+transport-neutral channel selector and then to a canonical channel and email binding. See the
+[Transport Architecture Contract](transport_architecture.md).
+
 ## Why the underscore
 
 Both slug namespaces are constrained by the database:

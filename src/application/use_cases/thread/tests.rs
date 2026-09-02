@@ -136,6 +136,13 @@ impl CompanyPersistence for MockCompanyPersistence {
             .collect())
     }
 
+    async fn list_company_team_accounts(
+        &self,
+        _company_id: Uuid,
+    ) -> AppResult<Vec<crate::entities::company::CompanyTeamAccount>> {
+        unimplemented!("this double is not exercised on the team-account path")
+    }
+
     /// This double never reaches a provider call: the tests around it assert on ingestion and
     /// threading, and an agent run that gets this far fails at parameter resolution by design.
     async fn list_model_connections(

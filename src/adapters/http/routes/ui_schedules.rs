@@ -33,7 +33,11 @@ use crate::{
         },
     },
     app_error::{AppError, AppResult},
-    entities::{company::Company, schedule::ScheduleRun, value_objects::EmailAddress},
+    entities::{
+        company::Company,
+        schedule::{ScheduleRun, ScheduleRunAsChoices},
+        value_objects::EmailAddress,
+    },
     infra::config::AppConfig,
     infra::events::MailboxEvents,
     services::email_parser::RawInboundPayload,
@@ -152,6 +156,13 @@ impl SchedulesWorkspace {
         company_id: Option<Uuid>,
     ) -> AppResult<(Vec<Company>, Option<Company>)> {
         load_managed_company(&self.company_use_cases, self.user_id, company_id).await
+    }
+
+    /// Whom this caller may make a schedule run as, and who the listed ones already run as.
+    async fn run_as_choices(&self, company_id: Uuid) -> AppResult<ScheduleRunAsChoices> {
+        self.schedule_use_cases
+            .run_as_choices(self.user_id, company_id)
+            .await
     }
 
     /// One page of a schedule's runs. `PAGE_SIZE + 1` is fetched so the pager knows whether a
@@ -281,6 +292,8 @@ async fn schedules_page(
         .list_company_channels(workspace.user_id, company.id)
         .await?;
 
+    let run_as = workspace.run_as_choices(company.id).await?;
+
     let selected_schedule = query
         .schedule_id
         .and_then(|id| schedules.iter().find(|s| s.id == id))
@@ -296,6 +309,7 @@ async fn schedules_page(
             company_id: company.id,
             channels: &channels,
             schedule: None,
+            run_as: &run_as,
             error: None,
         });
         (String::new(), form_pane)
@@ -395,6 +409,7 @@ async fn schedules_page(
         company: &company,
         schedules: &schedules,
         selected_schedule_id: selected_schedule.map(|s| s.id),
+        run_as: &run_as,
         runs_html: &runs_html,
         pane_html: &pane_html,
     })))
@@ -642,11 +657,14 @@ async fn create_pane(
         .list_company_channels(workspace.user_id, company.id)
         .await?;
 
+    let run_as = workspace.run_as_choices(company.id).await?;
+
     Ok(Html(pages::schedule_form_pane(
         &pages::ScheduleFormPaneProps {
             company_id: company.id,
             channels: &channels,
             schedule: None,
+            run_as: &run_as,
             error: None,
         },
     )))
@@ -674,11 +692,14 @@ async fn edit_schedule_pane(
         .list_company_channels(workspace.user_id, company.id)
         .await?;
 
+    let run_as = workspace.run_as_choices(company.id).await?;
+
     Ok(Html(pages::schedule_form_pane(
         &pages::ScheduleFormPaneProps {
             company_id: company.id,
             channels: &channels,
             schedule: Some(&schedule),
+            run_as: &run_as,
             error: None,
         },
     )))
@@ -732,10 +753,12 @@ async fn toggle_schedule(
         .schedule_use_cases
         .list_company_schedules(workspace.user_id, form.company_id)
         .await?;
+    let run_as = workspace.run_as_choices(form.company_id).await?;
     let sidebar = pages::schedules_sidebar_list(
         form.company_id,
         &schedules,
         Some(id),
+        &run_as,
         pages::FragmentSwap::OutOfBand,
     );
 
@@ -866,7 +889,7 @@ mod tests {
         schedule_runs_column, schedule_runs_column_fragment, schedule_thread_pane, schedules_page,
     };
     use crate::entities::{
-        company::Company,
+        company::{Company, CompanyTeamAccount},
         company_member::CompanyMembership,
         message::{Message, MessageDirection, MessageRole},
         schedule::{
@@ -904,6 +927,7 @@ mod tests {
             delivery_mode: ScheduleDeliveryMode::MailboxOnly,
             recipient_emails: vec![],
             timezone: ScheduleTimezone::utc(),
+            run_as_user_id: None,
             enabled: true,
             last_run_at: None,
             next_run_at: Some(Utc::now()),
@@ -963,6 +987,7 @@ mod tests {
                 company: &test_company(),
                 schedules: std::slice::from_ref(&schedule),
                 selected_schedule_id: Some(schedule.id),
+                run_as: &ScheduleRunAsChoices::default(),
                 runs_html: "",
                 pane_html: "",
             }),
@@ -991,6 +1016,7 @@ mod tests {
                 company_id,
                 channels: &[],
                 schedule: Some(&schedule),
+                run_as: &ScheduleRunAsChoices::default(),
                 error: None,
             }),
         ]
@@ -1037,6 +1063,7 @@ mod tests {
             company: &company,
             schedules: std::slice::from_ref(&schedule),
             selected_schedule_id: Some(schedule.id),
+            run_as: &ScheduleRunAsChoices::default(),
             runs_html: r#"<div id="schedule-runs-column">Runs Column</div>"#,
             pane_html: r#"<div id="schedule-pane">Detail Pane</div>"#,
         });
@@ -1238,7 +1265,7 @@ mod tests {
             "company_id={company_id}&name=Daily+Operations+Report&channel_id={channel_id}\
              &schedule_type=interval&interval_seconds=3600&scheduled_at=\
              &subject_template=%5BDaily%5D+Report&prompt_template=Summarise+the+day\
-             &timezone=UTC&delivery_mode=mailbox_only&recipient_emails="
+             &timezone=UTC&run_as_user_id=&delivery_mode=mailbox_only&recipient_emails="
         )
         .replace(['\n', ' '], "");
 
@@ -1266,6 +1293,10 @@ mod tests {
         assert_eq!(write.delivery_mode, ScheduleDeliveryMode::MailboxOnly);
         assert_eq!(write.scheduled_at, None);
         assert!(write.recipient_emails.is_empty());
+        assert_eq!(
+            write.run_as_user_id, None,
+            "the picker's own \"nobody\" option submits an empty value, not a bad uuid"
+        );
     }
 
     /// The one-off half of the same pane: the cadence select is hidden but still submits, and the
@@ -1278,11 +1309,13 @@ mod tests {
 
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
+        let member_id = Uuid::new_v4();
         let body = format!(
             "company_id={company_id}&name=Quarter+Close&channel_id={channel_id}\
              &schedule_type=one_off&interval_seconds=&scheduled_at=2026-08-25T14%3A30\
-             &subject_template=Close&prompt_template=Close+the+quarter\
-             &timezone=UTC&delivery_mode=email_custom&recipient_emails=a%40x.com%2C+b%40x.com"
+             &subject_template=Close&prompt_template=Close+the+quarter&timezone=UTC\
+             &run_as_user_id={member_id}&delivery_mode=email_custom\
+             &recipient_emails=a%40x.com%2C+b%40x.com"
         )
         .replace(['\n', ' '], "");
 
@@ -1309,5 +1342,71 @@ mod tests {
             Some("2026-08-25T14:30:00+00:00".to_string())
         );
         assert_eq!(write.recipient_emails.len(), 2);
+        assert_eq!(
+            write.run_as_user_id,
+            Some(member_id),
+            "a picked member has to reach the write as the account the picker names"
+        );
+    }
+
+    /// One team, two viewers: the picker offers the owner everybody and the admin only
+    /// themselves, and the schedule the owner already attributed comes back to the admin as a
+    /// locked value rather than as a choice they could quietly re-point.
+    #[test]
+    fn the_run_as_picker_offers_only_what_the_viewer_may_choose() {
+        let company = test_company();
+        let channel_id = Uuid::new_v4();
+        let owner = CompanyTeamAccount {
+            user_id: company.user_id,
+            email: EmailAddress::from("owner@example.com"),
+            username: Some("owner".into()),
+            membership: CompanyMembership::Owner,
+        };
+        let admin = CompanyTeamAccount {
+            user_id: Uuid::new_v4(),
+            email: EmailAddress::from("admin@example.com"),
+            username: Some("admin".into()),
+            membership: CompanyMembership::Admin,
+        };
+        let team = vec![owner.clone(), admin.clone()];
+
+        let mut schedule = test_schedule(company.id, channel_id);
+        schedule.run_as_user_id = Some(owner.user_id);
+
+        let owners_form = pages::schedule_form_pane(&pages::ScheduleFormPaneProps {
+            company_id: company.id,
+            channels: &[],
+            schedule: Some(&schedule),
+            run_as: &ScheduleRunAsChoices {
+                team: team.clone(),
+                restricted_to: None,
+            },
+            error: None,
+        });
+        assert!(owners_form.contains(r#"<select name="run_as_user_id""#));
+        assert!(owners_form.contains(&format!(r#"value="{}" selected"#, owner.user_id)));
+        assert!(owners_form.contains(&format!(r#"value="{}" "#, admin.user_id)));
+
+        let admins_form = pages::schedule_form_pane(&pages::ScheduleFormPaneProps {
+            company_id: company.id,
+            channels: &[],
+            schedule: Some(&schedule),
+            run_as: &ScheduleRunAsChoices {
+                team,
+                restricted_to: Some(admin.user_id),
+            },
+            error: None,
+        });
+        assert!(
+            admins_form.contains(&format!(
+                r#"<input type="hidden" name="run_as_user_id" value="{}">"#,
+                owner.user_id
+            )),
+            "an admin's save has to hand the owner's attribution back unchanged"
+        );
+        assert!(
+            !admins_form.contains(r#"<select name="run_as_user_id""#),
+            "an admin must not be offered a member they may not choose"
+        );
     }
 }

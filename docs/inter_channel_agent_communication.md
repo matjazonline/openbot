@@ -1,6 +1,14 @@
 # Inter-Channel Agent Communication
 
-Same-company agent channels can delegate work to one another without using SMTP. Internal delivery preserves email-style message metadata and reuses the existing thread, task, outreach, target, and outbox records.
+Same-company agent channels can delegate work to one another without using SMTP. The application
+addresses the destination with a transport-neutral `ChannelSelector`, resolves it to a canonical
+channel ID, and then performs internal delivery. A platform email address is one email-adapter
+syntax for producing that selector; it is not the identity of the destination channel.
+
+The current compatibility path preserves email-style message metadata and reuses the existing
+thread, task, outreach, target, and outbox records. New application contracts follow the
+[Transport Architecture Contract](transport_architecture.md) and must not manufacture an email
+address merely to call another channel.
 
 No separate agent-call or parent-child task model is required.
 
@@ -46,9 +54,13 @@ A outreach target
 
 ## Agent Configuration
 
-Agent A uses the existing `outreach_and_await_quorum` tool with a same-company-only target policy. A single target and a 100 percent threshold represent one channel call, and both are the defaults, so the model need only supply the address, subject and body.
+Agent A uses the existing `outreach_and_await_quorum` tool with a same-company-only target policy.
+A single target and a 100 percent threshold represent one channel call, and both are the defaults,
+so the model need only supply the target selector, subject, and body.
 
-Grant `list_company_agents` alongside it so Agent A can discover Agent B's address instead of carrying it in its prompt.
+Grant `list_company_agents` alongside it so Agent A can discover Agent B as a channel selector
+instead of carrying adapter routing syntax in its prompt. During the email compatibility cutover,
+the tool may also return the channel's email address as a display/delivery projection.
 
 ```yaml
 tools:
@@ -100,7 +112,7 @@ Supported target scopes are:
 | Scope | Permitted targets |
 |---|---|
 | `external_only` | External email addresses only; this is the default |
-| `same_company_channels` | Direct agent-channel addresses in the current company only |
+| `same_company_channels` | Canonical agent channels selected within the current company only |
 | `any` | External addresses and valid same-company agent channels |
 
 | Setting | Default | Effect |
@@ -111,7 +123,8 @@ Use `same_company_channels` for coordinator agents that must not contact third p
 
 ## Tool Call
 
-Agent A calls Agent B through its channel address:
+Agent A calls Agent B through a channel selector. This compatibility example uses the email
+adapter's platform-address syntax:
 
 ```json
 {
@@ -123,7 +136,8 @@ Agent A calls Agent B through its channel address:
 
 `completion_threshold_percent` defaults to 100 and `timeout_hours` to `default_timeout_hours`, so a delegated request omits both. Spelling them out explicitly produces an identical idempotency key.
 
-Agent A finds that address by calling `list_company_agents` first, which returns one entry per callable sibling channel:
+Agent A finds that channel by calling `list_company_agents` first, which returns one entry per
+callable sibling channel. The compatibility projection below exposes email adapter syntax:
 
 ```json
 {
@@ -141,9 +155,11 @@ Agent A finds that address by calling `list_company_agents` first, which returns
 
 `description` comes from the agent's Description field on its settings page. The directory applies exactly the same eligibility rules as the send path, so it can never advertise a channel the tool would then refuse.
 
-An internal target must satisfy all of these conditions:
+An internal target must satisfy all of these conditions after selector parsing and canonical
+channel resolution:
 
-- It is a direct `<channel>@<company>.<application-domain>` address.
+- It resolves to a direct channel selector (the email adapter accepts
+  `<channel>@<company>.<application-domain>` during the compatibility cutover).
 - It belongs to the caller's company.
 - It is not the caller's own channel.
 - It has at least one configured agent.
@@ -203,7 +219,8 @@ The internal ingress path validates:
 
 - Source channel ID exists.
 - Source channel and destination channel belong to the same company.
-- The sender address matches the source channel.
+- The sender principal and resolved selector match the source channel (the compatibility path also
+  verifies its projected email address).
 - The destination is a direct agent channel.
 - The hop limit has not been reached.
 
@@ -215,7 +232,7 @@ Normal repeated-channel traces are rejected. A return from B to A is allowed onl
 
 ```text
 destination company + channel + thread
-sender == outreach target channel address
+sender principal/channel == resolved outreach target channel
 In-Reply-To or References contains the A-to-B outbox Message-ID
 ```
 

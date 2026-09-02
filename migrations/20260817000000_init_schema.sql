@@ -1256,6 +1256,13 @@ CREATE TABLE channel_schedules (
     delivery_mode TEXT NOT NULL DEFAULT 'mailbox_only',
     recipient_emails CITEXT[] NOT NULL DEFAULT '{}',
     timezone TEXT NOT NULL DEFAULT 'UTC',
+    -- The team member a run acts as: its prompt is attributed to their address and user-scoped
+    -- memory is recalled and written as theirs. NULL is a run that belongs to nobody, which is
+    -- what every schedule was before the attribution existed. Team membership itself is not
+    -- constrained here, because it can be revoked after the fact -- the run re-checks it and
+    -- refuses rather than acting as somebody who has left; a deleted account leaves the schedule
+    -- running unattributed rather than erroring forever.
+    run_as_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     enabled BOOLEAN NOT NULL DEFAULT true,
     last_run_at TIMESTAMPTZ,
     next_run_at TIMESTAMPTZ,

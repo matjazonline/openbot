@@ -7,10 +7,13 @@ use crate::{
     adapters::persistence::{schedule::SchedulePersistence, task::TaskPersistence},
     app_error::{AppError, AppResult},
     entities::{
+        channel::Channel,
+        company::Company,
         correlation::CorrelationId,
         message::{Message, MessageDirection, MessageRole},
         schedule::{
-            ChannelSchedule, ScheduleDeliveryMode, ScheduleType, ScheduleWrite, ScheduledRunPayload,
+            ChannelSchedule, ScheduleDeliveryMode, ScheduleRunAs, ScheduleRunAsChoices,
+            ScheduleType, ScheduleWrite, ScheduledRunPayload,
         },
         task::NewTask,
         value_objects::{EmailAddress, MessageId},
@@ -26,6 +29,17 @@ use crate::{
 /// The `background_tasks.task_type` a schedule run is queued under. Named once here because the
 /// worker dispatches on it and the runs query filters by it.
 pub const SCHEDULED_AGENT_RUN_TASK: &str = "scheduled_agent_run";
+
+/// A submitted change of whom a schedule runs as: what the row holds now, and what the form
+/// asked for.
+///
+/// Two `Option<Uuid>` of opposite meaning, so they travel named rather than as adjacent
+/// positional arguments a call site can swap silently.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RunAsChange {
+    stored: Option<Uuid>,
+    requested: Option<Uuid>,
+}
 
 #[derive(Clone)]
 pub struct ScheduleUseCases {
@@ -60,9 +74,13 @@ impl ScheduleUseCases {
         &self.schedule_persistence
     }
 
-    async fn verify_company_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
-        Ok(())
+    /// The company whose automation this caller may manage, which every read and write here
+    /// starts from.
+    ///
+    /// Returns the company rather than asserting access, because who may be named as a run's
+    /// member turns on whether the caller owns it.
+    async fn managed_company(&self, user_id: Uuid, company_id: Uuid) -> AppResult<Company> {
+        managed_company(self.company_persistence.as_ref(), user_id, company_id).await
     }
 
     /// The one place a schedule is resolved for a caller: the user must own or administer the
@@ -74,7 +92,7 @@ impl ScheduleUseCases {
         company_id: Uuid,
         id: Uuid,
     ) -> AppResult<ChannelSchedule> {
-        self.verify_company_manager(user_id, company_id).await?;
+        self.managed_company(user_id, company_id).await?;
 
         let schedule = self
             .schedule_persistence
@@ -93,7 +111,7 @@ impl ScheduleUseCases {
         company_id: Uuid,
         channel_id: Uuid,
     ) -> AppResult<Uuid> {
-        self.verify_company_manager(user_id, company_id).await?;
+        self.managed_company(user_id, company_id).await?;
 
         let channel = self
             .channel_persistence
@@ -148,18 +166,81 @@ impl ScheduleUseCases {
         Ok(())
     }
 
+    /// Who this caller may make a schedule run as.
+    ///
+    /// The company's owner may attribute a run to anybody on the team; an admin may attribute one
+    /// only to themselves, so an admin cannot make the company's automation act as a colleague --
+    /// which would read that colleague's personal memory into a channel and write the channel's
+    /// answers back into it. Both the picker and [`Self::authorized_run_as`] are answered from
+    /// this one value, so a form cannot offer a choice the write would refuse.
+    #[instrument(skip(self))]
+    pub async fn run_as_choices(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<ScheduleRunAsChoices> {
+        let company = self.managed_company(user_id, company_id).await?;
+        let team = self
+            .company_persistence
+            .list_company_team_accounts(company_id)
+            .await?;
+
+        Ok(ScheduleRunAsChoices {
+            team,
+            restricted_to: (company.user_id != user_id).then_some(user_id),
+        })
+    }
+
+    /// The run-as member a write may store.
+    ///
+    /// Leaving a stored attribution alone is not a change, so an admin editing a schedule the
+    /// owner attributed to somebody else only has to leave it be -- they do not have to be
+    /// allowed to have chosen that person.
+    async fn authorized_run_as(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        change: RunAsChange,
+    ) -> AppResult<Option<Uuid>> {
+        let Some(requested) = change.requested else {
+            return Ok(None);
+        };
+        if change.stored == Some(requested) {
+            return Ok(Some(requested));
+        }
+
+        let choices = self.run_as_choices(user_id, company_id).await?;
+        if !choices.may_choose(requested) {
+            return Err(AppError::BadRequest(
+                "Only the company owner can have a schedule run as another team member.".into(),
+            ));
+        }
+
+        Ok(Some(requested))
+    }
+
     #[instrument(skip(self))]
     pub async fn create_schedule(
         &self,
         user_id: Uuid,
         company_id: Uuid,
         channel_id: Uuid,
-        write: ScheduleWrite,
+        mut write: ScheduleWrite,
     ) -> AppResult<ChannelSchedule> {
         let channel_id = self
             .managed_channel_id(user_id, company_id, channel_id)
             .await?;
         Self::validate_write(&write)?;
+        write.run_as_user_id = self
+            .authorized_run_as(
+                user_id,
+                company_id,
+                RunAsChange {
+                    stored: None,
+                    requested: write.run_as_user_id,
+                },
+            )
+            .await?;
 
         info!(
             "Creating schedule '{}' (type={}) for channel {} in company {}",
@@ -206,7 +287,7 @@ impl ScheduleUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<ChannelSchedule>> {
-        self.verify_company_manager(user_id, company_id).await?;
+        self.managed_company(user_id, company_id).await?;
         self.schedule_persistence
             .list_by_company_id(company_id)
             .await
@@ -219,13 +300,23 @@ impl ScheduleUseCases {
         company_id: Uuid,
         id: Uuid,
         channel_id: Uuid,
-        write: ScheduleWrite,
+        mut write: ScheduleWrite,
     ) -> AppResult<ChannelSchedule> {
         let existing = self.managed_schedule(user_id, company_id, id).await?;
         let channel_id = self
             .managed_channel_id(user_id, company_id, channel_id)
             .await?;
         Self::validate_write(&write)?;
+        write.run_as_user_id = self
+            .authorized_run_as(
+                user_id,
+                company_id,
+                RunAsChange {
+                    stored: existing.run_as_user_id,
+                    requested: write.run_as_user_id,
+                },
+            )
+            .await?;
 
         info!(
             "Updating schedule {} for company {}: {}",
@@ -326,6 +417,73 @@ impl ScheduleUseCases {
         Ok(schedule)
     }
 
+    /// The identity a run acts as, resolved fresh each time the schedule fires.
+    ///
+    /// Re-checked against the team rather than trusted from the row: revoking somebody's
+    /// membership has to stop runs that act as them, so a schedule left pointing at a former
+    /// colleague fails loudly onto `last_error` instead of quietly running as nobody. An account
+    /// that is deleted outright clears the column, which is the unattributed run it was before.
+    async fn run_as_identity(
+        &self,
+        schedule: &ChannelSchedule,
+    ) -> AppResult<Option<ScheduleRunAs>> {
+        let Some(user_id) = schedule.run_as_user_id else {
+            return Ok(None);
+        };
+
+        let account = self
+            .company_persistence
+            .list_company_team_accounts(schedule.company_id)
+            .await?
+            .into_iter()
+            .find(|account| account.user_id == user_id)
+            .ok_or_else(|| {
+                AppError::BadRequest(
+                    "The team member this schedule runs as is no longer on the company team."
+                        .into(),
+                )
+            })?;
+
+        Ok(Some(ScheduleRunAs {
+            user_id: account.user_id,
+            email: account.email,
+        }))
+    }
+
+    /// Who a run's thread is between: the channel's own participants, or the company's team when
+    /// the channel names none -- plus the member the run acts as, who belongs on a thread opened
+    /// in their name.
+    ///
+    /// The team read propagates rather than falling back to an empty list: a participant list
+    /// decides who may see the thread, and "nobody" is not the safe reading of a failed query.
+    async fn thread_participants(
+        &self,
+        channel: &Channel,
+        company_id: Uuid,
+        run_as: Option<&ScheduleRunAs>,
+    ) -> AppResult<Vec<EmailAddress>> {
+        let mut participants = channel.participant_emails.clone().unwrap_or_default();
+        if participants.is_empty() {
+            participants = self
+                .company_persistence
+                .list_company_team_emails(company_id)
+                .await?
+                .into_iter()
+                .map(EmailAddress::from)
+                .collect();
+        }
+
+        if let Some(run_as) = run_as
+            && !participants
+                .iter()
+                .any(|email| email.eq_ignore_case(&run_as.email))
+        {
+            participants.push(run_as.email.clone());
+        }
+
+        Ok(participants)
+    }
+
     /// Spawns the thread and enqueues the `background_tasks` entry for this schedule run.
     pub async fn execute_schedule_trigger(&self, schedule: &ChannelSchedule) -> AppResult<Uuid> {
         self.execute_schedule_run(schedule, None).await
@@ -355,16 +513,10 @@ impl ScheduleUseCases {
             .await?
             .ok_or_else(|| AppError::Internal("Company not found for schedule execution".into()))?;
 
-        // Thread participants: default to channel participants or company team
-        let mut participants = channel.participant_emails.clone().unwrap_or_default();
-        if participants.is_empty() {
-            let team = self
-                .company_persistence
-                .list_company_team_emails(company.id)
-                .await
-                .unwrap_or_default();
-            participants = team.into_iter().map(EmailAddress::from).collect();
-        }
+        let run_as = self.run_as_identity(schedule).await?;
+        let participants = self
+            .thread_participants(&channel, company.id, run_as.as_ref())
+            .await?;
 
         // 1. Create a fresh thread in the channel
         let thread = match run_id {
@@ -391,7 +543,13 @@ impl ScheduleUseCases {
         );
 
         // 2. Save the initial prompt message into the thread
-        let sender = channel.inbound_address(&company.slug, &self.config.app_domain_name);
+        let channel_address = channel.inbound_address(&company.slug, &self.config.app_domain_name);
+        // A run that acts as a member is that member's standing request, so the prompt is from
+        // them and reads as a person's turn rather than the channel talking to itself.
+        let (sender, role) = match run_as.as_ref() {
+            Some(run_as) => (run_as.email.clone(), MessageRole::Human),
+            None => (channel_address.clone(), MessageRole::System),
+        };
         let prompt_message_id = MessageId::new(match run_id {
             Some(run_id) => format!("<schedule-run-{run_id}@{}>", self.config.app_domain_name),
             None => format!(
@@ -410,8 +568,8 @@ impl ScheduleUseCases {
                 message_id: prompt_message_id.clone(),
                 in_reply_to: None,
                 references_list: vec![],
-                sender: sender.clone(),
-                recipients_to: vec![sender.clone()],
+                sender,
+                recipients_to: vec![channel_address],
                 recipients_cc: vec![],
                 subject: rendered_subject.clone(),
                 clean_text_body: rendered_prompt.clone(),
@@ -419,7 +577,7 @@ impl ScheduleUseCases {
                 raw_html_body: None,
                 attachments: None,
                 direction: MessageDirection::Inbound,
-                role: MessageRole::System,
+                role,
                 thread_index: None,
                 created_at: now,
             })
@@ -437,6 +595,7 @@ impl ScheduleUseCases {
             prompt: rendered_prompt,
             delivery_mode: schedule.delivery_mode,
             recipient_emails: schedule.recipient_emails.clone(),
+            run_as,
             trigger_message_id: prompt_message.message_id.clone(),
         };
         let task_payload = serde_json::to_value(&task_payload).map_err(|err| {
@@ -544,7 +703,7 @@ mod tests {
     use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
     use crate::entities::{
         channel::Channel,
-        company::{Company, CompanyAccess},
+        company::{Company, CompanyAccess, CompanyTeamAccount},
         company_member::CompanyMembership,
         cursor::{MessageCursor, ThreadCursor},
         schedule::ScheduleTimezone,
@@ -568,6 +727,7 @@ mod tests {
             delivery_mode: ScheduleDeliveryMode::MailboxOnly,
             recipient_emails: vec![],
             timezone: ScheduleTimezone::utc(),
+            run_as_user_id: None,
             enabled: true,
         };
 
@@ -635,6 +795,7 @@ mod tests {
                 delivery_mode: write.delivery_mode,
                 recipient_emails: write.recipient_emails,
                 timezone: write.timezone,
+                run_as_user_id: write.run_as_user_id,
                 enabled: write.enabled,
                 last_run_at: None,
                 next_run_at: Some(Utc::now()),
@@ -702,6 +863,7 @@ mod tests {
             s.delivery_mode = write.delivery_mode;
             s.recipient_emails = write.recipient_emails;
             s.timezone = write.timezone;
+            s.run_as_user_id = write.run_as_user_id;
             s.updated_at = Utc::now();
             Ok(s.clone())
         }
@@ -873,6 +1035,36 @@ mod tests {
         }
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec!["admin@example.com".into()])
+        }
+
+        /// The company's owner plus whatever memberships this double was built with, addressed as
+        /// `<account id>@example.com` so a test can recognise whom a run was attributed to.
+        async fn list_company_team_accounts(
+            &self,
+            company_id: Uuid,
+        ) -> AppResult<Vec<CompanyTeamAccount>> {
+            let companies = self.companies.lock().unwrap();
+            let memberships = self.memberships.lock().unwrap();
+            let owner = companies
+                .iter()
+                .find(|company| company.id == company_id)
+                .map(|company| (company.user_id, CompanyMembership::Owner));
+
+            Ok(owner
+                .into_iter()
+                .chain(
+                    memberships
+                        .iter()
+                        .filter(|(_, member_company, _)| *member_company == company_id)
+                        .map(|(user_id, _, membership)| (*user_id, *membership)),
+                )
+                .map(|(user_id, membership)| CompanyTeamAccount {
+                    user_id,
+                    email: EmailAddress::new(format!("{user_id}@example.com")),
+                    username: None,
+                    membership,
+                })
+                .collect())
         }
 
         /// Model connections are not part of what these tests drive; a call here is a wiring mistake
@@ -1160,6 +1352,47 @@ mod tests {
         }
     }
 
+    /// A company owned by `user_id`, named after its slug.
+    fn company_of(id: Uuid, user_id: Uuid, slug: &str) -> Company {
+        Company {
+            channel_defaults: Default::default(),
+            id,
+            user_id,
+            name: slug.into(),
+            slug: slug.into(),
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: Utc::now(),
+        }
+    }
+
+    /// An unrestricted channel: with no participant list of its own, a run's thread falls back to
+    /// the company team, which is the path the run-as member is added on top of.
+    fn channel_of(id: Uuid, company_id: Uuid) -> Channel {
+        Channel {
+            owner_agent_id: None,
+            id,
+            company_id,
+            name: "Reports".into(),
+            description: None,
+            slug: "reports".into(),
+            alias_slugs: vec![],
+            participant_emails: None,
+            agent_ids: None,
+            enabled: true,
+            add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: Utc::now(),
+        }
+    }
+
     fn test_config() -> Arc<AppConfig> {
         Arc::new(AppConfig {
             jwt_secret: "secret".into(),
@@ -1205,39 +1438,6 @@ mod tests {
         let theirs_channel = Uuid::new_v4();
         let mine_channel = Uuid::new_v4();
 
-        let company_of = |id: Uuid, user_id: Uuid, slug: &str| Company {
-            channel_defaults: Default::default(),
-            id,
-            user_id,
-            name: slug.into(),
-            slug: slug.into(),
-            enable_llm_spam_guardrail: None,
-            avatar_url: None,
-            memory_provider: None,
-            created_at: Utc::now(),
-        };
-        let channel_of = |id: Uuid, company_id: Uuid| Channel {
-            owner_agent_id: None,
-            id,
-            company_id,
-            name: "Reports".into(),
-            description: None,
-            slug: "reports".into(),
-            alias_slugs: vec![],
-            participant_emails: None,
-            agent_ids: None,
-            enabled: true,
-            add_3rd_party: true,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
-            created_by: crate::entities::creation::CreationProvenance::system(),
-            created_at: Utc::now(),
-        };
-
         let schedule_persistence = Arc::new(MockSchedulePersistence {
             schedules: Mutex::new(vec![]),
         });
@@ -1281,6 +1481,7 @@ mod tests {
                     delivery_mode: ScheduleDeliveryMode::MailboxOnly,
                     recipient_emails: vec![],
                     timezone: ScheduleTimezone::utc(),
+                    run_as_user_id: None,
                     enabled: true,
                 },
             )
@@ -1431,6 +1632,7 @@ mod tests {
             delivery_mode: ScheduleDeliveryMode::MailboxOnly,
             recipient_emails: vec![],
             timezone: ScheduleTimezone::utc(),
+            run_as_user_id: None,
             enabled: true,
         };
 
@@ -1480,6 +1682,7 @@ mod tests {
                     delivery_mode: created.delivery_mode,
                     recipient_emails: created.recipient_emails.clone(),
                     timezone: created.timezone,
+                    run_as_user_id: None,
                     enabled: created.enabled,
                 },
             )
@@ -1529,5 +1732,301 @@ mod tests {
             .delete_schedule(admin_id, company_id, created.id)
             .await
             .expect("an admin deletes a schedule");
+    }
+
+    /// The company, its team and one channel, wired to in-memory persistence.
+    ///
+    /// Every run-as test needs the same three people -- an owner, an admin and a member -- so the
+    /// fixture is built once rather than re-declared per test.
+    struct RunAsFixture {
+        owner_id: Uuid,
+        admin_id: Uuid,
+        member_id: Uuid,
+        company_id: Uuid,
+        channel_id: Uuid,
+        use_cases: ScheduleUseCases,
+        company_persistence: Arc<MockCompanyPersistence>,
+        thread_persistence: Arc<MockThreadPersistence>,
+        task_persistence: Arc<MockTaskPersistence>,
+    }
+
+    impl RunAsFixture {
+        fn new() -> Self {
+            let owner_id = Uuid::new_v4();
+            let admin_id = Uuid::new_v4();
+            let member_id = Uuid::new_v4();
+            let company_id = Uuid::new_v4();
+            let channel_id = Uuid::new_v4();
+
+            let company_persistence = Arc::new(MockCompanyPersistence {
+                companies: Mutex::new(vec![company_of(company_id, owner_id, "acme")]),
+                memberships: Mutex::new(vec![
+                    (admin_id, company_id, CompanyMembership::Admin),
+                    (member_id, company_id, CompanyMembership::Member),
+                ]),
+            });
+            let thread_persistence = Arc::new(MockThreadPersistence {
+                threads: Mutex::new(vec![]),
+                messages: Mutex::new(vec![]),
+            });
+            let task_persistence = Arc::new(MockTaskPersistence {
+                tasks: Mutex::new(vec![]),
+            });
+
+            let use_cases = ScheduleUseCases::new(
+                Arc::new(MockSchedulePersistence {
+                    schedules: Mutex::new(vec![]),
+                }),
+                company_persistence.clone(),
+                Arc::new(MockChannelPersistence {
+                    channels: Mutex::new(vec![channel_of(channel_id, company_id)]),
+                }),
+                thread_persistence.clone(),
+                task_persistence.clone(),
+                test_config(),
+            );
+
+            Self {
+                owner_id,
+                admin_id,
+                member_id,
+                company_id,
+                channel_id,
+                use_cases,
+                company_persistence,
+                thread_persistence,
+                task_persistence,
+            }
+        }
+
+        /// A valid write, naming whoever the test wants the runs attributed to.
+        fn write(&self, run_as_user_id: Option<Uuid>) -> ScheduleWrite {
+            ScheduleWrite {
+                name: "Morning Digest".into(),
+                schedule_type: ScheduleType::Interval,
+                interval_seconds: Some(3600),
+                scheduled_at: None,
+                subject_template: "[Daily] {{date}}".into(),
+                prompt_template: "Summarise yesterday".into(),
+                delivery_mode: ScheduleDeliveryMode::MailboxOnly,
+                recipient_emails: vec![],
+                timezone: ScheduleTimezone::utc(),
+                run_as_user_id,
+                enabled: true,
+            }
+        }
+
+        /// The address [`MockCompanyPersistence`] gives an account.
+        fn email_of(user_id: Uuid) -> EmailAddress {
+            EmailAddress::new(format!("{user_id}@example.com"))
+        }
+    }
+
+    /// The owner may hand a schedule to anybody on the team; an admin may only take it themselves.
+    /// The two halves are one rule, so they are asserted against one picker.
+    #[tokio::test]
+    async fn who_a_schedule_may_run_as_depends_on_who_is_asking() {
+        let fixture = RunAsFixture::new();
+
+        let owners_choices = fixture
+            .use_cases
+            .run_as_choices(fixture.owner_id, fixture.company_id)
+            .await
+            .unwrap();
+        assert!(owners_choices.may_choose(fixture.member_id));
+        assert!(owners_choices.may_choose(fixture.admin_id));
+        assert_eq!(owners_choices.choosable().count(), 3);
+
+        let admins_choices = fixture
+            .use_cases
+            .run_as_choices(fixture.admin_id, fixture.company_id)
+            .await
+            .unwrap();
+        assert!(admins_choices.may_choose(fixture.admin_id));
+        assert!(!admins_choices.may_choose(fixture.member_id));
+        assert!(!admins_choices.may_choose(fixture.owner_id));
+        // The whole team is still named, so an admin can read an attribution they cannot pick.
+        assert_eq!(admins_choices.team.len(), 3);
+        assert_eq!(admins_choices.choosable().count(), 1);
+    }
+
+    /// The picker's rule has to hold at the write, or naming a colleague in a hand-made request
+    /// would attribute the company's automation to them anyway.
+    #[tokio::test]
+    async fn an_admin_cannot_attribute_a_schedule_to_a_colleague() {
+        let fixture = RunAsFixture::new();
+
+        let refused = fixture
+            .use_cases
+            .create_schedule(
+                fixture.admin_id,
+                fixture.company_id,
+                fixture.channel_id,
+                fixture.write(Some(fixture.member_id)),
+            )
+            .await;
+        assert!(
+            matches!(refused, Err(AppError::BadRequest(_))),
+            "an admin naming a colleague must be refused, got {refused:?}"
+        );
+
+        let theirs = fixture
+            .use_cases
+            .create_schedule(
+                fixture.admin_id,
+                fixture.company_id,
+                fixture.channel_id,
+                fixture.write(Some(fixture.admin_id)),
+            )
+            .await
+            .expect("an admin may run a schedule as themselves");
+        assert_eq!(theirs.run_as_user_id, Some(fixture.admin_id));
+
+        let owners = fixture
+            .use_cases
+            .create_schedule(
+                fixture.owner_id,
+                fixture.company_id,
+                fixture.channel_id,
+                fixture.write(Some(fixture.member_id)),
+            )
+            .await
+            .expect("the owner may run a schedule as any team member");
+        assert_eq!(owners.run_as_user_id, Some(fixture.member_id));
+    }
+
+    /// Leaving somebody else's attribution alone is not a change, or an admin editing the
+    /// schedule's prompt would silently re-point the run at themselves.
+    #[tokio::test]
+    async fn an_admin_may_keep_an_attribution_they_could_not_have_chosen() {
+        let fixture = RunAsFixture::new();
+
+        let created = fixture
+            .use_cases
+            .create_schedule(
+                fixture.owner_id,
+                fixture.company_id,
+                fixture.channel_id,
+                fixture.write(Some(fixture.member_id)),
+            )
+            .await
+            .unwrap();
+
+        let mut edit = fixture.write(Some(fixture.member_id));
+        edit.prompt_template = "Summarise last week".into();
+        let kept = fixture
+            .use_cases
+            .update_schedule(
+                fixture.admin_id,
+                fixture.company_id,
+                created.id,
+                fixture.channel_id,
+                edit,
+            )
+            .await
+            .expect("an unrelated edit must not have to re-choose the member");
+        assert_eq!(kept.run_as_user_id, Some(fixture.member_id));
+        assert_eq!(kept.prompt_template, "Summarise last week");
+
+        // Changing it to somebody else is still a change, and still theirs alone to make.
+        let refused = fixture
+            .use_cases
+            .update_schedule(
+                fixture.admin_id,
+                fixture.company_id,
+                created.id,
+                fixture.channel_id,
+                fixture.write(Some(fixture.owner_id)),
+            )
+            .await;
+        assert!(matches!(refused, Err(AppError::BadRequest(_))));
+    }
+
+    /// What attributing a run actually buys: the prompt is the member's, and the payload carries
+    /// them so the worker scopes their memory rather than nobody's.
+    #[tokio::test]
+    async fn a_run_acts_as_the_member_it_names() {
+        let fixture = RunAsFixture::new();
+        let member_email = RunAsFixture::email_of(fixture.member_id);
+
+        let created = fixture
+            .use_cases
+            .create_schedule(
+                fixture.owner_id,
+                fixture.company_id,
+                fixture.channel_id,
+                fixture.write(Some(fixture.member_id)),
+            )
+            .await
+            .unwrap();
+
+        fixture
+            .use_cases
+            .trigger_schedule_now(fixture.owner_id, fixture.company_id, created.id)
+            .await
+            .unwrap();
+
+        let messages = fixture.thread_persistence.messages.lock().unwrap();
+        let prompt = messages.first().expect("the run opens with its prompt");
+        assert_eq!(prompt.sender, member_email);
+        assert_eq!(prompt.role, MessageRole::Human);
+
+        let threads = fixture.thread_persistence.threads.lock().unwrap();
+        assert!(
+            threads[0]
+                .participant_emails
+                .iter()
+                .any(|email| email.eq_ignore_case(&member_email)),
+            "the member a run acts as belongs on its thread"
+        );
+
+        let tasks = fixture.task_persistence.tasks.lock().unwrap();
+        let payload: ScheduledRunPayload =
+            serde_json::from_value(tasks[0].payload.clone()).unwrap();
+        assert_eq!(
+            payload.run_as,
+            Some(ScheduleRunAs {
+                user_id: fixture.member_id,
+                email: member_email,
+            })
+        );
+    }
+
+    /// Membership can be revoked after the fact, and a run that still acts as a former colleague
+    /// would read and write their personal memory. It has to stop instead.
+    #[tokio::test]
+    async fn a_run_refuses_once_its_member_has_left_the_team() {
+        let fixture = RunAsFixture::new();
+
+        let created = fixture
+            .use_cases
+            .create_schedule(
+                fixture.owner_id,
+                fixture.company_id,
+                fixture.channel_id,
+                fixture.write(Some(fixture.member_id)),
+            )
+            .await
+            .unwrap();
+
+        fixture
+            .company_persistence
+            .memberships
+            .lock()
+            .unwrap()
+            .retain(|(user_id, _, _)| *user_id != fixture.member_id);
+
+        let refused = fixture
+            .use_cases
+            .trigger_schedule_now(fixture.owner_id, fixture.company_id, created.id)
+            .await;
+        assert!(
+            matches!(refused, Err(AppError::BadRequest(_))),
+            "a run naming a former member must not launch, got {refused:?}"
+        );
+        assert!(
+            fixture.task_persistence.tasks.lock().unwrap().is_empty(),
+            "nothing may be queued for a run that cannot name who it acts as"
+        );
     }
 }

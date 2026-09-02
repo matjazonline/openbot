@@ -33,7 +33,7 @@ use crate::{
         channel::Channel,
         company::Company,
         memory::{MemoryPersistenceMode, MemoryRecallMode},
-        schedule::ChannelSchedule,
+        schedule::{ChannelSchedule, ScheduleRunAsChoices},
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
@@ -936,6 +936,13 @@ impl AgentSettingsView<'_> {
             .await
     }
 
+    /// Whom this caller may make the channel's scheduled runs act as.
+    async fn run_as_choices(&self) -> AppResult<ScheduleRunAsChoices> {
+        self.schedule_use_cases
+            .run_as_choices(self.user_id, self.company.id)
+            .await
+    }
+
     /// Whether the company's memory provider is usable, which is what decides whether the channel
     /// form's memory grants are described as effective or as stored-but-inactive.
     async fn memory_ready(&self) -> AppResult<bool> {
@@ -1114,10 +1121,12 @@ impl AgentSettingsView<'_> {
         let used_by = self.used_by(agent.id, channels);
         let model_connections = self.model_connections().await?;
         let schedules = self.schedules(channel.id).await?;
+        let run_as = self.run_as_choices().await?;
         let memory_ready = self.memory_ready().await?;
         let tab = pages::AgentChannelTab {
             channel,
             schedules: &schedules,
+            run_as: &run_as,
             spam_scan_enabled: self.config.is_spam_scan_enabled(),
             memory_ready,
             draft,

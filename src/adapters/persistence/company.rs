@@ -1,16 +1,20 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
-        company::{Company, CompanyAccess, CompanyChannelDefaults, CompanyModelConnection},
-        company_member::CompanyMembership,
+        company::{
+            Company, CompanyAccess, CompanyChannelDefaults, CompanyModelConnection,
+            CompanyTeamAccount,
+        },
+        company_member::{CompanyAccessRole, CompanyMembership},
         memory::{MEMORY_DELETION_QUIESCENCE_SECONDS, MemoryProviderKind},
-        value_objects::{AvatarUrl, CompanySlug, ModelName, ModelProvider},
+        value_objects::{AvatarUrl, CompanySlug, EmailAddress, ModelName, ModelProvider},
     },
     use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence, CompanyWrite},
 };
@@ -497,6 +501,58 @@ impl CompanyPersistence for PostgresPersistence {
         .map_err(AppError::from)?;
 
         Ok(rows)
+    }
+
+    async fn list_company_team_accounts(
+        &self,
+        company_id: Uuid,
+    ) -> AppResult<Vec<CompanyTeamAccount>> {
+        // The owner is a `companies.user_id`, not a `company_members` row, so the two halves of a
+        // team only meet in a union. `DISTINCT ON` then keeps the stronger of the two if an owner
+        // was also invited as a member, and the rank puts them first for a reader.
+        let rows = sqlx::query!(
+            r#"WITH team AS (
+                   SELECT company.user_id AS account_id, 'owner'::text AS membership, 0 AS rank
+                   FROM companies AS company
+                   WHERE company.id = $1
+                   UNION ALL
+                   SELECT member.user_id, member.role::text, 1
+                   FROM company_members AS member
+                   WHERE member.company_id = $1
+               ), ranked AS (
+                   SELECT DISTINCT ON (account_id) account_id, membership, rank
+                   FROM team
+                   ORDER BY account_id, rank
+               )
+               SELECT account.id AS "user_id!", account.email::text AS "email!",
+                      account.username::text AS "username!", ranked.membership AS "membership!"
+               FROM ranked
+               JOIN users AS account ON account.id = ranked.account_id
+               ORDER BY ranked.rank, LOWER(account.email::text)
+               LIMIT 200"#,
+            company_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        rows.into_iter()
+            .map(|row| {
+                let membership = match row.membership.as_str() {
+                    "owner" => CompanyMembership::Owner,
+                    role => CompanyMembership::from_access_role(
+                        CompanyAccessRole::from_str(role).map_err(AppError::Internal)?,
+                    ),
+                };
+
+                Ok(CompanyTeamAccount {
+                    user_id: row.user_id,
+                    email: EmailAddress::from(row.email),
+                    username: Some(row.username),
+                    membership,
+                })
+            })
+            .collect()
     }
 
     async fn list_model_connections(

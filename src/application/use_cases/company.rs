@@ -7,7 +7,10 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        company::{Company, CompanyAccess, CompanyChannelDefaults, CompanyModelConnection},
+        company::{
+            Company, CompanyAccess, CompanyChannelDefaults, CompanyModelConnection,
+            CompanyTeamAccount,
+        },
         company_member::CompanyMembership,
         memory::MemoryProviderKind,
         value_objects::{AvatarUrl, ModelName, ModelProvider},
@@ -275,6 +278,18 @@ pub trait CompanyPersistence: Send + Sync {
         email: &str,
     ) -> AppResult<CompanyMembership>;
     async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>>;
+
+    /// The same team as one identity per account, owner first.
+    ///
+    /// [`CompanyPersistence::list_company_team_emails`] answers only "which addresses belong to
+    /// this team", which is enough to decide delivery but not to *choose* a person: attributing a
+    /// scheduled run to a colleague needs their account id and what they are to the company as
+    /// well. Required rather than defaulted for that reason -- an empty list would read as "this
+    /// company has no team", and the choice it feeds is an authorization decision.
+    async fn list_company_team_accounts(
+        &self,
+        company_id: Uuid,
+    ) -> AppResult<Vec<CompanyTeamAccount>>;
 
     /// Required rather than defaulted, like the two below it. A default returning an empty list
     /// reads as "this company has configured no providers", which is a real state with real
@@ -647,6 +662,13 @@ mod tests {
 
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
+        }
+
+        async fn list_company_team_accounts(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::company::CompanyTeamAccount>> {
+            unimplemented!("this double is not exercised on the team-account path")
         }
 
         /// Model connections are not part of what these tests drive; a call here is a wiring mistake

@@ -1159,7 +1159,10 @@ impl TaskWorker {
                     company: &context.company,
                     channel: &context.channel,
                     agent: Some(&context.agent),
-                    sender: None,
+                    // A run that acts as a member writes into that member's own memory, which is
+                    // the whole point of attributing it to them; an unattributed run has no user
+                    // scope, exactly as before.
+                    sender: payload.run_as_email().map(EmailAddress::as_str),
                     task_id: task.id,
                     user_context: &payload.prompt,
                     final_answer: &answer,
@@ -1247,7 +1250,7 @@ impl TaskWorker {
                     company: &context.company,
                     channel: &context.channel,
                     agent: Some(&context.agent),
-                    sender: None,
+                    sender: payload.run_as_email().map(EmailAddress::as_str),
                     audience: MemoryRecallAudience::MemberOrSystem,
                     task_id,
                     latest_prompt: &payload.prompt,
@@ -1294,9 +1297,15 @@ impl TaskWorker {
         context: &ScheduledRunContext,
         answer: &str,
     ) -> Result<(), String> {
-        let sender = context
+        let channel_address = context
             .channel
             .inbound_address(&context.company.slug, &self.config.app_domain_name);
+        // Addressed to whoever asked: the member an attributed run acts as, and otherwise the
+        // channel itself, which is what a run belonging to nobody has always replied to.
+        let addressee = payload
+            .run_as_email()
+            .cloned()
+            .unwrap_or_else(|| channel_address.clone());
 
         let message = Message {
             id: Uuid::new_v4(),
@@ -1304,8 +1313,8 @@ impl TaskWorker {
             message_id: scheduled_reply_message_id(task.id, &self.config.app_domain_name),
             in_reply_to: Some(payload.trigger_message_id.clone()),
             references_list: vec![payload.trigger_message_id.clone()],
-            sender: sender.clone(),
-            recipients_to: vec![sender],
+            sender: channel_address,
+            recipients_to: vec![addressee],
             recipients_cc: vec![],
             subject: reply_subject(&payload.subject),
             clean_text_body: answer.to_string(),
@@ -1672,6 +1681,13 @@ mod tests {
         }
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
+        }
+
+        async fn list_company_team_accounts(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::company::CompanyTeamAccount>> {
+            unimplemented!("this double is not exercised on the team-account path")
         }
 
         async fn list_model_connections(

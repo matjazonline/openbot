@@ -5,6 +5,7 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::entities::{
+    company::CompanyTeamAccount,
     task::{TaskStatus, ThreadActivity},
     value_objects::{EmailAddress, MessageId},
 };
@@ -162,6 +163,11 @@ pub struct ChannelSchedule {
     /// IANA zone the templates render in and the cadence counts its days by.
     #[serde(default = "default_timezone")]
     pub timezone: ScheduleTimezone,
+    /// The team member every run acts as, or `None` for a run attributed to nobody. Stored as the
+    /// account rather than the address so renaming a mailbox does not re-point the attribution;
+    /// [`ScheduleRunAs`] is what the address is resolved into at execution.
+    #[serde(default)]
+    pub run_as_user_id: Option<Uuid>,
     #[serde(default = "default_true")]
     pub enabled: bool,
     pub last_run_at: Option<DateTime<Utc>>,
@@ -262,7 +268,86 @@ pub struct ScheduleWrite {
     pub delivery_mode: ScheduleDeliveryMode,
     pub recipient_emails: Vec<EmailAddress>,
     pub timezone: ScheduleTimezone,
+    /// Whom the runs act as. Never taken from a form untouched: only
+    /// [`crate::use_cases::schedule::ScheduleUseCases`] decides whether the submitter may
+    /// attribute runs to this account.
+    pub run_as_user_id: Option<Uuid>,
     pub enabled: bool,
+}
+
+/// The identity one scheduled run acts as, resolved from the schedule's `run_as_user_id` when the
+/// run is materialized.
+///
+/// The account and its address travel together because both are needed and neither is derivable
+/// from the other in the worker: the address keys user-scoped memory and stands as the prompt's
+/// sender, and the account id is what the run is traced by.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ScheduleRunAs {
+    pub user_id: Uuid,
+    pub email: EmailAddress,
+}
+
+/// Who a schedule may be made to run as, and which of those this caller may choose.
+///
+/// One value rather than two lists, because every place that renders the picker also has to name
+/// a member the caller cannot pick: an admin sees that a schedule runs as the owner and may leave
+/// it that way, without being able to attribute a new run to anybody but themselves.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ScheduleRunAsChoices {
+    /// Everyone on the company's team, for naming whoever a stored schedule already runs as.
+    pub team: Vec<CompanyTeamAccount>,
+    /// The one account this caller may attribute runs to, or `None` when they may pick anyone.
+    pub restricted_to: Option<Uuid>,
+}
+
+impl ScheduleRunAsChoices {
+    /// Whether this caller may store `user_id` as a schedule's run-as member.
+    pub fn may_choose(&self, user_id: Uuid) -> bool {
+        self.account(user_id).is_some()
+            && self
+                .restricted_to
+                .is_none_or(|restricted| restricted == user_id)
+    }
+
+    /// The team member behind an id, whether or not this caller may choose them.
+    pub fn account(&self, user_id: Uuid) -> Option<&CompanyTeamAccount> {
+        self.team.iter().find(|account| account.user_id == user_id)
+    }
+
+    /// The members to offer in a picker.
+    pub fn choosable(&self) -> impl Iterator<Item = &CompanyTeamAccount> {
+        self.team
+            .iter()
+            .filter(|account| self.may_choose(account.user_id))
+    }
+
+    /// How a picker has to present what a schedule already stores, which is not the same question
+    /// as who may be chosen: a member the caller cannot pick is still one they must be able to
+    /// leave in place, and an id whose account has left the team is one they can only replace.
+    pub fn selection(&self, stored: Option<Uuid>) -> RunAsSelection<'_> {
+        let Some(user_id) = stored else {
+            return RunAsSelection::System;
+        };
+
+        match self.account(user_id) {
+            None => RunAsSelection::Departed,
+            Some(account) if self.may_choose(user_id) => RunAsSelection::Choosable(account),
+            Some(account) => RunAsSelection::Locked(account),
+        }
+    }
+}
+
+/// What a schedule's stored run-as member is to the caller looking at it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RunAsSelection<'a> {
+    /// No member named: the run acts as nobody.
+    System,
+    /// A member this caller may keep or change.
+    Choosable(&'a CompanyTeamAccount),
+    /// A member only the company owner may change, offered back unchanged.
+    Locked(&'a CompanyTeamAccount),
+    /// An account that has left the team, which any caller may replace but nobody may keep.
+    Departed,
 }
 
 /// What one `scheduled_agent_run` task carries. The worker deserialises this rather than reaching
@@ -283,6 +368,10 @@ pub struct ScheduledRunPayload {
     pub delivery_mode: ScheduleDeliveryMode,
     #[serde(default)]
     pub recipient_emails: Vec<EmailAddress>,
+    /// Whom this run acts as. Absent both for an unattributed run and in payloads queued before
+    /// attribution existed, which are the same thing to the worker.
+    #[serde(default)]
+    pub run_as: Option<ScheduleRunAs>,
     pub trigger_message_id: MessageId,
 }
 
@@ -309,6 +398,12 @@ impl ScheduledRunPayload {
 
     pub fn wants_email(&self) -> bool {
         !matches!(self.delivery_mode, ScheduleDeliveryMode::MailboxOnly)
+    }
+
+    /// The address this run's memory is scoped to and its prompt is attributed to, or `None` when
+    /// the run acts as nobody.
+    pub fn run_as_email(&self) -> Option<&EmailAddress> {
+        self.run_as.as_ref().map(|run_as| &run_as.email)
     }
 }
 
@@ -351,6 +446,7 @@ mod tests {
             delivery_mode: ScheduleDeliveryMode::MailboxOnly,
             recipient_emails: vec![],
             timezone: ScheduleTimezone::utc(),
+            run_as_user_id: None,
             enabled: true,
             last_run_at: None,
             next_run_at: None,
@@ -387,6 +483,7 @@ mod tests {
             delivery_mode: ScheduleDeliveryMode::MailboxOnly,
             recipient_emails: vec![],
             timezone: ScheduleTimezone::utc(),
+            run_as_user_id: None,
             enabled: true,
             last_run_at: None,
             next_run_at: None,
