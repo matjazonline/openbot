@@ -4,6 +4,9 @@ use serde::Serialize;
 use std::{collections::HashSet, str::FromStr};
 use uuid::Uuid;
 
+use crate::adapters::persistence::integration::email_binding::{
+    CanonicalEmailBinding, write_canonical_email_binding,
+};
 use crate::adapters::persistence::participant::{
     create_agent_principal_on, resolve_or_create_external_identity_on,
 };
@@ -270,11 +273,47 @@ pub(crate) async fn insert_email_allowlist_grants(
     Ok(())
 }
 
+/// Every channel owns one canonical email interface, written in the same transaction as the
+/// channel itself so the two can never disagree.
+///
+/// The three creation paths and the update path all route through here rather than each building
+/// their own binding: the endpoint key, access policy and delivery policy are one decision.
+async fn write_channel_email_binding(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company_id: Uuid,
+    channel_id: Uuid,
+    write: &ChannelWrite,
+) -> AppResult<()> {
+    let channel_slug = ChannelSlug::new(write.slug.clone());
+    let created_by = write
+        .created_by
+        .clone()
+        .unwrap_or_else(CreationProvenance::system);
+    write_canonical_email_binding(
+        transaction,
+        CanonicalEmailBinding {
+            company_id,
+            channel_id,
+            channel_slug: &channel_slug,
+            channel_name: &write.name,
+            created_by: &created_by,
+        },
+    )
+    .await
+}
+
 #[async_trait]
 impl ChannelPersistence for PostgresPersistence {
     async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
         let uuid = Uuid::new_v4();
-        let (access_mode, participants) = channel_access(write.participant_emails);
+        let (access_mode, participants) = channel_access(write.participant_emails.clone());
+        let created_by = serde_json::to_value(
+            write
+                .created_by
+                .clone()
+                .unwrap_or_else(CreationProvenance::system),
+        )
+        .map_err(|error| AppError::Internal(error.to_string()))?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
 
         sqlx::query(
@@ -287,15 +326,12 @@ impl ChannelPersistence for PostgresPersistence {
         )
         .bind(uuid)
         .bind(company_id)
-        .bind(write.name)
-        .bind(write.description)
+        .bind(&write.name)
+        .bind(&write.description)
         .bind(access_mode.as_str())
         .bind(write.enabled)
         .bind(write.add_3rd_party)
-        .bind(
-            serde_json::to_value(write.created_by.unwrap_or_else(CreationProvenance::system))
-                .map_err(|e| AppError::Internal(e.to_string()))?,
-        )
+        .bind(created_by)
         .bind(write.retrieve_company_memory)
         .bind(write.retrieve_agent_memory)
         .bind(write.retrieve_user_memory)
@@ -307,6 +343,8 @@ impl ChannelPersistence for PostgresPersistence {
         .map_err(AppError::from)?;
 
         insert_channel_slugs(&mut tx, company_id, uuid, &write.slug, &write.alias_slugs).await?;
+
+        write_channel_email_binding(&mut tx, company_id, uuid, &write).await?;
 
         insert_email_allowlist_grants(&mut tx, company_id, uuid, participants).await?;
 
@@ -419,6 +457,7 @@ impl ChannelPersistence for PostgresPersistence {
             &channel.alias_slugs,
         )
         .await?;
+        write_channel_email_binding(&mut tx, company_id, channel_id, &channel).await?;
         insert_email_allowlist_grants(&mut tx, company_id, channel_id, participants).await?;
         let mut assigned = vec![agent_id];
         assigned.extend(
@@ -489,7 +528,7 @@ impl ChannelPersistence for PostgresPersistence {
     }
 
     async fn update(&self, id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
-        let (access_mode, participants) = channel_access(write.participant_emails);
+        let (access_mode, participants) = channel_access(write.participant_emails.clone());
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let result = sqlx::query(
             r#"UPDATE channels
@@ -500,8 +539,8 @@ impl ChannelPersistence for PostgresPersistence {
                    persist_user_memory = $11
                WHERE id = $12"#,
         )
-        .bind(write.name)
-        .bind(write.description)
+        .bind(&write.name)
+        .bind(&write.description)
         .bind(access_mode.as_str())
         .bind(write.enabled)
         .bind(write.add_3rd_party)
@@ -547,6 +586,10 @@ impl ChannelPersistence for PostgresPersistence {
             .await
             .map_err(AppError::from)?;
         insert_channel_slugs(&mut tx, company_id, id, &write.slug, &write.alias_slugs).await?;
+
+        // A renamed address moves the channel's canonical email interface rather than replacing
+        // it, so the binding's audit history survives the rename.
+        write_channel_email_binding(&mut tx, company_id, id, &write).await?;
 
         insert_email_allowlist_grants(&mut tx, company_id, id, participants).await?;
 
@@ -703,6 +746,7 @@ impl OwnedAgentChannelPersistence for PostgresPersistence {
             )),
             other => other,
         })?;
+        write_channel_email_binding(&mut tx, company_id, channel_id, &channel).await?;
         insert_email_allowlist_grants(&mut tx, company_id, channel_id, participants).await?;
         sqlx::query(
             "INSERT INTO channel_agents (company_id, channel_id, agent_id, position) VALUES ($1, $2, $3, 0)",

@@ -386,6 +386,124 @@ CREATE TABLE participant_identities (
 CREATE INDEX participant_identities_principal_idx
     ON participant_identities (company_id, principal_id, created_at, id);
 
+-- Which transports need a company-scoped provider account before anything can be read or sent.
+-- Email is a *deployment* transport: this server owns its own mail namespace, so a channel is
+-- reachable as soon as it has an address. Slack is an *installed* transport, and a binding onto it
+-- is meaningless without the workspace grant behind it.
+--
+-- Written once as a function because three constraints need the same answer, and mirrored in Rust
+-- by `TransportKind::requires_installation`. The equivalence is a test, not a comment: see
+-- `rust_and_sql_agree_on_which_transports_require_an_installation`.
+CREATE FUNCTION transport_requires_installation(transport TEXT) RETURNS BOOLEAN
+LANGUAGE SQL
+IMMUTABLE
+RETURN transport = 'slack';
+
+-- Why a binding changed state, for the `disabled_reason` column and the audit log alike. One list
+-- so an operator reading an audit row and an operator reading a disabled binding see the same
+-- vocabulary, and so a reason can never be recovered by parsing a free-text error.
+CREATE FUNCTION valid_binding_change_reason(reason TEXT) RETURNS BOOLEAN
+LANGUAGE SQL
+IMMUTABLE
+RETURN reason IN (
+    'manager_request', 'installation_revoked', 'endpoint_removed',
+    'access_revoked', 'channel_disabled', 'provider_drift'
+);
+
+-- One provider account a company has installed. No token is stored here: the broad entity is
+-- listed in the UI, logged, and serialized, so the secret lives one table over in
+-- `integration_credentials` and is only ever read through an exact-scope query.
+CREATE TABLE integration_installations (
+    id UUID PRIMARY KEY,
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    transport TEXT NOT NULL,
+    -- The provider's own identifier for the account -- a Slack team id.
+    external_tenant_key TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    status TEXT NOT NULL,
+    -- What the provider says it granted, as the provider spells it. Diagnostic only; it never
+    -- substitutes for handling the provider's own authorization errors.
+    granted_scopes TEXT[] NOT NULL DEFAULT '{}',
+    installed_by JSONB NOT NULL,
+    installed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    revoked_by JSONB,
+    revoked_at TIMESTAMPTZ,
+    -- Composite keys the tenant-scoped children below point at. The three-column form additionally
+    -- proves a binding's `transport` matches the installation it names, so a Slack binding cannot
+    -- hang off some future provider's account.
+    CONSTRAINT integration_installations_company_id_id_key UNIQUE (company_id, id),
+    CONSTRAINT integration_installations_company_transport_key UNIQUE (company_id, id, transport),
+    -- v1 refuses to let one external workspace install into two app companies: either company's
+    -- managers could then link the other's conversations. Revisit only with a written
+    -- multi-tenant-workspace threat model, not because a customer asks.
+    CONSTRAINT integration_installations_tenant_key UNIQUE (transport, external_tenant_key),
+    CONSTRAINT integration_installations_transport_check
+        CHECK (transport_requires_installation(transport)),
+    CONSTRAINT integration_installations_tenant_key_check CHECK (
+        btrim(external_tenant_key) <> '' AND octet_length(external_tenant_key) <= 255
+    ),
+    CONSTRAINT integration_installations_display_name_check CHECK (
+        btrim(display_name) <> '' AND octet_length(display_name) <= 255
+    ),
+    CONSTRAINT integration_installations_status_check CHECK (
+        status IN ('active', 'reauthorization_required', 'revoked', 'disabled')
+    ),
+    -- A provider can hand back an arbitrary scope list; this is the bound on it.
+    CONSTRAINT integration_installations_scopes_check CHECK (
+        array_position(granted_scopes, NULL) IS NULL
+        AND NOT ('' = ANY (granted_scopes))
+        AND COALESCE(array_length(granted_scopes, 1), 0) <= 64
+        AND octet_length(array_to_string(granted_scopes, ',')) <= 4096
+    ),
+    CONSTRAINT integration_installations_installed_by_check
+        CHECK (valid_creation_provenance(installed_by)),
+    CONSTRAINT integration_installations_updated_by_check
+        CHECK (valid_creation_provenance(updated_by)),
+    -- Revocation is the one terminal transition, so it is the one that has to name an actor and a
+    -- time -- and it cannot be recorded without the status that means it.
+    CONSTRAINT integration_installations_revocation_check CHECK (
+        (status = 'revoked') = (revoked_at IS NOT NULL)
+        AND (revoked_at IS NULL) = (revoked_by IS NULL)
+        AND (revoked_by IS NULL OR valid_creation_provenance(revoked_by))
+    )
+);
+
+CREATE INDEX integration_installations_company_idx
+    ON integration_installations (company_id, transport, installed_at DESC, id DESC);
+
+-- One secret, in its own table, keyed by exactly the scope a reader must state.
+--
+-- `envelope` is the output of the per-credential DEK format in
+-- `src/adapters/persistence/credentials/envelope.rs`: a random data key encrypts the token, the
+-- key-encryption key wraps the data key, and both layers authenticate the row's own
+-- (company, installation, transport, kind) context. Moving a row's ciphertext to another company,
+-- installation or credential kind therefore fails to open rather than silently decrypting.
+--
+-- The CHECK is defence in depth. It recognizes the envelope's *structure* so a plaintext token
+-- cannot be written by hand; it proves nothing about authenticity, which is the application's job.
+CREATE TABLE integration_credentials (
+    company_id UUID NOT NULL,
+    installation_id UUID NOT NULL,
+    credential_kind TEXT NOT NULL,
+    envelope TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (company_id, installation_id, credential_kind),
+    CONSTRAINT integration_credentials_installation_fk
+        FOREIGN KEY (company_id, installation_id)
+        REFERENCES integration_installations(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT integration_credentials_kind_check CHECK (
+        credential_kind IN ('bot_access_token', 'bot_refresh_token', 'user_access_token')
+    ),
+    -- enc:v2:<kek version>:<dek nonce>:<wrapped dek>:<data nonce>:<ciphertext+tag>
+    CONSTRAINT integration_credentials_envelope_check CHECK (
+        envelope ~ '^enc:v2:[1-9][0-9]{0,8}(:[A-Za-z0-9+/]+={0,2}){4}$'
+        AND octet_length(envelope) <= 8192
+    )
+);
+
 -- A channel's addresses live in `channel_slugs`, not here; see that table.
 CREATE TABLE channels (
     id UUID PRIMARY KEY,
@@ -544,6 +662,163 @@ CREATE TABLE channel_principal_grants (
 
 CREATE INDEX channel_principal_grants_principal_idx
     ON channel_principal_grants (company_id, principal_id, channel_id, capability);
+
+-- One protocol-facing interface onto a business channel.
+--
+-- A channel is not an inbox and not a Slack conversation: it owns agents, policy and threads, and
+-- exposes zero or more bindings. That is what lets a channel gain a second transport without a
+-- nullable column per provider, and lets one interface be paused while the rest keeps working.
+--
+-- `installation_id` is NULL exactly for the deployment transports, which is `transport_requires_
+-- installation` stated as a CHECK. The composite foreign key carries the tenancy *and* the
+-- transport, so a binding can neither borrow another company's provider account nor point a Slack
+-- binding at a non-Slack installation. NULL `installation_id` makes that MATCH SIMPLE key
+-- unenforced, which is exactly the wanted behaviour for email -- the CHECK is what keeps the two
+-- cases from blurring.
+CREATE TABLE channel_bindings (
+    id UUID PRIMARY KEY,
+    company_id UUID NOT NULL,
+    channel_id UUID NOT NULL,
+    installation_id UUID,
+    transport TEXT NOT NULL,
+    -- The scope in which `external_endpoint_key` is unique, and always an immutable identifier:
+    -- the provider workspace for an installed transport, the company id for email. Nothing here is
+    -- a slug -- `companies.slug` and `channel_slugs.slug` are both editable, and a key built from
+    -- an editable value goes stale the moment someone edits it.
+    namespace TEXT NOT NULL,
+    external_endpoint_key TEXT NOT NULL,
+    display_label TEXT NOT NULL,
+    access_policy TEXT NOT NULL,
+    delivery_policy TEXT NOT NULL,
+    status TEXT NOT NULL,
+    disabled_reason TEXT,
+    created_by JSONB NOT NULL,
+    -- What a human confirmed about the endpoint at link time. Confirmations only: no member lists,
+    -- no provider responses, no message content.
+    access_snapshot JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT channel_bindings_company_id_id_key UNIQUE (company_id, id),
+    CONSTRAINT channel_bindings_channel_fk
+        FOREIGN KEY (company_id, channel_id)
+        REFERENCES channels(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT channel_bindings_installation_fk
+        FOREIGN KEY (company_id, installation_id, transport)
+        REFERENCES integration_installations(company_id, id, transport) ON DELETE CASCADE,
+    CONSTRAINT channel_bindings_transport_check CHECK (transport IN ('email', 'slack')),
+    CONSTRAINT channel_bindings_installation_coherence_check CHECK (
+        transport_requires_installation(transport) = (installation_id IS NOT NULL)
+    ),
+    CONSTRAINT channel_bindings_namespace_check CHECK (
+        btrim(namespace) <> '' AND octet_length(namespace) <= 255
+    ),
+    CONSTRAINT channel_bindings_endpoint_key_check CHECK (
+        btrim(external_endpoint_key) <> '' AND octet_length(external_endpoint_key) <= 512
+    ),
+    CONSTRAINT channel_bindings_display_label_check CHECK (
+        btrim(display_label) <> '' AND octet_length(display_label) <= 255
+    ),
+    CONSTRAINT channel_bindings_access_policy_check
+        CHECK (access_policy IN ('channel_acl', 'conversation_members_read_and_participate')),
+    CONSTRAINT channel_bindings_delivery_policy_check
+        CHECK (delivery_policy IN ('reply_only', 'reply_and_initiate')),
+    CONSTRAINT channel_bindings_status_check
+        CHECK (status IN ('active', 'paused', 'disabled', 'orphaned')),
+    -- A binding that stopped carrying traffic says why, and one that is carrying traffic cannot
+    -- claim it was disabled for a reason.
+    CONSTRAINT channel_bindings_disabled_reason_check CHECK (
+        (status IN ('disabled', 'orphaned')) = (disabled_reason IS NOT NULL)
+        AND (disabled_reason IS NULL OR valid_binding_change_reason(disabled_reason))
+    ),
+    CONSTRAINT channel_bindings_created_by_check CHECK (valid_creation_provenance(created_by)),
+    CONSTRAINT channel_bindings_access_snapshot_check CHECK (
+        jsonb_typeof(access_snapshot) = 'object'
+        AND access_snapshot->'version' = '1'::JSONB
+        AND jsonb_typeof(access_snapshot->'kind') = 'string'
+        AND access_snapshot->>'kind' IN ('deployment_endpoint', 'provider_conversation')
+        AND octet_length(access_snapshot::text) <= 4096
+    )
+);
+
+-- `active` and `paused` are the statuses that still *claim* an endpoint; `disabled` and `orphaned`
+-- release it so the same conversation can be linked to a different channel. The three partial
+-- unique indexes below are all defined over that same set, and `BindingStatus::
+-- holds_endpoint_claim` states it in Rust.
+
+-- Two channels in one workspace cannot consume the same conversation. Scoped by installation
+-- rather than by company because the installation is what the provider's ids are unique within.
+CREATE UNIQUE INDEX channel_bindings_installed_endpoint_idx
+    ON channel_bindings (installation_id, transport, namespace, external_endpoint_key)
+    WHERE installation_id IS NOT NULL AND status IN ('active', 'paused');
+
+-- The same rule for the deployment transports, written separately rather than folded into the
+-- index above: a NULL `installation_id` makes a composite unique index match nothing, so one
+-- combined index would let every email binding collide silently. For email this reads as one live
+-- binding per (company, local part), which is the guarantee `channel_slugs` already makes.
+CREATE UNIQUE INDEX channel_bindings_deployment_endpoint_idx
+    ON channel_bindings (transport, namespace, external_endpoint_key)
+    WHERE installation_id IS NULL AND status IN ('active', 'paused');
+
+-- One canonical deployment interface per channel per transport, so a retried or concurrent
+-- channel creation cannot leave a channel with two email bindings.
+CREATE UNIQUE INDEX channel_bindings_canonical_deployment_idx
+    ON channel_bindings (company_id, channel_id, transport)
+    WHERE installation_id IS NULL AND status IN ('active', 'paused');
+
+CREATE INDEX channel_bindings_channel_idx
+    ON channel_bindings (company_id, channel_id, transport, status);
+
+CREATE INDEX channel_bindings_installation_idx
+    ON channel_bindings (installation_id, status)
+    WHERE installation_id IS NOT NULL;
+
+-- Append-only lifecycle history. Linking a private provider conversation is a read grant to
+-- everyone in it, so who did it, when, and what they were shown has to survive the binding being
+-- paused, re-enabled and disabled again.
+CREATE TABLE binding_audit_events (
+    id UUID PRIMARY KEY,
+    company_id UUID NOT NULL,
+    binding_id UUID NOT NULL,
+    action TEXT NOT NULL,
+    reason TEXT,
+    actor JSONB NOT NULL,
+    -- Safe identifiers plus the confirmed access-policy snapshot. Never a credential, never a full
+    -- provider response; `ChannelBinding::audit_metadata` is the only thing that builds it.
+    metadata JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT binding_audit_events_binding_fk
+        FOREIGN KEY (company_id, binding_id)
+        REFERENCES channel_bindings(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT binding_audit_events_action_check CHECK (
+        action IN ('linked', 'endpoint_changed', 'enabled', 'paused', 'disabled',
+                   'drift_detected', 'unlinked')
+    ),
+    CONSTRAINT binding_audit_events_reason_check
+        CHECK (reason IS NULL OR valid_binding_change_reason(reason)),
+    CONSTRAINT binding_audit_events_actor_check CHECK (valid_creation_provenance(actor)),
+    CONSTRAINT binding_audit_events_metadata_check CHECK (
+        jsonb_typeof(metadata) = 'object'
+        AND metadata->'version' = '1'::JSONB
+        AND jsonb_typeof(metadata->'transport') = 'string'
+        AND octet_length(metadata::text) <= 4096
+    )
+);
+
+CREATE INDEX binding_audit_events_binding_idx
+    ON binding_audit_events (company_id, binding_id, created_at DESC, id DESC);
+
+-- Append-only means append-only. Deleting a company or a channel still cascades the history away
+-- with the rows it describes, but nothing may rewrite what an audit row said it saw.
+CREATE FUNCTION reject_binding_audit_rewrite() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'binding_audit_events is append-only' USING ERRCODE = '23514';
+END;
+$$;
+
+CREATE TRIGGER binding_audit_events_append_only
+BEFORE UPDATE ON binding_audit_events
+FOR EACH ROW EXECUTE FUNCTION reject_binding_audit_rewrite();
 
 CREATE TABLE threads (
     id UUID PRIMARY KEY,

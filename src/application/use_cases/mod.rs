@@ -3,6 +3,7 @@ pub mod approval;
 pub mod channel;
 pub mod company;
 pub mod company_invite;
+pub mod integration;
 pub mod memory;
 pub mod participant;
 pub mod schedule;

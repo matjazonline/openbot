@@ -1,18 +1,65 @@
 use lettre::message::Mailbox;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::entities::{
     transport::{
-        ExternalMessageKey, IdentityNamespace, IdentitySubject, QualifiedIdentity, TransportKind,
-        TransportValueError,
+        EndpointNamespace, ExternalEndpointKey, ExternalMessageKey, IdentityNamespace,
+        IdentitySubject, QualifiedIdentity, TransportKind, TransportValueError,
     },
-    value_objects::{EmailAddress, MessageId},
+    value_objects::{ChannelSlug, EmailAddress, MessageId},
 };
 
 /// A database is one email-identity namespace. Deployments do not share a database, so using a
 /// stable discriminator lets account/bootstrap and ingress writers resolve the same mailbox
 /// without smuggling runtime host configuration into persistence.
 pub const EMAIL_IDENTITY_NAMESPACE: &str = "email";
+
+/// The canonical inbound interface of one channel, as a binding endpoint key.
+///
+/// # Why the key is a bare local part
+///
+/// A channel answers at `{channel}@{company}.{app_domain}`, and only the middle piece --
+/// `{channel}` -- is stable. `app_domain` is deployment configuration, and `companies.slug` is
+/// editable in company settings. Putting either into the stored key means the key has to be
+/// rewritten whenever they change, and every writer that forgets strands the binding at an address
+/// that no longer resolves.
+///
+/// So the mutable and configured parts are kept out of it. The *namespace* carries the tenant as
+/// its immutable company id, and the key carries the local part. This is the same shape the
+/// installed transports already use -- a Slack binding's namespace is its workspace, the scope in
+/// which a conversation id is unique -- rather than a special case for email.
+///
+/// What this leaves is exactly what a lookup has in hand:
+/// `(company_id, channel_slug)`. Inbound routing parses the host off and resolves the company
+/// before it can authorize anything anyway
+/// ([`EmailChannelSelectorParser`](super::EmailChannelSelectorParser)), and the display form stays
+/// a rendering concern where `Channel::inbound_address` already builds it from all three parts.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct EmailEndpointKey(ExternalEndpointKey);
+
+impl EmailEndpointKey {
+    /// The channel's canonical local part.
+    pub fn canonical(channel: &ChannelSlug) -> Result<Self, TransportValueError> {
+        Ok(Self(ExternalEndpointKey::parse(channel.to_string())?))
+    }
+
+    /// The scope the local part is unique within: this company, by its immutable id.
+    ///
+    /// A slug would read better in `psql` and would be wrong -- it is the value that changes.
+    pub fn namespace(company_id: Uuid) -> EndpointNamespace {
+        EndpointNamespace::parse(company_id.to_string())
+            .expect("a UUID is a valid endpoint namespace")
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    pub fn into_external(self) -> ExternalEndpointKey {
+        self.0
+    }
+}
 
 /// An email identity after adapter-owned mailbox parsing and case normalization.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -105,6 +152,25 @@ mod tests {
         let second = EmailIdentity::parse(EmailAddress::from("person@example.com")).unwrap();
         assert_eq!(first, second);
         assert_eq!(first.subject().as_str(), "person@example.com");
+    }
+
+    #[test]
+    fn a_channel_endpoint_key_holds_only_the_part_of_the_address_that_is_stable() {
+        let acme = Uuid::new_v4();
+        let key = EmailEndpointKey::canonical(&ChannelSlug::from("support")).unwrap();
+
+        assert_eq!(key.as_str(), "support");
+        assert_eq!(EmailEndpointKey::namespace(acme).as_str(), acme.to_string());
+        // Two companies may both have a `support` channel. The key does not separate them; the
+        // namespace does, and it is an id no rename can move.
+        assert_eq!(
+            key,
+            EmailEndpointKey::canonical(&ChannelSlug::from("support")).unwrap()
+        );
+        assert_ne!(
+            EmailEndpointKey::namespace(acme),
+            EmailEndpointKey::namespace(Uuid::new_v4())
+        );
     }
 
     #[test]

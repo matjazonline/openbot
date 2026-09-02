@@ -13,6 +13,7 @@ pub mod credential_rotation;
 pub mod credentials;
 pub mod dashboard;
 pub mod database_query_health;
+pub mod integration;
 pub mod memory;
 pub mod participant;
 pub mod runtime_metrics;
@@ -49,6 +50,16 @@ impl PostgresPersistence {
 
     pub fn pool(&self) -> &PgPool {
         &self.pool
+    }
+
+    /// The configured cipher, or an error naming the missing configuration.
+    ///
+    /// Credential storage has no plaintext fallback: a deployment without a key ring must fail the
+    /// read or write rather than quietly persist a token in the clear.
+    pub(crate) fn credential_cipher(&self) -> Result<&credentials::CredentialCipher, AppError> {
+        self.credential_cipher
+            .as_deref()
+            .ok_or_else(|| AppError::Internal("Credential encryption is not configured".into()))
     }
 
     pub(crate) fn encrypt_credential(

@@ -3,6 +3,15 @@
 //! Provider-specific syntax is validated by the owning adapter.  The types in this module make
 //! qualification and bounds unavoidable once a value crosses into the domain.
 
+mod integration;
+
+pub use integration::{
+    BindingAccessPolicy, BindingAccessSnapshot, BindingAuditAction, BindingAuditEvent,
+    BindingAuditMetadata, BindingChangeReason, BindingDeliveryPolicy, BindingStatus,
+    ChannelBinding, InstallationStatus, IntegrationCredentialKind, IntegrationInstallation,
+    InvalidTransportValue,
+};
+
 use std::{fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
@@ -19,10 +28,30 @@ pub enum TransportKind {
 }
 
 impl TransportKind {
+    /// Every supported transport, so a test can assert the whole set against the database at once.
+    pub const ALL: &'static [Self] = &[Self::Email, Self::Slack];
+
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Email => "email",
             Self::Slack => "slack",
+        }
+    }
+
+    /// Whether reaching this transport needs a company-scoped provider account.
+    ///
+    /// Email is a *deployment* transport: the server owns its own MX namespace, so a channel is
+    /// reachable the moment it has an address. Slack is an *installed* transport: nothing can be
+    /// read or sent until a workspace has granted this company an installation.
+    ///
+    /// `transport_requires_installation()` in the migration is the same decision in SQL, and
+    /// `rust_and_sql_agree_on_which_transports_require_an_installation` proves the two agree for
+    /// every variant -- a new transport that disagrees fails that test rather than silently
+    /// letting a binding exist with no credential behind it.
+    pub const fn requires_installation(self) -> bool {
+        match self {
+            Self::Email => false,
+            Self::Slack => true,
         }
     }
 }
@@ -93,12 +122,16 @@ macro_rules! uuid_id {
 
 uuid_id!(InstallationId);
 uuid_id!(ChannelBindingId);
+uuid_id!(BindingAuditEventId);
 uuid_id!(PrincipalId);
 uuid_id!(ParticipantIdentityId);
 uuid_id!(DeliveryId);
 
 pub const MAX_IDENTITY_NAMESPACE_BYTES: usize = 255;
 pub const MAX_IDENTITY_SUBJECT_BYTES: usize = 320;
+pub const MAX_ENDPOINT_NAMESPACE_BYTES: usize = 255;
+pub const MAX_EXTERNAL_TENANT_KEY_BYTES: usize = 255;
+pub const MAX_EXTERNAL_ENDPOINT_KEY_BYTES: usize = 512;
 pub const MAX_EXTERNAL_EVENT_KEY_BYTES: usize = 512;
 pub const MAX_EXTERNAL_THREAD_KEY_BYTES: usize = 998;
 pub const MAX_EXTERNAL_MESSAGE_KEY_BYTES: usize = 998;
@@ -181,6 +214,9 @@ macro_rules! bounded_string {
 }
 
 bounded_string!(IdentityNamespace, MAX_IDENTITY_NAMESPACE_BYTES);
+bounded_string!(EndpointNamespace, MAX_ENDPOINT_NAMESPACE_BYTES);
+bounded_string!(ExternalTenantKey, MAX_EXTERNAL_TENANT_KEY_BYTES);
+bounded_string!(ExternalEndpointKey, MAX_EXTERNAL_ENDPOINT_KEY_BYTES);
 bounded_string!(IdentitySubject, MAX_IDENTITY_SUBJECT_BYTES);
 bounded_string!(ExternalEventKey, MAX_EXTERNAL_EVENT_KEY_BYTES);
 bounded_string!(ExternalThreadKey, MAX_EXTERNAL_THREAD_KEY_BYTES);

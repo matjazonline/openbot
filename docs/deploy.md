@@ -146,6 +146,36 @@ rotate the credentials themselves with each model provider and save the replacem
 the application; database encryption limits storage exposure but cannot invalidate provider keys
 that may already have been copied from an older dump.
 
+### Stored credential formats
+
+Two formats share the one key ring, and both are inventoried by `credentials status` and moved by
+`credentials rotate`.
+
+| Format | Column | Shape |
+|---|---|---|
+| `enc:v1` | `company_model_connections.api_key` | The key ring's key encrypts the credential directly, with empty associated data. Legacy; `plan/db_improve/improve-key-credentials.md` is the plan to retire it. |
+| `enc:v2` | `integration_credentials.envelope` | Envelope encryption. A random per-credential data key encrypts the token; the key-ring key wraps only that data key. |
+
+`enc:v2` is the format every new secret uses. Two properties follow from it:
+
+- **The row is authenticated.** Both AES-256-GCM layers bind `(company, installation, transport,
+  credential kind)` as associated data, so an envelope copied into another company's, another
+  installation's, or the neighbouring credential kind's row fails to open instead of yielding the
+  original token. A row that fails this check is an error at the read boundary, never a silent
+  "no credential stored".
+- **Rotation never handles plaintext.** Moving an `enc:v2` row to a new key version rewraps the
+  48-byte data key and copies the ciphertext through untouched. `enc:v1` has no such option and is
+  decrypted and re-encrypted, which is one more reason it is being retired.
+
+**Threat model, and its accepted limitation.** The key-encryption key is an exportable value held in
+Fly secrets and loaded into process memory — the "bounded launch alternative" of
+`plan/db_improve/improve-key-credentials.md`, chosen so launch is not blocked on standing up a KMS.
+It gives envelope structure, per-row context binding, and cheap rewrapping. It does **not** protect a
+token from a compromised application process or a malicious deployment, because that process can
+legitimately request the plaintext in order to call the provider. Moving the KEK behind a KMS is a
+change to two functions in `src/adapters/persistence/credentials/envelope.rs` and does not change the
+stored format; revisit it when the deployment holds credentials for workspaces it does not own.
+
 ### Multi-Machine credential-key rotation
 
 Never replace bytes under an existing version number: authenticated decryption of data written with

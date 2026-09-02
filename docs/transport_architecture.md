@@ -64,7 +64,7 @@ lifecycle state, and explicit access/delivery policy selection.
 ```mermaid
 flowchart LR
     C[Business Channel<br/>agents, policy, memory, ACLs, threads]
-    E[Email binding<br/>deployment namespace + address]
+    E[Email binding<br/>company namespace + local part]
     S1[Slack binding<br/>installation A + private conversation X]
     S2[Slack binding<br/>installation A + private conversation Y]
     F[Future provider binding]
@@ -74,6 +74,11 @@ flowchart LR
     C --> S2
     C -.-> F
 ```
+
+A binding's namespace is the immutable scope its endpoint key is unique within: the provider
+workspace for an installed transport, the company id for email. Neither a company slug nor a
+deployment mail domain appears in a stored endpoint key, because both are editable or configured and
+a durable key built from either goes stale when it changes.
 
 An email alias is adapter routing syntax and resolves to the channel's email binding. A Slack
 conversation ID resolves only within its installation. Neither value is the channel's identity.

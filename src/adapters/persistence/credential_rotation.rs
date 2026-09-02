@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, time::Instant};
+use std::{collections::BTreeMap, str::FromStr, time::Instant};
 
 use serde::Serialize;
 use sqlx::{Connection, PgConnection};
@@ -6,9 +6,12 @@ use uuid::Uuid;
 
 use super::{
     PostgresPersistence,
-    credentials::{CredentialCipher, CredentialState},
+    credentials::{CredentialCipher, CredentialContext, CredentialFormat, CredentialState},
 };
-use crate::app_error::{AppError, AppResult};
+use crate::{
+    app_error::{AppError, AppResult},
+    entities::transport::{IntegrationCredentialKind, TransportKind},
+};
 
 const CREDENTIAL_BATCH_SIZE: i64 = 100;
 const CREDENTIAL_ROTATION_LOCK_ID: i64 = 0x4352_4544_524f_5441;
@@ -56,17 +59,112 @@ pub struct CredentialRotationReport {
     pub final_status: CredentialStatus,
 }
 
+/// The tables that hold a protected secret.
+///
+/// Status and rotation walk every one of them. A table added here but not to this list is a table
+/// whose rows never rotate, and nothing else in the system would notice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CredentialTable {
+    /// `company_model_connections.api_key` — the legacy `enc:v1` direct-key format.
+    ModelConnections,
+    /// `integration_credentials.envelope` — `enc:v2`, rotated by rewrapping the data key.
+    IntegrationCredentials,
+}
+
+impl CredentialTable {
+    const ALL: &'static [Self] = &[Self::ModelConnections, Self::IntegrationCredentials];
+}
+
+/// Where one credential lives, in the terms its own table keys it by.
+///
+/// Doubles as the keyset cursor: both tables are scanned in their primary-key order, so the last
+/// key of a batch is exactly where the next batch starts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CredentialKey {
+    ModelConnection {
+        company_id: Uuid,
+        provider: String,
+    },
+    IntegrationCredential {
+        company_id: Uuid,
+        installation_id: Uuid,
+        credential_kind: String,
+    },
+}
+
+/// One credential row, with the format its column is written in.
+///
+/// The format comes from the *table*, never from the stored string: letting a value pick its own
+/// reader is how a plaintext row talks its way past a validity check.
+#[derive(Debug, Clone)]
+struct InventoryRow {
+    key: CredentialKey,
+    format: CredentialFormat,
+    stored: String,
+}
+
 #[derive(Debug, Clone, sqlx::FromRow)]
-struct CredentialRow {
+struct ModelConnectionRow {
     company_id: Uuid,
     provider: String,
     api_key: String,
 }
 
-#[derive(Debug, Clone)]
-struct CredentialCursor {
+#[derive(Debug, Clone, sqlx::FromRow)]
+struct IntegrationCredentialRow {
     company_id: Uuid,
-    provider: String,
+    installation_id: Uuid,
+    credential_kind: String,
+    envelope: String,
+    transport: String,
+}
+
+impl From<ModelConnectionRow> for InventoryRow {
+    fn from(row: ModelConnectionRow) -> Self {
+        Self {
+            key: CredentialKey::ModelConnection {
+                company_id: row.company_id,
+                provider: row.provider,
+            },
+            format: CredentialFormat::LegacyDirectKey,
+            stored: row.api_key,
+        }
+    }
+}
+
+impl TryFrom<IntegrationCredentialRow> for InventoryRow {
+    type Error = AppError;
+
+    /// A transport or credential kind the current build does not know is schema drift, not a bad
+    /// credential: both columns are `CHECK`-constrained, so reaching this arm means the database
+    /// was edited past what this build understands. Failing the scan is the honest answer.
+    fn try_from(row: IntegrationCredentialRow) -> AppResult<Self> {
+        let transport = TransportKind::from_str(&row.transport).map_err(|error| {
+            AppError::Internal(format!(
+                "Invalid integration_installations.transport: {error}"
+            ))
+        })?;
+        let credential_kind =
+            IntegrationCredentialKind::from_str(&row.credential_kind).map_err(|error| {
+                AppError::Internal(format!(
+                    "Invalid integration_credentials.credential_kind: {error}"
+                ))
+            })?;
+        Ok(Self {
+            format: CredentialFormat::Envelope(CredentialContext::integration_credential(
+                row.company_id,
+                row.installation_id,
+                transport,
+                credential_kind,
+            )),
+            key: CredentialKey::IntegrationCredential {
+                company_id: row.company_id,
+                installation_id: row.installation_id,
+                credential_kind: row.credential_kind,
+            },
+            stored: row.envelope,
+        })
+    }
 }
 
 #[derive(Debug, Default)]
@@ -138,12 +236,6 @@ impl PostgresPersistence {
             }
         }
     }
-
-    fn credential_cipher(&self) -> AppResult<&CredentialCipher> {
-        self.credential_cipher
-            .as_deref()
-            .ok_or_else(|| AppError::Internal("Credential encryption is not configured".into()))
-    }
 }
 
 async fn rotate_locked(
@@ -205,18 +297,31 @@ async fn run_rotation_pass(
     cipher: &CredentialCipher,
 ) -> AppResult<RotationPassOutcome> {
     let mut outcome = RotationPassOutcome::default();
-    let mut cursor = None;
+    for table in CredentialTable::ALL {
+        rotate_table(connection, cipher, *table, &mut outcome).await?;
+    }
+    Ok(outcome)
+}
 
+/// Walk one table in keyset-cursored batches, rotating what needs it.
+///
+/// Bounded on purpose: the batch is capped, the cursor is the primary key, and each batch commits
+/// on its own, so a rotation over a large table neither loads it into memory nor holds one
+/// transaction open across the whole scan.
+async fn rotate_table(
+    connection: &mut PgConnection,
+    cipher: &CredentialCipher,
+    table: CredentialTable,
+    outcome: &mut RotationPassOutcome,
+) -> AppResult<()> {
+    let mut cursor = None;
     loop {
-        let rows = fetch_credential_batch(connection, cursor.as_ref()).await?;
+        let rows = fetch_credential_batch(connection, table, cursor.as_ref()).await?;
         if rows.is_empty() {
-            return Ok(outcome);
+            return Ok(());
         }
         debug_assert!(rows.len() <= usize::try_from(CREDENTIAL_BATCH_SIZE).unwrap_or(usize::MAX));
-        cursor = rows.last().map(|row| CredentialCursor {
-            company_id: row.company_id,
-            provider: row.provider.clone(),
-        });
+        cursor = rows.last().map(|row| row.key.clone());
         outcome.batches += 1;
         outcome.scanned += rows.len() as u64;
         let batch = rotate_credential_batch(connection, cipher, rows).await?;
@@ -230,32 +335,16 @@ async fn run_rotation_pass(
 async fn rotate_credential_batch(
     connection: &mut PgConnection,
     cipher: &CredentialCipher,
-    rows: Vec<CredentialRow>,
+    rows: Vec<InventoryRow>,
 ) -> AppResult<RotationBatchOutcome> {
     let mut outcome = RotationBatchOutcome::default();
     let mut transaction = connection.begin().await.map_err(AppError::from)?;
     for row in rows {
-        match cipher.inspect(&row.api_key) {
+        match cipher.classify(&row.format, &row.stored) {
             CredentialState::Active { .. } => {}
             CredentialState::Old { .. } => {
-                let plaintext = cipher.decrypt_envelope(&row.api_key)?;
-                let encrypted = cipher.encrypt(&plaintext)?;
-                let changed = sqlx::query(
-                    r#"UPDATE company_model_connections AS connection
-                       SET api_key = $3, updated_at = CURRENT_TIMESTAMP
-                       WHERE connection.company_id = $1
-                         AND connection.provider = $2
-                         AND connection.api_key = $4"#,
-                )
-                .bind(row.company_id)
-                .bind(&row.provider)
-                .bind(encrypted)
-                .bind(&row.api_key)
-                .execute(&mut *transaction)
-                .await
-                .map_err(AppError::from)?
-                .rows_affected();
-                if changed == 1 {
+                let rotated = cipher.rotate_to_active(&row.format, &row.stored)?;
+                if store_rotated_credential(&mut transaction, &row, &rotated).await? {
                     outcome.rotated += 1;
                 } else {
                     outcome.cas_conflicts += 1;
@@ -267,6 +356,60 @@ async fn rotate_credential_batch(
     }
     transaction.commit().await.map_err(AppError::from)?;
     Ok(outcome)
+}
+
+/// Compare-and-swap on the stored value, so a rotation that read a row before a normal writer
+/// replaced it loses rather than clobbering the newer credential.
+async fn store_rotated_credential(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    row: &InventoryRow,
+    rotated: &str,
+) -> AppResult<bool> {
+    let changed = match &row.key {
+        CredentialKey::ModelConnection {
+            company_id,
+            provider,
+        } => {
+            sqlx::query(
+                r#"UPDATE company_model_connections AS connection
+               SET api_key = $3, updated_at = CURRENT_TIMESTAMP
+               WHERE connection.company_id = $1
+                 AND connection.provider = $2
+                 AND connection.api_key = $4"#,
+            )
+            .bind(company_id)
+            .bind(provider)
+            .bind(rotated)
+            .bind(&row.stored)
+            .execute(&mut **transaction)
+            .await
+        }
+        CredentialKey::IntegrationCredential {
+            company_id,
+            installation_id,
+            credential_kind,
+        } => {
+            sqlx::query(
+                r#"UPDATE integration_credentials AS credential
+               SET envelope = $4, updated_at = CURRENT_TIMESTAMP
+               WHERE credential.company_id = $1
+                 AND credential.installation_id = $2
+                 AND credential.credential_kind = $3
+                 AND credential.envelope = $5"#,
+            )
+            .bind(company_id)
+            .bind(installation_id)
+            .bind(credential_kind)
+            .bind(rotated)
+            .bind(&row.stored)
+            .execute(&mut **transaction)
+            .await
+        }
+    }
+    .map_err(AppError::from)?
+    .rows_affected();
+
+    Ok(changed == 1)
 }
 
 async fn credential_status_on_connection(
@@ -284,71 +427,148 @@ async fn credential_status_on_connection(
         versions: BTreeMap::new(),
         unavailable_versions: BTreeMap::new(),
     };
-    let mut cursor = None;
-    loop {
-        let rows = fetch_credential_batch(connection, cursor.as_ref()).await?;
-        if rows.is_empty() {
-            return Ok(status);
-        }
-        debug_assert!(rows.len() <= usize::try_from(CREDENTIAL_BATCH_SIZE).unwrap_or(usize::MAX));
-        cursor = rows.last().map(|row| CredentialCursor {
-            company_id: row.company_id,
-            provider: row.provider.clone(),
-        });
-        for row in rows {
-            status.total_rows += 1;
-            match cipher.inspect(&row.api_key) {
-                CredentialState::Active { version } => {
-                    status.active_rows += 1;
-                    *status.versions.entry(version).or_default() += 1;
-                }
-                CredentialState::Old { version } => {
-                    status.old_rows += 1;
-                    *status.versions.entry(version).or_default() += 1;
-                }
-                CredentialState::Unavailable { version } => {
-                    status.unavailable_rows += 1;
-                    *status.versions.entry(version).or_default() += 1;
-                    *status.unavailable_versions.entry(version).or_default() += 1;
-                }
-                CredentialState::Malformed => status.malformed_rows += 1,
+    for table in CredentialTable::ALL {
+        let mut cursor = None;
+        loop {
+            let rows = fetch_credential_batch(connection, *table, cursor.as_ref()).await?;
+            if rows.is_empty() {
+                break;
             }
+            debug_assert!(
+                rows.len() <= usize::try_from(CREDENTIAL_BATCH_SIZE).unwrap_or(usize::MAX)
+            );
+            cursor = rows.last().map(|row| row.key.clone());
+            for row in rows {
+                status.total_rows += 1;
+                match cipher.classify(&row.format, &row.stored) {
+                    CredentialState::Active { version } => {
+                        status.active_rows += 1;
+                        *status.versions.entry(version).or_default() += 1;
+                    }
+                    CredentialState::Old { version } => {
+                        status.old_rows += 1;
+                        *status.versions.entry(version).or_default() += 1;
+                    }
+                    CredentialState::Unavailable { version } => {
+                        status.unavailable_rows += 1;
+                        *status.versions.entry(version).or_default() += 1;
+                        *status.unavailable_versions.entry(version).or_default() += 1;
+                    }
+                    CredentialState::Malformed => status.malformed_rows += 1,
+                }
+            }
+        }
+    }
+    Ok(status)
+}
+
+/// One bounded batch of `table`, starting after `cursor` in primary-key order.
+///
+/// The cursor is the table's own key rather than an offset, so a scan stays O(batch) however far
+/// into the table it has walked, and a row inserted behind the cursor is picked up by the next
+/// full pass rather than shifting the window.
+async fn fetch_credential_batch(
+    connection: &mut PgConnection,
+    table: CredentialTable,
+    cursor: Option<&CredentialKey>,
+) -> AppResult<Vec<InventoryRow>> {
+    match table {
+        CredentialTable::ModelConnections => fetch_model_connection_batch(connection, cursor).await,
+        CredentialTable::IntegrationCredentials => {
+            fetch_integration_credential_batch(connection, cursor).await
         }
     }
 }
 
-async fn fetch_credential_batch(
+async fn fetch_model_connection_batch(
     connection: &mut PgConnection,
-    cursor: Option<&CredentialCursor>,
-) -> AppResult<Vec<CredentialRow>> {
+    cursor: Option<&CredentialKey>,
+) -> AppResult<Vec<InventoryRow>> {
+    const COLUMNS: &str = "connection.company_id, connection.provider, connection.api_key";
     let rows = match cursor {
-        Some(cursor) => {
-            sqlx::query_as::<_, CredentialRow>(
-                r#"SELECT connection.company_id, connection.provider, connection.api_key
-               FROM company_model_connections AS connection
-               WHERE (connection.company_id, connection.provider) > ($1, $2)
-               ORDER BY connection.company_id, connection.provider
-               LIMIT $3"#,
-            )
-            .bind(cursor.company_id)
-            .bind(&cursor.provider)
+        Some(CredentialKey::ModelConnection {
+            company_id,
+            provider,
+        }) => {
+            sqlx::query_as::<_, ModelConnectionRow>(&format!(
+                "SELECT {COLUMNS}
+                   FROM company_model_connections AS connection
+                  WHERE (connection.company_id, connection.provider) > ($1, $2)
+                  ORDER BY connection.company_id, connection.provider
+                  LIMIT $3"
+            ))
+            .bind(company_id)
+            .bind(provider)
             .bind(CREDENTIAL_BATCH_SIZE)
             .fetch_all(&mut *connection)
             .await
         }
-        None => {
-            sqlx::query_as::<_, CredentialRow>(
-                r#"SELECT connection.company_id, connection.provider, connection.api_key
-               FROM company_model_connections AS connection
-               ORDER BY connection.company_id, connection.provider
-               LIMIT $1"#,
-            )
+        _ => {
+            sqlx::query_as::<_, ModelConnectionRow>(&format!(
+                "SELECT {COLUMNS}
+                   FROM company_model_connections AS connection
+                  ORDER BY connection.company_id, connection.provider
+                  LIMIT $1"
+            ))
             .bind(CREDENTIAL_BATCH_SIZE)
             .fetch_all(&mut *connection)
             .await
         }
     };
-    rows.map_err(AppError::from)
+    Ok(rows
+        .map_err(AppError::from)?
+        .into_iter()
+        .map(InventoryRow::from)
+        .collect())
+}
+
+/// The installation join carries the transport, which is part of every envelope's authenticated
+/// context: rotation cannot rewrap a row without knowing which account it belongs to, and reading
+/// it from the row rather than assuming a literal is what keeps a second provider correct.
+async fn fetch_integration_credential_batch(
+    connection: &mut PgConnection,
+    cursor: Option<&CredentialKey>,
+) -> AppResult<Vec<InventoryRow>> {
+    const SELECT: &str = "SELECT credential.company_id, credential.installation_id,
+                                 credential.credential_kind, credential.envelope,
+                                 installation.transport
+                            FROM integration_credentials AS credential
+                            JOIN integration_installations AS installation
+                              ON installation.company_id = credential.company_id
+                             AND installation.id = credential.installation_id";
+    const ORDER: &str = "ORDER BY credential.company_id, credential.installation_id,
+                                  credential.credential_kind";
+    let rows = match cursor {
+        Some(CredentialKey::IntegrationCredential {
+            company_id,
+            installation_id,
+            credential_kind,
+        }) => {
+            sqlx::query_as::<_, IntegrationCredentialRow>(&format!(
+                "{SELECT}
+                  WHERE (credential.company_id, credential.installation_id,
+                         credential.credential_kind) > ($1, $2, $3)
+                  {ORDER}
+                  LIMIT $4"
+            ))
+            .bind(company_id)
+            .bind(installation_id)
+            .bind(credential_kind)
+            .bind(CREDENTIAL_BATCH_SIZE)
+            .fetch_all(&mut *connection)
+            .await
+        }
+        _ => {
+            sqlx::query_as::<_, IntegrationCredentialRow>(&format!("{SELECT} {ORDER} LIMIT $1"))
+                .bind(CREDENTIAL_BATCH_SIZE)
+                .fetch_all(&mut *connection)
+                .await
+        }
+    };
+    rows.map_err(AppError::from)?
+        .into_iter()
+        .map(InventoryRow::try_from)
+        .collect()
 }
 
 async fn try_acquire_rotation_lock(connection: &mut PgConnection) -> AppResult<bool> {
@@ -374,246 +594,5 @@ async fn release_rotation_lock(connection: &mut PgConnection) -> AppResult<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use sqlx::Executor;
-
-    use super::*;
-    use crate::adapters::persistence::test_support::test_pool;
-
-    async fn isolated_connection() -> Option<PgConnection> {
-        let pool = test_pool().await?;
-        let options = pool.connect_options();
-        let mut connection = PgConnection::connect_with(&options)
-            .await
-            .expect("an isolated credential-rotation test connection");
-        connection
-            .execute(
-                r#"CREATE TEMPORARY TABLE company_model_connections (
-                       company_id UUID NOT NULL,
-                       provider TEXT NOT NULL,
-                       api_key TEXT NOT NULL,
-                       updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                       PRIMARY KEY (company_id, provider)
-                   ) ON COMMIT PRESERVE ROWS"#,
-            )
-            .await
-            .expect("a session-local credential table");
-        Some(connection)
-    }
-
-    async fn insert_credential(
-        connection: &mut PgConnection,
-        company_id: Uuid,
-        provider: &str,
-        api_key: &str,
-    ) {
-        sqlx::query(
-            r#"INSERT INTO company_model_connections (company_id, provider, api_key)
-               VALUES ($1, $2, $3)"#,
-        )
-        .bind(company_id)
-        .bind(provider)
-        .bind(api_key)
-        .execute(connection)
-        .await
-        .expect("the credential fixture is insertable");
-    }
-
-    fn rotation_ciphers() -> (CredentialCipher, CredentialCipher) {
-        let keys = [(1, [42_u8; 32]), (2, [84_u8; 32])];
-        (
-            CredentialCipher::for_test_with_keys(&keys, 1),
-            CredentialCipher::for_test_with_keys(&keys, 2),
-        )
-    }
-
-    async fn simulated_rotation_command(
-        connection: &mut PgConnection,
-        cipher: &CredentialCipher,
-    ) -> AppResult<CredentialRotationReport> {
-        if !try_acquire_rotation_lock(connection).await? {
-            return Err(AppError::Conflict(
-                "Another credential rotation currently owns the database lock".into(),
-            ));
-        }
-        // Keep the ownership window open long enough for the competing command to reach the lock.
-        sqlx::query("SELECT pg_sleep(0.05)")
-            .execute(&mut *connection)
-            .await
-            .map_err(AppError::from)?;
-        let result = rotate_locked(connection, cipher).await;
-        release_rotation_lock(connection).await?;
-        result
-    }
-
-    #[tokio::test]
-    async fn two_competing_rotation_commands_have_exactly_one_owner() {
-        let Some(mut first) = isolated_connection().await else {
-            return;
-        };
-        let Some(mut second) = isolated_connection().await else {
-            return;
-        };
-        let (old_writer, rotator) = rotation_ciphers();
-        insert_credential(
-            &mut first,
-            Uuid::new_v4(),
-            "openai",
-            &old_writer.encrypt("first").unwrap(),
-        )
-        .await;
-        insert_credential(
-            &mut second,
-            Uuid::new_v4(),
-            "openai",
-            &old_writer.encrypt("second").unwrap(),
-        )
-        .await;
-
-        let (first_result, second_result) = tokio::join!(
-            simulated_rotation_command(&mut first, &rotator),
-            simulated_rotation_command(&mut second, &rotator)
-        );
-
-        let outcomes = [first_result, second_result];
-        assert_eq!(outcomes.iter().filter(|result| result.is_ok()).count(), 1);
-        assert_eq!(
-            outcomes
-                .iter()
-                .filter(|result| matches!(result, Err(AppError::Conflict(_))))
-                .count(),
-            1
-        );
-    }
-
-    #[tokio::test]
-    async fn stale_rotation_ciphertext_cannot_clobber_a_normal_write() {
-        let Some(mut connection) = isolated_connection().await else {
-            return;
-        };
-        let (old_writer, rotator) = rotation_ciphers();
-        let company_id = Uuid::new_v4();
-        insert_credential(
-            &mut connection,
-            company_id,
-            "openai",
-            &old_writer.encrypt("before-race").unwrap(),
-        )
-        .await;
-        let stale_rows = fetch_credential_batch(&mut connection, None).await.unwrap();
-        let replacement = rotator.encrypt("normal-writer-wins").unwrap();
-        sqlx::query(
-            r#"UPDATE company_model_connections
-               SET api_key = $3
-               WHERE company_id = $1 AND provider = $2"#,
-        )
-        .bind(company_id)
-        .bind("openai")
-        .bind(&replacement)
-        .execute(&mut connection)
-        .await
-        .unwrap();
-
-        let outcome = rotate_credential_batch(&mut connection, &rotator, stale_rows)
-            .await
-            .unwrap();
-        let stored: String = sqlx::query_scalar(
-            "SELECT api_key FROM company_model_connections WHERE company_id = $1",
-        )
-        .bind(company_id)
-        .fetch_one(&mut connection)
-        .await
-        .unwrap();
-
-        assert_eq!(outcome.rotated, 0);
-        assert_eq!(outcome.cas_conflicts, 1);
-        assert_eq!(stored, replacement);
-    }
-
-    #[tokio::test]
-    async fn a_late_old_writer_is_found_by_the_next_complete_pass() {
-        let Some(mut connection) = isolated_connection().await else {
-            return;
-        };
-        let (old_writer, rotator) = rotation_ciphers();
-        insert_credential(
-            &mut connection,
-            Uuid::new_v4(),
-            "openai",
-            &old_writer.encrypt("first").unwrap(),
-        )
-        .await;
-        let first_pass = run_rotation_pass(&mut connection, &rotator).await.unwrap();
-        assert_eq!(first_pass.rotated, 1);
-
-        insert_credential(
-            &mut connection,
-            Uuid::new_v4(),
-            "openai",
-            &old_writer.encrypt("late").unwrap(),
-        )
-        .await;
-        let report = rotate_locked(&mut connection, &rotator).await.unwrap();
-
-        assert!(report.complete);
-        assert_eq!(report.rotated, 1);
-        assert_eq!(report.final_status.active_rows, 2);
-        assert_eq!(report.final_status.old_rows, 0);
-    }
-
-    #[tokio::test]
-    async fn batches_are_bounded_and_a_second_rotation_is_idempotent() {
-        let Some(mut connection) = isolated_connection().await else {
-            return;
-        };
-        let (old_writer, rotator) = rotation_ciphers();
-        for index in 0..205_u16 {
-            insert_credential(
-                &mut connection,
-                Uuid::from_u128(u128::from(index) + 1),
-                "openai",
-                &old_writer.encrypt("secret").unwrap(),
-            )
-            .await;
-        }
-
-        let first_batch = fetch_credential_batch(&mut connection, None).await.unwrap();
-        assert_eq!(first_batch.len(), CREDENTIAL_BATCH_SIZE as usize);
-        let first = rotate_locked(&mut connection, &rotator).await.unwrap();
-        let second = rotate_locked(&mut connection, &rotator).await.unwrap();
-
-        assert!(first.complete);
-        assert_eq!(first.rotated, 205);
-        assert!(first.batches >= 6);
-        assert!(second.complete);
-        assert_eq!(second.rotated, 0);
-        assert_eq!(second.cas_conflicts, 0);
-    }
-
-    #[tokio::test]
-    async fn status_and_rotation_reject_malformed_and_unavailable_rows() {
-        let Some(mut connection) = isolated_connection().await else {
-            return;
-        };
-        let (old_writer, rotator) = rotation_ciphers();
-        let unavailable =
-            old_writer
-                .encrypt("unavailable")
-                .unwrap()
-                .replacen("enc:v1:1:", "enc:v1:3:", 1);
-        insert_credential(&mut connection, Uuid::new_v4(), "openai", "plaintext").await;
-        insert_credential(&mut connection, Uuid::new_v4(), "openai", &unavailable).await;
-
-        let status = credential_status_on_connection(&mut connection, &rotator)
-            .await
-            .unwrap();
-        let report = rotate_locked(&mut connection, &rotator).await.unwrap();
-
-        assert_eq!(status.malformed_rows, 1);
-        assert_eq!(status.unavailable_rows, 1);
-        assert_eq!(status.unavailable_versions.get(&3), Some(&1));
-        assert!(!status.is_valid());
-        assert!(!report.complete);
-        assert_eq!(report.invalid_rows, 2);
-    }
-}
+#[path = "credential_rotation_tests.rs"]
+mod tests;

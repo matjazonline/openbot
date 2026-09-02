@@ -9,4 +9,6 @@ pub use selector::{
     EmailChannelSelection, EmailChannelSelectorParser, EmailDeliveryHints, EmailDeliveryMode,
     EmailRecipientDestination,
 };
-pub use types::{EmailIdentity, EmailIdentityError, EmailMessageKey};
+pub use types::{
+    EMAIL_IDENTITY_NAMESPACE, EmailEndpointKey, EmailIdentity, EmailIdentityError, EmailMessageKey,
+};

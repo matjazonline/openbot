@@ -1,3 +1,14 @@
+//! Credential encryption for the two shapes of secret this database stores.
+//!
+//! `enc:v1` — this module — is the original format: one long-lived environment key encrypts each
+//! value directly, with empty associated data. It is what `company_model_connections` stores and
+//! `plan/db_improve/improve-key-credentials.md` is the plan to retire it.
+//!
+//! [`envelope`] is `enc:v2`, the per-credential data-key format that integration credentials use.
+//! New secret storage goes there; nothing new is added to `enc:v1`.
+
+pub mod envelope;
+
 use std::collections::HashMap;
 
 use base64::{
@@ -9,7 +20,11 @@ use ring::{
     rand::{SecureRandom, SystemRandom},
 };
 
+use secrecy::SecretString;
+
 use crate::app_error::{AppError, AppResult};
+
+pub use envelope::CredentialContext;
 
 const PREFIX: &str = "enc:v1";
 const KEYS_ENV: &str = "CREDENTIAL_ENCRYPTION_KEYS";
@@ -19,6 +34,19 @@ pub struct CredentialCipher {
     active_version: u32,
     keys: HashMap<u32, LessSafeKey>,
     random: SystemRandom,
+}
+
+/// How one stored credential column is protected.
+///
+/// The inventory in `credential_rotation.rs` walks two tables that do not share a format, and a
+/// credential's format is a property of the *column*, not of the string: reading it off the
+/// string would let a plaintext value pick its own reader.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum CredentialFormat {
+    /// `company_model_connections.api_key`: `enc:v1`, direct master key, no row context.
+    LegacyDirectKey,
+    /// `integration_credentials.envelope`: `enc:v2`, bound to the row it belongs to.
+    Envelope(CredentialContext),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -165,6 +193,96 @@ impl CredentialCipher {
 
     pub(crate) fn decrypt_envelope(&self, stored: &str) -> AppResult<String> {
         self.decrypt_parsed(parse_envelope(stored)?)
+    }
+
+    /// Encrypt one integration credential under a fresh data key, wrapped by the active KEK.
+    pub(crate) fn seal_envelope(
+        &self,
+        context: &CredentialContext,
+        secret: &SecretString,
+    ) -> AppResult<String> {
+        let kek = self.key_encryption_key(self.active_version)?;
+        envelope::seal(kek, self.active_version, &self.random, context, secret).map_err(Into::into)
+    }
+
+    /// Decrypt one integration credential. The caller must present the row's exact context.
+    pub(crate) fn open_envelope(
+        &self,
+        context: &CredentialContext,
+        stored: &str,
+    ) -> AppResult<SecretString> {
+        let parsed = envelope::parse(stored)?;
+        let kek = self.key_encryption_key(parsed.key_version)?;
+        envelope::open(kek, context, &parsed).map_err(Into::into)
+    }
+
+    /// Classify one stored credential without returning any of it.
+    pub(crate) fn classify(&self, format: &CredentialFormat, stored: &str) -> CredentialState {
+        match format {
+            CredentialFormat::LegacyDirectKey => self.inspect(stored),
+            CredentialFormat::Envelope(context) => self.classify_envelope(context, stored),
+        }
+    }
+
+    fn classify_envelope(&self, context: &CredentialContext, stored: &str) -> CredentialState {
+        let Ok(parsed) = envelope::parse(stored) else {
+            return CredentialState::Malformed;
+        };
+        let Some(kek) = self.keys.get(&parsed.key_version) else {
+            return CredentialState::Unavailable {
+                version: parsed.key_version,
+            };
+        };
+        // Opening, not merely unwrapping: a row whose payload was tampered with must classify as
+        // malformed rather than rotate cleanly into the new key version.
+        if envelope::open(kek, context, &parsed).is_err() {
+            return CredentialState::Malformed;
+        }
+        if parsed.key_version == self.active_version {
+            CredentialState::Active {
+                version: parsed.key_version,
+            }
+        } else {
+            CredentialState::Old {
+                version: parsed.key_version,
+            }
+        }
+    }
+
+    /// Move one stored credential onto the active key version.
+    ///
+    /// The envelope path rewraps the data key and never materializes the credential; the legacy
+    /// path has no such option and decrypts, which is one more reason it is being retired.
+    pub(crate) fn rotate_to_active(
+        &self,
+        format: &CredentialFormat,
+        stored: &str,
+    ) -> AppResult<String> {
+        match format {
+            CredentialFormat::LegacyDirectKey => self.encrypt(&self.decrypt_envelope(stored)?),
+            CredentialFormat::Envelope(context) => {
+                let parsed = envelope::parse(stored)?;
+                let current = self.key_encryption_key(parsed.key_version)?;
+                let target = self.key_encryption_key(self.active_version)?;
+                envelope::rewrap(
+                    current,
+                    target,
+                    self.active_version,
+                    &self.random,
+                    context,
+                    &parsed,
+                )
+                .map_err(Into::into)
+            }
+        }
+    }
+
+    /// The key-encryption key for one envelope version, as an envelope failure class rather than a
+    /// generic error, so an unavailable version is distinguishable from a tampered row in a log.
+    fn key_encryption_key(&self, version: u32) -> Result<&LessSafeKey, envelope::EnvelopeError> {
+        self.keys
+            .get(&version)
+            .ok_or(envelope::EnvelopeError::UnavailableKeyVersion(version))
     }
 
     fn decrypt_parsed(&self, envelope: CredentialEnvelope) -> AppResult<String> {

@@ -4,13 +4,17 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::{PostgresPersistence, participant::create_agent_principal_on},
+    adapters::persistence::{
+        PostgresPersistence,
+        integration::email_binding::{CanonicalEmailBinding, write_canonical_email_binding},
+        participant::create_agent_principal_on,
+    },
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
         creation::CreationProvenance,
         memory::{MemoryPersistenceMode, MemoryRecallMode},
-        value_objects::AvatarUrl,
+        value_objects::{AvatarUrl, ChannelSlug},
     },
     use_cases::agent::{AgentPersistence, AgentWrite},
 };
@@ -97,8 +101,10 @@ pub(crate) async fn update_agent_and_owned_address(
     .fetch_one(&mut *tx)
     .await
     .map_err(AppError::from)?;
-    let owned_channel_id: Option<Uuid> =
-        sqlx::query_scalar("SELECT id FROM channels WHERE owner_agent_id = $1 FOR UPDATE")
+    // The name comes back with the id because the channel's canonical email binding is relabelled
+    // from it below, and this path must not overwrite that label with the agent's name.
+    let owned_channel: Option<(Uuid, String)> =
+        sqlx::query_as("SELECT id, name FROM channels WHERE owner_agent_id = $1 FOR UPDATE")
             .bind(id)
             .fetch_optional(&mut *tx)
             .await
@@ -134,7 +140,7 @@ pub(crate) async fn update_agent_and_owned_address(
     .await
     .map_err(|error| address_update_error(error, &write.slug, company_slug.as_deref()))?;
 
-    if let (Some(channel_id), Some(company_id)) = (owned_channel_id, company_id) {
+    if let (Some((channel_id, channel_name)), Some(company_id)) = (owned_channel, company_id) {
         let current_slug: String = sqlx::query_scalar(
             "SELECT slug::text FROM channel_slugs WHERE channel_id = $1 AND is_primary FOR UPDATE",
         )
@@ -176,6 +182,25 @@ pub(crate) async fn update_agent_and_owned_address(
             .execute(&mut *tx)
             .await
             .map_err(|error| address_update_error(error, &write.slug, company_slug.as_deref()))?;
+
+            // An agent's address *is* its channel's address, so the channel's email interface has
+            // to move with it. Same writer as every other rename, in this same transaction: a
+            // binding left on the old local part would stop resolving inbound mail entirely.
+            //
+            // The actor is `system` because this path has none -- `update_library_agent` is an
+            // operator route that takes no user id. Recording that honestly beats attributing the
+            // move to someone who did not make it.
+            write_canonical_email_binding(
+                &mut tx,
+                CanonicalEmailBinding {
+                    company_id,
+                    channel_id,
+                    channel_slug: &ChannelSlug::new(write.slug.clone()),
+                    channel_name: &channel_name,
+                    created_by: &CreationProvenance::system(),
+                },
+            )
+            .await?;
         }
     }
     tx.commit().await.map_err(AppError::from)?;

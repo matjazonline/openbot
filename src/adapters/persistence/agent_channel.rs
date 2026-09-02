@@ -3,10 +3,13 @@ use uuid::Uuid;
 
 use crate::{
     adapters::persistence::{
-        PostgresPersistence, channel::insert_email_allowlist_grants,
+        PostgresPersistence,
+        channel::insert_email_allowlist_grants,
+        integration::email_binding::{CanonicalEmailBinding, write_canonical_email_binding},
         participant::create_agent_principal_on,
     },
     app_error::{AppError, AppResult},
+    entities::{creation::CreationProvenance, value_objects::ChannelSlug},
     services::agent_channel_tool::{
         AgentChannelProvisioning, ProvisionAgentChannelRequest, ProvisionedAgentChannel,
     },
@@ -50,9 +53,9 @@ impl AgentChannelProvisioning for PostgresPersistence {
 
         let agent_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
-        let agent_created_by = serde_json::to_value(request.agent.created_by)
+        let agent_created_by = serde_json::to_value(&request.agent.created_by)
             .map_err(|error| AppError::Internal(error.to_string()))?;
-        let channel_created_by = serde_json::to_value(request.channel.created_by)
+        let channel_created_by = serde_json::to_value(&request.channel.created_by)
             .map_err(|error| AppError::Internal(error.to_string()))?;
 
         sqlx::query(
@@ -128,6 +131,24 @@ impl AgentChannelProvisioning for PostgresPersistence {
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
+        // The provisioned channel gets its canonical email interface in this same transaction, so
+        // an agent-created channel is reachable on exactly the terms a manager-created one is.
+        let binding_created_by = request
+            .channel
+            .created_by
+            .clone()
+            .unwrap_or_else(CreationProvenance::system);
+        write_canonical_email_binding(
+            &mut tx,
+            CanonicalEmailBinding {
+                company_id: request.company_id,
+                channel_id,
+                channel_slug: &ChannelSlug::new(request.channel.slug.clone()),
+                channel_name: &request.channel.name,
+                created_by: &binding_created_by,
+            },
+        )
+        .await?;
         sqlx::query(
             "INSERT INTO channel_agents (company_id, channel_id, agent_id, position) VALUES ($1, $2, $3, 0)",
         )
