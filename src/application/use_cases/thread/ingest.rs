@@ -30,8 +30,10 @@ use crate::{
         message::{Message, MessageDirection, MessageRole},
         message_contract::NormalizedInboundMessage,
         outreach::OutreachReplyMatch,
+        participant::PrincipalAccessContext,
         task::NewTask,
         thread::Thread,
+        transport::PrincipalId,
         value_objects::{
             ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex, ThreadIndexParseError,
         },
@@ -199,6 +201,33 @@ enum ChannelVerdict {
     Accept(Box<Option<OutreachReplyMatch>>),
     Unauthorized,
     Reject(Box<InboundIngestResult>),
+}
+
+/// One inbound sender, in both the terms the thread rules need.
+///
+/// `principal_id` is the stable actor that decides participation; `address` is the transport
+/// handle that outreach correlation and the bounce still speak in. Carrying them together stops a
+/// caller passing one thread's principal alongside another's address.
+#[derive(Clone, Copy)]
+struct ThreadSender<'a> {
+    address: &'a str,
+    principal_id: Option<PrincipalId>,
+}
+
+impl<'a> ThreadSender<'a> {
+    fn new(address: &'a str, context: PrincipalAccessContext) -> Self {
+        Self {
+            address,
+            principal_id: context.principal_id,
+        }
+    }
+
+    /// Whether this sender is already a party to the thread. A handle that resolved to no
+    /// principal is nobody, and is never a party to anything.
+    fn is_party_to(self, thread: &Thread) -> bool {
+        self.principal_id
+            .is_some_and(|principal_id| thread.contains_principal(principal_id))
+    }
 }
 
 /// How an already-existing thread authorizes (or refuses) this sender.
@@ -591,8 +620,8 @@ impl ThreadUseCases {
         };
 
         let sender = parsed.sender.trim();
-        let membership = directory.membership(company.id, sender).await?;
-        if !membership.is_team() {
+        let context = directory.access_context(company.id, sender).await?;
+        if !context.membership.is_team() {
             warn!(
                 "Ignoring {} request from non-member '{}' for company '{}'",
                 system.local_part(),
@@ -649,14 +678,14 @@ impl ThreadUseCases {
         sender: &str,
         directory: &mut DirectoryCache<'_>,
     ) -> AppResult<Vec<ChannelDirectoryEntry>> {
-        let membership = directory.membership(company.id, sender).await?;
-        if !membership.is_team() {
+        let context = directory.access_context(company.id, sender).await?;
+        if !context.membership.is_team() {
             return Ok(Vec::new());
         }
 
         let mut entries = Vec::new();
         for channel in directory.channels(company.id).await? {
-            if !channel.enabled || !channel.participant_access(sender, membership).authorized {
+            if !channel.enabled || !channel.participant_access(context).authorized {
                 continue;
             }
             let description = match channel.description.clone() {
@@ -728,13 +757,16 @@ impl ThreadUseCases {
             }
         }
 
-        let membership = directory.membership(channel.company_id, sender).await?;
-        let access = channel.participant_access(sender, membership);
+        let context = directory.access_context(channel.company_id, sender).await?;
+        let access = channel.participant_access(context);
 
         // Someone who isn't on the channel ACL may still be a party to an existing thread.
         let mut thread_authorized = false;
         if !access.authorized && !is_inter_channel {
-            match self.thread_access_for(channel, parsed, sender).await? {
+            match self
+                .thread_access_for(channel, parsed, ThreadSender::new(sender, context))
+                .await?
+            {
                 ThreadAccess::Denied => {}
                 ThreadAccess::Participant => thread_authorized = true,
                 ThreadAccess::OutreachReply(matched) => {
@@ -821,13 +853,13 @@ impl ThreadUseCases {
             .await
     }
 
-    /// Whether an existing thread lets this sender in, either as a listed participant or as the
-    /// target of an outreach awaiting their reply.
+    /// Whether an existing thread lets this sender in, either as a party to it or as the target
+    /// of an outreach awaiting their reply.
     async fn thread_access_for(
         &self,
         channel: &Channel,
         parsed: &ParsedEmail,
-        sender: &str,
+        sender: ThreadSender<'_>,
     ) -> AppResult<ThreadAccess> {
         let references = reference_ids(parsed);
         let Some(thread) = self
@@ -839,11 +871,7 @@ impl ThreadUseCases {
         if thread.channel_id != channel.id {
             return Ok(ThreadAccess::Denied);
         }
-        if thread
-            .participant_emails
-            .iter()
-            .any(|p| p.trim().eq_ignore_ascii_case(sender))
-        {
+        if sender.is_party_to(&thread) {
             return Ok(ThreadAccess::Participant);
         }
         let matched = self
@@ -852,7 +880,7 @@ impl ThreadUseCases {
                 channel.company_id,
                 channel.id,
                 thread.id,
-                sender,
+                sender.address,
                 &references,
             )
             .await?;
@@ -912,6 +940,9 @@ impl ThreadUseCases {
             total_steps,
         } = candidate;
         let sender = parsed.sender.trim().to_string();
+        let context = directory
+            .access_context(channel.company_id, &sender)
+            .await?;
 
         let existing_thread = self
             .find_existing_thread(
@@ -929,7 +960,7 @@ impl ThreadUseCases {
                     &channel,
                     thread,
                     parsed,
-                    &sender,
+                    ThreadSender::new(&sender, context),
                     outreach_by_channel,
                 )
                 .await?
@@ -937,8 +968,7 @@ impl ThreadUseCases {
             return Ok(ControlFlow::Break(rejection));
         }
 
-        let membership = directory.membership(channel.company_id, &sender).await?;
-        let access = channel.participant_access(&sender, membership);
+        let access = channel.participant_access(context);
 
         // A third party joins the thread only when the sender is trusted *and* the channel
         // permits it: the flag can narrow who gets pulled in, never widen it.
@@ -1095,13 +1125,10 @@ impl ThreadUseCases {
         channel: &Channel,
         thread: &Thread,
         parsed: &ParsedEmail,
-        sender: &str,
+        sender: ThreadSender<'_>,
         outreach_by_channel: &mut HashMap<Uuid, OutreachReplyMatch>,
     ) -> AppResult<ControlFlow<InboundIngestResult>> {
-        let is_thread_participant = thread
-            .participant_emails
-            .iter()
-            .any(|p| p.trim().eq_ignore_ascii_case(sender));
+        let is_thread_participant = sender.is_party_to(thread);
 
         if !is_thread_participant && !outreach_by_channel.contains_key(&channel.id) {
             let references = reference_ids(parsed);
@@ -1111,7 +1138,7 @@ impl ThreadUseCases {
                     channel.company_id,
                     channel.id,
                     thread.id,
-                    sender,
+                    sender.address,
                     &references,
                 )
                 .await?
@@ -1126,7 +1153,7 @@ impl ThreadUseCases {
 
         warn!(
             "Unauthorized thread injection attempt by '{}' for thread '{}'. Triggering bounce notification.",
-            sender, thread.id
+            sender.address, thread.id
         );
         Ok(ControlFlow::Break(
             InboundIngestResult::rejected_with_bounce(
@@ -1136,7 +1163,7 @@ impl ThreadUseCases {
                     company_slug: Some(company.slug.clone()),
                     invalid_slugs: vec![ChannelSlug::from(format!(
                         "Thread {} (Unauthorized Sender: {})",
-                        thread.id, sender
+                        thread.id, sender.address
                     ))],
                     disabled_slugs: vec![],
                     suggestions: vec![],
@@ -1218,7 +1245,7 @@ impl ThreadUseCases {
         sender_is_trusted: bool,
         add_sender: bool,
     ) -> AppResult<Thread> {
-        let mut participants = thread.participant_emails.clone();
+        let mut participants = thread.participant_projection.email_addresses.clone();
         let mut changed = false;
 
         if add_sender

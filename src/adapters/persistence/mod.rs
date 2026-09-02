@@ -14,6 +14,7 @@ pub mod credentials;
 pub mod dashboard;
 pub mod database_query_health;
 pub mod memory;
+pub mod participant;
 pub mod runtime_metrics;
 pub mod schedule;
 pub mod task;

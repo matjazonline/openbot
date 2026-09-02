@@ -602,6 +602,8 @@ mod tests {
             slug: "memory".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: crate::entities::channel::ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: None,
             enabled: true,
             add_3rd_party: false,

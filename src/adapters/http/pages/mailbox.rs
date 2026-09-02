@@ -1955,7 +1955,7 @@ fn thread_row(column: &ThreadColumn<'_>, thread: &Thread) -> String {
 
 /// Whether another channel's agent opened this thread.
 ///
-/// A platform address reaches `thread_participants` only as the sender of an internal message:
+/// A platform address becomes a thread principal only as the sender of an internal message:
 /// [`is_third_party_address`] keeps platform addresses out of the third parties a thread pulls in,
 /// a channel is never a participant of its own thread (self-outreach is rejected), and outbound
 /// recipients are never added at all. So the address form is the whole test, and it needs no
@@ -1964,7 +1964,8 @@ fn thread_row(column: &ThreadColumn<'_>, thread: &Thread) -> String {
 /// [`is_third_party_address`]: crate::use_cases::thread::ThreadUseCases
 pub fn opened_by_another_channel(thread: &Thread, app_domain_name: &str) -> bool {
     thread
-        .participant_emails
+        .participant_projection
+        .email_addresses
         .iter()
         .any(|email| parse_platform_address(email, app_domain_name).is_some())
 }
@@ -2011,10 +2012,10 @@ pub fn thread_row_fragment(
     selected: bool,
     marks: ThreadRowMarks,
 ) -> String {
-    let participants = if thread.participant_emails.is_empty() {
+    let participants = if thread.participant_projection.email_addresses.is_empty() {
         "No participants".to_string()
     } else {
-        escape_html_text(&thread.participant_emails.join(", "))
+        escape_html_text(&thread.participant_projection.email_addresses.join(", "))
     };
     let channel_id = channel.id;
 
@@ -2094,10 +2095,21 @@ pub fn empty_detail_pane(message: &str, swap: FragmentSwap) -> String {
 }
 
 pub fn message_pane(pane: &MessagePane<'_>) -> String {
-    let participants = if pane.thread.participant_emails.is_empty() {
+    let participants = if pane
+        .thread
+        .participant_projection
+        .email_addresses
+        .is_empty()
+    {
         "No participants".to_string()
     } else {
-        escape_html_text(&pane.thread.participant_emails.join(", "))
+        escape_html_text(
+            &pane
+                .thread
+                .participant_projection
+                .email_addresses
+                .join(", "),
+        )
     };
 
     let messages_html = if pane.messages.is_empty() {

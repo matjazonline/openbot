@@ -4,7 +4,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::PostgresPersistence,
+    adapters::persistence::{PostgresPersistence, participant::create_agent_principal_on},
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
@@ -206,6 +206,7 @@ fn address_update_error_message(slug: &str, company_slug: Option<&str>) -> AppEr
 impl AgentPersistence for PostgresPersistence {
     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
         let uuid = Uuid::new_v4();
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         let run_timeout_secs = write
             .run_timeout_secs
             .map(i32::try_from)
@@ -233,9 +234,12 @@ impl AgentPersistence for PostgresPersistence {
         .bind(write.memory_persistence_mode.as_str())
         .bind(write.memory_recall_mode.as_str())
         .bind(i16::from(write.memory_max_results))
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *transaction)
         .await
         .map_err(AppError::from)?;
+
+        create_agent_principal_on(&mut transaction, company_id, uuid, &write.name).await?;
+        transaction.commit().await.map_err(AppError::from)?;
 
         db.try_into()
     }

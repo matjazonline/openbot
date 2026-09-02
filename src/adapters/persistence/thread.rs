@@ -9,16 +9,20 @@ use std::{
 };
 use uuid::Uuid;
 
+use crate::adapters::persistence::participant::resolve_or_create_external_identity_on;
+use crate::adapters::protocols::email::EmailIdentity;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
         cursor::{MessageCursor, ThreadCursor},
         message::{AttachmentMetadata, Message, MessageDirection, MessageRole},
-        thread::Thread,
+        participant::{IdentityClaimMetadata, IdentityProvenance, ThreadPrincipalRole},
+        thread::{Thread, ThreadParticipantProjection},
+        transport::PrincipalId,
         value_objects::{EmailAddress, MessageId, ThreadIndex},
     },
-    use_cases::thread::ThreadPersistence,
+    use_cases::{participant::IdentityObservation, thread::ThreadPersistence},
 };
 
 #[derive(sqlx::FromRow, Debug)]
@@ -26,6 +30,7 @@ pub struct ThreadDb {
     pub id: Uuid,
     pub channel_id: Uuid,
     pub subject: String,
+    pub participant_principal_ids: Vec<Uuid>,
     pub participant_emails: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -37,11 +42,18 @@ impl From<ThreadDb> for Thread {
             id: db.id,
             channel_id: db.channel_id,
             subject: db.subject,
-            participant_emails: db
-                .participant_emails
+            participant_principal_ids: db
+                .participant_principal_ids
                 .into_iter()
-                .map(EmailAddress::from)
+                .map(PrincipalId::new)
                 .collect(),
+            participant_projection: ThreadParticipantProjection {
+                email_addresses: db
+                    .participant_emails
+                    .into_iter()
+                    .map(EmailAddress::from)
+                    .collect(),
+            },
             created_at: db.created_at,
             updated_at: db.updated_at,
         }
@@ -125,10 +137,21 @@ impl TryFrom<MessageDb> for Message {
 const THREAD_SELECT: &str = r#"
     SELECT thread.id, thread.channel_id, thread.subject,
            COALESCE(
-               (SELECT array_agg(thread_participant.email::text
-                                 ORDER BY thread_participant.email::text)
-                  FROM thread_participants AS thread_participant
-                 WHERE thread_participant.thread_id = thread.id),
+               (SELECT array_agg(DISTINCT thread_principal.principal_id)
+                  FROM thread_principals AS thread_principal
+                 WHERE thread_principal.company_id = thread.company_id
+                   AND thread_principal.thread_id = thread.id),
+               ARRAY[]::uuid[]
+           ) AS participant_principal_ids,
+           COALESCE(
+               (SELECT array_agg(DISTINCT identity.subject ORDER BY identity.subject)
+                  FROM thread_principals AS thread_principal
+                  JOIN participant_identities AS identity
+                    ON (identity.company_id, identity.principal_id) =
+                       (thread_principal.company_id, thread_principal.principal_id)
+                 WHERE thread_principal.company_id = thread.company_id
+                   AND thread_principal.thread_id = thread.id
+                   AND identity.transport = 'email' AND identity.status <> 'disabled'),
                ARRAY[]::text[]
            ) AS participant_emails,
            thread.created_at, thread.updated_at
@@ -164,6 +187,62 @@ fn normalized_participants(participants: &[EmailAddress]) -> Vec<String> {
             (!normalized.is_empty() && seen.insert(normalized.clone())).then_some(normalized)
         })
         .collect()
+}
+
+async fn insert_thread_email_principals(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company_id: Uuid,
+    channel_id: Uuid,
+    thread_id: Uuid,
+    participant_emails: &[EmailAddress],
+    first_is_author: bool,
+) -> AppResult<()> {
+    for (index, email) in normalized_participants(participant_emails)
+        .into_iter()
+        .enumerate()
+    {
+        let identity = EmailIdentity::parse(EmailAddress::from(email))
+            .map(EmailIdentity::qualify_default)
+            .map_err(|error| {
+                AppError::BadRequest(format!("Invalid thread participant: {error}"))
+            })?;
+        let resolved = resolve_or_create_external_identity_on(
+            transaction,
+            company_id,
+            IdentityObservation {
+                identity,
+                display_label: None,
+                claim_metadata: IdentityClaimMetadata::observation(),
+                provenance: IdentityProvenance::EmailIngress,
+            },
+        )
+        .await?;
+        let roles: &[ThreadPrincipalRole] = if first_is_author && index == 0 {
+            &[
+                ThreadPrincipalRole::Author,
+                ThreadPrincipalRole::Participant,
+            ]
+        } else {
+            &[ThreadPrincipalRole::Participant]
+        };
+        for role in roles {
+            sqlx::query(
+                r#"INSERT INTO thread_principals
+                       (company_id, channel_id, thread_id, principal_id, role)
+                   VALUES ($1, $2, $3, $4, $5)
+                   ON CONFLICT DO NOTHING"#,
+            )
+            .bind(company_id)
+            .bind(channel_id)
+            .bind(thread_id)
+            .bind(resolved.principal.id.as_uuid())
+            .bind(role.as_str())
+            .execute(&mut **transaction)
+            .await
+            .map_err(AppError::from)?;
+        }
+    }
+    Ok(())
 }
 
 /// Insert one message and attach it to its thread, on a caller-supplied connection.
@@ -275,29 +354,31 @@ impl ThreadPersistence for PostgresPersistence {
     ) -> AppResult<Thread> {
         let id = Uuid::new_v4();
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let inserted = sqlx::query(
+        let scope: Option<(Uuid, Uuid)> = sqlx::query_as(
             r#"INSERT INTO threads (id, company_id, channel_id, subject)
-               SELECT $1, company_id, id, $3 FROM channels WHERE id = $2"#,
+               SELECT $1, company_id, id, $3 FROM channels WHERE id = $2
+               RETURNING company_id, channel_id"#,
         )
         .bind(id)
         .bind(channel_id)
         .bind(subject)
-        .execute(&mut *tx)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(AppError::from)?;
 
-        if inserted.rows_affected() == 0 {
+        let Some((company_id, channel_id)) = scope else {
             return Err(AppError::Internal("Channel not found".into()));
-        }
+        };
 
-        for email in normalized_participants(participant_emails) {
-            sqlx::query("INSERT INTO thread_participants (thread_id, email) VALUES ($1, $2)")
-                .bind(id)
-                .bind(email)
-                .execute(&mut *tx)
-                .await
-                .map_err(AppError::from)?;
-        }
+        insert_thread_email_principals(
+            &mut tx,
+            company_id,
+            channel_id,
+            id,
+            participant_emails,
+            true,
+        )
+        .await?;
 
         tx.commit().await.map_err(AppError::from)?;
         load_thread(&self.pool, id)
@@ -330,28 +411,29 @@ impl ThreadPersistence for PostgresPersistence {
         }
 
         let id = Uuid::new_v4();
-        let inserted = sqlx::query(
+        let scope: Option<(Uuid, Uuid)> = sqlx::query_as(
             r#"INSERT INTO threads (id, company_id, channel_id, subject)
-               SELECT $1, company_id, id, $3 FROM channels WHERE id = $2"#,
+               SELECT $1, company_id, id, $3 FROM channels WHERE id = $2
+               RETURNING company_id, channel_id"#,
         )
         .bind(id)
         .bind(channel_id)
         .bind(subject)
-        .execute(&mut *tx)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(AppError::from)?;
-        if inserted.rows_affected() == 0 {
+        let Some((company_id, channel_id)) = scope else {
             return Err(AppError::Internal("Channel not found".into()));
-        }
-
-        for email in normalized_participants(participant_emails) {
-            sqlx::query("INSERT INTO thread_participants (thread_id, email) VALUES ($1, $2)")
-                .bind(id)
-                .bind(email)
-                .execute(&mut *tx)
-                .await
-                .map_err(AppError::from)?;
-        }
+        };
+        insert_thread_email_principals(
+            &mut tx,
+            company_id,
+            channel_id,
+            id,
+            participant_emails,
+            true,
+        )
+        .await?;
         sqlx::query(
             "UPDATE schedule_runs SET thread_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
         )
@@ -475,17 +557,24 @@ impl ThreadPersistence for PostgresPersistence {
         participant_emails: &[EmailAddress],
     ) -> AppResult<Thread> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        for email in normalized_participants(participant_emails) {
-            sqlx::query(
-                r#"INSERT INTO thread_participants (thread_id, email)
-                   VALUES ($1, $2) ON CONFLICT (thread_id, email) DO NOTHING"#,
-            )
-            .bind(id)
-            .bind(email)
-            .execute(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
-        }
+        let scope: Option<(Uuid, Uuid)> =
+            sqlx::query_as("SELECT company_id, channel_id FROM threads WHERE id = $1 FOR UPDATE")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+        let Some((company_id, channel_id)) = scope else {
+            return Err(AppError::Internal("Thread not found".into()));
+        };
+        insert_thread_email_principals(
+            &mut tx,
+            company_id,
+            channel_id,
+            id,
+            participant_emails,
+            false,
+        )
+        .await?;
 
         let updated =
             sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
@@ -1635,5 +1724,101 @@ mod tests {
         CompanyPersistence::delete(&fixture.persistence, fixture.company_id)
             .await
             .unwrap();
+    }
+
+    /// A thread's parties are principals with a role, and the address list the UI and email
+    /// delivery render is a projection over their email identities -- not the stored key.
+    #[tokio::test]
+    async fn a_thread_records_its_parties_as_principals_and_projects_their_addresses() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+
+        let suffix = Uuid::new_v4().simple().to_string();
+        let username = format!("thread_principals_{suffix}");
+        let owner_email = format!("{username}@example.com");
+        persistence
+            .create_user(&username, &owner_email, "hash")
+            .await
+            .unwrap();
+        let owner = UserPersistence::get_by_email(&persistence, &owner_email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Parties".to_string(),
+                slug: format!("parties-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Desk".into(),
+                slug: "desk".into(),
+                enabled: false,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let author = EmailAddress::from("Author@Partner.test");
+        let thread = persistence
+            .create_thread(channel.id, "Subject", std::slice::from_ref(&author))
+            .await
+            .unwrap();
+        assert_eq!(thread.participant_principal_ids.len(), 1);
+        assert_eq!(
+            thread.participant_projection.email_addresses,
+            vec![EmailAddress::from("author@partner.test")],
+            "the projection carries the normalized mailbox, not what the header said"
+        );
+
+        let roles: Vec<String> = sqlx::query_scalar(
+            "SELECT role FROM thread_principals WHERE thread_id = $1 ORDER BY role",
+        )
+        .bind(thread.id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(roles, vec!["author".to_string(), "participant".to_string()]);
+
+        // A later CC joins as a participant only, and re-adding the author changes nothing.
+        let joined = persistence
+            .update_thread_participants(
+                thread.id,
+                &[author.clone(), EmailAddress::from("cc@partner.test")],
+            )
+            .await
+            .unwrap();
+        assert_eq!(joined.participant_principal_ids.len(), 2);
+        assert_eq!(
+            joined.participant_projection.email_addresses,
+            vec![
+                EmailAddress::from("author@partner.test"),
+                EmailAddress::from("cc@partner.test"),
+            ]
+        );
+        let authors: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM thread_principals WHERE thread_id = $1 AND role = 'author'",
+        )
+        .bind(thread.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            authors, 1,
+            "joining a thread never promotes anyone to author"
+        );
+
+        let _ = CompanyPersistence::delete(&persistence, company.id).await;
     }
 }

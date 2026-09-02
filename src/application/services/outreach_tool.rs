@@ -491,7 +491,7 @@ mod tests {
     use super::*;
     use crate::{
         app_error::AppResult,
-        entities::channel::Channel,
+        entities::channel::{Channel, ChannelAccessMode},
         use_cases::channel::{ChannelPersistence, ChannelWrite},
     };
 
@@ -545,6 +545,8 @@ mod tests {
             slug: slug.into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: Some(vec![Uuid::new_v4()]),
             retrieve_company_memory: false,
             retrieve_agent_memory: false,

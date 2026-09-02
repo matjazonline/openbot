@@ -360,6 +360,8 @@ fn mailbox_channel(company_id: Uuid) -> Channel {
         slug: "inbox".into(),
         alias_slugs: Vec::new(),
         participant_emails: Some(vec!["person@example.com".into()]),
+        access_mode: crate::entities::channel::ChannelAccessMode::Allowlist,
+        principal_grants: Vec::new(),
         agent_ids: None,
         retrieve_company_memory: false,
         retrieve_agent_memory: false,
@@ -377,7 +379,10 @@ fn mailbox_thread(channel_id: Uuid) -> Thread {
         id: Uuid::new_v4(),
         channel_id,
         subject: "Question <script>".to_string(),
-        participant_emails: vec!["person@example.com".into()],
+        participant_principal_ids: Vec::new(),
+        participant_projection: crate::entities::thread::ThreadParticipantProjection {
+            email_addresses: vec!["person@example.com".into()],
+        },
         created_at: Utc::now(),
         updated_at: Utc::now(),
     }
@@ -2995,16 +3000,18 @@ fn a_message_from_another_channel_is_marked_and_keeps_its_own_sender() {
 }
 
 /// A thread whose participant is a channel address was opened by that channel's agent delegating
-/// work in -- a platform address reaches `thread_participants` no other way.
+/// work in -- a platform address becomes a thread principal no other way.
 #[test]
 fn a_thread_opened_by_another_channel_is_marked_and_one_from_a_person_is_not() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
 
     let delegated = Thread {
-        participant_emails: vec![EmailAddress::from(format!(
-            "research@acme.{MAILBOX_APP_DOMAIN}"
-        ))],
+        participant_projection: crate::entities::thread::ThreadParticipantProjection {
+            email_addresses: vec![EmailAddress::from(format!(
+                "research@acme.{MAILBOX_APP_DOMAIN}"
+            ))],
+        },
         ..mailbox_thread(channel.id)
     };
     let row = thread_row_fragment(
@@ -3045,9 +3052,11 @@ fn the_column_marks_a_delegated_thread_without_being_told() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
     let delegated = Thread {
-        participant_emails: vec![EmailAddress::from(format!(
-            "research@acme.{MAILBOX_APP_DOMAIN}"
-        ))],
+        participant_projection: crate::entities::thread::ThreadParticipantProjection {
+            email_addresses: vec![EmailAddress::from(format!(
+                "research@acme.{MAILBOX_APP_DOMAIN}"
+            ))],
+        },
         ..mailbox_thread(channel.id)
     };
 

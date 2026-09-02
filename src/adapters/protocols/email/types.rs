@@ -9,6 +9,11 @@ use crate::entities::{
     value_objects::{EmailAddress, MessageId},
 };
 
+/// A database is one email-identity namespace. Deployments do not share a database, so using a
+/// stable discriminator lets account/bootstrap and ingress writers resolve the same mailbox
+/// without smuggling runtime host configuration into persistence.
+pub const EMAIL_IDENTITY_NAMESPACE: &str = "email";
+
 /// An email identity after adapter-owned mailbox parsing and case normalization.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(transparent)]
@@ -49,6 +54,13 @@ impl EmailIdentity {
 
     pub fn qualify(self, namespace: IdentityNamespace) -> QualifiedIdentity {
         QualifiedIdentity::new(TransportKind::Email, namespace, self.0)
+    }
+
+    pub fn qualify_default(self) -> QualifiedIdentity {
+        self.qualify(
+            IdentityNamespace::parse(EMAIL_IDENTITY_NAMESPACE)
+                .expect("the constant email identity namespace is valid"),
+        )
     }
 }
 

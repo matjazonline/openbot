@@ -30,9 +30,10 @@ use crate::{
         cursor::{MessageCursor, ThreadCursor},
         message::{Message, MessageDirection, MessageRole},
         message_contract::NormalizedInboundMessage,
+        participant::PrincipalAccessContext,
         task::{ThreadActivity, TokenUsage},
         thread::Thread,
-        transport::{ChannelSelector, IdentityNamespace, QualifiedIdentity, TransportKind},
+        transport::{ChannelSelector, QualifiedIdentity, TransportKind},
         value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
     },
     infra::config::AppConfig,
@@ -42,8 +43,11 @@ use crate::{
         outbound_dispatcher::{MailTransport, OutboundDispatcher, OutboundEmail, SentEmailResult},
     },
     use_cases::{
-        agent::AgentPersistence, approval::ApprovalUseCases, channel::ChannelPersistence,
+        agent::AgentPersistence,
+        approval::ApprovalUseCases,
+        channel::ChannelPersistence,
         company::CompanyPersistence,
+        participant::{ParticipantPersistence, observe_email_access_context},
     },
 };
 
@@ -62,16 +66,9 @@ mod inter_channel_tests;
 
 pub const MAX_THREAD_MESSAGES_PER_HOUR: usize = 60;
 
-fn qualified_email_identity(
-    address: impl Into<String>,
-    namespace: &str,
-) -> AppResult<QualifiedIdentity> {
-    let namespace =
-        IdentityNamespace::parse(namespace.trim().to_ascii_lowercase()).map_err(|error| {
-            AppError::Internal(format!("Invalid email identity namespace: {error}"))
-        })?;
+fn qualified_email_identity(address: impl Into<String>) -> AppResult<QualifiedIdentity> {
     EmailIdentity::parse(EmailAddress::from(address.into()))
-        .map(|identity| identity.qualify(namespace))
+        .map(EmailIdentity::qualify_default)
         .map_err(|error| AppError::Internal(format!("Invalid email identity: {error}")))
 }
 
@@ -196,6 +193,7 @@ pub struct ThreadUseCases {
     thread_persistence: Arc<dyn ThreadPersistence>,
     channel_persistence: Arc<dyn ChannelPersistence>,
     company_persistence: Arc<dyn CompanyPersistence>,
+    participant_persistence: Arc<dyn ParticipantPersistence>,
     task_persistence: Arc<dyn TaskPersistence>,
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
     agent_channel_provisioning: Option<Arc<dyn AgentChannelProvisioning>>,
@@ -215,6 +213,7 @@ impl ThreadUseCases {
         thread_persistence: Arc<dyn ThreadPersistence>,
         channel_persistence: Arc<dyn ChannelPersistence>,
         company_persistence: Arc<dyn CompanyPersistence>,
+        participant_persistence: Arc<dyn ParticipantPersistence>,
         task_persistence: Arc<dyn TaskPersistence>,
         config: Arc<AppConfig>,
     ) -> Self {
@@ -228,6 +227,7 @@ impl ThreadUseCases {
             thread_persistence,
             channel_persistence,
             company_persistence,
+            participant_persistence,
             task_persistence,
             agent_persistence: None,
             agent_channel_provisioning: None,
@@ -240,6 +240,30 @@ impl ThreadUseCases {
             config,
             agent_run_timeout: std::time::Duration::from_secs(300),
         }
+    }
+
+    pub(crate) async fn observe_email_access_context(
+        &self,
+        company_id: Uuid,
+        address: &str,
+    ) -> AppResult<PrincipalAccessContext> {
+        observe_email_access_context(self.participant_persistence.as_ref(), company_id, address)
+            .await
+    }
+
+    pub(crate) async fn preferred_email_for_principal(
+        &self,
+        company_id: Uuid,
+        principal_id: crate::entities::transport::PrincipalId,
+    ) -> AppResult<Option<EmailAddress>> {
+        let identities = self
+            .participant_persistence
+            .identities_for_principals(company_id, &[principal_id], TransportKind::Email)
+            .await?;
+        Ok(identities
+            .into_iter()
+            .next()
+            .map(|identity| EmailAddress::from(identity.subject.into_string())))
     }
 
     pub fn with_agent_run_timeout(mut self, timeout: std::time::Duration) -> Self {
@@ -469,21 +493,18 @@ impl ThreadUseCases {
             thread_ref: Some(sent.in_reply_to.clone()),
             references: sent.references.clone(),
             thread_index: None,
-            sender: qualified_email_identity(
-                sent.from_address.clone(),
-                &self.config.app_domain_name,
-            )?,
+            sender: qualified_email_identity(sent.from_address.clone())?,
             recipients_to: sent
                 .recipients_to
                 .iter()
                 .cloned()
-                .map(|address| qualified_email_identity(address, &self.config.app_domain_name))
+                .map(qualified_email_identity)
                 .collect::<AppResult<Vec<_>>>()?,
             recipients_cc: sent
                 .recipients_cc
                 .iter()
                 .cloned()
-                .map(|address| qualified_email_identity(address, &self.config.app_domain_name))
+                .map(qualified_email_identity)
                 .collect::<AppResult<Vec<_>>>()?,
             subject: sent.subject.clone(),
             clean_text: sent.body_text.clone(),

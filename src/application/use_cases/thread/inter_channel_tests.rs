@@ -174,6 +174,7 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
         persistence.clone(),
         persistence.clone(),
         persistence.clone(),
+        persistence.clone(),
         loop_test_config(),
     )
     .with_agent_persistence(persistence.clone());
@@ -198,8 +199,8 @@ fn inbound(from: &str, to: &str, message_id: &str, subject: &str) -> NormalizedI
         thread_ref: None,
         references: Vec::new(),
         thread_index: None,
-        sender: qualified_email_identity(from, APP_DOMAIN).unwrap(),
-        recipients_to: vec![qualified_email_identity(to, APP_DOMAIN).unwrap()],
+        sender: qualified_email_identity(from).unwrap(),
+        recipients_to: vec![qualified_email_identity(to).unwrap()],
         recipients_cc: Vec::new(),
         subject: subject.to_string(),
         clean_text: "Please find out the earliest delivery date.".to_string(),

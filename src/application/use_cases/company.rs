@@ -266,17 +266,6 @@ pub trait CompanyPersistence: Send + Sync {
             .into_iter()
             .find(|access| access.company.id == company_id))
     }
-    /// What the account behind an *address* is to this company.
-    ///
-    /// The by-email counterpart of [`CompanyPersistence::company_access`], for the inbound path,
-    /// which knows a sender only by the address they wrote from. `Channel::participant_access`
-    /// asks it about every sender, and needs the owner told apart from the rest of the team --
-    /// a restricted channel takes its own owner's mail whether or not they are on its list.
-    async fn membership_for_email(
-        &self,
-        company_id: Uuid,
-        email: &str,
-    ) -> AppResult<CompanyMembership>;
     async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>>;
 
     /// The same team as one identity per account, owner first.
@@ -650,14 +639,6 @@ mod tests {
         async fn delete(&self, id: Uuid) -> AppResult<()> {
             self.companies.lock().unwrap().retain(|c| c.id != id);
             Ok(())
-        }
-
-        async fn membership_for_email(
-            &self,
-            _company_id: Uuid,
-            _email: &str,
-        ) -> AppResult<CompanyMembership> {
-            Ok(CompanyMembership::Member)
         }
 
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {

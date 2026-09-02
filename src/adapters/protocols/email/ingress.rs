@@ -4,7 +4,7 @@ use crate::{
     entities::{
         correlation::{CORRELATION_HEADER, CorrelationId},
         message_contract::NormalizedInboundMessage,
-        transport::{IdentityNamespace, TransportKind},
+        transport::TransportKind,
         value_objects::{EmailAddress, MessageId},
     },
     infra::config::AppConfig,
@@ -54,13 +54,9 @@ impl EmailIngressAdapter {
         let correlation_id = correlation_from_headers(payload.headers.as_deref());
         let parsed = EmailParser::parse(payload, &config.app_domain_name);
 
-        let namespace =
-            IdentityNamespace::parse(config.app_domain_name.trim().to_ascii_lowercase()).map_err(
-                |error| AppError::Internal(format!("Invalid email identity namespace: {error}")),
-            )?;
         let qualify = |address: String| -> AppResult<_> {
             EmailIdentity::parse(EmailAddress::from(address))
-                .map(|identity| identity.qualify(namespace.clone()))
+                .map(EmailIdentity::qualify_default)
                 .map_err(|error| AppError::BadRequest(format!("Invalid email mailbox: {error}")))
         };
         let sender = qualify(parsed.sender.clone())?;

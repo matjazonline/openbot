@@ -470,10 +470,10 @@ fn channel_thread_card(
     app_domain_name: &str,
     thread: &Thread,
 ) -> String {
-    let participants = if thread.participant_emails.is_empty() {
+    let participants = if thread.participant_projection.email_addresses.is_empty() {
         "No participants".to_string()
     } else {
-        escape_html_text(&thread.participant_emails.join(", "))
+        escape_html_text(&thread.participant_projection.email_addresses.join(", "))
     };
 
     format!(

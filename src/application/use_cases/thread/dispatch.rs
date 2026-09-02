@@ -25,7 +25,6 @@ use crate::{
         agent::Agent,
         approval::ApprovalSubject,
         channel::{PUBLIC_PARTICIPANT, ParticipantAccess},
-        company_member::CompanyMembership,
         correlation::CorrelationId,
         memory::{MAX_MEMORY_UPSTREAM_CONTEXT_CHARS, truncate_memory_text},
         message::{Message, MessageDirection, MessageRole},
@@ -259,7 +258,6 @@ impl ThreadUseCases {
             primary_agent: None,
         };
         let mut agent_cache: HashMap<Uuid, Option<Agent>> = HashMap::new();
-        let mut membership_cache: HashMap<(Uuid, String), CompanyMembership> = HashMap::new();
 
         for (index, channel_match) in matches.iter().enumerate() {
             let history = self
@@ -284,19 +282,11 @@ impl ThreadUseCases {
             }
 
             let sender = parsed.sender.trim();
-            let member_key = (channel_match.company.id, sender.to_lowercase());
-            let membership = match membership_cache.get(&member_key) {
-                Some(cached) => *cached,
-                None => {
-                    let loaded = self
-                        .company_persistence
-                        .membership_for_email(channel_match.company.id, sender)
-                        .await?;
-                    membership_cache.insert(member_key, loaded);
-                    loaded
-                }
-            };
-            let access = channel_match.channel.participant_access(sender, membership);
+            let context = self
+                .observe_email_access_context(channel_match.company.id, sender)
+                .await?;
+            let membership = context.membership;
+            let access = channel_match.channel.participant_access(context);
 
             let upstream_context = self
                 .upstream_context_for(&run.outputs, ingest.task_id)
@@ -725,16 +715,11 @@ impl ThreadUseCases {
             thread_id: primary.thread.id,
             in_reply_to_ref: Some(MessageId::from(parsed.message_id.clone())),
             references: references.into_iter().map(MessageId::from).collect(),
-            recipients_to: vec![super::qualified_email_identity(
-                parsed.sender.clone(),
-                &self.config.app_domain_name,
-            )?],
+            recipients_to: vec![super::qualified_email_identity(parsed.sender.clone())?],
             recipients_cc: recipients_cc
                 .iter()
                 .cloned()
-                .map(|address| {
-                    super::qualified_email_identity(address, &self.config.app_domain_name)
-                })
+                .map(super::qualified_email_identity)
                 .collect::<AppResult<Vec<_>>>()?,
             subject: parsed.subject.clone(),
             content: response.to_string(),

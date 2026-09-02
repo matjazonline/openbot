@@ -1510,7 +1510,8 @@ mod tests {
             id: Uuid::new_v4(),
             channel_id: Uuid::new_v4(),
             subject: "Subject".into(),
-            participant_emails: vec![],
+            participant_principal_ids: Vec::new(),
+            participant_projection: crate::entities::thread::ThreadParticipantProjection::default(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -1548,6 +1549,8 @@ mod tests {
             slug: "auto-dispatcher".into(),
             alias_slugs: Vec::new(),
             participant_emails: Some(vec!["agent@test.com".into()]),
+            access_mode: crate::entities::channel::ChannelAccessMode::Allowlist,
+            principal_grants: Vec::new(),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -1599,7 +1602,10 @@ mod tests {
             id: Uuid::new_v4(),
             channel_id: channel.id,
             subject: "Question <script>".into(),
-            participant_emails: vec!["person@example.com".into()],
+            participant_principal_ids: Vec::new(),
+            participant_projection: crate::entities::thread::ThreadParticipantProjection {
+                email_addresses: vec!["person@example.com".into()],
+            },
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -1754,7 +1760,10 @@ mod tests {
             id: Uuid::new_v4(),
             channel_id: channel.id,
             subject: "Existing Thread Subject".to_string(),
-            participant_emails: vec!["user@test.com".into()],
+            participant_principal_ids: Vec::new(),
+            participant_projection: crate::entities::thread::ThreadParticipantProjection {
+                email_addresses: vec!["user@test.com".into()],
+            },
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

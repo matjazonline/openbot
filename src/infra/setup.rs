@@ -127,8 +127,13 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     let company_invite_use_cases =
         CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());
     let channel_use_cases = Arc::new(
-        ChannelUseCases::new(postgres_arc.clone(), postgres_arc.clone(), config.clone())
-            .with_memory_persistence(postgres_arc.clone()),
+        ChannelUseCases::new(
+            postgres_arc.clone(),
+            postgres_arc.clone(),
+            postgres_arc.clone(),
+            config.clone(),
+        )
+        .with_memory_persistence(postgres_arc.clone()),
     );
     let agent_use_cases = AgentUseCases::new(
         postgres_arc.clone(),
@@ -154,6 +159,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
 
     let thread_use_cases = Arc::new(
         ThreadUseCases::new(
+            postgres_arc.clone(),
             postgres_arc.clone(),
             postgres_arc.clone(),
             postgres_arc.clone(),

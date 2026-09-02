@@ -360,7 +360,6 @@ impl CompanyInviteUseCases {
 mod tests {
     use super::*;
     use crate::entities::company::Company;
-    use crate::entities::company_member::CompanyMembership;
     use crate::use_cases::company::CompanyWrite;
     use chrono::Utc;
     use std::sync::Mutex;
@@ -405,14 +404,6 @@ mod tests {
 
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
-        }
-
-        async fn membership_for_email(
-            &self,
-            _company_id: Uuid,
-            _email: &str,
-        ) -> AppResult<CompanyMembership> {
-            Ok(CompanyMembership::Member)
         }
 
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {

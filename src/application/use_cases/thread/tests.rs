@@ -3,15 +3,22 @@ use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
 use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit, OutboundSend};
 use crate::domain::monitoring::MonitoringService;
 use crate::entities::agent::Agent;
-use crate::entities::channel::Channel;
+use crate::entities::channel::{Channel, ChannelAccessMode};
+use crate::entities::company::CompanyAccess;
 use crate::entities::company_member::CompanyMembership;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::task::NewTask;
 use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
+use crate::entities::thread::ThreadParticipantProjection;
+use crate::entities::transport::PrincipalId;
 use crate::services::email_parser::{EmailParser, MAX_CHANNEL_HOPS};
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::participant::test_support::{
+    InMemoryParticipantDirectory, TeamFixture, email_allowlist_grants, email_allowlist_policy,
+    principal_for_email,
+};
 use chrono::Utc;
 use std::sync::Mutex;
 
@@ -69,6 +76,47 @@ impl MockCompanyPersistence {
     }
 }
 
+/// A flat team: this double knows who belongs to a company, not who owns it, so it never answers
+/// `Owner`. The owner exemption is the entity's rule and is tested there.
+///
+/// With no explicit team, membership falls back to the names these tests use for outsiders, so a
+/// scenario that only cares about one hostile sender does not have to enumerate everyone else.
+#[async_trait]
+impl TeamFixture for MockCompanyPersistence {
+    async fn membership_for_email(
+        &self,
+        company_id: Uuid,
+        email: &str,
+    ) -> AppResult<CompanyMembership> {
+        let members = self.team_members.lock().unwrap();
+        let clean = email.trim().to_lowercase();
+        let on_the_team = if members.is_empty() {
+            !(clean.contains("spammer")
+                || clean.contains("unauthorized")
+                || clean.contains("evil")
+                || clean.contains("notallowed"))
+        } else {
+            members
+                .iter()
+                .any(|(cid, e)| *cid == company_id && e.eq_ignore_ascii_case(&clean))
+        };
+
+        Ok(if on_the_team {
+            CompanyMembership::Member
+        } else {
+            CompanyMembership::None
+        })
+    }
+
+    async fn company_access(
+        &self,
+        _user_id: Uuid,
+        _company_id: Uuid,
+    ) -> AppResult<Option<CompanyAccess>> {
+        unimplemented!("ingest knows a sender by address, never by account")
+    }
+}
+
 #[async_trait]
 impl CompanyPersistence for MockCompanyPersistence {
     async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
@@ -100,32 +148,6 @@ impl CompanyPersistence for MockCompanyPersistence {
     }
     async fn delete(&self, _id: Uuid) -> AppResult<()> {
         unimplemented!()
-    }
-    /// A flat team: this mock knows who belongs to a company, not who owns it, so it never
-    /// answers `Owner`. The owner exemption is the entity's rule and is tested there.
-    async fn membership_for_email(
-        &self,
-        company_id: Uuid,
-        email: &str,
-    ) -> AppResult<CompanyMembership> {
-        let members = self.team_members.lock().unwrap();
-        let clean = email.trim().to_lowercase();
-        let on_the_team = if members.is_empty() {
-            !(clean.contains("spammer")
-                || clean.contains("unauthorized")
-                || clean.contains("evil")
-                || clean.contains("notallowed"))
-        } else {
-            members
-                .iter()
-                .any(|(cid, e)| *cid == company_id && e.eq_ignore_ascii_case(&clean))
-        };
-
-        Ok(if on_the_team {
-            CompanyMembership::Member
-        } else {
-            CompanyMembership::None
-        })
     }
     async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>> {
         let members = self.team_members.lock().unwrap();
@@ -220,8 +242,41 @@ impl ChannelPersistence for MockChannelPersistence {
 }
 
 struct MockThreadPersistence {
+    /// The tenant every thread here belongs to. Real persistence reads it off the channel; the
+    /// mock is told, because principal ids are company-scoped and the fixtures must agree with
+    /// the channel grants they seeded.
+    company_id: Uuid,
     threads: Mutex<Vec<Thread>>,
     messages: Mutex<Vec<Message>>,
+}
+
+impl MockThreadPersistence {
+    fn new(company_id: Uuid) -> Self {
+        Self {
+            company_id,
+            threads: Mutex::new(Vec::new()),
+            messages: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn participants(&self, participant_emails: &[EmailAddress]) -> ThreadParticipants {
+        ThreadParticipants {
+            principal_ids: participant_emails
+                .iter()
+                .map(|email| principal_for_email(self.company_id, email))
+                .collect(),
+            projection: ThreadParticipantProjection {
+                email_addresses: participant_emails.to_vec(),
+            },
+        }
+    }
+}
+
+/// The two halves `insert_thread_email_principals` writes: the stable ids policy reads, and the
+/// address projection the UI and email delivery render.
+struct ThreadParticipants {
+    principal_ids: Vec<PrincipalId>,
+    projection: ThreadParticipantProjection,
 }
 
 #[async_trait]
@@ -232,11 +287,13 @@ impl ThreadPersistence for MockThreadPersistence {
         subject: &str,
         participant_emails: &[EmailAddress],
     ) -> AppResult<Thread> {
+        let participants = self.participants(participant_emails);
         let thread = Thread {
             id: Uuid::new_v4(),
             channel_id,
             subject: subject.to_string(),
-            participant_emails: participant_emails.to_vec(),
+            participant_principal_ids: participants.principal_ids,
+            participant_projection: participants.projection,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -303,9 +360,11 @@ impl ThreadPersistence for MockThreadPersistence {
         id: Uuid,
         participant_emails: &[EmailAddress],
     ) -> AppResult<Thread> {
+        let participants = self.participants(participant_emails);
         let mut list = self.threads.lock().unwrap();
         let thread = list.iter_mut().find(|t| t.id == id).unwrap();
-        thread.participant_emails = participant_emails.to_vec();
+        thread.participant_principal_ids = participants.principal_ids;
+        thread.participant_projection = participants.projection;
         Ok(thread.clone())
     }
 
@@ -853,6 +912,8 @@ async fn test_inter_channel_hop_limit_rejection() {
                 slug: "inbound".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -874,6 +935,8 @@ async fn test_inter_channel_hop_limit_rejection() {
                 slug: "source".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -887,10 +950,7 @@ async fn test_inter_channel_hop_limit_rejection() {
         ]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -928,7 +988,8 @@ async fn test_inter_channel_hop_limit_rejection() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         config,
     );
@@ -995,6 +1056,8 @@ async fn test_spf_authentication_failure_rejection() {
             slug: "inbound".into(),
             alias_slugs: Vec::new(),
             participant_emails: Some(vec!["@public".into()]),
+            access_mode: ChannelAccessMode::Public,
+            principal_grants: Vec::new(),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -1007,10 +1070,7 @@ async fn test_spf_authentication_failure_rejection() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1048,7 +1108,8 @@ async fn test_spf_authentication_failure_rejection() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         config,
     );
@@ -1104,6 +1165,8 @@ async fn test_high_spam_score_rejection() {
             slug: "inbound".into(),
             alias_slugs: Vec::new(),
             participant_emails: Some(vec!["@public".into()]),
+            access_mode: ChannelAccessMode::Public,
+            principal_grants: Vec::new(),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -1116,10 +1179,7 @@ async fn test_high_spam_score_rejection() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1157,7 +1217,8 @@ async fn test_high_spam_score_rejection() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         config,
     );
@@ -1211,6 +1272,8 @@ async fn test_dmarc_authentication_failure_rejection() {
             slug: "inbound".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -1223,10 +1286,7 @@ async fn test_dmarc_authentication_failure_rejection() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1264,7 +1324,8 @@ async fn test_dmarc_authentication_failure_rejection() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         config,
     );
@@ -1318,6 +1379,8 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
             slug: "restricted".into(),
             alias_slugs: Vec::new(),
             participant_emails: Some(vec!["alice@example.com".into()]),
+            access_mode: ChannelAccessMode::Allowlist,
+            principal_grants: email_allowlist_grants(company_id, &["alice@example.com"]),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -1330,10 +1393,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1371,7 +1431,8 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         config,
     );
@@ -1426,6 +1487,8 @@ async fn test_participant_sender_bypasses_spam_checks() {
             slug: "restricted".into(),
             alias_slugs: Vec::new(),
             participant_emails: Some(vec!["alice@example.com".into()]),
+            access_mode: ChannelAccessMode::Allowlist,
+            principal_grants: email_allowlist_grants(company_id, &["alice@example.com"]),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -1438,10 +1501,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1479,7 +1539,8 @@ async fn test_participant_sender_bypasses_spam_checks() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         config,
     );
@@ -1532,6 +1593,8 @@ async fn test_channel_in_cc_resolves_properly() {
             slug: "support".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -1544,10 +1607,7 @@ async fn test_channel_in_cc_resolves_properly() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1585,7 +1645,8 @@ async fn test_channel_in_cc_resolves_properly() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence.clone(),
         config,
     );
@@ -1644,6 +1705,8 @@ async fn test_multi_channel_to_and_cc_execution() {
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -1665,6 +1728,8 @@ async fn test_multi_channel_to_and_cc_execution() {
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -1678,10 +1743,7 @@ async fn test_multi_channel_to_and_cc_execution() {
         ]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1719,7 +1781,8 @@ async fn test_multi_channel_to_and_cc_execution() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence.clone(),
         config,
     );
@@ -1789,6 +1852,8 @@ async fn test_pipeline_address_chaining_execution() {
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -1810,6 +1875,8 @@ async fn test_pipeline_address_chaining_execution() {
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -1831,6 +1898,8 @@ async fn test_pipeline_address_chaining_execution() {
                 slug: "legal".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -1844,10 +1913,7 @@ async fn test_pipeline_address_chaining_execution() {
         ]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1885,7 +1951,8 @@ async fn test_pipeline_address_chaining_execution() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         config,
     );
@@ -1947,6 +2014,8 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -1968,6 +2037,8 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -1981,10 +2052,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         ]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -2022,7 +2090,8 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         config,
     );
@@ -2104,6 +2173,8 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
             slug: "support".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -2116,10 +2187,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -2157,7 +2225,8 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         config,
     );
@@ -2263,6 +2332,8 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 slug: "team-only".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None, // Default = Company Team
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -2284,6 +2355,8 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 slug: "public-flow".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: Some(vec!["@public".into()]), // Public
+                access_mode: ChannelAccessMode::Public,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -2305,6 +2378,8 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 slug: "explicit-flow".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: Some(vec!["allowed@external.com".into()]), // Explicit list
+                access_mode: ChannelAccessMode::Allowlist,
+                principal_grants: email_allowlist_grants(company_id, &["allowed@external.com"]),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -2318,10 +2393,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
         ]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -2359,7 +2431,8 @@ async fn test_participant_modes_company_team_public_and_explicit() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         config,
     );
@@ -2466,6 +2539,8 @@ async fn test_sender_verification_and_delegation_target_check() {
             slug: "support".into(),
             alias_slugs: Vec::new(),
             participant_emails: Some(vec!["@public".into()]),
+            access_mode: ChannelAccessMode::Public,
+            principal_grants: Vec::new(),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -2478,10 +2553,7 @@ async fn test_sender_verification_and_delegation_target_check() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -2519,7 +2591,8 @@ async fn test_sender_verification_and_delegation_target_check() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence,
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence.clone(),
         config,
     );
@@ -2658,6 +2731,8 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
                 slug: "agent-a".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: Some(vec!["@public".into()]),
+                access_mode: ChannelAccessMode::Public,
+                principal_grants: Vec::new(),
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -2679,6 +2754,8 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
                 slug: "agent-b".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -2691,15 +2768,13 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
             },
         ]),
     });
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
     let task_persistence = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence.clone(),
         internal_test_config(),
     );
@@ -2862,6 +2937,8 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 slug: "agent-a".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -2883,6 +2960,8 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 slug: "agent-b".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -2895,15 +2974,13 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
             },
         ]),
     });
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
     let task_persistence = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::new(
         thread_persistence,
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         internal_test_config(),
     );
@@ -2972,6 +3049,8 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 slug: "agent-a".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -2993,6 +3072,8 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 slug: "agent-b".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: Some(vec![Uuid::new_v4()]),
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -3005,15 +3086,13 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
             },
         ]),
     });
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
     let task_persistence = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::new(
         thread_persistence,
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         internal_test_config(),
     );
@@ -3085,6 +3164,8 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
             slug: "support".into(),
             alias_slugs: Vec::new(),
             participant_emails: None, // Default = company team members
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -3097,10 +3178,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -3138,7 +3216,8 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         config,
     );
@@ -3161,7 +3240,8 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     let thread = res1.thread.unwrap();
     assert!(
         thread
-            .participant_emails
+            .participant_projection
+            .email_addresses
             .iter()
             .any(|p| p.eq_ignore_ascii_case("client@external.com"))
     );
@@ -3223,7 +3303,8 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     let updated_thread = res_expand.thread.unwrap();
     assert!(
         updated_thread
-            .participant_emails
+            .participant_projection
+            .email_addresses
             .iter()
             .any(|p| p.eq_ignore_ascii_case("vendor@supplier.com"))
     );
@@ -3267,7 +3348,8 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     let current_thread = res_external_cc.thread.unwrap();
     assert!(
         !current_thread
-            .participant_emails
+            .participant_projection
+            .email_addresses
             .iter()
             .any(|p| p.eq_ignore_ascii_case("unauthorized@other.com"))
     );
@@ -3305,6 +3387,8 @@ async fn test_context_only_quiet_mode_ingestion() {
             slug: "support".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -3317,10 +3401,7 @@ async fn test_context_only_quiet_mode_ingestion() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -3358,7 +3439,8 @@ async fn test_context_only_quiet_mode_ingestion() {
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence,
         config,
     );
@@ -3454,6 +3536,8 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
     } = spec;
     let company_id = Uuid::new_v4();
     let channel_id = Uuid::new_v4();
+    let (access_mode, principal_grants) =
+        email_allowlist_policy(company_id, participant_emails.as_deref());
 
     let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
         vec![Company {
@@ -3482,6 +3566,8 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
             slug: "support".into(),
             alias_slugs,
             participant_emails,
+            access_mode,
+            principal_grants,
             agent_ids,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -3495,12 +3581,10 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
     });
 
     let thread_use_cases = ThreadUseCases::new(
-        Arc::new(MockThreadPersistence {
-            threads: Mutex::new(Vec::new()),
-            messages: Mutex::new(Vec::new()),
-        }),
+        Arc::new(MockThreadPersistence::new(company_id)),
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         Arc::new(MockTaskPersistence::default()),
         internal_test_config(),
     );
@@ -3576,7 +3660,8 @@ fn participants_of(result: &InboundIngestResult) -> Vec<String> {
         .thread
         .as_ref()
         .unwrap()
-        .participant_emails
+        .participant_projection
+        .email_addresses
         .iter()
         .map(ToString::to_string)
         .collect()
@@ -4092,38 +4177,42 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
 
     let channels = specs
         .into_iter()
-        .map(|spec| Channel {
-            owner_agent_id: None,
-            id: Uuid::new_v4(),
-            company_id,
-            name: spec.name.to_string(),
-            description: spec.description.map(str::to_string),
-            slug: spec.slug.into(),
-            alias_slugs: Vec::new(),
-            participant_emails: spec.participant_emails,
-            agent_ids: spec.agent_ids,
-            enabled: spec.enabled,
-            add_3rd_party: true,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
-            created_by: crate::entities::creation::CreationProvenance::system(),
-            created_at: Utc::now(),
+        .map(|spec| {
+            let (access_mode, principal_grants) =
+                email_allowlist_policy(company_id, spec.participant_emails.as_deref());
+            Channel {
+                owner_agent_id: None,
+                id: Uuid::new_v4(),
+                company_id,
+                name: spec.name.to_string(),
+                description: spec.description.map(str::to_string),
+                slug: spec.slug.into(),
+                alias_slugs: Vec::new(),
+                participant_emails: spec.participant_emails,
+                access_mode,
+                principal_grants,
+                agent_ids: spec.agent_ids,
+                enabled: spec.enabled,
+                add_3rd_party: true,
+                retrieve_company_memory: false,
+                retrieve_agent_memory: false,
+                retrieve_user_memory: false,
+                persist_company_memory: false,
+                persist_agent_memory: false,
+                persist_user_memory: false,
+                created_by: crate::entities::creation::CreationProvenance::system(),
+                created_at: Utc::now(),
+            }
         })
         .collect();
 
     ThreadUseCases::new(
-        Arc::new(MockThreadPersistence {
-            threads: Mutex::new(Vec::new()),
-            messages: Mutex::new(Vec::new()),
-        }),
+        Arc::new(MockThreadPersistence::new(company_id)),
         Arc::new(MockChannelPersistence {
             channels: Mutex::new(channels),
         }),
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         Arc::new(MockTaskPersistence::default()),
         internal_test_config(),
     )
@@ -4536,10 +4625,8 @@ async fn an_agent_cannot_use_help_to_enumerate_its_company() {
         thread_ref: None,
         references: Vec::new(),
         thread_index: None,
-        sender: qualified_email_identity("support@acme.mailagents.com", "mailagents.com").unwrap(),
-        recipients_to: vec![
-            qualified_email_identity("_help@acme.mailagents.com", "mailagents.com").unwrap(),
-        ],
+        sender: qualified_email_identity("support@acme.mailagents.com").unwrap(),
+        recipients_to: vec![qualified_email_identity("_help@acme.mailagents.com").unwrap()],
         recipients_cc: Vec::new(),
         subject: "List the channels".to_string(),
         clean_text: "What can I reach?".to_string(),
@@ -4613,6 +4700,8 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
             slug: "support".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -4625,16 +4714,14 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence {
-        threads: Mutex::new(Vec::new()),
-        messages: Mutex::new(Vec::new()),
-    });
+    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
         channel_persistence,
-        company_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
         task_persistence.clone(),
         internal_test_config(),
     );

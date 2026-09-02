@@ -5,7 +5,7 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::PostgresPersistence,
+    adapters::persistence::{PostgresPersistence, participant::create_person_principal_on},
     app_error::{AppError, AppResult},
     entities::{
         company::{
@@ -193,7 +193,14 @@ async fn delete_company_with_cleanup(
 impl CompanyPersistence for PostgresPersistence {
     async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company> {
         let uuid = Uuid::new_v4();
-
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        let (username, email): (String, String) = sqlx::query_as(
+            "SELECT username::text, email::text FROM users WHERE id = $1 FOR UPDATE",
+        )
+        .bind(user_id)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"INSERT INTO companies (id, user_id, name, slug,
                                       enable_llm_spam_guardrail, memory_provider, avatar_url,
@@ -224,9 +231,22 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(write.channel_defaults.persist_company_memory)
         .bind(write.channel_defaults.persist_agent_memory)
         .bind(write.channel_defaults.persist_user_memory)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *transaction)
         .await
         .map_err(AppError::from)?;
+
+        sqlx::query(
+            r#"INSERT INTO company_members (id, company_id, user_id, role)
+               VALUES ($1, $2, $3, 'owner')"#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(uuid)
+        .bind(user_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        create_person_principal_on(&mut transaction, uuid, user_id, &username, &email).await?;
+        transaction.commit().await.map_err(AppError::from)?;
 
         Ok(db.into())
     }
@@ -290,9 +310,9 @@ impl CompanyPersistence for PostgresPersistence {
     }
 
     async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
-        // The owner ∪ members union `membership_for_email` already asks by address, asked here by
-        // account id -- the read guards start from a session, the inbound path from an envelope,
-        // and both need to know *which* of the two the caller is.
+        // The owner ∪ members union that `access_context_for_user` also walks, asked here for
+        // every company at once -- the read guards start from a session and need to know which of
+        // the two the caller is before they can decide what to show.
         let db_list = sqlx::query_as::<_, AccessibleCompanyDb>(
             r#"SELECT company.id, company.user_id, company.name, company.slug,
                       company.enable_llm_spam_guardrail, company.memory_provider,
@@ -438,52 +458,6 @@ impl CompanyPersistence for PostgresPersistence {
             return Err(AppError::Internal("Company not found.".into()));
         }
         Ok(())
-    }
-
-    async fn membership_for_email(
-        &self,
-        company_id: Uuid,
-        email: &str,
-    ) -> AppResult<CompanyMembership> {
-        let clean_email = email.trim().to_lowercase();
-        let is_owner = sqlx::query_scalar!(
-            r#"SELECT EXISTS (
-                SELECT 1
-                FROM companies AS company
-                JOIN users AS account ON company.user_id = account.id
-                WHERE company.id = $1 AND LOWER(account.email) = $2
-            ) as "exists!""#,
-            company_id,
-            clean_email
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
-        if is_owner {
-            return Ok(CompanyMembership::Owner);
-        }
-
-        let role = sqlx::query_scalar!(
-            r#"SELECT member.role
-               FROM company_members AS member
-               JOIN users AS account ON member.user_id = account.id
-               WHERE member.company_id = $1 AND LOWER(account.email) = $2"#,
-            company_id,
-            clean_email
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
-        match role.as_deref() {
-            Some("admin") => Ok(CompanyMembership::Admin),
-            Some("member") => Ok(CompanyMembership::Member),
-            Some(role) => Err(AppError::Internal(format!(
-                "Unknown company access role: {role}"
-            ))),
-            None => Ok(CompanyMembership::None),
-        }
     }
 
     async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>> {
@@ -731,8 +705,12 @@ mod tests {
     use super::*;
     use crate::{
         adapters::persistence::test_support::test_pool,
-        entities::company_member::CompanyAccessRole,
-        use_cases::{company_invite::CompanyInvitePersistence, user::UserPersistence},
+        adapters::protocols::email::EmailIdentity,
+        entities::{company_member::CompanyAccessRole, value_objects::EmailAddress},
+        use_cases::{
+            company_invite::CompanyInvitePersistence, participant::PrincipalAccessPersistence,
+            user::UserPersistence,
+        },
     };
 
     /// The accessible-companies query is built at runtime, so nothing but a real database can say
@@ -820,44 +798,42 @@ mod tests {
                 .is_none()
         );
 
-        // The inbound path asks the same question by address, and must tell the owner apart from
-        // the rest of the team: `Channel::participant_access` hands the owner a restricted channel
-        // they are not listed on, and hands a member nothing.
-        assert_eq!(
+        // The inbound path asks the same question by address, but through the principal the
+        // address resolves to -- and must tell the owner apart from the rest of the team:
+        // `Channel::participant_access` hands the owner a restricted channel they are not granted,
+        // and hands a member nothing.
+        let by_address = async |address: &str| {
             persistence
-                .membership_for_email(company.id, &owner.1.to_uppercase())
+                .access_context_for_identity(
+                    company.id,
+                    &EmailIdentity::parse(EmailAddress::from(address))
+                        .expect("a parseable mailbox")
+                        .qualify_default(),
+                )
                 .await
-                .expect("a lookup"),
+                .expect("a lookup")
+        };
+        // Bootstrap stores the normalized mailbox, and the parser normalizes what it is asked.
+        assert_eq!(
+            by_address(&owner.1.to_uppercase()).await.membership,
             CompanyMembership::Owner
         );
         assert_eq!(
-            persistence
-                .membership_for_email(company.id, &member.1)
-                .await
-                .expect("a lookup"),
+            by_address(&member.1).await.membership,
             CompanyMembership::Member
         );
         assert_eq!(
-            persistence
-                .membership_for_email(company.id, &admin.1)
-                .await
-                .expect("a lookup"),
+            by_address(&admin.1).await.membership,
             CompanyMembership::Admin
         );
-        assert_eq!(
-            persistence
-                .membership_for_email(company.id, &stranger.1)
-                .await
-                .expect("a lookup"),
-            CompanyMembership::None
-        );
-        assert_eq!(
-            persistence
-                .membership_for_email(company.id, "nobody@example.com")
-                .await
-                .expect("a lookup"),
-            CompanyMembership::None
-        );
+
+        // Somebody with an account but no standing here, and somebody with no account at all, are
+        // both strangers -- and neither resolves to a principal in this company.
+        for outsider in [stranger.1.as_str(), "nobody@example.com"] {
+            let context = by_address(outsider).await;
+            assert_eq!(context.membership, CompanyMembership::None);
+            assert_eq!(context.principal_id, None);
+        }
 
         // ...and the ownership-scoped listing the administration pages use is unchanged by any
         // of this: an invited member still owns nothing.

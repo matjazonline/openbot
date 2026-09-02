@@ -923,7 +923,8 @@ pub fn channel_simulation_loaded_thread_fragment(
     let target_recipient = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
 
     let default_sender = thread
-        .participant_emails
+        .participant_projection
+        .email_addresses
         .first()
         .cloned()
         .or_else(|| {
@@ -998,10 +999,10 @@ pub(crate) fn loaded_thread_overview_card(
     target_recipient: &str,
     msg_count: usize,
 ) -> String {
-    let participants_str = if thread.participant_emails.is_empty() {
+    let participants_str = if thread.participant_projection.email_addresses.is_empty() {
         "None recorded".to_string()
     } else {
-        thread.participant_emails.join(", ")
+        thread.participant_projection.email_addresses.join(", ")
     };
 
     format!(

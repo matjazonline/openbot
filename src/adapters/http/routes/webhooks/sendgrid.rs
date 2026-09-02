@@ -295,9 +295,11 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::approval::NewApproval;
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
+    use crate::entities::company::CompanyAccess;
     use crate::entities::company_member::CompanyMembership;
     use crate::entities::task::NewTask;
     use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
+    use crate::use_cases::participant::test_support::{InMemoryParticipantDirectory, TeamFixture};
     use async_trait::async_trait;
     use axum::body::Body;
     use axum::http::Request;
@@ -363,6 +365,26 @@ mod tests {
         companies: Mutex<Vec<Company>>,
     }
 
+    /// These tests are about webhook ingestion, not team management: every sender is a colleague.
+    #[async_trait]
+    impl TeamFixture for MockCompanyPersistence {
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
+        }
+
+        async fn company_access(
+            &self,
+            _user_id: Uuid,
+            _company_id: Uuid,
+        ) -> AppResult<Option<CompanyAccess>> {
+            unimplemented!("this double is not exercised on the signed-in path")
+        }
+    }
+
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
         async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
@@ -388,13 +410,6 @@ mod tests {
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
-        }
-        async fn membership_for_email(
-            &self,
-            _company_id: Uuid,
-            _email: &str,
-        ) -> AppResult<CompanyMembership> {
-            Ok(CompanyMembership::Member)
         }
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
@@ -557,7 +572,10 @@ mod tests {
                 id: Uuid::new_v4(),
                 channel_id,
                 subject: subject.to_string(),
-                participant_emails: participant_emails.to_vec(),
+                participant_principal_ids: Vec::new(),
+                participant_projection: crate::entities::thread::ThreadParticipantProjection {
+                    email_addresses: participant_emails.to_vec(),
+                },
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
             };
@@ -611,7 +629,7 @@ mod tests {
         ) -> AppResult<Thread> {
             let mut list = self.threads.lock().unwrap();
             let thread = list.iter_mut().find(|t| t.id == id).unwrap();
-            thread.participant_emails = participant_emails.to_vec();
+            thread.participant_projection.email_addresses = participant_emails.to_vec();
             Ok(thread.clone())
         }
 
@@ -1252,6 +1270,8 @@ mod tests {
                 slug: "inbound".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: crate::entities::channel::ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -1308,6 +1328,7 @@ mod tests {
             thread_persistence.clone(),
             channel_persistence.clone(),
             company_persistence.clone(),
+            Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence.clone())),
             task_persistence.clone(),
             config.clone(),
         ));
@@ -1322,6 +1343,7 @@ mod tests {
         let channel_use_cases = Arc::new(ChannelUseCases::new(
             company_persistence.clone(),
             channel_persistence.clone(),
+            Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence.clone())),
             config.clone(),
         ));
         let memory_persistence = Arc::new(crate::adapters::persistence::PostgresPersistence::new(

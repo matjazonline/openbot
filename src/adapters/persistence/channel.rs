@@ -1,21 +1,27 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use std::collections::HashSet;
+use std::{collections::HashSet, str::FromStr};
 use uuid::Uuid;
 
+use crate::adapters::persistence::participant::{
+    create_agent_principal_on, resolve_or_create_external_identity_on,
+};
+use crate::adapters::protocols::email::EmailIdentity;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
-        channel::Channel,
+        channel::{Channel, ChannelAccessMode},
         creation::CreationProvenance,
+        participant::{IdentityClaimMetadata, IdentityProvenance, PrincipalCapability},
         value_objects::{AvatarUrl, ChannelSlug, CompanySlug, EmailAddress},
     },
     use_cases::{
         agent::{AgentPersistence, AgentWrite, OwnedAgentChannelPersistence},
         channel::{ChannelPersistence, ChannelWrite},
+        participant::{IdentityObservation, IdentityResolution},
     },
 };
 
@@ -29,6 +35,8 @@ pub struct ChannelDb {
     pub slug: String,
     pub alias_slugs: Vec<String>,
     pub participant_emails: Option<Vec<String>>,
+    pub access_mode: String,
+    pub principal_grants: serde_json::Value,
     pub agent_ids: Option<Vec<Uuid>>,
     pub enabled: bool,
     pub add_3rd_party: bool,
@@ -57,6 +65,14 @@ impl TryFrom<ChannelDb> for Channel {
             participant_emails: db
                 .participant_emails
                 .map(|emails| emails.into_iter().map(EmailAddress::from).collect()),
+            access_mode: ChannelAccessMode::from_str(&db.access_mode)
+                .map_err(|error| AppError::Internal(error.to_string()))?,
+            principal_grants: serde_json::from_value(db.principal_grants).map_err(|error| {
+                AppError::Internal(format!(
+                    "Invalid channel principal grants for {}: {error}",
+                    db.id
+                ))
+            })?,
             agent_ids: db.agent_ids,
             enabled: db.enabled,
             add_3rd_party: db.add_3rd_party,
@@ -85,15 +101,40 @@ const CHANNEL_SELECT: &str = r#"
                ARRAY[]::text[]) AS alias_slugs,
            CASE ch.access_mode
                WHEN 'public' THEN ARRAY['@public']::text[] || COALESCE(
-                   (SELECT array_agg(cp.email::text ORDER BY cp.email::text)
-                    FROM channel_participants cp WHERE cp.channel_id = ch.id),
+                   (SELECT array_agg(identity.subject ORDER BY identity.subject)
+                    FROM channel_principal_grants AS channel_grant
+                    JOIN participant_identities AS identity
+                      ON (identity.company_id, identity.principal_id) =
+                         (channel_grant.company_id, channel_grant.principal_id)
+                    WHERE channel_grant.company_id = ch.company_id AND channel_grant.channel_id = ch.id
+                      AND channel_grant.capability = 'participate'
+                      AND channel_grant.provenance = 'email_allowlist'
+                      AND identity.transport = 'email' AND identity.status <> 'disabled'),
                    ARRAY[]::text[])
                WHEN 'allowlist' THEN COALESCE(
-                   (SELECT array_agg(cp.email::text ORDER BY cp.email::text)
-                    FROM channel_participants cp WHERE cp.channel_id = ch.id),
+                   (SELECT array_agg(identity.subject ORDER BY identity.subject)
+                    FROM channel_principal_grants AS channel_grant
+                    JOIN participant_identities AS identity
+                      ON (identity.company_id, identity.principal_id) =
+                         (channel_grant.company_id, channel_grant.principal_id)
+                    WHERE channel_grant.company_id = ch.company_id AND channel_grant.channel_id = ch.id
+                      AND channel_grant.capability = 'participate'
+                      AND channel_grant.provenance = 'email_allowlist'
+                      AND identity.transport = 'email' AND identity.status <> 'disabled'),
                    ARRAY[]::text[])
                ELSE NULL::text[]
            END AS participant_emails,
+           ch.access_mode,
+           COALESCE(
+               (SELECT jsonb_agg(jsonb_build_object(
+                           'principal_id', channel_grant.principal_id,
+                           'capability', channel_grant.capability,
+                           'provenance', channel_grant.provenance,
+                           'created_at', channel_grant.created_at)
+                       ORDER BY channel_grant.created_at, channel_grant.principal_id, channel_grant.capability)
+                FROM channel_principal_grants AS channel_grant
+                WHERE channel_grant.company_id = ch.company_id AND channel_grant.channel_id = ch.id),
+               '[]'::jsonb) AS principal_grants,
            (SELECT array_agg(ca.agent_id ORDER BY ca.position)
             FROM channel_agents ca WHERE ca.channel_id = ch.id) AS agent_ids,
            ch.enabled, ch.add_3rd_party,
@@ -157,7 +198,9 @@ fn slug_conflict_error(err: sqlx::Error, slug: &str) -> AppError {
     AppError::from(err)
 }
 
-fn channel_access(participant_emails: Option<Vec<String>>) -> (&'static str, Vec<String>) {
+/// Turn the form's email allowlist into the channel's stored access mode and the addresses that
+/// become principal grants. `@public` selects a mode; it is never a participant of its own.
+fn channel_access(participant_emails: Option<Vec<String>>) -> (ChannelAccessMode, Vec<String>) {
     let mut seen = HashSet::new();
     let mut participants = Vec::new();
     let mut is_public = false;
@@ -175,14 +218,56 @@ fn channel_access(participant_emails: Option<Vec<String>>) -> (&'static str, Vec
     }
 
     let mode = if is_public {
-        "public"
+        ChannelAccessMode::Public
     } else if participants.is_empty() {
-        "team"
+        ChannelAccessMode::Team
     } else {
-        "allowlist"
+        ChannelAccessMode::Allowlist
     };
 
     (mode, participants)
+}
+
+pub(crate) async fn insert_email_allowlist_grants(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company_id: Uuid,
+    channel_id: Uuid,
+    participants: Vec<String>,
+) -> AppResult<()> {
+    for email in participants {
+        let identity = EmailIdentity::parse(EmailAddress::from(email))
+            .map(EmailIdentity::qualify_default)
+            .map_err(|error| AppError::BadRequest(format!("Invalid participant email: {error}")))?;
+        let IdentityResolution { principal, .. } = resolve_or_create_external_identity_on(
+            transaction,
+            company_id,
+            IdentityObservation {
+                identity,
+                display_label: None,
+                claim_metadata: IdentityClaimMetadata::observation(),
+                provenance: IdentityProvenance::ChannelAllowlist,
+            },
+        )
+        .await?;
+
+        for capability in [PrincipalCapability::Participate, PrincipalCapability::View] {
+            sqlx::query(
+                r#"INSERT INTO channel_principal_grants
+                       (company_id, channel_id, principal_id, capability, provenance)
+                   VALUES ($1, $2, $3, $4, 'email_allowlist')
+                   ON CONFLICT (company_id, channel_id, principal_id, capability)
+                   DO UPDATE SET provenance = EXCLUDED.provenance"#,
+            )
+            .bind(company_id)
+            .bind(channel_id)
+            .bind(principal.id.as_uuid())
+            .bind(capability.as_str())
+            .execute(&mut **transaction)
+            .await
+            .map_err(AppError::from)?;
+        }
+    }
+    Ok(())
 }
 
 #[async_trait]
@@ -204,7 +289,7 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(company_id)
         .bind(write.name)
         .bind(write.description)
-        .bind(access_mode)
+        .bind(access_mode.as_str())
         .bind(write.enabled)
         .bind(write.add_3rd_party)
         .bind(
@@ -223,14 +308,7 @@ impl ChannelPersistence for PostgresPersistence {
 
         insert_channel_slugs(&mut tx, company_id, uuid, &write.slug, &write.alias_slugs).await?;
 
-        for email in participants {
-            sqlx::query("INSERT INTO channel_participants (channel_id, email) VALUES ($1, $2)")
-                .bind(uuid)
-                .bind(email)
-                .execute(&mut *tx)
-                .await
-                .map_err(AppError::from)?;
-        }
+        insert_email_allowlist_grants(&mut tx, company_id, uuid, participants).await?;
 
         for (position, agent_id) in write.agent_ids.unwrap_or_default().into_iter().enumerate() {
             sqlx::query(
@@ -305,6 +383,8 @@ impl ChannelPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
+        create_agent_principal_on(&mut tx, company_id, agent_id, &agent.name).await?;
+
         sqlx::query(
             r#"INSERT INTO channels (
                     id, company_id, name, description, access_mode, enabled, add_3rd_party,
@@ -317,7 +397,7 @@ impl ChannelPersistence for PostgresPersistence {
         .bind(company_id)
         .bind(&channel.name)
         .bind(&channel.description)
-        .bind(access_mode)
+        .bind(access_mode.as_str())
         .bind(channel.enabled)
         .bind(channel.add_3rd_party)
         .bind(channel_created_by)
@@ -339,14 +419,7 @@ impl ChannelPersistence for PostgresPersistence {
             &channel.alias_slugs,
         )
         .await?;
-        for email in participants {
-            sqlx::query("INSERT INTO channel_participants (channel_id, email) VALUES ($1, $2)")
-                .bind(channel_id)
-                .bind(email)
-                .execute(&mut *tx)
-                .await
-                .map_err(AppError::from)?;
-        }
+        insert_email_allowlist_grants(&mut tx, company_id, channel_id, participants).await?;
         let mut assigned = vec![agent_id];
         assigned.extend(
             channel
@@ -429,7 +502,7 @@ impl ChannelPersistence for PostgresPersistence {
         )
         .bind(write.name)
         .bind(write.description)
-        .bind(access_mode)
+        .bind(access_mode.as_str())
         .bind(write.enabled)
         .bind(write.add_3rd_party)
         .bind(write.retrieve_company_memory)
@@ -447,11 +520,16 @@ impl ChannelPersistence for PostgresPersistence {
             return Err(AppError::Internal("Channel not found".into()));
         }
 
-        sqlx::query("DELETE FROM channel_participants WHERE channel_id = $1")
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
+        // Only the grants this form owns: a grant written by another provenance is not the email
+        // allowlist's to replace.
+        sqlx::query(
+            r#"DELETE FROM channel_principal_grants
+               WHERE channel_id = $1 AND provenance = 'email_allowlist'"#,
+        )
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
         sqlx::query("DELETE FROM channel_agents WHERE channel_id = $1")
             .bind(id)
             .execute(&mut *tx)
@@ -470,14 +548,7 @@ impl ChannelPersistence for PostgresPersistence {
             .map_err(AppError::from)?;
         insert_channel_slugs(&mut tx, company_id, id, &write.slug, &write.alias_slugs).await?;
 
-        for email in participants {
-            sqlx::query("INSERT INTO channel_participants (channel_id, email) VALUES ($1, $2)")
-                .bind(id)
-                .bind(email)
-                .execute(&mut *tx)
-                .await
-                .map_err(AppError::from)?;
-        }
+        insert_email_allowlist_grants(&mut tx, company_id, id, participants).await?;
 
         for (position, agent_id) in write.agent_ids.unwrap_or_default().into_iter().enumerate() {
             sqlx::query(
@@ -589,6 +660,8 @@ impl OwnedAgentChannelPersistence for PostgresPersistence {
         .await
         .map_err(|error| owned_address_error(error, &address))?;
 
+        create_agent_principal_on(&mut tx, company_id, agent_id, &agent.name).await?;
+
         sqlx::query(
             r#"INSERT INTO channels (
                     id, company_id, owner_agent_id, name, description, access_mode, enabled,
@@ -602,7 +675,7 @@ impl OwnedAgentChannelPersistence for PostgresPersistence {
         .bind(agent_id)
         .bind(&channel.name)
         .bind(&channel.description)
-        .bind(access_mode)
+        .bind(access_mode.as_str())
         .bind(channel.enabled)
         .bind(channel.add_3rd_party)
         .bind(channel_created_by)
@@ -630,14 +703,7 @@ impl OwnedAgentChannelPersistence for PostgresPersistence {
             )),
             other => other,
         })?;
-        for email in participants {
-            sqlx::query("INSERT INTO channel_participants (channel_id, email) VALUES ($1, $2)")
-                .bind(channel_id)
-                .bind(email)
-                .execute(&mut *tx)
-                .await
-                .map_err(AppError::from)?;
-        }
+        insert_email_allowlist_grants(&mut tx, company_id, channel_id, participants).await?;
         sqlx::query(
             "INSERT INTO channel_agents (company_id, channel_id, agent_id, position) VALUES ($1, $2, $3, 0)",
         )
@@ -1302,6 +1368,162 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+        let _ = CompanyPersistence::delete(&persistence, company.id).await;
+    }
+
+    /// The form still edits addresses; storage no longer does. A round trip therefore has to go
+    /// address -> identity -> principal -> grant and back, and `@public` has to survive that as an
+    /// access *mode* rather than turning into a grant for a principal named "@public".
+    #[tokio::test]
+    async fn a_channel_form_round_trips_its_email_allowlist_through_principal_grants() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+
+        let suffix = Uuid::new_v4().simple().to_string();
+        let owner_username = format!("grants_{suffix}");
+        let owner_email = format!("{owner_username}@example.com");
+        persistence
+            .create_user(&owner_username, &owner_email, "hash")
+            .await
+            .unwrap();
+        let owner = persistence
+            .get_by_email(&owner_email)
+            .await
+            .unwrap()
+            .unwrap();
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner.id,
+            CompanyWrite {
+                name: "Grants Corp".to_string(),
+                slug: format!("grants-corp-{suffix}"),
+                ..CompanyWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        let agent = AgentPersistence::create(
+            &persistence,
+            company.id,
+            AgentWrite {
+                name: "Desk Agent".to_string(),
+                slug: "desk-agent".to_string(),
+                ..AgentWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let channel = ChannelPersistence::create(
+            &persistence,
+            company.id,
+            ChannelWrite {
+                name: "Front Desk".into(),
+                slug: "front-desk".into(),
+                // Mixed case and surrounding space, because the form is a text box.
+                participant_emails: Some(vec![
+                    "  Dana@Partner.test ".to_string(),
+                    "@public".to_string(),
+                ]),
+                agent_ids: Some(vec![agent.id]),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(channel.access_mode, ChannelAccessMode::Public);
+        assert_eq!(
+            channel.participant_emails,
+            Some(vec![
+                EmailAddress::from("@public"),
+                EmailAddress::from("dana@partner.test"),
+            ]),
+            "the form reads back the list it submitted, normalized"
+        );
+
+        // Authorization reads the grants, and `@public` is not one of them.
+        let dana = channel
+            .principal_grants
+            .iter()
+            .map(|grant| grant.principal_id)
+            .collect::<HashSet<_>>();
+        assert_eq!(dana.len(), 1, "one address, one principal");
+        let capabilities: HashSet<_> = channel
+            .principal_grants
+            .iter()
+            .map(|grant| grant.capability)
+            .collect();
+        assert_eq!(
+            capabilities,
+            HashSet::from([PrincipalCapability::Participate, PrincipalCapability::View]),
+            "the allowlist form grants participation and UI read together"
+        );
+
+        let subject: String = sqlx::query_scalar(
+            r#"SELECT identity.subject
+               FROM channel_principal_grants AS channel_grant
+               JOIN participant_identities AS identity
+                 ON (identity.company_id, identity.principal_id) =
+                    (channel_grant.company_id, channel_grant.principal_id)
+               WHERE channel_grant.channel_id = $1 AND channel_grant.capability = 'participate'"#,
+        )
+        .bind(channel.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(subject, "dana@partner.test");
+
+        // Editing the list replaces the grants rather than accumulating them.
+        let updated = ChannelPersistence::update(
+            &persistence,
+            channel.id,
+            ChannelWrite {
+                name: "Front Desk".into(),
+                slug: "front-desk".into(),
+                participant_emails: Some(vec!["sam@partner.test".to_string()]),
+                agent_ids: Some(vec![agent.id]),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(updated.access_mode, ChannelAccessMode::Allowlist);
+        assert_eq!(
+            updated.participant_emails,
+            Some(vec![EmailAddress::from("sam@partner.test")])
+        );
+        assert_eq!(updated.principal_grants.len(), 2);
+
+        // A malformed address is a form error, not a silent "not authorized".
+        let malformed = ChannelPersistence::update(
+            &persistence,
+            channel.id,
+            ChannelWrite {
+                name: "Front Desk".into(),
+                slug: "front-desk".into(),
+                participant_emails: Some(vec!["not-an-address".to_string()]),
+                agent_ids: Some(vec![agent.id]),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        )
+        .await;
+        assert!(matches!(malformed, Err(AppError::BadRequest(_))));
+        let unchanged = ChannelPersistence::get_by_id(&persistence, channel.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            unchanged.participant_emails,
+            Some(vec![EmailAddress::from("sam@partner.test")]),
+            "the rejected edit rolled back whole"
+        );
+
         let _ = CompanyPersistence::delete(&persistence, company.id).await;
     }
 }

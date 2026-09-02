@@ -1002,6 +1002,7 @@ mod tests {
         value_objects::{ChannelSlug, EmailAddress},
     };
     use crate::use_cases::company::CompanyWrite;
+    use crate::use_cases::participant::test_support::email_allowlist_policy;
     use chrono::Utc;
     use serde_json::json;
 
@@ -1191,14 +1192,6 @@ mod tests {
             unimplemented!()
         }
 
-        async fn membership_for_email(
-            &self,
-            _company_id: Uuid,
-            _email: &str,
-        ) -> AppResult<CompanyMembership> {
-            Ok(CompanyMembership::Member)
-        }
-
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
         }
@@ -1343,6 +1336,11 @@ mod tests {
             channel: ChannelWrite,
         ) -> AppResult<(Agent, Channel)> {
             let agent = AgentPersistence::create(self, company_id, agent).await?;
+            let participant_emails: Option<Vec<EmailAddress>> = channel
+                .participant_emails
+                .map(|items| items.into_iter().map(Into::into).collect());
+            let (access_mode, principal_grants) =
+                email_allowlist_policy(company_id, participant_emails.as_deref());
             let channel = Channel {
                 id: Uuid::new_v4(),
                 company_id,
@@ -1351,9 +1349,9 @@ mod tests {
                 description: channel.description,
                 slug: channel.slug.into(),
                 alias_slugs: channel.alias_slugs.into_iter().map(Into::into).collect(),
-                participant_emails: channel
-                    .participant_emails
-                    .map(|items| items.into_iter().map(Into::into).collect()),
+                participant_emails,
+                access_mode,
+                principal_grants,
                 agent_ids: Some(vec![agent.id]),
                 enabled: channel.enabled,
                 add_3rd_party: channel.add_3rd_party,

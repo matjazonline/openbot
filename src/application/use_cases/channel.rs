@@ -10,8 +10,9 @@ use crate::{
     entities::{
         agent::Agent,
         channel::{Channel, PUBLIC_PARTICIPANT},
-        company::{Company, CompanyAccess},
+        company::Company,
         creation::CreationProvenance,
+        participant::PrincipalAccessContext,
         transport::ChannelSelector,
         user::Viewer,
         value_objects::{ChannelSlug, CompanySlug},
@@ -20,6 +21,7 @@ use crate::{
     use_cases::agent::{AgentWrite, SpamScanning},
     use_cases::company::{CompanyPersistence, managed_company},
     use_cases::memory::{ActiveMemoryBinding, MemoryBindingPersistence},
+    use_cases::participant::{ParticipantPersistence, observe_email_access_context},
 };
 use serde::{Deserialize, Serialize};
 
@@ -204,17 +206,20 @@ pub struct ChannelUseCases {
     channel_persistence: Arc<dyn ChannelPersistence>,
     config: Arc<AppConfig>,
     memory_persistence: Option<Arc<dyn MemoryBindingPersistence>>,
+    participant_persistence: Arc<dyn ParticipantPersistence>,
 }
 
 impl ChannelUseCases {
     pub fn new(
         company_persistence: Arc<dyn CompanyPersistence>,
         channel_persistence: Arc<dyn ChannelPersistence>,
+        participant_persistence: Arc<dyn ParticipantPersistence>,
         config: Arc<AppConfig>,
     ) -> Self {
         Self {
             company_persistence,
             channel_persistence,
+            participant_persistence,
             config,
             memory_persistence: None,
         }
@@ -340,7 +345,7 @@ impl ChannelUseCases {
             .list_by_company_id(company_id)
             .await?
             .into_iter()
-            .filter(|channel| channel.viewer_access(&viewer.email, access.membership))
+            .filter(|channel| channel.viewer_access(access))
             .collect())
     }
 
@@ -361,10 +366,8 @@ impl ChannelUseCases {
 
         let channel = self.channel_persistence.get_by_id(channel_id).await?;
 
-        Ok(channel.filter(|channel| {
-            channel.company_id == company_id
-                && channel.viewer_access(&viewer.email, access.membership)
-        }))
+        Ok(channel
+            .filter(|channel| channel.company_id == company_id && channel.viewer_access(access)))
     }
 
     /// What the viewer is to a company, or `None` if they are nothing to it.
@@ -372,9 +375,17 @@ impl ChannelUseCases {
         &self,
         viewer: &Viewer,
         company_id: Uuid,
-    ) -> AppResult<Option<CompanyAccess>> {
-        self.company_persistence
+    ) -> AppResult<Option<PrincipalAccessContext>> {
+        if self
+            .company_persistence
             .company_access(viewer.user_id, company_id)
+            .await?
+            .is_none()
+        {
+            return Ok(None);
+        }
+        self.participant_persistence
+            .access_context_for_user(company_id, viewer.user_id)
             .await
     }
 
@@ -505,11 +516,13 @@ impl ChannelUseCases {
                 // that re-implemented the participant rule would drift out of sync with it.
                 let sender_authorized = match (company.as_ref(), channel.as_ref()) {
                     (Some(comp), Some(ch)) => {
-                        let membership = self
-                            .company_persistence
-                            .membership_for_email(comp.id, &sender_email)
-                            .await?;
-                        ch.participant_access(&sender_email, membership).authorized
+                        let context = observe_email_access_context(
+                            self.participant_persistence.as_ref(),
+                            comp.id,
+                            &sender_email,
+                        )
+                        .await?;
+                        ch.participant_access(context).authorized
                     }
                     _ => false,
                 };
@@ -523,7 +536,7 @@ impl ChannelUseCases {
                     );
                 } else if !sender_authorized {
                     info!(
-                        "Unauthorized sender '{}' for channel '{}@{}' (not in participant_emails)",
+                        "Unauthorized sender '{}' for channel '{}@{}' (no participate grant)",
                         sender_email, channel_slug, company_slug
                     );
                 } else {
@@ -874,16 +887,41 @@ pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<Ch
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::channel::ChannelAccessMode;
     use crate::entities::company::{Company, CompanyAccess};
     use crate::entities::company_member::CompanyMembership;
     use crate::entities::value_objects::EmailAddress;
     use crate::use_cases::company::CompanyWrite;
+    use crate::use_cases::participant::test_support::{
+        InMemoryParticipantDirectory, TeamFixture, email_allowlist_policy,
+    };
     use chrono::Utc;
     use std::sync::Mutex;
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
         memberships: Mutex<Vec<(Uuid, Uuid, CompanyMembership)>>,
+    }
+
+    /// The signed-in half is what these tests drive, so `company_access` carries the memberships
+    /// this double was built with and the by-address half is never reached.
+    #[async_trait]
+    impl TeamFixture for MockCompanyPersistence {
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
+        }
+
+        async fn company_access(
+            &self,
+            user_id: Uuid,
+            company_id: Uuid,
+        ) -> AppResult<Option<CompanyAccess>> {
+            CompanyPersistence::company_access(self, user_id, company_id).await
+        }
     }
 
     #[async_trait]
@@ -947,14 +985,6 @@ mod tests {
 
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
-        }
-
-        async fn membership_for_email(
-            &self,
-            _company_id: Uuid,
-            _email: &str,
-        ) -> AppResult<CompanyMembership> {
-            Ok(CompanyMembership::Member)
         }
 
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
@@ -1064,6 +1094,13 @@ mod tests {
     }
 
     fn channel_from_write(id: Uuid, company_id: Uuid, write: ChannelWrite) -> Channel {
+        let participant_emails: Option<Vec<EmailAddress>> = write
+            .participant_emails
+            .map(|emails| emails.into_iter().map(EmailAddress::from).collect());
+        // The mock resolves the entered addresses the way the SQL writer does, so a form
+        // round-trip in these tests exercises the same projection the real one stores.
+        let (access_mode, principal_grants) =
+            email_allowlist_policy(company_id, participant_emails.as_deref());
         Channel {
             owner_agent_id: None,
             id,
@@ -1072,9 +1109,9 @@ mod tests {
             description: None,
             slug: write.slug.into(),
             alias_slugs: Vec::new(),
-            participant_emails: write
-                .participant_emails
-                .map(|emails| emails.into_iter().map(EmailAddress::from).collect()),
+            participant_emails,
+            access_mode,
+            principal_grants,
             agent_ids: write.agent_ids,
             enabled: write.enabled,
             add_3rd_party: write.add_3rd_party,
@@ -1148,8 +1185,12 @@ mod tests {
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(Vec::new()),
         });
-        let use_cases =
-            ChannelUseCases::new(company_persistence, channel_persistence, test_config(true));
+        let use_cases = ChannelUseCases::new(
+            company_persistence.clone(),
+            channel_persistence,
+            Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
+            test_config(true),
+        );
 
         // The owner owns both companies, so this is a cross-tenant id, not an authorization miss.
         let foreign = use_cases
@@ -1252,8 +1293,12 @@ mod tests {
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(Vec::new()),
         });
-        let use_cases =
-            ChannelUseCases::new(company_persistence, channel_persistence, test_config(true));
+        let use_cases = ChannelUseCases::new(
+            company_persistence.clone(),
+            channel_persistence,
+            Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
+            test_config(true),
+        );
 
         assert!(
             use_cases
@@ -1345,8 +1390,12 @@ mod tests {
             channels: Mutex::new(Vec::new()),
         });
 
-        let use_cases =
-            ChannelUseCases::new(company_persistence, channel_persistence, test_config(true));
+        let use_cases = ChannelUseCases::new(
+            company_persistence.clone(),
+            channel_persistence,
+            Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
+            test_config(true),
+        );
 
         // 1. Owner creates channel with participant emails and config
         let emails = vec![
@@ -1604,6 +1653,8 @@ mod tests {
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -1625,6 +1676,8 @@ mod tests {
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -1668,8 +1721,12 @@ mod tests {
             channels: Mutex::new(Vec::new()),
         });
 
-        let use_cases =
-            ChannelUseCases::new(company_persistence, channel_persistence, test_config(true));
+        let use_cases = ChannelUseCases::new(
+            company_persistence.clone(),
+            channel_persistence,
+            Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
+            test_config(true),
+        );
 
         let _ = use_cases
             .create_channel(
@@ -1786,8 +1843,12 @@ mod tests {
         });
 
         // Config with spam scanning completely disabled
-        let use_cases =
-            ChannelUseCases::new(company_persistence, channel_persistence, test_config(false));
+        let use_cases = ChannelUseCases::new(
+            company_persistence.clone(),
+            channel_persistence,
+            Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
+            test_config(false),
+        );
 
         // 1. Trying to create public channel (@public) without confirmation fails when spam scanning is disabled
         let res = use_cases

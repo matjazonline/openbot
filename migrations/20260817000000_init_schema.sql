@@ -213,8 +213,13 @@ CREATE TABLE company_members (
     role TEXT NOT NULL DEFAULT 'member',
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT company_members_company_user_key UNIQUE (company_id, user_id),
-    CONSTRAINT company_members_role_check CHECK (role IN ('member', 'admin'))
+    CONSTRAINT company_members_role_check CHECK (role IN ('owner', 'member', 'admin'))
 );
+
+-- The owner is also a member row, so a person principal can prove company membership with one
+-- foreign key instead of a union against `companies.user_id`.
+CREATE UNIQUE INDEX company_members_one_owner_idx
+    ON company_members (company_id) WHERE role = 'owner';
 
 CREATE INDEX company_members_user_company_idx ON company_members (user_id, company_id);
 CREATE INDEX company_members_company_created_idx
@@ -287,6 +292,99 @@ $$;
 CREATE TRIGGER library_agent_delete_guard
 BEFORE DELETE ON agents
 FOR EACH ROW EXECUTE FUNCTION prevent_assigned_library_agent_delete();
+
+-- A principal is one company-scoped actor: a teammate, an agent, an outsider we have seen, or the
+-- platform itself.  Every authorization and thread-participation decision names a principal, so
+-- that none of them is keyed by a mutable address string.
+CREATE TABLE principals (
+    id UUID PRIMARY KEY,
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    user_id UUID,
+    agent_id UUID,
+    display_label TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT principals_company_id_id_key UNIQUE (company_id, id),
+    CONSTRAINT principals_kind_check CHECK (kind IN ('person', 'agent', 'external', 'system')),
+    CONSTRAINT principals_display_label_check CHECK (
+        btrim(display_label) <> '' AND octet_length(display_label) <= 255
+    ),
+    -- Exactly the reference its kind allows: an external or system principal cannot smuggle in a
+    -- user or agent id and inherit that actor's access.
+    CONSTRAINT principals_shape_check CHECK (
+        (kind = 'person' AND user_id IS NOT NULL AND agent_id IS NULL)
+        OR (kind = 'agent' AND user_id IS NULL AND agent_id IS NOT NULL)
+        OR (kind IN ('external', 'system') AND user_id IS NULL AND agent_id IS NULL)
+    ),
+    -- Composite references prove the referenced user or agent belongs to the *same* company, so a
+    -- cross-tenant principal cannot be written at all.
+    CONSTRAINT principals_company_user_fk
+        FOREIGN KEY (company_id, user_id)
+        REFERENCES company_members(company_id, user_id) ON DELETE CASCADE,
+    CONSTRAINT principals_company_agent_fk
+        FOREIGN KEY (company_id, agent_id)
+        REFERENCES agents(company_id, id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX principals_company_user_key
+    ON principals (company_id, user_id) WHERE user_id IS NOT NULL;
+CREATE UNIQUE INDEX principals_company_agent_key
+    ON principals (company_id, agent_id) WHERE agent_id IS NOT NULL;
+
+-- One transport-qualified handle for a principal.  `(transport, namespace, subject)` is the whole
+-- key: an email mailbox and a Slack user id in two workspaces are three distinct rows that never
+-- collide, and nothing here is compared case-insensitively -- the email writer stores the
+-- normalized lower-case mailbox instead, so the generic column keeps provider-exact bytes.
+CREATE TABLE participant_identities (
+    id UUID PRIMARY KEY,
+    company_id UUID NOT NULL,
+    principal_id UUID NOT NULL,
+    transport TEXT NOT NULL,
+    namespace TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    display_label TEXT,
+    status TEXT NOT NULL,
+    claim_metadata JSONB NOT NULL,
+    provenance TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT participant_identities_company_id_id_key UNIQUE (company_id, id),
+    CONSTRAINT participant_identities_qualified_key
+        UNIQUE (company_id, transport, namespace, subject),
+    CONSTRAINT participant_identities_principal_fk
+        FOREIGN KEY (company_id, principal_id)
+        REFERENCES principals(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT participant_identities_transport_check CHECK (transport IN ('email', 'slack')),
+    CONSTRAINT participant_identities_namespace_check CHECK (
+        btrim(namespace) <> '' AND octet_length(namespace) <= 255
+    ),
+    CONSTRAINT participant_identities_subject_check CHECK (
+        btrim(subject) <> '' AND octet_length(subject) <= 320
+    ),
+    CONSTRAINT participant_identities_display_label_check CHECK (
+        display_label IS NULL OR octet_length(display_label) <= 255
+    ),
+    CONSTRAINT participant_identities_status_check
+        CHECK (status IN ('observed', 'verified', 'disabled')),
+    CONSTRAINT participant_identities_provenance_check CHECK (
+        provenance IN ('account', 'agent', 'channel_allowlist', 'email_ingress',
+                       'slack_event', 'slack_profile_claim', 'system')
+    ),
+    -- A claim is enrichment, never a key: a Slack profile email lives in here and merges nothing.
+    -- The payload is versioned, discriminated and bounded; Rust still decodes it fallibly because
+    -- a structurally valid object can carry a discriminator a rolling deploy has not learned yet.
+    CONSTRAINT participant_identities_claim_metadata_check CHECK (
+        jsonb_typeof(claim_metadata) = 'object'
+        AND claim_metadata->'version' = '1'::JSONB
+        AND jsonb_typeof(claim_metadata->'kind') = 'string'
+        AND claim_metadata->>'kind' IN ('observation', 'account', 'slack_profile')
+        AND octet_length(claim_metadata::text) <= 8192
+    )
+);
+
+CREATE INDEX participant_identities_principal_idx
+    ON participant_identities (company_id, principal_id, created_at, id);
 
 -- A channel's addresses live in `channel_slugs`, not here; see that table.
 CREATE TABLE channels (
@@ -420,15 +518,32 @@ AFTER INSERT OR UPDATE OR DELETE ON channel_agents
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION enforce_enabled_channel_has_active_agent();
 
-CREATE TABLE channel_participants (
-    channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-    email CITEXT NOT NULL,
+-- What one principal may do on one channel.  `participate` is permission to send into the channel;
+-- `view` is permission to read it in the UI.  The email allowlist form writes both; `@public` is
+-- an access *mode* on the channel rather than a grant, so it never confers UI read access, and the
+-- owner and team rules stay in `Channel`'s domain policy rather than being denormalized here.
+CREATE TABLE channel_principal_grants (
+    company_id UUID NOT NULL,
+    channel_id UUID NOT NULL,
+    principal_id UUID NOT NULL,
+    capability TEXT NOT NULL,
+    provenance TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (channel_id, email)
+    PRIMARY KEY (company_id, channel_id, principal_id, capability),
+    CONSTRAINT channel_principal_grants_channel_fk
+        FOREIGN KEY (company_id, channel_id)
+        REFERENCES channels(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT channel_principal_grants_principal_fk
+        FOREIGN KEY (company_id, principal_id)
+        REFERENCES principals(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT channel_principal_grants_capability_check
+        CHECK (capability IN ('participate', 'view')),
+    CONSTRAINT channel_principal_grants_provenance_check
+        CHECK (provenance IN ('email_allowlist', 'manager', 'slack_conversation', 'system'))
 );
 
-CREATE INDEX channel_participants_email_idx
-    ON channel_participants (email, channel_id);
+CREATE INDEX channel_principal_grants_principal_idx
+    ON channel_principal_grants (company_id, principal_id, channel_id, capability);
 
 CREATE TABLE threads (
     id UUID PRIMARY KEY,
@@ -449,15 +564,27 @@ CREATE TABLE threads (
 CREATE INDEX threads_channel_updated_idx
     ON threads (channel_id, updated_at DESC, id DESC);
 
-CREATE TABLE thread_participants (
-    thread_id UUID NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
-    email CITEXT NOT NULL,
+-- Who is a party to a thread, and in what capacity.  `role` carries the author/participant
+-- distinction that an email array could only imply by position.
+CREATE TABLE thread_principals (
+    company_id UUID NOT NULL,
+    channel_id UUID NOT NULL,
+    thread_id UUID NOT NULL,
+    principal_id UUID NOT NULL,
+    role TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (thread_id, email)
+    PRIMARY KEY (company_id, channel_id, thread_id, principal_id, role),
+    CONSTRAINT thread_principals_thread_fk
+        FOREIGN KEY (company_id, channel_id, thread_id)
+        REFERENCES threads(company_id, channel_id, id) ON DELETE CASCADE,
+    CONSTRAINT thread_principals_principal_fk
+        FOREIGN KEY (company_id, principal_id)
+        REFERENCES principals(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT thread_principals_role_check CHECK (role IN ('author', 'participant'))
 );
 
-CREATE INDEX thread_participants_email_idx
-    ON thread_participants (email, thread_id);
+CREATE INDEX thread_principals_principal_idx
+    ON thread_principals (company_id, principal_id, thread_id, role);
 
 CREATE TABLE email_messages (
     id UUID PRIMARY KEY,

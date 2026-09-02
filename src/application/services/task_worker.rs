@@ -993,20 +993,40 @@ impl TaskWorker {
     }
 
     /// The channel's own approver, falling back to any member of the owning company's team.
+    ///
+    /// The channel names a *principal*; only the email transport needs an address. A principal
+    /// with no email identity is a routing gap, so the team fallback still applies rather than
+    /// the approval going unasked.
     async fn approver_for(&self, channel: &Channel, company_id: Uuid) -> Option<EmailAddress> {
-        let approver = match channel.preferred_approver() {
-            Some(approver) => Some(approver),
-            None => self
+        if let Some(principal_id) = channel.preferred_approver() {
+            match self
                 .thread_use_cases
-                .company_persistence()
-                .list_company_team_emails(company_id)
+                .preferred_email_for_principal(company_id, principal_id)
                 .await
-                .unwrap_or_default()
-                .into_iter()
-                .next()
-                .map(EmailAddress::from),
-        };
-        approver.filter(|email| !email.is_empty())
+            {
+                Ok(address) => match address.filter(|email| !email.is_empty()) {
+                    Some(address) => return Some(address),
+                    None => warn!(
+                        %principal_id,
+                        "Channel approver has no email identity; asking the team instead"
+                    ),
+                },
+                Err(error) => warn!(
+                    %error, %principal_id,
+                    "Approver identity lookup failed; asking the team instead"
+                ),
+            }
+        }
+
+        self.thread_use_cases
+            .company_persistence()
+            .list_company_team_emails(company_id)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .next()
+            .map(EmailAddress::from)
+            .filter(|email| !email.is_empty())
     }
 
     /// One task's work, as `Result` so the `?` operator still carries the failures upward.
@@ -1567,9 +1587,12 @@ impl TaskWorker {
 mod tests {
     use super::*;
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
+    use crate::entities::channel::ChannelAccessMode;
+    use crate::entities::company::CompanyAccess;
     use crate::entities::company_member::CompanyMembership;
     use crate::entities::task::NewTask;
     use crate::entities::task::TaskLeaseRef;
+    use crate::use_cases::participant::test_support::{InMemoryParticipantDirectory, TeamFixture};
     use async_trait::async_trait;
     use chrono::Utc;
     use std::sync::{
@@ -1652,6 +1675,26 @@ mod tests {
     struct MockCompanyPersistence {
         company: Option<Company>,
     }
+    /// The worker's tests drive dispatch, not authorization: every sender is a colleague.
+    #[async_trait]
+    impl TeamFixture for MockCompanyPersistence {
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
+        }
+
+        async fn company_access(
+            &self,
+            _user_id: Uuid,
+            _company_id: Uuid,
+        ) -> AppResult<Option<CompanyAccess>> {
+            unimplemented!("this double is not exercised on the signed-in path")
+        }
+    }
+
     #[async_trait]
     impl CompanyPersistence for MockCompanyPersistence {
         async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
@@ -1671,13 +1714,6 @@ mod tests {
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
-        }
-        async fn membership_for_email(
-            &self,
-            _company_id: Uuid,
-            _email: &str,
-        ) -> AppResult<CompanyMembership> {
-            Ok(CompanyMembership::Member)
         }
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
@@ -2556,7 +2592,8 @@ mod tests {
         let thread_use_cases = Arc::new(ThreadUseCases::new(
             thread_persistence,
             channel_persistence,
-            company_persistence,
+            company_persistence.clone(),
+            Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
             task_persistence.clone(),
             config.clone(),
         ));
@@ -2639,6 +2676,8 @@ mod tests {
             slug: "support".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: Some(vec![agent_id]),
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -2692,7 +2731,8 @@ mod tests {
             ThreadUseCases::new(
                 thread_persistence,
                 channel_persistence,
-                company_persistence,
+                company_persistence.clone(),
+                Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
                 task_persistence.clone(),
                 config.clone(),
             )
@@ -2726,7 +2766,10 @@ mod tests {
                 id: thread_id,
                 channel_id,
                 subject: "Help".to_string(),
-                participant_emails: vec!["user@test.com".into()],
+                participant_principal_ids: Vec::new(),
+                participant_projection: crate::entities::thread::ThreadParticipantProjection {
+                    email_addresses: vec!["user@test.com".into()],
+                },
                 created_at: chrono::Utc::now(),
                 updated_at: chrono::Utc::now(),
             }),
@@ -2819,6 +2862,8 @@ mod tests {
             slug: "audit".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: Some(vec![agent_id]),
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -2833,6 +2878,9 @@ mod tests {
         let thread_persistence = Arc::new(MockThreadPersistence {
             messages: Mutex::new(vec![]),
             threads: Mutex::new(vec![]),
+        });
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            company: Some(company.clone()),
         });
 
         let config = Arc::new(AppConfig {
@@ -2872,9 +2920,8 @@ mod tests {
                 Arc::new(MockChannelPersistence {
                     channel: Some(channel.clone()),
                 }),
-                Arc::new(MockCompanyPersistence {
-                    company: Some(company.clone()),
-                }),
+                company_persistence.clone(),
+                Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
                 task_persistence.clone(),
                 config.clone(),
             )
@@ -2962,6 +3009,8 @@ mod tests {
             slug: "audit".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: Some(vec![agent_id]),
             retrieve_company_memory: false,
             retrieve_agent_memory: false,
@@ -2997,6 +3046,9 @@ mod tests {
         let thread_persistence = Arc::new(MockThreadPersistence {
             messages: Mutex::new(vec![existing_reply]),
             threads: Mutex::new(vec![]),
+        });
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            company: Some(company.clone()),
         });
 
         let config = Arc::new(AppConfig {
@@ -3036,9 +3088,8 @@ mod tests {
                 Arc::new(MockChannelPersistence {
                     channel: Some(channel.clone()),
                 }),
-                Arc::new(MockCompanyPersistence {
-                    company: Some(company.clone()),
-                }),
+                company_persistence.clone(),
+                Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
                 task_persistence.clone(),
                 config.clone(),
             )

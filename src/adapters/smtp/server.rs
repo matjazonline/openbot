@@ -16,7 +16,6 @@ use crate::{
     application::use_cases::thread::ThreadUseCases,
     domain::monitoring::{MonitoringService, SmtpConnectionMetrics, SmtpStatus},
     entities::auth::AuthVerdict,
-    entities::company_member::CompanyMembership,
     infra::config::AppConfig,
     services::email_parser::{
         MAX_INBOUND_MESSAGE_BYTES, RawAttachmentData, RawInboundPayload, extract_email,
@@ -607,21 +606,20 @@ impl SmtpServer {
         };
 
         let sender = raw_payload.from.trim();
-        let membership = match self
+        let context = match self
             .thread_use_cases
-            .company_persistence()
-            .membership_for_email(company.id, sender)
+            .observe_email_access_context(company.id, sender)
             .await
         {
-            Ok(membership) => membership,
+            Ok(context) => context,
             Err(error) => {
                 // Every other bail-out here scans too: a directory lookup that failed must not be
                 // the reason a stranger is promoted to a trusted sender.
-                warn!(%error, "Membership lookup failed; scanning sender as a stranger");
-                CompanyMembership::None
+                warn!(%error, "Principal resolution failed; scanning sender as a stranger");
+                return true;
             }
         };
-        !channel.participant_access(sender, membership).trusted
+        !channel.participant_access(context).trusted
     }
 
     async fn apply_spam_score(&self, session: &SmtpSession, raw_payload: &mut RawInboundPayload) {
@@ -1016,7 +1014,8 @@ mod tests {
         app_error::AppResult,
         entities::{
             channel::Channel,
-            company::Company,
+            company::{Company, CompanyAccess},
+            company_member::CompanyMembership,
             cursor::{MessageCursor, ThreadCursor},
             message::Message,
             thread::Thread,
@@ -1024,12 +1023,33 @@ mod tests {
         use_cases::{
             channel::{ChannelPersistence, ChannelWrite},
             company::{CompanyPersistence, CompanyWrite},
+            participant::test_support::{InMemoryParticipantDirectory, TeamFixture},
             thread::ThreadPersistence,
         },
     };
 
     struct MockCompanyPersistence {
         companies: Mutex<Vec<Company>>,
+    }
+
+    /// These tests are about SMTP, not team management: every sender is a colleague.
+    #[async_trait]
+    impl TeamFixture for MockCompanyPersistence {
+        async fn membership_for_email(
+            &self,
+            _company_id: Uuid,
+            _email: &str,
+        ) -> AppResult<CompanyMembership> {
+            Ok(CompanyMembership::Member)
+        }
+
+        async fn company_access(
+            &self,
+            _user_id: Uuid,
+            _company_id: Uuid,
+        ) -> AppResult<Option<CompanyAccess>> {
+            unimplemented!("this double is not exercised on the signed-in path")
+        }
     }
 
     #[async_trait]
@@ -1057,13 +1077,6 @@ mod tests {
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
-        }
-        async fn membership_for_email(
-            &self,
-            _company_id: Uuid,
-            _email: &str,
-        ) -> AppResult<CompanyMembership> {
-            Ok(CompanyMembership::Member)
         }
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec![])
@@ -1156,7 +1169,10 @@ mod tests {
                 id: Uuid::new_v4(),
                 channel_id,
                 subject: subject.to_string(),
-                participant_emails: participant_emails.to_vec(),
+                participant_principal_ids: Vec::new(),
+                participant_projection: crate::entities::thread::ThreadParticipantProjection {
+                    email_addresses: participant_emails.to_vec(),
+                },
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
             };
@@ -1210,7 +1226,7 @@ mod tests {
         ) -> AppResult<Thread> {
             let mut list = self.threads.lock().unwrap();
             let thread = list.iter_mut().find(|t| t.id == id).unwrap();
-            thread.participant_emails = participant_emails.to_vec();
+            thread.participant_projection.email_addresses = participant_emails.to_vec();
             Ok(thread.clone())
         }
 
@@ -1516,6 +1532,8 @@ mod tests {
                 slug: "inbound".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: crate::entities::channel::ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -1569,7 +1587,8 @@ mod tests {
         let thread_use_cases = Arc::new(ThreadUseCases::new(
             thread_persistence.clone(),
             channel_persistence,
-            company_persistence,
+            company_persistence.clone(),
+            Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
             task_persistence,
             config.clone(),
         ));
@@ -1748,6 +1767,8 @@ regis";
                 slug: "network".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
+                access_mode: crate::entities::channel::ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
                 agent_ids: None,
                 retrieve_company_memory: false,
                 retrieve_agent_memory: false,
@@ -1801,7 +1822,8 @@ regis";
         let thread_use_cases = Arc::new(ThreadUseCases::new(
             thread_persistence.clone(),
             channel_persistence,
-            company_persistence,
+            company_persistence.clone(),
+            Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
             task_persistence,
             config.clone(),
         ));
@@ -1932,7 +1954,8 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         let thread_use_cases = Arc::new(ThreadUseCases::new(
             thread_persistence.clone(),
             channel_persistence,
-            company_persistence,
+            company_persistence.clone(),
+            Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
             task_persistence,
             config.clone(),
         ));

@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::entities::company_member::CompanyMembership;
 use crate::entities::{
     creation::CreationProvenance,
+    participant::{ChannelPrincipalGrant, PrincipalAccessContext, PrincipalCapability},
+    transport::PrincipalId,
     value_objects::{ChannelSlug, CompanySlug, EmailAddress},
 };
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Channel {
@@ -30,7 +32,11 @@ pub struct Channel {
     /// payloads written before aliases existed must still re-hydrate.
     #[serde(default)]
     pub alias_slugs: Vec<ChannelSlug>,
+    /// Email-only form/delivery projection of allowlist grants. Authorization never consults this
+    /// field; the stable grant rows below are the source of truth.
     pub participant_emails: Option<Vec<EmailAddress>>,
+    pub access_mode: ChannelAccessMode,
+    pub principal_grants: Vec<ChannelPrincipalGrant>,
     pub agent_ids: Option<Vec<Uuid>>,
     /// Whether the channel takes traffic at all. A disabled channel keeps its threads and tasks
     /// but bounces inbound mail and cannot be an internal delivery target.
@@ -71,6 +77,37 @@ fn default_true() -> bool {
 /// Participant list entry that opens a channel to any sender.
 pub const PUBLIC_PARTICIPANT: &str = "@public";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChannelAccessMode {
+    Team,
+    Allowlist,
+    Public,
+}
+
+impl ChannelAccessMode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Team => "team",
+            Self::Allowlist => "allowlist",
+            Self::Public => "public",
+        }
+    }
+}
+
+impl FromStr for ChannelAccessMode {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "team" => Ok(Self::Team),
+            "allowlist" => Ok(Self::Allowlist),
+            "public" => Ok(Self::Public),
+            _ => Err(format!("invalid channel access mode '{value}'")),
+        }
+    }
+}
+
 /// What a channel's participant list says about one sender.
 ///
 /// `authorized` decides whether the message may enter the channel at all; `trusted` additionally
@@ -92,28 +129,22 @@ impl Channel {
     /// this shares with [`Channel::viewer_access`] can be applied here too: a restricted channel
     /// never shuts its own company's owner out, whether they are reading it or writing to it.
     /// Mail from an address that belongs to no account is simply [`CompanyMembership::None`].
-    pub fn participant_access(
-        &self,
-        sender: &str,
-        membership: CompanyMembership,
-    ) -> ParticipantAccess {
-        match &self.participant_emails {
-            Some(allowed) if !allowed.is_empty() => {
-                let is_public = allowed
-                    .iter()
-                    .any(|e| e.trim().eq_ignore_ascii_case(PUBLIC_PARTICIPANT));
-                let explicitly_listed = allowed.iter().any(|e| {
-                    !e.trim().eq_ignore_ascii_case(PUBLIC_PARTICIPANT)
-                        && e.eq_ignore_ascii_case(sender)
-                });
-                ParticipantAccess {
-                    authorized: is_public || explicitly_listed || membership.is_owner(),
-                    trusted: explicitly_listed || membership.is_team(),
-                }
-            }
-            _ => ParticipantAccess {
-                authorized: membership.is_team(),
-                trusted: membership.is_team(),
+    pub fn participant_access(&self, context: PrincipalAccessContext) -> ParticipantAccess {
+        let explicitly_listed = context.principal_id.is_some_and(|principal_id| {
+            self.has_capability(principal_id, PrincipalCapability::Participate)
+        });
+        match self.access_mode {
+            ChannelAccessMode::Public => ParticipantAccess {
+                authorized: true,
+                trusted: explicitly_listed || context.membership.is_team(),
+            },
+            ChannelAccessMode::Allowlist => ParticipantAccess {
+                authorized: explicitly_listed || context.membership.is_owner(),
+                trusted: explicitly_listed || context.membership.is_team(),
+            },
+            ChannelAccessMode::Team => ParticipantAccess {
+                authorized: context.membership.is_team(),
+                trusted: context.membership.is_team(),
             },
         }
     }
@@ -136,32 +167,37 @@ impl Channel {
     /// A restricted channel is therefore *narrower* than the team: a colleague who is not a
     /// participant does not see it. The owner is the one exception, so a company cannot lock
     /// itself out of its own data.
-    pub fn viewer_access(&self, viewer: &EmailAddress, membership: CompanyMembership) -> bool {
-        if !membership.is_team() {
+    pub fn viewer_access(&self, context: PrincipalAccessContext) -> bool {
+        if !context.membership.is_team() {
             return false;
         }
 
-        if membership.is_owner() {
+        if context.membership.is_owner() {
             return true;
         }
 
-        match &self.participant_emails {
-            Some(allowed) if !allowed.is_empty() => allowed.iter().any(|participant| {
-                participant.trim().eq_ignore_ascii_case(PUBLIC_PARTICIPANT)
-                    || participant.eq_ignore_case(viewer)
+        match self.access_mode {
+            ChannelAccessMode::Team | ChannelAccessMode::Public => true,
+            ChannelAccessMode::Allowlist => context.principal_id.is_some_and(|principal_id| {
+                self.has_capability(principal_id, PrincipalCapability::View)
             }),
-            _ => true,
         }
     }
 
-    /// Who should be asked to approve an action on this channel: the first listed participant
-    /// that names an actual person rather than the `@public` wildcard.
-    pub fn preferred_approver(&self) -> Option<EmailAddress> {
-        self.participant_emails
-            .as_ref()?
+    /// The stable principal to ask for approval. Resolving a delivery identity is an application
+    /// projection and deliberately does not happen in channel policy.
+    pub fn preferred_approver(&self) -> Option<PrincipalId> {
+        self.principal_grants
             .iter()
-            .find(|email| !email.eq_ignore_ascii_case(PUBLIC_PARTICIPANT))
-            .cloned()
+            .filter(|grant| grant.capability == PrincipalCapability::View)
+            .min_by_key(|grant| (grant.created_at, grant.principal_id))
+            .map(|grant| grant.principal_id)
+    }
+
+    fn has_capability(&self, principal_id: PrincipalId, capability: PrincipalCapability) -> bool {
+        self.principal_grants
+            .iter()
+            .any(|grant| grant.principal_id == principal_id && grant.capability == capability)
     }
 
     /// Every local part this channel answers on: the canonical slug first, then its aliases.
@@ -220,157 +256,10 @@ impl Channel {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// A channel whose participant list is the only thing under test.
-    fn channel_for(participants: Option<&[&str]>) -> Channel {
-        Channel {
-            owner_agent_id: None,
-            participant_emails: participants.map(|list| {
-                list.iter()
-                    .map(|email| EmailAddress::from(*email))
-                    .collect()
-            }),
-            ..channel_with_aliases(&[])
-        }
-    }
-
-    #[test]
-    fn an_unrestricted_channel_is_readable_by_the_team_and_nobody_else() {
-        let viewer = EmailAddress::from("dana@acme.test");
-
-        for channel in [channel_for(None), channel_for(Some(&[]))] {
-            assert!(channel.viewer_access(&viewer, CompanyMembership::Owner));
-            assert!(channel.viewer_access(&viewer, CompanyMembership::Admin));
-            assert!(channel.viewer_access(&viewer, CompanyMembership::Member));
-            assert!(!channel.viewer_access(&viewer, CompanyMembership::None));
-        }
-    }
-
-    #[test]
-    fn a_restricted_channel_is_narrower_than_the_team() {
-        let channel = channel_for(Some(&["dana@acme.test", "ops@partner.test"]));
-
-        // A listed colleague sees it...
-        assert!(channel.viewer_access(
-            &EmailAddress::from("dana@acme.test"),
-            CompanyMembership::Member
-        ));
-        // ...and an unlisted one does not, even though they are on the team.
-        assert!(!channel.viewer_access(
-            &EmailAddress::from("sam@acme.test"),
-            CompanyMembership::Member
-        ));
-        assert!(!channel.viewer_access(
-            &EmailAddress::from("sam@acme.test"),
-            CompanyMembership::Admin
-        ));
-        // The owner is the one exception, so a company cannot lock itself out of its own data.
-        assert!(channel.viewer_access(
-            &EmailAddress::from("sam@acme.test"),
-            CompanyMembership::Owner
-        ));
-        // Being listed is not a way into a company you do not belong to.
-        assert!(!channel.viewer_access(
-            &EmailAddress::from("ops@partner.test"),
-            CompanyMembership::None
-        ));
-    }
-
-    #[test]
-    fn public_opens_a_channel_to_mail_not_to_readers() {
-        let channel = channel_for(Some(&[PUBLIC_PARTICIPANT, "dana@acme.test"]));
-        let stranger = EmailAddress::from("anyone@example.test");
-
-        // `@public` lets anyone write in, so the whole team may read what arrives...
-        assert!(channel.viewer_access(&stranger, CompanyMembership::Member));
-        assert!(channel.viewer_access(&stranger, CompanyMembership::Admin));
-        assert!(channel.viewer_access(&stranger, CompanyMembership::Owner));
-        // ...but it never makes the traffic readable to the public that sent it.
-        assert!(!channel.viewer_access(&stranger, CompanyMembership::None));
-    }
-
-    #[test]
-    fn a_restricted_channel_still_takes_its_owner_s_mail() {
-        let channel = channel_for(Some(&["dana@acme.test", "ops@partner.test"]));
-
-        // The listed participant writes in, as they always could.
-        let listed = channel.participant_access("dana@acme.test", CompanyMembership::Member);
-        assert!(listed.authorized);
-        assert!(listed.trusted);
-
-        // The owner is not on the list, and still gets in -- the same exemption `viewer_access`
-        // makes, so the mailbox cannot show them a channel they may not answer in.
-        let owner = channel.participant_access("sam@acme.test", CompanyMembership::Owner);
-        assert!(owner.authorized);
-        assert!(owner.trusted);
-        assert!(channel.viewer_access(
-            &EmailAddress::from("sam@acme.test"),
-            CompanyMembership::Owner
-        ));
-
-        // An unlisted colleague is not the owner: a restricted channel is still narrower than the
-        // team, on the way in as on the way out.
-        let colleague = channel.participant_access("sam@acme.test", CompanyMembership::Member);
-        assert!(!colleague.authorized);
-        assert!(!channel.viewer_access(
-            &EmailAddress::from("sam@acme.test"),
-            CompanyMembership::Member
-        ));
-
-        // A stranger stays a stranger, whatever address they claim.
-        assert!(
-            !channel
-                .participant_access("anyone@example.test", CompanyMembership::None)
-                .authorized
-        );
-    }
-
-    #[test]
-    fn an_unrestricted_channel_takes_the_team_s_mail_and_no_one_else_s() {
-        for channel in [channel_for(None), channel_for(Some(&[]))] {
-            for membership in [
-                CompanyMembership::Owner,
-                CompanyMembership::Admin,
-                CompanyMembership::Member,
-            ] {
-                let access = channel.participant_access("dana@acme.test", membership);
-                assert!(access.authorized);
-                assert!(access.trusted);
-            }
-            let stranger =
-                channel.participant_access("anyone@example.test", CompanyMembership::None);
-            assert!(!stranger.authorized);
-            assert!(!stranger.trusted);
-        }
-    }
-
-    #[test]
-    fn public_lets_a_stranger_write_without_trusting_them() {
-        let channel = channel_for(Some(&[PUBLIC_PARTICIPANT, "dana@acme.test"]));
-
-        // Anyone may write in...
-        let stranger = channel.participant_access("anyone@example.test", CompanyMembership::None);
-        assert!(stranger.authorized);
-        // ...but `@public` alone never waives spam scoring or opens the thread to third parties.
-        assert!(!stranger.trusted);
-
-        // Being on the team is what earns that, listed or not.
-        assert!(
-            channel
-                .participant_access("sam@acme.test", CompanyMembership::Member)
-                .trusted
-        );
-    }
-
-    #[test]
-    fn a_participant_is_matched_the_way_a_mailbox_is() {
-        let channel = channel_for(Some(&["  Dana@Acme.test  "]));
-
-        assert!(channel.viewer_access(
-            &EmailAddress::from("dana@acme.test"),
-            CompanyMembership::Member
-        ));
-    }
+    use crate::entities::{
+        company_member::CompanyMembership,
+        participant::{GrantProvenance, PrincipalAccessContext},
+    };
 
     fn channel_with_aliases(aliases: &[&str]) -> Channel {
         Channel {
@@ -382,6 +271,8 @@ mod tests {
             slug: "support".into(),
             alias_slugs: aliases.iter().map(|a| ChannelSlug::from(*a)).collect(),
             participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: None,
             enabled: true,
             add_3rd_party: true,
@@ -394,6 +285,203 @@ mod tests {
             created_by: CreationProvenance::system(),
             created_at: chrono::Utc::now(),
         }
+    }
+
+    /// A channel whose access policy is the only thing under test. The allowlist form grants both
+    /// capabilities at once, which is what the persistence writer does for an entered address.
+    fn channel_for(mode: ChannelAccessMode, granted: &[PrincipalId]) -> Channel {
+        Channel {
+            access_mode: mode,
+            principal_grants: granted
+                .iter()
+                .flat_map(|principal_id| {
+                    [PrincipalCapability::Participate, PrincipalCapability::View].map(
+                        |capability| ChannelPrincipalGrant {
+                            principal_id: *principal_id,
+                            capability,
+                            provenance: GrantProvenance::EmailAllowlist,
+                            created_at: chrono::Utc::now(),
+                        },
+                    )
+                })
+                .collect(),
+            ..channel_with_aliases(&[])
+        }
+    }
+
+    fn actor(principal_id: PrincipalId, membership: CompanyMembership) -> PrincipalAccessContext {
+        PrincipalAccessContext {
+            principal_id: Some(principal_id),
+            membership,
+        }
+    }
+
+    #[test]
+    fn a_team_channel_is_readable_by_the_team_and_nobody_else() {
+        let channel = channel_for(ChannelAccessMode::Team, &[]);
+        let dana = PrincipalId::random();
+
+        assert!(channel.viewer_access(actor(dana, CompanyMembership::Owner)));
+        assert!(channel.viewer_access(actor(dana, CompanyMembership::Admin)));
+        assert!(channel.viewer_access(actor(dana, CompanyMembership::Member)));
+        assert!(!channel.viewer_access(actor(dana, CompanyMembership::None)));
+    }
+
+    #[test]
+    fn an_allowlist_channel_is_narrower_than_the_team() {
+        let dana = PrincipalId::random();
+        let partner = PrincipalId::random();
+        let sam = PrincipalId::random();
+        let channel = channel_for(ChannelAccessMode::Allowlist, &[dana, partner]);
+
+        // A granted colleague sees it...
+        assert!(channel.viewer_access(actor(dana, CompanyMembership::Member)));
+        // ...and an ungranted one does not, even though they are on the team.
+        assert!(!channel.viewer_access(actor(sam, CompanyMembership::Member)));
+        assert!(!channel.viewer_access(actor(sam, CompanyMembership::Admin)));
+        // The owner is the one exception, so a company cannot lock itself out of its own data.
+        assert!(channel.viewer_access(actor(sam, CompanyMembership::Owner)));
+        // Being granted is not a way into a company you do not belong to.
+        assert!(!channel.viewer_access(actor(partner, CompanyMembership::None)));
+    }
+
+    #[test]
+    fn public_opens_a_channel_to_mail_not_to_readers() {
+        let channel = channel_for(ChannelAccessMode::Public, &[]);
+        let stranger = PrincipalId::random();
+
+        // `@public` lets anyone write in, so the whole team may read what arrives...
+        assert!(channel.viewer_access(actor(stranger, CompanyMembership::Member)));
+        assert!(channel.viewer_access(actor(stranger, CompanyMembership::Admin)));
+        assert!(channel.viewer_access(actor(stranger, CompanyMembership::Owner)));
+        // ...but it never makes the traffic readable to the public that sent it.
+        assert!(!channel.viewer_access(actor(stranger, CompanyMembership::None)));
+    }
+
+    #[test]
+    fn an_allowlist_channel_still_takes_its_owner_s_mail() {
+        let dana = PrincipalId::random();
+        let sam = PrincipalId::random();
+        let channel = channel_for(ChannelAccessMode::Allowlist, &[dana]);
+
+        // The granted participant writes in, as they always could.
+        let granted = channel.participant_access(actor(dana, CompanyMembership::Member));
+        assert!(granted.authorized);
+        assert!(granted.trusted);
+
+        // The owner holds no grant, and still gets in -- the same exemption `viewer_access`
+        // makes, so the mailbox cannot show them a channel they may not answer in.
+        let owner = channel.participant_access(actor(sam, CompanyMembership::Owner));
+        assert!(owner.authorized);
+        assert!(owner.trusted);
+        assert!(channel.viewer_access(actor(sam, CompanyMembership::Owner)));
+
+        // An ungranted colleague is not the owner: an allowlist channel is still narrower than
+        // the team, on the way in as on the way out.
+        let colleague = channel.participant_access(actor(sam, CompanyMembership::Member));
+        assert!(!colleague.authorized);
+        assert!(!channel.viewer_access(actor(sam, CompanyMembership::Member)));
+
+        // A stranger stays a stranger, whatever handle they arrive on.
+        let stranger = PrincipalId::random();
+        assert!(
+            !channel
+                .participant_access(actor(stranger, CompanyMembership::None))
+                .authorized
+        );
+    }
+
+    #[test]
+    fn a_team_channel_takes_the_team_s_mail_and_no_one_else_s() {
+        let channel = channel_for(ChannelAccessMode::Team, &[]);
+        let dana = PrincipalId::random();
+
+        for membership in [
+            CompanyMembership::Owner,
+            CompanyMembership::Admin,
+            CompanyMembership::Member,
+        ] {
+            let access = channel.participant_access(actor(dana, membership));
+            assert!(access.authorized);
+            assert!(access.trusted);
+        }
+        let stranger =
+            channel.participant_access(actor(PrincipalId::random(), CompanyMembership::None));
+        assert!(!stranger.authorized);
+        assert!(!stranger.trusted);
+    }
+
+    #[test]
+    fn public_lets_a_stranger_write_without_trusting_them() {
+        let dana = PrincipalId::random();
+        let channel = channel_for(ChannelAccessMode::Public, &[dana]);
+
+        // Anyone may write in...
+        let stranger =
+            channel.participant_access(actor(PrincipalId::random(), CompanyMembership::None));
+        assert!(stranger.authorized);
+        // ...but `@public` alone never waives spam scoring or opens the thread to third parties.
+        assert!(!stranger.trusted);
+
+        // Being on the team is what earns that, granted or not.
+        assert!(
+            channel
+                .participant_access(actor(PrincipalId::random(), CompanyMembership::Member))
+                .trusted
+        );
+    }
+
+    /// A sender whose transport handle resolved to no principal at all is not "everyone else's"
+    /// principal: an allowlist channel must not let them in on an empty match.
+    fn unresolved(membership: CompanyMembership) -> PrincipalAccessContext {
+        PrincipalAccessContext {
+            principal_id: None,
+            membership,
+        }
+    }
+
+    #[test]
+    fn an_unresolved_actor_holds_no_grant() {
+        let channel = channel_for(ChannelAccessMode::Allowlist, &[PrincipalId::random()]);
+
+        assert!(
+            !channel
+                .participant_access(unresolved(CompanyMembership::None))
+                .authorized
+        );
+        assert!(!channel.viewer_access(unresolved(CompanyMembership::Member)));
+    }
+
+    #[test]
+    fn the_preferred_approver_is_the_first_principal_granted_a_view() {
+        let first = PrincipalId::random();
+        let second = PrincipalId::random();
+        let earlier = chrono::Utc::now() - chrono::Duration::minutes(5);
+        let channel = Channel {
+            access_mode: ChannelAccessMode::Allowlist,
+            principal_grants: vec![
+                ChannelPrincipalGrant {
+                    principal_id: second,
+                    capability: PrincipalCapability::View,
+                    provenance: GrantProvenance::EmailAllowlist,
+                    created_at: chrono::Utc::now(),
+                },
+                ChannelPrincipalGrant {
+                    principal_id: first,
+                    capability: PrincipalCapability::View,
+                    provenance: GrantProvenance::EmailAllowlist,
+                    created_at: earlier,
+                },
+            ],
+            ..channel_with_aliases(&[])
+        };
+
+        assert_eq!(channel.preferred_approver(), Some(first));
+        // A public channel grants participation to the world without naming an approver.
+        assert_eq!(
+            channel_for(ChannelAccessMode::Public, &[]).preferred_approver(),
+            None
+        );
     }
 
     #[test]

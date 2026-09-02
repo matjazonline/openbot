@@ -1742,14 +1742,6 @@ mod tests {
         ) -> crate::app_error::AppResult<()> {
             unimplemented!()
         }
-        async fn membership_for_email(
-            &self,
-            _company_id: Uuid,
-            _email: &str,
-        ) -> crate::app_error::AppResult<crate::entities::company_member::CompanyMembership>
-        {
-            unimplemented!()
-        }
         async fn list_company_team_emails(
             &self,
             _company_id: Uuid,
@@ -2393,6 +2385,8 @@ system_prompt: Hello
             slug: slug.into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: crate::entities::channel::ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: Some(vec![Uuid::new_v4()]),
             enabled: true,
             add_3rd_party: true,

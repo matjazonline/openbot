@@ -2,16 +2,24 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::entities::cursor::ThreadCursor;
-use crate::entities::value_objects::EmailAddress;
+use crate::entities::{transport::PrincipalId, value_objects::EmailAddress};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Thread {
     pub id: Uuid,
     pub channel_id: Uuid,
     pub subject: String,
-    pub participant_emails: Vec<EmailAddress>,
+    pub participant_principal_ids: Vec<PrincipalId>,
+    /// Adapter/read-side identities for rendering and email delivery. Business authorization
+    /// consults `participant_principal_ids`, never this transport projection.
+    pub participant_projection: ThreadParticipantProjection,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct ThreadParticipantProjection {
+    pub email_addresses: Vec<EmailAddress>,
 }
 
 impl Thread {
@@ -30,6 +38,10 @@ impl Thread {
             format!("Re: {subject}")
         }
     }
+
+    pub fn contains_principal(&self, principal_id: PrincipalId) -> bool {
+        self.participant_principal_ids.contains(&principal_id)
+    }
 }
 
 #[cfg(test)]
@@ -41,7 +53,8 @@ mod tests {
             id: Uuid::new_v4(),
             channel_id: Uuid::new_v4(),
             subject: subject.to_string(),
-            participant_emails: vec![],
+            participant_principal_ids: vec![],
+            participant_projection: ThreadParticipantProjection::default(),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         }

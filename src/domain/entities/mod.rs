@@ -14,6 +14,7 @@ pub mod message;
 pub mod message_contract;
 pub mod outbox;
 pub mod outreach;
+pub mod participant;
 pub mod runtime_metrics;
 pub mod schedule;
 pub mod stuck_work;

@@ -702,16 +702,17 @@ mod tests {
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
     use crate::entities::{
-        channel::Channel,
+        channel::{Channel, ChannelAccessMode},
         company::{Company, CompanyAccess, CompanyTeamAccount},
         company_member::CompanyMembership,
         cursor::{MessageCursor, ThreadCursor},
         schedule::ScheduleTimezone,
         task::{BackgroundTask, TaskStatus},
-        thread::Thread,
+        thread::{Thread, ThreadParticipantProjection},
         value_objects::ChannelSlug,
     };
     use crate::use_cases::company::CompanyWrite;
+    use crate::use_cases::participant::test_support::email_allowlist_grants;
     use async_trait::async_trait;
     use std::sync::Mutex;
 
@@ -1026,13 +1027,6 @@ mod tests {
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
         }
-        async fn membership_for_email(
-            &self,
-            _company_id: Uuid,
-            _email: &str,
-        ) -> AppResult<CompanyMembership> {
-            Ok(CompanyMembership::Member)
-        }
         async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
             Ok(vec!["admin@example.com".into()])
         }
@@ -1155,7 +1149,10 @@ mod tests {
                 id: Uuid::new_v4(),
                 channel_id,
                 subject: subject.to_string(),
-                participant_emails: participant_emails.to_vec(),
+                participant_principal_ids: Vec::new(),
+                participant_projection: ThreadParticipantProjection {
+                    email_addresses: participant_emails.to_vec(),
+                },
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
             };
@@ -1379,6 +1376,8 @@ mod tests {
             slug: "reports".into(),
             alias_slugs: vec![],
             participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: None,
             enabled: true,
             add_3rd_party: true,
@@ -1571,6 +1570,8 @@ mod tests {
             slug: "reports".into(),
             alias_slugs: vec![],
             participant_emails: Some(vec![EmailAddress::from("admin@example.com")]),
+            access_mode: ChannelAccessMode::Allowlist,
+            principal_grants: email_allowlist_grants(company_id, &["admin@example.com"]),
             agent_ids: None,
             enabled: true,
             add_3rd_party: true,
@@ -1974,7 +1975,8 @@ mod tests {
         let threads = fixture.thread_persistence.threads.lock().unwrap();
         assert!(
             threads[0]
-                .participant_emails
+                .participant_projection
+                .email_addresses
                 .iter()
                 .any(|email| email.eq_ignore_case(&member_email)),
             "the member a run acts as belongs on its thread"

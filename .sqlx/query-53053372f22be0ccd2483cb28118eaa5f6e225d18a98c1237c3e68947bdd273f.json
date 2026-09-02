@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "WITH updated AS (\n                   UPDATE company_members\n                   SET role = $3\n                   WHERE company_id = $1 AND user_id = $2\n                   RETURNING id, company_id, user_id, role, created_at\n               )\n               SELECT updated.id, updated.company_id, updated.user_id,\n                      account.username AS \"username?\", account.email AS \"email?\", account.avatar_url,\n                      updated.role, updated.created_at AS \"created_at!\"\n               FROM updated\n               JOIN users AS account ON account.id = updated.user_id",
+  "query": "WITH updated AS (\n                   UPDATE company_members\n                   SET role = $3\n                   WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'\n                   RETURNING id, company_id, user_id, role, created_at\n               )\n               SELECT updated.id, updated.company_id, updated.user_id,\n                      account.username AS \"username?\", account.email AS \"email?\", account.avatar_url,\n                      updated.role, updated.created_at AS \"created_at!\"\n               FROM updated\n               JOIN users AS account ON account.id = updated.user_id",
   "describe": {
     "columns": [
       {
@@ -72,5 +72,5 @@
       false
     ]
   },
-  "hash": "bfc56f7f2e600daaafb5b04c5c821d83555dddbd061f02830a5b7d4c8ecf3e52"
+  "hash": "53053372f22be0ccd2483cb28118eaa5f6e225d18a98c1237c3e68947bdd273f"
 }

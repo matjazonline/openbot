@@ -14,9 +14,9 @@ use crate::{
         agent::Agent,
         channel::Channel,
         company::Company,
-        company_member::CompanyMembership,
         message::{AttachmentMetadata, Message},
         message_contract::NormalizedInboundMessage,
+        participant::PrincipalAccessContext,
         value_objects::{CompanySlug, MessageId, ThreadIndex, ThreadIndexParseError},
     },
     services::email_parser::{
@@ -35,7 +35,7 @@ pub(super) struct DirectoryCache<'a> {
     use_cases: &'a ThreadUseCases,
     companies: HashMap<String, Option<Company>>,
     channels: HashMap<Uuid, Vec<Channel>>,
-    memberships: HashMap<(Uuid, String), CompanyMembership>,
+    access_contexts: HashMap<(Uuid, String), PrincipalAccessContext>,
     agents: HashMap<Uuid, Option<Agent>>,
 }
 
@@ -45,7 +45,7 @@ impl<'a> DirectoryCache<'a> {
             use_cases,
             companies: HashMap::new(),
             channels: HashMap::new(),
-            memberships: HashMap::new(),
+            access_contexts: HashMap::new(),
             agents: HashMap::new(),
         }
     }
@@ -73,25 +73,22 @@ impl<'a> DirectoryCache<'a> {
         Ok(loaded)
     }
 
-    /// What the sender is to the company, for `Channel::participant_access`.
-    ///
-    /// Membership feeds authorization decisions, so a persistence failure propagates rather than
-    /// silently degrading the sender to a stranger.
-    pub(super) async fn membership(
+    /// Resolve one transport identity to its stable principal and membership. The observation is
+    /// idempotent and confers no grant; it only ensures all later decisions use the same actor id.
+    pub(super) async fn access_context(
         &mut self,
         company_id: Uuid,
         sender: &str,
-    ) -> AppResult<CompanyMembership> {
+    ) -> AppResult<PrincipalAccessContext> {
         let key = (company_id, sender.trim().to_lowercase());
-        if let Some(cached) = self.memberships.get(&key) {
+        if let Some(cached) = self.access_contexts.get(&key) {
             return Ok(*cached);
         }
         let loaded = self
             .use_cases
-            .company_persistence
-            .membership_for_email(company_id, sender.trim())
+            .observe_email_access_context(company_id, sender)
             .await?;
-        self.memberships.insert(key, loaded);
+        self.access_contexts.insert(key, loaded);
         Ok(loaded)
     }
 

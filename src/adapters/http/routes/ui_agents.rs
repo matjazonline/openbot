@@ -1395,6 +1395,8 @@ mod tests {
             slug: "triage".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: crate::entities::channel::ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: agent_id.map(|id| vec![id]),
             enabled: true,
             add_3rd_party: true,

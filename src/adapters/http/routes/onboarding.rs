@@ -465,6 +465,8 @@ mod tests {
             slug: "customer-support".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
+            access_mode: crate::entities::channel::ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
             agent_ids: None,
             retrieve_company_memory: false,
             retrieve_agent_memory: false,

@@ -2,7 +2,10 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::PostgresPersistence,
+    adapters::persistence::{
+        PostgresPersistence, channel::insert_email_allowlist_grants,
+        participant::create_agent_principal_on,
+    },
     app_error::{AppError, AppResult},
     services::agent_channel_tool::{
         AgentChannelProvisioning, ProvisionAgentChannelRequest, ProvisionedAgentChannel,
@@ -72,6 +75,8 @@ impl AgentChannelProvisioning for PostgresPersistence {
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
+        create_agent_principal_on(&mut tx, request.company_id, agent_id, &request.agent.name)
+            .await?;
 
         sqlx::query(
             r#"INSERT INTO channels
@@ -100,23 +105,19 @@ impl AgentChannelProvisioning for PostgresPersistence {
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
-        for email in request
+        let participants = request
             .channel
             .participant_emails
-            .as_ref()
+            .clone()
+            .unwrap_or_default()
             .into_iter()
-            .flatten()
             .filter(|email| {
                 !email.eq_ignore_ascii_case(crate::entities::channel::PUBLIC_PARTICIPANT)
             })
-        {
-            sqlx::query("INSERT INTO channel_participants (channel_id, email) VALUES ($1, $2)")
-                .bind(channel_id)
-                .bind(email)
-                .execute(&mut *tx)
-                .await
-                .map_err(AppError::from)?;
-        }
+            .map(|email| email.to_string())
+            .collect();
+        insert_email_allowlist_grants(&mut tx, request.company_id, channel_id, participants)
+            .await?;
 
         sqlx::query(
             "INSERT INTO channel_slugs (company_id, channel_id, slug, is_primary) VALUES ($1, $2, $3, TRUE)",

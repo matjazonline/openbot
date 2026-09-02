@@ -5,7 +5,7 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::PostgresPersistence,
+    adapters::persistence::{PostgresPersistence, participant::create_person_principal_on},
     app_error::{AppError, AppResult},
     entities::{
         company_invite::CompanyInvite,
@@ -208,6 +208,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
         user_email: &str,
     ) -> AppResult<Option<CompanyInvite>> {
         let member_id = Uuid::new_v4();
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         let db = sqlx::query_as::<_, CompanyInviteDb>(
             r#"
             WITH accepted AS (
@@ -234,9 +235,27 @@ impl CompanyInvitePersistence for PostgresPersistence {
         .bind(user_email)
         .bind(member_id)
         .bind(user_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *transaction)
         .await
         .map_err(AppError::from)?;
+
+        if let Some(invite) = &db {
+            let username: String =
+                sqlx::query_scalar("SELECT username::text FROM users WHERE id = $1")
+                    .bind(user_id)
+                    .fetch_one(&mut *transaction)
+                    .await
+                    .map_err(AppError::from)?;
+            create_person_principal_on(
+                &mut transaction,
+                invite.company_id,
+                user_id,
+                &username,
+                user_email,
+            )
+            .await?;
+        }
+        transaction.commit().await.map_err(AppError::from)?;
 
         db.map(TryInto::try_into).transpose()
     }
@@ -269,6 +288,11 @@ impl CompanyInvitePersistence for PostgresPersistence {
         db.map(TryInto::try_into).transpose()
     }
 
+    /// The people invited into this company.
+    ///
+    /// The owner also holds a `company_members` row -- it is the relational fact a person
+    /// principal's foreign key needs -- but `owner` is not an invitation role, so this surface
+    /// and the two writes below leave that row alone.
     async fn list_members_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyMember>> {
         let db_list = sqlx::query_as!(
             CompanyMemberDb,
@@ -277,7 +301,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
                       member.role, member.created_at AS "created_at!"
                FROM company_members AS member
                JOIN users AS account ON account.id = member.user_id
-               WHERE member.company_id = $1
+               WHERE member.company_id = $1 AND member.role <> 'owner'
                ORDER BY member.created_at ASC, member.id ASC LIMIT 200"#,
             company_id
         )
@@ -299,7 +323,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
             r#"WITH updated AS (
                    UPDATE company_members
                    SET role = $3
-                   WHERE company_id = $1 AND user_id = $2
+                   WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'
                    RETURNING id, company_id, user_id, role, created_at
                )
                SELECT updated.id, updated.company_id, updated.user_id,
@@ -318,15 +342,39 @@ impl CompanyInvitePersistence for PostgresPersistence {
         db.map(TryInto::try_into).transpose()
     }
 
+    /// Take somebody off the team without erasing what they were party to.
+    ///
+    /// Their principal is demoted to an external actor first. The member row is what a person
+    /// principal's foreign key hangs on, so deleting it alone would cascade the principal away and
+    /// take its identities, grants and thread participation with it -- a former colleague would
+    /// vanish from every thread they ever wrote in.
     async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()> {
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         sqlx::query!(
-            "DELETE FROM company_members WHERE company_id = $1 AND user_id = $2",
+            r#"UPDATE principals
+               SET kind = 'external', user_id = NULL, updated_at = CURRENT_TIMESTAMP
+               WHERE company_id = $1 AND user_id = $2
+                 AND EXISTS (
+                     SELECT 1 FROM company_members AS member
+                     WHERE member.company_id = $1 AND member.user_id = $2
+                       AND member.role <> 'owner'
+                 )"#,
             company_id,
             user_id
         )
-        .execute(&self.pool)
+        .execute(&mut *transaction)
         .await
         .map_err(AppError::from)?;
+        sqlx::query!(
+            "DELETE FROM company_members
+             WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'",
+            company_id,
+            user_id
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        transaction.commit().await.map_err(AppError::from)?;
 
         Ok(())
     }
@@ -447,7 +495,16 @@ mod tests {
             .unwrap();
         assert_eq!(members[0].role, CompanyAccessRole::Member);
 
-        // 6. Remove team member
+        // 6. Remove team member. Their principal survives as an outsider, so the threads they
+        // were party to keep their author instead of losing them to a cascade.
+        let principal_before: Uuid = sqlx::query_scalar!(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+            company.id,
+            member.id
+        )
+        .fetch_one(&persistence.pool)
+        .await
+        .unwrap();
         persistence
             .remove_member(company.id, member.id)
             .await
@@ -457,6 +514,30 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(members_after.len(), 0);
+        let (kind, still_attached): (String, Option<Uuid>) =
+            sqlx::query_as("SELECT kind, user_id FROM principals WHERE id = $1")
+                .bind(principal_before)
+                .fetch_one(&persistence.pool)
+                .await
+                .unwrap();
+        assert_eq!(kind, "external");
+        assert_eq!(still_attached, None);
+
+        // The owner's own member row is the anchor of their person principal, so it is not the
+        // team-management surface's to remove.
+        persistence
+            .remove_member(company.id, owner.id)
+            .await
+            .unwrap();
+        let owner_kind: String = sqlx::query_scalar!(
+            "SELECT kind FROM principals WHERE company_id = $1 AND user_id = $2",
+            company.id,
+            owner.id
+        )
+        .fetch_one(&persistence.pool)
+        .await
+        .unwrap();
+        assert_eq!(owner_kind, "person");
 
         // 7. Delete invite
         persistence.delete_invite(invite.id).await.unwrap();

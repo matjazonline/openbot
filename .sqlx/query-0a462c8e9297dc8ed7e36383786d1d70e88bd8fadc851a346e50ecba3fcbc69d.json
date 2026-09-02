@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT member.id, member.company_id, member.user_id,\n                      account.username AS \"username?\", account.email AS \"email?\", account.avatar_url,\n                      member.role, member.created_at AS \"created_at!\"\n               FROM company_members AS member\n               JOIN users AS account ON account.id = member.user_id\n               WHERE member.company_id = $1\n               ORDER BY member.created_at ASC, member.id ASC LIMIT 200",
+  "query": "SELECT member.id, member.company_id, member.user_id,\n                      account.username AS \"username?\", account.email AS \"email?\", account.avatar_url,\n                      member.role, member.created_at AS \"created_at!\"\n               FROM company_members AS member\n               JOIN users AS account ON account.id = member.user_id\n               WHERE member.company_id = $1 AND member.role <> 'owner'\n               ORDER BY member.created_at ASC, member.id ASC LIMIT 200",
   "describe": {
     "columns": [
       {
@@ -70,5 +70,5 @@
       false
     ]
   },
-  "hash": "474c2520765fe670712c5fc81ff2193f3a47ed61c5de80c94c5b9d50bd31882b"
+  "hash": "0a462c8e9297dc8ed7e36383786d1d70e88bd8fadc851a346e50ecba3fcbc69d"
 }
