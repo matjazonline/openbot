@@ -567,6 +567,7 @@ mod tests {
         let channel_id = Uuid::new_v4();
 
         let company = crate::entities::company::Company {
+            channel_defaults: Default::default(),
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Test Co".to_string(),
@@ -578,6 +579,7 @@ mod tests {
         };
 
         let channel = crate::entities::channel::Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -611,6 +613,7 @@ mod tests {
         let channel_id = Uuid::new_v4();
 
         let company = crate::entities::company::Company {
+            channel_defaults: Default::default(),
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Token Test Co".to_string(),

@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use crate::use_cases::agent::AgentWrite;
+use crate::use_cases::agent::{AgentWrite, PersonalChannelPlan};
 
 use axum::{
     Form, Router,
@@ -32,6 +32,7 @@ use crate::{
         agent::Agent,
         channel::Channel,
         company::Company,
+        memory::{MemoryPersistenceMode, MemoryRecallMode},
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
@@ -43,14 +44,20 @@ use crate::{
 
 use super::{
     agent::{AgentForm, AgentInstructionRequest, ModelOverrides, create_agent_from_instructions},
-    channel::parse_config_form,
+    channel::{ChannelForm, checkbox_ticked, parse_agent_ids_form, parse_config_form},
+    task::deserialize_empty_string_as_none,
     ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
+    ui_channels::SubmittedChannel,
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/ui/agents", get(agents_page).post(create_agent))
         .route("/ui/agents/new", get(create_pane))
+        .route("/ui/agents/new/channel", post(channel_step))
+        .route("/ui/agents/new/agent", post(agent_step))
+        .route("/ui/agents/new/create", post(create_agent_with_channel))
+        .route("/ui/agents/from-library", post(create_from_library))
         .route("/ui/agents/generate-prompt", post(generate_prompt))
         .route(
             "/ui/agents/{agent_id}",
@@ -85,6 +92,96 @@ pub struct PromptGeneratorForm {
     pub id_prefix: Option<Uuid>,
     pub provider: Option<String>,
     pub model: Option<String>,
+}
+
+/// What the create form's channel step sends: the channel as filled in, and the agent from the
+/// first step that came along with it.
+///
+/// The channel half is [`ChannelForm`] itself rather than a copy of its fields, so the step and the
+/// Channels workspace cannot drift on what a submitted channel means.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AgentChannelStepForm {
+    #[serde(flatten)]
+    pub agent: CarriedAgent,
+    #[serde(flatten)]
+    pub channel: ChannelForm,
+}
+
+/// The create form's first step, as the channel step submits it back.
+///
+/// Every field is prefixed because the channel form beside it owns the unprefixed `name`, `slug`,
+/// `description` and `system_prompt`. It converts into [`AgentForm`] rather than being handled
+/// separately, so both steps go through one parser — and because that conversion writes an
+/// exhaustive struct literal, a field added to `AgentForm` cannot be quietly dropped here.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CarriedAgent {
+    #[serde(rename = "agent_name")]
+    pub name: String,
+    #[serde(rename = "agent_slug")]
+    pub slug: Option<String>,
+    #[serde(rename = "agent_provider")]
+    pub provider: Option<String>,
+    #[serde(rename = "agent_model")]
+    pub model: Option<String>,
+    #[serde(
+        rename = "agent_run_timeout_secs",
+        default,
+        deserialize_with = "deserialize_empty_string_as_none"
+    )]
+    pub run_timeout_secs: Option<u32>,
+    #[serde(rename = "agent_system_prompt")]
+    pub system_prompt: Option<String>,
+    #[serde(rename = "agent_description")]
+    pub description: Option<String>,
+    #[serde(rename = "agent_config_json")]
+    pub config_json: Option<String>,
+    #[serde(rename = "agent_avatar_url")]
+    pub avatar_url: Option<String>,
+    /// A ticked box as its raw value: a flattened field is handed to its type as the string the
+    /// browser sent (see the note on `deserialize_interval_seconds` in `routes/schedule.rs`), and
+    /// a bare `bool` refuses `"true"`. An absent key is an unticked box, as everywhere else here.
+    #[serde(rename = "agent_memory_enabled")]
+    pub memory_enabled: Option<String>,
+    #[serde(rename = "agent_memory_persistence_mode")]
+    pub memory_persistence_mode: Option<MemoryPersistenceMode>,
+    #[serde(rename = "agent_memory_recall_mode")]
+    pub memory_recall_mode: Option<MemoryRecallMode>,
+    #[serde(
+        rename = "agent_memory_max_results",
+        default,
+        deserialize_with = "deserialize_empty_string_as_none"
+    )]
+    pub memory_max_results: Option<u8>,
+}
+
+impl From<CarriedAgent> for AgentForm {
+    fn from(carried: CarriedAgent) -> Self {
+        Self {
+            name: carried.name,
+            slug: carried.slug,
+            provider: carried.provider,
+            model: carried.model,
+            run_timeout_secs: carried.run_timeout_secs,
+            system_prompt: carried.system_prompt,
+            description: carried.description,
+            config_json: carried.config_json,
+            avatar_url: carried.avatar_url,
+            memory_enabled: checkbox_ticked(carried.memory_enabled.as_deref()),
+            memory_persistence_mode: carried.memory_persistence_mode,
+            memory_recall_mode: carried.memory_recall_mode,
+            memory_max_results: carried.memory_max_results,
+            // Only the Advanced tab has a channel step, and its prompt is written rather than
+            // expanded.
+            form_mode: Some("advanced".to_string()),
+        }
+    }
+}
+
+/// What the Easy tab sends: the library definitions to copy into this company, as the one
+/// comma-separated field a urlencoded form can carry a set in.
+#[derive(Debug, Clone, Deserialize)]
+pub struct LibraryPickForm {
+    pub library_agent_ids: Option<String>,
 }
 
 impl PromptGeneratorForm {
@@ -144,8 +241,10 @@ impl Workspace {
         AgentSettingsView {
             agent_use_cases: &self.agent_use_cases,
             channel_use_cases: &self.channel_use_cases,
+            config: &self.config,
             user_id: self.user_id,
             company,
+            app_domain_name: &self.config.app_domain_name,
         }
     }
 }
@@ -174,7 +273,7 @@ async fn agents_page(
 
     let view = workspace.view(&company);
     let agents = view.agents().await?;
-    let model_connections = view.model_connections().await?;
+    let channels = view.channels().await?;
     // Landing on `/ui/agents` with no `agent_id` opens the first agent rather than an empty pane,
     // so the workspace is never a blank screen when there is something to show.
     let selected = query
@@ -184,14 +283,22 @@ async fn agents_page(
 
     let creating = matches!(query.new.as_deref(), Some("1") | Some("true"));
     let pane_html = match (creating, selected) {
-        (true, _) => view.create_pane(&pages::AgentDraft::default(), None, &model_connections),
-        (false, Some(agent)) => view.edit_pane(agent, None, None).await?,
+        (true, _) => {
+            view.create_pane(CreateForm {
+                draft: &pages::AgentDraft::default(),
+                error: None,
+                selected_library_agent_ids: &[],
+                tab: None,
+            })
+            .await?
+        }
+        (false, Some(agent)) => view.edit_pane(agent, &channels, None, None).await?,
         (false, None) => {
             pages::agent_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline)
         }
     };
 
-    let list = view.list(&agents, selected.map(|agent| agent.id));
+    let list = view.list(&agents, &channels, selected.map(|agent| agent.id));
     Ok(Html(pages::agent_settings_page(
         &pages::AgentSettingsPage {
             user: &workspace_user,
@@ -210,13 +317,16 @@ async fn create_pane(
 ) -> AppResult<Html<String>> {
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company);
-    let model_connections = view.model_connections().await?;
 
-    Ok(Html(view.create_pane(
-        &pages::AgentDraft::default(),
-        None,
-        &model_connections,
-    )))
+    Ok(Html(
+        view.create_pane(CreateForm {
+            draft: &pages::AgentDraft::default(),
+            error: None,
+            selected_library_agent_ids: &[],
+            tab: None,
+        })
+        .await?,
+    ))
 }
 
 /// GET /ui/agents/{agent_id} - One agent's settings for the pane (Protected).
@@ -229,8 +339,9 @@ async fn edit_pane(
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company);
     let agent = view.agent(agent_id).await?;
+    let channels = view.channels().await?;
 
-    Ok(Html(view.edit_pane(&agent, None, None).await?))
+    Ok(Html(view.edit_pane(&agent, &channels, None, None).await?))
 }
 
 /// POST /ui/agents/generate-prompt - Expand instructions into a system prompt for the pane's form
@@ -284,22 +395,14 @@ async fn create_agent(
 ) -> AppResult<Response> {
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company);
-    let model_connections = view.model_connections().await?;
     let submitted = SubmittedAgent::new(form);
 
-    let rejected = |message: String| {
-        Ok(
-            Html(view.create_pane(&submitted.draft(), Some(&message), &model_connections))
-                .into_response(),
-        )
-    };
-
-    let avatar_url = match &submitted.avatar_url {
-        Ok(avatar) => avatar.clone(),
-        Err(message) => return rejected(message.clone()),
-    };
-
     let created = if submitted.is_simple() {
+        let avatar_url = match &submitted.avatar_url {
+            Ok(avatar) => avatar.clone(),
+            Err(message) => return rejected(&view, &submitted, message).await,
+        };
+
         create_agent_from_instructions(
             &workspace.agent_use_cases,
             AgentInstructionRequest {
@@ -314,47 +417,259 @@ async fn create_agent(
             },
         )
         .await
+        .map(|provisioned| (provisioned.agent, provisioned.warnings))
     } else {
-        let config_json = match parse_config_form(submitted.form.config_json.clone()) {
-            Ok(config) => config,
-            Err(message) => return rejected(message),
+        let write = match submitted.agent_write() {
+            Ok(write) => write,
+            Err(message) => return rejected(&view, &submitted, &message).await,
         };
 
         workspace
             .agent_use_cases
-            .create_agent(
-                workspace.user_id,
-                company.id,
-                AgentWrite {
-                    name: submitted.form.name.clone(),
-                    slug: submitted.slug.clone(),
-                    provider: submitted.form.provider.clone(),
-                    model: submitted.form.model.clone(),
-                    run_timeout_secs: submitted.form.run_timeout_secs,
-                    system_prompt: submitted.form.system_prompt.clone(),
-                    description: submitted.form.description.clone(),
-                    config_json,
-                    memory_persistence_mode: submitted
-                        .form
-                        .memory_persistence_mode
-                        .unwrap_or_default(),
-                    memory_recall_mode: submitted.form.memory_recall_mode.unwrap_or_default(),
-                    memory_max_results: submitted
-                        .form
-                        .memory_max_results
-                        .unwrap_or_else(crate::entities::memory::default_memory_max_results),
-                    avatar_url,
-                    created_by: None,
-                },
-            )
+            .create_addressable_agent(workspace.user_id, company.id, write)
             .await
+            .map(|provisioned| (provisioned.agent, provisioned.warnings))
             .map_err(|err| format!("Failed to create agent: {err}"))
     };
 
     match created {
-        Ok(agent) => view.saved_response(&agent).await,
-        Err(message) => rejected(message),
+        Ok((agent, warnings)) => view.saved_response(&agent, &warnings).await,
+        Err(message) => rejected(&view, &submitted, &message).await,
     }
+}
+
+/// POST /ui/agents/new/channel - The Advanced create form's second step (Protected).
+///
+/// Nothing is written here. The agent is checked first so a bad handle, model pair or config JSON
+/// is refused while the field carrying it is still on screen, and the channel step then opens on
+/// the values `personal_channel_write` would otherwise have chosen without showing them.
+#[instrument(skip(workspace, form))]
+async fn channel_step(
+    workspace: Workspace,
+    Query(query): Query<CompanyQuery>,
+    Form(form): Form<AgentForm>,
+) -> AppResult<Response> {
+    let company = workspace.scoped_company(query.company_id).await?;
+    let view = workspace.view(&company);
+    let submitted = SubmittedAgent::new(form);
+
+    let write = match submitted.agent_write() {
+        Ok(write) => write,
+        Err(message) => return rejected(&view, &submitted, &message).await,
+    };
+    let write = match workspace
+        .agent_use_cases
+        .validate_new_agent(workspace.user_id, company.id, write)
+        .await
+    {
+        Ok(write) => write,
+        Err(err) => return rejected(&view, &submitted, &err.to_string()).await,
+    };
+    if let Some(message) = view.address_taken(&write.slug).await? {
+        return rejected(&view, &submitted, &message).await;
+    }
+
+    // What was typed, with the handle in the form it will be stored in -- the channel address is
+    // built from it, so the step must not preview one the create would not produce.
+    let agent = pages::AgentDraft {
+        slug: &write.slug,
+        ..submitted.draft()
+    };
+    let participants = default_participants(&company);
+    let draft = default_channel_draft(&company, &agent, &participants);
+
+    Ok(Html(view.channel_step(&agent, &draft, None).await?).into_response())
+}
+
+/// POST /ui/agents/new/agent - Back from the channel step to the Advanced form (Protected).
+#[instrument(skip(workspace, form))]
+async fn agent_step(
+    workspace: Workspace,
+    Query(query): Query<CompanyQuery>,
+    Form(form): Form<AgentChannelStepForm>,
+) -> AppResult<Html<String>> {
+    let company = workspace.scoped_company(query.company_id).await?;
+    let view = workspace.view(&company);
+    let submitted = SubmittedAgent::new(form.agent.into());
+
+    Ok(Html(
+        view.create_pane(CreateForm {
+            draft: &submitted.draft(),
+            error: None,
+            selected_library_agent_ids: &[],
+            tab: Some(pages::AgentCreateTab::Advanced),
+        })
+        .await?,
+    ))
+}
+
+/// POST /ui/agents/new/create - Create the agent and the channel it answers on (Protected).
+#[instrument(skip(workspace, form))]
+async fn create_agent_with_channel(
+    workspace: Workspace,
+    Query(query): Query<CompanyQuery>,
+    Form(form): Form<AgentChannelStepForm>,
+) -> AppResult<Response> {
+    let company = workspace.scoped_company(query.company_id).await?;
+    let view = workspace.view(&company);
+    let agent = SubmittedAgent::new(form.agent.into());
+    let channel = SubmittedChannel::new(form.channel);
+
+    let agent_write = match agent.agent_write() {
+        Ok(write) => write,
+        Err(message) => return view.channel_step_rejected(&agent, &channel, &message).await,
+    };
+    // The position-0 assignment arrives with the transaction that creates the pair, so the step
+    // never submits an agent list of its own.
+    let channel_write = match channel.write(None) {
+        Ok(write) => write,
+        Err(message) => return view.channel_step_rejected(&agent, &channel, &message).await,
+    };
+
+    let created = workspace
+        .agent_use_cases
+        .create_addressable_agent_with(
+            workspace.user_id,
+            company.id,
+            agent_write,
+            PersonalChannelPlan::configured(channel_write, channel.form.confirm_spam_disabled()),
+        )
+        .await;
+
+    match created {
+        Ok(provisioned) => {
+            view.saved_response(&provisioned.agent, &provisioned.warnings)
+                .await
+        }
+        Err(err) => {
+            view.channel_step_rejected(&agent, &channel, &format!("Failed to create agent: {err}"))
+                .await
+        }
+    }
+}
+
+/// The company's default participants as the comma-separated list the channel step's field holds.
+///
+/// Kept out of [`default_channel_draft`] because [`pages::ChannelDraft`] borrows every string it
+/// renders, so the joined list has to outlive the draft.
+fn default_participants(company: &Company) -> String {
+    company
+        .channel_defaults
+        .participant_emails
+        .as_ref()
+        .map(|emails| {
+            emails
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
+        .unwrap_or_default()
+}
+
+/// The channel step as it first opens: the company's channel defaults, named after the agent.
+///
+/// Mirrors `personal_channel_write`, so a step submitted untouched creates exactly what the
+/// one-step Advanced tab created. The one thing it does not copy is that function's stripping of
+/// `@public` on a server without spam scanning -- here the interlock's confirmation is on screen,
+/// so the choice is offered rather than made.
+fn default_channel_draft<'a>(
+    company: &'a Company,
+    agent: &'a pages::AgentDraft<'a>,
+    participant_emails: &'a str,
+) -> pages::ChannelDraft<'a> {
+    let defaults = &company.channel_defaults;
+    pages::ChannelDraft {
+        name: agent.name,
+        description: agent.description,
+        slug: agent.slug,
+        participant_emails,
+        advanced: true,
+        enabled: true,
+        add_3rd_party: defaults.add_3rd_party,
+        retrieve_company_memory: defaults.retrieve_company_memory,
+        retrieve_agent_memory: defaults.retrieve_agent_memory,
+        retrieve_user_memory: defaults.retrieve_user_memory,
+        persist_company_memory: defaults.persist_company_memory,
+        persist_agent_memory: defaults.persist_agent_memory,
+        persist_user_memory: defaults.persist_user_memory,
+        ..pages::ChannelDraft::default()
+    }
+}
+
+/// A refused create, as the tab it was submitted from, filled back in with what was typed.
+async fn rejected(
+    view: &AgentSettingsView<'_>,
+    submitted: &SubmittedAgent,
+    message: &str,
+) -> AppResult<Response> {
+    let pane = view
+        .create_pane(CreateForm {
+            draft: &submitted.draft(),
+            error: Some(message),
+            selected_library_agent_ids: &[],
+            tab: Some(if submitted.is_simple() {
+                pages::AgentCreateTab::Simple
+            } else {
+                pages::AgentCreateTab::Advanced
+            }),
+        })
+        .await?;
+    Ok(Html(pane).into_response())
+}
+
+/// POST /ui/agents/from-library - Create one company agent per picked library definition
+/// (Protected).
+///
+/// Each pick is copied and provisioned on its own, so one that collides with an agent this company
+/// already has does not cost the others: the pane comes back showing what was created, with a line
+/// per pick that could not be.
+#[instrument(skip(workspace, form))]
+async fn create_from_library(
+    workspace: Workspace,
+    Query(query): Query<CompanyQuery>,
+    Form(form): Form<LibraryPickForm>,
+) -> AppResult<Response> {
+    let company = workspace.scoped_company(query.company_id).await?;
+    let view = workspace.view(&company);
+    let picked = parse_agent_ids_form(form.library_agent_ids).unwrap_or_default();
+    if picked.is_empty() {
+        return view
+            .library_rejected(&picked, "Pick at least one agent from the library.")
+            .await;
+    }
+
+    let mut created = Vec::new();
+    let mut warnings = Vec::new();
+    let mut refusals = Vec::new();
+    for agent_id in &picked {
+        match workspace
+            .agent_use_cases
+            .create_agent_from_library(workspace.user_id, company.id, *agent_id)
+            .await
+        {
+            Ok(provisioned) => {
+                warnings.extend(provisioned.warnings);
+                created.push(provisioned.agent);
+            }
+            Err(err) => refusals.push(crate::use_cases::agent::ProvisioningWarning {
+                code: "library_agent_not_created".into(),
+                message: format!("A picked library agent was not created: {err}"),
+            }),
+        }
+    }
+
+    let Some(agent) = created.first() else {
+        let message = refusals
+            .iter()
+            .map(|refusal| refusal.message.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        return view.library_rejected(&picked, &message).await;
+    };
+
+    warnings.extend(refusals);
+    view.saved_response(agent, &warnings).await
 }
 
 /// PUT /ui/agents/{agent_id} - Save one agent's settings (Protected).
@@ -368,6 +683,7 @@ async fn update_agent(
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company);
     let stored = view.agent(agent_id).await?;
+    let channels = view.channels().await?;
     let submitted = SubmittedAgent::new(form);
 
     let fields = parse_config_form(submitted.form.config_json.clone())
@@ -377,7 +693,7 @@ async fn update_agent(
         Ok(fields) => fields,
         Err(message) => {
             return Ok(Html(
-                view.edit_pane(&stored, Some(&submitted.draft()), Some(&message))
+                view.edit_pane(&stored, &channels, Some(&submitted.draft()), Some(&message))
                     .await?,
             )
             .into_response());
@@ -399,6 +715,7 @@ async fn update_agent(
                 system_prompt: submitted.form.system_prompt.clone(),
                 description: submitted.form.description.clone(),
                 config_json,
+                memory_enabled: submitted.form.memory_enabled,
                 memory_persistence_mode: submitted.form.memory_persistence_mode.unwrap_or_default(),
                 memory_recall_mode: submitted.form.memory_recall_mode.unwrap_or_default(),
                 memory_max_results: submitted
@@ -412,10 +729,11 @@ async fn update_agent(
         .await;
 
     match saved {
-        Ok(agent) => view.saved_response(&agent).await,
+        Ok(agent) => view.saved_response(&agent, &[]).await,
         Err(err) => Ok(Html(
             view.edit_pane(
                 &stored,
+                &channels,
                 Some(&submitted.draft()),
                 Some(&format!("Failed to save agent: {err}")),
             )
@@ -440,19 +758,34 @@ async fn delete_agent(
 
     let view = workspace.view(&company);
     let agents = view.agents().await?;
+    let channels = view.channels().await?;
     let pane = pages::agent_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline);
-    let list =
-        pages::agent_settings_list(&view.list(&agents, None), pages::FragmentSwap::OutOfBand);
+    let list = pages::agent_settings_list(
+        &view.list(&agents, &channels, None),
+        pages::FragmentSwap::OutOfBand,
+    );
 
     Ok(Html(format!("{pane}{list}")).into_response())
+}
+
+/// What the create pane is rendered from, beyond what the view can load itself.
+struct CreateForm<'a> {
+    draft: &'a pages::AgentDraft<'a>,
+    error: Option<&'a str>,
+    /// The library definitions ticked on the Easy tab, so a refused pick comes back intact.
+    selected_library_agent_ids: &'a [Uuid],
+    /// The tab that opens; `None` opens Easy whenever the library has anything to offer.
+    tab: Option<pages::AgentCreateTab>,
 }
 
 /// Everything the workspace renders from, so each handler names its data once.
 struct AgentSettingsView<'a> {
     agent_use_cases: &'a AgentUseCases,
     channel_use_cases: &'a ChannelUseCases,
+    config: &'a AppConfig,
     user_id: Uuid,
     company: &'a Company,
+    app_domain_name: &'a str,
 }
 
 impl AgentSettingsView<'_> {
@@ -477,63 +810,160 @@ impl AgentSettingsView<'_> {
             .ok_or_else(|| AppError::NotFound("Agent not found".into()))
     }
 
-    /// The channels running this agent. Nothing enforces the reference, so the pane has to look
-    /// it up to say what a delete would cost.
-    async fn used_by(&self, agent_id: Uuid) -> AppResult<Vec<Channel>> {
-        let channels = self
-            .channel_use_cases
+    async fn channels(&self) -> AppResult<Vec<Channel>> {
+        self.channel_use_cases
             .list_company_channels(self.user_id, self.company.id)
-            .await?;
+            .await
+    }
 
-        Ok(channels
-            .into_iter()
+    fn used_by<'a>(&self, agent_id: Uuid, channels: &'a [Channel]) -> Vec<&'a Channel> {
+        channels
+            .iter()
             .filter(|channel| {
                 channel
                     .agent_ids
                     .as_deref()
                     .is_some_and(|ids| ids.contains(&agent_id))
             })
-            .collect())
+            .collect()
     }
 
     fn list<'a>(
         &'a self,
         agents: &'a [Agent],
+        channels: &'a [Channel],
         selected_agent_id: Option<Uuid>,
     ) -> pages::AgentSettingsList<'a> {
         pages::AgentSettingsList {
             company: self.company,
+            app_domain_name: self.app_domain_name,
             agents,
+            channels,
             selected_agent_id,
         }
     }
 
-    fn create_pane(
-        &self,
-        draft: &pages::AgentDraft<'_>,
-        error: Option<&str>,
-        model_connections: &[crate::entities::company::CompanyModelConnection],
-    ) -> String {
-        pages::agent_create_pane(&pages::AgentCreatePane {
+    /// The create pane, on whichever tab the request means.
+    ///
+    /// It loads its own model connections and library definitions the way [`Self::edit_pane`]
+    /// does, so no caller has to fetch what only this pane reads.
+    async fn create_pane(&self, form: CreateForm<'_>) -> AppResult<String> {
+        let model_connections = self.model_connections().await?;
+        let library_agents = self.agent_use_cases.list_library_agents().await?;
+        // Nothing to start from means no Easy tab, so a request that asked for it lands on Simple.
+        let tab = match form.tab {
+            Some(pages::AgentCreateTab::Easy) | None if library_agents.is_empty() => {
+                pages::AgentCreateTab::Simple
+            }
+            Some(tab) => tab,
+            None => pages::AgentCreateTab::Easy,
+        };
+
+        Ok(pages::agent_create_pane(&pages::AgentCreatePane {
             company: self.company,
-            model_connections,
-            draft,
-            error,
-        })
+            app_domain_name: self.app_domain_name,
+            model_connections: &model_connections,
+            library_agents: &library_agents,
+            selected_library_agent_ids: form.selected_library_agent_ids,
+            tab,
+            draft: form.draft,
+            error: form.error,
+        }))
+    }
+
+    /// The create form's channel step, for an agent that has not been written yet.
+    async fn channel_step(
+        &self,
+        agent: &pages::AgentDraft<'_>,
+        draft: &pages::ChannelDraft<'_>,
+        error: Option<&str>,
+    ) -> AppResult<String> {
+        let memory_ready = self
+            .channel_use_cases
+            .memory_ready(self.user_id, self.company.id)
+            .await?;
+
+        Ok(pages::agent_channel_step_pane(
+            &pages::AgentChannelStepPane {
+                company: self.company,
+                app_domain_name: self.app_domain_name,
+                agent,
+                draft,
+                spam_scan_enabled: self.config.is_spam_scan_enabled(),
+                memory_ready,
+                error,
+            },
+        ))
+    }
+
+    /// The channel step, filled back in with both halves and why the create was refused.
+    async fn channel_step_rejected(
+        &self,
+        agent: &SubmittedAgent,
+        channel: &SubmittedChannel,
+        message: &str,
+    ) -> AppResult<Response> {
+        let pane = self
+            .channel_step(&agent.draft(), &channel.draft(), Some(message))
+            .await?;
+        Ok(Html(pane).into_response())
+    }
+
+    /// Why this handle cannot be used, when something already answers on it.
+    ///
+    /// The unique constraints on `agents.slug` and `channel_slugs` are what actually hold this —
+    /// the check exists so the create form's first step can say so while the handle is still on
+    /// screen, rather than after the channel step has been filled in.
+    async fn address_taken(&self, slug: &str) -> AppResult<Option<String>> {
+        if self
+            .agents()
+            .await?
+            .iter()
+            .any(|agent| agent.slug.eq_ignore_ascii_case(slug))
+        {
+            return Ok(Some(format!(
+                "This company already has an agent with the handle '{slug}'."
+            )));
+        }
+
+        let taken = self.channels().await?.iter().any(|channel| {
+            channel.slug.eq_ignore_ascii_case(slug)
+                || channel
+                    .alias_slugs
+                    .iter()
+                    .any(|alias| alias.eq_ignore_ascii_case(slug))
+        });
+        Ok(taken.then(|| {
+            format!("The address '{slug}' is already in use by another channel in this company.")
+        }))
+    }
+
+    /// The Easy tab, filled back in with what was picked and why it was refused.
+    async fn library_rejected(&self, picked: &[Uuid], message: &str) -> AppResult<Response> {
+        let pane = self
+            .create_pane(CreateForm {
+                draft: &pages::AgentDraft::default(),
+                error: Some(message),
+                selected_library_agent_ids: picked,
+                tab: Some(pages::AgentCreateTab::Easy),
+            })
+            .await?;
+        Ok(Html(pane).into_response())
     }
 
     async fn edit_pane(
         &self,
         agent: &Agent,
+        channels: &[Channel],
         draft: Option<&pages::AgentDraft<'_>>,
         error: Option<&str>,
     ) -> AppResult<String> {
-        let used_by = self.used_by(agent.id).await?;
-        let used_by: Vec<&Channel> = used_by.iter().collect();
+        let used_by = self.used_by(agent.id, channels);
         let model_connections = self.model_connections().await?;
 
         Ok(pages::agent_edit_pane(&pages::AgentEditPane {
             company: self.company,
+            app_domain_name: self.app_domain_name,
             model_connections: &model_connections,
             agent,
             used_by: &used_by,
@@ -544,11 +974,20 @@ impl AgentSettingsView<'_> {
 
     /// What every successful write returns: the saved agent's pane, with the sidebar list
     /// refreshed beside it so a create, rename or handle change shows up immediately.
-    async fn saved_response(&self, agent: &Agent) -> AppResult<Response> {
-        let pane = self.edit_pane(agent, None, None).await?;
+    async fn saved_response(
+        &self,
+        agent: &Agent,
+        warnings: &[crate::use_cases::agent::ProvisioningWarning],
+    ) -> AppResult<Response> {
+        let warning = warnings
+            .iter()
+            .map(|warning| pages::error_alert(&warning.message))
+            .collect::<String>();
+        let channels = self.channels().await?;
+        let pane = self.edit_pane(agent, &channels, None, None).await?;
         let agents = self.agents().await?;
         let list = pages::agent_settings_list(
-            &self.list(&agents, Some(agent.id)),
+            &self.list(&agents, &channels, Some(agent.id)),
             pages::FragmentSwap::OutOfBand,
         );
 
@@ -560,7 +999,7 @@ impl AgentSettingsView<'_> {
                     self.company.id, agent.id
                 ),
             )],
-            Html(format!("{pane}{list}")),
+            Html(format!("{warning}{pane}{list}")),
         )
             .into_response())
     }
@@ -594,6 +1033,33 @@ impl SubmittedAgent {
         self.form.form_mode.as_deref() == Some("simple")
     }
 
+    /// The write this submission asks for, or why it cannot be built.
+    ///
+    /// One builder for the three places an Advanced submit becomes a write — the one-step create,
+    /// the channel step's check, and the create that ends it — so none of them can drift on what
+    /// the form means.
+    fn agent_write(&self) -> Result<AgentWrite, String> {
+        Ok(AgentWrite {
+            name: self.form.name.clone(),
+            slug: self.slug.clone(),
+            provider: self.form.provider.clone(),
+            model: self.form.model.clone(),
+            run_timeout_secs: self.form.run_timeout_secs,
+            system_prompt: self.form.system_prompt.clone(),
+            description: self.form.description.clone(),
+            config_json: parse_config_form(self.form.config_json.clone())?,
+            memory_enabled: self.form.memory_enabled,
+            memory_persistence_mode: self.form.memory_persistence_mode.unwrap_or_default(),
+            memory_recall_mode: self.form.memory_recall_mode.unwrap_or_default(),
+            memory_max_results: self
+                .form
+                .memory_max_results
+                .unwrap_or_else(crate::entities::memory::default_memory_max_results),
+            avatar_url: self.avatar_url.clone()?,
+            created_by: None,
+        })
+    }
+
     fn overrides(&self) -> ModelOverrides<'_> {
         ModelOverrides {
             provider: self.form.provider.as_deref(),
@@ -610,6 +1076,7 @@ impl SubmittedAgent {
             provider: self.form.provider.as_deref().unwrap_or(""),
             model: self.form.model.as_deref().unwrap_or(""),
             run_timeout_secs: self.form.run_timeout_secs,
+            memory_enabled: self.form.memory_enabled,
             memory_persistence_mode: self
                 .form
                 .memory_persistence_mode
@@ -630,5 +1097,96 @@ impl SubmittedAgent {
             avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
             advanced: !self.is_simple(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{
+        body::Body,
+        extract::{Form, FromRequest},
+        http::{Request, header},
+    };
+
+    use super::*;
+
+    async fn channel_step_form(body: &str) -> AgentChannelStepForm {
+        let request = Request::builder()
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        Form::<AgentChannelStepForm>::from_request(request, &())
+            .await
+            .expect("the channel step's body parses")
+            .0
+    }
+
+    /// The two halves of the channel step share a body and several field names, so the prefix is
+    /// the only thing keeping the agent's name out of the channel's.
+    #[tokio::test]
+    async fn the_channel_step_parses_both_halves_of_its_body() {
+        let form = channel_step_form(
+            "agent_name=Support+Triage&agent_slug=support-triage\
+             &agent_system_prompt=You+are+support&agent_description=Answers+billing\
+             &agent_provider=anthropic&agent_model=claude&agent_run_timeout_secs=120\
+             &agent_memory_enabled=true&agent_memory_persistence_mode=scope_specific_facts\
+             &agent_memory_recall_mode=thinking&agent_memory_max_results=7\
+             &agent_config_json=&agent_avatar_url=\
+             &name=Support+Inbox&slug=support-triage&description=Where+support+mail+lands\
+             &alias_slugs=help,+sales&participant_emails=%40public&enabled=true&add_3rd_party=true\
+             &retrieve_company_memory=true&confirm_spam_disabled=true",
+        )
+        .await;
+
+        assert_eq!(form.agent.name, "Support Triage");
+        assert_eq!(form.agent.slug.as_deref(), Some("support-triage"));
+        assert_eq!(form.agent.run_timeout_secs, Some(120));
+        assert_eq!(form.agent.memory_max_results, Some(7));
+        assert_eq!(form.agent.memory_enabled.as_deref(), Some("true"));
+        assert_eq!(
+            form.agent.memory_persistence_mode,
+            Some(MemoryPersistenceMode::ScopeSpecificFacts)
+        );
+        assert_eq!(
+            form.agent.memory_recall_mode,
+            Some(MemoryRecallMode::Thinking)
+        );
+
+        assert_eq!(form.channel.name, "Support Inbox");
+        assert_eq!(
+            form.channel.description.as_deref(),
+            Some("Where support mail lands")
+        );
+        assert_eq!(form.channel.alias_slugs.as_deref(), Some("help, sales"));
+        assert!(form.channel.confirm_spam_disabled());
+
+        // The carried half becomes the ordinary agent form, on the tab it came from.
+        let agent = AgentForm::from(form.agent);
+        assert_eq!(agent.form_mode.as_deref(), Some("advanced"));
+        assert_eq!(agent.system_prompt.as_deref(), Some("You are support"));
+        let submitted = SubmittedAgent::new(agent);
+        assert!(!submitted.is_simple());
+        assert_eq!(
+            submitted.agent_write().expect("the write builds").slug,
+            "support-triage"
+        );
+    }
+
+    /// An unticked memory switch submits no key at all, the same way the agent form itself reads
+    /// one, and a blank number field must not 422 the whole submit.
+    #[tokio::test]
+    async fn the_channel_step_reads_an_absent_memory_switch_as_off() {
+        let form = channel_step_form(
+            "agent_name=Triage&agent_slug=triage&agent_system_prompt=Hi&agent_description=\
+             &agent_provider=&agent_model=&agent_run_timeout_secs=&agent_memory_max_results=5\
+             &agent_memory_persistence_mode=audience_only&agent_memory_recall_mode=fast\
+             &agent_config_json=&agent_avatar_url=&name=Triage&slug=triage",
+        )
+        .await;
+
+        assert_eq!(form.agent.memory_enabled, None);
+        assert_eq!(form.agent.run_timeout_secs, None);
+        assert!(!form.channel.enabled());
     }
 }

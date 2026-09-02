@@ -17,10 +17,14 @@ use uuid::Uuid;
 use crate::{
     app_error::AppResult,
     entities::{
+        company::CompanyChannelDefaults,
         creation::CreationProvenance,
         value_objects::{ChannelSlug, CompanySlug},
     },
-    use_cases::{agent::AgentWrite, channel::ChannelWrite},
+    use_cases::{
+        agent::{AgentWrite, ProvisioningWarning, SpamScanning, personal_channel_write},
+        channel::ChannelWrite,
+    },
 };
 
 pub const CREATE_AGENT_CHANNEL_TOOL_ID: &str = "create_agent_channel";
@@ -34,6 +38,8 @@ pub struct AgentChannelToolContext {
     pub source_channel_id: Uuid,
     pub task_id: Uuid,
     pub app_domain_name: String,
+    pub channel_defaults: CompanyChannelDefaults,
+    pub spam_scanning: SpamScanning,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -51,6 +57,7 @@ pub struct ProvisionAgentChannelRequest {
     pub source_task_id: Uuid,
     pub agent: AgentWrite,
     pub channel: ChannelWrite,
+    pub warnings: Vec<ProvisioningWarning>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -58,6 +65,7 @@ pub struct ProvisionedAgentChannel {
     pub created: bool,
     pub agent_id: Uuid,
     pub channel_id: Uuid,
+    pub warnings: Vec<ProvisioningWarning>,
 }
 
 #[async_trait]
@@ -107,25 +115,17 @@ impl CreateAgentChannelTool {
             created_by: Some(provenance.clone()),
             ..AgentWrite::default()
         };
-        let mut channel = ChannelWrite {
-            name: input.name,
-            slug: input.slug,
-            // The agent id is allocated inside the provisioning transaction. Normalize while
-            // disabled, then enable before the deferred database invariant is checked at commit.
-            enabled: false,
-            add_3rd_party: false,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
-            created_by: Some(provenance),
-            ..ChannelWrite::default()
-        };
         agent.normalize().map_err(|e| e.to_string())?;
-        channel.normalize().map_err(|e| e.to_string())?;
-        channel.enabled = true;
+        let mut decision = personal_channel_write(
+            &agent,
+            &self.context.channel_defaults,
+            self.context.spam_scanning,
+        );
+        decision.channel.created_by = Some(provenance);
+        decision
+            .channel
+            .normalize_with(crate::use_cases::channel::ActiveAgent::SuppliedByCaller)
+            .map_err(|e| e.to_string())?;
         let canonical = serde_json::json!({
             "name": agent.name,
             "slug": agent.slug,
@@ -138,7 +138,8 @@ impl CreateAgentChannelTool {
             company_id: self.context.company_id,
             source_task_id: self.context.task_id,
             agent,
-            channel,
+            channel: decision.channel,
+            warnings: decision.warnings,
         })
     }
 }
@@ -198,6 +199,7 @@ impl Tool for CreateAgentChannelTool {
                         "created": result.created, "agent_id": result.agent_id,
                         "channel_id": result.channel_id, "name": name, "slug": slug.as_str(),
                         "address": address.as_str(),
+                        "warnings": result.warnings,
                     })
                     .to_string(),
                 )
@@ -234,6 +236,8 @@ mod tests {
                 source_channel_id: Uuid::from_u128(2),
                 task_id: Uuid::from_u128(3),
                 app_domain_name: "mailagents.test".into(),
+                channel_defaults: CompanyChannelDefaults::default(),
+                spam_scanning: SpamScanning::Available,
             },
         )
     }
@@ -253,7 +257,7 @@ mod tests {
         assert_eq!(request.agent.provider, None);
         assert_eq!(request.channel.agent_ids, None);
         assert!(request.channel.enabled);
-        assert!(!request.channel.add_3rd_party);
+        assert!(request.channel.add_3rd_party);
         let provenance = request.agent.created_by.unwrap();
         assert_eq!(provenance.actor_id, Some(Uuid::from_u128(1)));
         assert_eq!(provenance.source_channel_id, Some(Uuid::from_u128(2)));

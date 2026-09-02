@@ -125,6 +125,14 @@ pub struct CompanyDraft<'a> {
     /// [`company_fields`], which is where it becomes an [`AvatarUrl`] again.
     pub avatar_url: &'a str,
     pub memory_provider: &'a str,
+    pub default_add_3rd_party: bool,
+    pub default_participant_emails: String,
+    pub default_retrieve_company_memory: bool,
+    pub default_retrieve_agent_memory: bool,
+    pub default_retrieve_user_memory: bool,
+    pub default_persist_company_memory: bool,
+    pub default_persist_agent_memory: bool,
+    pub default_persist_user_memory: bool,
     pub model_connections: Vec<CompanyModelConnectionDraft>,
 }
 
@@ -147,6 +155,14 @@ impl Default for CompanyDraft<'_> {
             spam_guardrail: SpamGuardrail::ServerDefault,
             avatar_url: "",
             memory_provider: "",
+            default_add_3rd_party: true,
+            default_participant_emails: String::new(),
+            default_retrieve_company_memory: false,
+            default_retrieve_agent_memory: false,
+            default_retrieve_user_memory: false,
+            default_persist_company_memory: false,
+            default_persist_agent_memory: false,
+            default_persist_user_memory: false,
             model_connections: Vec::new(),
         }
     }
@@ -520,6 +536,27 @@ fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProvide
                         </select>
                         <div class="label"><span class="text-[11px] opacity-60">Disabling suspends memory immediately but retains the provider connection and channel memory choices. Company deletion removes the remote memory. Hindsight extracts facts in the background, so a memory becomes recallable shortly after the reply rather than at once.</span></div>
                     </label>
+                    <details class="collapse-arrow collapse border border-base-300 bg-base-200">
+                        <summary class="collapse-title text-sm font-medium">New agent channel defaults</summary>
+                        <div class="collapse-content space-y-4">
+                            <label class="form-control"><span class="text-xs opacity-70">Participants / access</span>
+                                <textarea name="default_participant_emails" rows="2" class="textarea w-full" placeholder="person@example.com, or @public">{default_participants}</textarea>
+                                <span class="text-[11px] opacity-60">Blank is team-only. @public requires spam scanning.</span>
+                            </label>
+                            <label class="form-control"><span class="text-xs opacity-70">Allow trusted senders to add third parties</span>
+                                <select name="default_add_3rd_party" class="select w-full"><option value="true"{default_third_party_yes}>Yes</option><option value="false"{default_third_party_no}>No</option></select>
+                            </label>
+                            <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+                                <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="default_retrieve_company_memory" value="true" class="checkbox checkbox-sm"{drc}><span>Read company memory</span></label>
+                                <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="default_persist_company_memory" value="true" class="checkbox checkbox-sm"{dpc}><span>Write company memory</span></label>
+                                <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="default_retrieve_agent_memory" value="true" class="checkbox checkbox-sm"{dra}><span>Read agent memory</span></label>
+                                <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="default_persist_agent_memory" value="true" class="checkbox checkbox-sm"{dpa}><span>Write agent memory</span></label>
+                                <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="default_retrieve_user_memory" value="true" class="checkbox checkbox-sm"{dru}><span>Read user memory</span></label>
+                                <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="default_persist_user_memory" value="true" class="checkbox checkbox-sm"{dpu}><span>Write user memory</span></label>
+                            </div>
+                            <p class="text-[11px] opacity-60">User memory includes authorized external participants and is isolated to this company. Grants may be saved before the selected provider is ready; they become effective only when infrastructure and agent policy allow them.</p>
+                        </div>
+                    </details>
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
                         <summary class="collapse-title text-sm font-medium">Model providers</summary>
                         <div class="collapse-content space-y-4">
@@ -546,6 +583,23 @@ fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProvide
             ""
         },
         memory_provider_options = memory_provider_options(draft.memory_provider, configured),
+        default_participants = escape_html_text(&draft.default_participant_emails),
+        default_third_party_yes = if draft.default_add_3rd_party {
+            " selected"
+        } else {
+            ""
+        },
+        default_third_party_no = if draft.default_add_3rd_party {
+            ""
+        } else {
+            " selected"
+        },
+        drc = checked(draft.default_retrieve_company_memory),
+        dra = checked(draft.default_retrieve_agent_memory),
+        dru = checked(draft.default_retrieve_user_memory),
+        dpc = checked(draft.default_persist_company_memory),
+        dpa = checked(draft.default_persist_agent_memory),
+        dpu = checked(draft.default_persist_user_memory),
     )
 }
 
@@ -704,6 +758,10 @@ fn selected_attr(draft: SpamGuardrail, option: SpamGuardrail) -> &'static str {
     if draft == option { "selected" } else { "" }
 }
 
+fn checked(value: bool) -> &'static str {
+    if value { " checked" } else { "" }
+}
+
 /// A stored company as the form sees it.
 fn stored_draft<'a>(
     company: &'a Company,
@@ -718,6 +776,25 @@ fn stored_draft<'a>(
             .memory_provider
             .map(MemoryProviderKind::as_str)
             .unwrap_or(""),
+        default_add_3rd_party: company.channel_defaults.add_3rd_party,
+        default_participant_emails: company
+            .channel_defaults
+            .participant_emails
+            .as_ref()
+            .map(|values| {
+                values
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+            .unwrap_or_default(),
+        default_retrieve_company_memory: company.channel_defaults.retrieve_company_memory,
+        default_retrieve_agent_memory: company.channel_defaults.retrieve_agent_memory,
+        default_retrieve_user_memory: company.channel_defaults.retrieve_user_memory,
+        default_persist_company_memory: company.channel_defaults.persist_company_memory,
+        default_persist_agent_memory: company.channel_defaults.persist_agent_memory,
+        default_persist_user_memory: company.channel_defaults.persist_user_memory,
         model_connections: connections
             .iter()
             .map(|connection| CompanyModelConnectionDraft {

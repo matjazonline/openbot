@@ -4,6 +4,43 @@ use super::*;
 
 pub(crate) const MARKDOWN_CONTENT_STYLES: &str = "[&_p]:mb-2 [&_p:last-child]:mb-0 [&_h1]:mb-2 [&_h1]:text-base [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:text-sm [&_h2]:font-bold [&_h3]:mb-2 [&_h3]:font-bold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-600 [&_blockquote]:pl-3 [&_blockquote]:text-slate-300 [&_a]:underline [&_a]:text-indigo-300 [&_strong]:font-bold [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-slate-900 [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_table]:my-2 [&_table]:w-full [&_th]:border [&_th]:border-slate-700 [&_th]:p-2 [&_th]:text-left [&_td]:border [&_td]:border-slate-800 [&_td]:p-2";
 
+/// Makes daisyUI's `loading` indicators actually move.
+///
+/// daisyUI paints `loading` as a `mask-image` whose animation is SMIL *inside* the data URI, and a
+/// masked image is a decorative context that Chrome never animates: every spinner in the app was
+/// painting the motionless dot its `stroke-dasharray: 0,150` starts on. Verified in Chrome -- the
+/// same data URI is frozen as an `<img>` too, so this is the mask, not the mask alone.
+///
+/// The spinner is redrawn as a border arc on a real CSS animation, keeping daisyUI's own sizing
+/// (`width` plus `aspect-ratio: 1`) and `currentColor`, so `loading-xs` / `loading-sm` and every
+/// button variant keep working with no markup change. The dots keep their mask -- frozen, three
+/// dots read as a plain ellipsis -- and are given their motion separately.
+pub(crate) const SPINNER_STYLES: &str = r#"
+        .loading-spinner {
+            -webkit-mask-image: none;
+            mask-image: none;
+            background-color: transparent;
+            box-sizing: border-box;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spinner-rotate 0.7s linear infinite;
+        }
+        @keyframes spinner-rotate { to { transform: rotate(360deg); } }
+
+        .loading-dots { animation: loading-fade 1.2s ease-in-out infinite; }
+        @keyframes loading-fade { 50% { opacity: 0.35; } }
+
+        /* An icon-only button has no room beside its glyph, so the spinner stands in for it
+           rather than crowding in next to it. */
+        [data-busy-icon-only] > :not([data-request-spinner]) { display: none !important; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .loading-spinner { animation-duration: 2s; }
+            .loading-dots { animation-duration: 3s; }
+        }
+"#;
+
 pub(crate) fn render_markdown(markdown: &str) -> String {
     let options =
         Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES | Options::ENABLE_TASKLISTS;
@@ -33,7 +70,7 @@ pub(crate) fn public_layout(title: &str, content: &str) -> String {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Mail Agents</title>
     <link href="{app_css}" rel="stylesheet" type="text/css" />
-    <style>
+    <style>{SPINNER_STYLES}
         [data-theme="dark"] {{
             --color-primary: oklch(50% 0.19 264.05);
             --color-primary-content: oklch(96% 0.02 264.05);
@@ -377,7 +414,10 @@ pub(crate) const LEGACY_FORMS_SCRIPT: &str = r##"        function slugifyValue(v
             var slug = input.dataset.slugTarget
                 ? document.getElementById(input.dataset.slugTarget)
                 : (input.form ? input.form.slug : null);
-            if (slug) slug.value = slugifyValue(input.value);
+            if (slug) {
+                slug.value = slugifyValue(input.value);
+                slug.dispatchEvent(new Event('input', { bubbles: true }));
+            }
         }
 
         function toggleFormCard(button) {
@@ -501,6 +541,7 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Mail Agents</title>
     <link href="{app_css}" rel="stylesheet" type="text/css" />
+    <style>{SPINNER_STYLES}</style>
     <script src="/assets/htmx-2.0.4.min.js" defer></script>
 </head>
 <body class="h-full font-sans antialiased text-slate-100 flex flex-col items-center p-4 md:p-8">

@@ -329,6 +329,23 @@ pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: b
     let draft = pane.draft.unwrap_or(&stored);
     let company_id = pane.company.id;
     let channel_id = pane.channel.id;
+    let owner = pane
+        .channel
+        .owner_agent_id
+        .and_then(|owner_id| pane.agents.iter().find(|agent| agent.id == owner_id))
+        .map_or(ChannelOwner::None, ChannelOwner::Existing);
+    let delete_action = if pane.channel.owner_agent_id.is_some() {
+        String::new()
+    } else {
+        format!(
+            r##"<button type="button" class="btn btn-error btn-outline ml-auto"
+                            hx-delete="/ui/channels/{channel_id}?company_id={company_id}"
+                            hx-target="#channel-pane" hx-swap="outerHTML"
+                            hx-confirm="Delete channel '{name}'? Its threads and tasks go with it."
+                            hx-push-url="/ui/channels?company_id={company_id}">Delete Channel</button>"##,
+            name = escape_html_attr(&pane.channel.name),
+        )
+    };
 
     format!(
         r##"
@@ -359,11 +376,7 @@ pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: b
                             hx-get="/ui/channels/close?company_id={company_id}"
                             hx-target="#channel-pane" hx-swap="outerHTML" hx-sync="#channel-pane:replace"
                             hx-push-url="/ui/channels?company_id={company_id}">Cancel</button>
-                        <button type="button" class="btn btn-error btn-outline ml-auto"
-                            hx-delete="/ui/channels/{channel_id}?company_id={company_id}"
-                            hx-target="#channel-pane" hx-swap="outerHTML"
-                            hx-confirm="Delete channel '{name}'? Its threads and tasks go with it."
-                            hx-push-url="/ui/channels?company_id={company_id}">Delete Channel</button>
+                        {delete_action}
                     </div>
                 </form>
 
@@ -387,7 +400,9 @@ pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: b
             draft,
             spam_scan_enabled: pane.spam_scan_enabled,
             memory_ready,
+            owner,
         }),
+        delete_action = delete_action,
         schedules_html = channel_schedules_card(company_id, channel_id, pane.schedules),
     )
 }
@@ -518,38 +533,120 @@ pub fn channel_create_pane_with_memory(pane: &ChannelCreatePane<'_>, memory_read
             draft: pane.draft,
             spam_scan_enabled: pane.spam_scan_enabled,
             memory_ready,
+            owner: ChannelOwner::None,
         }),
     )
 }
 
 /// Everything about a channel except which URL its form submits to.
-struct ChannelFields<'a> {
-    company: &'a Company,
-    app_domain_name: &'a str,
-    agents: &'a [Agent],
+pub(super) struct ChannelFields<'a> {
+    pub company: &'a Company,
+    pub app_domain_name: &'a str,
+    pub agents: &'a [Agent],
     /// Namespaces the element ids, so the create pane's two forms do not collide.
-    id_prefix: &'a str,
-    draft: &'a ChannelDraft<'a>,
-    spam_scan_enabled: bool,
-    memory_ready: bool,
+    pub id_prefix: &'a str,
+    pub draft: &'a ChannelDraft<'a>,
+    pub spam_scan_enabled: bool,
+    pub memory_ready: bool,
+    pub owner: ChannelOwner<'a>,
 }
 
-fn channel_fields(fields: &ChannelFields<'_>) -> String {
+/// Whose personal channel this form is, if it is one at all.
+///
+/// An owned channel's primary address and position-zero assignment are lifecycle state rather than
+/// settings, so the form shows them instead of offering them. The agent owning it may not exist
+/// yet -- the Agents workspace's create form configures the channel before either row is written --
+/// which is why the owner is named by what the form needs of it rather than by an [`Agent`].
+#[derive(Clone, Copy)]
+pub(super) enum ChannelOwner<'a> {
+    /// A channel that picks its agents from the company's list.
+    None,
+    /// An agent-owned personal channel whose owner is already stored.
+    Existing(&'a Agent),
+    /// The agent from the create form's first step, not yet written.
+    Pending { name: &'a str, slug: &'a str },
+}
+
+impl<'a> ChannelOwner<'a> {
+    /// The owner's name and handle, for the parts of the form that only need to say who it is.
+    fn identity(self) -> Option<(&'a str, &'a str)> {
+        match self {
+            Self::None => None,
+            Self::Existing(agent) => Some((agent.name.as_str(), agent.slug.as_str())),
+            Self::Pending { name, slug } => Some((name, slug)),
+        }
+    }
+}
+
+pub(super) fn channel_fields(fields: &ChannelFields<'_>) -> String {
     let draft = fields.draft;
+    let owner = fields.owner.identity();
+    let name_slug_behavior = if owner.is_some() {
+        ""
+    } else {
+        r#" data-input="slugify""#
+    };
+    let slug_field = if owner.is_some() {
+        format!(
+            r##"<label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Primary address (@{company_slug}.{app_domain_name})</span></div>
+                            <input type="text" name="slug" required readonly value="{slug}"
+                                class="input w-full cursor-not-allowed bg-base-200 font-mono">
+                            <div class="label"><span class="text-[11px] opacity-60">{address_help}</span></div>
+                        </label>"##,
+            company_slug = escape_html_text(&fields.company.slug),
+            app_domain_name = escape_html_text(fields.app_domain_name),
+            slug = escape_html_attr(draft.slug),
+            address_help = owned_address_help(fields.company.id, fields.owner),
+        )
+    } else {
+        format!(
+            r##"<label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Address (@{company_slug}.{app_domain_name})</span></div>
+                            <input type="text" name="slug" required value="{slug}" placeholder="inbound-email-handler"
+                                class="input w-full font-mono">
+                        </label>"##,
+            company_slug = escape_html_text(&fields.company.slug),
+            app_domain_name = escape_html_text(fields.app_domain_name),
+            slug = escape_html_attr(draft.slug),
+        )
+    };
+    let agents_html = match owner {
+        // A pending owner has no id to assign, and needs none: the agent and its channel are
+        // written in one transaction that puts the agent at position 0 itself.
+        Some((owner_name, owner_slug)) => format!(
+            r##"{assignment}
+                        <div class="rounded-box border border-base-300 bg-base-200 px-3 py-3">
+                            <span class="text-sm font-medium">{owner_name}</span>
+                            <span class="ml-2 font-mono text-xs opacity-60">@{owner_slug}</span>
+                            <span class="block text-[11px] opacity-60">The owner always remains the position-0 agent, including while this channel is disabled.</span>
+                        </div>"##,
+            assignment = match fields.owner {
+                ChannelOwner::Existing(agent) => format!(
+                    r##"<input type="hidden" name="agent_ids" value="{}">"##,
+                    agent.id
+                ),
+                _ => String::new(),
+            },
+            owner_name = escape_html_text(owner_name),
+            owner_slug = escape_html_text(owner_slug),
+        ),
+        None => agent_radios(
+            fields.company.id,
+            fields.agents,
+            draft.agent_ids,
+            fields.id_prefix,
+        ),
+    };
     format!(
         r##"
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <label class="form-control w-full">
                             <div class="label"><span class="text-xs opacity-70">Channel Name</span></div>
-                            <input type="text" name="name" required value="{name}" placeholder="Inbound Email Handler"
-                                data-input="slugify"
+                            <input type="text" name="name" required value="{name}" placeholder="Inbound Email Handler"{name_slug_behavior}
                                 class="input w-full">
                         </label>
-                        <label class="form-control w-full">
-                            <div class="label"><span class="text-xs opacity-70">Address (@{company_slug}.{app_domain_name})</span></div>
-                            <input type="text" name="slug" required value="{slug}" placeholder="inbound-email-handler"
-                                class="input w-full font-mono">
-                        </label>
+                        {slug_field}
                     </div>
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Description</span></div>
@@ -599,23 +696,38 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                     {spam_html}
         "##,
         name = escape_html_text(draft.name),
+        name_slug_behavior = name_slug_behavior,
         description = escape_html_text(draft.description),
         company_slug = escape_html_text(&fields.company.slug),
         app_domain_name = escape_html_text(fields.app_domain_name),
-        slug = escape_html_text(draft.slug),
+        slug_field = slug_field,
         alias_slugs = escape_html_text(draft.alias_slugs),
-        agents_html = agent_radios(
-            fields.company.id,
-            fields.agents,
-            draft.agent_ids,
-            fields.id_prefix
-        ),
+        agents_html = agents_html,
         participant_emails = escape_html_text(draft.participant_emails),
         memory_fields = memory_fields(fields.memory_ready, draft),
         enabled_checked = if draft.enabled { " checked" } else { "" },
         add_3rd_party_checked = if draft.add_3rd_party { " checked" } else { "" },
         spam_html = spam_disabled_confirmation(fields.spam_scan_enabled, draft.is_public()),
     )
+}
+
+/// Why the address under an owned channel cannot be typed here, and where it can be changed.
+///
+/// A stored owner is a link into its settings; a pending one is still on the form's first step,
+/// which is a button away rather than a page away.
+fn owned_address_help(company_id: Uuid, owner: ChannelOwner<'_>) -> String {
+    match owner {
+        ChannelOwner::None => String::new(),
+        ChannelOwner::Existing(agent) => format!(
+            r##"This address follows the agent handle. <a class="link" href="/ui/agents?company_id={company_id}&amp;agent_id={agent_id}">Rename {name} in Agents</a>."##,
+            agent_id = agent.id,
+            name = escape_html_text(&agent.name),
+        ),
+        ChannelOwner::Pending { .. } => {
+            "This address follows the agent handle. Go back to the agent step to change it."
+                .to_string()
+        }
+    }
 }
 
 /// The company's agents as radios feeding one hidden `agent_ids` field.
@@ -847,25 +959,29 @@ fn stored_draft<'a>(
 }
 
 fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {
-    let disabled = if memory_ready { "" } else { " disabled" };
+    let state_notice = if memory_ready {
+        "The selected provider is ready; these grants are currently effective when agent policy also permits memory."
+    } else {
+        "You can save these grants now. They remain inactive until the company's selected provider is ready."
+    };
     let checked = |value: bool| if value { " checked" } else { "" };
     format!(
-        r##"<fieldset class="rounded-lg border border-base-300 bg-base-200 p-4"{disabled}>
+        r##"<fieldset class="rounded-lg border border-base-300 bg-base-200 p-4">
                         <legend class="px-1 text-xs font-semibold">Memory</legend>
-                        <p class="mb-3 text-[11px] opacity-60">Controls become authoritative only when the company's selected provider is ready.</p>
+                        <p class="mb-3 text-[11px] opacity-60">{state_notice} User memory includes authorized external senders and stays isolated to this company.</p>
                         <div class="grid max-w-sm grid-cols-4 items-center gap-x-2 gap-y-2 text-xs">
                             <span></span>
                             <span class="text-center opacity-70">Company</span>
                             <span class="text-center opacity-70">Agent</span>
                             <span class="text-center opacity-70">User</span>
                             <span class="opacity-70">Retrieve</span>
-                            <input aria-label="Retrieve company memory" type="checkbox" name="retrieve_company_memory" value="true" class="checkbox checkbox-sm justify-self-center"{retrieve_company}{disabled}>
-                            <input aria-label="Retrieve agent memory" type="checkbox" name="retrieve_agent_memory" value="true" class="checkbox checkbox-sm justify-self-center"{retrieve_agent}{disabled}>
-                            <input aria-label="Retrieve user memory" type="checkbox" name="retrieve_user_memory" value="true" class="checkbox checkbox-sm justify-self-center"{retrieve_user}{disabled}>
+                            <input aria-label="Retrieve company memory" type="checkbox" name="retrieve_company_memory" value="true" class="checkbox checkbox-sm justify-self-center"{retrieve_company}>
+                            <input aria-label="Retrieve agent memory" type="checkbox" name="retrieve_agent_memory" value="true" class="checkbox checkbox-sm justify-self-center"{retrieve_agent}>
+                            <input aria-label="Retrieve user memory" type="checkbox" name="retrieve_user_memory" value="true" class="checkbox checkbox-sm justify-self-center"{retrieve_user}>
                             <span class="opacity-70">Persist</span>
-                            <input aria-label="Persist company memory" type="checkbox" name="persist_company_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_company}{disabled}>
-                            <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_agent}{disabled}>
-                            <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_user}{disabled}>
+                            <input aria-label="Persist company memory" type="checkbox" name="persist_company_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_company}>
+                            <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_agent}>
+                            <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_user}>
                         </div>
                     </fieldset>"##,
         retrieve_company = checked(draft.retrieve_company_memory),
@@ -874,6 +990,7 @@ fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {
         persist_company = checked(draft.persist_company_memory),
         persist_agent = checked(draft.persist_agent_memory),
         persist_user = checked(draft.persist_user_memory),
+        state_notice = state_notice,
     )
 }
 

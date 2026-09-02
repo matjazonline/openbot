@@ -7,7 +7,7 @@ use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
-        company::{Company, CompanyAccess, CompanyModelConnection},
+        company::{Company, CompanyAccess, CompanyChannelDefaults, CompanyModelConnection},
         company_member::CompanyMembership,
         memory::{MEMORY_DELETION_QUIESCENCE_SECONDS, MemoryProviderKind},
         value_objects::{AvatarUrl, CompanySlug, ModelName, ModelProvider},
@@ -23,6 +23,14 @@ pub struct CompanyDb {
     pub slug: String,
     pub enable_llm_spam_guardrail: Option<bool>,
     pub memory_provider: Option<String>,
+    pub default_add_3rd_party: bool,
+    pub default_participant_emails: Option<Vec<String>>,
+    pub default_retrieve_company_memory: bool,
+    pub default_retrieve_agent_memory: bool,
+    pub default_retrieve_user_memory: bool,
+    pub default_persist_company_memory: bool,
+    pub default_persist_agent_memory: bool,
+    pub default_persist_user_memory: bool,
     pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
 }
@@ -42,6 +50,21 @@ impl From<CompanyDb> for Company {
                 .memory_provider
                 .as_deref()
                 .and_then(MemoryProviderKind::parse),
+            channel_defaults: CompanyChannelDefaults {
+                add_3rd_party: db.default_add_3rd_party,
+                participant_emails: db.default_participant_emails.map(|values| {
+                    values
+                        .into_iter()
+                        .map(crate::entities::value_objects::EmailAddress::from)
+                        .collect()
+                }),
+                retrieve_company_memory: db.default_retrieve_company_memory,
+                retrieve_agent_memory: db.default_retrieve_agent_memory,
+                retrieve_user_memory: db.default_retrieve_user_memory,
+                persist_company_memory: db.default_persist_company_memory,
+                persist_agent_memory: db.default_persist_agent_memory,
+                persist_user_memory: db.default_persist_user_memory,
+            },
             avatar_url: db.avatar_url.map(AvatarUrl::from),
             created_at: db.created_at,
         }
@@ -169,9 +192,17 @@ impl CompanyPersistence for PostgresPersistence {
 
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"INSERT INTO companies (id, user_id, name, slug,
-                                      enable_llm_spam_guardrail, memory_provider, avatar_url)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)
+                                      enable_llm_spam_guardrail, memory_provider, avatar_url,
+                                      default_add_3rd_party, default_participant_emails,
+                                      default_retrieve_company_memory, default_retrieve_agent_memory,
+                                      default_retrieve_user_memory, default_persist_company_memory,
+                                      default_persist_agent_memory, default_persist_user_memory)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                RETURNING id, user_id, name, slug, enable_llm_spam_guardrail, memory_provider,
+                      default_add_3rd_party, default_participant_emails,
+                      default_retrieve_company_memory, default_retrieve_agent_memory,
+                      default_retrieve_user_memory, default_persist_company_memory,
+                      default_persist_agent_memory, default_persist_user_memory,
                       avatar_url, created_at"#,
         )
         .bind(uuid)
@@ -181,6 +212,14 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(write.enable_llm_spam_guardrail)
         .bind(write.memory_provider.map(MemoryProviderKind::as_str))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
+        .bind(write.channel_defaults.add_3rd_party)
+        .bind(write.channel_defaults.participant_emails.as_ref().map(|values| values.iter().map(|value| value.as_str()).collect::<Vec<_>>()))
+        .bind(write.channel_defaults.retrieve_company_memory)
+        .bind(write.channel_defaults.retrieve_agent_memory)
+        .bind(write.channel_defaults.retrieve_user_memory)
+        .bind(write.channel_defaults.persist_company_memory)
+        .bind(write.channel_defaults.persist_agent_memory)
+        .bind(write.channel_defaults.persist_user_memory)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -191,7 +230,12 @@ impl CompanyPersistence for PostgresPersistence {
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"SELECT id, user_id, name, slug,
-                      enable_llm_spam_guardrail, memory_provider, avatar_url, created_at
+                      enable_llm_spam_guardrail, memory_provider,
+                      default_add_3rd_party, default_participant_emails,
+                      default_retrieve_company_memory, default_retrieve_agent_memory,
+                      default_retrieve_user_memory, default_persist_company_memory,
+                      default_persist_agent_memory, default_persist_user_memory,
+                      avatar_url, created_at
                FROM companies WHERE id = $1"#,
         )
         .bind(id)
@@ -205,7 +249,12 @@ impl CompanyPersistence for PostgresPersistence {
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"SELECT id, user_id, name, slug,
-                      enable_llm_spam_guardrail, memory_provider, avatar_url, created_at
+                      enable_llm_spam_guardrail, memory_provider,
+                      default_add_3rd_party, default_participant_emails,
+                      default_retrieve_company_memory, default_retrieve_agent_memory,
+                      default_retrieve_user_memory, default_persist_company_memory,
+                      default_persist_agent_memory, default_persist_user_memory,
+                      avatar_url, created_at
                FROM companies WHERE slug = $1"#,
         )
         .bind(slug)
@@ -219,7 +268,12 @@ impl CompanyPersistence for PostgresPersistence {
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         let db_list = sqlx::query_as::<_, CompanyDb>(
             r#"SELECT id, user_id, name, slug,
-                      enable_llm_spam_guardrail, memory_provider, avatar_url, created_at
+                      enable_llm_spam_guardrail, memory_provider,
+                      default_add_3rd_party, default_participant_emails,
+                      default_retrieve_company_memory, default_retrieve_agent_memory,
+                      default_retrieve_user_memory, default_persist_company_memory,
+                      default_persist_agent_memory, default_persist_user_memory,
+                      avatar_url, created_at
                FROM companies WHERE user_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -238,6 +292,10 @@ impl CompanyPersistence for PostgresPersistence {
         let db_list = sqlx::query_as::<_, AccessibleCompanyDb>(
             r#"SELECT company.id, company.user_id, company.name, company.slug,
                       company.enable_llm_spam_guardrail, company.memory_provider,
+                      company.default_add_3rd_party, company.default_participant_emails,
+                      company.default_retrieve_company_memory, company.default_retrieve_agent_memory,
+                      company.default_retrieve_user_memory, company.default_persist_company_memory,
+                      company.default_persist_agent_memory, company.default_persist_user_memory,
                       company.avatar_url, company.created_at,
                       (company.user_id = $1) AS is_owner,
                       COALESCE((
@@ -265,9 +323,17 @@ impl CompanyPersistence for PostgresPersistence {
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"UPDATE companies SET name = $1, slug = $2,
                       enable_llm_spam_guardrail = $3,
-                      memory_provider = COALESCE($4, memory_provider), avatar_url = $5
-               WHERE id = $6
+                      memory_provider = COALESCE($4, memory_provider), avatar_url = $5,
+                      default_add_3rd_party = $6, default_participant_emails = $7,
+                      default_retrieve_company_memory = $8, default_retrieve_agent_memory = $9,
+                      default_retrieve_user_memory = $10, default_persist_company_memory = $11,
+                      default_persist_agent_memory = $12, default_persist_user_memory = $13
+               WHERE id = $14
                RETURNING id, user_id, name, slug, enable_llm_spam_guardrail, memory_provider,
+                      default_add_3rd_party, default_participant_emails,
+                      default_retrieve_company_memory, default_retrieve_agent_memory,
+                      default_retrieve_user_memory, default_persist_company_memory,
+                      default_persist_agent_memory, default_persist_user_memory,
                       avatar_url, created_at"#,
         )
         .bind(&write.name)
@@ -275,6 +341,25 @@ impl CompanyPersistence for PostgresPersistence {
         .bind(write.enable_llm_spam_guardrail)
         .bind(write.memory_provider.map(MemoryProviderKind::as_str))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
+        .bind(write.channel_defaults.add_3rd_party)
+        .bind(
+            write
+                .channel_defaults
+                .participant_emails
+                .as_ref()
+                .map(|values| {
+                    values
+                        .iter()
+                        .map(|value| value.as_str())
+                        .collect::<Vec<_>>()
+                }),
+        )
+        .bind(write.channel_defaults.retrieve_company_memory)
+        .bind(write.channel_defaults.retrieve_agent_memory)
+        .bind(write.channel_defaults.retrieve_user_memory)
+        .bind(write.channel_defaults.persist_company_memory)
+        .bind(write.channel_defaults.persist_agent_memory)
+        .bind(write.channel_defaults.persist_user_memory)
         .bind(id)
         .fetch_one(&self.pool)
         .await
@@ -297,16 +382,44 @@ impl CompanyPersistence for PostgresPersistence {
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"UPDATE companies
                SET name = $1, slug = $2, enable_llm_spam_guardrail = $3,
-                   memory_provider = COALESCE($4, memory_provider), avatar_url = $5
-               WHERE id = $6 AND user_id = $7
+                   memory_provider = COALESCE($4, memory_provider), avatar_url = $5,
+                   default_add_3rd_party = $6, default_participant_emails = $7,
+                   default_retrieve_company_memory = $8, default_retrieve_agent_memory = $9,
+                   default_retrieve_user_memory = $10, default_persist_company_memory = $11,
+                   default_persist_agent_memory = $12, default_persist_user_memory = $13
+               WHERE id = $14 AND user_id = $15
                RETURNING id, user_id, name, slug,
-                         enable_llm_spam_guardrail, memory_provider, avatar_url, created_at"#,
+                         enable_llm_spam_guardrail, memory_provider,
+                         default_add_3rd_party, default_participant_emails,
+                         default_retrieve_company_memory, default_retrieve_agent_memory,
+                         default_retrieve_user_memory, default_persist_company_memory,
+                         default_persist_agent_memory, default_persist_user_memory,
+                         avatar_url, created_at"#,
         )
         .bind(&write.name)
         .bind(&write.slug)
         .bind(write.enable_llm_spam_guardrail)
         .bind(write.memory_provider.map(MemoryProviderKind::as_str))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
+        .bind(write.channel_defaults.add_3rd_party)
+        .bind(
+            write
+                .channel_defaults
+                .participant_emails
+                .as_ref()
+                .map(|values| {
+                    values
+                        .iter()
+                        .map(|value| value.as_str())
+                        .collect::<Vec<_>>()
+                }),
+        )
+        .bind(write.channel_defaults.retrieve_company_memory)
+        .bind(write.channel_defaults.retrieve_agent_memory)
+        .bind(write.channel_defaults.retrieve_user_memory)
+        .bind(write.channel_defaults.persist_company_memory)
+        .bind(write.channel_defaults.persist_agent_memory)
+        .bind(write.channel_defaults.persist_user_memory)
         .bind(id)
         .bind(user_id)
         .fetch_optional(&self.pool)

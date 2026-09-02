@@ -1206,6 +1206,7 @@ mod tests {
         let mine_channel = Uuid::new_v4();
 
         let company_of = |id: Uuid, user_id: Uuid, slug: &str| Company {
+            channel_defaults: Default::default(),
             id,
             user_id,
             name: slug.into(),
@@ -1216,6 +1217,7 @@ mod tests {
             created_at: Utc::now(),
         };
         let channel_of = |id: Uuid, company_id: Uuid| Channel {
+            owner_agent_id: None,
             id,
             company_id,
             name: "Reports".into(),
@@ -1348,6 +1350,7 @@ mod tests {
         let channel_id = Uuid::new_v4();
 
         let company = Company {
+            channel_defaults: Default::default(),
             id: company_id,
             user_id: owner_id,
             name: "Acme Corp".into(),
@@ -1359,6 +1362,7 @@ mod tests {
         };
 
         let channel = Channel {
+            owner_agent_id: None,
             id: channel_id,
             company_id,
             name: "Daily Reports".into(),
@@ -1379,6 +1383,7 @@ mod tests {
             created_at: Utc::now(),
         };
         let target_channel = Channel {
+            owner_agent_id: None,
             id: Uuid::new_v4(),
             name: "Planning".into(),
             slug: "planning".into(),

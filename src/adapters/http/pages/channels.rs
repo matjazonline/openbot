@@ -38,101 +38,6 @@ fn agent_radio_card(
     )
 }
 
-/// The form for creating an agent without leaving the channel page; hidden until the user asks for
-/// it, or shown pre-opened when a previous attempt failed.
-fn inline_agent_form(
-    company_id: Uuid,
-    container_id: &str,
-    inline_form_id: &str,
-    agents_selection_id: &str,
-    error_msg: Option<&str>,
-) -> String {
-    let form_hidden = if error_msg.is_some() { "" } else { "hidden" };
-    let error_html = match error_msg {
-        Some(msg) => format!(
-            r#"<div class="p-2 mb-2 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-xs">{msg}</div>"#,
-            msg = escape_html_text(msg),
-        ),
-        None => String::new(),
-    };
-    let inline_prompt_gen_html = render_ai_prompt_generator(
-        company_id,
-        &format!("inline_agent_system_prompt_{container_id}"),
-        &format!("inline_prompt_gen_box_{container_id}"),
-        &format!("inline_prompt_gen_input_{container_id}"),
-        &format!("inline_prompt_gen_status_{container_id}"),
-        &format!(", #inline_agent_provider_{container_id}, #inline_agent_model_{container_id}"),
-    );
-    let hx_post_val = format!("/companies/{company_id}/agents/inline?container_id={container_id}");
-    // Pre-built so the literals below stay clear of `"#`, which would close the raw string.
-    let hx_target_val = format!("#{agents_selection_id}");
-    let hx_include_val = format!("#{inline_form_id}");
-
-    format!(
-        r#"
-            <div id="{inline_form_id}" class="{form_hidden} bg-slate-800/90 border border-indigo-500/50 p-3.5 rounded-xl space-y-3 mt-2 shadow-inner">
-                <div class="flex items-center justify-between text-xs font-semibold text-indigo-300 border-b border-slate-700/60 pb-1.5">
-                    <span>Create Agent Inline</span>
-                    <span class="text-[10px] font-normal text-slate-400">Selected automatically after creation</span>
-                </div>
-                {error_html}
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-300 mb-0.5">Agent Name</label>
-                        <input type="text" id="inline_agent_name_{container_id}" name="inline_agent_name"
-                            data-input="slugify" data-slug-target="inline_agent_slug_{container_id}"
-                            class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            placeholder="Support Specialist">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-300 mb-0.5">Slug</label>
-                        <input type="text" id="inline_agent_slug_{container_id}" name="inline_agent_slug"
-                            class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs font-mono placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            placeholder="support-specialist">
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-300 mb-0.5">Provider (Optional)</label>
-                        <input type="text" id="inline_agent_provider_{container_id}" name="inline_agent_provider"
-                            class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs font-mono placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            placeholder="google, openai">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-300 mb-0.5">Model (Optional)</label>
-                        <input type="text" id="inline_agent_model_{container_id}" name="inline_agent_model"
-                            class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs font-mono placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            placeholder="gemini-2.5-flash">
-                    </div>
-                </div>
-                <div>
-                    {inline_prompt_gen_html}
-                    <textarea id="inline_agent_system_prompt_{container_id}" name="inline_agent_system_prompt" rows="2"
-                        class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        placeholder="You are a helpful support agent..."></textarea>
-                </div>
-                <div class="flex justify-end gap-2 pt-1">
-                    <button type="button"
-                        data-action="hide-element" data-target="{inline_form_id}"
-                        class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium rounded transition cursor-pointer">
-                        Cancel
-                    </button>
-                    <button type="button"
-                        hx-post="{hx_post_val}"
-                        hx-target="{hx_target_val}"
-                        hx-swap="outerHTML"
-                        hx-include="{hx_include_val}"
-                        hx-novalidate="true"
-                        formnovalidate
-                        class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded shadow transition cursor-pointer">
-                        Create & Select Agent
-                    </button>
-                </div>
-            </div>
-        "#
-    )
-}
-
 pub fn render_agents_selection_full(
     company_id: Uuid,
     agents: &[Agent],
@@ -145,7 +50,6 @@ pub fn render_agents_selection_full(
         _ => String::new(),
     };
     let agents_selection_id = format!("agents-selection-{container_id}");
-    let inline_form_id = format!("inline-agent-form-{container_id}");
     // Unique per render so several of these on one page don't share a radio group.
     let group_name = format!("agent_radio_{}_{}", container_id, Uuid::new_v4().simple());
 
@@ -199,13 +103,12 @@ pub fn render_agents_selection_full(
             .push_str(r#"<p class="text-xs text-slate-500">No custom company agents yet.</p>"#);
     }
 
-    let inline_form = inline_agent_form(
-        company_id,
-        container_id,
-        &inline_form_id,
-        &agents_selection_id,
-        error_msg,
-    );
+    let error_html = error_msg.map_or_else(String::new, |message| {
+        format!(
+            r#"<div class="alert alert-error text-xs">{}</div>"#,
+            escape_html_text(message)
+        )
+    });
 
     format!(
         r#"
@@ -216,13 +119,12 @@ pub fn render_agents_selection_full(
             </div>
 
             <div>
-                <button type="button"
-                    data-action="toggle-element" data-target="{inline_form_id}"
+                <a href="/ui/agents?company_id={company_id}&new=1"
                     class="text-xs text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer inline-flex items-center gap-1">
-                    <span>+ Create New Agent Inline</span>
-                </button>
+                    <span>Manage agents in the Agents workspace</span>
+                </a>
             </div>
-{inline_form}
+            {error_html}
         </div>
         "#
     )
@@ -691,6 +593,19 @@ pub fn channel_row_fragment(
     } else {
         r#"<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-600">Disabled</span>"#
     };
+    let delete_action = if channel.owner_agent_id.is_some() {
+        String::new()
+    } else {
+        format!(
+            r##"<button hx-delete="/companies/{company_id}/channels/{channel_id}" hx-target="#channel-{channel_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete channel '{name}'?"
+                        class="px-3 py-1.5 text-xs font-medium bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
+                        Delete
+                    </button>"##,
+            company_id = company.id,
+            channel_id = channel.id,
+            name = escape_html_attr(&channel.name),
+        )
+    };
 
     format!(
         r##"
@@ -721,10 +636,7 @@ pub fn channel_row_fragment(
                         class="px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition cursor-pointer">
                         Edit
                     </button>
-                    <button hx-delete="/companies/{company_id}/channels/{channel_id}" hx-target="#channel-{channel_id}" hx-swap="outerHTML" hx-confirm="Are you sure you want to delete channel '{name}'?"
-                        class="px-3 py-1.5 text-xs font-medium bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-800/50 rounded-lg transition cursor-pointer">
-                        Delete
-                    </button>
+                    {delete_action}
                 </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs bg-slate-950/60 p-3 rounded-lg border border-slate-800 font-mono">
@@ -768,6 +680,7 @@ pub fn channel_row_fragment(
         assigned_agents_str = escape_html_text(&assigned_agents_str),
         emails_str = escape_html_text(&emails_str),
         config_str = escape_html_text(config_str),
+        delete_action = delete_action,
     )
 }
 
@@ -783,12 +696,41 @@ pub fn channel_edit_fragment(
         None => String::new(),
     };
     let alias_slugs_str = super::channel_settings::stored_alias_slugs(channel);
-    let agents_selection_html = render_agents_selection(
-        company.id,
-        agents,
-        channel.agent_ids.as_deref(),
-        &channel.id.to_string(),
+    let owner = channel
+        .owner_agent_id
+        .and_then(|owner_id| agents.iter().find(|agent| agent.id == owner_id));
+    let agents_selection_html = owner.map_or_else(
+        || {
+            render_agents_selection(
+                company.id,
+                agents,
+                channel.agent_ids.as_deref(),
+                &channel.id.to_string(),
+            )
+        },
+        |owner| {
+            format!(
+                r#"<input type="hidden" name="agent_ids" value="{owner_id}"><p class="rounded-lg border border-slate-700 bg-slate-800 p-3 text-xs"><span class="font-medium">{owner_name}</span> <span class="font-mono text-slate-400">@{owner_slug}</span><span class="mt-1 block text-slate-400">The owner remains the position-0 agent while this channel is enabled or disabled.</span></p>"#,
+                owner_id = owner.id,
+                owner_name = escape_html_text(&owner.name),
+                owner_slug = escape_html_text(&owner.slug),
+            )
+        },
     );
+    let slug_readonly = if owner.is_some() { " readonly" } else { "" };
+    let name_slug_behavior = if owner.is_some() {
+        ""
+    } else {
+        r#" data-input="slugify""#
+    };
+    let slug_help = owner.map_or_else(String::new, |owner| {
+        format!(
+            r#"<p class="mt-1 text-[11px] text-slate-400">The primary address follows the agent handle. <a class="text-indigo-300" href="/ui/agents?company_id={}&amp;agent_id={}">Rename {} in Agents</a>.</p>"#,
+            company.id,
+            owner.id,
+            escape_html_text(&owner.name),
+        )
+    });
     let is_public = channel
         .participant_emails
         .as_ref()
@@ -809,14 +751,14 @@ pub fn channel_edit_fragment(
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Channel Name</label>
-                    <input type="text" name="name" value="{name}" required
-                        data-input="slugify"
+                    <input type="text" name="name" value="{name}" required{name_slug_behavior}
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Slug (@{company_slug}.{app_domain_name})</label>
-                    <input type="text" name="slug" value="{slug}" required
+                    <input type="text" name="slug" value="{slug}" required{slug_readonly}
                         class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
+                    {slug_help}
                 </div>
             </div>
 
@@ -877,7 +819,10 @@ pub fn channel_edit_fragment(
         channel_id = channel.id,
         company_id = company.id,
         name = escape_html_attr(&channel.name),
+        name_slug_behavior = name_slug_behavior,
         slug = escape_html_attr(&channel.slug),
+        slug_readonly = slug_readonly,
+        slug_help = slug_help,
         enabled_checked = if channel.enabled { "checked" } else { "" },
         add_3rd_party_checked = if channel.add_3rd_party { "checked" } else { "" },
         company_slug = escape_html_text(&company.slug),
@@ -888,7 +833,11 @@ pub fn channel_edit_fragment(
 }
 
 fn classic_memory_fields(memory_available: bool, channel: Option<&Channel>) -> String {
-    let disabled = if memory_available { "" } else { " disabled" };
+    let state_notice = if memory_available {
+        "The selected provider is ready; grants are effective when agent policy also permits memory."
+    } else {
+        "Grants can be saved now and remain inactive until the selected company provider is ready."
+    };
     let checked = |enabled: bool| if enabled { " checked" } else { "" };
     let retrieve_company = checked(channel.is_some_and(|c| c.retrieve_company_memory));
     let retrieve_agent = checked(channel.is_some_and(|c| c.retrieve_agent_memory));
@@ -897,22 +846,22 @@ fn classic_memory_fields(memory_available: bool, channel: Option<&Channel>) -> S
     let persist_agent = checked(channel.is_some_and(|c| c.persist_agent_memory));
     let persist_user = checked(channel.is_some_and(|c| c.persist_user_memory));
     format!(
-        r##"<fieldset class="rounded-lg border border-slate-700 bg-slate-800/50 p-4"{disabled}>
+        r##"<fieldset class="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
                 <legend class="px-1 text-xs font-semibold text-slate-300">Memory</legend>
-                <p class="mb-3 text-[11px] text-slate-400">Enable recall and persistence by scope after the company provider is ready.</p>
+                <p class="mb-3 text-[11px] text-slate-400">{state_notice} User memory includes authorized external senders and remains isolated to this company.</p>
                 <div class="grid max-w-sm grid-cols-4 items-center gap-x-2 gap-y-2 text-xs text-slate-300">
                     <span></span>
                     <span class="text-center">Company</span>
                     <span class="text-center">Agent</span>
                     <span class="text-center">User</span>
                     <span>Retrieve</span>
-                    <input aria-label="Retrieve company memory" type="checkbox" name="retrieve_company_memory" value="true" class="justify-self-center"{retrieve_company}{disabled}>
-                    <input aria-label="Retrieve agent memory" type="checkbox" name="retrieve_agent_memory" value="true" class="justify-self-center"{retrieve_agent}{disabled}>
-                    <input aria-label="Retrieve user memory" type="checkbox" name="retrieve_user_memory" value="true" class="justify-self-center"{retrieve_user}{disabled}>
+                    <input aria-label="Retrieve company memory" type="checkbox" name="retrieve_company_memory" value="true" class="justify-self-center"{retrieve_company}>
+                    <input aria-label="Retrieve agent memory" type="checkbox" name="retrieve_agent_memory" value="true" class="justify-self-center"{retrieve_agent}>
+                    <input aria-label="Retrieve user memory" type="checkbox" name="retrieve_user_memory" value="true" class="justify-self-center"{retrieve_user}>
                     <span>Persist</span>
-                    <input aria-label="Persist company memory" type="checkbox" name="persist_company_memory" value="true" class="justify-self-center"{persist_company}{disabled}>
-                    <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true" class="justify-self-center"{persist_agent}{disabled}>
-                    <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true" class="justify-self-center"{persist_user}{disabled}>
+                    <input aria-label="Persist company memory" type="checkbox" name="persist_company_memory" value="true" class="justify-self-center"{persist_company}>
+                    <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true" class="justify-self-center"{persist_agent}>
+                    <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true" class="justify-self-center"{persist_user}>
                 </div>
             </fieldset>"##,
     )

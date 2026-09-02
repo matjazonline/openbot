@@ -282,18 +282,7 @@ async fn create_channel(
         Ok(agent) => agent,
         Err(message) => return rejected(message),
     };
-    let agent_ids = match resolve_channel_agents(
-        &workspace.agent_use_cases,
-        &submitted.form,
-        &submitted.slug,
-        workspace.user_id,
-        company.id,
-    )
-    .await
-    {
-        Ok(agent_ids) => agent_ids,
-        Err(message) => return rejected(message),
-    };
+    let agent_ids = resolve_channel_agents(&submitted.form);
     let write = match submitted.write(agent_ids) {
         Ok(write) => write,
         Err(message) => return rejected(message),
@@ -615,14 +604,18 @@ impl ChannelSettingsView<'_> {
 ///
 /// It also owns the two derivations every write needs — the slug the name falls back to, and the
 /// parsed agent list — so neither is re-derived at a call site.
-struct SubmittedChannel {
-    form: ChannelForm,
+///
+/// Visible to the rest of `routes` because the Agents workspace's create form ends on a channel
+/// step: the channel half of that submit is this same form, and parsing it the same way is what
+/// keeps the two panes from drifting on what a submitted channel means.
+pub(super) struct SubmittedChannel {
+    pub form: ChannelForm,
     slug: String,
     agent_ids: Vec<Uuid>,
 }
 
 impl SubmittedChannel {
-    fn new(form: ChannelForm) -> Self {
+    pub(super) fn new(form: ChannelForm) -> Self {
         let slug = form
             .slug
             .as_deref()
@@ -639,7 +632,7 @@ impl SubmittedChannel {
         }
     }
 
-    fn draft(&self) -> pages::ChannelDraft<'_> {
+    pub(super) fn draft(&self) -> pages::ChannelDraft<'_> {
         pages::ChannelDraft {
             name: &self.form.name,
             description: self.form.description.as_deref().unwrap_or(""),
@@ -661,7 +654,7 @@ impl SubmittedChannel {
     }
 
     /// The write this submission asks for. Create may mint an agent while update reuses the list.
-    fn write(&self, agent_ids: Option<Vec<Uuid>>) -> Result<ChannelWrite, String> {
+    pub(super) fn write(&self, agent_ids: Option<Vec<Uuid>>) -> Result<ChannelWrite, String> {
         let memory = self.form.memory_settings()?;
         Ok(ChannelWrite {
             name: self.form.name.clone(),

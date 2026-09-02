@@ -408,6 +408,7 @@ mod tests {
 
     fn company() -> Company {
         Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme".to_string(),
@@ -421,6 +422,7 @@ mod tests {
 
     fn library_agent(name: &str, slug: &str) -> Agent {
         Agent {
+            memory_enabled: false,
             memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
             memory_max_results: 5,
@@ -453,6 +455,7 @@ mod tests {
             company_membership: CompanyMembership::Owner,
         };
         let channel = Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: Uuid::new_v4(),

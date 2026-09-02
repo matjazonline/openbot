@@ -28,6 +28,9 @@ pub struct Agent {
     /// the agent directory tool. Not part of the prompt.
     pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
+    /// Master policy switch for every memory scope used by this agent.
+    #[serde(default)]
+    pub memory_enabled: bool,
     #[serde(default)]
     pub memory_persistence_mode: MemoryPersistenceMode,
     #[serde(default)]

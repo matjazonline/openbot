@@ -63,6 +63,9 @@ impl ParticipantIdentity {
 pub struct Channel {
     pub id: Uuid,
     pub company_id: Uuid,
+    /// The agent whose personal address this channel is, or `None` for standalone channels.
+    #[serde(default)]
+    pub owner_agent_id: Option<Uuid>,
     pub name: String,
     /// What this channel is for, in one line, as its owner wrote it.
     ///
@@ -218,6 +221,16 @@ impl Channel {
         std::iter::once(&self.slug).chain(self.alias_slugs.iter())
     }
 
+    /// Whether this channel is the given agent's personal address.
+    ///
+    /// The single definition of the ownership test: an owned channel's slug follows its owner's
+    /// handle, its owner is pinned at position 0, and it can only be deleted through that agent —
+    /// so the pages and use cases that special-case any of those all ask this rather than
+    /// re-comparing `owner_agent_id` themselves.
+    pub fn is_owned_by(&self, agent_id: Uuid) -> bool {
+        self.owner_agent_id == Some(agent_id)
+    }
+
     /// The single definition of "does this addressed slug reach this channel".
     pub fn matches_slug(&self, slug: &str) -> bool {
         self.slugs().any(|own| own.eq_ignore_ascii_case(slug))
@@ -263,6 +276,7 @@ mod tests {
     /// A channel whose participant list is the only thing under test.
     fn channel_for(participants: Option<&[&str]>) -> Channel {
         Channel {
+            owner_agent_id: None,
             participant_emails: participants.map(|list| {
                 list.iter()
                     .map(|email| EmailAddress::from(*email))
@@ -412,6 +426,7 @@ mod tests {
 
     fn channel_with_aliases(aliases: &[&str]) -> Channel {
         Channel {
+            owner_agent_id: None,
             id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
             name: "Support".to_string(),

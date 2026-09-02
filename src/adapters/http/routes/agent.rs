@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use axum::{
     Form, Json, Router,
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::StatusCode,
     response::{Html, IntoResponse},
     routing::{get, post, put},
@@ -17,23 +17,24 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
+        channel::Channel,
         memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
         value_objects::AvatarUrl,
     },
-    use_cases::{agent::AgentUseCases, company::CompanyUseCases},
+    use_cases::{
+        agent::{AgentUseCases, ProvisioningWarning},
+        company::CompanyUseCases,
+    },
 };
 
 use super::channel::{parse_config_form, slugify};
+use super::task::deserialize_empty_string_as_none;
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route(
             "/companies/{company_id}/agents",
             get(list_agents_page).post(create_agent_handler),
-        )
-        .route(
-            "/companies/{company_id}/agents/inline",
-            post(create_agent_inline_handler),
         )
         .route(
             "/companies/{company_id}/agents/{id}",
@@ -74,14 +75,21 @@ pub struct AgentForm {
     pub slug: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
+    /// Left blank to inherit the deployment default. A blank number input posts `""`, which
+    /// plain `Option<u32>` rejects with a 422 before the handler ever runs, so it is parsed the
+    /// same way every other optional form number is.
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub run_timeout_secs: Option<u32>,
     pub system_prompt: Option<String>,
     /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
     pub description: Option<String>,
     pub config_json: Option<String>,
     pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub memory_enabled: bool,
     pub memory_persistence_mode: Option<MemoryPersistenceMode>,
     pub memory_recall_mode: Option<MemoryRecallMode>,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub memory_max_results: Option<u8>,
     /// `"simple"` means `system_prompt` holds instructions to expand, not the prompt itself.
     pub form_mode: Option<String>,
@@ -108,33 +116,6 @@ impl AgentForm {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct InlineAgentQuery {
-    #[serde(default = "default_container_id")]
-    pub container_id: String,
-}
-
-fn default_container_id() -> String {
-    "new".to_string()
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct InlineAgentForm {
-    pub inline_agent_name: Option<String>,
-    pub inline_agent_slug: Option<String>,
-    pub inline_agent_provider: Option<String>,
-    pub inline_agent_model: Option<String>,
-    pub inline_agent_system_prompt: Option<String>,
-    pub inline_agent_config_json: Option<String>,
-
-    pub name: Option<String>,
-    pub slug: Option<String>,
-    pub provider: Option<String>,
-    pub model: Option<String>,
-    pub system_prompt: Option<String>,
-    pub config_json: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
 pub struct AgentJsonPayload {
     pub name: String,
     pub slug: String,
@@ -146,6 +127,8 @@ pub struct AgentJsonPayload {
     pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
     pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub memory_enabled: bool,
     #[serde(default)]
     pub memory_persistence_mode: MemoryPersistenceMode,
     #[serde(default)]
@@ -165,6 +148,10 @@ impl AgentJsonPayload {
 pub struct AgentResponse {
     pub success: bool,
     pub agent: Agent,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel: Option<Channel>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<ProvisioningWarning>,
 }
 
 /// What an agent answers with when it should not take the company's LLM settings.
@@ -190,16 +177,15 @@ pub(super) struct AgentInstructionRequest<'a> {
 
 /// An agent built from plain-language instructions rather than a written system prompt.
 ///
-/// Shared by the `/ui` Agents workspace's Simple tab and by
-/// [`super::channel::resolve_channel_agents`], so "type instructions, get a working agent" means
-/// one thing wherever it is offered.
+/// Used by the `/ui` Agents workspace's Simple tab so prompt expansion and atomic address
+/// provisioning share the same model-validation path as Advanced creation.
 pub(super) async fn create_agent_from_instructions(
     agent_use_cases: &AgentUseCases,
     request: AgentInstructionRequest<'_>,
-) -> Result<Agent, String> {
+) -> Result<crate::use_cases::agent::ProvisionedAgent, String> {
     let write = agent_write_from_instructions(agent_use_cases, request).await?;
     agent_use_cases
-        .create_agent(request.user_id, request.company_id, write)
+        .create_addressable_agent(request.user_id, request.company_id, write)
         .await
         .map_err(|err| format!("Failed to create agent: {err}"))
 }
@@ -288,7 +274,7 @@ async fn create_agent_handler(
     };
 
     match agent_use_cases
-        .create_agent(
+        .create_addressable_agent(
             user.id,
             company_id,
             AgentWrite {
@@ -300,6 +286,7 @@ async fn create_agent_handler(
                 system_prompt: form.system_prompt.clone(),
                 description: form.description.clone(),
                 config_json,
+                memory_enabled: form.memory_enabled,
                 memory_persistence_mode: form.memory_persistence_mode.unwrap_or_default(),
                 memory_recall_mode: form.memory_recall_mode.unwrap_or_default(),
                 memory_max_results: form
@@ -311,12 +298,20 @@ async fn create_agent_handler(
         )
         .await
     {
-        Ok(_) => {
+        Ok(provisioned) => {
             let agents = agent_use_cases
                 .list_company_agents(user.id, company_id)
                 .await
                 .unwrap_or_default();
-            Html(pages::agent_list_fragment(&company, &agents))
+            let warnings = provisioned
+                .warnings
+                .iter()
+                .map(|warning| pages::error_alert(&warning.message))
+                .collect::<String>();
+            Html(format!(
+                "{warnings}{}",
+                pages::agent_list_fragment(&company, &agents)
+            ))
         }
         Err(err) => {
             let error_html = pages::error_alert(&format!("Failed to create agent: {err}"));
@@ -328,126 +323,6 @@ async fn create_agent_handler(
                 "{}{}",
                 error_html,
                 pages::agent_list_fragment(&company, &agents)
-            ))
-        }
-    }
-}
-
-/// POST /companies/{company_id}/agents/inline - HTMX inline agent creation for channel page (Protected).
-#[instrument(skip(company_use_cases, agent_use_cases, user, form))]
-async fn create_agent_inline_handler(
-    State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
-    user: AuthenticatedUser,
-    Path(company_id): Path<Uuid>,
-    Query(query): Query<InlineAgentQuery>,
-    Form(form): Form<InlineAgentForm>,
-) -> impl IntoResponse {
-    let _company = match company_use_cases.get_company(company_id).await {
-        Ok(Some(c)) => c,
-        _ => {
-            let agents = agent_use_cases
-                .list_company_agents(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            return Html(pages::render_agents_selection_full(
-                company_id,
-                &agents,
-                None,
-                &query.container_id,
-                Some("Company not found."),
-            ));
-        }
-    };
-
-    let name = form
-        .inline_agent_name
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| form.name.filter(|s| !s.trim().is_empty()))
-        .unwrap_or_default();
-
-    let slug = form
-        .inline_agent_slug
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| form.slug.filter(|s| !s.trim().is_empty()))
-        .unwrap_or_default();
-
-    let provider = form
-        .inline_agent_provider
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| form.provider.filter(|s| !s.trim().is_empty()));
-
-    let model = form
-        .inline_agent_model
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| form.model.filter(|s| !s.trim().is_empty()));
-
-    let system_prompt = form
-        .inline_agent_system_prompt
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| form.system_prompt.filter(|s| !s.trim().is_empty()));
-
-    let config_json_raw = form
-        .inline_agent_config_json
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| form.config_json.filter(|s| !s.trim().is_empty()));
-
-    let config_json = match parse_config_form(config_json_raw) {
-        Ok(c) => c,
-        Err(err) => {
-            let agents = agent_use_cases
-                .list_company_agents(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            return Html(pages::render_agents_selection_full(
-                company_id,
-                &agents,
-                None,
-                &query.container_id,
-                Some(&err),
-            ));
-        }
-    };
-
-    match agent_use_cases
-        .create_agent(
-            user.id,
-            company_id,
-            AgentWrite {
-                name: name.clone(),
-                slug: slug.clone(),
-                provider: provider.clone(),
-                model: model.clone(),
-                system_prompt: system_prompt.clone(),
-                config_json,
-                ..AgentWrite::default()
-            },
-        )
-        .await
-    {
-        Ok(agent) => {
-            let agents = agent_use_cases
-                .list_company_agents(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            Html(pages::render_agents_selection(
-                company_id,
-                &agents,
-                Some(&[agent.id]),
-                &query.container_id,
-            ))
-        }
-        Err(err) => {
-            let agents = agent_use_cases
-                .list_company_agents(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            Html(pages::render_agents_selection_full(
-                company_id,
-                &agents,
-                None,
-                &query.container_id,
-                Some(&format!("Failed to create agent: {err}")),
             ))
         }
     }
@@ -535,6 +410,7 @@ async fn update_agent_handler(
                 system_prompt: form.system_prompt.clone(),
                 description: form.description.clone(),
                 config_json,
+                memory_enabled: form.memory_enabled,
                 memory_persistence_mode: form.memory_persistence_mode.unwrap_or_default(),
                 memory_recall_mode: form.memory_recall_mode.unwrap_or_default(),
                 memory_max_results: form
@@ -585,8 +461,8 @@ async fn create_agent_json(
 ) -> AppResult<impl IntoResponse> {
     let avatar_url = payload.avatar_url().map_err(AppError::BadRequest)?;
 
-    let agent = agent_use_cases
-        .create_agent(
+    let provisioned = agent_use_cases
+        .create_addressable_agent(
             user.id,
             company_id,
             AgentWrite {
@@ -598,6 +474,7 @@ async fn create_agent_json(
                 system_prompt: payload.system_prompt.clone(),
                 description: payload.description.clone(),
                 config_json: payload.config_json.clone(),
+                memory_enabled: payload.memory_enabled,
                 memory_persistence_mode: payload.memory_persistence_mode,
                 memory_recall_mode: payload.memory_recall_mode,
                 memory_max_results: payload.memory_max_results,
@@ -611,7 +488,9 @@ async fn create_agent_json(
         StatusCode::CREATED,
         Json(AgentResponse {
             success: true,
-            agent,
+            agent: provisioned.agent,
+            channel: Some(provisioned.channel),
+            warnings: provisioned.warnings,
         }),
     ))
 }
@@ -653,6 +532,7 @@ async fn update_agent_json(
                 system_prompt: payload.system_prompt.clone(),
                 description: payload.description.clone(),
                 config_json: payload.config_json.clone(),
+                memory_enabled: payload.memory_enabled,
                 memory_persistence_mode: payload.memory_persistence_mode,
                 memory_recall_mode: payload.memory_recall_mode,
                 memory_max_results: payload.memory_max_results,
@@ -667,6 +547,8 @@ async fn update_agent_json(
         Json(AgentResponse {
             success: true,
             agent,
+            channel: None,
+            warnings: Vec::new(),
         }),
     ))
 }
@@ -691,8 +573,6 @@ pub struct GeneratePromptForm {
     pub prompt: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
-    pub inline_agent_provider: Option<String>,
-    pub inline_agent_model: Option<String>,
     pub target_id: Option<String>,
     pub gen_box_id: Option<String>,
 }
@@ -733,14 +613,8 @@ pub async fn generate_agent_prompt_handler(
             .into_response());
     }
 
-    let provider_override = form
-        .provider
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| form.inline_agent_provider.filter(|s| !s.trim().is_empty()));
-    let model_override = form
-        .model
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| form.inline_agent_model.filter(|s| !s.trim().is_empty()));
+    let provider_override = form.provider.filter(|s| !s.trim().is_empty());
+    let model_override = form.model.filter(|s| !s.trim().is_empty());
     let target_id = form
         .target_id
         .unwrap_or_else(|| "agent_system_prompt".to_string());
@@ -815,9 +689,49 @@ mod tests {
 
     use super::*;
 
+    /// A blank number input posts `name=`, and plain `Option<u32>`/`Option<u8>` answer that with
+    /// a 422 before the handler runs -- which is what "leave blank to inherit" used to do.
+    #[tokio::test]
+    async fn blank_optional_numbers_mean_absent_rather_than_a_rejected_form() {
+        async fn parse(body: &'static str) -> Result<AgentForm, StatusCode> {
+            use axum::extract::{FromRequest, Request};
+
+            let request = Request::post("/ui/agents")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(axum::body::Body::from(body))
+                .unwrap();
+
+            Form::<AgentForm>::from_request(request, &())
+                .await
+                .map(|Form(form)| form)
+                .map_err(|rejection| rejection.status())
+        }
+
+        let form = parse(
+            "name=Support&system_prompt=Help&run_timeout_secs=&memory_max_results=&form_mode=simple",
+        )
+        .await
+        .expect("a blank number field is an omitted one");
+        assert_eq!(form.run_timeout_secs, None);
+        assert_eq!(form.memory_max_results, None);
+
+        let filled = parse("name=Support&run_timeout_secs=90&memory_max_results=7")
+            .await
+            .expect("a filled number field still parses");
+        assert_eq!(filled.run_timeout_secs, Some(90));
+        assert_eq!(filled.memory_max_results, Some(7));
+
+        assert_eq!(
+            parse("name=Support&run_timeout_secs=soon").await.err(),
+            Some(StatusCode::UNPROCESSABLE_ENTITY),
+            "a non-numeric timeout is still a bad form, not a silent None"
+        );
+    }
+
     #[test]
     fn agent_pages_and_fragments_render_correctly() {
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
@@ -829,6 +743,7 @@ mod tests {
         };
 
         let agent = Agent {
+            memory_enabled: false,
             memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
             memory_max_results: 5,
@@ -872,10 +787,10 @@ mod tests {
             "new",
         );
         assert!(selection_html.contains("agents-selection-new"));
-        assert!(selection_html.contains("inline-agent-form-new"));
-        assert!(selection_html.contains("/companies/"));
-        assert!(selection_html.contains("/agents/inline?container_id=new"));
-        assert!(selection_html.contains("Create & Select Agent"));
+        assert!(!selection_html.contains("inline-agent-form-new"));
+        assert!(!selection_html.contains("/agents/inline"));
+        assert!(selection_html.contains("/ui/agents?company_id="));
+        assert!(selection_html.contains("Manage agents in the Agents workspace"));
         assert!(selection_html.contains("checked"));
 
         let selection_error_html = pages::render_agents_selection_full(
@@ -887,37 +802,6 @@ mod tests {
         );
         assert!(selection_error_html.contains("Slug is already taken"));
         assert!(selection_error_html.contains("agents-selection-wf-1"));
-    }
-
-    #[tokio::test]
-    async fn test_inline_agent_form_deserialization_with_parent_channel_fields() {
-        use axum::body::Body;
-        use axum::extract::FromRequest;
-        use axum::http::{Request, header};
-
-        let req = Request::builder()
-            .method("POST")
-            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(Body::from("name=&slug=&inline_agent_name=Billing+Bot&inline_agent_slug=billing-bot&inline_agent_provider=openai"))
-            .unwrap();
-        let form = Form::<InlineAgentForm>::from_request(req, &())
-            .await
-            .unwrap()
-            .0;
-
-        let name = form
-            .inline_agent_name
-            .filter(|s| !s.trim().is_empty())
-            .or_else(|| form.name.filter(|s| !s.trim().is_empty()))
-            .unwrap_or_default();
-        let slug = form
-            .inline_agent_slug
-            .filter(|s| !s.trim().is_empty())
-            .or_else(|| form.slug.filter(|s| !s.trim().is_empty()))
-            .unwrap_or_default();
-
-        assert_eq!(name, "Billing Bot");
-        assert_eq!(slug, "billing-bot");
     }
 
     #[test]

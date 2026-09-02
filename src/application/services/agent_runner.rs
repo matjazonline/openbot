@@ -1499,6 +1499,7 @@ mod tests {
     #[tokio::test]
     async fn test_agent_runner_returns_error_when_model_missing() -> anyhow::Result<()> {
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
@@ -1524,6 +1525,7 @@ mod tests {
     #[tokio::test]
     async fn test_agent_runner_returns_error_when_api_key_missing() -> anyhow::Result<()> {
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
@@ -1549,6 +1551,7 @@ mod tests {
     #[tokio::test]
     async fn test_agent_runner_accepts_api_key_provider_and_model() -> anyhow::Result<()> {
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
@@ -1567,6 +1570,7 @@ mod tests {
     #[tokio::test]
     async fn test_agent_runner_uses_entity_model_override() -> anyhow::Result<()> {
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),
@@ -1622,6 +1626,7 @@ mod tests {
     #[test]
     fn test_resolve_agent_params_company_only() {
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
@@ -1768,6 +1773,7 @@ mod tests {
 
     fn agent_selecting(provider: Option<&str>, model: Option<&str>) -> AgentEntity {
         AgentEntity {
+            memory_enabled: false,
             id: Uuid::new_v4(),
             company_id: None,
             name: "Selector".into(),
@@ -1789,6 +1795,7 @@ mod tests {
 
     fn resolving_company() -> Company {
         Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
@@ -1912,6 +1919,7 @@ mod tests {
     #[test]
     fn test_resolve_agent_params_validates_provider() {
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
@@ -1949,6 +1957,7 @@ mod tests {
     #[test]
     fn test_resolve_agent_params_uses_agent_system_prompt_when_config_system_prompt_empty() {
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
@@ -1960,6 +1969,7 @@ mod tests {
         };
 
         let agent = AgentEntity {
+            memory_enabled: false,
             memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
             memory_max_results: 5,
@@ -1994,6 +2004,7 @@ mod tests {
     #[test]
     fn test_resolve_agent_params_defaults_system_prompt_when_empty() {
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
@@ -2358,6 +2369,7 @@ system_prompt: Hello
 
     fn agent_channel(company_id: Uuid, slug: &str) -> Channel {
         Channel {
+            owner_agent_id: None,
             id: Uuid::new_v4(),
             company_id,
             name: slug.to_string(),
@@ -2513,6 +2525,7 @@ system_prompt: Hello
 
     fn prompt_params() -> ResolvedAgentParams {
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test".to_string(),

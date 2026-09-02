@@ -879,6 +879,7 @@ mod tests {
 
     fn test_company() -> Company {
         Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Schedule Corp".into(),

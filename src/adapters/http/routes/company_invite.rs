@@ -525,6 +525,7 @@ mod tests {
     #[test]
     fn company_invites_page_renders_html_components() {
         let company = crate::entities::company::Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test Company".to_string(),

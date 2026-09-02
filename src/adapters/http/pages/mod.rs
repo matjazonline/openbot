@@ -18,7 +18,8 @@ use crate::entities::{
     correlation::CorrelationId,
     memory::{
         MEMORY_READINESS_TIMEOUT_ERROR, MemoryConnection, MemoryConnectionReadiness,
-        MemoryProviderKind, MemoryProvisioningPhase,
+        MemoryPersistenceMode, MemoryProviderKind, MemoryProvisioningPhase, MemoryRecallMode,
+        default_memory_max_results,
     },
     message::{AttachmentMetadata, Message, MessageDirection, MessageRole},
     outbox::{OutboxEntry, OutboxFilter, OutboxStatus},

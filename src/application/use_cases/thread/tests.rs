@@ -822,6 +822,7 @@ async fn test_inter_channel_hop_limit_rejection() {
     let source_channel_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -835,6 +836,7 @@ async fn test_inter_channel_hop_limit_rejection() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_id,
@@ -855,6 +857,7 @@ async fn test_inter_channel_hop_limit_rejection() {
                 created_at: Utc::now(),
             },
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: source_channel_id,
@@ -962,6 +965,7 @@ async fn test_spf_authentication_failure_rejection() {
     let channel_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -974,6 +978,7 @@ async fn test_spf_authentication_failure_rejection() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1069,6 +1074,7 @@ async fn test_high_spam_score_rejection() {
     let channel_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -1081,6 +1087,7 @@ async fn test_high_spam_score_rejection() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1174,6 +1181,7 @@ async fn test_dmarc_authentication_failure_rejection() {
     let channel_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -1186,6 +1194,7 @@ async fn test_dmarc_authentication_failure_rejection() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1279,6 +1288,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
     let channel_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -1291,6 +1301,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1385,6 +1396,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
     let channel_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -1397,6 +1409,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1489,6 +1502,7 @@ async fn test_channel_in_cc_resolves_properly() {
     let channel_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -1501,6 +1515,7 @@ async fn test_channel_in_cc_resolves_properly() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1598,6 +1613,7 @@ async fn test_multi_channel_to_and_cc_execution() {
     let wf2_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -1611,6 +1627,7 @@ async fn test_multi_channel_to_and_cc_execution() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf1_id,
@@ -1631,6 +1648,7 @@ async fn test_multi_channel_to_and_cc_execution() {
                 created_at: Utc::now(),
             },
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf2_id,
@@ -1740,6 +1758,7 @@ async fn test_pipeline_address_chaining_execution() {
     let wf3_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -1753,6 +1772,7 @@ async fn test_pipeline_address_chaining_execution() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf1_id,
@@ -1773,6 +1793,7 @@ async fn test_pipeline_address_chaining_execution() {
                 created_at: Utc::now(),
             },
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf2_id,
@@ -1793,6 +1814,7 @@ async fn test_pipeline_address_chaining_execution() {
                 created_at: Utc::now(),
             },
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf3_id,
@@ -1894,6 +1916,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     let company_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -1907,6 +1930,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),
@@ -1927,6 +1951,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 created_at: Utc::now(),
             },
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),
@@ -2049,6 +2074,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
     let channel_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -2061,6 +2087,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -2199,6 +2226,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
     let company_id = Uuid::new_v4();
     let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
         vec![Company {
+            channel_defaults: Default::default(),
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
@@ -2218,6 +2246,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: flow_team_only,
@@ -2238,6 +2267,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 created_at: Utc::now(),
             },
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: flow_public,
@@ -2258,6 +2288,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 created_at: Utc::now(),
             },
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: flow_explicit,
@@ -2405,6 +2436,7 @@ async fn test_sender_verification_and_delegation_target_check() {
     let channel_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -2417,6 +2449,7 @@ async fn test_sender_verification_and_delegation_target_check() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -2595,6 +2628,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
     let channel_a_id = Uuid::new_v4();
     let channel_b_id = Uuid::new_v4();
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -2607,6 +2641,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_a_id,
@@ -2627,6 +2662,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
                 created_at: Utc::now(),
             },
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_b_id,
@@ -2796,6 +2832,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
     let channel_a_id = Uuid::new_v4();
     let channel_b_id = Uuid::new_v4();
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -2808,6 +2845,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_a_id,
@@ -2828,6 +2866,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 created_at: Utc::now(),
             },
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_b_id,
@@ -2903,6 +2942,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
     let channel_a_id = Uuid::new_v4();
     let channel_b_id = Uuid::new_v4();
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -2915,6 +2955,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_a_id,
@@ -2935,6 +2976,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 created_at: Utc::now(),
             },
             Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_b_id,
@@ -3011,6 +3053,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
 
     let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
         vec![Company {
+            channel_defaults: Default::default(),
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
@@ -3025,6 +3068,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -3229,6 +3273,7 @@ async fn test_context_only_quiet_mode_ingestion() {
 
     let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
         vec![Company {
+            channel_defaults: Default::default(),
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
@@ -3243,6 +3288,7 @@ async fn test_context_only_quiet_mode_ingestion() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -3404,6 +3450,7 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
 
     let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
         vec![Company {
+            channel_defaults: Default::default(),
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
@@ -3418,6 +3465,7 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
             enabled,
             add_3rd_party,
             id: channel_id,
@@ -3588,6 +3636,7 @@ async fn a_cc_d_channel_runs_for_its_assigned_agent_slug() {
     let thread_use_cases =
         thread_use_cases.with_agent_persistence(Arc::new(MockAgentPersistence {
             agents: vec![Agent {
+                memory_enabled: false,
                 memory_persistence_mode:
                     crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
                 memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
@@ -4021,6 +4070,7 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
 
     let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
         vec![Company {
+            channel_defaults: Default::default(),
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
@@ -4036,6 +4086,7 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
     let channels = specs
         .into_iter()
         .map(|spec| Channel {
+            owner_agent_id: None,
             id: Uuid::new_v4(),
             company_id,
             name: spec.name.to_string(),
@@ -4256,6 +4307,7 @@ async fn a_channel_without_its_own_description_borrows_its_agent_s() {
             },
         ],
         vec![Agent {
+            memory_enabled: false,
             memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
             memory_max_results: 5,
@@ -4529,6 +4581,7 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
     // No provider anywhere -- not on the company, the channel, or an agent -- so resolving the
     // run's parameters fails and stands in for any provider-side failure.
     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
         id: company_id,
         user_id: Uuid::new_v4(),
         name: "Acme Corp".to_string(),
@@ -4541,6 +4594,7 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,

@@ -59,6 +59,7 @@ fn legacy_approval_prompts_escape_every_external_field() {
 fn legacy_agent_json_and_confirmation_attribute_are_escaped() {
     let company = mailbox_company();
     let agent = Agent {
+        memory_enabled: false,
         config_json: Some(json!({"label": "</span><script>alert(1)</script>"})),
         system_prompt: Some("Answer <unsafe> input".into()),
         ..settings_agent(
@@ -334,6 +335,7 @@ const MAILBOX_APP_DOMAIN: &str = "mailagents.test";
 
 fn mailbox_company() -> Company {
     Company {
+        channel_defaults: Default::default(),
         id: Uuid::new_v4(),
         user_id: Uuid::new_v4(),
         name: "Acme".to_string(),
@@ -347,6 +349,7 @@ fn mailbox_company() -> Company {
 
 fn mailbox_channel(company_id: Uuid) -> Channel {
     Channel {
+        owner_agent_id: None,
         enabled: true,
         add_3rd_party: true,
         id: Uuid::new_v4(),
@@ -928,6 +931,31 @@ fn the_ui_shell_reports_live_update_interruptions_without_replacing_sse_retries(
     assert!(script.contains("Live updates restored."));
     assert!(!script.contains("new EventSource"));
     assert!(!script.contains("data.get('api_key')"));
+
+    // Every `/ui` page carries one place for a failed request to be reported, because htmx does
+    // not swap a non-2xx answer and would otherwise leave the click looking like a no-op.
+    assert!(html.contains(r#"id="request-error-toast" role="alert" aria-live="assertive""#));
+    assert!(html.contains(r#"id="request-error-message""#));
+    assert!(script.contains("htmx:responseError"));
+    assert!(script.contains("htmx:sendError"));
+    assert!(script.contains("htmx:timeout"));
+    assert!(script.contains("htmx:swapError"));
+    assert!(script.contains("case 'dismiss-request-error': hideRequestError(); break;"));
+
+    // Every button that is waiting on the server says so, and the spinner it uses actually turns:
+    // daisyUI's own `loading` animation is SMIL inside a `mask-image`, which Chrome never runs.
+    assert!(script.contains("htmx:beforeRequest"));
+    assert!(script.contains("loading loading-spinner loading-xs"));
+    assert!(script.contains("data-request-spinner"));
+    assert!(
+        html.contains("animation: spinner-rotate"),
+        "the shell must redraw the spinner on a real CSS animation"
+    );
+    assert!(html.contains("@keyframes spinner-rotate"));
+    assert!(
+        !html.contains(".loading-spinner {{"),
+        "the style block is interpolated, not a format literal"
+    );
 }
 
 #[test]
@@ -985,6 +1013,8 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
     let agent = settings_agent(company.id, "Triage", "triage");
     let agent_list = AgentSettingsList {
         company: &company,
+        app_domain_name: "mail.test",
+        channels: &[],
         agents: std::slice::from_ref(&agent),
         selected_agent_id: None,
     };
@@ -1068,6 +1098,7 @@ fn the_icon_rail_only_advertises_company_workspaces_the_role_can_open() {
 fn agent_settings_list_targets_the_pane_and_swaps_out_of_band() {
     let company = mailbox_company();
     let agent = Agent {
+        memory_enabled: false,
         provider: Some("openai".to_string()),
         model: Some("gpt-4o".to_string()),
         run_timeout_secs: Some(45),
@@ -1075,6 +1106,8 @@ fn agent_settings_list_targets_the_pane_and_swaps_out_of_band() {
     };
     let list = AgentSettingsList {
         company: &company,
+        app_domain_name: "mail.test",
+        channels: &[],
         agents: std::slice::from_ref(&agent),
         selected_agent_id: Some(agent.id),
     };
@@ -1090,6 +1123,20 @@ fn agent_settings_list_targets_the_pane_and_swaps_out_of_band() {
     assert!(inline.contains("openai / gpt-4o"));
     assert!(inline.contains("menu-active"));
     assert!(!inline.contains("hx-swap-oob"));
+
+    let owned = Channel {
+        owner_agent_id: Some(agent.id),
+        agent_ids: Some(vec![agent.id]),
+        slug: "triage".into(),
+        ..mailbox_channel(company.id)
+    };
+    let addressed = AgentSettingsList {
+        channels: std::slice::from_ref(&owned),
+        ..list
+    };
+    assert!(
+        agent_settings_list(&addressed, FragmentSwap::Inline).contains("triage@acme.mail.test")
+    );
 
     // After a write the list rides along on the pane's response.
     let oob = agent_settings_list(&list, FragmentSwap::OutOfBand);
@@ -1117,6 +1164,7 @@ fn agent_settings_list_targets_the_pane_and_swaps_out_of_band() {
 fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     let company = mailbox_company();
     let agent = Agent {
+        memory_enabled: false,
         provider: Some("openai".to_string()),
         model: Some("gpt-4o".to_string()),
         run_timeout_secs: Some(45),
@@ -1134,6 +1182,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
 
     let html = agent_edit_pane(&AgentEditPane {
         company: &company,
+        app_domain_name: "mail.test",
         model_connections: &model_connections,
         agent: &agent,
         used_by: &[],
@@ -1167,6 +1216,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     let plain = settings_agent(company.id, "Plain", "plain");
     let plain_html = agent_edit_pane(&AgentEditPane {
         company: &company,
+        app_domain_name: "mail.test",
         model_connections: &[],
         agent: &plain,
         used_by: &[],
@@ -1180,6 +1230,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
 fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
     let company = mailbox_company();
     let pictured = Agent {
+        memory_enabled: false,
         avatar_url: Some(AvatarUrl::from("https://example.com/triage.png")),
         ..settings_agent(company.id, "Triage", "triage")
     };
@@ -1187,6 +1238,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
 
     let html = agent_edit_pane(&AgentEditPane {
         company: &company,
+        app_domain_name: "mail.test",
         model_connections: &[],
         agent: &pictured,
         used_by: &[],
@@ -1201,6 +1253,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
 
     let plain_html = agent_edit_pane(&AgentEditPane {
         company: &company,
+        app_domain_name: "mail.test",
         model_connections: &[],
         agent: &plain,
         used_by: &[],
@@ -1215,6 +1268,8 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
     let list = agent_settings_list(
         &AgentSettingsList {
             company: &company,
+            app_domain_name: "mail.test",
+            channels: &[],
             agents: &agents,
             selected_agent_id: None,
         },
@@ -1231,6 +1286,7 @@ fn agent_edit_pane_lists_the_channels_running_the_agent() {
 
     let html = agent_edit_pane(&AgentEditPane {
         company: &company,
+        app_domain_name: "mail.test",
         model_connections: &[],
         agent: &agent,
         used_by: &[&channel],
@@ -1244,7 +1300,7 @@ fn agent_edit_pane_lists_the_channels_running_the_agent() {
         company.id, channel.id
     )));
     // Deleting it is not free, and the confirmation has to say so.
-    assert!(html.contains("1 channel is running it and will stop."));
+    assert!(html.contains("1 other channel assignment will be removed."));
 }
 
 #[test]
@@ -1262,6 +1318,7 @@ fn agent_edit_pane_keeps_a_rejected_save_in_the_form() {
 
     let html = agent_edit_pane(&AgentEditPane {
         company: &company,
+        app_domain_name: "mail.test",
         model_connections: &[],
         agent: &agent,
         used_by: &[],
@@ -1285,6 +1342,7 @@ fn prompt_generator_names_the_pane_it_answers_into() {
 
     let edit = agent_edit_pane(&AgentEditPane {
         company: &company,
+        app_domain_name: "mail.test",
         model_connections: &[],
         agent: &agent,
         used_by: &[],
@@ -1310,7 +1368,11 @@ fn prompt_generator_names_the_pane_it_answers_into() {
     // The create pane has no agent to name; an absent id is what tells the handler so.
     let create = agent_create_pane(&AgentCreatePane {
         company: &company,
+        app_domain_name: "mail.test",
         model_connections: &[],
+        library_agents: &[],
+        selected_library_agent_ids: &[],
+        tab: AgentCreateTab::Simple,
         draft: &AgentDraft::default(),
         error: None,
     });
@@ -1343,32 +1405,247 @@ fn a_generated_prompt_swaps_into_the_field_without_a_script() {
 }
 
 #[test]
+fn the_easy_tab_creates_the_picked_library_agents() {
+    let company = mailbox_company();
+    let triage = Agent {
+        company_id: None,
+        description: Some("Sorts incoming support mail".into()),
+        ..settings_agent(company.id, "Triage", "triage")
+    };
+    let billing = Agent {
+        company_id: None,
+        ..settings_agent(company.id, "Billing", "billing")
+    };
+    let pane = agent_create_pane(&AgentCreatePane {
+        company: &company,
+        app_domain_name: "mail.test",
+        model_connections: &[],
+        library_agents: &[triage.clone(), billing.clone()],
+        selected_library_agent_ids: &[billing.id],
+        tab: AgentCreateTab::Easy,
+        draft: &AgentDraft::default(),
+        error: None,
+    });
+
+    // The tab opens on the picker, and the other two forms stay behind their tabs.
+    assert!(pane.contains(r##"id="agent-tab-easy-btn" class="tab tab-active""##));
+    assert!(pane.contains(&format!(
+        r##"hx-post="/ui/agents/from-library?company_id={}""##,
+        company.id
+    )));
+    assert!(pane.contains(r##"<form id="agent-tab-simple" class="hidden space-y-4""##));
+    assert!(pane.contains(r##"<form id="agent-tab-advanced" class="hidden space-y-4""##));
+
+    // Every definition is offered, and what was already picked comes back ticked.
+    assert!(pane.contains("Sorts incoming support mail"));
+    assert!(pane.contains(&format!(
+        r#"value="{}" class="checkbox checkbox-primary mt-1""#,
+        triage.id
+    )));
+    assert!(!pane.contains(&format!(
+        r#"value="{}" class="checkbox checkbox-primary mt-1" checked"#,
+        triage.id
+    )));
+    assert!(pane.contains(&format!(
+        r#"value="{}" class="checkbox checkbox-primary mt-1" checked"#,
+        billing.id
+    )));
+    assert!(pane.contains(&format!(
+        r#"<input type="hidden" name="library_agent_ids" value="{}">"#,
+        billing.id
+    )));
+}
+
+#[test]
+fn an_empty_library_leaves_no_easy_tab_to_open() {
+    let company = mailbox_company();
+    let pane = agent_create_pane(&AgentCreatePane {
+        company: &company,
+        app_domain_name: "mail.test",
+        model_connections: &[],
+        library_agents: &[],
+        selected_library_agent_ids: &[],
+        tab: AgentCreateTab::Simple,
+        draft: &AgentDraft::default(),
+        error: None,
+    });
+
+    assert!(!pane.contains("agent-tab-easy"));
+    assert!(!pane.contains("/ui/agents/from-library"));
+    assert!(!pane.contains(r##"<form id="agent-tab-simple" class="hidden space-y-4""##));
+}
+
+#[test]
 fn agent_create_pane_opens_on_the_tab_that_was_submitted() {
     let company = mailbox_company();
-    let pane = |advanced| {
+    let pane = |tab| {
         agent_create_pane(&AgentCreatePane {
             company: &company,
+            app_domain_name: "mail.test",
             model_connections: &[],
+            library_agents: &[],
+            selected_library_agent_ids: &[],
+            tab,
             draft: &AgentDraft {
                 name: "Triage",
-                advanced,
+                advanced: tab == AgentCreateTab::Advanced,
                 ..AgentDraft::default()
             },
             error: None,
         })
     };
 
-    let simple = pane(false);
+    let simple = pane(AgentCreateTab::Simple);
     assert!(simple.contains(&format!("hx-post=\"/ui/agents?company_id={}\"", company.id)));
     assert!(simple.contains("name=\"form_mode\" value=\"simple\""));
     assert!(simple.contains("name=\"form_mode\" value=\"advanced\""));
+    assert!(simple.contains("agent-handle@acme.mail.test"));
+    assert!(simple.contains("data-input=\"agent-simple-address-preview\""));
+    assert!(simple.contains("data-input=\"agent-address-preview\""));
     assert!(simple.contains(r##"<form id="agent-tab-advanced" class="hidden space-y-4""##));
     assert!(!simple.contains(r##"<form id="agent-tab-simple" class="hidden space-y-4""##));
 
+    // Advanced is the only tab that does not create on submit: it opens the channel step.
+    assert!(simple.contains(&format!(
+        "hx-post=\"/ui/agents/new/channel?company_id={}\"",
+        company.id
+    )));
+    assert!(simple.contains(">Next: Channel<"));
+    assert!(simple.contains(r##"<li class="step step-primary">Agent</li>"##));
+
     // A rejected Advanced submit has to come back on the Advanced tab.
-    let advanced = pane(true);
+    let advanced = pane(AgentCreateTab::Advanced);
     assert!(advanced.contains(r##"<form id="agent-tab-simple" class="hidden space-y-4""##));
     assert!(!advanced.contains(r##"<form id="agent-tab-advanced" class="hidden space-y-4""##));
+}
+
+/// The memory-result field renders into a `min="1"` number input inside a collapsed `<details>`,
+/// so a draft that defaults it to zero makes the empty create form fail browser validation with
+/// nowhere to report it — the submit simply does nothing.
+#[test]
+fn a_blank_agent_form_stays_inside_the_bounds_its_own_fields_declare() {
+    let company = mailbox_company();
+    let pane = agent_create_pane(&AgentCreatePane {
+        company: &company,
+        app_domain_name: "mail.test",
+        model_connections: &[],
+        library_agents: &[],
+        selected_library_agent_ids: &[],
+        tab: AgentCreateTab::Advanced,
+        draft: &AgentDraft::default(),
+        error: None,
+    });
+
+    assert!(pane.contains(
+        r##"<input name="memory_max_results" type="number" min="1" max="20" value="5""##
+    ));
+    assert!(pane.contains(r##"<option value="audience_only" selected>"##));
+    assert!(pane.contains(r##"<option value="fast" selected>"##));
+}
+
+#[test]
+fn the_channel_step_carries_the_agent_and_locks_the_address_it_follows() {
+    let company = mailbox_company();
+    let agent = AgentDraft {
+        name: "Support <Triage>",
+        slug: "support-triage",
+        system_prompt: "You are support",
+        description: "Answers billing",
+        memory_enabled: true,
+        memory_persistence_mode: "scope_specific_facts",
+        memory_recall_mode: "thinking",
+        memory_max_results: 7,
+        config_json: r#"{"temperature": 0.2}"#,
+        advanced: true,
+        ..AgentDraft::default()
+    };
+    let draft = ChannelDraft {
+        name: agent.name,
+        slug: agent.slug,
+        participant_emails: "@public",
+        advanced: true,
+        ..ChannelDraft::default()
+    };
+
+    let pane = agent_channel_step_pane(&AgentChannelStepPane {
+        company: &company,
+        app_domain_name: "mail.test",
+        agent: &agent,
+        draft: &draft,
+        spam_scan_enabled: false,
+        memory_ready: true,
+        error: None,
+    });
+
+    // The step submits the pair, and can go back to the agent without losing it.
+    assert!(pane.contains(&format!(
+        "hx-post=\"/ui/agents/new/create?company_id={}\"",
+        company.id
+    )));
+    assert!(pane.contains(&format!(
+        "hx-post=\"/ui/agents/new/agent?company_id={}\"",
+        company.id
+    )));
+    assert!(pane.contains(r##"<li class="step step-primary">Channel</li>"##));
+
+    // The agent rides along prefixed, so the channel's own name and slug stay unprefixed.
+    assert!(
+        pane.contains(
+            r##"<input type="hidden" name="agent_name" value="Support &lt;Triage&gt;">"##
+        )
+    );
+    assert!(pane.contains(r##"<input type="hidden" name="agent_slug" value="support-triage">"##));
+    assert!(pane.contains(r##"name="agent_system_prompt" value="You are support""##));
+    assert!(pane.contains(r##"name="agent_memory_enabled" value="true""##));
+    assert!(pane.contains(r##"name="agent_memory_max_results" value="7""##));
+    assert!(pane.contains(r##"name="agent_config_json" value="{&quot;temperature&quot;: 0.2}""##));
+
+    // The address follows the handle, so it is shown rather than offered.
+    assert!(pane.contains("support-triage@acme.mail.test"));
+    assert!(
+        pane.contains(
+            r##"<input type="text" name="slug" required readonly value="support-triage""##
+        )
+    );
+    assert!(pane.contains("Go back to the agent step to change it."));
+    // Nothing assigns the owner: the transaction that creates the pair does that itself.
+    assert!(!pane.contains(r##"name="agent_ids""##));
+    // A `@public` channel on a server without spam scanning still has to be confirmed.
+    assert!(pane.contains(r##"name="confirm_spam_disabled""##));
+    assert!(!pane.contains("pointer-events-none"));
+}
+
+#[test]
+fn a_rejected_channel_step_keeps_both_halves_and_says_why() {
+    let company = mailbox_company();
+    let agent = AgentDraft {
+        name: "Triage",
+        slug: "triage",
+        advanced: true,
+        ..AgentDraft::default()
+    };
+    let draft = ChannelDraft {
+        name: "Triage Inbox",
+        slug: "triage",
+        alias_slugs: "help, sales",
+        advanced: true,
+        ..ChannelDraft::default()
+    };
+
+    let pane = agent_channel_step_pane(&AgentChannelStepPane {
+        company: &company,
+        app_domain_name: "mail.test",
+        agent: &agent,
+        draft: &draft,
+        spam_scan_enabled: true,
+        memory_ready: false,
+        error: Some("Address 'triage' is already in use"),
+    });
+
+    assert!(pane.contains("Address &#39;triage&#39; is already in use"));
+    assert!(pane.contains("value=\"Triage Inbox\""));
+    assert!(pane.contains("value=\"help, sales\""));
+    assert!(pane.contains(r##"<input type="hidden" name="agent_name" value="Triage">"##));
 }
 
 #[test]
@@ -1408,6 +1685,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
 
 fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
     Agent {
+        memory_enabled: false,
         memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
         memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
         memory_max_results: 5,
@@ -1433,6 +1711,7 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
     let triage = settings_agent(company.id, "Triage <bot>", "triage");
     let unused = settings_agent(company.id, "Unused", "unused");
     let channel = Channel {
+        owner_agent_id: None,
         participant_emails: Some(vec!["person@example.com".into(), "@public".into()]),
         agent_ids: Some(vec![triage.id]),
         ..mailbox_channel(company.id)
@@ -1479,21 +1758,58 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
     assert!(!html.contains("confirm_spam_disabled"));
 }
 
+#[test]
+fn owned_channel_locks_owner_and_primary_address_and_hides_delete() {
+    let company = mailbox_company();
+    let owner = settings_agent(company.id, "Owner <bot>", "owner");
+    let other = settings_agent(company.id, "Other", "other");
+    let channel = Channel {
+        owner_agent_id: Some(owner.id),
+        agent_ids: Some(vec![owner.id]),
+        slug: "owner".into(),
+        ..mailbox_channel(company.id)
+    };
+    let html = channel_edit_pane(&ChannelEditPane {
+        company: &company,
+        app_domain_name: "example.com",
+        channel: &channel,
+        agents: &[owner.clone(), other],
+        schedules: &[],
+        spam_scan_enabled: true,
+        draft: None,
+        error: None,
+    });
+
+    assert!(html.contains("name=\"slug\" required readonly"));
+    assert!(html.contains("The owner always remains the position-0 agent"));
+    assert!(html.contains(&format!(
+        "/ui/agents?company_id={}&amp;agent_id={}",
+        company.id, owner.id
+    )));
+    assert!(html.contains("Owner &lt;bot&gt;"));
+    assert!(!html.contains("hx-delete=\"/ui/channels/"));
+    assert!(html.contains("name=\"enabled\""));
+    assert!(html.contains("name=\"retrieve_user_memory\""));
+}
+
 /// A library definition is picked on what it does, so the pane opens a modal of cards rather than
 /// a dropdown that could only carry names.
 #[test]
 fn library_agents_are_picked_from_a_modal_of_cards() {
     let company = mailbox_company();
     let scheduler = Agent {
+        memory_enabled: false,
         company_id: None,
         description: Some("Books meetings from the thread.".to_string()),
         ..settings_agent(company.id, "Scheduler", "scheduler")
     };
     let researcher = Agent {
+        memory_enabled: false,
         company_id: None,
         ..settings_agent(company.id, "Researcher", "researcher")
     };
     let channel = Channel {
+        owner_agent_id: None,
         agent_ids: Some(vec![scheduler.id]),
         ..mailbox_channel(company.id)
     };
@@ -1555,6 +1871,7 @@ fn channel_edit_pane_reflects_the_stored_third_party_setting() {
     ));
 
     let closed_channel = Channel {
+        owner_agent_id: None,
         add_3rd_party: false,
         ..mailbox_channel(company.id)
     };
@@ -1721,6 +2038,10 @@ fn channel_create_pane_opens_on_the_tab_that_was_submitted() {
     assert!(fresh.contains(r##"id="channel-tab-easy" class="hidden space-y-4"##));
     assert!(fresh.contains(r##"id="channel-tab-simple" class=" space-y-4"##));
     assert!(fresh.contains(r##"id="channel-tab-advanced" class="hidden space-y-4"##));
+    assert!(fresh.contains("You can save these grants now"));
+    assert!(!fresh.contains(
+        "<fieldset class=\"rounded-lg border border-base-300 bg-base-200 p-4\" disabled"
+    ));
 
     // A rejected Advanced submit comes back on the Advanced tab with what was typed.
     let retried = pane(
@@ -1750,6 +2071,7 @@ fn channel_create_pane_opens_on_the_tab_that_was_submitted() {
     assert!(simple_retry.contains(r##"id="channel-tab-simple" class=" space-y-4"##));
 
     let scheduler = Agent {
+        memory_enabled: false,
         company_id: None,
         description: Some("Books meetings from email.".to_string()),
         ..settings_agent(company.id, "Scheduler", "scheduler")
@@ -2355,6 +2677,7 @@ fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
     let company = mailbox_company();
     let thread = mailbox_thread(mailbox_channel(company.id).id);
     let agent = Agent {
+        memory_enabled: false,
         avatar_url: Some(AvatarUrl::from("https://example.com/triage.png")),
         ..settings_agent(company.id, "Triage", "triage")
     };
@@ -2418,6 +2741,7 @@ fn a_message_from_another_channel_is_marked_and_keeps_its_own_sender() {
     let company = mailbox_company();
     let thread = mailbox_thread(mailbox_channel(company.id).id);
     let agent = Agent {
+        memory_enabled: false,
         avatar_url: Some(AvatarUrl::from("https://example.com/triage.png")),
         ..settings_agent(company.id, "Triage", "triage")
     };
@@ -3167,6 +3491,7 @@ fn task_filter_clamps_paging_and_probes_for_a_next_page() {
 
 fn settings_company(name: &str, slug: &str) -> Company {
     Company {
+        channel_defaults: Default::default(),
         name: name.to_string(),
         slug: slug.into(),
         ..mailbox_company()
@@ -3275,6 +3600,7 @@ fn company_settings_list_saves_selection_in_the_url_and_swaps_out_of_band() {
 #[test]
 fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
     let company = Company {
+        channel_defaults: Default::default(),
         enable_llm_spam_guardrail: Some(true),
         ..settings_company("Acme & Co", "acme")
     };
@@ -3373,6 +3699,7 @@ fn rejected_company_edit_gets_key_status_only_from_stored_metadata() {
 #[test]
 fn company_member_can_open_company_without_edit_controls_or_api_key() {
     let company = Company {
+        channel_defaults: Default::default(),
         ..settings_company("Acme", "acme")
     };
 
@@ -3480,6 +3807,7 @@ fn company_edit_pane_keeps_a_rejected_save_in_the_form() {
         avatar_url: "",
         memory_provider: "",
         model_connections: Vec::new(),
+        ..CompanyDraft::default()
     };
 
     let html = company_edit_pane(&CompanyEditPane {
@@ -3828,7 +4156,11 @@ fn each_agent_form_owns_its_own_picker() {
     // not swap each other when a file is picked.
     let create = agent_create_pane(&AgentCreatePane {
         company: &company,
+        app_domain_name: "mail.test",
         model_connections: &[],
+        library_agents: &[],
+        selected_library_agent_ids: &[],
+        tab: AgentCreateTab::Simple,
         draft: &AgentDraft::default(),
         error: None,
     });
@@ -3837,11 +4169,13 @@ fn each_agent_form_owns_its_own_picker() {
     assert!(!create.contains(r#"type="url" name="avatar_url""#));
 
     let agent = Agent {
+        memory_enabled: false,
         avatar_url: Some(AvatarUrl::from("https://cdn.example.com/bot.png")),
         ..settings_agent(company.id, "Triage", "triage")
     };
     let edit = agent_edit_pane(&AgentEditPane {
         company: &company,
+        app_domain_name: "mail.test",
         model_connections: &[],
         agent: &agent,
         used_by: &[],
@@ -4419,6 +4753,8 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         companies: &companies,
         list: &AgentSettingsList {
             company: &company,
+            app_domain_name: "mail.test",
+            channels: &[],
             agents: &[],
             selected_agent_id: None,
         },

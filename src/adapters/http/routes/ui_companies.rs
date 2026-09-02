@@ -73,7 +73,7 @@ pub fn router() -> Router<AppState> {
 ///
 /// The Team tab's own selection rides along in here rather than in a query of its own: the tab is
 /// part of the company's pane, so it is part of the same page and the same URL.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct WorkspaceQuery {
     pub company_id: Option<Uuid>,
     /// `?tab=team` opens the company's people instead of its settings.
@@ -91,7 +91,7 @@ pub struct WorkspaceQuery {
 /// The guardrail arrives as text rather than the `Option<bool>` the classic form takes: a checkbox
 /// can only say "on" or "absent", and absent already means "leave it to the server", so the third
 /// state needs a `<select>` — see [`SpamGuardrail`].
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct CompanyForm {
     pub name: String,
     pub slug: Option<String>,
@@ -99,6 +99,14 @@ pub struct CompanyForm {
     /// What the pane's picker is holding: an uploaded picture's URL, or blank for the letter.
     pub avatar_url: Option<String>,
     pub memory_provider: Option<String>,
+    pub default_add_3rd_party: Option<bool>,
+    pub default_participant_emails: Option<String>,
+    pub default_retrieve_company_memory: Option<bool>,
+    pub default_retrieve_agent_memory: Option<bool>,
+    pub default_retrieve_user_memory: Option<bool>,
+    pub default_persist_company_memory: Option<bool>,
+    pub default_persist_agent_memory: Option<bool>,
+    pub default_persist_user_memory: Option<bool>,
     pub default_model_provider: Option<usize>,
     #[serde(flatten)]
     pub connection_fields: HashMap<String, String>,
@@ -444,28 +452,30 @@ async fn edit_pane(workspace: Workspace, Path(company_id): Path<Uuid>) -> AppRes
 async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> Response {
     let submitted = SubmittedCompany::new(form);
 
-    let created = match submitted.write().and_then(|write| {
-        submitted.selected_memory(workspace.memory_use_cases.configured())?;
-        let connections = submitted
-            .model_connections()
-            .map_err(|error| error.to_string())?;
-        // A company may be created before any provider is configured. Only an *update* to an
-        // empty set is a wipe, and `validate_model_connections` refuses that one.
-        if !connections.is_empty() {
-            CompanyUseCases::validate_model_connections(&connections)
+    let created = match submitted
+        .write(workspace.config.is_spam_scan_enabled())
+        .and_then(|write| {
+            submitted.selected_memory(workspace.memory_use_cases.configured())?;
+            let connections = submitted
+                .model_connections()
                 .map_err(|error| error.to_string())?;
-            if connections
-                .iter()
-                .any(|connection| connection.api_key.is_none())
-            {
-                return Err(
-                    "An API key is required for every provider when creating a company."
-                        .to_string(),
-                );
+            // A company may be created before any provider is configured. Only an *update* to an
+            // empty set is a wipe, and `validate_model_connections` refuses that one.
+            if !connections.is_empty() {
+                CompanyUseCases::validate_model_connections(&connections)
+                    .map_err(|error| error.to_string())?;
+                if connections
+                    .iter()
+                    .any(|connection| connection.api_key.is_none())
+                {
+                    return Err(
+                        "An API key is required for every provider when creating a company."
+                            .to_string(),
+                    );
+                }
             }
-        }
-        Ok(write)
-    }) {
+            Ok(write)
+        }) {
         Ok(write) => {
             workspace
                 .company_use_cases
@@ -519,15 +529,17 @@ async fn update_company(
     let counts = workspace.counts(company_id, true).await?;
     let submitted = SubmittedCompany::new(form);
 
-    let saved = match submitted.write().and_then(|write| {
-        submitted.selected_memory(workspace.memory_use_cases.configured())?;
-        let connections = submitted
-            .model_connections()
-            .map_err(|error| error.to_string())?;
-        CompanyUseCases::validate_model_connections(&connections)
-            .map_err(|error| error.to_string())?;
-        Ok(write)
-    }) {
+    let saved = match submitted
+        .write(workspace.config.is_spam_scan_enabled())
+        .and_then(|write| {
+            submitted.selected_memory(workspace.memory_use_cases.configured())?;
+            let connections = submitted
+                .model_connections()
+                .map_err(|error| error.to_string())?;
+            CompanyUseCases::validate_model_connections(&connections)
+                .map_err(|error| error.to_string())?;
+            Ok(write)
+        }) {
         Ok(write) => {
             workspace
                 .company_use_cases
@@ -642,6 +654,24 @@ impl SubmittedCompany {
             spam_guardrail: self.spam_guardrail,
             avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
             memory_provider: self.form.memory_provider.as_deref().unwrap_or(""),
+            default_add_3rd_party: self.form.default_add_3rd_party.unwrap_or(false),
+            default_participant_emails: self
+                .form
+                .default_participant_emails
+                .clone()
+                .unwrap_or_default(),
+            default_retrieve_company_memory: self
+                .form
+                .default_retrieve_company_memory
+                .unwrap_or(false),
+            default_retrieve_agent_memory: self.form.default_retrieve_agent_memory.unwrap_or(false),
+            default_retrieve_user_memory: self.form.default_retrieve_user_memory.unwrap_or(false),
+            default_persist_company_memory: self
+                .form
+                .default_persist_company_memory
+                .unwrap_or(false),
+            default_persist_agent_memory: self.form.default_persist_agent_memory.unwrap_or(false),
+            default_persist_user_memory: self.form.default_persist_user_memory.unwrap_or(false),
             // This view model deliberately has no credential field. Preserve only safe submitted
             // metadata so even a rejected request cannot echo its API key into the response.
             model_connections: self.model_connection_drafts(),
@@ -684,12 +714,48 @@ impl SubmittedCompany {
 
     /// The submitted company as a write. The picture is parsed rather than taken as typed: it
     /// ends up in an `<img src>` on the rail of every page this company scopes.
-    fn write(&self) -> Result<CompanyWrite, String> {
+    fn write(&self, spam_scanning: bool) -> Result<CompanyWrite, String> {
+        if !spam_scanning
+            && self
+                .form
+                .default_participant_emails
+                .as_deref()
+                .is_some_and(|values| {
+                    values.split([',', '\n']).any(|value| {
+                        value
+                            .trim()
+                            .eq_ignore_ascii_case(crate::entities::channel::PUBLIC_PARTICIPANT)
+                    })
+                })
+        {
+            return Err(
+                "Public new-agent channel defaults require spam scanning to be enabled.".into(),
+            );
+        }
         Ok(CompanyWrite {
             name: self.form.name.clone(),
             slug: self.slug.clone(),
             enable_llm_spam_guardrail: self.spam_guardrail.stored(),
             memory_provider: None,
+            channel_defaults: crate::entities::company::CompanyChannelDefaults {
+                add_3rd_party: self.form.default_add_3rd_party.unwrap_or(false),
+                participant_emails: self
+                    .form
+                    .default_participant_emails
+                    .as_deref()
+                    .map(|values| {
+                        values
+                            .split([',', '\n'])
+                            .map(crate::entities::value_objects::EmailAddress::from)
+                            .collect()
+                    }),
+                retrieve_company_memory: self.form.default_retrieve_company_memory.unwrap_or(false),
+                retrieve_agent_memory: self.form.default_retrieve_agent_memory.unwrap_or(false),
+                retrieve_user_memory: self.form.default_retrieve_user_memory.unwrap_or(false),
+                persist_company_memory: self.form.default_persist_company_memory.unwrap_or(false),
+                persist_agent_memory: self.form.default_persist_agent_memory.unwrap_or(false),
+                persist_user_memory: self.form.default_persist_user_memory.unwrap_or(false),
+            },
             avatar_url: AvatarUrl::parse(self.form.avatar_url.as_deref().unwrap_or(""))?,
         })
     }
@@ -826,6 +892,7 @@ mod tests {
                 .iter()
                 .map(|(name, value)| ((*name).to_string(), (*value).to_string()))
                 .collect(),
+            ..CompanyForm::default()
         }
     }
 

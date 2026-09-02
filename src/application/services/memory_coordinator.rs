@@ -11,8 +11,8 @@ use crate::{
         channel::Channel,
         company::Company,
         memory::{
-            MemoryPersistenceMode, MemoryRecallMode, MemoryScope, deduplicate_chunks,
-            resolve_scopes, stable_memory_id,
+            MemoryPersistenceMode, MemoryScope, deduplicate_chunks, resolve_scopes,
+            stable_memory_id,
         },
     },
     services::memory_provider::{
@@ -80,10 +80,15 @@ impl MemoryCoordinator {
 
     pub async fn recall(&self, input: MemoryRecallInput<'_>) -> AppResult<Option<String>> {
         let channel = input.channel;
+        let Some(agent) = input.agent.filter(|agent| agent.memory_enabled) else {
+            self.record_policy_skip("recall", "agent_policy_disabled");
+            return Ok(None);
+        };
         if !channel.retrieve_company_memory
             && !channel.retrieve_agent_memory
             && !channel.retrieve_user_memory
         {
+            self.record_policy_skip("recall", "channel_grant_absent");
             return Ok(None);
         }
         let resolution = resolve_scopes(
@@ -91,7 +96,7 @@ impl MemoryCoordinator {
                 && input.audience == MemoryRecallAudience::MemberOrSystem,
             channel.retrieve_agent_memory,
             channel.retrieve_user_memory,
-            input.agent.map(|agent| agent.id),
+            Some(agent.id),
             input.sender,
         );
         for unavailable in resolution.unavailable {
@@ -106,7 +111,11 @@ impl MemoryCoordinator {
             self.monitoring.increment_counter(
                 "memory_scope_skipped_total",
                 1,
-                &[("operation", "recall"), ("scope", unavailable.label())],
+                &[
+                    ("operation", "recall"),
+                    ("reason", "scope_identity_missing"),
+                    ("scope", unavailable.label()),
+                ],
             );
         }
         if resolution.resolved.is_empty() {
@@ -132,13 +141,8 @@ impl MemoryCoordinator {
         }
         // Resolved once: the request's limit and the bound the reply is checked against have to
         // be the same number, or the guard below polices a limit nobody asked for.
-        let recall_mode = input
-            .agent
-            .map_or_else(MemoryRecallMode::default, |agent| agent.memory_recall_mode);
-        let max_results = input.agent.map_or_else(
-            crate::entities::memory::default_memory_max_results,
-            |agent| agent.memory_max_results,
-        );
+        let recall_mode = agent.memory_recall_mode;
+        let max_results = agent.memory_max_results;
         let started = Instant::now();
         let recalled = provider
             .recall(
@@ -204,17 +208,28 @@ impl MemoryCoordinator {
     /// reported and logged but intentionally never returned as an application error.
     pub async fn persist(&self, input: MemoryPersistInput<'_>) -> MemoryPersistReport {
         let channel = input.channel;
+        let Some(agent) = input.agent.filter(|agent| agent.memory_enabled) else {
+            self.record_policy_skip("persist", "agent_policy_disabled");
+            return MemoryPersistReport {
+                skipped: 1,
+                ..MemoryPersistReport::default()
+            };
+        };
         if !channel.persist_company_memory
             && !channel.persist_agent_memory
             && !channel.persist_user_memory
         {
-            return MemoryPersistReport::default();
+            self.record_policy_skip("persist", "channel_grant_absent");
+            return MemoryPersistReport {
+                skipped: 1,
+                ..MemoryPersistReport::default()
+            };
         }
         let resolution = resolve_scopes(
             channel.persist_company_memory,
             channel.persist_agent_memory,
             channel.persist_user_memory,
-            input.agent.map(|agent| agent.id),
+            Some(agent.id),
             input.sender,
         );
         for unavailable in resolution.unavailable {
@@ -229,7 +244,11 @@ impl MemoryCoordinator {
             self.monitoring.increment_counter(
                 "memory_scope_skipped_total",
                 1,
-                &[("operation", "persist"), ("scope", unavailable.label())],
+                &[
+                    ("operation", "persist"),
+                    ("reason", "scope_identity_missing"),
+                    ("scope", unavailable.label()),
+                ],
             );
         }
         if resolution.resolved.is_empty() {
@@ -269,11 +288,8 @@ impl MemoryCoordinator {
             .map(|scope| MemoryPersistenceTarget {
                 scope: scope.scope,
                 collection: scope.collection,
-                custom_instructions: input
-                    .agent
-                    .is_some_and(|agent| {
-                        agent.memory_persistence_mode == MemoryPersistenceMode::ScopeSpecificFacts
-                    })
+                custom_instructions: (agent.memory_persistence_mode
+                    == MemoryPersistenceMode::ScopeSpecificFacts)
                     .then(|| scope.scope.extraction_instructions()),
             })
             .collect();
@@ -357,6 +373,14 @@ impl MemoryCoordinator {
         );
     }
 
+    fn record_policy_skip(&self, operation: &'static str, reason: &'static str) {
+        self.monitoring.increment_counter(
+            "memory_scope_skipped_total",
+            1,
+            &[("operation", operation), ("reason", reason)],
+        );
+    }
+
     fn record_bound_error(
         &self,
         operation: &'static str,
@@ -389,6 +413,7 @@ impl MemoryCoordinator {
         let binding = self.persistence.active_binding(company_id).await?;
         let state = binding.state_name();
         let ActiveMemoryBinding::Ready(connection) = binding else {
+            self.record_policy_skip(operation, "provider_unavailable");
             self.monitoring.increment_counter(
                 "memory_runtime_binding_total",
                 1,
@@ -399,6 +424,7 @@ impl MemoryCoordinator {
         };
         let kind = connection.provider;
         let Some(provider) = self.providers.get(kind) else {
+            self.record_policy_skip(operation, "provider_unavailable");
             self.monitoring.increment_counter(
                 "memory_runtime_binding_total",
                 1,
@@ -554,6 +580,7 @@ mod tests {
 
     fn stale_company(company_id: Uuid) -> Company {
         Company {
+            channel_defaults: Default::default(),
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Stale queued company".into(),
@@ -567,6 +594,7 @@ mod tests {
 
     fn memory_channel(company_id: Uuid) -> Channel {
         Channel {
+            owner_agent_id: None,
             id: Uuid::new_v4(),
             company_id,
             name: "Memory channel".into(),
@@ -590,6 +618,7 @@ mod tests {
 
     fn memory_agent(company_id: Uuid) -> Agent {
         Agent {
+            memory_enabled: true,
             memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
             memory_max_results: 5,
@@ -806,13 +835,14 @@ mod tests {
         let company = stale_company(company_id);
         let mut channel = memory_channel(company_id);
         channel.retrieve_user_memory = true;
+        let agent = memory_agent(company_id);
         let (coordinator, provider) = ready_coordinator(company_id);
 
         coordinator
             .recall(MemoryRecallInput {
                 company: &company,
                 channel: &channel,
-                agent: None,
+                agent: Some(&agent),
                 sender: Some("external@example.com"),
                 audience: MemoryRecallAudience::External,
                 task_id: Uuid::new_v4(),
@@ -901,6 +931,45 @@ mod tests {
                 Some(target.scope.extraction_instructions())
             );
         }
+    }
+
+    #[tokio::test]
+    async fn disabled_agent_policy_prevents_all_provider_calls() {
+        let company_id = Uuid::new_v4();
+        let company = stale_company(company_id);
+        let mut agent = memory_agent(company_id);
+        agent.memory_enabled = false;
+        let channel = memory_channel(company_id);
+        let (coordinator, provider) = ready_coordinator(company_id);
+
+        let recalled = coordinator
+            .recall(MemoryRecallInput {
+                company: &company,
+                channel: &channel,
+                agent: Some(&agent),
+                sender: Some("user@example.com"),
+                audience: MemoryRecallAudience::MemberOrSystem,
+                task_id: Uuid::new_v4(),
+                latest_prompt: "question",
+            })
+            .await
+            .unwrap();
+        let report = coordinator
+            .persist(MemoryPersistInput {
+                company: &company,
+                channel: &channel,
+                agent: Some(&agent),
+                sender: Some("user@example.com"),
+                task_id: Uuid::new_v4(),
+                user_context: "question",
+                final_answer: "answer",
+            })
+            .await;
+
+        assert_eq!(recalled, None);
+        assert_eq!(report.skipped, 1);
+        assert_eq!(provider.recalls.load(Ordering::SeqCst), 0);
+        assert_eq!(provider.persists.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]

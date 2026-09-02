@@ -1620,6 +1620,7 @@ mod tests {
 
     fn active_agent(company_id: Uuid, id: Uuid) -> Agent {
         Agent {
+            memory_enabled: false,
             id,
             company_id: Some(company_id),
             name: "Test agent".into(),
@@ -2600,6 +2601,7 @@ mod tests {
         });
 
         let company = crate::entities::company::Company {
+            channel_defaults: Default::default(),
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Test Corp".to_string(),
@@ -2611,6 +2613,7 @@ mod tests {
         };
 
         let channel = Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -2778,6 +2781,7 @@ mod tests {
         let agent_id = Uuid::new_v4();
 
         let company = Company {
+            channel_defaults: Default::default(),
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Test Company".to_string(),
@@ -2789,6 +2793,7 @@ mod tests {
         };
 
         let channel = Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -2919,6 +2924,7 @@ mod tests {
         let agent_id = Uuid::new_v4();
 
         let company = Company {
+            channel_defaults: Default::default(),
             id: company_id,
             user_id: Uuid::new_v4(),
             name: "Test Company".to_string(),
@@ -2930,6 +2936,7 @@ mod tests {
         };
 
         let channel = Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,

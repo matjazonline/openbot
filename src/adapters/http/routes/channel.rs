@@ -150,7 +150,7 @@ pub struct SubmittedMemorySettings {
 }
 
 /// The two shapes a browser sends for a ticked checkbox, in one place.
-fn checkbox_ticked(value: Option<&str>) -> bool {
+pub(super) fn checkbox_ticked(value: Option<&str>) -> bool {
     matches!(value, Some("true") | Some("on"))
 }
 
@@ -415,11 +415,7 @@ async fn create_channel_handler(
             Ok(agent) => agent,
             Err(message) => return view.render(Some(message)).await,
         };
-    let agent_ids =
-        match resolve_channel_agents(&agent_use_cases, &form, &slug, user.id, company_id).await {
-            Ok(agent_ids) => agent_ids,
-            Err(message) => return view.render(Some(message)).await,
-        };
+    let agent_ids = resolve_channel_agents(&form);
 
     let confirm_spam_disabled = form.confirm_spam_disabled();
     let enabled = form.enabled();
@@ -505,44 +501,8 @@ impl ChannelListView<'_> {
 ///
 /// In "simple" mode the submitted instructions are expanded into a system prompt and saved as a
 /// brand new agent, which is then appended to any explicitly selected ones.
-pub(super) async fn resolve_channel_agents(
-    agent_use_cases: &AgentUseCases,
-    form: &ChannelForm,
-    slug: &str,
-    user_id: Uuid,
-    company_id: Uuid,
-) -> Result<Option<Vec<Uuid>>, String> {
-    let agent_ids = parse_agent_ids_form(form.agent_ids.clone());
-    let instructions = form
-        .system_prompt
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
-
-    let Some(instructions) = instructions else {
-        return Ok(agent_ids);
-    };
-
-    if form.form_mode.as_deref() == Some("simple") {
-        return Ok(agent_ids);
-    }
-    let agent = agent_use_cases
-        .create_agent(
-            user_id,
-            company_id,
-            AgentWrite {
-                name: form.name.clone(),
-                slug: slug.to_string(),
-                system_prompt: Some(instructions.to_string()),
-                ..AgentWrite::default()
-            },
-        )
-        .await
-        .map_err(|err| format!("Failed to create agent for channel: {err}"))?;
-
-    let mut ids = agent_ids.unwrap_or_default();
-    ids.push(agent.id);
-    Ok(Some(ids))
+pub(super) fn resolve_channel_agents(form: &ChannelForm) -> Option<Vec<Uuid>> {
+    parse_agent_ids_form(form.agent_ids.clone())
 }
 
 pub(super) async fn simple_channel_agent_write(
@@ -1566,6 +1526,7 @@ mod tests {
     #[test]
     fn channel_pages_and_fragments_render_correctly() {
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),
@@ -1577,6 +1538,7 @@ mod tests {
         };
 
         let channel = Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: Uuid::new_v4(),

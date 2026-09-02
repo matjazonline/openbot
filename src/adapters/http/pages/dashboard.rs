@@ -1236,6 +1236,7 @@ mod tests {
 
     fn company() -> Company {
         Company {
+            channel_defaults: Default::default(),
             id: Uuid::nil(),
             user_id: Uuid::nil(),
             name: "Acme".into(),

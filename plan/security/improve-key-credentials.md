@@ -2,8 +2,10 @@
 
 ## Goal
 
-Close the remaining credential-storage and launch gaps other than multi-instance rotation, which is
-specified separately in `plan/security/fix-multi-instance-key-rotation.md`.
+Close the remaining credential-storage and launch gaps. Multi-instance key rotation is no longer one
+of them: the rollout protocol, bounded rotation, and convergence proof are implemented in
+`src/adapters/persistence/credential_rotation.rs` and `scripts/credential-key-rotation.sh`, and the
+runbook is `docs/deploy.md` §"Multi-Machine credential-key rotation".
 
 The result must prevent plaintext persistence by construction, authenticate a credential's row
 context, satisfy the repository's envelope-encryption requirement or record an explicit approved
@@ -12,10 +14,16 @@ reproducible, and revoke credentials previously exposed during development.
 
 ## Verified Starting Point
 
-- Provider credentials now live in `company_model_connections`, not in `companies`, `agents`, and
-  `channels` as the older launch-prerequisites document states.
+- Provider credentials live in `company_model_connections`, not in `companies`, `agents`, and
+  `channels`.
 - Production construction requires `CREDENTIAL_ENCRYPTION_KEYS`; a missing or malformed key ring
   already prevents a healthy startup.
+- `CREDENTIAL_ENCRYPTION_ACTIVE_VERSION` selects the write key independently of the highest readable
+  version, and startup rejects an active version absent from the ring.
+- Rotation no longer runs at process boot. `mail_agents credentials status` and
+  `mail_agents credentials rotate` are explicit subcommands; rotation scans in keyset-cursored
+  batches under a PostgreSQL advisory lock, updates compare-and-swap, and emits a JSON convergence
+  report.
 - AES-256-GCM uses a random 96-bit nonce and records a key version in the stored string.
 - Ordinary model-connection projections expose only `has_api_key`; the narrow credential read
   decrypts only when a caller needs the provider key.
@@ -30,26 +38,26 @@ other provider key entered during development remains valid until it is revoked 
 
 ## Security Gaps in Scope
 
-1. `decrypt` accepts non-`enc:` values as plaintext.
+1. `decrypt` accepts non-`enc:` values as plaintext (`credentials.rs:141-143`).
 2. `PostgresPersistence` can be constructed without a cipher, and credential reads/writes then pass
-   plaintext through.
+   plaintext through (`persistence/mod.rs:53-75`).
 3. The database constraint accepts any non-empty string rather than requiring a supported encrypted
-   envelope.
-4. `needs_rotation` uses a prefix test, so active-looking malformed or tampered ciphertext can skip
-   validation.
-5. AES-GCM uses empty associated data, allowing valid ciphertext to be moved between company or
-   provider rows without authentication failure.
-6. One long-lived environment key directly encrypts every provider credential. That is
+   envelope (`20260817000000_init_schema.sql:173-175` checks only non-blank and a length cap).
+4. AES-GCM uses empty associated data, allowing valid ciphertext to be moved between company or
+   provider rows without authentication failure (`Aad::empty()` in `encrypt` and `decrypt_parsed`).
+5. One long-lived environment key directly encrypts every provider credential. That is
    application-layer AEAD, but it is not technically envelope encryption as required by
    `src/adapters/persistence/AGENTS.md`.
-7. Bootstrap and the first-deploy example omit credential-encryption secrets even though runtime
-   requires them.
-8. Fly secret values cannot be retrieved later; there is no documented custody, recovery, backup,
-   or loss procedure for the encryption key.
-9. Rotation and validation currently load all credentials into memory. Bounded rotation is owned by
-   the multi-instance plan; this plan must provide a parse/authenticate interface that operation can
-   use safely.
-10. External provider-key revocation is an unaudited manual acceptance statement.
+6. Fly secret values cannot be retrieved later. `docs/deploy.md` requires escrow and forbids reusing
+   a version number, but names no secret manager and defines no key inventory, recovery drill, or
+   loss/compromise response.
+7. External provider-key revocation is an unaudited manual acceptance statement.
+
+Three gaps from the original list are closed and are not in scope. `needs_rotation`'s prefix test is
+gone — `CredentialCipher::inspect` parses and decrypts a row before classifying it. Bootstrap sets and
+preflights the encryption secrets (`scripts/deploy.sh`, `scripts/tests/deploy.sh`). Rotation is
+bounded rather than loading every credential into memory. The parse/authenticate interface this plan
+introduces must keep those consumers working.
 
 ## Required Architecture Decision
 
@@ -157,32 +165,38 @@ The database constraint is defense in depth, not a substitute for application pa
 authentication. It need only recognize supported envelope structure; it must not pretend a regex
 proves that ciphertext is authentic.
 
-### 4. Replace prefix-based validity decisions
+### 4. Route every validity decision through the parsed envelope
 
-1. Replace `needs_rotation(&str) -> bool` with parsing that returns a version or an error.
-2. Authenticate rows before declaring them valid or current.
-3. Treat plaintext, malformed fields, unavailable key versions, invalid authentication tags,
-   invalid UTF-8, and context mismatch as distinct internal failure classes.
-4. Fail closed at startup/operational validation and at narrow credential reads.
-5. Ensure HTTP callers still receive a generic internal error while structured server logs contain
+`CredentialCipher::inspect` already parses and decrypts a row before classifying it, so the prefix
+test is gone. What remains is making that path context-aware and its failures distinguishable.
+
+1. Give `inspect` the row's `CredentialContext`, so an envelope moved between companies or providers
+   classifies as a failure rather than as `Active`.
+2. Split the collapsed `CredentialState::Malformed` into distinct internal failure classes:
+   plaintext, malformed fields, invalid authentication tag, invalid UTF-8, and context mismatch.
+   `Unavailable { version }` already stands apart; keep it.
+3. Fail closed at operational validation (`credentials status`) and at narrow credential reads.
+4. Ensure HTTP callers still receive a generic internal error while structured server logs contain
    only safe row identifiers and failure class.
 
-The bounded status and rotation consumers of this interface are specified in
-`fix-multi-instance-key-rotation.md`.
+The bounded status and rotation consumers of this interface already exist in
+`src/adapters/persistence/credential_rotation.rs`; port `CredentialState` classification onto the new
+parse API rather than adding a second validity path.
 
-### 5. Fix bootstrap, deploy preflight, and documentation
+### 5. Carry the new format through bootstrap, deploy preflight, and documentation
 
-1. Generate the initial KEK with the existing CSPRNG-based helper or a replacement that emits the
-   selected envelope/KMS configuration.
-2. Set `CREDENTIAL_ENCRYPTION_KEYS` and the explicit active-version setting during app bootstrap in
-   the same secret operation as the other required launch secrets.
-3. For an existing app, inspect `fly secrets list --json` and refuse deployment when required secret
-   names are absent. Do not claim this validates values; runtime parsing remains authoritative.
-4. Update the first-deploy command in `docs/deploy.md`, not only the configuration table.
-5. Document that a missing/invalid key causes startup failure and that secret values must never be
-   placed in `fly.toml`, command output captured by CI, or repository files.
-6. Refactor the deploy script enough that secret preflight can be tested with a fake `fly` command
-   and without performing a real deployment.
+Bootstrap already sets `CREDENTIAL_ENCRYPTION_KEYS` and `CREDENTIAL_ENCRYPTION_ACTIVE_VERSION` in the
+same `fly secrets set` as the other launch secrets, `validate_app_secrets` refuses to deploy an
+existing app missing either name, `scripts/tests/deploy.sh` exercises both paths against a fake `fly`,
+and the first-deploy command in `docs/deploy.md` names both settings. What remains is whatever the
+selected envelope format changes:
+
+1. Update `scripts/generate-credential-encryption-key.sh` to emit the KEK/KMS configuration the
+   selected format needs, and update bootstrap and the first-deploy command to match.
+2. Extend the preflight required-name list and `scripts/tests/deploy.sh` together if the format adds
+   a setting. Preflight checks names only; runtime parsing remains authoritative.
+3. Document that a missing or invalid key causes startup failure, and that secret values must never
+   be placed in `fly.toml`, command output captured by CI, or repository files.
 
 ### 6. Define key custody and recovery
 
@@ -203,14 +217,8 @@ Emit structured fields for envelope format, key version, validation outcome, and
 emit provider credentials, ciphertext, wrapped DEKs, raw keys, or full connection objects. Add a
 named validation/rotation duration and working-set metric so future scale decisions use evidence.
 
-Rotation-completion observability and durable convergence proof belong to the multi-instance plan.
-
-### 8. Replace the old launch-prerequisites document
-
-After both security plans are implemented, mark
-`plan/db_improve/04-credential-encryption-launch-prerequisites.md` superseded or remove it in a
-separate cleanup change. Until then, add a pointer so nobody follows its obsolete three-table and
-highest-version assumptions.
+`CredentialRotationReport` already carries per-batch counts, duration, and a convergence flag; extend
+it rather than adding a parallel channel.
 
 ## Tests
 
@@ -256,13 +264,11 @@ existing stack-budget check required by repository policy.
 3. Implement the new envelope, associated data, strict parsing, and mandatory persistence boundary.
 4. Add and test the additive database constraint migration.
 5. Implement bootstrap/preflight and key custody documentation.
-6. Implement the explicit active version and operational rotation commands from the multi-instance
-   plan.
-7. Configure and escrow the initial production key material.
-8. Deploy to the empty production database and run `credentials status`.
-9. Revoke development provider keys, create least-privilege replacements, and enter only those
+6. Configure and escrow the initial production key material.
+7. Deploy to the empty production database and run `credentials status`.
+8. Revoke development provider keys, create least-privilege replacements, and enter only those
    replacements through the application.
-10. Verify stored rows are supported envelopes and complete the secure operational sign-off.
+9. Verify stored rows are supported envelopes and complete the secure operational sign-off.
 
 ## Acceptance Criteria
 
@@ -281,7 +287,7 @@ existing stack-budget check required by repository policy.
 ## Out of Scope
 
 - The two-phase multi-Machine rollout, advisory-lock ownership, bounded rotation command, and old-key
-  retirement sequence; see `fix-multi-instance-key-rotation.md`.
+  retirement sequence. These are implemented; `docs/deploy.md` is the runbook.
 - General provider-token scoping capabilities that a provider does not offer.
 - Protection from a fully compromised application process. Even KMS-backed encryption cannot stop
   authorized application code from requesting plaintext when it legitimately needs to call a

@@ -15,7 +15,7 @@ use crate::{
         value_objects::{ChannelSlug, CompanySlug},
     },
     infra::config::AppConfig,
-    use_cases::agent::AgentWrite,
+    use_cases::agent::{AgentWrite, SpamScanning},
     use_cases::company::{CompanyPersistence, managed_company},
     use_cases::memory::{ActiveMemoryBinding, MemoryBindingPersistence},
 };
@@ -122,11 +122,30 @@ impl ChannelWrite {
 
     /// Whether the participant list opens this channel to anyone — the only case the spam
     /// interlock applies to.
-    fn is_public(&self) -> bool {
+    pub(crate) fn is_public(&self) -> bool {
         self.participant_emails
             .as_ref()
             .is_some_and(|emails| emails.iter().any(|e| e == PUBLIC_PARTICIPANT))
     }
+}
+
+/// A channel open to `@public` must not be saved while the server has no spam scanning at all,
+/// unless the caller explicitly says it knows.
+///
+/// Free-standing because two use cases enforce it: the Channels workspace saving a channel, and
+/// the Agents workspace creating an agent whose personal channel was written on the create form's
+/// channel step. One copy means the two cannot come to refuse it in different words.
+pub(crate) fn check_spam_interlock(
+    write: &ChannelWrite,
+    spam_scanning: SpamScanning,
+    confirmed: bool,
+) -> AppResult<()> {
+    if write.is_public() && spam_scanning == SpamScanning::Unavailable && !confirmed {
+        return Err(AppError::BadRequest(
+            "Spam scanning is disabled in server configuration. Saving a public channel (@public) requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// Where a channel write's position-0 agent comes from, for [`ChannelWrite::normalize_with`].
@@ -225,8 +244,6 @@ impl ChannelUseCases {
 
         write.normalize()?;
         self.check_spam_interlock(&write, confirm_spam_disabled)?;
-        self.check_memory_interlock(user_id, company_id, &write)
-            .await?;
 
         info!(
             "Creating channel '{}' ({}) for company {}",
@@ -253,8 +270,6 @@ impl ChannelUseCases {
 
         channel.normalize_with(ActiveAgent::SuppliedByCaller)?;
         self.check_spam_interlock(&channel, confirm_spam_disabled)?;
-        self.check_memory_interlock(user_id, company_id, &channel)
-            .await?;
 
         let (_, channel) = self
             .channel_persistence
@@ -263,66 +278,21 @@ impl ChannelUseCases {
         Ok(channel)
     }
 
-    /// A channel open to `@public` must not be saved while the server has no spam scanning at all,
-    /// unless the caller explicitly says it knows.
+    /// This deployment's spam scanning, as the shared [`check_spam_interlock`] states it.
+    fn spam_scanning(&self) -> SpamScanning {
+        if self.config.is_spam_scan_enabled() {
+            SpamScanning::Available
+        } else {
+            SpamScanning::Unavailable
+        }
+    }
+
     fn check_spam_interlock(
         &self,
         write: &ChannelWrite,
         confirm_spam_disabled: bool,
     ) -> AppResult<()> {
-        if write.is_public() && !self.config.is_spam_scan_enabled() && !confirm_spam_disabled {
-            return Err(AppError::BadRequest(
-                "Spam scanning is disabled in server configuration. Saving a public channel (@public) requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
-            ));
-        }
-        Ok(())
-    }
-
-    async fn check_memory_interlock(
-        &self,
-        user_id: Uuid,
-        company_id: Uuid,
-        write: &ChannelWrite,
-    ) -> AppResult<()> {
-        let enabled = write.retrieve_company_memory
-            || write.retrieve_agent_memory
-            || write.retrieve_user_memory
-            || write.persist_company_memory
-            || write.persist_agent_memory
-            || write.persist_user_memory;
-        if !enabled {
-            return Ok(());
-        }
-        self.verify_company_manager(user_id, company_id).await?;
-        let persistence = self.memory_persistence.as_ref().ok_or_else(|| {
-            AppError::BadRequest("Memory is not configured for this deployment.".into())
-        })?;
-        let binding = persistence.active_binding(company_id).await?;
-        let configured = self.config.configured_memory_providers();
-        if configured.is_empty() {
-            return Err(AppError::BadRequest(
-                "Memory is not configured for this deployment.".into(),
-            ));
-        }
-        match binding {
-            // A connection whose provider this deployment no longer configures has no runtime
-            // behind it, however ready the stored row claims to be.
-            ActiveMemoryBinding::Ready(connection) if configured.contains(connection.provider) => {
-                Ok(())
-            }
-            ActiveMemoryBinding::Ready(_) => Err(AppError::BadRequest(
-                "The selected memory provider is not configured for this deployment.".into(),
-            )),
-            ActiveMemoryBinding::Disabled => Err(AppError::BadRequest(
-                "Select a memory provider before enabling memory.".into(),
-            )),
-            ActiveMemoryBinding::NotReady(_) => Err(AppError::BadRequest(
-                "Memory controls require a ready provider.".into(),
-            )),
-            ActiveMemoryBinding::Misconfigured => Err(AppError::BadRequest(
-                "The selected memory provider is misconfigured.".into(),
-            )),
-        }
+        check_spam_interlock(write, self.spam_scanning(), confirm_spam_disabled)
     }
 
     pub async fn memory_ready(&self, user_id: Uuid, company_id: Uuid) -> AppResult<bool> {
@@ -448,10 +418,22 @@ impl ChannelUseCases {
             return Err(channel_not_found());
         }
 
+        if let Some(owner_agent_id) = channel.owner_agent_id {
+            write.slug = channel.slug.to_string();
+            let mut agents = vec![owner_agent_id];
+            agents.extend(
+                write
+                    .agent_ids
+                    .take()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|agent_id| *agent_id != owner_agent_id),
+            );
+            write.agent_ids = Some(agents);
+        }
+
         write.normalize()?;
         self.check_spam_interlock(&write, confirm_spam_disabled)?;
-        self.check_memory_interlock(user_id, company_id, &write)
-            .await?;
 
         info!(
             "Updating channel {} for company {}: {} ({}), enabled={}",
@@ -478,6 +460,11 @@ impl ChannelUseCases {
 
         if channel.company_id != company_id {
             return Err(channel_not_found());
+        }
+        if channel.owner_agent_id.is_some() {
+            return Err(AppError::Conflict(
+                "This is an agent-owned personal channel. Delete the owning agent instead.".into(),
+            ));
         }
 
         info!("Deleting channel {} for company {}", channel_id, company_id);
@@ -1161,6 +1148,7 @@ mod tests {
                 .ok_or_else(|| AppError::Internal("Not found".into()))?;
 
             *existing = Channel {
+                owner_agent_id: None,
                 created_at: existing.created_at,
                 ..channel_from_write(id, existing.company_id, write)
             };
@@ -1175,6 +1163,7 @@ mod tests {
 
     fn channel_from_write(id: Uuid, company_id: Uuid, write: ChannelWrite) -> Channel {
         Channel {
+            owner_agent_id: None,
             id,
             company_id,
             name: write.name,
@@ -1240,6 +1229,7 @@ mod tests {
         let other_company_id = Uuid::new_v4();
 
         let company = |id| Company {
+            channel_defaults: Default::default(),
             id,
             user_id: owner_id,
             name: "Acme Corp".to_string(),
@@ -1342,6 +1332,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![Company {
+                channel_defaults: Default::default(),
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".into(),
@@ -1435,6 +1426,7 @@ mod tests {
 
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![Company {
+                channel_defaults: Default::default(),
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
@@ -1700,6 +1692,7 @@ mod tests {
         let company_id = uuid::Uuid::new_v4();
         let available = vec![
             Channel {
+                owner_agent_id: None,
                 enabled: false,
                 add_3rd_party: true,
                 id: uuid::Uuid::new_v4(),
@@ -1720,6 +1713,7 @@ mod tests {
                 created_at: chrono::Utc::now(),
             },
             Channel {
+                owner_agent_id: None,
                 enabled: false,
                 add_3rd_party: true,
                 id: uuid::Uuid::new_v4(),
@@ -1755,6 +1749,7 @@ mod tests {
 
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![Company {
+                channel_defaults: Default::default(),
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
@@ -1871,6 +1866,7 @@ mod tests {
 
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![Company {
+                channel_defaults: Default::default(),
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),

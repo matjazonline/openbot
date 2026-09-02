@@ -27,6 +27,7 @@ pub struct AgentDb {
     pub system_prompt: Option<String>,
     pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
+    pub memory_enabled: bool,
     pub memory_persistence_mode: String,
     pub memory_recall_mode: String,
     pub memory_max_results: i16,
@@ -54,6 +55,7 @@ impl TryFrom<AgentDb> for Agent {
             system_prompt: db.system_prompt,
             description: db.description,
             config_json: db.config_json,
+            memory_enabled: db.memory_enabled,
             memory_persistence_mode: match db.memory_persistence_mode.as_str() {
                 "scope_specific_facts" => MemoryPersistenceMode::ScopeSpecificFacts,
                 _ => MemoryPersistenceMode::AudienceOnly,
@@ -73,6 +75,133 @@ impl TryFrom<AgentDb> for Agent {
     }
 }
 
+pub(crate) async fn update_agent_and_owned_address(
+    persistence: &PostgresPersistence,
+    id: Uuid,
+    write: AgentWrite,
+) -> AppResult<Agent> {
+    let run_timeout_secs = write
+        .run_timeout_secs
+        .map(i32::try_from)
+        .transpose()
+        .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
+    let mut tx = persistence.pool.begin().await.map_err(AppError::from)?;
+    let (company_id, company_slug): (Option<Uuid>, Option<String>) = sqlx::query_as(
+        r#"SELECT agent.company_id, company.slug::text
+           FROM agents AS agent
+           LEFT JOIN companies AS company ON company.id = agent.company_id
+           WHERE agent.id = $1
+           FOR UPDATE OF agent"#,
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
+    let owned_channel_id: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM channels WHERE owner_agent_id = $1 FOR UPDATE")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+
+    let db = sqlx::query_as::<_, AgentDb>(
+        r#"UPDATE agents
+           SET name = $1, slug = $2, provider = $3, model = $4, system_prompt = $5,
+               description = $6, config_json = $7, avatar_url = $8, run_timeout_secs = $9,
+               memory_enabled = $10, memory_persistence_mode = $11,
+               memory_recall_mode = $12, memory_max_results = $13
+           WHERE id = $14
+           RETURNING id, company_id, name, slug, provider, model, system_prompt, description,
+                     config_json, avatar_url, created_by, created_at, run_timeout_secs,
+                     memory_enabled, memory_persistence_mode, memory_recall_mode,
+                     memory_max_results"#,
+    )
+    .bind(&write.name)
+    .bind(&write.slug)
+    .bind(&write.provider)
+    .bind(&write.model)
+    .bind(&write.system_prompt)
+    .bind(&write.description)
+    .bind(&write.config_json)
+    .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
+    .bind(run_timeout_secs)
+    .bind(write.memory_enabled)
+    .bind(write.memory_persistence_mode.as_str())
+    .bind(write.memory_recall_mode.as_str())
+    .bind(i16::from(write.memory_max_results))
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|error| address_update_error(error, &write.slug, company_slug.as_deref()))?;
+
+    if let (Some(channel_id), Some(company_id)) = (owned_channel_id, company_id) {
+        let current_slug: String = sqlx::query_scalar(
+            "SELECT slug::text FROM channel_slugs WHERE channel_id = $1 AND is_primary FOR UPDATE",
+        )
+        .bind(channel_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        if !current_slug.eq_ignore_ascii_case(&write.slug) {
+            let occupied: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM channel_slugs WHERE company_id = $1 AND slug = $2 AND channel_id <> $3)",
+            )
+            .bind(company_id)
+            .bind(&write.slug)
+            .bind(channel_id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+            if occupied {
+                return Err(address_update_error_message(
+                    &write.slug,
+                    company_slug.as_deref(),
+                ));
+            }
+            sqlx::query(
+                "UPDATE channel_slugs SET is_primary = FALSE WHERE channel_id = $1 AND is_primary",
+            )
+            .bind(channel_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+            sqlx::query(
+                r#"INSERT INTO channel_slugs (company_id, channel_id, slug, is_primary)
+                   VALUES ($1, $2, $3, TRUE)
+                   ON CONFLICT (channel_id, slug) DO UPDATE SET is_primary = TRUE"#,
+            )
+            .bind(company_id)
+            .bind(channel_id)
+            .bind(&write.slug)
+            .execute(&mut *tx)
+            .await
+            .map_err(|error| address_update_error(error, &write.slug, company_slug.as_deref()))?;
+        }
+    }
+    tx.commit().await.map_err(AppError::from)?;
+    db.try_into()
+}
+
+fn address_update_error(error: sqlx::Error, slug: &str, company_slug: Option<&str>) -> AppError {
+    if error
+        .as_database_error()
+        .and_then(|db| db.code())
+        .as_deref()
+        == Some("23505")
+    {
+        return address_update_error_message(slug, company_slug);
+    }
+    AppError::from(error)
+}
+
+fn address_update_error_message(slug: &str, company_slug: Option<&str>) -> AppError {
+    let address =
+        company_slug.map_or_else(|| slug.to_string(), |company| format!("{slug}@{company}"));
+    AppError::BadRequest(format!(
+        "Address '{address}' is already in use; the agent was not changed."
+    ))
+}
+
 #[async_trait]
 impl AgentPersistence for PostgresPersistence {
     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
@@ -84,9 +213,9 @@ impl AgentPersistence for PostgresPersistence {
             .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
 
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-               RETURNING id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results"#,
+            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, run_timeout_secs, memory_enabled, memory_persistence_mode, memory_recall_mode, memory_max_results)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+               RETURNING id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_enabled, memory_persistence_mode, memory_recall_mode, memory_max_results"#,
         )
         .bind(uuid)
         .bind(company_id)
@@ -100,6 +229,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(serde_json::to_value(write.created_by.unwrap_or_else(CreationProvenance::system)).map_err(|e| AppError::Internal(e.to_string()))?)
         .bind(run_timeout_secs)
+        .bind(write.memory_enabled)
         .bind(write.memory_persistence_mode.as_str())
         .bind(write.memory_recall_mode.as_str())
         .bind(i16::from(write.memory_max_results))
@@ -118,9 +248,9 @@ impl AgentPersistence for PostgresPersistence {
             .transpose()
             .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results)
-               VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-               RETURNING id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results"#,
+            r#"INSERT INTO agents (id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, run_timeout_secs, memory_enabled, memory_persistence_mode, memory_recall_mode, memory_max_results)
+               VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+               RETURNING id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_enabled, memory_persistence_mode, memory_recall_mode, memory_max_results"#,
         )
         .bind(uuid)
         .bind(&write.name)
@@ -133,6 +263,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(serde_json::to_value(write.created_by.unwrap_or_else(CreationProvenance::system)).map_err(|e| AppError::Internal(e.to_string()))?)
         .bind(run_timeout_secs)
+        .bind(write.memory_enabled)
         .bind(write.memory_persistence_mode.as_str())
         .bind(write.memory_recall_mode.as_str())
         .bind(i16::from(write.memory_max_results))
@@ -144,7 +275,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>> {
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results
+            r#"SELECT id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_enabled, memory_persistence_mode, memory_recall_mode, memory_max_results
                FROM agents WHERE id = $1"#,
         )
         .bind(id)
@@ -161,7 +292,7 @@ impl AgentPersistence for PostgresPersistence {
         agent_slug: &str,
     ) -> AppResult<Option<Agent>> {
         let db = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT a.id, a.company_id, a.name, a.slug, a.provider, a.model, a.system_prompt, a.description, a.config_json, a.avatar_url, a.created_by, a.created_at, a.run_timeout_secs, a.memory_persistence_mode, a.memory_recall_mode, a.memory_max_results
+            r#"SELECT a.id, a.company_id, a.name, a.slug, a.provider, a.model, a.system_prompt, a.description, a.config_json, a.avatar_url, a.created_by, a.created_at, a.run_timeout_secs, a.memory_enabled, a.memory_persistence_mode, a.memory_recall_mode, a.memory_max_results
                FROM agents a
                JOIN companies c ON c.id = a.company_id
                WHERE c.slug = $1 AND a.slug = $2"#,
@@ -177,7 +308,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>> {
         let db_list = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results
+            r#"SELECT id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_enabled, memory_persistence_mode, memory_recall_mode, memory_max_results
                FROM agents WHERE company_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -191,7 +322,7 @@ impl AgentPersistence for PostgresPersistence {
 
     async fn list_library(&self) -> AppResult<Vec<Agent>> {
         let rows = sqlx::query_as::<_, AgentDb>(
-            r#"SELECT id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results
+            r#"SELECT id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_enabled, memory_persistence_mode, memory_recall_mode, memory_max_results
                FROM agents WHERE company_id IS NULL
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -209,9 +340,9 @@ impl AgentPersistence for PostgresPersistence {
             .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
         let db = sqlx::query_as::<_, AgentDb>(
             r#"UPDATE agents
-               SET name = $1, slug = $2, provider = $3, model = $4, system_prompt = $5, description = $6, config_json = $7, avatar_url = $8, run_timeout_secs = $9, memory_persistence_mode = $10, memory_recall_mode = $11, memory_max_results = $12
-               WHERE id = $13
-               RETURNING id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_persistence_mode, memory_recall_mode, memory_max_results"#,
+               SET name = $1, slug = $2, provider = $3, model = $4, system_prompt = $5, description = $6, config_json = $7, avatar_url = $8, run_timeout_secs = $9, memory_enabled = $10, memory_persistence_mode = $11, memory_recall_mode = $12, memory_max_results = $13
+               WHERE id = $14
+               RETURNING id, company_id, name, slug, provider, model, system_prompt, description, config_json, avatar_url, created_by, created_at, run_timeout_secs, memory_enabled, memory_persistence_mode, memory_recall_mode, memory_max_results"#,
         )
         .bind(&write.name)
         .bind(&write.slug)
@@ -222,6 +353,7 @@ impl AgentPersistence for PostgresPersistence {
         .bind(&write.config_json)
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(run_timeout_secs)
+        .bind(write.memory_enabled)
         .bind(write.memory_persistence_mode.as_str())
         .bind(write.memory_recall_mode.as_str())
         .bind(i16::from(write.memory_max_results))
@@ -268,6 +400,7 @@ mod tests {
     #[test]
     fn malformed_provenance_is_a_conversion_error_not_a_panic() {
         let db = AgentDb {
+            memory_enabled: false,
             memory_persistence_mode: "audience_only".into(),
             memory_recall_mode: "fast".into(),
             memory_max_results: 5,
@@ -327,6 +460,7 @@ mod tests {
             &persistence,
             company.id,
             AgentWrite {
+                memory_enabled: false,
                 memory_persistence_mode:
                     crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
                 memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,

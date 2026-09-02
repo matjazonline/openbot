@@ -78,6 +78,21 @@ const LIVE_UPDATE_STATUS: &str = r##"
         </div>
         "##;
 
+/// One shared place for "that request failed", for every `/ui` page.
+///
+/// htmx does not swap a non-2xx response, so without somewhere for the reason to land a failed
+/// request leaves the page looking untouched. [`REQUEST_ERROR_SCRIPT`] fills this in.
+const REQUEST_ERROR_TOAST: &str = r##"
+        <div id="request-error-toast" role="alert" aria-live="assertive" aria-atomic="true"
+            class="toast toast-top toast-center z-50 hidden max-w-[calc(100vw-2rem)]">
+            <div class="alert alert-error shadow-lg">
+                <span id="request-error-message" class="text-sm font-medium break-words"></span>
+                <button type="button" class="btn btn-ghost btn-xs" data-action="dismiss-request-error"
+                    aria-label="Dismiss">&times;</button>
+            </div>
+        </div>
+        "##;
+
 /// The chrome every `/ui` response shares: the top bar, the icon rail, and the HTML shell around
 /// them. Only what sits to the right of the rail differs between workspaces.
 pub struct UiShell<'a> {
@@ -109,6 +124,7 @@ pub fn ui_shell(shell: &UiShell<'_>) -> String {
     </div>
     <div id="rail-backdrop" data-action="close-rail" aria-hidden="true"></div>
     {LIVE_UPDATE_STATUS}
+    {REQUEST_ERROR_TOAST}
     {LOGOUT_MODAL}
         "##,
         top_bar = top_bar(shell.user, shell.company),
@@ -116,6 +132,43 @@ pub fn ui_shell(shell: &UiShell<'_>) -> String {
     );
 
     ui_layout(shell.title, &body)
+}
+
+/// The page a `/ui` navigation gets when the request failed outright.
+///
+/// A browser typing a URL cannot use the toast -- there is no page left to put it on -- and the
+/// plain-text body `AppError` and axum's extractor rejections answer with renders as a bare wall of
+/// text. This is that same reason, in the app's own chrome.
+pub fn ui_error_page(status: u16, reason: &str) -> String {
+    let heading = match status {
+        400..=403 => "That request was refused",
+        404 => "Not found",
+        409 => "That conflicts with something already there",
+        422 => "That form could not be read",
+        _ => "Something went wrong",
+    };
+
+    let body = format!(
+        r##"
+    <div class="flex min-h-full items-center justify-center p-6">
+        <div class="card w-full max-w-lg border border-base-300 bg-base-200 shadow-lg">
+            <div class="card-body gap-4">
+                <div class="alert alert-error text-sm">
+                    <span class="font-medium">{status} — {heading}</span>
+                </div>
+                <p class="text-sm opacity-70">{reason}</p>
+                <div class="card-actions justify-end">
+                    <a href="/ui" class="btn btn-primary btn-sm">Back to the mailbox</a>
+                </div>
+            </div>
+        </div>
+    </div>
+        "##,
+        heading = heading,
+        reason = escape_html_text(reason),
+    );
+
+    ui_layout(heading, &body)
 }
 
 /// The whole mailbox shell for one request.
@@ -590,6 +643,132 @@ pub(crate) const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` ch
             }
         });"##;
 
+/// Surfaces every failed `/ui` request as the shared [`REQUEST_ERROR_TOAST`] alert.
+///
+/// htmx leaves the page untouched on a non-2xx answer, so a rejected form body or a handler that
+/// returned an error would otherwise look exactly like a click that did nothing. Errors that never
+/// reach a handler -- an extractor rejection, a dropped connection, a timeout -- land here too,
+/// which is the whole point of listening on the events rather than rendering an alert per route.
+pub(crate) const REQUEST_ERROR_SCRIPT: &str = r##"
+        var requestErrorTimer = null;
+
+        function hideRequestError() {
+            window.clearTimeout(requestErrorTimer);
+            requestErrorTimer = null;
+            var toast = document.getElementById('request-error-toast');
+            if (toast) toast.classList.add('hidden');
+        }
+
+        function showRequestError(message) {
+            var toast = document.getElementById('request-error-toast');
+            if (!toast) return;
+            toast.querySelector('#request-error-message').textContent = message;
+            toast.classList.remove('hidden');
+            window.clearTimeout(requestErrorTimer);
+            requestErrorTimer = window.setTimeout(hideRequestError, 10000);
+        }
+
+        // What the server said, when it said something a reader can act on. `/ui` error bodies are
+        // short plain text; an HTML body is a page rather than a message, so it is reported by
+        // status instead of dumped into the alert.
+        function requestErrorMessage(xhr) {
+            var status = xhr && xhr.status ? xhr.status : 0;
+            var body = xhr && typeof xhr.responseText === 'string' ? xhr.responseText.trim() : '';
+            if (!body || body.charAt(0) === '<' || body.length > 300) {
+                body = status ? 'The server rejected the request.' : 'The server could not be reached.';
+            }
+            return status ? status + ' — ' + body : body;
+        }
+
+        document.body.addEventListener('htmx:responseError', function (event) {
+            showRequestError(requestErrorMessage(event.detail && event.detail.xhr));
+        });
+
+        document.body.addEventListener('htmx:sendError', function () {
+            showRequestError('Network error — the server could not be reached.');
+        });
+
+        document.body.addEventListener('htmx:timeout', function () {
+            showRequestError('The request timed out. Try again.');
+        });
+
+        document.body.addEventListener('htmx:swapError', function () {
+            showRequestError('The response could not be displayed. Reload the page.');
+        });
+"##;
+
+/// Puts a spinner on the button that is waiting for the server, for every button, without each
+/// one carrying its own markup.
+///
+/// htmx hangs the request on either the button itself (`hx-post` on a button) or on the form (a
+/// submit), so both shapes are resolved back to the one control the reader actually pressed. A
+/// button that already shows its own progress keeps doing it -- nothing ends up with two spinners.
+pub(crate) const BUTTON_BUSY_SCRIPT: &str = r##"
+        var buttonsAwaitingResponse = new Map();
+
+        function pressedControl(detail) {
+            var elt = detail && detail.elt;
+            if (!elt || !elt.matches) return null;
+            if (elt.matches('button, input[type=submit]')) return elt;
+
+            // A form submit: the button that submitted it, which the triggering event names.
+            var trigger = detail.requestConfig && detail.requestConfig.triggeringEvent;
+            var submitter = trigger && trigger.submitter;
+            if (submitter && elt.contains(submitter)) return submitter;
+
+            // Only a form falls back to a search, and only for its own default submit button. Any
+            // other element -- a polling div, a swapped pane -- would just be finding somebody
+            // else's button somewhere inside it.
+            if (!elt.matches('form')) return null;
+            return elt.querySelector('button[type=submit], button:not([type])');
+        }
+
+        // The `[.htmx-request_&]` spinners and the `[data-progress]` SVG on the non-htmx forms are
+        // already progress of their own, so those buttons are left alone.
+        function ownsItsSpinner(button) {
+            return !!button.querySelector('.loading, [data-progress]');
+        }
+
+        document.body.addEventListener('htmx:beforeRequest', function (event) {
+            var button = pressedControl(event.detail);
+            if (!button || ownsItsSpinner(button) || buttonsAwaitingResponse.has(event.detail.elt)) return;
+
+            var spinner = document.createElement('span');
+            spinner.className = 'loading loading-spinner loading-xs';
+            spinner.setAttribute('data-request-spinner', '');
+            button.prepend(spinner);
+            button.setAttribute('aria-busy', 'true');
+            // An icon-only button has nothing to sit beside, so the spinner takes the icon's place.
+            var iconOnly = !button.textContent.trim();
+            if (iconOnly) button.setAttribute('data-busy-icon-only', '');
+
+            // `htmx:configRequest` has already gathered the parameters, so disabling the submitter
+            // here cannot drop its own value from the body. A button htmx disabled itself through
+            // `hx-disabled-elt` is left for htmx to re-enable -- re-enabling it twice, from two
+            // owners, is how a button ends up permanently dead.
+            var weDisabled = !button.disabled;
+            if (weDisabled) button.disabled = true;
+
+            buttonsAwaitingResponse.set(event.detail.elt, {
+                button: button,
+                weDisabled: weDisabled,
+                iconOnly: iconOnly
+            });
+        });
+
+        document.body.addEventListener('htmx:afterRequest', function (event) {
+            var pending = buttonsAwaitingResponse.get(event.detail.elt);
+            if (!pending) return;
+            buttonsAwaitingResponse.delete(event.detail.elt);
+
+            var spinner = pending.button.querySelector('[data-request-spinner]');
+            if (spinner) spinner.remove();
+            pending.button.removeAttribute('aria-busy');
+            if (pending.iconOnly) pending.button.removeAttribute('data-busy-icon-only');
+            if (pending.weDisabled) pending.button.disabled = false;
+        });
+"##;
+
 /// Applies the reader's saved theme before the first paint, so returning to a light-theme page
 /// never flashes dark first. That is why it is inline in `<head>` rather than in
 /// [`MAILBOX_SCRIPT`] at the end of `<body>` -- from there it would arrive after the paint.
@@ -619,7 +798,7 @@ fn ui_layout(title: &str, body: &str) -> String {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Mail Agents</title>
     <link href="{app_css}" rel="stylesheet" type="text/css" />
-    <style>{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}{APP_SHELL_STYLES}{THREAD_ROW_STYLES}{MAILBOX_LAYOUT_STYLES}{COMPACT_LAYOUT_STYLES}</style>
+    <style>{SPINNER_STYLES}{BRAND_LOGO_STYLES}{DARK_THEME_BLUES}{FIELD_STYLES}{APP_SHELL_STYLES}{THREAD_ROW_STYLES}{MAILBOX_LAYOUT_STYLES}{COMPACT_LAYOUT_STYLES}</style>
     <script src="{theme_init_js}"></script>
     <script src="/assets/htmx-2.0.4.min.js" defer></script>
     <script src="/assets/htmx-ext-sse-2.2.3.js" defer></script>
@@ -634,7 +813,7 @@ fn ui_layout(title: &str, body: &str) -> String {
 
 pub(crate) fn application_javascript() -> String {
     format!(
-        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{library}\n{delegation}",
+        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}",
         selected = icon(Icon::Check, BUTTON_ICON),
         add = icon(Icon::Plus, BUTTON_ICON),
         replied = icon(Icon::Check, BUTTON_ICON),
@@ -648,6 +827,8 @@ pub(crate) fn application_javascript() -> String {
         channels = super::channel_settings::CHANNEL_SETTINGS_SCRIPT,
         library = super::agent_library_multi_select::AGENT_LIBRARY_SCRIPT,
         delegation = EVENT_DELEGATION_SCRIPT,
+        request_errors = REQUEST_ERROR_SCRIPT,
+        button_busy = BUTTON_BUSY_SCRIPT,
     )
 }
 
@@ -671,9 +852,10 @@ document.addEventListener('click', function (event) {
         case 'toggle-mailbox-sidebar': toggleMailboxSidebar(); break;
         case 'toggle-rail': toggleRail(); break;
         case 'close-rail': setRailOpen(false); break;
+        case 'dismiss-request-error': hideRequestError(); break;
         case 'navigate-workspace': closeLiveStreamsForNavigation(event, control); break;
         case 'pane-back': setMobilePane('list'); break;
-        case 'show-agent-tab': showAgentTab(control.dataset.advanced === 'true'); break;
+        case 'show-agent-tab': showAgentTab(control.dataset.tab); break;
         case 'toggle-agent-prompt': toggleAgentPromptGenerator(control.dataset.prefix); break;
         case 'show-channel-tab': showChannelTab(control.dataset.tab); break;
         case 'hide-element': {
@@ -761,6 +943,8 @@ document.addEventListener('input', function (event) {
     if (!control) return;
     switch (control.dataset.input) {
         case 'slugify': syncSlugField(control); break;
+        case 'agent-address-preview': updateAgentAddressPreview(control); break;
+        case 'agent-simple-address-preview': updateSimpleAgentAddressPreview(control); break;
         case 'spam-warning': toggleSpamWarning(control); break;
         case 'channel-spam-confirm': toggleChannelSpamConfirm(control); break;
         case 'auto-grow-composer': autoGrowComposer(control); break;

@@ -15,6 +15,7 @@ impl AgentChannelProvisioning for PostgresPersistence {
         &self,
         request: ProvisionAgentChannelRequest,
     ) -> AppResult<ProvisionedAgentChannel> {
+        let warnings = request.warnings.clone();
         let mut tx = self.pool().begin().await.map_err(AppError::from)?;
         let lock_key = format!("{}:{}", request.source_task_id, request.request_hash);
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
@@ -23,8 +24,9 @@ impl AgentChannelProvisioning for PostgresPersistence {
             .await
             .map_err(AppError::from)?;
 
-        if let Some((agent_id, channel_id)) = sqlx::query_as::<_, (Uuid, Uuid)>(
-            "SELECT agent_id, channel_id FROM agent_channel_provisions WHERE task_id = $1 AND request_hash = $2",
+        if let Some((agent_id, channel_id, stored_warnings)) =
+            sqlx::query_as::<_, (Uuid, Uuid, serde_json::Value)>(
+            "SELECT agent_id, channel_id, warnings FROM agent_channel_provisions WHERE task_id = $1 AND request_hash = $2",
         )
         .bind(request.source_task_id)
         .bind(&request.request_hash)
@@ -33,7 +35,14 @@ impl AgentChannelProvisioning for PostgresPersistence {
         .map_err(AppError::from)?
         {
             tx.commit().await.map_err(AppError::from)?;
-            return Ok(ProvisionedAgentChannel { created: false, agent_id, channel_id });
+            return Ok(ProvisionedAgentChannel {
+                created: false,
+                agent_id,
+                channel_id,
+                warnings: serde_json::from_value(stored_warnings).map_err(|error| {
+                    AppError::Internal(format!("Stored provisioning warnings are invalid: {error}"))
+                })?,
+            });
         }
 
         let agent_id = Uuid::new_v4();
@@ -45,8 +54,9 @@ impl AgentChannelProvisioning for PostgresPersistence {
 
         sqlx::query(
             r#"INSERT INTO agents
-               (id, company_id, name, slug, system_prompt, description, created_by)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+               (id, company_id, name, slug, system_prompt, description, created_by,
+                memory_enabled, memory_persistence_mode, memory_recall_mode, memory_max_results)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"#,
         )
         .bind(agent_id)
         .bind(request.company_id)
@@ -55,22 +65,58 @@ impl AgentChannelProvisioning for PostgresPersistence {
         .bind(&request.agent.system_prompt)
         .bind(&request.agent.description)
         .bind(agent_created_by)
+        .bind(request.agent.memory_enabled)
+        .bind(request.agent.memory_persistence_mode.as_str())
+        .bind(request.agent.memory_recall_mode.as_str())
+        .bind(i16::from(request.agent.memory_max_results))
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
 
         sqlx::query(
             r#"INSERT INTO channels
-               (id, company_id, name, access_mode, enabled, add_3rd_party, created_by)
-               VALUES ($1, $2, $3, 'team', TRUE, FALSE, $4)"#,
+               (id, company_id, owner_agent_id, name, description, access_mode, enabled,
+                add_3rd_party, created_by, retrieve_company_memory, retrieve_agent_memory,
+                retrieve_user_memory, persist_company_memory, persist_agent_memory,
+                persist_user_memory)
+               VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7, $8, $9, $10, $11, $12, $13, $14)"#,
         )
         .bind(channel_id)
         .bind(request.company_id)
+        .bind(agent_id)
         .bind(&request.channel.name)
+        .bind(&request.channel.description)
+        .bind(channel_access_mode(
+            request.channel.participant_emails.as_ref(),
+        ))
+        .bind(request.channel.add_3rd_party)
         .bind(channel_created_by)
+        .bind(request.channel.retrieve_company_memory)
+        .bind(request.channel.retrieve_agent_memory)
+        .bind(request.channel.retrieve_user_memory)
+        .bind(request.channel.persist_company_memory)
+        .bind(request.channel.persist_agent_memory)
+        .bind(request.channel.persist_user_memory)
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
+        for email in request
+            .channel
+            .participant_emails
+            .as_ref()
+            .into_iter()
+            .flatten()
+            .filter(|email| {
+                !email.eq_ignore_ascii_case(crate::entities::channel::PUBLIC_PARTICIPANT)
+            })
+        {
+            sqlx::query("INSERT INTO channel_participants (channel_id, email) VALUES ($1, $2)")
+                .bind(channel_id)
+                .bind(email)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+        }
 
         sqlx::query(
             "INSERT INTO channel_slugs (company_id, channel_id, slug, is_primary) VALUES ($1, $2, $3, TRUE)",
@@ -91,12 +137,15 @@ impl AgentChannelProvisioning for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
         sqlx::query(
-            "INSERT INTO agent_channel_provisions (task_id, request_hash, agent_id, channel_id) VALUES ($1, $2, $3, $4)",
+            "INSERT INTO agent_channel_provisions (task_id, request_hash, agent_id, channel_id, warnings) VALUES ($1, $2, $3, $4, $5)",
         )
         .bind(request.source_task_id)
         .bind(&request.request_hash)
         .bind(agent_id)
         .bind(channel_id)
+        .bind(serde_json::to_value(&warnings).map_err(|error| {
+            AppError::Internal(format!("Provisioning warnings could not be stored: {error}"))
+        })?)
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -106,7 +155,22 @@ impl AgentChannelProvisioning for PostgresPersistence {
             created: true,
             agent_id,
             channel_id,
+            warnings,
         })
+    }
+}
+
+fn channel_access_mode(participants: Option<&Vec<String>>) -> &'static str {
+    match participants {
+        Some(values)
+            if values.iter().any(|value| {
+                value.eq_ignore_ascii_case(crate::entities::channel::PUBLIC_PARTICIPANT)
+            }) =>
+        {
+            "public"
+        }
+        Some(values) if !values.is_empty() => "allowlist",
+        _ => "team",
     }
 }
 
@@ -188,6 +252,10 @@ mod tests {
         let provenance =
             CreationProvenance::agent(parent.id, parent.name.clone(), source.id, task_id);
         let request = ProvisionAgentChannelRequest {
+            warnings: vec![crate::use_cases::agent::ProvisioningWarning {
+                code: "public_access_removed".into(),
+                message: "original effective-default warning".into(),
+            }],
             request_hash: "stable-request".into(),
             company_id: company.id,
             source_task_id: task_id,
@@ -218,11 +286,21 @@ mod tests {
             .provision_agent_channel(request.clone())
             .await
             .unwrap();
-        let retried = persistence.provision_agent_channel(request).await.unwrap();
+        let mut changed_defaults_retry = request;
+        changed_defaults_retry.warnings.clear();
+        let retried = persistence
+            .provision_agent_channel(changed_defaults_retry)
+            .await
+            .unwrap();
         assert!(created.created);
         assert!(!retried.created);
         assert_eq!(created.agent_id, retried.agent_id);
         assert_eq!(created.channel_id, retried.channel_id);
+        assert_eq!(created.warnings, retried.warnings);
+        assert_eq!(
+            retried.warnings[0].message,
+            "original effective-default warning"
+        );
         let agent = AgentPersistence::get_by_id(&persistence, created.agent_id)
             .await
             .unwrap()

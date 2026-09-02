@@ -482,6 +482,7 @@ mod tests {
 
     fn channel(id: Uuid, company_id: Uuid, slug: &str) -> Channel {
         Channel {
+            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id,

@@ -15,6 +15,7 @@ use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
     entities::{company::Company, memory::MemoryConnection, value_objects::AvatarUrl},
+    infra::config::AppConfig,
     services::memory_provider::{ConfiguredMemoryProviders, SelectedMemoryProvider},
     use_cases::{
         company::{CompanyUseCases, CompanyWrite},
@@ -45,7 +46,7 @@ pub fn router() -> Router<AppState> {
         )
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct CompanyForm {
     pub name: String,
     pub slug: String,
@@ -55,17 +56,56 @@ pub struct CompanyForm {
     pub avatar_url: Option<String>,
     #[serde(default)]
     pub memory_provider: Option<String>,
+    pub default_add_3rd_party: Option<bool>,
+    pub default_participant_emails: Option<String>,
+    pub default_retrieve_company_memory: Option<bool>,
+    pub default_retrieve_agent_memory: Option<bool>,
+    pub default_retrieve_user_memory: Option<bool>,
+    pub default_persist_company_memory: Option<bool>,
+    pub default_persist_agent_memory: Option<bool>,
+    pub default_persist_user_memory: Option<bool>,
 }
 
 impl CompanyForm {
     /// The submitted company as a write, with the avatar parsed rather than taken as typed --
     /// it ends up in an `<img src>` on every page that shows the company.
-    fn write(&self) -> AppResult<CompanyWrite> {
+    fn write(&self, spam_scanning: bool) -> AppResult<CompanyWrite> {
+        if !spam_scanning
+            && self
+                .default_participant_emails
+                .as_deref()
+                .is_some_and(|values| {
+                    values.split([',', '\n']).any(|value| {
+                        value
+                            .trim()
+                            .eq_ignore_ascii_case(crate::entities::channel::PUBLIC_PARTICIPANT)
+                    })
+                })
+        {
+            return Err(AppError::BadRequest(
+                "Public new-agent channel defaults require spam scanning to be enabled.".into(),
+            ));
+        }
         Ok(CompanyWrite {
             name: self.name.clone(),
             slug: self.slug.clone(),
             enable_llm_spam_guardrail: self.enable_llm_spam_guardrail,
             memory_provider: None,
+            channel_defaults: crate::entities::company::CompanyChannelDefaults {
+                add_3rd_party: self.default_add_3rd_party.unwrap_or(false),
+                participant_emails: self.default_participant_emails.as_deref().map(|values| {
+                    values
+                        .split([',', '\n'])
+                        .map(crate::entities::value_objects::EmailAddress::from)
+                        .collect()
+                }),
+                retrieve_company_memory: self.default_retrieve_company_memory.unwrap_or(false),
+                retrieve_agent_memory: self.default_retrieve_agent_memory.unwrap_or(false),
+                retrieve_user_memory: self.default_retrieve_user_memory.unwrap_or(false),
+                persist_company_memory: self.default_persist_company_memory.unwrap_or(false),
+                persist_agent_memory: self.default_persist_agent_memory.unwrap_or(false),
+                persist_user_memory: self.default_persist_user_memory.unwrap_or(false),
+            },
             avatar_url: parsed_avatar(self.avatar_url.as_deref())?,
         })
     }
@@ -156,10 +196,11 @@ async fn list_companies(
 }
 
 /// POST /companies - HTMX create company form submission (Protected).
-#[instrument(skip(company_use_cases, memory_use_cases, user, form))]
+#[instrument(skip(company_use_cases, memory_use_cases, config, user, form))]
 async fn create_company(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(memory_use_cases): State<Arc<MemoryUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Form(form): Form<CompanyForm>,
 ) -> impl IntoResponse {
@@ -167,7 +208,7 @@ async fn create_company(
         form.memory_provider.as_deref(),
         memory_use_cases.configured(),
     )
-    .and_then(|()| form.write())
+    .and_then(|()| form.write(config.is_spam_scan_enabled()))
     {
         Ok(write) => company_use_cases.create_company(user.id, write).await,
         Err(err) => Err(err),
@@ -245,10 +286,11 @@ async fn cancel_company_edit(
 }
 
 /// PUT /companies/{id} - Handles HTMX company update form submission (Protected).
-#[instrument(skip(company_use_cases, memory_use_cases, _user, form))]
+#[instrument(skip(company_use_cases, memory_use_cases, config, _user, form))]
 async fn update_company(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(memory_use_cases): State<Arc<MemoryUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     _user: AuthenticatedUser,
     Path(id): Path<Uuid>,
     Form(form): Form<CompanyForm>,
@@ -257,7 +299,7 @@ async fn update_company(
         form.memory_provider.as_deref(),
         memory_use_cases.configured(),
     )
-    .and_then(|()| form.write())
+    .and_then(|()| form.write(config.is_spam_scan_enabled()))
     {
         Ok(write) => {
             company_use_cases
@@ -309,6 +351,7 @@ async fn list_companies_json(
 async fn create_company_json(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(memory_use_cases): State<Arc<MemoryUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Json(payload): Json<CompanyForm>,
 ) -> AppResult<impl IntoResponse> {
@@ -317,7 +360,7 @@ async fn create_company_json(
         memory_use_cases.configured(),
     )?;
     let company = company_use_cases
-        .create_company(user.id, payload.write()?)
+        .create_company(user.id, payload.write(config.is_spam_scan_enabled())?)
         .await?;
     let memory = apply_memory_provider(
         &memory_use_cases,
@@ -341,6 +384,7 @@ async fn create_company_json(
 async fn update_company_json(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(memory_use_cases): State<Arc<MemoryUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     _user: AuthenticatedUser,
     Path(id): Path<Uuid>,
     Json(payload): Json<CompanyForm>,
@@ -350,7 +394,7 @@ async fn update_company_json(
         memory_use_cases.configured(),
     )?;
     let company = company_use_cases
-        .update_company_for_user(_user.id, id, payload.write()?)
+        .update_company_for_user(_user.id, id, payload.write(config.is_spam_scan_enabled())?)
         .await?;
     let memory = apply_memory_provider(
         &memory_use_cases,
@@ -416,6 +460,7 @@ mod tests {
     #[test]
     fn companies_page_renders_htmx_crud_elements() {
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test Corp".to_string(),
@@ -457,10 +502,11 @@ mod tests {
             enable_llm_spam_guardrail: None,
             avatar_url: avatar_url.map(str::to_string),
             memory_provider: None,
+            ..CompanyForm::default()
         };
 
         let kept = form(Some("https://cdn.example.com/acme.png"))
-            .write()
+            .write(true)
             .expect("an http URL is a picture a page may show");
         assert_eq!(
             kept.avatar_url,
@@ -469,13 +515,17 @@ mod tests {
 
         // The page this form lives on has no picker, so it sends the stored URL in a hidden
         // field -- and a company saved from a form that carries none has no picture.
-        assert_eq!(form(None).write().expect("no picture").avatar_url, None);
-        assert_eq!(form(Some("")).write().expect("no picture").avatar_url, None);
+        assert_eq!(form(None).write(true).expect("no picture").avatar_url, None);
+        assert_eq!(
+            form(Some("")).write(true).expect("no picture").avatar_url,
+            None
+        );
 
         // A tampered field is refused rather than stored: it ends up in an `<img src>`.
-        assert!(form(Some("javascript:alert(1)")).write().is_err());
+        assert!(form(Some("javascript:alert(1)")).write(true).is_err());
 
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Test Corp".to_string(),
@@ -491,9 +541,23 @@ mod tests {
     }
 
     #[test]
+    fn public_agent_channel_defaults_require_spam_scanning() {
+        let form = CompanyForm {
+            name: "Test Corp".into(),
+            slug: "test-corp".into(),
+            default_participant_emails: Some("partner@example.com, @PUBLIC".into()),
+            ..CompanyForm::default()
+        };
+        assert!(matches!(form.write(false), Err(AppError::BadRequest(_))));
+        assert!(form.write(true).is_ok());
+        assert!(!form.write(true).unwrap().channel_defaults.add_3rd_party);
+    }
+
+    #[test]
     fn cached_company_client_nav_and_row_rendering() {
         let cid = Uuid::new_v4();
         let company = Company {
+            channel_defaults: Default::default(),
             id: cid,
             user_id: Uuid::new_v4(),
             name: "Acme Corp".to_string(),

@@ -130,7 +130,16 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         ChannelUseCases::new(postgres_arc.clone(), postgres_arc.clone(), config.clone())
             .with_memory_persistence(postgres_arc.clone()),
     );
-    let agent_use_cases = AgentUseCases::new(postgres_arc.clone(), postgres_arc.clone());
+    let agent_use_cases = AgentUseCases::new(
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        if config.is_spam_scan_enabled() {
+            crate::use_cases::agent::SpamScanning::Available
+        } else {
+            crate::use_cases::agent::SpamScanning::Unavailable
+        },
+    );
 
     let approval_use_cases = Arc::new(ApprovalUseCases::new(
         postgres_arc.clone(),

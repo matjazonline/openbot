@@ -220,6 +220,7 @@ mod tests {
 
         // Company has explicitly enabled guardrail
         let company_enabled = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "Secured Corp".to_string(),
@@ -254,6 +255,7 @@ mod tests {
         config_env_true.enable_llm_spam_guardrail = true;
 
         let company_disabled = Company {
+            channel_defaults: Default::default(),
             enable_llm_spam_guardrail: Some(false),
             ..company_enabled
         };

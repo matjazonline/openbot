@@ -388,6 +388,15 @@ impl ThreadUseCases {
                                     source_channel_id: channel_match.channel.id,
                                     task_id,
                                     app_domain_name: self.config.app_domain_name.clone(),
+                                    channel_defaults: channel_match
+                                        .company
+                                        .channel_defaults
+                                        .clone(),
+                                    spam_scanning: if self.config.is_spam_scan_enabled() {
+                                        crate::use_cases::agent::SpamScanning::Available
+                                    } else {
+                                        crate::use_cases::agent::SpamScanning::Unavailable
+                                    },
                                 },
                             );
                         }

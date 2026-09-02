@@ -28,12 +28,15 @@ No index migration is included in this change:
 
 - The local database has no representative `email_messages`, `thread_messages`, or
   `task_attempts` population from which to capture meaningful `EXPLAIN (ANALYZE, BUFFERS)` output.
-- The production statistics and skewed-seed tooling required by
-  `plan/db_improve/03-capture-query-statistics.md` is not present yet.
+- Statistics collection is live — `pg_stat_statements` is preloaded, the extension is created by
+  `migrations/20260901000000_enable_pg_stat_statements.sql`, and the operator query-health panel and
+  `scripts/db-stats.sh` read it — but its counters are accruing against a near-empty database, and
+  the skewed-seed and workload tooling tracked in `plan/db_improve/05-deferred-until-traffic.md` is
+  not present yet.
 - Therefore neither the partial `email_messages (thread_index)` candidate nor a
   `task_attempts (started_at)` candidate has passed the repository's evidence gate.
 
 Before either index is proposed, retain the complete before/after plans, buffer activity, relation
 and index sizes, write rate, and window selectivity for the scope/window matrix in
-`plan/db_improve/01-index-thread-index-and-task-attempts.md`. The absence of a migration here is the
+`plan/db_improve/05-deferred-until-traffic.md`. The absence of a migration here is the
 intentional outcome of that gate, not an assertion that either index is unnecessary.

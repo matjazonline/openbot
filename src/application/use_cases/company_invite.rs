@@ -628,6 +628,7 @@ mod tests {
 
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![Company {
+                channel_defaults: Default::default(),
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
@@ -699,6 +700,7 @@ mod tests {
 
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![Company {
+                channel_defaults: Default::default(),
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),

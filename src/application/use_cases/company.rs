@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        company::{Company, CompanyAccess, CompanyModelConnection},
+        company::{Company, CompanyAccess, CompanyChannelDefaults, CompanyModelConnection},
         company_member::CompanyMembership,
         memory::MemoryProviderKind,
         value_objects::{AvatarUrl, ModelName, ModelProvider},
@@ -105,6 +105,7 @@ pub struct CompanyWrite {
     pub slug: String,
     pub enable_llm_spam_guardrail: Option<bool>,
     pub memory_provider: Option<MemoryProviderKind>,
+    pub channel_defaults: CompanyChannelDefaults,
     /// The company's picture, already parsed as a URL a page may render.
     pub avatar_url: Option<AvatarUrl>,
 }
@@ -122,8 +123,90 @@ impl CompanyWrite {
             ));
         }
 
+        let submitted_participants = self
+            .channel_defaults
+            .participant_emails
+            .take()
+            .unwrap_or_default();
+        if submitted_participants.len() > 64 {
+            return Err(AppError::BadRequest(
+                "A company may configure at most 64 default channel participants.".into(),
+            ));
+        }
+
+        let mut seen = std::collections::HashSet::new();
+        let mut participants = Vec::new();
+        for participant in submitted_participants {
+            let normalized = participant.trim().to_ascii_lowercase();
+            if normalized.is_empty() || !seen.insert(normalized.clone()) {
+                continue;
+            }
+            if normalized != crate::entities::channel::PUBLIC_PARTICIPANT
+                && !email_shaped(&normalized)
+            {
+                return Err(AppError::BadRequest(format!(
+                    "Invalid default channel participant '{normalized}'."
+                )));
+            }
+            participants.push(normalized.into());
+        }
+        self.channel_defaults.participant_emails =
+            (!participants.is_empty()).then_some(participants);
+
         Ok(())
     }
+}
+
+fn email_shaped(value: &str) -> bool {
+    if value.chars().any(char::is_whitespace) {
+        return false;
+    }
+    let mut parts = value.split('@');
+    let (Some(local), Some(domain), None) = (parts.next(), parts.next(), parts.next()) else {
+        return false;
+    };
+    if local.is_empty()
+        || local.starts_with('.')
+        || local.ends_with('.')
+        || local.contains("..")
+        || !local.chars().all(|character| {
+            character.is_ascii_alphanumeric()
+                || matches!(
+                    character,
+                    '.' | '!'
+                        | '#'
+                        | '$'
+                        | '%'
+                        | '&'
+                        | '\''
+                        | '*'
+                        | '+'
+                        | '-'
+                        | '/'
+                        | '='
+                        | '?'
+                        | '^'
+                        | '_'
+                        | '`'
+                        | '{'
+                        | '|'
+                        | '}'
+                        | '~'
+                )
+        })
+    {
+        return false;
+    }
+    let labels = domain.split('.').collect::<Vec<_>>();
+    labels.len() >= 2
+        && labels.iter().all(|label| {
+            !label.is_empty()
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric() || character == '-')
+        })
 }
 
 #[async_trait]
@@ -465,6 +548,7 @@ mod tests {
     impl CompanyPersistence for MockCompanyPersistence {
         async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company> {
             let company = Company {
+                channel_defaults: Default::default(),
                 id: Uuid::new_v4(),
                 user_id,
                 name: write.name,
@@ -637,6 +721,51 @@ mod tests {
         );
     }
 
+    #[test]
+    fn channel_defaults_normalize_and_validate_participants() {
+        let mut write = CompanyWrite {
+            name: "Acme".into(),
+            slug: "acme".into(),
+            channel_defaults: CompanyChannelDefaults {
+                participant_emails: Some(vec![
+                    "  Partner@Example.COM  ".into(),
+                    "partner@example.com".into(),
+                    " ".into(),
+                    "@PUBLIC".into(),
+                ]),
+                ..CompanyChannelDefaults::default()
+            },
+            ..CompanyWrite::default()
+        };
+        write.normalize().unwrap();
+        assert_eq!(
+            write.channel_defaults.participant_emails,
+            Some(vec!["partner@example.com".into(), "@public".into()])
+        );
+
+        let mut invalid = CompanyWrite {
+            name: "Acme".into(),
+            slug: "acme".into(),
+            channel_defaults: CompanyChannelDefaults {
+                participant_emails: Some(vec!["not-an-email".into()]),
+                ..CompanyChannelDefaults::default()
+            },
+            ..CompanyWrite::default()
+        };
+        assert!(matches!(invalid.normalize(), Err(AppError::BadRequest(_))));
+
+        let mut too_many = CompanyWrite {
+            name: "Acme".into(),
+            slug: "acme".into(),
+            channel_defaults: CompanyChannelDefaults {
+                participant_emails: Some(vec!["same@example.com".into(); 65]),
+                ..CompanyChannelDefaults::default()
+            },
+            ..CompanyWrite::default()
+        };
+        assert!(matches!(too_many.normalize(), Err(AppError::BadRequest(_))));
+    }
+
     #[tokio::test]
     async fn company_crud_flow_works() {
         let persistence = Arc::new(MockCompanyPersistence {
@@ -655,6 +784,7 @@ mod tests {
                     slug: "acme-corp".to_string(),
                     enable_llm_spam_guardrail: Some(true),
                     memory_provider: None,
+                    channel_defaults: crate::entities::company::CompanyChannelDefaults::default(),
                     avatar_url: Some(AvatarUrl::from("https://cdn.example.com/acme.png")),
                 },
             )
@@ -703,6 +833,7 @@ mod tests {
         let owner = Uuid::new_v4();
         let stranger = Uuid::new_v4();
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: owner,
             name: "Acme".into(),
@@ -742,6 +873,7 @@ mod tests {
         let admin = Uuid::new_v4();
         let member = Uuid::new_v4();
         let company = Company {
+            channel_defaults: Default::default(),
             id: Uuid::new_v4(),
             user_id: owner,
             name: "Acme".into(),

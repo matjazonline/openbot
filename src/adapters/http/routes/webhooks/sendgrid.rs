@@ -463,6 +463,35 @@ mod tests {
 
     struct MockAgentPersistence;
 
+    struct UnusedOwnedAgentPersistence;
+
+    #[async_trait]
+    impl crate::use_cases::agent::OwnedAgentChannelPersistence for UnusedOwnedAgentPersistence {
+        async fn create_owned_agent_channel(
+            &self,
+            _company_id: Uuid,
+            _agent: crate::use_cases::agent::AgentWrite,
+            _channel: crate::use_cases::channel::ChannelWrite,
+        ) -> AppResult<(
+            crate::entities::agent::Agent,
+            crate::entities::channel::Channel,
+        )> {
+            Err(crate::app_error::AppError::Internal(
+                "unused owned-agent persistence".into(),
+            ))
+        }
+
+        async fn update_agent_and_owned_address(
+            &self,
+            _agent_id: Uuid,
+            _write: crate::use_cases::agent::AgentWrite,
+        ) -> AppResult<crate::entities::agent::Agent> {
+            Err(crate::app_error::AppError::Internal(
+                "unused owned-agent persistence".into(),
+            ))
+        }
+    }
+
     #[async_trait]
     impl crate::use_cases::agent::AgentPersistence for MockAgentPersistence {
         async fn create(
@@ -1188,6 +1217,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![Company {
+                channel_defaults: Default::default(),
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -1201,6 +1231,7 @@ mod tests {
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),
@@ -1354,6 +1385,8 @@ mod tests {
             agent_use_cases: Arc::new(crate::use_cases::agent::AgentUseCases::new(
                 company_persistence.clone(),
                 Arc::new(MockAgentPersistence),
+                Arc::new(UnusedOwnedAgentPersistence),
+                crate::use_cases::agent::SpamScanning::Available,
             )),
             thread_use_cases,
             approval_use_cases,

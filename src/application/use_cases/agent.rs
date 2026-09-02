@@ -9,13 +9,15 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         agent::{Agent, MAX_AGENT_RUN_TIMEOUT_SECS, MIN_AGENT_RUN_TIMEOUT_SECS},
+        channel::{Channel, PUBLIC_PARTICIPANT},
+        company::{Company, CompanyChannelDefaults},
         creation::CreationProvenance,
         memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
         user::Viewer,
         value_objects::{AvatarUrl, ModelName, ModelProvider},
     },
     use_cases::{
-        channel::{SlugKind, validate_slug},
+        channel::{ChannelWrite, SlugKind, check_spam_interlock, validate_slug},
         company::{CompanyPersistence, managed_company},
     },
 };
@@ -42,6 +44,7 @@ pub struct AgentWrite {
     /// Short statement of what the agent is for, read by the agent directory tool.
     pub description: Option<String>,
     pub config_json: Option<serde_json::Value>,
+    pub memory_enabled: bool,
     pub memory_persistence_mode: MemoryPersistenceMode,
     pub memory_recall_mode: MemoryRecallMode,
     pub memory_max_results: u8,
@@ -60,6 +63,7 @@ impl Default for AgentWrite {
             system_prompt: None,
             description: None,
             config_json: None,
+            memory_enabled: false,
             memory_persistence_mode: MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: MemoryRecallMode::Fast,
             memory_max_results: default_memory_max_results(),
@@ -186,6 +190,148 @@ pub trait AgentPersistence: Send + Sync {
     async fn delete(&self, id: Uuid) -> AppResult<()>;
 }
 
+#[async_trait]
+pub trait OwnedAgentChannelPersistence: Send + Sync {
+    async fn create_owned_agent_channel(
+        &self,
+        company_id: Uuid,
+        agent: AgentWrite,
+        channel: ChannelWrite,
+    ) -> AppResult<(Agent, Channel)>;
+
+    async fn update_agent_and_owned_address(
+        &self,
+        agent_id: Uuid,
+        write: AgentWrite,
+    ) -> AppResult<Agent>;
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct ProvisioningWarning {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProvisionedAgent {
+    pub agent: Agent,
+    pub channel: Channel,
+    pub warnings: Vec<ProvisioningWarning>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpamScanning {
+    Available,
+    Unavailable,
+}
+
+/// Where the personal channel a new agent gets comes from.
+///
+/// An agent is never created without one, so this is not "should there be a channel" but "who
+/// wrote it" -- and the two cases carry different data, which is why it is an enum rather than an
+/// `Option<ChannelWrite>` beside a confirmation flag.
+#[derive(Debug, Clone)]
+pub enum PersonalChannelPlan {
+    /// Derived from the company's channel defaults, which is what every caller outside the
+    /// Agents workspace's channel step asks for.
+    CompanyDefaults,
+    /// Written by the caller, on the create form's channel step. Boxed because it dwarfs the
+    /// other variant, and this plan travels inside the create future.
+    Configured(Box<ConfiguredPersonalChannel>),
+}
+
+impl PersonalChannelPlan {
+    /// A channel the caller wrote, and its answer to the `@public` spam interlock.
+    pub fn configured(write: ChannelWrite, spam_disabled_confirmed: bool) -> Self {
+        Self::Configured(Box::new(ConfiguredPersonalChannel {
+            write,
+            spam_disabled_confirmed,
+        }))
+    }
+}
+
+/// A personal channel as the channel step submitted it.
+#[derive(Debug, Clone)]
+pub struct ConfiguredPersonalChannel {
+    pub write: ChannelWrite,
+    /// Whether the `@public`-without-spam-scanning interlock was answered on the step.
+    pub spam_disabled_confirmed: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct PersonalChannelDecision {
+    pub channel: ChannelWrite,
+    pub warnings: Vec<ProvisioningWarning>,
+}
+
+pub(crate) fn personal_channel_write(
+    agent: &AgentWrite,
+    defaults: &CompanyChannelDefaults,
+    spam_scanning: SpamScanning,
+) -> PersonalChannelDecision {
+    let mut participants = defaults
+        .participant_emails
+        .as_ref()
+        .map(|values| values.iter().map(ToString::to_string).collect::<Vec<_>>());
+    let mut warnings = Vec::new();
+    if spam_scanning == SpamScanning::Unavailable {
+        let had_public = participants.as_mut().is_some_and(|values| {
+            let before = values.len();
+            values.retain(|value| !value.eq_ignore_ascii_case(PUBLIC_PARTICIPANT));
+            before != values.len()
+        });
+        if had_public {
+            warnings.push(ProvisioningWarning {
+                code: "public_access_removed".into(),
+                message: "The personal channel was created without public access because spam scanning is unavailable.".into(),
+            });
+        }
+    }
+    if participants.as_ref().is_some_and(Vec::is_empty) {
+        participants = None;
+    }
+
+    PersonalChannelDecision {
+        channel: ChannelWrite {
+            name: agent.name.clone(),
+            description: agent.description.clone(),
+            slug: agent.slug.clone(),
+            participant_emails: participants,
+            enabled: true,
+            add_3rd_party: defaults.add_3rd_party,
+            retrieve_company_memory: defaults.retrieve_company_memory,
+            retrieve_agent_memory: defaults.retrieve_agent_memory,
+            retrieve_user_memory: defaults.retrieve_user_memory,
+            persist_company_memory: defaults.persist_company_memory,
+            persist_agent_memory: defaults.persist_agent_memory,
+            persist_user_memory: defaults.persist_user_memory,
+            ..ChannelWrite::default()
+        },
+        warnings,
+    }
+}
+
+/// One library definition as a company agent write: every stored field, with the provenance left
+/// for [`AgentUseCases::create_addressable_agent`] to stamp with whoever picked it.
+fn library_agent_write(definition: &Agent) -> AgentWrite {
+    AgentWrite {
+        name: definition.name.clone(),
+        slug: definition.slug.clone(),
+        provider: definition.provider.clone(),
+        model: definition.model.clone(),
+        run_timeout_secs: definition.run_timeout_secs,
+        system_prompt: definition.system_prompt.clone(),
+        description: definition.description.clone(),
+        config_json: definition.config_json.clone(),
+        memory_enabled: definition.memory_enabled,
+        memory_persistence_mode: definition.memory_persistence_mode,
+        memory_recall_mode: definition.memory_recall_mode,
+        memory_max_results: definition.memory_max_results,
+        avatar_url: definition.avatar_url.clone(),
+        created_by: None,
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct SelectableAgents {
     pub company_agents: Vec<Agent>,
@@ -196,16 +342,22 @@ pub struct SelectableAgents {
 pub struct AgentUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
     agent_persistence: Arc<dyn AgentPersistence>,
+    owned_persistence: Arc<dyn OwnedAgentChannelPersistence>,
+    spam_scanning: SpamScanning,
 }
 
 impl AgentUseCases {
     pub fn new(
         company_persistence: Arc<dyn CompanyPersistence>,
         agent_persistence: Arc<dyn AgentPersistence>,
+        owned_persistence: Arc<dyn OwnedAgentChannelPersistence>,
+        spam_scanning: SpamScanning,
     ) -> Self {
         Self {
             company_persistence,
             agent_persistence,
+            owned_persistence,
+            spam_scanning,
         }
     }
 
@@ -262,19 +414,189 @@ impl AgentUseCases {
         &self,
         user_id: Uuid,
         company_id: Uuid,
-        mut write: AgentWrite,
+        write: AgentWrite,
     ) -> AppResult<Agent> {
-        self.verify_company_manager(user_id, company_id).await?;
-        write.created_by = Some(CreationProvenance::user(user_id));
-        write.normalize()?;
-        self.validate_model_selection(company_id, &write).await?;
+        Ok(self
+            .create_addressable_agent(user_id, company_id, write)
+            .await?
+            .agent)
+    }
+
+    #[instrument(skip(self))]
+    pub async fn create_addressable_agent(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        write: AgentWrite,
+    ) -> AppResult<ProvisionedAgent> {
+        self.create_addressable_agent_with(
+            user_id,
+            company_id,
+            write,
+            PersonalChannelPlan::CompanyDefaults,
+        )
+        .await
+    }
+
+    /// [`create_addressable_agent`](Self::create_addressable_agent), told where the personal
+    /// channel comes from.
+    ///
+    /// Both go through one body because the agent and its channel are written in a single
+    /// transaction either way: what the plan changes is who filled the channel in, not when it is
+    /// created.
+    #[instrument(skip(self))]
+    pub async fn create_addressable_agent_with(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        write: AgentWrite,
+        plan: PersonalChannelPlan,
+    ) -> AppResult<ProvisionedAgent> {
+        let (company, write) = self
+            .prepared_agent_write(user_id, company_id, write)
+            .await?;
 
         info!(
             "Creating agent '{}' ({}) for company {}",
             write.name, write.slug, company_id
         );
 
-        self.agent_persistence.create(company_id, write).await
+        let mut decision = match plan {
+            PersonalChannelPlan::CompanyDefaults => {
+                personal_channel_write(&write, &company.channel_defaults, self.spam_scanning)
+            }
+            PersonalChannelPlan::Configured(configured) => {
+                self.configured_personal_channel(&write, *configured)?
+            }
+        };
+        decision.channel.created_by = Some(CreationProvenance::user(user_id));
+        decision
+            .channel
+            .normalize_with(crate::use_cases::channel::ActiveAgent::SuppliedByCaller)?;
+        let (agent, channel) = self
+            .owned_persistence
+            .create_owned_agent_channel(company_id, write, decision.channel)
+            .await?;
+        Ok(ProvisionedAgent {
+            agent,
+            channel,
+            warnings: decision.warnings,
+        })
+    }
+
+    /// Everything a create checks before it writes anything, answering with the normalized write.
+    ///
+    /// The create form's channel step calls it so a bad handle, model pair or config JSON is
+    /// refused on the agent step rather than after the channel is filled in, and the step renders
+    /// the handle in the form it will be stored in.
+    pub async fn validate_new_agent(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        write: AgentWrite,
+    ) -> AppResult<AgentWrite> {
+        let (_, write) = self
+            .prepared_agent_write(user_id, company_id, write)
+            .await?;
+        Ok(write)
+    }
+
+    /// The company a new agent belongs to, and the write itself normalized and checked.
+    ///
+    /// One place for "is this a valid new agent here", so the channel step and the create that
+    /// follows it cannot disagree about what will be accepted.
+    async fn prepared_agent_write(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        mut write: AgentWrite,
+    ) -> AppResult<(Company, AgentWrite)> {
+        let company =
+            managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
+        write.created_by = Some(CreationProvenance::user(user_id));
+        write.normalize()?;
+        self.validate_model_selection(company_id, &write).await?;
+        Ok((company, write))
+    }
+
+    /// The channel the create form's channel step submitted, held to the two rules a personal
+    /// channel has that its form cannot enforce.
+    ///
+    /// Its address follows the agent handle -- [`update_agent_and_owned_address`] keeps them in
+    /// step forever after -- so the submitted slug is replaced rather than trusted; and `@public`
+    /// on a server without spam scanning needs the confirmation the step showed. The defaults path
+    /// strips `@public` and warns instead, because nobody was there to answer.
+    ///
+    /// [`update_agent_and_owned_address`]: OwnedAgentChannelPersistence::update_agent_and_owned_address
+    fn configured_personal_channel(
+        &self,
+        agent: &AgentWrite,
+        configured: ConfiguredPersonalChannel,
+    ) -> AppResult<PersonalChannelDecision> {
+        let ConfiguredPersonalChannel {
+            mut write,
+            spam_disabled_confirmed,
+        } = configured;
+
+        check_spam_interlock(&write, self.spam_scanning, spam_disabled_confirmed)?;
+
+        write.slug = agent.slug.clone();
+        if write.name.trim().is_empty() {
+            write.name = agent.name.clone();
+        }
+
+        Ok(PersonalChannelDecision {
+            channel: write,
+            warnings: Vec::new(),
+        })
+    }
+
+    /// Create one company agent from a global library definition.
+    ///
+    /// The definition is copied rather than referenced: the company owns what it creates and can
+    /// edit it afterwards without the global entry changing under it, and it gets the personal
+    /// channel every other created agent gets.
+    #[instrument(skip(self))]
+    pub async fn create_agent_from_library(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        library_agent_id: Uuid,
+    ) -> AppResult<ProvisionedAgent> {
+        self.verify_company_manager(user_id, company_id).await?;
+        let definition = self
+            .get_library_agent(library_agent_id)
+            .await?
+            .ok_or_else(agent_not_found)?;
+        let mut write = library_agent_write(&definition);
+
+        // A library definition names a model the company may not have enabled, and the picker
+        // never showed one. Fall back to the company default rather than refusing the pick, and
+        // say so.
+        let mut warnings = Vec::new();
+        if write.provider.is_some()
+            && self
+                .validate_model_selection(company_id, &write)
+                .await
+                .is_err()
+        {
+            write.provider = None;
+            write.model = None;
+            warnings.push(ProvisioningWarning {
+                code: "library_model_unavailable".into(),
+                message: format!(
+                    "'{}' was created on the company's default model: the model it is published with is not enabled here.",
+                    definition.name
+                ),
+            });
+        }
+
+        let mut provisioned = self
+            .create_addressable_agent(user_id, company_id, write)
+            .await?;
+        warnings.append(&mut provisioned.warnings);
+        provisioned.warnings = warnings;
+        Ok(provisioned)
     }
 
     #[instrument(skip(self))]
@@ -343,7 +665,9 @@ impl AgentUseCases {
             .await?
             .ok_or_else(agent_not_found)?;
         write.normalize()?;
-        self.agent_persistence.update(agent_id, write).await
+        self.owned_persistence
+            .update_agent_and_owned_address(agent_id, write)
+            .await
     }
 
     pub async fn delete_library_agent(&self, agent_id: Uuid) -> AppResult<()> {
@@ -675,11 +999,47 @@ mod tests {
     use crate::entities::{
         company::{Company, CompanyAccess},
         company_member::CompanyMembership,
-        value_objects::EmailAddress,
+        value_objects::{ChannelSlug, EmailAddress},
     };
     use crate::use_cases::company::CompanyWrite;
     use chrono::Utc;
     use serde_json::json;
+
+    #[test]
+    fn personal_channel_derivation_copies_defaults_and_safely_removes_public() {
+        let agent = AgentWrite {
+            name: "Helper".into(),
+            slug: "helper".into(),
+            description: Some("Helps".into()),
+            ..AgentWrite::default()
+        };
+        let defaults = CompanyChannelDefaults {
+            add_3rd_party: false,
+            participant_emails: Some(vec!["@public".into(), "partner@example.com".into()]),
+            retrieve_company_memory: true,
+            retrieve_agent_memory: true,
+            retrieve_user_memory: true,
+            persist_company_memory: true,
+            persist_agent_memory: true,
+            persist_user_memory: true,
+        };
+        let decision = personal_channel_write(&agent, &defaults, SpamScanning::Unavailable);
+        assert_eq!(decision.channel.name, "Helper");
+        assert_eq!(decision.channel.description.as_deref(), Some("Helps"));
+        assert_eq!(decision.channel.slug, "helper");
+        assert_eq!(
+            decision.channel.participant_emails,
+            Some(vec!["partner@example.com".into()])
+        );
+        assert!(!decision.channel.add_3rd_party);
+        assert!(decision.channel.retrieve_company_memory);
+        assert!(decision.channel.retrieve_agent_memory);
+        assert!(decision.channel.retrieve_user_memory);
+        assert!(decision.channel.persist_company_memory);
+        assert!(decision.channel.persist_agent_memory);
+        assert!(decision.channel.persist_user_memory);
+        assert_eq!(decision.warnings.len(), 1);
+    }
     use std::sync::Mutex;
 
     #[test]
@@ -700,6 +1060,7 @@ mod tests {
         assert!(invalid.normalize().is_err());
 
         let agent = Agent {
+            memory_enabled: false,
             memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
             memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
             memory_max_results: 5,
@@ -894,6 +1255,7 @@ mod tests {
                 system_prompt: write.system_prompt,
                 description: write.description,
                 config_json: write.config_json,
+                memory_enabled: write.memory_enabled,
                 avatar_url: write.avatar_url,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
@@ -950,6 +1312,7 @@ mod tests {
             agent.model = write.model;
             agent.system_prompt = write.system_prompt;
             agent.description = write.description;
+            agent.memory_enabled = write.memory_enabled;
             agent.memory_persistence_mode = write.memory_persistence_mode;
             agent.memory_recall_mode = write.memory_recall_mode;
             agent.memory_max_results = write.memory_max_results;
@@ -964,6 +1327,275 @@ mod tests {
         }
     }
 
+    #[async_trait]
+    impl OwnedAgentChannelPersistence for MockAgentPersistence {
+        async fn create_owned_agent_channel(
+            &self,
+            company_id: Uuid,
+            agent: AgentWrite,
+            channel: ChannelWrite,
+        ) -> AppResult<(Agent, Channel)> {
+            let agent = AgentPersistence::create(self, company_id, agent).await?;
+            let channel = Channel {
+                id: Uuid::new_v4(),
+                company_id,
+                owner_agent_id: Some(agent.id),
+                name: channel.name,
+                description: channel.description,
+                slug: channel.slug.into(),
+                alias_slugs: channel.alias_slugs.into_iter().map(Into::into).collect(),
+                participant_emails: channel
+                    .participant_emails
+                    .map(|items| items.into_iter().map(Into::into).collect()),
+                agent_ids: Some(vec![agent.id]),
+                enabled: channel.enabled,
+                add_3rd_party: channel.add_3rd_party,
+                retrieve_company_memory: channel.retrieve_company_memory,
+                retrieve_agent_memory: channel.retrieve_agent_memory,
+                retrieve_user_memory: channel.retrieve_user_memory,
+                persist_company_memory: channel.persist_company_memory,
+                persist_agent_memory: channel.persist_agent_memory,
+                persist_user_memory: channel.persist_user_memory,
+                created_by: channel
+                    .created_by
+                    .unwrap_or_else(CreationProvenance::system),
+                created_at: Utc::now(),
+            };
+            Ok((agent, channel))
+        }
+
+        async fn update_agent_and_owned_address(
+            &self,
+            agent_id: Uuid,
+            write: AgentWrite,
+        ) -> AppResult<Agent> {
+            AgentPersistence::update(self, agent_id, write).await
+        }
+    }
+
+    /// A company, its owner, and the use cases over mock persistence — what every test about
+    /// creating an agent needs before it can say anything about the channel that comes with it.
+    struct Fixture {
+        owner_id: Uuid,
+        company_id: Uuid,
+        use_cases: AgentUseCases,
+    }
+
+    fn fixture(defaults: CompanyChannelDefaults, spam_scanning: SpamScanning) -> Fixture {
+        let owner_id = Uuid::new_v4();
+        let company_id = Uuid::new_v4();
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            members: Mutex::new(Vec::new()),
+            companies: Mutex::new(vec![Company {
+                channel_defaults: defaults,
+                id: company_id,
+                user_id: owner_id,
+                name: "Acme Corp".to_string(),
+                slug: "acme".into(),
+                enable_llm_spam_guardrail: None,
+                avatar_url: None,
+                memory_provider: None,
+                created_at: Utc::now(),
+            }]),
+        });
+        let agent_persistence = Arc::new(MockAgentPersistence {
+            agents: Mutex::new(Vec::new()),
+        });
+
+        Fixture {
+            owner_id,
+            company_id,
+            use_cases: AgentUseCases::new(
+                company_persistence,
+                agent_persistence.clone(),
+                agent_persistence,
+                spam_scanning,
+            ),
+        }
+    }
+
+    fn support_agent() -> AgentWrite {
+        AgentWrite {
+            name: "Support Triage".into(),
+            slug: "support-triage".into(),
+            ..AgentWrite::default()
+        }
+    }
+
+    /// The channel step writes the personal channel itself, so what it submitted is what gets
+    /// stored — except the address, which belongs to the agent handle and is taken from it whatever
+    /// the body said.
+    #[tokio::test]
+    async fn a_configured_personal_channel_is_stored_on_the_agent_handle() {
+        let fixture = fixture(CompanyChannelDefaults::default(), SpamScanning::Available);
+
+        let provisioned = fixture
+            .use_cases
+            .create_addressable_agent_with(
+                fixture.owner_id,
+                fixture.company_id,
+                support_agent(),
+                PersonalChannelPlan::configured(
+                    ChannelWrite {
+                        name: "Support Inbox".into(),
+                        description: Some("Where support mail lands".into()),
+                        slug: "somewhere-else".into(),
+                        alias_slugs: vec!["help".into(), "sales".into()],
+                        participant_emails: Some(vec!["partner@example.com".into()]),
+                        enabled: true,
+                        add_3rd_party: false,
+                        retrieve_company_memory: true,
+                        persist_user_memory: true,
+                        ..ChannelWrite::default()
+                    },
+                    false,
+                ),
+            )
+            .await
+            .expect("the pair is created");
+
+        assert_eq!(provisioned.channel.slug, "support-triage");
+        assert_eq!(provisioned.channel.name, "Support Inbox");
+        assert_eq!(
+            provisioned.channel.description.as_deref(),
+            Some("Where support mail lands")
+        );
+        assert_eq!(
+            provisioned.channel.alias_slugs,
+            vec![ChannelSlug::from("help"), ChannelSlug::from("sales")]
+        );
+        assert_eq!(
+            provisioned.channel.participant_emails,
+            Some(vec!["partner@example.com".into()])
+        );
+        assert!(!provisioned.channel.add_3rd_party);
+        assert!(provisioned.channel.retrieve_company_memory);
+        assert!(provisioned.channel.persist_user_memory);
+        assert!(!provisioned.channel.retrieve_user_memory);
+        assert!(provisioned.warnings.is_empty());
+    }
+
+    /// The defaults path strips `@public` and warns, because nobody was there to answer. The
+    /// configured path showed the interlock, so it refuses instead — and takes the answer.
+    #[tokio::test]
+    async fn a_public_configured_channel_is_refused_until_the_interlock_is_answered() {
+        let public = |confirmed| {
+            PersonalChannelPlan::configured(
+                ChannelWrite {
+                    name: "Support Triage".into(),
+                    slug: "support-triage".into(),
+                    participant_emails: Some(vec![PUBLIC_PARTICIPANT.into()]),
+                    enabled: true,
+                    ..ChannelWrite::default()
+                },
+                confirmed,
+            )
+        };
+
+        let fixture = fixture(CompanyChannelDefaults::default(), SpamScanning::Unavailable);
+        let refused = fixture
+            .use_cases
+            .create_addressable_agent_with(
+                fixture.owner_id,
+                fixture.company_id,
+                support_agent(),
+                public(false),
+            )
+            .await;
+        assert!(
+            matches!(refused, Err(AppError::BadRequest(_))),
+            "{refused:?}"
+        );
+
+        let provisioned = fixture
+            .use_cases
+            .create_addressable_agent_with(
+                fixture.owner_id,
+                fixture.company_id,
+                support_agent(),
+                public(true),
+            )
+            .await
+            .expect("a confirmed public channel is created");
+        assert_eq!(
+            provisioned.channel.participant_emails,
+            Some(vec![PUBLIC_PARTICIPANT.into()])
+        );
+        assert!(provisioned.warnings.is_empty());
+    }
+
+    /// The split must not change what a create that names no channel produces.
+    #[tokio::test]
+    async fn an_unconfigured_personal_channel_still_comes_from_the_company_defaults() {
+        let fixture = fixture(
+            CompanyChannelDefaults {
+                add_3rd_party: false,
+                participant_emails: Some(vec![
+                    PUBLIC_PARTICIPANT.into(),
+                    "partner@example.com".into(),
+                ]),
+                retrieve_agent_memory: true,
+                ..CompanyChannelDefaults::default()
+            },
+            SpamScanning::Unavailable,
+        );
+
+        let provisioned = fixture
+            .use_cases
+            .create_addressable_agent(fixture.owner_id, fixture.company_id, support_agent())
+            .await
+            .expect("the pair is created");
+
+        assert_eq!(provisioned.channel.slug, "support-triage");
+        assert_eq!(provisioned.channel.name, "Support Triage");
+        assert_eq!(
+            provisioned.channel.participant_emails,
+            Some(vec!["partner@example.com".into()])
+        );
+        assert!(!provisioned.channel.add_3rd_party);
+        assert!(provisioned.channel.retrieve_agent_memory);
+        assert_eq!(provisioned.warnings.len(), 1);
+    }
+
+    /// The channel step checks the agent before it renders, so the two must refuse the same things.
+    #[tokio::test]
+    async fn validating_a_new_agent_normalizes_the_handle_and_refuses_an_unavailable_model() {
+        let fixture = fixture(CompanyChannelDefaults::default(), SpamScanning::Available);
+
+        let validated = fixture
+            .use_cases
+            .validate_new_agent(
+                fixture.owner_id,
+                fixture.company_id,
+                AgentWrite {
+                    name: "  Support Triage  ".into(),
+                    slug: "Support Triage".into(),
+                    ..AgentWrite::default()
+                },
+            )
+            .await
+            .expect("a plain agent validates");
+        assert_eq!(validated.name, "Support Triage");
+        assert_eq!(validated.slug, "support-triage");
+
+        let refused = fixture
+            .use_cases
+            .validate_new_agent(
+                fixture.owner_id,
+                fixture.company_id,
+                AgentWrite {
+                    provider: Some("anthropic".into()),
+                    model: Some("claude-not-enabled".into()),
+                    ..support_agent()
+                },
+            )
+            .await;
+        assert!(
+            matches!(refused, Err(AppError::BadRequest(_))),
+            "{refused:?}"
+        );
+    }
+
     #[tokio::test]
     async fn company_owner_agent_crud_flow_works() {
         let owner_id = Uuid::new_v4();
@@ -972,6 +1604,7 @@ mod tests {
         let company_persistence = Arc::new(MockCompanyPersistence {
             members: Mutex::new(Vec::new()),
             companies: Mutex::new(vec![Company {
+                channel_defaults: Default::default(),
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme Corp".to_string(),
@@ -987,7 +1620,12 @@ mod tests {
             agents: Mutex::new(Vec::new()),
         });
 
-        let use_cases = AgentUseCases::new(company_persistence, agent_persistence);
+        let use_cases = AgentUseCases::new(
+            company_persistence,
+            agent_persistence.clone(),
+            agent_persistence,
+            SpamScanning::Available,
+        );
 
         // 0. Invalid reserved suffix slug rejection test
         let invalid_res = use_cases
@@ -1174,6 +1812,7 @@ Guidelines:
         let other_company_id = Uuid::new_v4();
 
         let company = |id: Uuid, user_id: Uuid, slug: &str| Company {
+            channel_defaults: Default::default(),
             id,
             user_id,
             name: "Acme Corp".to_string(),
@@ -1197,7 +1836,12 @@ Guidelines:
         let agent_persistence = Arc::new(MockAgentPersistence {
             agents: Mutex::new(Vec::new()),
         });
-        let use_cases = AgentUseCases::new(company_persistence, agent_persistence);
+        let use_cases = AgentUseCases::new(
+            company_persistence,
+            agent_persistence.clone(),
+            agent_persistence,
+            SpamScanning::Available,
+        );
 
         let agent = use_cases
             .create_agent(
@@ -1312,5 +1956,108 @@ Guidelines:
             .delete_agent(admin_id, company_id, managed.id)
             .await
             .expect("an admin deletes an agent");
+    }
+
+    #[tokio::test]
+    async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
+        let owner_id = Uuid::new_v4();
+        let company_id = Uuid::new_v4();
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            members: Mutex::new(Vec::new()),
+            companies: Mutex::new(vec![Company {
+                channel_defaults: Default::default(),
+                id: company_id,
+                user_id: owner_id,
+                name: "Acme Corp".to_string(),
+                slug: "acme".into(),
+                enable_llm_spam_guardrail: None,
+                avatar_url: None,
+                memory_provider: None,
+                created_at: Utc::now(),
+            }]),
+        });
+
+        // A library definition is one with no company of its own.
+        let definition = |name: &str, slug: &str, provider: &str, model: &str| Agent {
+            id: Uuid::new_v4(),
+            company_id: None,
+            name: name.to_string(),
+            slug: slug.to_string(),
+            provider: Some(provider.to_string()),
+            model: Some(model.to_string()),
+            run_timeout_secs: Some(90),
+            system_prompt: Some("Answer briefly.".into()),
+            description: Some("Sorts support mail".into()),
+            config_json: None,
+            memory_enabled: true,
+            memory_persistence_mode: MemoryPersistenceMode::AudienceOnly,
+            memory_recall_mode: MemoryRecallMode::Fast,
+            memory_max_results: 7,
+            avatar_url: None,
+            created_by: CreationProvenance::system(),
+            created_at: Utc::now(),
+        };
+        let runnable = definition("Triage", "triage", "openai", "gpt-4o");
+        let elsewhere = definition(
+            "Billing",
+            "billing",
+            "anthropic",
+            "claude-3-5-sonnet-20241022",
+        );
+        let agent_persistence = Arc::new(MockAgentPersistence {
+            agents: Mutex::new(vec![runnable.clone(), elsewhere.clone()]),
+        });
+        let use_cases = AgentUseCases::new(
+            company_persistence,
+            agent_persistence.clone(),
+            agent_persistence,
+            SpamScanning::Available,
+        );
+
+        // The definition is copied field for field, and the company owns the copy.
+        let provisioned = use_cases
+            .create_agent_from_library(owner_id, company_id, runnable.id)
+            .await
+            .expect("the owner picks a library agent");
+        assert_eq!(provisioned.agent.company_id, Some(company_id));
+        assert_ne!(provisioned.agent.id, runnable.id);
+        assert_eq!(provisioned.agent.name, "Triage");
+        assert_eq!(provisioned.agent.slug, "triage");
+        assert_eq!(provisioned.agent.provider.as_deref(), Some("openai"));
+        assert_eq!(provisioned.agent.model.as_deref(), Some("gpt-4o"));
+        assert_eq!(provisioned.agent.run_timeout_secs, Some(90));
+        assert_eq!(
+            provisioned.agent.system_prompt.as_deref(),
+            Some("Answer briefly.")
+        );
+        assert!(provisioned.agent.memory_enabled);
+        // It gets the personal channel every created agent gets.
+        assert_eq!(provisioned.channel.slug.as_str(), "triage");
+        assert!(provisioned.warnings.is_empty());
+
+        // A definition published on a model this company has not enabled still gets created --
+        // on the company default, and it says so rather than failing the pick.
+        let fallback = use_cases
+            .create_agent_from_library(owner_id, company_id, elsewhere.id)
+            .await
+            .expect("a pick whose model is unavailable here");
+        assert_eq!(fallback.agent.provider, None);
+        assert_eq!(fallback.agent.model, None);
+        assert_eq!(
+            fallback
+                .warnings
+                .iter()
+                .map(|warning| warning.code.as_str())
+                .collect::<Vec<_>>(),
+            vec!["library_model_unavailable"]
+        );
+
+        // A company agent is not a library definition, so it cannot be picked as one.
+        assert!(
+            use_cases
+                .create_agent_from_library(owner_id, company_id, provisioned.agent.id)
+                .await
+                .is_err()
+        );
     }
 }

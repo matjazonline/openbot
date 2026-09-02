@@ -55,7 +55,7 @@ fn authenticated_user(
         .map(|id| AuthenticatedUser { id })
 }
 
-fn is_htmx_request(headers: &axum::http::HeaderMap) -> bool {
+pub(super) fn is_htmx_request(headers: &axum::http::HeaderMap) -> bool {
     headers
         .get("HX-Request")
         .and_then(|value| value.to_str().ok())

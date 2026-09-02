@@ -1481,6 +1481,7 @@ mod tests {
         let company_id = Uuid::new_v4();
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![Company {
+                channel_defaults: Default::default(),
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Acme Corp".to_string(),
@@ -1494,6 +1495,7 @@ mod tests {
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),
@@ -1711,6 +1713,7 @@ regis";
         let company_id = Uuid::new_v4();
         let company_persistence = Arc::new(MockCompanyPersistence {
             companies: Mutex::new(vec![Company {
+                channel_defaults: Default::default(),
                 id: company_id,
                 user_id: Uuid::new_v4(),
                 name: "Populus Network".to_string(),
@@ -1724,6 +1727,7 @@ regis";
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
+                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),
