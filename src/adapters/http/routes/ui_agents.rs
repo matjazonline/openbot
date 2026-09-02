@@ -33,12 +33,13 @@ use crate::{
         channel::Channel,
         company::Company,
         memory::{MemoryPersistenceMode, MemoryRecallMode},
+        schedule::ChannelSchedule,
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
     use_cases::{
         agent::AgentUseCases, channel::ChannelUseCases, company::CompanyUseCases,
-        user::UserUseCases,
+        schedule::ScheduleUseCases, user::UserUseCases,
     },
 };
 
@@ -63,6 +64,10 @@ pub fn router() -> Router<AppState> {
             "/ui/agents/{agent_id}",
             get(edit_pane).put(update_agent).delete(delete_agent),
         )
+        .route(
+            "/ui/agents/{agent_id}/channel",
+            axum::routing::put(update_owned_channel),
+        )
 }
 
 /// What the workspace has selected, all optional so `/ui/agents` alone is a valid entry point.
@@ -72,6 +77,8 @@ pub struct WorkspaceQuery {
     pub agent_id: Option<Uuid>,
     /// `?new=1` opens the create form instead of an agent's settings.
     pub new: Option<String>,
+    /// Which half of the selected agent to open on; see [`pages::AgentTab`].
+    pub tab: Option<String>,
 }
 
 /// The company scope every fragment and every write carries, in the URL rather than the body so
@@ -79,6 +86,16 @@ pub struct WorkspaceQuery {
 #[derive(Debug, Clone, Deserialize)]
 pub struct CompanyQuery {
     pub company_id: Uuid,
+}
+
+/// The same scope, plus the tab a pane fragment is for.
+///
+/// Separate from [`CompanyQuery`] rather than an optional field on it: only the edit pane and its
+/// channel write have a tab, and the create and generator routes should not appear to accept one.
+#[derive(Debug, Clone, Deserialize)]
+pub struct EditPaneQuery {
+    pub company_id: Uuid,
+    pub tab: Option<String>,
 }
 
 /// What the "Generate with AI" box sends: the instructions, plus whichever model overrides the
@@ -195,6 +212,16 @@ impl PromptGeneratorForm {
 
 const NO_SELECTION: &str = "Select an agent to configure it, or create a new one.";
 
+/// The channel this agent owns, out of the company's channels.
+///
+/// An agent owns at most one — `channels.owner_agent_id` is unique — so this is a `find` over the
+/// list every handler has already loaded rather than a query of its own.
+fn owned_channel(agent_id: Uuid, channels: &[Channel]) -> Option<&Channel> {
+    channels
+        .iter()
+        .find(|channel| channel.is_owned_by(agent_id))
+}
+
 /// The use cases and the caller every Agents handler starts from.
 ///
 /// Extracted as one value rather than five `State`s per handler: each of these routes needs the
@@ -203,6 +230,7 @@ struct Workspace {
     company_use_cases: Arc<CompanyUseCases>,
     agent_use_cases: Arc<AgentUseCases>,
     channel_use_cases: Arc<ChannelUseCases>,
+    schedule_use_cases: Arc<ScheduleUseCases>,
     user_use_cases: Arc<UserUseCases>,
     config: Arc<AppConfig>,
     user_id: Uuid,
@@ -221,6 +249,7 @@ impl FromRequestParts<AppState> for Workspace {
             company_use_cases: state.company_use_cases.clone(),
             agent_use_cases: state.agent_use_cases.clone(),
             channel_use_cases: state.channel_use_cases.clone(),
+            schedule_use_cases: state.schedule_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             config: state.config.clone(),
             user_id: user.id,
@@ -241,6 +270,7 @@ impl Workspace {
         AgentSettingsView {
             agent_use_cases: &self.agent_use_cases,
             channel_use_cases: &self.channel_use_cases,
+            schedule_use_cases: &self.schedule_use_cases,
             config: &self.config,
             user_id: self.user_id,
             company,
@@ -292,7 +322,14 @@ async fn agents_page(
             })
             .await?
         }
-        (false, Some(agent)) => view.edit_pane(agent, &channels, None, None).await?,
+        (false, Some(agent)) => {
+            view.tab_pane(
+                agent,
+                &channels,
+                pages::AgentTab::from_query(query.tab.as_deref()),
+            )
+            .await?
+        }
         (false, None) => {
             pages::agent_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline)
         }
@@ -334,14 +371,21 @@ async fn create_pane(
 async fn edit_pane(
     workspace: Workspace,
     Path(agent_id): Path<Uuid>,
-    Query(query): Query<CompanyQuery>,
+    Query(query): Query<EditPaneQuery>,
 ) -> AppResult<Html<String>> {
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company);
     let agent = view.agent(agent_id).await?;
     let channels = view.channels().await?;
 
-    Ok(Html(view.edit_pane(&agent, &channels, None, None).await?))
+    Ok(Html(
+        view.tab_pane(
+            &agent,
+            &channels,
+            pages::AgentTab::from_query(query.tab.as_deref()),
+        )
+        .await?,
+    ))
 }
 
 /// POST /ui/agents/generate-prompt - Expand instructions into a system prompt for the pane's form
@@ -433,7 +477,10 @@ async fn create_agent(
     };
 
     match created {
-        Ok((agent, warnings)) => view.saved_response(&agent, &warnings).await,
+        Ok((agent, warnings)) => {
+            view.saved_response(&agent, pages::AgentTab::Settings, &warnings)
+                .await
+        }
         Err(message) => rejected(&view, &submitted, &message).await,
     }
 }
@@ -538,8 +585,12 @@ async fn create_agent_with_channel(
 
     match created {
         Ok(provisioned) => {
-            view.saved_response(&provisioned.agent, &provisioned.warnings)
-                .await
+            view.saved_response(
+                &provisioned.agent,
+                pages::AgentTab::Settings,
+                &provisioned.warnings,
+            )
+            .await
         }
         Err(err) => {
             view.channel_step_rejected(&agent, &channel, &format!("Failed to create agent: {err}"))
@@ -669,7 +720,8 @@ async fn create_from_library(
     };
 
     warnings.extend(refusals);
-    view.saved_response(agent, &warnings).await
+    view.saved_response(agent, pages::AgentTab::Settings, &warnings)
+        .await
 }
 
 /// PUT /ui/agents/{agent_id} - Save one agent's settings (Protected).
@@ -729,7 +781,10 @@ async fn update_agent(
         .await;
 
     match saved {
-        Ok(agent) => view.saved_response(&agent, &[]).await,
+        Ok(agent) => {
+            view.saved_response(&agent, pages::AgentTab::Settings, &[])
+                .await
+        }
         Err(err) => Ok(Html(
             view.edit_pane(
                 &stored,
@@ -741,6 +796,64 @@ async fn update_agent(
         )
         .into_response()),
     }
+}
+
+/// PUT /ui/agents/{agent_id}/channel - Save the agent's personal channel (Protected).
+///
+/// The channel half of the Agents workspace, and deliberately not a second implementation of it:
+/// the submission is parsed by [`SubmittedChannel`] and written by
+/// [`ChannelUseCases::update_channel`], which is also what pins an owned channel's address and
+/// keeps its owner at position 0 — so nothing about ownership has to be re-decided here.
+#[instrument(skip(workspace, form))]
+async fn update_owned_channel(
+    workspace: Workspace,
+    Path(agent_id): Path<Uuid>,
+    Query(query): Query<EditPaneQuery>,
+    Form(form): Form<ChannelForm>,
+) -> AppResult<Response> {
+    let company = workspace.scoped_company(query.company_id).await?;
+    let view = workspace.view(&company);
+    let agent = view.agent(agent_id).await?;
+    let channels = view.channels().await?;
+    let stored = owned_channel(agent_id, &channels)
+        .ok_or_else(|| AppError::NotFound("Agent has no personal channel".into()))?;
+    let submitted = SubmittedChannel::new(form);
+
+    // Both ways of refusing the save end in the same re-render, so they meet as one message here
+    // rather than as two calls into the pane.
+    let refused = match submitted.write(Some(submitted.agent_ids())) {
+        Err(message) => Some(message),
+        Ok(write) => workspace
+            .channel_use_cases
+            .update_channel(
+                workspace.user_id,
+                company.id,
+                stored.id,
+                write,
+                submitted.form.confirm_spam_disabled(),
+            )
+            .await
+            .err()
+            .map(|err| format!("Failed to save channel: {err}")),
+    };
+
+    let Some(message) = refused else {
+        return view
+            .saved_response(&agent, pages::AgentTab::Channel, &[])
+            .await;
+    };
+
+    Ok(Html(
+        view.channel_pane(
+            &agent,
+            &channels,
+            stored,
+            Some(&submitted.draft()),
+            Some(&message),
+        )
+        .await?,
+    )
+    .into_response())
 }
 
 /// DELETE /ui/agents/{agent_id} - Delete an agent and clear the pane (Protected).
@@ -782,6 +895,7 @@ struct CreateForm<'a> {
 struct AgentSettingsView<'a> {
     agent_use_cases: &'a AgentUseCases,
     channel_use_cases: &'a ChannelUseCases,
+    schedule_use_cases: &'a ScheduleUseCases,
     config: &'a AppConfig,
     user_id: Uuid,
     company: &'a Company,
@@ -813,6 +927,20 @@ impl AgentSettingsView<'_> {
     async fn channels(&self) -> AppResult<Vec<Channel>> {
         self.channel_use_cases
             .list_company_channels(self.user_id, self.company.id)
+            .await
+    }
+
+    async fn schedules(&self, channel_id: Uuid) -> AppResult<Vec<ChannelSchedule>> {
+        self.schedule_use_cases
+            .list_channel_schedules(self.user_id, self.company.id, channel_id)
+            .await
+    }
+
+    /// Whether the company's memory provider is usable, which is what decides whether the channel
+    /// form's memory grants are described as effective or as stored-but-inactive.
+    async fn memory_ready(&self) -> AppResult<bool> {
+        self.channel_use_cases
+            .memory_ready(self.user_id, self.company.id)
             .await
     }
 
@@ -878,10 +1006,7 @@ impl AgentSettingsView<'_> {
         draft: &pages::ChannelDraft<'_>,
         error: Option<&str>,
     ) -> AppResult<String> {
-        let memory_ready = self
-            .channel_use_cases
-            .memory_ready(self.user_id, self.company.id)
-            .await?;
+        let memory_ready = self.memory_ready().await?;
 
         Ok(pages::agent_channel_step_pane(
             &pages::AgentChannelStepPane {
@@ -951,6 +1076,7 @@ impl AgentSettingsView<'_> {
         Ok(Html(pane).into_response())
     }
 
+    /// The Settings tab, which is the tab every agent write comes back on.
     async fn edit_pane(
         &self,
         agent: &Agent,
@@ -969,14 +1095,72 @@ impl AgentSettingsView<'_> {
             used_by: &used_by,
             draft,
             error,
+            body: pages::AgentPaneBody::Settings,
         }))
     }
 
-    /// What every successful write returns: the saved agent's pane, with the sidebar list
-    /// refreshed beside it so a create, rename or handle change shows up immediately.
+    /// The Channel tab: the agent's personal channel, with its schedules.
+    ///
+    /// Takes the channel rather than looking it up, because every caller has already found it in
+    /// the `channels` it must pass anyway.
+    async fn channel_pane(
+        &self,
+        agent: &Agent,
+        channels: &[Channel],
+        channel: &Channel,
+        draft: Option<&pages::ChannelDraft<'_>>,
+        error: Option<&str>,
+    ) -> AppResult<String> {
+        let used_by = self.used_by(agent.id, channels);
+        let model_connections = self.model_connections().await?;
+        let schedules = self.schedules(channel.id).await?;
+        let memory_ready = self.memory_ready().await?;
+        let tab = pages::AgentChannelTab {
+            channel,
+            schedules: &schedules,
+            spam_scan_enabled: self.config.is_spam_scan_enabled(),
+            memory_ready,
+            draft,
+            error,
+        };
+
+        Ok(pages::agent_edit_pane(&pages::AgentEditPane {
+            company: self.company,
+            app_domain_name: self.app_domain_name,
+            model_connections: &model_connections,
+            agent,
+            used_by: &used_by,
+            draft: None,
+            error: None,
+            body: pages::AgentPaneBody::Channel(&tab),
+        }))
+    }
+
+    /// Whichever tab was asked for, falling back to Settings when the agent owns no channel for
+    /// the Channel tab to be about.
+    async fn tab_pane(
+        &self,
+        agent: &Agent,
+        channels: &[Channel],
+        tab: pages::AgentTab,
+    ) -> AppResult<String> {
+        match (tab, owned_channel(agent.id, channels)) {
+            (pages::AgentTab::Channel, Some(channel)) => {
+                self.channel_pane(agent, channels, channel, None, None)
+                    .await
+            }
+            _ => self.edit_pane(agent, channels, None, None).await,
+        }
+    }
+
+    /// What every successful write returns: the saved agent's pane on the tab the write was made
+    /// from, with the sidebar list refreshed beside it so a create, rename or handle change shows
+    /// up immediately — a channel write included, since the sidebar row carries the owned
+    /// channel's address.
     async fn saved_response(
         &self,
         agent: &Agent,
+        tab: pages::AgentTab,
         warnings: &[crate::use_cases::agent::ProvisioningWarning],
     ) -> AppResult<Response> {
         let warning = warnings
@@ -984,7 +1168,7 @@ impl AgentSettingsView<'_> {
             .map(|warning| pages::error_alert(&warning.message))
             .collect::<String>();
         let channels = self.channels().await?;
-        let pane = self.edit_pane(agent, &channels, None, None).await?;
+        let pane = self.tab_pane(agent, &channels, tab).await?;
         let agents = self.agents().await?;
         let list = pages::agent_settings_list(
             &self.list(&agents, &channels, Some(agent.id)),
@@ -995,8 +1179,10 @@ impl AgentSettingsView<'_> {
             [(
                 "HX-Push-Url",
                 format!(
-                    "/ui/agents?company_id={}&agent_id={}",
-                    self.company.id, agent.id
+                    "/ui/agents?company_id={}&agent_id={}&tab={}",
+                    self.company.id,
+                    agent.id,
+                    tab.as_query()
                 ),
             )],
             Html(format!("{warning}{pane}{list}")),
@@ -1188,5 +1374,85 @@ mod tests {
         assert_eq!(form.agent.memory_enabled, None);
         assert_eq!(form.agent.run_timeout_secs, None);
         assert!(!form.channel.enabled());
+    }
+
+    fn owned(company_id: Uuid, agent_id: Option<Uuid>) -> Channel {
+        Channel {
+            owner_agent_id: agent_id,
+            id: Uuid::new_v4(),
+            company_id,
+            name: "Triage".to_string(),
+            description: None,
+            slug: "triage".into(),
+            alias_slugs: Vec::new(),
+            participant_emails: None,
+            agent_ids: agent_id.map(|id| vec![id]),
+            enabled: true,
+            add_3rd_party: true,
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            created_by: crate::entities::creation::CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    /// Ownership is what the Channel tab is about, and it is not the same question as assignment:
+    /// a channel this agent merely runs on is not the one the tab may edit.
+    #[test]
+    fn owned_channel_finds_the_agents_own_and_never_a_borrowed_one() {
+        let company_id = Uuid::new_v4();
+        let agent_id = Uuid::new_v4();
+        let mine = owned(company_id, Some(agent_id));
+        let theirs = owned(company_id, Some(Uuid::new_v4()));
+        let mut shared = owned(company_id, None);
+        shared.agent_ids = Some(vec![agent_id]);
+
+        let channels = vec![shared, theirs, mine.clone()];
+        assert_eq!(
+            owned_channel(agent_id, &channels).map(|channel| channel.id),
+            Some(mine.id)
+        );
+        assert!(owned_channel(Uuid::new_v4(), &channels).is_none());
+    }
+
+    /// The Channel tab renders `channel_fields` with `ChannelOwner::Existing`, whose only agent
+    /// input is one hidden `agent_ids` carrying the owner. The write has to come back out of that
+    /// body with the owner still in it, or the save would drop the position-0 assignment an owned
+    /// channel is required to have.
+    #[tokio::test]
+    async fn the_channel_tab_body_writes_the_owner_back() {
+        let agent_id = Uuid::new_v4();
+        let request = Request::builder()
+            .method("PUT")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from(format!(
+                "form_mode=advanced&name=Triage&slug=triage\
+                 &description=Answers+billing&alias_slugs=help,+sales\
+                 &participant_emails=%40public&agent_ids={agent_id}\
+                 &enabled=true&add_3rd_party=true&confirm_spam_disabled=true"
+            )))
+            .unwrap();
+        let form = Form::<ChannelForm>::from_request(request, &())
+            .await
+            .expect("the channel tab's body parses")
+            .0;
+
+        let submitted = SubmittedChannel::new(form);
+        assert_eq!(submitted.agent_ids(), vec![agent_id]);
+
+        let write = submitted
+            .write(Some(submitted.agent_ids()))
+            .expect("the write builds");
+        assert_eq!(write.slug, "triage");
+        assert_eq!(write.agent_ids, Some(vec![agent_id]));
+        assert_eq!(
+            write.alias_slugs,
+            vec!["help".to_string(), "sales".to_string()]
+        );
+        assert!(submitted.form.confirm_spam_disabled());
     }
 }

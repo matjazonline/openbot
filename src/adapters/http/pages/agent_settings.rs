@@ -6,6 +6,7 @@
 //! list along out of band, so a rename or a delete shows up immediately.
 
 use super::*;
+use crate::entities::schedule::ChannelSchedule;
 
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
 ///
@@ -122,6 +123,70 @@ pub struct AgentEditPane<'a> {
     pub used_by: &'a [&'a Channel],
     /// What the user last typed, when a save was rejected; `None` shows the stored agent.
     pub draft: Option<&'a AgentDraft<'a>>,
+    pub error: Option<&'a str>,
+    /// Which half of the agent the pane is showing.
+    pub body: AgentPaneBody<'a>,
+}
+
+/// Which half of an agent's settings a request asked for.
+///
+/// An agent's personal channel is part of the agent rather than a neighbour of it — the address
+/// follows the handle, the owner is pinned at position 0, and the channel dies with the agent — so
+/// it is a tab here rather than only a stop in the Channels workspace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AgentTab {
+    #[default]
+    Settings,
+    Channel,
+}
+
+impl AgentTab {
+    /// What `?tab=` names. Anything unrecognised is the settings the pane opens on.
+    pub fn from_query(value: Option<&str>) -> Self {
+        match value.map(str::trim) {
+            Some("channel") => Self::Channel,
+            _ => Self::Settings,
+        }
+    }
+
+    /// How this tab names itself in a URL.
+    pub fn as_query(self) -> &'static str {
+        match self {
+            Self::Settings => "settings",
+            Self::Channel => "channel",
+        }
+    }
+}
+
+/// What the agent pane holds below its tabs.
+///
+/// Holding the body rather than an [`AgentTab`] field beside it is what keeps "Channel is lit" and
+/// "the channel is showing" the same fact — the same reason [`CompanyPaneBody`] is shaped this way.
+pub enum AgentPaneBody<'a> {
+    Settings,
+    Channel(&'a AgentChannelTab<'a>),
+}
+
+impl AgentPaneBody<'_> {
+    fn tab(&self) -> AgentTab {
+        match self {
+            Self::Settings => AgentTab::Settings,
+            Self::Channel(_) => AgentTab::Channel,
+        }
+    }
+}
+
+/// The agent's own channel, as its tab needs it.
+///
+/// Everything here is what [`channel_fields`] and [`channel_schedules_card`] take: the Channel tab
+/// is the Channels workspace's own form, not a second one that could drift from it.
+pub struct AgentChannelTab<'a> {
+    pub channel: &'a Channel,
+    pub schedules: &'a [ChannelSchedule],
+    pub spam_scan_enabled: bool,
+    pub memory_ready: bool,
+    /// What the user last typed, when a save was rejected; `None` shows the stored channel.
+    pub draft: Option<&'a ChannelDraft<'a>>,
     pub error: Option<&'a str>,
 }
 
@@ -260,10 +325,7 @@ fn agent_display_address<'a>(
     app_domain_name: &str,
 ) -> String {
     let channels = channels.collect::<Vec<_>>();
-    let owned = channels
-        .iter()
-        .copied()
-        .find(|channel| channel.owner_agent_id == Some(agent.id));
+    let owned = owned_channel(agent.id, channels.iter().copied());
     let channel = owned.or_else(|| {
         let mut matches = channels.iter().copied().filter(|channel| {
             channel
@@ -309,9 +371,6 @@ pub fn agent_settings_empty_pane(message: &str, swap: FragmentSwap) -> String {
 }
 
 pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
-    let config = stored_agent_config(pane.agent);
-    let stored = stored_draft(pane.agent, &config);
-    let draft = pane.draft.unwrap_or(&stored);
     let company_id = pane.company.id;
     let agent_id = pane.agent.id;
     let address = agent_display_address(
@@ -320,20 +379,68 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
         pane.company,
         pane.app_domain_name,
     );
+    let tabs = agent_tabs(
+        company_id,
+        agent_id,
+        pane.body.tab(),
+        owned_channel(agent_id, pane.used_by.iter().copied()).is_some(),
+    );
 
     format!(
         r##"
         <section id="agent-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
-            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-base-300 px-4 py-4 sm:px-6">
-                <div class="flex min-w-0 grow basis-48 items-center gap-3">
-                    {avatar}
-                    <div class="min-w-0">
-                        <h2 class="truncate text-xl font-bold">{name}</h2>
-                        <p class="truncate font-mono text-xs opacity-60">{address} · {model}</p>
-                        <p class="truncate text-xs opacity-50">{creator}</p>
+            <div class="border-b border-base-300 {header_padding}">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="flex min-w-0 grow basis-48 items-center gap-3">
+                        {avatar}
+                        <div class="min-w-0">
+                            <h2 class="truncate text-xl font-bold">{name}</h2>
+                            <p class="truncate font-mono text-xs opacity-60">{address} · {model}</p>
+                            <p class="truncate text-xs opacity-50">{creator}</p>
+                        </div>
                     </div>
                 </div>
+                {strip}
             </div>
+            {body}
+        </section>
+        "##,
+        header_padding = tabs.header_padding,
+        strip = tabs.strip,
+        avatar = avatar_bubble(
+            pane.agent.avatar_url.as_ref(),
+            &pane.agent.name,
+            AvatarSize::Header
+        ),
+        name = escape_html_text(&pane.agent.name),
+        address = escape_html_text(&address),
+        model = escape_html_text(&agent_model_summary(pane.agent)),
+        creator = escape_html_text(&pane.agent.created_by.label()),
+        body = match &pane.body {
+            AgentPaneBody::Settings => agent_settings_body(pane),
+            AgentPaneBody::Channel(tab) => agent_channel_body(pane, tab),
+        },
+    )
+}
+
+/// The Settings tab: the agent's own form, and what deleting it would cost.
+fn agent_settings_body(pane: &AgentEditPane<'_>) -> String {
+    let config = stored_agent_config(pane.agent);
+    let stored = stored_draft(pane.agent, &config);
+    let draft = pane.draft.unwrap_or(&stored);
+    let company_id = pane.company.id;
+    let agent_id = pane.agent.id;
+    // The personal channel has a tab of its own, so "Run by" is left saying the thing it is
+    // actually for: the *other* channels that would notice this agent going away.
+    let shared = pane
+        .used_by
+        .iter()
+        .copied()
+        .filter(|channel| !channel.is_owned_by(agent_id))
+        .collect::<Vec<_>>();
+
+    format!(
+        r##"
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 {used_by_html}
@@ -358,19 +465,10 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
                     </div>
                 </form>
             </div>
-        </section>
         "##,
-        avatar = avatar_bubble(
-            pane.agent.avatar_url.as_ref(),
-            &pane.agent.name,
-            AvatarSize::Header
-        ),
-        name = escape_html_text(&pane.agent.name),
-        address = escape_html_text(&address),
-        model = escape_html_text(&agent_model_summary(pane.agent)),
-        creator = escape_html_text(&pane.agent.created_by.label()),
+        name = escape_html_attr(&pane.agent.name),
         error_html = form_error_banner(pane.error),
-        used_by_html = used_by_channels(company_id, pane.used_by),
+        used_by_html = used_by_channels(company_id, &shared),
         delete_warning = escape_html_attr(&delete_warning(agent_id, pane.used_by)),
         fields = agent_fields(&AgentFields {
             scope: AgentFormScope::Company(company_id),
@@ -379,6 +477,129 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
             model_connections: pane.model_connections,
         }),
     )
+}
+
+/// The Channel tab: the agent's personal channel, on the form the Channels workspace uses.
+///
+/// The owner, its position-0 assignment and the primary address are lifecycle state rather than
+/// settings, which is what [`ChannelOwner::Existing`] shows instead of offering — and it is why
+/// there is no delete here either: the channel goes when the agent does, and the database refuses
+/// it any other way.
+fn agent_channel_body(pane: &AgentEditPane<'_>, tab: &AgentChannelTab<'_>) -> String {
+    let participants = stored_participants(tab.channel);
+    let aliases = stored_alias_slugs(tab.channel);
+    let stored = stored_channel_draft(tab.channel, &participants, &aliases);
+    let draft = tab.draft.unwrap_or(&stored);
+    let company_id = pane.company.id;
+    let agent_id = pane.agent.id;
+
+    format!(
+        r##"
+            <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-6">
+                {error_html}
+                <form hx-put="/ui/agents/{agent_id}/channel?company_id={company_id}"
+                    hx-target="#agent-pane" hx-swap="outerHTML" class="space-y-4">
+                    <input type="hidden" name="form_mode" value="advanced">
+                    {fields}
+                    <div class="flex items-center gap-3 border-t border-base-300 pt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                            <span class="[.htmx-request_&]:hidden">Save Changes</span>
+                            <span class="hidden [.htmx-request_&]:inline">Saving...</span>
+                        </button>
+                        <button type="button" class="btn btn-ghost"
+                            hx-get="/ui/agents/{agent_id}?company_id={company_id}&tab=channel"
+                            hx-target="#agent-pane" hx-swap="outerHTML" hx-sync="#agent-pane:replace">Cancel</button>
+                    </div>
+                </form>
+
+                {schedules_html}
+            </div>
+        "##,
+        error_html = form_error_banner(tab.error),
+        fields = channel_fields(&ChannelFields {
+            company: pane.company,
+            app_domain_name: pane.app_domain_name,
+            agents: &[],
+            id_prefix: &format!("agent-channel-{agent_id}"),
+            draft,
+            spam_scan_enabled: tab.spam_scan_enabled,
+            memory_ready: tab.memory_ready,
+            owner: ChannelOwner::Existing(pane.agent),
+        }),
+        schedules_html = channel_schedules_card(company_id, tab.channel.id, tab.schedules),
+    )
+}
+
+/// The pane's tab strip, and the header padding that belongs with it.
+///
+/// The two travel together because they are one decision: with a strip the header's bottom edge is
+/// the tabs' own, without one it is the header's padding — the same reason [`EasyTab`] carries its
+/// button and its form as a pair rather than as two independently-absent strings.
+struct AgentTabs {
+    strip: String,
+    header_padding: &'static str,
+}
+
+/// The pane's two halves, as htmx-swapped links.
+///
+/// A tab is a whole pane, and a plain URL is what makes one shareable and what the back button
+/// already understands — the same reasoning as the Companies pane's tabs. `#agent-pane` is already
+/// a swap target though, so these fetch the fragment rather than the whole page, exactly as the
+/// sidebar's own entries do.
+///
+/// An agent with no personal channel gets no strip at all rather than a tab leading nowhere.
+fn agent_tabs(
+    company_id: Uuid,
+    agent_id: Uuid,
+    tab: AgentTab,
+    has_owned_channel: bool,
+) -> AgentTabs {
+    if !has_owned_channel {
+        return AgentTabs {
+            strip: String::new(),
+            header_padding: "px-4 py-4 sm:px-6",
+        };
+    }
+
+    let entry = |target: AgentTab, label: &str| {
+        format!(
+            r##"<a role="tab" class="tab {active}"
+                        hx-get="/ui/agents/{agent_id}?company_id={company_id}&tab={query}"
+                        hx-target="#agent-pane" hx-swap="outerHTML" hx-sync="#agent-pane:replace"
+                        hx-push-url="/ui/agents?company_id={company_id}&agent_id={agent_id}&tab={query}">{label}</a>"##,
+            active = if tab == target { "tab-active" } else { "" },
+            query = target.as_query(),
+        )
+    };
+
+    AgentTabs {
+        strip: format!(
+            r##"
+                <div role="tablist" class="tabs tabs-border -mb-px mt-3">
+                    {settings}
+                    {channel}
+                </div>
+            "##,
+            settings = entry(AgentTab::Settings, "Settings"),
+            channel = entry(AgentTab::Channel, "Channel"),
+        ),
+        header_padding: "px-4 pt-4 sm:px-6",
+    }
+}
+
+/// The channel this agent owns, out of the channels it is assigned to.
+///
+/// An agent owns at most one — `channels.owner_agent_id` is unique — and an owned channel always
+/// assigns its owner at position 0, so it is always in the assigned set and never needs a lookup
+/// of its own.
+fn owned_channel<'a>(
+    agent_id: Uuid,
+    channels: impl Iterator<Item = &'a Channel>,
+) -> Option<&'a Channel> {
+    channels
+        .into_iter()
+        .find(|channel| channel.is_owned_by(agent_id))
 }
 
 pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
@@ -1053,12 +1274,12 @@ fn used_by_channels(company_id: Uuid, channels: &[&Channel]) -> String {
 fn delete_warning(agent_id: Uuid, used_by: &[&Channel]) -> String {
     let owned = used_by
         .iter()
-        .filter(|channel| channel.owner_agent_id == Some(agent_id))
+        .filter(|channel| channel.is_owned_by(agent_id))
         .count();
     let blockers = used_by
         .iter()
         .filter(|channel| {
-            channel.owner_agent_id != Some(agent_id)
+            !channel.is_owned_by(agent_id)
                 && channel.enabled
                 && channel
                     .agent_ids

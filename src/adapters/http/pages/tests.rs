@@ -1188,6 +1188,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         used_by: &[],
         draft: None,
         error: None,
+        body: AgentPaneBody::Settings,
     });
 
     assert!(html.contains(&format!(
@@ -1222,6 +1223,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         used_by: &[],
         draft: None,
         error: None,
+        body: AgentPaneBody::Settings,
     });
     assert!(!plain_html.contains("bg-base-200\" open"));
 }
@@ -1244,6 +1246,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
         used_by: &[],
         draft: None,
         error: None,
+        body: AgentPaneBody::Settings,
     });
     assert!(html.contains(r#"src="https://example.com/triage.png""#));
     // The form round-trips it, so saving from this pane cannot silently clear the picture.
@@ -1259,6 +1262,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
         used_by: &[],
         draft: None,
         error: None,
+        body: AgentPaneBody::Settings,
     });
     assert!(!plain_html.contains("<img"));
     assert!(plain_html.contains(">P</span>"));
@@ -1292,6 +1296,7 @@ fn agent_edit_pane_lists_the_channels_running_the_agent() {
         used_by: &[&channel],
         draft: None,
         error: None,
+        body: AgentPaneBody::Settings,
     });
 
     assert!(html.contains("Run by"));
@@ -1301,6 +1306,194 @@ fn agent_edit_pane_lists_the_channels_running_the_agent() {
     )));
     // Deleting it is not free, and the confirmation has to say so.
     assert!(html.contains("1 other channel assignment will be removed."));
+}
+
+/// The personal channel has a tab of its own, so listing it under "Run by" as well would say the
+/// agent is run by something separate from itself. The delete warning still counts it, because
+/// deleting the agent really does take it.
+#[test]
+fn run_by_names_the_shared_channels_and_leaves_the_personal_one_to_its_tab() {
+    let company = mailbox_company();
+    let agent = settings_agent(company.id, "Triage", "triage");
+    let personal = owned_channel_for(&agent, &company);
+    let shared = mailbox_channel(company.id);
+
+    let html = agent_edit_pane(&AgentEditPane {
+        company: &company,
+        app_domain_name: "mail.test",
+        model_connections: &[],
+        agent: &agent,
+        used_by: &[&personal, &shared],
+        draft: None,
+        error: None,
+        body: AgentPaneBody::Settings,
+    });
+
+    assert!(html.contains(&format!(
+        "/ui/channels?company_id={}&channel_id={}",
+        company.id, shared.id
+    )));
+    assert!(!html.contains(&format!("channel_id={}", personal.id)));
+    assert!(html.contains("1 owned personal channel and all of its data will be deleted"));
+
+    // Nothing but the personal channel means there is no one else to warn about at all.
+    let alone = agent_edit_pane(&AgentEditPane {
+        company: &company,
+        app_domain_name: "mail.test",
+        model_connections: &[],
+        agent: &agent,
+        used_by: &[&personal],
+        draft: None,
+        error: None,
+        body: AgentPaneBody::Settings,
+    });
+    assert!(!alone.contains("Run by"));
+}
+
+#[test]
+fn the_channel_tab_appears_only_for_an_agent_that_owns_a_channel() {
+    let company = mailbox_company();
+    let agent = settings_agent(company.id, "Triage", "triage");
+    let personal = owned_channel_for(&agent, &company);
+    let settings_url = format!(
+        "hx-push-url=\"/ui/agents?company_id={}&agent_id={}&tab=settings\"",
+        company.id, agent.id
+    );
+
+    let owning = agent_edit_pane(&AgentEditPane {
+        company: &company,
+        app_domain_name: "mail.test",
+        model_connections: &[],
+        agent: &agent,
+        used_by: &[&personal],
+        draft: None,
+        error: None,
+        body: AgentPaneBody::Settings,
+    });
+
+    assert!(owning.contains("role=\"tablist\""));
+    assert!(owning.contains(&settings_url));
+    assert!(owning.contains(&format!(
+        "hx-get=\"/ui/agents/{}?company_id={}&tab=channel\"",
+        agent.id, company.id
+    )));
+    // Settings is the tab it opened on, so that is the lit one.
+    assert!(owning.contains("class=\"tab tab-active\""));
+
+    // An agent with no personal channel gets no strip rather than a tab leading nowhere.
+    let alone = agent_edit_pane(&AgentEditPane {
+        company: &company,
+        app_domain_name: "mail.test",
+        model_connections: &[],
+        agent: &agent,
+        used_by: &[],
+        draft: None,
+        error: None,
+        body: AgentPaneBody::Settings,
+    });
+    assert!(!alone.contains("role=\"tablist\""));
+}
+
+#[test]
+fn the_channel_tab_renders_the_owned_channel_and_cannot_delete_it() {
+    let company = mailbox_company();
+    let agent = settings_agent(company.id, "Owner <bot>", "owner");
+    let personal = Channel {
+        description: Some("Answers billing mail.".to_string()),
+        alias_slugs: vec!["billing".into()],
+        ..owned_channel_for(&agent, &company)
+    };
+    let tab = AgentChannelTab {
+        channel: &personal,
+        schedules: &[],
+        spam_scan_enabled: true,
+        memory_ready: false,
+        draft: None,
+        error: None,
+    };
+
+    let html = agent_edit_pane(&AgentEditPane {
+        company: &company,
+        app_domain_name: "mail.test",
+        model_connections: &[],
+        agent: &agent,
+        used_by: &[&personal],
+        draft: None,
+        error: None,
+        body: AgentPaneBody::Channel(&tab),
+    });
+
+    assert!(html.contains(&format!(
+        "hx-put=\"/ui/agents/{}/channel?company_id={}\"",
+        agent.id, company.id
+    )));
+    // The Channels workspace's own form, with the parts an owned channel does not choose locked.
+    assert!(html.contains("name=\"slug\" required readonly"));
+    assert!(html.contains("The owner always remains the position-0 agent"));
+    assert!(html.contains(&format!("value=\"{}\"", agent.id)));
+    assert!(html.contains("value=\"Answers billing mail.\""));
+    assert!(html.contains("value=\"billing\""));
+    assert!(html.contains("No automated schedules configured for this channel yet."));
+    // The channel goes with the agent, and the database refuses it any other way.
+    assert!(!html.contains("hx-delete=\"/ui/channels/"));
+    assert!(!html.contains("Delete Channel"));
+    // The agent's own form is not on this tab, so a channel save cannot carry it along.
+    assert!(!html.contains("name=\"system_prompt\""));
+    assert!(html.contains("class=\"tab tab-active\""));
+}
+
+#[test]
+fn the_channel_tab_keeps_a_rejected_save_in_the_form() {
+    let company = mailbox_company();
+    let agent = settings_agent(company.id, "Triage", "triage");
+    let personal = owned_channel_for(&agent, &company);
+    let draft = ChannelDraft {
+        name: "Renamed",
+        slug: "triage",
+        alias_slugs: "help, sales",
+        participant_emails: "@public",
+        ..ChannelDraft::default()
+    };
+    let tab = AgentChannelTab {
+        channel: &personal,
+        schedules: &[],
+        spam_scan_enabled: false,
+        memory_ready: false,
+        draft: Some(&draft),
+        error: Some("Failed to save channel: nope"),
+    };
+
+    let html = agent_edit_pane(&AgentEditPane {
+        company: &company,
+        app_domain_name: "mail.test",
+        model_connections: &[],
+        agent: &agent,
+        used_by: &[&personal],
+        draft: None,
+        error: None,
+        body: AgentPaneBody::Channel(&tab),
+    });
+
+    assert!(html.contains("alert alert-error"));
+    assert!(html.contains("Failed to save channel: nope"));
+    assert!(html.contains("value=\"Renamed\""));
+    assert!(html.contains("value=\"help, sales\""));
+    // `@public` without spam scanning is what the interlock is for.
+    assert!(html.contains("confirm_spam_disabled"));
+    // The header still names the stored agent; only the form carries the attempt.
+    assert!(html.contains("<h2 class=\"truncate text-xl font-bold\">Triage</h2>"));
+}
+
+/// The personal channel every agent is created with: its owner at position 0, its address the
+/// agent's handle.
+fn owned_channel_for(agent: &Agent, company: &Company) -> Channel {
+    Channel {
+        owner_agent_id: Some(agent.id),
+        agent_ids: Some(vec![agent.id]),
+        name: agent.name.clone(),
+        slug: agent.slug.as_str().into(),
+        ..mailbox_channel(company.id)
+    }
 }
 
 #[test]
@@ -1324,6 +1517,7 @@ fn agent_edit_pane_keeps_a_rejected_save_in_the_form() {
         used_by: &[],
         draft: Some(&draft),
         error: Some("Invalid JSON config"),
+        body: AgentPaneBody::Settings,
     });
 
     assert!(html.contains("alert alert-error"));
@@ -1348,6 +1542,7 @@ fn prompt_generator_names_the_pane_it_answers_into() {
         used_by: &[],
         draft: None,
         error: None,
+        body: AgentPaneBody::Settings,
     });
 
     // The box is namespaced by the agent it belongs to, and pulls the overrides along so an agent
@@ -4181,6 +4376,7 @@ fn each_agent_form_owns_its_own_picker() {
         used_by: &[],
         draft: None,
         error: None,
+        body: AgentPaneBody::Settings,
     });
     assert!(edit.contains(&format!(r#"id="agent-avatar-{}""#, agent.id)));
     assert!(edit.contains(

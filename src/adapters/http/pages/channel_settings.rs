@@ -325,7 +325,7 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
 pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: bool) -> String {
     let participants = stored_participants(pane.channel);
     let aliases = stored_alias_slugs(pane.channel);
-    let stored = stored_draft(pane.channel, &participants, &aliases);
+    let stored = stored_channel_draft(pane.channel, &participants, &aliases);
     let draft = pane.draft.unwrap_or(&stored);
     let company_id = pane.company.id;
     let channel_id = pane.channel.id;
@@ -933,7 +933,12 @@ fn spam_disabled_confirmation(spam_scan_enabled: bool, is_public: bool) -> Strin
 ///
 /// The channel's list-valued fields are rendered as form text and passed in so the draft can stay
 /// a pure set of borrows.
-fn stored_draft<'a>(
+/// A stored channel as its own form will accept it.
+///
+/// `pub(super)` because the Agents workspace's Channel tab renders the very same form for an
+/// agent's personal channel: one filler for one form, so the two panes cannot disagree about what
+/// a stored channel looks like.
+pub(super) fn stored_channel_draft<'a>(
     channel: &'a Channel,
     participant_emails: &'a str,
     alias_slugs: &'a str,

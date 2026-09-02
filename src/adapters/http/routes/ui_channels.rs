@@ -653,6 +653,14 @@ impl SubmittedChannel {
         }
     }
 
+    /// The agents this submission names, in the order the form sent them.
+    ///
+    /// Exposed for the same reason `form` is: the Agents workspace's Channel tab submits this same
+    /// form, and parsing the list in one place is what keeps the two panes from drifting.
+    pub(super) fn agent_ids(&self) -> Vec<Uuid> {
+        self.agent_ids.clone()
+    }
+
     /// The write this submission asks for. Create may mint an agent while update reuses the list.
     pub(super) fn write(&self, agent_ids: Option<Vec<Uuid>>) -> Result<ChannelWrite, String> {
         let memory = self.form.memory_settings()?;
