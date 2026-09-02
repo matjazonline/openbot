@@ -43,7 +43,7 @@ Update `.github/workflows/ci.yml` so it continues to run formatting, locked offl
 migrations, the full Postgres-backed suite, Clippy, deployment-script tests, and stack budget. Add:
 
 - `scripts/transport-boundary-check.sh` from step 11;
-- populated upgrade-migration fixture and fresh-schema migration tests;
+- fresh-schema migration, reset/bootstrap, and final-schema assertion tests;
 - local Slack stub integration tests requiring no external credential/network;
 - concurrent inbox and delivery claimants;
 - lease loss during active Slack request;
@@ -62,20 +62,20 @@ shrink/box the correct seam. Do not raise `RUST_MIN_STACK`, `RUNTIME_THREAD_STAC
 
 ## Rollout
 
-1. Deploy additive canonical/identity/binding migrations with Slack disabled and complete the email
-   cutover/backfill checks.
-2. Run the step-11 contract only after rollback/restore evidence and zero legacy census.
-3. Deploy Slack code with install/event routes disabled by absent config; verify email regression,
+1. Confirm and record that each target environment may be destructively reset, stop all writers and
+   workers, reset the database, run the complete migration set, and bootstrap only final-model data.
+   There is no rolling upgrade, data import, queue drain, or rollback to the old schema.
+2. Deploy Slack code with install/event routes disabled by absent config; verify email regression,
    generic queues, dashboards, and resource use.
-4. Configure a separate Slack test app/workspace and one non-sensitive private conversation. Enable
+3. Configure a separate Slack test app/workspace and one non-sensitive private conversation. Enable
    one company/binding; exercise roots, replies, reordering, mirrors, agent replies, restarts, 429,
    token revoke, unlink, and unknown-outcome recovery.
-5. Observe queue age/error/duplicate indicators through a defined soak window. Define numeric abort
+4. Observe queue age/error/duplicate indicators through a defined soak window. Define numeric abort
    thresholds before the soak, including oldest-event age, dead-letter count, unknown-outcome age,
    and message duplication.
-6. Expand by company behind a persisted feature flag. Pausing a binding is the immediate kill
+5. Expand by company behind a persisted feature flag. Pausing a binding is the immediate kill
    switch; it must not disable email or delete history.
-7. Publish operator/user documentation for installation, private-channel grant, supported message
+6. Publish operator/user documentation for installation, private-channel grant, supported message
    types, data retention, unlink/revoke, reauthorization, rate limits, and non-exact-once edge cases.
 
 ## Final acceptance criteria
@@ -87,4 +87,3 @@ shrink/box the correct seam. Do not raise `RUST_MIN_STACK`, `RUNTIME_THREAD_STAC
 - Every review-required failure scenario is automated and green in CI.
 - Production documentation names only enforced limits/configuration and makes no unsupported
   validation or exactly-once promise.
-

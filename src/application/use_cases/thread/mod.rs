@@ -15,13 +15,16 @@ use crate::{
     adapters::persistence::task::TaskPersistence,
     adapters::protocols::{
         EgressRegistry,
-        email::{EmailEgressAdapter, EmailIngressAdapter},
+        email::{
+            EmailChannelSelectorParser, EmailEgressAdapter, EmailIdentity, EmailIngressAdapter,
+            EmailRecipientDestination,
+        },
     },
     adapters::storage::FileStorage,
     app_error::{AppError, AppResult},
     domain::monitoring::MonitoringService,
     entities::{
-        channel::{Channel, ChannelType, ParticipantIdentity},
+        channel::Channel,
         company::Company,
         correlation::CorrelationId,
         cursor::{MessageCursor, ThreadCursor},
@@ -29,6 +32,7 @@ use crate::{
         message_contract::NormalizedInboundMessage,
         task::{ThreadActivity, TokenUsage},
         thread::Thread,
+        transport::{ChannelSelector, IdentityNamespace, QualifiedIdentity, TransportKind},
         value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
     },
     infra::config::AppConfig,
@@ -38,9 +42,7 @@ use crate::{
         outbound_dispatcher::{MailTransport, OutboundDispatcher, OutboundEmail, SentEmailResult},
     },
     use_cases::{
-        agent::AgentPersistence,
-        approval::ApprovalUseCases,
-        channel::{ChannelPersistence, parse_recipient_address_pipeline},
+        agent::AgentPersistence, approval::ApprovalUseCases, channel::ChannelPersistence,
         company::CompanyPersistence,
     },
 };
@@ -59,6 +61,19 @@ mod tests;
 mod inter_channel_tests;
 
 pub const MAX_THREAD_MESSAGES_PER_HOUR: usize = 60;
+
+fn qualified_email_identity(
+    address: impl Into<String>,
+    namespace: &str,
+) -> AppResult<QualifiedIdentity> {
+    let namespace =
+        IdentityNamespace::parse(namespace.trim().to_ascii_lowercase()).map_err(|error| {
+            AppError::Internal(format!("Invalid email identity namespace: {error}"))
+        })?;
+    EmailIdentity::parse(EmailAddress::from(address.into()))
+        .map(|identity| identity.qualify(namespace))
+        .map_err(|error| AppError::Internal(format!("Invalid email identity: {error}")))
+}
 
 #[derive(Clone, Copy)]
 struct InternalChannelSource {
@@ -319,44 +334,53 @@ impl ThreadUseCases {
         self.memory.as_ref()
     }
 
+    fn internal_channel_selector(&self, recipient: &str) -> AppResult<Option<ChannelSelector>> {
+        let destination = EmailChannelSelectorParser::new(&self.config.app_domain_name)
+            .classify(EmailAddress::from(recipient.trim().to_ascii_lowercase()));
+        match destination {
+            EmailRecipientDestination::External(_) => Ok(None),
+            EmailRecipientDestination::InvalidPlatformAddress => Err(AppError::Internal(format!(
+                "Invalid platform channel address: {recipient}"
+            ))),
+            EmailRecipientDestination::Channel(selection)
+                if selection.delivery().is_context_only() || selection.selectors().len() != 1 =>
+            {
+                Err(AppError::Internal(
+                    "Internal channel delivery requires one direct channel address".into(),
+                ))
+            }
+            EmailRecipientDestination::Channel(selection) => {
+                Ok(selection.into_selectors().into_iter().next())
+            }
+        }
+    }
+
     async fn resolve_internal_destination(
         &self,
         source_channel_id: Uuid,
-        recipient: &str,
+        selector: &ChannelSelector,
     ) -> AppResult<Option<(Channel, Channel, Company)>> {
-        let recipient_domain = recipient
-            .trim()
-            .rsplit_once('@')
-            .map(|(_, domain)| domain.trim().to_lowercase())
-            .unwrap_or_default();
-        let app_domain = self.config.app_domain_name.trim().to_lowercase();
-        if recipient_domain != app_domain && !recipient_domain.ends_with(&format!(".{app_domain}"))
-        {
-            return Ok(None);
-        }
-
-        let (company_slug, channel_slugs, is_context_only) =
-            parse_recipient_address_pipeline(recipient, &self.config.app_domain_name).ok_or_else(
-                || AppError::Internal(format!("Invalid platform channel address: {recipient}")),
-            )?;
-        if is_context_only || channel_slugs.len() != 1 {
-            return Err(AppError::Internal(
-                "Internal channel delivery requires one direct channel address".into(),
-            ));
-        }
-
         let source = self
             .channel_persistence
             .get_by_id(source_channel_id)
             .await?
             .ok_or_else(|| AppError::Internal("Internal source channel was not found".into()))?;
-        let target = self
-            .channel_persistence
-            .get_by_company_slug_and_channel_slug(&company_slug, &channel_slugs[0])
-            .await?
-            .ok_or_else(|| {
-                AppError::Internal(format!("Platform channel does not exist: {recipient}"))
-            })?;
+        let target = match selector {
+            ChannelSelector::CurrentCompany(channel_slug) => self
+                .channel_persistence
+                .list_by_company_id(source.company_id)
+                .await?
+                .into_iter()
+                .find(|channel| channel.matches_slug(channel_slug)),
+            ChannelSelector::Qualified { company, channel } => {
+                self.channel_persistence
+                    .get_by_company_slug_and_channel_slug(company, channel)
+                    .await?
+            }
+        }
+        .ok_or_else(|| {
+            AppError::Internal(format!("Platform channel does not exist: {selector}"))
+        })?;
         if source.company_id != target.company_id {
             return Err(AppError::Internal(
                 "Cross-company internal channel delivery is not allowed".into(),
@@ -384,7 +408,10 @@ impl ThreadUseCases {
             .get_by_id(source.company_id)
             .await?
             .ok_or_else(|| AppError::Internal("Internal source company was not found".into()))?;
-        if !company.slug.eq_ignore_ascii_case(&company_slug) {
+        if selector
+            .company()
+            .is_some_and(|selected| !company.slug.eq_ignore_ascii_case(selected))
+        {
             return Err(AppError::Internal(
                 "Internal recipient company does not match the source company".into(),
             ));
@@ -397,13 +424,11 @@ impl ThreadUseCases {
         email: OutboundEmail,
         idempotency_key: Option<&str>,
     ) -> AppResult<Option<SentEmailResult>> {
-        if self
-            .resolve_internal_destination(email.channel_id, &email.recipient_to)
-            .await?
-            .is_none()
-        {
+        let Some(selector) = self.internal_channel_selector(&email.recipient_to)? else {
             return Ok(None);
-        }
+        };
+        self.resolve_internal_destination(email.channel_id, &selector)
+            .await?;
         let prepared = match idempotency_key {
             Some(key) => self.mail_dispatcher.prepare_idempotent(email, key)?,
             None => self.mail_dispatcher.prepare(email)?,
@@ -422,8 +447,11 @@ impl ThreadUseCases {
             .recipients_to
             .first()
             .ok_or_else(|| AppError::Internal("Internal delivery has no recipient".into()))?;
+        let selector = self
+            .internal_channel_selector(recipient)?
+            .ok_or_else(|| AppError::Internal("Recipient is not an internal channel".into()))?;
         let (source, _, company) = self
-            .resolve_internal_destination(source_channel_id, recipient)
+            .resolve_internal_destination(source_channel_id, &selector)
             .await?
             .ok_or_else(|| AppError::Internal("Recipient is not an internal channel".into()))?;
         let expected_sender = format!(
@@ -441,19 +469,22 @@ impl ThreadUseCases {
             thread_ref: Some(sent.in_reply_to.clone()),
             references: sent.references.clone(),
             thread_index: None,
-            sender: ParticipantIdentity::email(sent.from_address.clone()),
+            sender: qualified_email_identity(
+                sent.from_address.clone(),
+                &self.config.app_domain_name,
+            )?,
             recipients_to: sent
                 .recipients_to
                 .iter()
                 .cloned()
-                .map(ParticipantIdentity::email)
-                .collect(),
+                .map(|address| qualified_email_identity(address, &self.config.app_domain_name))
+                .collect::<AppResult<Vec<_>>>()?,
             recipients_cc: sent
                 .recipients_cc
                 .iter()
                 .cloned()
-                .map(ParticipantIdentity::email)
-                .collect(),
+                .map(|address| qualified_email_identity(address, &self.config.app_domain_name))
+                .collect::<AppResult<Vec<_>>>()?,
             subject: sent.subject.clone(),
             clean_text: sent.body_text.clone(),
             raw_text: Some(sent.body_text.clone()),
@@ -468,7 +499,7 @@ impl ThreadUseCases {
             // carried is passed straight across instead. Agent A's run and agent B's run are one
             // chain, which is the case the correlation id exists for.
             correlation_id: sent.correlation_id,
-            protocol: ChannelType::Email,
+            transport: TransportKind::Email,
             spf_status: Default::default(),
             dkim_status: Default::default(),
             dmarc_status: Default::default(),
@@ -548,7 +579,7 @@ impl ThreadUseCases {
 
     pub async fn handle_bounce_dispatch(&self, ingest: &InboundIngestResult) {
         if let Some(ref bounce) = ingest.bounce_info {
-            if let Some(adapter) = self.egress_registry.get(&ChannelType::Email) {
+            if let Some(adapter) = self.egress_registry.get(&TransportKind::Email) {
                 let _ = adapter.dispatch_bounce(bounce).await;
             } else {
                 let bounce_body = format_bounce_email_body(bounce, &self.config.app_domain_name);

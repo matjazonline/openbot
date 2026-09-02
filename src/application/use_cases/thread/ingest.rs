@@ -253,7 +253,7 @@ impl ThreadUseCases {
     ) -> AppResult<InboundIngestResult> {
         let norm =
             EmailIngressAdapter::parse_and_store(raw_payload, &self.config, self.file_storage())
-                .await;
+                .await?;
         self.ingest_normalized_message(norm).await
     }
 
@@ -279,7 +279,7 @@ impl ThreadUseCases {
     ) -> AppResult<InboundIngestResult> {
         let norm =
             EmailIngressAdapter::parse_and_store(raw_payload, &self.config, self.file_storage())
-                .await;
+                .await?;
         self.ingest_normalized_message_with_source(
             norm,
             None,

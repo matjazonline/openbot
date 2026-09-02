@@ -44,8 +44,8 @@ Keep protocol-specific newtypes at their boundaries:
 - Change `resolve_internal_target` and agent/outreach tool contexts to accept a resolved
   `ChannelSelector`/channel ID. Preserve external email recipients as an explicit
   `ExternalDestination::Email(EmailAddress)` rather than overloading the selector.
-- Keep compatibility conversion functions temporarily behind `pub(crate)` and mark every caller;
-  step 11 deletes them.
+- Replace callers directly; do not add compatibility conversions between the email-shaped and
+  transport-neutral types.
 
 ## Pure tests
 
@@ -65,4 +65,3 @@ Keep protocol-specific newtypes at their boundaries:
   `Channel` is not conflated with either.
 - No Slack value is represented by an `EmailAddress` or `MessageId`.
 - `cargo test` proves all parsing and equality rules without network or database mocks.
-

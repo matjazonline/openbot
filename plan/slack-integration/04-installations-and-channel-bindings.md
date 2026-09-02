@@ -6,9 +6,10 @@ Make transport interfaces first-class. A company can install a provider account,
 channel can expose one or more independently enabled bindings without adding protocol fields to the
 `channels` table.
 
-## Additive migration
+## Final schema
 
-Create `migrations/20260902010000_add_installations_and_bindings.sql` with:
+Define installations and bindings directly in the rewritten clean-reset migration set so a fresh
+database contains:
 
 ### `integration_installations`
 
@@ -65,10 +66,11 @@ Create `migrations/20260902010000_add_installations_and_bindings.sql` with:
 - Add queries for active bindings by channel, exact inbound endpoint lookup, and manager-scoped
   list/detail views. All caller-supplied IDs include company predicates.
 
-## Email backfill
+## Email binding creation
 
-- Create one active email binding per existing channel representing its canonical outbound
-  interface; aliases remain adapter routing keys that resolve to that binding.
+- Channel creation creates one active email binding representing its canonical outbound interface;
+  reset/seed fixtures do the same through the final-model bootstrap path. Aliases remain adapter
+  routing keys that resolve to that binding.
 - Store the resolved canonical inbound address as the endpoint key. Do not remove `channel_slugs`;
   they remain product-level selectors and email aliases.
 - Set email binding access policy to `channel_acl` and delivery policy to the behavior currently
@@ -82,7 +84,7 @@ Create `migrations/20260902010000_add_installations_and_bindings.sql` with:
   delivery queries.
 - Generic installation/list projections cannot select ciphertext.
 - Credential rotation/status includes integration credentials in bounded batches.
-- Email binding backfill creates exactly one binding per channel and is idempotent.
+- Concurrent/retried channel creation cannot create more than one canonical email binding.
 
 ## Acceptance criteria
 

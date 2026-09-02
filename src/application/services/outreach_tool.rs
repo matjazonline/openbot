@@ -1,9 +1,11 @@
 use crate::{
     adapters::persistence::task::TaskPersistence,
+    adapters::protocols::email::{EmailChannelSelectorParser, EmailRecipientDestination},
     entities::{
         correlation::CorrelationId,
         outreach::{CreateOutreachRequest, OutreachTargetRequest},
-        value_objects::{ChannelSlug, CompanySlug, MessageId},
+        transport::{ChannelSelector, ExternalDestination},
+        value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId},
     },
     services::outbound_dispatcher::OutboundEmail,
     use_cases::channel::{ChannelPersistence, InternalTargetOutcome, resolve_internal_target},
@@ -166,6 +168,10 @@ impl Tool for OutreachAndAwaitQuorumTool {
             Ok(targets) => targets,
             Err(error) => return ToolResult::error(error),
         };
+        let canonical_emails: Vec<String> = target_emails
+            .iter()
+            .map(|target| target.email.as_str().to_string())
+            .collect();
         let request = match ValidatedOutreach::from_input(&input, limits) {
             Ok(request) => request,
             Err(error) => return ToolResult::error(error),
@@ -185,7 +191,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
                 channel_id: self.context.channel_id,
                 correlation_id: self.context.correlation_id,
                 worker_id: self.context.worker_id,
-                outreach_key: request.idempotency_key(self.context.task_id, &target_emails),
+                outreach_key: request.idempotency_key(self.context.task_id, &canonical_emails),
                 required_threshold_percent: request.threshold_percent,
                 expires_at: Utc::now() + Duration::hours(request.timeout_hours as i64),
                 subject: request.subject.to_string(),
@@ -306,12 +312,13 @@ impl OutreachAndAwaitQuorumTool {
     /// land back on the same thread.
     fn build_target_requests(
         &self,
-        target_emails: &[String],
+        targets: &[NormalizedOutreachTarget],
         request: &ValidatedOutreach<'_>,
     ) -> Result<Vec<OutreachTargetRequest>, String> {
-        target_emails
+        targets
             .iter()
-            .map(|email| {
+            .map(|target| {
+                let email = target.email.clone();
                 let payload = serde_json::to_value(OutboundEmail {
                     channel_id: self.context.channel_id,
                     channel_name: self.context.channel_name.clone(),
@@ -319,7 +326,7 @@ impl OutreachAndAwaitQuorumTool {
                     company_slug: self.context.company_slug.clone(),
                     trigger_message_id: self.context.trigger_message_id.clone(),
                     thread_references: self.context.thread_references.clone(),
-                    recipient_to: email.clone().into(),
+                    recipient_to: email.clone(),
                     recipients_cc: Vec::new(),
                     subject: request.subject.to_string(),
                     body_text: request.body.to_string(),
@@ -329,7 +336,7 @@ impl OutreachAndAwaitQuorumTool {
                 })
                 .map_err(|error| format!("Failed to serialize outreach email: {error}"))?;
                 Ok(OutreachTargetRequest {
-                    email: email.clone().into(),
+                    email,
                     outbox_id: Uuid::new_v4(),
                     outbox_payload: payload,
                 })
@@ -343,6 +350,21 @@ enum AllowedTargetScope {
     ExternalOnly,
     SameCompanyChannels,
     Any,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum NormalizedOutreachDestination {
+    Channel {
+        selector: ChannelSelector,
+        channel_id: Uuid,
+    },
+    External(ExternalDestination),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NormalizedOutreachTarget {
+    email: EmailAddress,
+    destination: NormalizedOutreachDestination,
 }
 
 fn configured_target_scope(config: &Value) -> Result<AllowedTargetScope, String> {
@@ -368,13 +390,14 @@ async fn normalize_targets(
     source_channel_id: Uuid,
     config: &Value,
     channel_persistence: &dyn ChannelPersistence,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<NormalizedOutreachTarget>, String> {
     if values.is_empty() || values.len() > max_targets {
         return Err(format!(
             "target_emails must contain between 1 and {max_targets} addresses"
         ));
     }
     let scope = configured_target_scope(config)?;
+    let selector_parser = EmailChannelSelectorParser::new(app_domain_name);
     let mut targets = Vec::with_capacity(values.len());
     for value in values {
         let mailbox: Mailbox = value
@@ -383,37 +406,67 @@ async fn normalize_targets(
             .map_err(|_| format!("Invalid target email address: {value}"))?;
         let email = mailbox.email.to_string().to_lowercase();
 
-        let outcome = resolve_internal_target(
-            &email,
-            app_domain_name,
-            company_id,
-            source_channel_id,
-            channel_persistence,
-        )
-        .await
-        .map_err(|error| format!("Failed to resolve platform channel {email}: {error}"))?;
-
-        match outcome {
-            InternalTargetOutcome::External if scope == AllowedTargetScope::SameCompanyChannels => {
+        let email = EmailAddress::from(email);
+        let destination = match selector_parser.classify(email.clone()) {
+            EmailRecipientDestination::External(_)
+                if scope == AllowedTargetScope::SameCompanyChannels =>
+            {
                 return Err(format!(
                     "Only same-company platform channels are permitted by this tool policy: {email}"
                 ));
             }
-            InternalTargetOutcome::External => {}
-            _ if scope == AllowedTargetScope::ExternalOnly => {
+            EmailRecipientDestination::External(destination) => {
+                NormalizedOutreachDestination::External(destination)
+            }
+            EmailRecipientDestination::InvalidPlatformAddress => {
+                return Err(format!("Invalid platform channel address: {email}"));
+            }
+            EmailRecipientDestination::Channel(selection)
+                if selection.delivery().is_context_only() || selection.selectors().len() != 1 =>
+            {
+                return Err(format!(
+                    "Internal outreach requires one direct channel address without pipeline or context-only suffix: {email}"
+                ));
+            }
+            EmailRecipientDestination::Channel(_) if scope == AllowedTargetScope::ExternalOnly => {
                 return Err(format!(
                     "Platform address cannot be an external outreach target: {email}"
                 ));
             }
-            InternalTargetOutcome::Callable(_) => {}
-            InternalTargetOutcome::Rejected(reason) => return Err(reason),
-        }
+            EmailRecipientDestination::Channel(selection) => {
+                let selector = selection
+                    .into_selectors()
+                    .into_iter()
+                    .next()
+                    .expect("length checked above");
+                let outcome = resolve_internal_target(
+                    &selector,
+                    company_id,
+                    source_channel_id,
+                    channel_persistence,
+                )
+                .await
+                .map_err(|error| format!("Failed to resolve platform channel {email}: {error}"))?;
+                match outcome {
+                    InternalTargetOutcome::Callable(channel) => {
+                        NormalizedOutreachDestination::Channel {
+                            selector,
+                            channel_id: channel.id,
+                        }
+                    }
+                    InternalTargetOutcome::Rejected(reason) => return Err(reason),
+                }
+            }
+        };
 
-        if !targets.contains(&email) {
-            targets.push(email);
+        if !targets
+            .iter()
+            .any(|target: &NormalizedOutreachTarget| target.email == email)
+        {
+            targets.push(NormalizedOutreachTarget { email, destination });
         }
     }
-    targets.sort();
+    targets.sort_by(|left, right| left.email.cmp(&right.email));
     Ok(targets)
 }
 
@@ -518,7 +571,12 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(targets, vec!["user@example.com"]);
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].email, "user@example.com");
+        assert!(matches!(
+            targets[0].destination,
+            NormalizedOutreachDestination::External(ExternalDestination::Email(_))
+        ));
     }
 
     #[tokio::test]
@@ -556,7 +614,12 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(result, vec!["support@acme.mailagents.test"]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].email, "support@acme.mailagents.test");
+        assert!(matches!(
+            result[0].destination,
+            NormalizedOutreachDestination::Channel { .. }
+        ));
     }
 
     #[tokio::test]

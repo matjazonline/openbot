@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::{
     adapters::protocols::ProtocolEgressAdapter,
     app_error::AppResult,
-    entities::{channel::ChannelType, message_contract::NormalizedOutboundMessage},
+    entities::{message_contract::NormalizedOutboundMessage, transport::TransportKind},
     services::outbound_dispatcher::{OutboundDispatcher, OutboundEmail},
     use_cases::thread::{BounceInfo, format_bounce_email_body},
 };
@@ -21,21 +21,21 @@ impl EmailEgressAdapter {
 
 #[async_trait]
 impl ProtocolEgressAdapter for EmailEgressAdapter {
-    fn protocol(&self) -> ChannelType {
-        ChannelType::Email
+    fn transport(&self) -> TransportKind {
+        TransportKind::Email
     }
 
     async fn dispatch(&self, message: &NormalizedOutboundMessage) -> AppResult<()> {
         let recipient_to = message
             .recipients_to
             .first()
-            .map(|p| p.identity.clone().into())
+            .map(|identity| identity.subject().as_str().into())
             .unwrap_or_default();
 
         let recipients_cc = message
             .recipients_cc
             .iter()
-            .map(|p| p.identity.clone().into())
+            .map(|identity| identity.subject().as_str().into())
             .collect();
 
         let trigger_message_id = message.in_reply_to_ref.clone().unwrap_or_default();

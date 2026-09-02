@@ -51,25 +51,25 @@ pass a row ID plus worker ID as adjacent UUIDs.
 - Replace `send_email: bool` and related flag matrices in `thread/dispatch.rs` with an outcome or
   enum that makes simulated, direct, and durable delivery modes explicit.
 - Remove direct construction of `OutboundEmail` from thread use cases, approval, schedules, and
-  outreach. Those callers create delivery intents; the email renderer creates `OutboundEmail` at
-  the outer boundary during the transition.
+  outreach. Those callers create delivery intents; only the email renderer creates `OutboundEmail`
+  at the outer boundary.
 - Avoid adding async forwarding layers. Extract pure synchronous decisions and `Box::pin` only at
   measured provider/agent seams, with a comment explaining stack impact.
 
-## Durable task payload v2
+## Durable task payload
 
 Stop serializing `Company`, `Channel`, parsed email, and normalized protocol messages into
 `background_tasks.payload`. Add a versioned payload containing stable IDs only:
 
 ```text
-InboundTaskPayloadV2 {
+InboundTaskPayloadV1 {
   version, company_id, channel_id, thread_id, source_message_id, correlation_id
 }
 ```
 
-The worker reloads current entities with tenant-scoped queries. During rollout, decode v1 and v2
-fallibly; step 11 removes v1 only after no queued row uses it. This prevents future entity fields
-from breaking old queued work and keeps raw provider content out of task JSON.
+The worker reloads current entities with tenant-scoped queries and accepts only this canonical
+version. Do not add a decoder for the pre-reset broad payload. Versioning remains so future schema
+changes can be handled deliberately, and raw provider content stays out of task JSON.
 
 ## Contract tests
 
@@ -87,4 +87,3 @@ from breaking old queued work and keeps raw provider content out of task JSON.
 - Adding a future chat adapter requires implementing ports and registering it, not changing the
   canonical message or thread use case.
 - Task payloads reference canonical IDs and remain bounded, versioned, and transport-neutral.
-

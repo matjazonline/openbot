@@ -4,6 +4,23 @@ This directory turns `plan/slack-peer-transport-architecture-review.md` into an 
 sequence. Each numbered file is one independently reviewable step. Complete the files in order;
 do not begin the Slack phase until the abstraction gate in step 11 passes.
 
+## Clean-reset implementation premise
+
+This plan assumes the database will be intentionally reset before the refactor is deployed. The
+implementation therefore targets only a freshly migrated empty database:
+
+- do not build data backfills, dual reads/writes, compatibility adapters, or old task-payload
+  decoders;
+- do not preserve IDs, queue rows, or protocol mappings from the current email-shaped schema;
+- migration history may be rewritten or consolidated so a clean migration run creates only the
+  final schema, without first creating and then converting the email-shaped schema; and
+- CI verifies fresh-schema migrations and the resulting application behavior, not upgrades from a
+  populated pre-refactor database.
+
+The reset is a deployment precondition, not an application feature. It must be explicitly approved
+for each environment, performed while writers are stopped, and followed by normal bootstrap/seed
+paths that create principals and email bindings in the final model.
+
 ## Target architecture
 
 ```text
@@ -58,10 +75,10 @@ The numbered steps remove these seams rather than placing Slack branches beside 
 5. [Create canonical messages and external correlation maps](05-canonical-messages-and-external-maps.md).
 6. [Move ingress and egress ports into the application layer](06-application-transport-ports.md).
 7. [Refactor email ingress and commit it atomically](07-email-ingress-cutover.md).
-8. [Migrate readers and non-ingress message producers](08-canonical-readers-and-producers.md).
+8. [Replace readers and non-ingress message producers](08-canonical-readers-and-producers.md).
 9. [Replace the email outbox with generic deliveries](09-generic-delivery-outbox-and-email-egress.md).
 10. [Add the generic durable inbound inbox](10-generic-inbound-inbox.md).
-11. [Remove the legacy email spine and enforce the abstraction gate](11-email-spine-contract-and-gate.md).
+11. [Delete the email-shaped spine and enforce the abstraction gate](11-email-spine-contract-and-gate.md).
 
 ### Phase B — add Slack as a peer transport
 
@@ -90,8 +107,8 @@ The numbered steps remove these seams rather than placing Slack branches beside 
   audited read grant to every current or future member of that conversation.
 - Provider delivery is not described as exactly once. Definitive failures, ambiguous outcomes,
   rate limits, and poison payloads have distinct durable states.
-- The immutable baseline migration is never edited. Every schema change uses a new timestamped
-  migration and refreshes `.sqlx` metadata.
+- The migration set must create the final schema reproducibly from an empty database. No migration
+  or runtime path is required to upgrade or preserve a populated pre-refactor database.
 
 ## Planned module ownership
 

@@ -24,13 +24,14 @@ use crate::{
     entities::{
         agent::Agent,
         approval::ApprovalSubject,
-        channel::{ChannelType, PUBLIC_PARTICIPANT, ParticipantAccess, ParticipantIdentity},
+        channel::{PUBLIC_PARTICIPANT, ParticipantAccess},
         company_member::CompanyMembership,
         correlation::CorrelationId,
         memory::{MAX_MEMORY_UPSTREAM_CONTEXT_CHARS, truncate_memory_text},
         message::{Message, MessageDirection, MessageRole},
         message_contract::NormalizedOutboundMessage,
         task::TokenUsage,
+        transport::TransportKind,
         value_objects::{EmailAddress, MessageId},
     },
     services::{
@@ -724,21 +725,27 @@ impl ThreadUseCases {
             thread_id: primary.thread.id,
             in_reply_to_ref: Some(MessageId::from(parsed.message_id.clone())),
             references: references.into_iter().map(MessageId::from).collect(),
-            recipients_to: vec![ParticipantIdentity::email(&parsed.sender)],
+            recipients_to: vec![super::qualified_email_identity(
+                parsed.sender.clone(),
+                &self.config.app_domain_name,
+            )?],
             recipients_cc: recipients_cc
                 .iter()
-                .map(ParticipantIdentity::email)
-                .collect(),
+                .cloned()
+                .map(|address| {
+                    super::qualified_email_identity(address, &self.config.app_domain_name)
+                })
+                .collect::<AppResult<Vec<_>>>()?,
             subject: parsed.subject.clone(),
             content: response.to_string(),
             attachments: vec![],
-            protocol: ChannelType::Email,
+            transport: TransportKind::Email,
             channel_id: primary.channel.id,
             hop_count: parsed.hop_count,
             trace_channels: parsed.trace_channels.clone(),
             correlation_id,
         };
-        let _ = self.egress_registry.get(&norm_outbound.protocol);
+        let _ = self.egress_registry.get(&norm_outbound.transport);
 
         Ok((
             OutboundDelivery {

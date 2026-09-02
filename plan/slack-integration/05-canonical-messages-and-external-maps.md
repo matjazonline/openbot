@@ -6,9 +6,11 @@ Replace `email_messages` as the canonical payload store. Preserve the useful man
 association in `thread_messages`, but make protocol metadata and provider keys optional extensions
 instead of mandatory message fields.
 
-## Additive migration
+## Final schema
 
-Create `migrations/20260902020000_add_canonical_messages.sql`.
+Define canonical-message storage directly in the rewritten clean-reset migration set. It must
+produce only the final canonical relationships; it does not copy or preserve rows from
+`email_messages`.
 
 ### Canonical storage
 
@@ -16,11 +18,10 @@ Create `migrations/20260902020000_add_canonical_messages.sql`.
   clean text, attachments, direction, role, correlation ID, content hash, and creation time.
 - `message_participants`: `(message_id, participant_identity_id, kind, position)` for sender/to/cc
   projections where a transport has them. Positions preserve deterministic email formatting.
-- Rename/add `thread_messages.message_id` as a FK to `messages`; keep `thread_messages.id` as the
-  association ID because outreach and UI rows already reference it. During expansion retain
-  `email_message_id` until backfill and code cutover are proven.
+- `thread_messages.message_id` is a required FK to `messages`; keep `thread_messages.id` as the
+  association ID used by outreach and UI rows. Do not retain `email_message_id`.
 - Add `background_tasks.source_message_uuid` with a tenant-scoped FK and unique constraint. The old
-  text `source_message_id` remains only during the transition.
+  text `source_message_id` is not present in the final schema.
 
 All canonical relationships carry `company_id` even when derivable, with composite FKs to messages,
 threads, bindings, principals, and identities. Database checks constrain role/direction and JSON
@@ -53,20 +54,14 @@ shape. Decode attachments fallibly as versioned untrusted JSON.
   mapping; if a repeated provider key has a different hash, return a typed collision error rather
   than silently updating content.
 
-## Backfill strategy
+## Reset-only schema rules
 
-1. Create each `messages` row with the existing `email_messages.id` so foreign-key transition is
-   deterministic.
-2. Resolve the sender identity/principal and ordered recipient identities created in step 3.
-3. Copy protocol-neutral fields into `messages` and email-only fields into
-   `email_message_metadata`.
-4. Populate `thread_messages.message_id` from `email_message_id`.
-5. For every thread/channel email binding, add external message mappings for its RFC Message-ID.
-6. Backfill task source UUIDs by company and RFC Message-ID; report unmatched/ambiguous rows.
-7. Assert hashes, counts, association IDs, task references, and newest-message ordering match.
-
-Do not drop old columns/tables here. Step 11 is the contract migration after all reads and writes
-have moved.
+- New ingress and producer paths write canonical messages, email metadata, thread associations,
+  external maps, and task source UUIDs directly.
+- Do not add copy SQL, temporary nullable foreign keys, dual-write triggers, or ID-preservation
+  logic for the pre-reset email tables.
+- Step 11 ensures the migration set and code contain no email-shaped canonical tables or fields
+  before Slack work begins.
 
 ## Database tests
 
@@ -83,5 +78,4 @@ have moved.
 - A valid canonical `Message` can represent an email, Slack message, schedule prompt, system note,
   or agent answer without fabricated email fields.
 - Thread lookup uses external maps, not columns embedded in the canonical message.
-- Existing data can be proved equivalent before any legacy object is removed.
-
+- A fresh migration exposes no email-shaped canonical message or thread key.

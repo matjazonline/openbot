@@ -6,10 +6,10 @@ Introduce a company-scoped actor model and move channel/thread participation awa
 The email UI can continue editing addresses during this step, but persistence resolves those
 addresses to principals and identities before it writes an ACL or thread participant.
 
-## Additive migration
+## Final schema
 
-Create a new migration such as
-`migrations/20260902000000_add_principals_and_identities.sql`; never edit the baseline. Add:
+Define principals and identities directly in the rewritten clean-reset migration set so a fresh
+database contains:
 
 ### `principals`
 
@@ -34,17 +34,18 @@ Create a new migration such as
 ### Principal grants and thread participants
 
 - Add `channel_principal_grants(company_id, channel_id, principal_id, capability, provenance, ...)`.
-  V1 capabilities are `participate` and `view`; create both when the legacy address allowlist meant
-  both, and retain the existing owner/team rules in the domain policy.
+  V1 capabilities are `participate` and `view`; the email allowlist form creates both, while
+  `@public` remains participation-only and the owner/team rules remain explicit domain policy.
 - Add `thread_principals(company_id, channel_id, thread_id, principal_id, role, ...)` with composite
   FKs. `role` distinguishes author/participant without using an email array.
-- Keep `channel_participants` and `thread_participants` only as migration sources until step 11.
+- Do not create or retain email-keyed `channel_participants` or `thread_participants` in the final
+  schema.
 
 ## Application and persistence work
 
 - Add `src/domain/entities/participant.rs` with `Principal`, `PrincipalKind`,
-  `ParticipantIdentity`, `IdentityStatus`, and typed provenance. Give all persisted additions
-  `#[serde(default)]` only where old durable payloads genuinely need a semantic default.
+  `ParticipantIdentity`, `IdentityStatus`, and typed provenance. Persisted values use explicit,
+  validated fields; do not add serde defaults to accept pre-reset payload shapes.
 - Define cohesive application-owned `IdentityDirectory` and `PrincipalAccessPersistence` ports in
   the consuming use-case module. Correctness methods have no silently-successful defaults.
 - Implement them in new `src/adapters/persistence/participant.rs` using tenant-scoped queries.
@@ -57,18 +58,13 @@ Create a new migration such as
 - Rewrite `Channel::participant_access`, `viewer_access`, and `preferred_approver` around named
   `PrincipalAccessContext`; do not add transport conditionals to these methods.
 
-## Backfill
+## Bootstrap and creation paths
 
-In a bounded, restartable backfill or a migration proven safe for the measured row count:
-
-1. Create person principals for company members and agent principals for company agents.
-2. Create email identities for verified user emails and every observed legacy participant/sender.
-3. Map channel allowlist addresses to principal grants without widening `@public` into a view grant.
-4. Map thread participant addresses to `thread_principals`.
-5. Report ambiguous address-to-user collisions and stop rather than choosing silently.
-
-Record counts before/after and add queries that prove no cross-company reference and no dropped
-legacy participant. If volume requires an online backfill, use a durable cursor rather than OFFSET.
+- Company/user/agent creation creates the corresponding principal in the same transaction.
+- Channel create/update resolves entered email identities and writes principal grants directly.
+- Ingress creates observed external principals and qualified identities through the concurrency-safe
+  resolver. There is no legacy participant import or reconciliation job.
+- Reset/seed fixtures use these same final-model paths rather than inserting email-keyed rows.
 
 ## Tests
 
@@ -76,8 +72,8 @@ legacy participant. If volume requires an online backfill, use a durable cursor 
 - Concurrent observation of one qualified identity creates one identity and one external principal.
 - The same external subject in two namespaces does not collide.
 - Profile-email claims do not merge principals or grant access.
-- Existing team/public/allowlist/owner access matrices remain behaviorally equivalent after
-  backfill, including the rule that `@public` never grants UI read access.
+- Cleanly created team/public/allowlist/owner channels enforce the intended matrix, including the
+  rule that `@public` never grants UI read access.
 - A channel form round-trip shows its email allowlist even though storage is principal-based.
 
 ## Acceptance criteria
@@ -85,4 +81,3 @@ legacy participant. If volume requires an online backfill, use a durable cursor 
 - No authorization or thread-participation decision is keyed by a mutable email string.
 - Every identity-to-principal association is tenant-scoped and auditable.
 - Email remains usable as one qualified identity, without becoming the identity model for Slack.
-

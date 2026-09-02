@@ -174,7 +174,11 @@ async fn sendgrid_inbound_webhook(
         thread_use_cases.config(),
         thread_use_cases.file_storage(),
     )
-    .await;
+    .await
+    .map_err(|error| {
+        warn!("Error parsing inbound email identities: {error}");
+        StatusCode::UNPROCESSABLE_ENTITY
+    })?;
     let ingest = thread_use_cases
         .ingest_normalized_message(norm_payload)
         .await

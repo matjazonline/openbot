@@ -87,7 +87,7 @@ threading, routing, and delivery semantics before names harden into migrations.
   email addresses are one adapter syntax for a channel selector, not the identity of a channel.
 - Add a compact glossary to `README.md` and link the decision record.
 - Add a “deferred” section: Slack files, edits/deletes/reactions, public/shared channels, native
-  Slack agent sessions, identity auto-linking, and provider-specific backfills are not v1.
+  Slack agent sessions, and identity auto-linking are not v1.
 
 ## Review checklist
 
@@ -106,4 +106,3 @@ threading, routing, and delivery semantics before names harden into migrations.
   once.
 - The private-conversation access grant and unsupported Slack conversation kinds are explicit.
 - Reviewers can reject any later change by pointing to one violated invariant in this document.
-

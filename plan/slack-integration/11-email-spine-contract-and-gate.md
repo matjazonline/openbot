@@ -1,46 +1,35 @@
-# Step 11 — Remove the Legacy Email Spine and Enforce the Abstraction Gate
+# Step 11 — Delete the Email-Shaped Spine and Enforce the Abstraction Gate
 
 ## Outcome
 
-Finish the canonical cutover before Slack code is allowed into the repository. Remove transitional
-tables, fields, payloads, and compatibility adapters only after data/runtime evidence proves they
-are unused.
+Finish the direct canonical replacement before Slack code is allowed into the repository. The
+database-reset premise means the final migration set and runtime contain no transitional tables,
+fields, payloads, or compatibility adapters.
 
-## Preconditions
+## Final schema definition
 
-- New email ingress writes only canonical messages, identities, external maps, tasks v2, and generic
-  deliveries.
-- Every message reader and non-ingress producer uses the canonical model.
-- Generic delivery workers have drained or imported every `email_outbox` row.
-- Operational queries show zero old task payloads and zero canonical/backfill mismatches for at
-  least one full maximum task/approval/outreach lifetime, or an explicit offline migration handles
-  the remaining rows.
-- A backup and restore rehearsal has been completed before destructive schema changes.
+Rewrite/consolidate the migration set so a clean run defines the final model directly:
 
-## Contract migration
-
-Create `migrations/20260902050000_contract_legacy_email_spine.sql` and, in dependency order:
-
-- make canonical `thread_messages.message_id` and task source UUID constraints required;
-- repoint `task_outreach_targets.response_message_id` and other FKs to the intended canonical or
+- canonical `thread_messages.message_id` and task source UUID constraints are required;
+- `task_outreach_targets.response_message_id` and other FKs point to the intended canonical or
   association ID explicitly;
-- remove `thread_messages.email_message_id`, `threads.external_thread_key`, and old email-key task
-  columns only after unmatched-row assertions;
-- drop legacy `thread_participants`/`channel_participants` after principal equivalents are complete;
-- drop `email_outbox` only after every row is represented in generic deliveries;
-- drop or rename `email_messages` only after `email_message_metadata` contains all required
-  protocol fields and no code references the old table;
-- replace old triggers/functions with canonical message notifications, preserving transaction-bound
-  wake semantics.
+- no `thread_messages.email_message_id`, `threads.external_thread_key`, or email-key task columns;
+- no email-keyed `thread_participants`/`channel_participants`;
+- no `email_outbox` or email-shaped canonical `email_messages` table; and
+- `email_message_metadata` exists only as a protocol extension of canonical `messages`.
 
-Use guarded precondition blocks that abort on non-zero mismatch counts instead of silently deleting
-data. Do not use `CASCADE` to discover dependencies.
+Define canonical message notifications directly, preserving transaction-bound wake semantics. Do
+not create a contract/cleanup migration whose only purpose is converting the pre-reset schema.
+
+Do not add mismatch assertions, row-copy logic, queue draining, or populated-database upgrade
+support. The deployment procedure resets the database before this migration set runs. The final
+dependency graph must still be explicit and reproducible.
 
 ## Code removal and naming cleanup
 
 - Delete `NormalizedInboundMessage`, `NormalizedOutboundMessage`, `ParticipantIdentity`,
-  `ChannelType`, `parsed_email_from_normalized`, adapter compatibility constructors, and v1 task
-  writers/readers once the row census is zero.
+  `ChannelType`, `parsed_email_from_normalized`, adapter compatibility constructors, and broad old
+  task writers/readers in the same implementation series.
 - Rename `email_outbox` modules, `OutboxEmail`, `OutboundSend`, and UI labels to delivery-neutral
   names. Keep `OutboundEmail` only inside the email renderer/sender boundary.
 - Move the email parser fully under the email adapter and remove application imports of MIME,
@@ -66,8 +55,8 @@ stack-budget. This is the early failure signal that replaces the removed structu
 
 - SMTP, SendGrid, simulation, mailbox compose, agent reply, schedule delivery, approval, bounce,
   outreach/quorum, inter-channel delegation, attachment access, live mailbox updates, and outbox UI.
-- Fresh migration and upgrade migration from a populated pre-refactor fixture.
-- Database count/hash/ordering equivalence before and after contract.
+- Fresh migration from an empty database and bootstrap through final-model creation paths.
+- Schema assertions prove the removed email-shaped tables/columns do not exist.
 - Offline SQLx compilation from committed metadata.
 
 ## Acceptance criteria
@@ -75,4 +64,3 @@ stack-budget. This is the early failure signal that replaces the removed structu
 - Email works exclusively as an adapter over transport-neutral application/domain contracts.
 - The build fails if later work leaks transport types back into the canonical spine.
 - Only after this commit is green may step 12 add Slack-specific modules.
-

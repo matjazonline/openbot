@@ -1,4 +1,5 @@
 use crate::adapters::persistence::task::TaskPersistence;
+use crate::adapters::protocols::email::{EmailChannelSelectorParser, EmailRecipientDestination};
 use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService};
 use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::approval::{ApprovalAction, ApprovalStatus, ApprovalSubject};
@@ -6,7 +7,7 @@ use crate::entities::company::Company;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::message::{Message, MessageRole};
 use crate::entities::task::TokenUsage;
-use crate::entities::value_objects::{ModelName, ModelProvider};
+use crate::entities::value_objects::{EmailAddress, ModelName, ModelProvider};
 use crate::services::agent_channel_tool::{
     AgentChannelProvisioning, AgentChannelToolContext, CreateAgentChannelTool,
 };
@@ -589,9 +590,17 @@ impl InternalDelegationPolicy {
             let Some(email) = target.as_str() else {
                 return false;
             };
+            let EmailRecipientDestination::Channel(selection) =
+                EmailChannelSelectorParser::new(&self.app_domain_name)
+                    .classify(EmailAddress::from(email.trim().to_ascii_lowercase()))
+            else {
+                return false;
+            };
+            if selection.delivery().is_context_only() || selection.selectors().len() != 1 {
+                return false;
+            }
             let outcome = resolve_internal_target(
-                &email.trim().to_lowercase(),
-                &self.app_domain_name,
+                selection.primary(),
                 self.company_id,
                 self.source_channel_id,
                 self.channel_persistence.as_ref(),

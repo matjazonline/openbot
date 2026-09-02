@@ -1,10 +1,9 @@
-# Step 8 — Migrate Canonical Readers and Non-Ingress Producers
+# Step 8 — Replace Readers and Non-Ingress Producers
 
 ## Outcome
 
 Move every message reader and every schedule/approval/agent/system writer to the canonical model.
-At the end of this step, only the transitional email egress path may still read legacy email
-fields.
+No reader or producer keeps an email-shaped fallback path.
 
 ## Persistence/read-model work
 
@@ -60,11 +59,11 @@ read projections. Expected visible changes:
 Touch the current user-edited files (`agent_settings.rs`, `channel_settings.rs`, their routes, and
 page tests) only after rebasing around their existing changes; do not overwrite unrelated work.
 
-## Durable payload transition
+## Durable payload use
 
-- Teach `TaskWorker` to decode both the current payload and `InboundTaskPayloadV2` fallibly.
-- New writers produce v2 only. Add an operational count/query for remaining v1 queued/parked tasks.
-- V2 processing reloads message, thread, channel, company, principal, and agent with tenant-scoped
+- Teach `TaskWorker` to decode only the canonical `InboundTaskPayloadV1` fallibly.
+- All writers produce that payload; there is no old queue-row decoder or census.
+- Processing reloads message, thread, channel, company, principal, and agent with tenant-scoped
   queries and returns a classified task failure for missing/incoherent state.
 
 ## Tests
@@ -74,8 +73,8 @@ page tests) only after rebasing around their existing changes; do not overwrite 
 - Agent history retains role, body ordering, and bounded size without needing email metadata.
 - Schedules, approvals, outreach replies, and multi-channel agent dispatch produce one canonical
   message and the expected associations/intents.
-- Old task payload fixtures still decode during expansion; malformed and unknown versions fail
-  observably rather than stopping silently.
+- Pre-reset task payload fixtures are rejected; malformed and unknown versions fail observably
+  rather than stopping silently.
 
 ## Acceptance criteria
 
@@ -83,4 +82,3 @@ page tests) only after rebasing around their existing changes; do not overwrite 
   adapter/projection code with documented reasons.
 - Every UI and agent-history read works for a message that has no email extension.
 - New background tasks contain stable IDs only and no serialized broad domain entities.
-

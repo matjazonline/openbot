@@ -2,13 +2,13 @@
 
 ## Outcome
 
-Create one crash-aware delivery state machine for email, Slack, and future transports, then migrate
-email onto it before writing Slack egress. A delivery is a durable attempt to expose one canonical
+Create one crash-aware delivery state machine for email, Slack, and future transports, and implement
+email on it before writing Slack egress. A delivery is a durable attempt to expose one canonical
 message through one destination binding; parts record provider-side results.
 
 ## Migration
 
-Create `migrations/20260902030000_add_message_deliveries.sql`.
+Define the delivery tables directly in the rewritten clean-reset migration set.
 
 ### `message_deliveries`
 
@@ -41,13 +41,6 @@ status, provider message key, content digest, attempt metadata, and timestamps.
 - Payload JSON is transport-rendered but versioned, bounded, and decoded fallibly. Secrets and raw
   authorization headers are forbidden.
 
-### Transition existing rows
-
-Backfill each `email_outbox` row to one delivery/part while preserving ID where practical,
-idempotency key, task/correlation/channel, status, retry count, timestamps, and provider Message-ID.
-Map irreducible legacy `sending` rows with expired or missing lease data to retryable/dead according
-to their attempts; report every repair.
-
 ## Application/persistence ports
 
 - Define `DeliveryQueue` next to the delivery worker: atomic bounded claim using one
@@ -60,7 +53,7 @@ to their attempts; report every repair.
   global; application scheduling enforces fair bounded global/per-company/per-installation capacity.
 - Keep `LISTEN/NOTIFY` as a wake-up and periodic reconciliation as correctness.
 
-## Email migration
+## Email implementation
 
 - Implement `EmailRenderer`: canonical message + email destination/context -> exactly one
   `OutboundEmail` part with a stable RFC Message-ID derived from `part_key`.
@@ -81,7 +74,7 @@ to their attempts; report every repair.
   commit becomes `outcome_unknown`, never an automatic resend.
 - One poison row does not hot-spin or monopolize the next full batch.
 - Partial multi-part state aggregates correctly even though email currently has one part.
-- Existing atomic agent reply + task payload + outbox tests pass with `message_deliveries`.
+- Atomic agent reply + canonical task payload + delivery tests pass with `message_deliveries`.
 - Shutdown during send cancels/awaits work and leaves either a short recoverable lease or an
   explicit unknown result.
 

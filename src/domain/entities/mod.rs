@@ -19,6 +19,7 @@ pub mod schedule;
 pub mod stuck_work;
 pub mod task;
 pub mod thread;
+pub mod transport;
 pub mod upload;
 pub mod user;
 pub mod value_objects;

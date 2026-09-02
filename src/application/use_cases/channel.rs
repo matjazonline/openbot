@@ -5,12 +5,14 @@ use tracing::{info, instrument};
 use uuid::Uuid;
 
 use crate::{
+    adapters::protocols::email::EmailChannelSelectorParser,
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
         channel::{Channel, PUBLIC_PARTICIPANT},
         company::{Company, CompanyAccess},
         creation::CreationProvenance,
+        transport::ChannelSelector,
         user::Viewer,
         value_objects::{ChannelSlug, CompanySlug},
     },
@@ -648,96 +650,18 @@ pub fn validate_slug(slug: &str, kind: SlugKind) -> AppResult<()> {
     Ok(())
 }
 
-pub fn strip_context_suffix_from_slug(raw_slug: &str) -> (String, bool) {
-    let lower = raw_slug.trim().to_lowercase();
-    for suffix in crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES {
-        let dot_s = format!(".{}", suffix);
-        let plus_s = format!("+{}", suffix);
-        let dash_s = format!("-{}", suffix);
-        let underscore_s = format!("_{}", suffix);
-
-        if lower.ends_with(&dot_s) {
-            let base = lower[..lower.len() - dot_s.len()].trim();
-            if !base.is_empty() {
-                return (base.to_string(), true);
-            }
-        } else if lower.ends_with(&plus_s) {
-            let base = lower[..lower.len() - plus_s.len()].trim();
-            if !base.is_empty() {
-                return (base.to_string(), true);
-            }
-        } else if lower.ends_with(&dash_s) {
-            let base = lower[..lower.len() - dash_s.len()].trim();
-            if !base.is_empty() {
-                return (base.to_string(), true);
-            }
-        } else if lower.ends_with(&underscore_s) {
-            let base = lower[..lower.len() - underscore_s.len()].trim();
-            if !base.is_empty() {
-                return (base.to_string(), true);
-            }
-        } else if lower == *suffix {
-            return (String::new(), true);
-        }
-    }
-    (raw_slug.trim().to_lowercase(), false)
-}
-
-/// Whether a bare domain belongs to this platform at all — the application domain itself, or any
-/// company subdomain of it.
-///
-/// Deliberately broader than [`parse_platform_address`]: `resolve_internal_target` has to treat
-/// `someone@{app_domain}` as *ours but malformed* rather than as a stranger, because classifying a
-/// platform address as external would mail the outside world under a policy meant for colleagues.
-pub fn is_platform_domain(domain: &str, app_domain_name: &str) -> bool {
-    let domain = domain.trim();
-    let app_domain_lower = app_domain_name.trim().to_lowercase();
-    domain.eq_ignore_ascii_case(&app_domain_lower)
-        || domain
-            .to_lowercase()
-            .ends_with(&format!(".{app_domain_lower}"))
-}
-
 /// Split `{local}@{company}.{app_domain}` into its company and its raw local part.
 ///
 /// The local part comes back lowercased but otherwise **untouched** — no pipeline split, no
 /// context-suffix stripping — because callers disagree about what it means. Channel routing expands
-/// it; [`SystemAddress::parse`] must see it whole, before `strip_context_suffix_from_slug` could
+/// it; [`SystemAddress::parse`] must see it whole, before context-suffix handling could
 /// eat a name like `_msg`.
-pub fn parse_platform_address(
+pub(crate) fn parse_platform_address(
     to_str: &str,
     app_domain_name: &str,
 ) -> Option<(CompanySlug, String)> {
-    let email_addr = if let (Some(start), Some(end)) = (to_str.find('<'), to_str.rfind('>')) {
-        if start < end {
-            &to_str[start + 1..end]
-        } else {
-            to_str
-        }
-    } else {
-        to_str
-    };
-
-    let cleaned = email_addr.trim().to_lowercase();
-    let parts: Vec<&str> = cleaned.split('@').collect();
-    if parts.len() != 2 {
-        return None;
-    }
-
-    let local_part = parts[0].trim();
-    let domain_part = parts[1].trim();
-
-    if local_part.is_empty() || domain_part.is_empty() {
-        return None;
-    }
-
-    let expected_suffix = format!(".{}", app_domain_name.trim().to_lowercase());
-    let company_slug = domain_part.strip_suffix(&expected_suffix)?;
-    if company_slug.is_empty() {
-        return None;
-    }
-
-    Some((CompanySlug::new(company_slug), local_part.to_string()))
+    // TODO(slack-step-11): compatibility shim for system-address parsing.
+    EmailChannelSelectorParser::new(app_domain_name).parse_platform_address(to_str)
 }
 
 /// A local part the server answers itself instead of routing to a channel.
@@ -773,37 +697,23 @@ impl SystemAddress {
     }
 }
 
-pub fn parse_recipient_address_pipeline(
+pub(crate) fn parse_recipient_address_pipeline(
     to_str: &str,
     app_domain_name: &str,
 ) -> Option<(CompanySlug, Vec<ChannelSlug>, bool)> {
-    let (company_slug, channel_part) = parse_platform_address(to_str, app_domain_name)?;
-
-    let mut is_context_only = false;
-    let mut channel_slugs: Vec<String> = Vec::new();
-
-    for part in channel_part.split('+') {
-        let (clean_slug, is_context) = strip_context_suffix_from_slug(part);
-        if is_context {
-            is_context_only = true;
-        }
-        if !clean_slug.is_empty() && !channel_slugs.contains(&clean_slug) {
-            channel_slugs.push(clean_slug);
-        }
-    }
-
-    if channel_slugs.is_empty() {
-        return None;
-    }
-
-    Some((
-        company_slug,
-        channel_slugs.into_iter().map(ChannelSlug::new).collect(),
-        is_context_only,
-    ))
+    // TODO(slack-step-11): compatibility projection for the legacy ingest pipeline.
+    let selection = EmailChannelSelectorParser::new(app_domain_name).parse(to_str)?;
+    let company = selection.selectors().first()?.company()?.clone();
+    let channels = selection
+        .selectors()
+        .iter()
+        .map(ChannelSelector::channel)
+        .cloned()
+        .collect();
+    Some((company, channels, selection.delivery().is_context_only()))
 }
 
-pub fn parse_recipient_address(
+pub(crate) fn parse_recipient_address(
     to_str: &str,
     app_domain_name: &str,
 ) -> Option<(CompanySlug, ChannelSlug)> {
@@ -870,61 +780,46 @@ pub fn check_internal_target(
 /// What one outreach recipient turns out to be.
 #[derive(Debug, Clone)]
 pub enum InternalTargetOutcome {
-    /// Not an address under the application domain — an ordinary third-party recipient.
-    External,
     /// A same-company channel the caller is allowed to call.
     Callable(Box<Channel>),
     /// An address under the application domain that cannot be called, and why.
     Rejected(String),
 }
 
-/// Classify one recipient address as external, callable internal channel, or refused.
+/// Resolve a transport-neutral business-channel intent as callable or refused.
 ///
 /// Shared by the outreach send path and the approval policy so that "is this a colleague or a
 /// stranger?" is answered the same way in both. Persistence errors propagate rather than
 /// degrading into `External` — misclassifying a channel as a stranger would mail the outside
 /// world under a policy meant for internal traffic.
 pub async fn resolve_internal_target(
-    email: &str,
-    app_domain_name: &str,
+    selector: &ChannelSelector,
     caller_company_id: Uuid,
     caller_channel_id: Uuid,
     channel_persistence: &dyn ChannelPersistence,
 ) -> AppResult<InternalTargetOutcome> {
-    let domain = match email.rsplit_once('@') {
-        Some((_, domain)) => domain,
-        None => return Ok(InternalTargetOutcome::External),
+    let channel = match selector {
+        ChannelSelector::CurrentCompany(channel_slug) => channel_persistence
+            .list_by_company_id(caller_company_id)
+            .await?
+            .into_iter()
+            .find(|channel| channel.matches_slug(channel_slug)),
+        ChannelSelector::Qualified { company, channel } => {
+            channel_persistence
+                .get_by_company_slug_and_channel_slug(company, channel)
+                .await?
+        }
     };
-    if !is_platform_domain(domain, app_domain_name) {
-        return Ok(InternalTargetOutcome::External);
-    }
-
-    let Some((company_slug, channel_slugs, is_context_only)) =
-        parse_recipient_address_pipeline(email, app_domain_name)
-    else {
+    let Some(channel) = channel else {
         return Ok(InternalTargetOutcome::Rejected(format!(
-            "Invalid platform channel address: {email}"
-        )));
-    };
-    if is_context_only || channel_slugs.len() != 1 {
-        return Ok(InternalTargetOutcome::Rejected(format!(
-            "Internal outreach requires one direct channel address without pipeline or context-only suffix: {email}"
-        )));
-    }
-
-    let Some(channel) = channel_persistence
-        .get_by_company_slug_and_channel_slug(&company_slug, &channel_slugs[0])
-        .await?
-    else {
-        return Ok(InternalTargetOutcome::Rejected(format!(
-            "Platform channel does not exist: {email}"
+            "Selected platform channel does not exist: {selector}"
         )));
     };
 
     match check_internal_target(&channel, caller_company_id, caller_channel_id) {
         Ok(()) => Ok(InternalTargetOutcome::Callable(Box::new(channel))),
         Err(rejection) => Ok(InternalTargetOutcome::Rejected(format!(
-            "{rejection}: {email}"
+            "{rejection}: {selector}"
         ))),
     }
 }
@@ -1981,12 +1876,13 @@ mod tests {
 
     #[test]
     fn the_platform_domain_test_is_wider_than_the_address_parser() {
-        // `resolve_internal_target` relies on this gap: `someone@mailagents.com` is ours but
-        // malformed, and must not be classified as an external stranger.
-        assert!(is_platform_domain("mailagents.com", "mailagents.com"));
-        assert!(is_platform_domain("acme.mailagents.com", "mailagents.com"));
-        assert!(!is_platform_domain("elsewhere.com", "mailagents.com"));
-        assert!(!is_platform_domain("notmailagents.com", "mailagents.com"));
+        // Email destination classification relies on this gap: `someone@mailagents.com` is ours
+        // but malformed, and must not be classified as an external stranger.
+        let parser = EmailChannelSelectorParser::new("mailagents.com");
+        assert!(parser.is_platform_domain("mailagents.com"));
+        assert!(parser.is_platform_domain("acme.mailagents.com"));
+        assert!(!parser.is_platform_domain("elsewhere.com"));
+        assert!(!parser.is_platform_domain("notmailagents.com"));
     }
 
     #[test]
@@ -2018,11 +1914,13 @@ mod tests {
                  context suffix -- see the assertion below"
             );
 
-            let (stripped, is_context) = strip_context_suffix_from_slug(local);
+            let parsed = EmailChannelSelectorParser::new("mailagents.com")
+                .parse(&format!("{local}@acme.mailagents.com"))
+                .expect("a reserved system address still has platform address syntax");
             assert!(
-                !is_context && stripped == local,
-                "'{local}' collides with a reserved context suffix: it parses to ({stripped:?}, \
-                 {is_context}) and would be eaten before SystemAddress::parse ever saw it"
+                !parsed.delivery().is_context_only() && parsed.primary().channel() == local,
+                "'{local}' collides with a reserved context suffix and would be eaten before \
+                 SystemAddress::parse ever saw it"
             );
         }
     }

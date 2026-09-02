@@ -534,11 +534,15 @@ impl SmtpServer {
             self.thread_use_cases.file_storage(),
         )
         .await;
-        match self
-            .thread_use_cases
-            .ingest_normalized_message(norm_payload)
-            .await
-        {
+        let ingest_result = match norm_payload {
+            Ok(norm_payload) => {
+                self.thread_use_cases
+                    .ingest_normalized_message(norm_payload)
+                    .await
+            }
+            Err(error) => Err(error),
+        };
+        match ingest_result {
             Ok(ingest) => {
                 self.record_connection(
                     client_ip,

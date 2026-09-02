@@ -3,9 +3,9 @@ use uuid::Uuid;
 
 use crate::entities::{
     auth::AuthVerdict,
-    channel::{ChannelType, ParticipantIdentity},
     correlation::CorrelationId,
     message::AttachmentMetadata,
+    transport::{QualifiedIdentity, TransportKind},
     value_objects::{MessageId, ThreadIndex},
 };
 
@@ -15,9 +15,9 @@ pub struct NormalizedInboundMessage {
     pub thread_ref: Option<MessageId>,
     pub references: Vec<MessageId>,
     pub thread_index: Option<ThreadIndex>,
-    pub sender: ParticipantIdentity,
-    pub recipients_to: Vec<ParticipantIdentity>,
-    pub recipients_cc: Vec<ParticipantIdentity>,
+    pub sender: QualifiedIdentity,
+    pub recipients_to: Vec<QualifiedIdentity>,
+    pub recipients_cc: Vec<QualifiedIdentity>,
     pub subject: String,
     pub clean_text: String,
     pub raw_text: Option<String>,
@@ -34,7 +34,7 @@ pub struct NormalizedInboundMessage {
     /// Deliberately not `#[serde(default)]`: this round-trips through the durable task payload,
     /// and a default would quietly mint a second chain for a message that already had one.
     pub correlation_id: CorrelationId,
-    pub protocol: ChannelType,
+    pub transport: TransportKind,
     #[serde(default)]
     pub spf_status: AuthVerdict,
     #[serde(default)]
@@ -50,12 +50,12 @@ pub struct NormalizedOutboundMessage {
     pub thread_id: Uuid,
     pub in_reply_to_ref: Option<MessageId>,
     pub references: Vec<MessageId>,
-    pub recipients_to: Vec<ParticipantIdentity>,
-    pub recipients_cc: Vec<ParticipantIdentity>,
+    pub recipients_to: Vec<QualifiedIdentity>,
+    pub recipients_cc: Vec<QualifiedIdentity>,
     pub subject: String,
     pub content: String,
     pub attachments: Vec<AttachmentMetadata>,
-    pub protocol: ChannelType,
+    pub transport: TransportKind,
     pub channel_id: Uuid,
     pub hop_count: u32,
     pub trace_channels: Vec<Uuid>,

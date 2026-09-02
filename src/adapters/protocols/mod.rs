@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::{
     app_error::AppResult,
-    entities::{channel::ChannelType, message_contract::NormalizedOutboundMessage},
+    entities::{message_contract::NormalizedOutboundMessage, transport::TransportKind},
     use_cases::thread::BounceInfo,
 };
 
@@ -12,14 +12,14 @@ pub mod email;
 
 #[async_trait]
 pub trait ProtocolEgressAdapter: Send + Sync {
-    fn protocol(&self) -> ChannelType;
+    fn transport(&self) -> TransportKind;
     async fn dispatch(&self, message: &NormalizedOutboundMessage) -> AppResult<()>;
     async fn dispatch_bounce(&self, bounce_info: &BounceInfo) -> AppResult<()>;
 }
 
 #[derive(Clone, Default)]
 pub struct EgressRegistry {
-    adapters: HashMap<ChannelType, Arc<dyn ProtocolEgressAdapter>>,
+    adapters: HashMap<TransportKind, Arc<dyn ProtocolEgressAdapter>>,
 }
 
 impl EgressRegistry {
@@ -30,11 +30,11 @@ impl EgressRegistry {
     }
 
     pub fn register(mut self, adapter: Arc<dyn ProtocolEgressAdapter>) -> Self {
-        self.adapters.insert(adapter.protocol(), adapter);
+        self.adapters.insert(adapter.transport(), adapter);
         self
     }
 
-    pub fn get(&self, protocol: &ChannelType) -> Option<Arc<dyn ProtocolEgressAdapter>> {
-        self.adapters.get(protocol).cloned()
+    pub fn get(&self, transport: &TransportKind) -> Option<Arc<dyn ProtocolEgressAdapter>> {
+        self.adapters.get(transport).cloned()
     }
 }

@@ -1,10 +1,11 @@
 use crate::{
     adapters::storage::FileStorage,
+    app_error::{AppError, AppResult},
     entities::{
-        channel::{ChannelType, ParticipantIdentity},
         correlation::{CORRELATION_HEADER, CorrelationId},
         message_contract::NormalizedInboundMessage,
-        value_objects::MessageId,
+        transport::{IdentityNamespace, TransportKind},
+        value_objects::{EmailAddress, MessageId},
     },
     infra::config::AppConfig,
     services::{
@@ -12,6 +13,8 @@ use crate::{
         email_parser::{EmailParser, RawInboundPayload},
     },
 };
+
+use super::EmailIdentity;
 
 pub struct EmailIngressAdapter;
 
@@ -25,7 +28,7 @@ impl EmailIngressAdapter {
         mut payload: RawInboundPayload,
         config: &AppConfig,
         storage: Option<&dyn FileStorage>,
-    ) -> NormalizedInboundMessage {
+    ) -> AppResult<NormalizedInboundMessage> {
         if let (Some(storage), Some(gcs)) = (storage, config.gcs.as_ref())
             && gcs.attachments_bucket.is_some()
             && !payload.attachments_data.is_empty()
@@ -41,26 +44,40 @@ impl EmailIngressAdapter {
         Self::parse(payload, config)
     }
 
-    pub fn parse(payload: RawInboundPayload, config: &AppConfig) -> NormalizedInboundMessage {
+    pub fn parse(
+        payload: RawInboundPayload,
+        config: &AppConfig,
+    ) -> AppResult<NormalizedInboundMessage> {
         // Read before `payload` is consumed. Extracted here rather than in `EmailParser` because
         // this is the protocol boundary the id crosses, and because `parse_headers` already
         // returns a nine-tuple that a tenth element would not improve.
         let correlation_id = correlation_from_headers(payload.headers.as_deref());
         let parsed = EmailParser::parse(payload, &config.app_domain_name);
 
-        let sender = ParticipantIdentity::email(&parsed.sender);
+        let namespace =
+            IdentityNamespace::parse(config.app_domain_name.trim().to_ascii_lowercase()).map_err(
+                |error| AppError::Internal(format!("Invalid email identity namespace: {error}")),
+            )?;
+        let qualify = |address: String| -> AppResult<_> {
+            EmailIdentity::parse(EmailAddress::from(address))
+                .map(|identity| identity.qualify(namespace.clone()))
+                .map_err(|error| AppError::BadRequest(format!("Invalid email mailbox: {error}")))
+        };
+        let sender = qualify(parsed.sender.clone())?;
         let recipients_to = parsed
             .recipients_to
             .iter()
-            .map(ParticipantIdentity::email)
-            .collect();
+            .cloned()
+            .map(&qualify)
+            .collect::<AppResult<Vec<_>>>()?;
         let recipients_cc = parsed
             .recipients_cc
             .iter()
-            .map(ParticipantIdentity::email)
-            .collect();
+            .cloned()
+            .map(&qualify)
+            .collect::<AppResult<Vec<_>>>()?;
 
-        NormalizedInboundMessage {
+        Ok(NormalizedInboundMessage {
             message_id: MessageId::from(parsed.message_id),
             thread_ref: parsed.in_reply_to.map(MessageId::from),
             references: parsed.references.into_iter().map(MessageId::from).collect(),
@@ -79,13 +96,13 @@ impl EmailIngressAdapter {
             hop_count: parsed.hop_count,
             trace_channels: parsed.trace_channels,
             correlation_id,
-            protocol: ChannelType::Email,
+            transport: TransportKind::Email,
             spf_status: parsed.spf_status,
             dkim_status: parsed.dkim_status,
             dmarc_status: parsed.dmarc_status,
             spam_score: parsed.spam_score,
             is_context_only: parsed.is_context_only,
-        }
+        })
     }
 }
 

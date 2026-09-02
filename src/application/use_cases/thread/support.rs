@@ -229,16 +229,16 @@ pub(super) fn parsed_email_from_normalized(norm: &NormalizedInboundMessage) -> P
             .map(MessageId::into_string)
             .collect(),
         thread_index: norm.thread_index.clone(),
-        sender: norm.sender.identity.clone(),
+        sender: norm.sender.subject().as_str().to_string(),
         recipients_to: norm
             .recipients_to
             .iter()
-            .map(|p| p.identity.clone())
+            .map(|identity| identity.subject().as_str().to_string())
             .collect(),
         recipients_cc: norm
             .recipients_cc
             .iter()
-            .map(|p| p.identity.clone())
+            .map(|identity| identity.subject().as_str().to_string())
             .collect(),
         subject: norm.subject.clone(),
         clean_text_body: norm.clean_text.clone(),
