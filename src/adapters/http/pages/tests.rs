@@ -1,11 +1,14 @@
 use super::*;
 use crate::entities::correlation::CorrelationId;
+use crate::entities::message::CanonicalMessageId;
+use crate::entities::message_view::{AuthorView, ExternalMessageRef};
 use crate::entities::schedule::ScheduleRunAsChoices;
 use crate::entities::task::{
     TaskAttemptRecord, TaskAttemptRecordStatus, TaskStatusEvent, TaskStopReason,
     TaskTransitionActorKind, TaskTransitionReason,
 };
-use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email};
+use crate::entities::transport::{ChannelBindingId, ExternalMessageKey, PrincipalId};
+use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email_view};
 use crate::use_cases::user::LoginMethods;
 use chrono::Utc;
 use serde_json::json;
@@ -98,19 +101,26 @@ fn simulation_attribute_values_and_message_ids_are_escaped() {
     assert!(html.contains("data-server-sender=\"sender@example.com&quot;"));
 
     let thread = mailbox_thread(channel.id);
-    let message = stored_email(EmailMessageDraft {
-        message_id: "<id><script>alert(1)</script>".into(),
+    let message = stored_email_view(EmailMessageDraft {
+        subject: "<id><script>alert(1)</script>".into(),
         ..mailbox_message_draft(thread.id, "body")
     });
-    let rendered = channel_simulation_loaded_thread_fragment(
-        &company,
-        &channel,
-        "example.com",
-        &thread,
-        &[message],
-        &[],
-        false,
-    );
+    let rendered = channel_simulation_loaded_thread_fragment(&SimulationThreadView {
+        company: &company,
+        channel: &channel,
+        app_domain_name: "example.com",
+        thread: &thread,
+        messages: &[message],
+        reply_context: Some(&EmailReplyContext {
+            canonical_id: CanonicalMessageId::random(),
+            author_email: None,
+            rfc_message_id: Some("<id><script>alert(1)</script>".into()),
+            references: Vec::new(),
+            cc: Vec::new(),
+        }),
+        tasks: &[],
+        include_oob: false,
+    });
     assert!(
         !rendered.contains("<script>alert(1)</script>"),
         "{rendered}"
@@ -136,166 +146,62 @@ fn library_agent_fields_reuse_the_advanced_editor_and_avatar_picker() {
     assert!(!html.contains("Overrides the company key"));
 }
 
+/// The payload names the message it answers and the reply it produced by canonical id, so a
+/// thread whose turns carry no mail headers at all matches on exactly this path.
 #[test]
-fn test_find_task_for_message_multi_task_matching() {
+fn a_message_is_matched_to_its_task_by_canonical_id() {
     let thread_id = Uuid::new_v4();
     let company_id = Uuid::new_v4();
     let channel_id = Uuid::new_v4();
 
+    let msg_in1 = mailbox_message_view(thread_id, "Inbound 1");
+    let msg_out1 = agent_reply_view(thread_id, "Response 1");
+    let msg_in2 = mailbox_message_view(thread_id, "Inbound 2");
+    let msg_out2 = agent_reply_view(thread_id, "Response 2");
+
+    let task = |id: Uuid, answered: &ThreadMessageView, reply: &ThreadMessageView| BackgroundTask {
+        correlation_id: CorrelationId::new(),
+        id,
+        company_id,
+        channel_id,
+        thread_id: Some(thread_id),
+        task_type: "email_agent_dispatch".to_string(),
+        status: TaskStatus::Completed,
+        payload: json!({
+            "source_message_id": answered.canonical_id,
+            "execution_result": {
+                "reply_message_id": reply.canonical_id,
+                "response": reply.body,
+            }
+        }),
+        retry_count: 0,
+        max_retries: 3,
+        last_error: None,
+        worker_id: None,
+        execution_generation: None,
+        locked_at: None,
+        lock_expires_at: None,
+        run_at: Utc::now(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+
     let task1_id = Uuid::new_v4();
     let task2_id = Uuid::new_v4();
+    let tasks = vec![
+        task(task1_id, &msg_in1, &msg_out1),
+        task(task2_id, &msg_in2, &msg_out2),
+    ];
 
-    let task1 = BackgroundTask {
-        correlation_id: CorrelationId::new(),
-        id: task1_id,
-        company_id,
-        channel_id,
-        thread_id: Some(thread_id),
-        task_type: "email_agent_dispatch".to_string(),
-        status: TaskStatus::Completed,
-        payload: json!({
-            "inbound_message": {
-                "message_id": "<in1@test.com>"
-            },
-            "execution_result": {
-                "outbound_message_id": "<out1@test.com>",
-                "response": "Response 1"
-            }
-        }),
-        retry_count: 0,
-        max_retries: 3,
-        last_error: None,
-        worker_id: None,
-        execution_generation: None,
-        locked_at: None,
-        lock_expires_at: None,
-        run_at: Utc::now(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-    };
-
-    let task2 = BackgroundTask {
-        correlation_id: CorrelationId::new(),
-        id: task2_id,
-        company_id,
-        channel_id,
-        thread_id: Some(thread_id),
-        task_type: "email_agent_dispatch".to_string(),
-        status: TaskStatus::Completed,
-        payload: json!({
-            "inbound_message": {
-                "message_id": "<in2@test.com>"
-            },
-            "execution_result": {
-                "outbound_message_id": "<out2@test.com>",
-                "response": "Response 2"
-            }
-        }),
-        retry_count: 0,
-        max_retries: 3,
-        last_error: None,
-        worker_id: None,
-        execution_generation: None,
-        locked_at: None,
-        lock_expires_at: None,
-        run_at: Utc::now(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-    };
-
-    let tasks = vec![task1, task2];
-
-    let msg_in1 = stored_email(EmailMessageDraft {
-        id: Uuid::new_v4(),
-        thread_id,
-        message_id: "<in1@test.com>".into(),
-        in_reply_to: None,
-        references_list: vec![],
-        sender: "user@test.com".into(),
-        recipients_to: vec![],
-        recipients_cc: vec![],
-        subject: "Hi".to_string(),
-        clean_text_body: "Inbound 1".to_string(),
-        raw_text_body: None,
-        raw_html_body: None,
-        attachments: None,
-        direction: MessageDirection::Inbound,
-        role: MessageRole::Human,
-        thread_index: None,
-        created_at: Utc::now(),
-    });
-
-    let msg_out1 = stored_email(EmailMessageDraft {
-        id: Uuid::new_v4(),
-        thread_id,
-        message_id: "<out1@test.com>".into(),
-        in_reply_to: Some("<in1@test.com>".into()),
-        references_list: vec![],
-        sender: "agent@test.com".into(),
-        recipients_to: vec![],
-        recipients_cc: vec![],
-        subject: "Re: Hi".to_string(),
-        clean_text_body: "Response 1".to_string(),
-        raw_text_body: None,
-        raw_html_body: None,
-        attachments: None,
-        direction: MessageDirection::Outbound,
-        role: MessageRole::Agent,
-        thread_index: None,
-        created_at: Utc::now(),
-    });
-
-    let msg_in2 = stored_email(EmailMessageDraft {
-        id: Uuid::new_v4(),
-        thread_id,
-        message_id: "<in2@test.com>".into(),
-        in_reply_to: Some("<out1@test.com>".into()),
-        references_list: vec![],
-        sender: "user@test.com".into(),
-        recipients_to: vec![],
-        recipients_cc: vec![],
-        subject: "Re: Hi 2".to_string(),
-        clean_text_body: "Inbound 2".to_string(),
-        raw_text_body: None,
-        raw_html_body: None,
-        attachments: None,
-        direction: MessageDirection::Inbound,
-        role: MessageRole::Human,
-        thread_index: None,
-        created_at: Utc::now(),
-    });
-
-    let msg_out2 = stored_email(EmailMessageDraft {
-        id: Uuid::new_v4(),
-        thread_id,
-        message_id: "<out2@test.com>".into(),
-        in_reply_to: Some("<in2@test.com>".into()),
-        references_list: vec![],
-        sender: "agent@test.com".into(),
-        recipients_to: vec![],
-        recipients_cc: vec![],
-        subject: "Re: Hi 2".to_string(),
-        clean_text_body: "Response 2".to_string(),
-        raw_text_body: None,
-        raw_html_body: None,
-        attachments: None,
-        direction: MessageDirection::Outbound,
-        role: MessageRole::Agent,
-        thread_index: None,
-        created_at: Utc::now(),
-    });
-
-    let matched_in1 = find_task_for_message(&msg_in1, &tasks, None, Some(thread_id)).unwrap();
-    assert_eq!(matched_in1.id, task1_id);
-
-    let matched_out1 = find_task_for_message(&msg_out1, &tasks, None, Some(thread_id)).unwrap();
-    assert_eq!(matched_out1.id, task1_id);
-
-    let matched_in2 = find_task_for_message(&msg_in2, &tasks, None, Some(thread_id)).unwrap();
-    assert_eq!(matched_in2.id, task2_id);
-
-    let matched_out2 = find_task_for_message(&msg_out2, &tasks, None, Some(thread_id)).unwrap();
-    assert_eq!(matched_out2.id, task2_id);
+    for (message, expected) in [
+        (&msg_in1, task1_id),
+        (&msg_out1, task1_id),
+        (&msg_in2, task2_id),
+        (&msg_out2, task2_id),
+    ] {
+        let matched = find_task_for_message(message, &tasks, None, Some(thread_id)).unwrap();
+        assert_eq!(matched.id, expected);
+    }
 }
 
 #[test]
@@ -2385,7 +2291,7 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
     let channel = mailbox_channel(company.id);
     let thread = mailbox_thread(channel.id);
 
-    let inbound = stored_email(EmailMessageDraft {
+    let inbound = stored_email_view(EmailMessageDraft {
         id: Uuid::new_v4(),
         thread_id: thread.id,
         message_id: "<in@test.com>".into(),
@@ -2404,7 +2310,7 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
         thread_index: None,
         created_at: Utc::now(),
     });
-    let outbound = stored_email(EmailMessageDraft {
+    let outbound = stored_email_view(EmailMessageDraft {
         id: Uuid::new_v4(),
         thread_id: thread.id,
         message_id: "<out@test.com>".into(),
@@ -2456,8 +2362,46 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
 }
 
 /// One message, so the live-stream tests below can say what they mean without 18 lines of struct.
-fn mailbox_message(thread_id: Uuid, body: &str) -> Message {
-    stored_email(mailbox_message_draft(thread_id, body))
+fn mailbox_message(thread_id: Uuid, body: &str) -> ThreadMessageView {
+    stored_email_view(mailbox_message_draft(thread_id, body))
+}
+
+/// A message as a page reads it, with no mail behind it at all -- the shape a Slack turn, a
+/// schedule prompt and an in-app reply share.
+fn mailbox_message_view(thread_id: Uuid, body: &str) -> ThreadMessageView {
+    ThreadMessageView {
+        id: Uuid::new_v4(),
+        canonical_id: CanonicalMessageId::random(),
+        thread_id,
+        author: AuthorView {
+            principal_id: PrincipalId::random(),
+            label: "Ada Lovelace".into(),
+            handle: None,
+            transport: None,
+        },
+        subject: "Question".into(),
+        body: body.to_string(),
+        attachments: Vec::new(),
+        direction: MessageDirection::Inbound,
+        role: MessageRole::Human,
+        created_at: Utc::now(),
+    }
+}
+
+/// An agent's answer as a page reads it: authored by the agent's principal, over no transport.
+fn agent_reply_view(thread_id: Uuid, body: &str) -> ThreadMessageView {
+    ThreadMessageView {
+        author: AuthorView {
+            principal_id: PrincipalId::random(),
+            label: "Triage Agent".into(),
+            handle: None,
+            transport: None,
+        },
+        subject: "Re: Question".into(),
+        direction: MessageDirection::Outbound,
+        role: MessageRole::Agent,
+        ..mailbox_message_view(thread_id, body)
+    }
 }
 
 /// The same message, still as a draft, for a scenario that overrides a field or two.
@@ -2901,7 +2845,7 @@ fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
         ..settings_agent(company.id, "Triage", "triage")
     };
 
-    let reply = stored_email(EmailMessageDraft {
+    let reply = stored_email_view(EmailMessageDraft {
         role: MessageRole::Agent,
         direction: MessageDirection::Outbound,
         sender: EmailAddress::from("support@acme.mailagents.com"),
@@ -2970,7 +2914,7 @@ fn a_message_from_another_channel_is_marked_and_keeps_its_own_sender() {
     };
 
     // Inbound *and* agent: only the internal delivery path writes that pair.
-    let delegated = stored_email(EmailMessageDraft {
+    let delegated = stored_email_view(EmailMessageDraft {
         role: MessageRole::Agent,
         direction: MessageDirection::Inbound,
         sender: EmailAddress::from("legal@acme.mailagents.test"),
@@ -2988,7 +2932,7 @@ fn a_message_from_another_channel_is_marked_and_keeps_its_own_sender() {
     assert!(html.contains(r#"data-role="agent""#));
 
     // This channel's own reply is unchanged: the agent's name and face, and no mark.
-    let own_reply = Message {
+    let own_reply = ThreadMessageView {
         direction: MessageDirection::Outbound,
         ..delegated.clone()
     };
@@ -3126,13 +3070,166 @@ fn a_reply_in_the_open_thread_quiets_that_thread_s_activity_mark() {
     assert!(!script.contains("row.classList.remove('thread-replied')"));
 }
 
+/// Every shape a canonical message comes in has to render through the one bubble, without a
+/// branch for the transport that carried it -- or one that has no transport at all.
+///
+/// The Slack-shaped case is the load-bearing one: no `To`, no `Cc`, no `Message-ID`, an author
+/// named by a workspace handle. The pre-canonical bubble could not have been given that message
+/// at all.
+#[test]
+fn a_message_renders_for_every_transport_including_none_at_all() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let scope = MessageScope {
+        company_id: company.id,
+        channel_id: channel.id,
+    };
+
+    let email = stored_email_view(mailbox_message_draft(thread.id, "Arrived by mail."));
+    let slack = ThreadMessageView {
+        author: AuthorView {
+            principal_id: PrincipalId::random(),
+            label: "Ada Lovelace".into(),
+            handle: Some("U0123ABC".into()),
+            transport: Some(TransportKind::Slack),
+        },
+        ..mailbox_message_view(thread.id, "Posted in a conversation.")
+    };
+    let agent = agent_reply_view(thread.id, "The answer.");
+    let schedule = ThreadMessageView {
+        author: AuthorView {
+            principal_id: PrincipalId::random(),
+            label: "System".into(),
+            handle: None,
+            transport: None,
+        },
+        role: MessageRole::System,
+        subject: "Nightly audit".into(),
+        ..mailbox_message_view(thread.id, "Run the audit.")
+    };
+
+    for message in [&email, &slack, &agent, &schedule] {
+        let html = message_bubble_chat(message, None, None, scope);
+        assert!(
+            html.contains(&escape_html_text(&message.body)),
+            "the body has to render: {html}"
+        );
+        assert!(
+            html.contains(&escape_html_text(message.author.display())),
+            "the author has to render: {html}"
+        );
+        // No provider key in an ordinary read, whichever transport carried it.
+        assert!(!html.contains("@test.com>"), "{html}");
+        assert!(!html.contains("<live@"), "{html}");
+    }
+
+    // The badge is what says which interface a turn came from, now that the name does not.
+    assert!(message_bubble_chat(&slack, None, None, scope).contains(">slack<"));
+    assert!(message_bubble_chat(&email, None, None, scope).contains(">email<"));
+    // Nothing carried the schedule prompt or the agent's answer, so neither claims one.
+    for message in [&agent, &schedule] {
+        let html = message_bubble_chat(message, None, None, scope);
+        assert!(!html.contains(">email<"), "{html}");
+        assert!(!html.contains(">slack<"), "{html}");
+    }
+}
+
+/// A thread page reaches provider identifiers only through a separately authorized request, so the
+/// link is in the HTML and the keys are not.
+#[test]
+fn a_thread_page_links_to_the_diagnostic_pane_rather_than_rendering_provider_keys() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let message = stored_email_view(mailbox_message_draft(thread.id, "Arrived by mail."));
+    let message_id = message.id;
+
+    let html = message_pane(&MessagePane {
+        company_id: company.id,
+        channel: &channel,
+        thread: &thread,
+        messages: &[message],
+        agent: None,
+        viewer_email: &mailbox_account_email(),
+        activity: None,
+    });
+
+    assert!(html.contains(&format!(
+        "/ui/threads/{}/messages/{message_id}/diagnostics",
+        thread.id
+    )));
+    assert!(html.contains(r#"id="message-diagnostics-body""#));
+    assert!(!html.contains("<live@test.com>"), "{html}");
+}
+
+/// The pane names the interface every key belongs to. A bare `Message-ID` identifies nothing: the
+/// same text is one outbound message on the sending channel's binding and one inbound message on
+/// the receiving channel's.
+#[test]
+fn the_diagnostic_pane_qualifies_every_provider_key_by_its_interface() {
+    let audit = MessageAuditView {
+        id: Uuid::new_v4(),
+        canonical_id: CanonicalMessageId::random(),
+        company_id: Uuid::new_v4(),
+        thread_id: Uuid::new_v4(),
+        channel_id: Uuid::new_v4(),
+        author: AuthorView {
+            principal_id: PrincipalId::random(),
+            label: "Triage Agent".into(),
+            handle: None,
+            transport: None,
+        },
+        direction: MessageDirection::Outbound,
+        role: MessageRole::Agent,
+        correlation_id: CorrelationId::new(),
+        external_keys: vec![ExternalMessageRef {
+            binding_id: ChannelBindingId::random(),
+            transport: TransportKind::Email,
+            key: ExternalMessageKey::parse("<reply@acme.example>").unwrap(),
+        }],
+        created_at: Utc::now(),
+    };
+
+    let html = message_diagnostics_pane(&audit);
+    assert!(html.contains(&audit.canonical_id.to_string()));
+    assert!(html.contains(&audit.external_keys[0].binding_id.to_string()));
+    assert!(html.contains("&lt;reply@acme.example&gt;"));
+    assert!(html.contains("email"));
+}
+
+/// A message no transport carried has no keys, and the pane says so rather than looking broken.
+#[test]
+fn the_diagnostic_pane_says_when_no_transport_carried_a_message() {
+    let audit = MessageAuditView {
+        id: Uuid::new_v4(),
+        canonical_id: CanonicalMessageId::random(),
+        company_id: Uuid::new_v4(),
+        thread_id: Uuid::new_v4(),
+        channel_id: Uuid::new_v4(),
+        author: AuthorView {
+            principal_id: PrincipalId::random(),
+            label: "System".into(),
+            handle: None,
+            transport: None,
+        },
+        direction: MessageDirection::Inbound,
+        role: MessageRole::System,
+        correlation_id: CorrelationId::new(),
+        external_keys: Vec::new(),
+        created_at: Utc::now(),
+    };
+
+    assert!(message_diagnostics_pane(&audit).contains("No transport carried this message."));
+}
+
 #[test]
 fn an_attachment_is_offered_as_a_download_scoped_to_its_thread() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
     let thread = mailbox_thread(channel.id);
     let mut message = mailbox_message(thread.id, "See attached.");
-    message.attachments = Some(vec![
+    message.attachments = vec![
         AttachmentMetadata {
             filename: "Q3 <report>.pdf".to_string(),
             content_type: "application/pdf".to_string(),
@@ -3150,7 +3247,7 @@ fn an_attachment_is_offered_as_a_download_scoped_to_its_thread() {
             size_bytes: 10,
             storage_key: None,
         },
-    ]);
+    ];
 
     let html = message_bubble_chat(
         &message,

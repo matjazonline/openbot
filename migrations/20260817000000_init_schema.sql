@@ -1589,6 +1589,14 @@ CREATE TABLE task_outreach_targets (
     responded_at TIMESTAMPTZ,
     response_message_id UUID,
     outbox_id UUID REFERENCES email_outbox(id) ON DELETE SET NULL,
+    -- The canonical message this outreach *asked* with.
+    --
+    -- Recorded so that "is this outbound message the agent's answer, or the agent asking somebody
+    -- else a question?" is answered by a canonical relation. The reply guard used to answer it by
+    -- joining `email_outbox.provider_message_id` back to an RFC `Message-ID` on the message, which
+    -- made a purely internal decision depend on an SMTP header -- and gave the wrong answer for
+    -- any transport that has none.
+    request_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     PRIMARY KEY (outreach_id, email),
     CONSTRAINT task_outreach_targets_response_message_id_fkey
         FOREIGN KEY (response_message_id) REFERENCES thread_messages(id) ON DELETE SET NULL,
@@ -1602,6 +1610,11 @@ CREATE INDEX task_outreach_targets_email_waiting_idx
 CREATE INDEX task_outreach_targets_response_message_idx
     ON task_outreach_targets (response_message_id)
     WHERE response_message_id IS NOT NULL;
+-- The reply guard's `NOT EXISTS` runs per candidate outbound message, so it reads this rather than
+-- the table.
+CREATE INDEX task_outreach_targets_request_message_idx
+    ON task_outreach_targets (request_message_id)
+    WHERE request_message_id IS NOT NULL;
 CREATE UNIQUE INDEX task_outreach_targets_outbox_idx
     ON task_outreach_targets (outbox_id) WHERE outbox_id IS NOT NULL;
 

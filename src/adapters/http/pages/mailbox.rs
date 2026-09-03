@@ -208,7 +208,7 @@ pub struct MessagePane<'a> {
     pub company_id: Uuid,
     pub channel: &'a Channel,
     pub thread: &'a Thread,
-    pub messages: &'a [Message],
+    pub messages: &'a [ThreadMessageView],
     /// The face and name the agent side of this thread is drawn with -- see [`message_bubble_chat`].
     pub agent: Option<&'a Agent>,
     /// The signed-in reader's address, used to put their own messages on the right.
@@ -1975,6 +1975,24 @@ pub fn opened_by_another_channel(thread: &Thread, app_domain_name: &str) -> bool
 /// One helper, so the thread row, the message bubble and the admin thread card cannot drift into
 /// three glyphs for one fact. [`icon`] renders `aria-hidden`, so the wrapper carries the title --
 /// the same arrangement [`thread_activity_mark`] uses.
+/// Which interface a message's author wrote over.
+///
+/// Shown beside the name because the name no longer implies it: a principal reached over mail and
+/// the same principal reached over Slack render as one person, and the badge is what says which
+/// conversation this particular turn came from. A message no transport carried -- a schedule
+/// prompt, a system note -- gets no badge, which is the honest rendering of "the platform said
+/// this".
+fn transport_badge(transport: Option<TransportKind>, handle: Option<&str>) -> String {
+    let Some(transport) = transport else {
+        return String::new();
+    };
+    format!(
+        r##"<span class="badge badge-ghost badge-xs font-mono uppercase" title="{title}">{label}</span>"##,
+        title = escape_html_text(handle.unwrap_or(transport.as_str())),
+        label = escape_html_text(transport.as_str()),
+    )
+}
+
 pub fn other_channel_glyph(from_other_channel: bool, title: &str) -> String {
     if !from_other_channel {
         return String::new();
@@ -2169,6 +2187,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
             </div>
             <div id="thread-activity" sse-swap="activity" hx-target="this" hx-swap="innerHTML">{activity_strip}</div>
             {composer}
+            {diagnostics_dialog}
         </section>
         "##,
         pencil = icon(Icon::Pencil, BUTTON_ICON),
@@ -2182,8 +2201,26 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         messages_html = messages_html,
         activity_strip = thread_activity_strip(pane.activity),
         composer = thread_composer(pane),
+        diagnostics_dialog = DIAGNOSTICS_DIALOG,
     )
 }
+
+/// Where the transport-identifier pane lands when a bubble's `ids` link is followed.
+///
+/// Empty until asked for. Nothing about a provider key is in the thread's own HTML, which is the
+/// point: the pane is a separate, separately authorized request.
+const DIAGNOSTICS_DIALOG: &str = r##"
+            <dialog id="message-diagnostics" class="modal">
+                <div class="modal-box">
+                    <h3 class="mb-3 text-sm font-bold">Transport identifiers</h3>
+                    <div id="message-diagnostics-body"></div>
+                    <div class="modal-action">
+                        <form method="dialog"><button class="btn btn-sm">Close</button></form>
+                    </div>
+                </div>
+                <form method="dialog" class="modal-backdrop"><button>close</button></form>
+            </dialog>
+"##;
 
 /// The chat-style send box under the messages: one line that grows as it is typed, sending into
 /// the open thread without leaving the pane.
@@ -2238,13 +2275,12 @@ fn thread_composer(pane: &MessagePane<'_>) -> String {
 /// A reply is stored with the *channel's* address as its sender rather than the agent that wrote
 /// it, so with a stack of agents there is no one face to show and the address stands in.
 pub fn message_bubble_chat(
-    message: &Message,
+    message: &ThreadMessageView,
     agent: Option<&Agent>,
     viewer_email: Option<&EmailAddress>,
     scope: MessageScope,
 ) -> String {
-    let is_agent =
-        message.role == MessageRole::Agent || message.direction == MessageDirection::Outbound;
+    let is_agent = message.is_agent();
     // Written by an agent in *another* channel: an inbound message only carries the agent role
     // when it came in over the internal delivery path, which validates the sender against its
     // source channel. Nothing arriving from the wire can reach this combination.
@@ -2259,12 +2295,12 @@ pub fn message_bubble_chat(
     let body = if is_agent {
         format!(
             r##"<div class="{MARKDOWN_CONTENT_STYLES}">{}</div>"##,
-            render_markdown(&message.clean_text_body)
+            render_markdown(&message.body)
         )
     } else {
         format!(
             r##"<div class="whitespace-pre-wrap">{}</div>"##,
-            escape_html_text(&message.clean_text_body)
+            escape_html_text(&message.body)
         )
     };
 
@@ -2280,11 +2316,11 @@ pub fn message_bubble_chat(
                 <div class="chat {side}" data-role="{role}">
                     <div class="chat-image">{avatar}</div>
                     <div class="chat-header gap-1 opacity-70">
-                        {channel_glyph}{writer}
+                        {channel_glyph}{writer}{transport_badge}
                         <time class="text-xs opacity-60">{created_at}</time>
                     </div>
                     <div class="chat-bubble {bubble_class} max-w-2xl text-sm">{body}{attachments}</div>
-                    <div class="chat-footer font-mono text-[11px] opacity-40">{subject}</div>
+                    <div class="chat-footer font-mono text-[11px] opacity-40">{subject}{diagnostics}</div>
                 </div>
         "##,
         side = if is_viewer { "chat-end" } else { "chat-start" },
@@ -2293,12 +2329,34 @@ pub fn message_bubble_chat(
         role = if is_agent { "agent" } else { "human" },
         bubble_class = if is_viewer { "chat-bubble-primary" } else { "" },
         channel_glyph = other_channel_glyph(from_other_channel, "From an agent in another channel"),
+        transport_badge =
+            transport_badge(message.author.transport, message.author.handle.as_deref()),
         avatar = avatar_bubble(avatar_url, writer, AvatarSize::Row),
         writer = escape_html_text(writer),
         created_at = super::format_date_time(message.created_at),
         subject = escape_html_text(&message.subject),
+        diagnostics = diagnostics_link(message, scope),
         body = body,
         attachments = attachment_chips(message, scope),
+    )
+}
+
+/// The way into the one pane that shows provider identifiers.
+///
+/// A link rather than rendered detail: the pane is separately authorized and separately loaded, so
+/// a `Message-ID` is never in the HTML of an ordinary thread read. The message is named by its
+/// canonical association id, which is what the route scopes.
+fn diagnostics_link(message: &ThreadMessageView, scope: MessageScope) -> String {
+    format!(
+        r##" · <button type="button" class="link link-hover"
+                    title="Transport identifiers for this message"
+                    data-action="open-dialog" data-dialog="message-diagnostics"
+                    hx-get="/ui/threads/{thread_id}/messages/{message_id}/diagnostics?company_id={company_id}&channel_id={channel_id}"
+                    hx-target="#message-diagnostics-body" hx-swap="innerHTML">ids</button>"##,
+        thread_id = message.thread_id,
+        message_id = message.id,
+        company_id = scope.company_id,
+        channel_id = scope.channel_id,
     )
 }
 
@@ -2318,12 +2376,13 @@ pub struct MessageScope {
 /// An attachment that was never stored -- mail that arrived before there was a bucket, or an
 /// upload that failed -- is still listed, as a chip that does not link anywhere. Saying nothing
 /// would misreport the mail.
-fn attachment_chips(message: &Message, scope: MessageScope) -> String {
-    let Some(attachments) = message.attachments.as_ref().filter(|a| !a.is_empty()) else {
+fn attachment_chips(message: &ThreadMessageView, scope: MessageScope) -> String {
+    if message.attachments.is_empty() {
         return String::new();
-    };
+    }
 
-    let chips: String = attachments
+    let chips: String = message
+        .attachments
         .iter()
         .map(|attachment| attachment_chip(message.thread_id, attachment, scope))
         .collect();
@@ -2548,5 +2607,72 @@ pub fn thread_list_oob(column: &ThreadColumn<'_>) -> String {
         "{list_open}{list_html}</div>",
         list_open = thread_list_open_tag(FragmentSwap::OutOfBand),
         list_html = thread_list_fragment(column, FragmentSwap::Inline),
+    )
+}
+
+/// The provider identifiers behind one message, for an operator matching it against a mail
+/// server's or a provider's own logs.
+///
+/// Loaded on demand rather than rendered with the thread: this is the only pane in the app that
+/// shows a provider key, and the request for it is authorized on its own. Every key is shown with
+/// the interface it belongs to, because a bare key identifies nothing -- the same `Message-ID`
+/// text is one outbound message on the sending channel's binding and one inbound message on the
+/// receiving channel's.
+pub fn message_diagnostics_pane(audit: &MessageAuditView) -> String {
+    let keys = if audit.external_keys.is_empty() {
+        r##"<p class="opacity-60">No transport carried this message.</p>"##.to_string()
+    } else {
+        audit
+            .external_keys
+            .iter()
+            .map(|key| {
+                format!(
+                    r##"<tr>
+                        <td class="font-mono">{transport}</td>
+                        <td class="font-mono break-all">{binding}</td>
+                        <td class="font-mono break-all">{value}</td>
+                    </tr>"##,
+                    transport = escape_html_text(key.transport.as_str()),
+                    binding = escape_html_text(&key.binding_id.to_string()),
+                    value = escape_html_text(key.key.as_str()),
+                )
+            })
+            .collect()
+    };
+
+    format!(
+        r##"
+        <div class="space-y-3 text-xs">
+            <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                <dt class="opacity-60">Message</dt>
+                <dd class="font-mono break-all">{canonical_id}</dd>
+                <dt class="opacity-60">In this thread</dt>
+                <dd class="font-mono break-all">{association_id}</dd>
+                <dt class="opacity-60">Author</dt>
+                <dd>{author}<span class="opacity-60 font-mono"> · {principal_id}</span></dd>
+                <dt class="opacity-60">Direction / role</dt>
+                <dd class="font-mono">{direction} · {role}</dd>
+                <dt class="opacity-60">Correlation</dt>
+                <dd class="font-mono break-all">{correlation_id}</dd>
+                <dt class="opacity-60">Recorded</dt>
+                <dd>{created_at}</dd>
+            </dl>
+            <div class="overflow-x-auto">
+                <table class="table table-xs">
+                    <thead><tr><th>Transport</th><th>Interface</th><th>Provider key</th></tr></thead>
+                    <tbody>{keys}</tbody>
+                </table>
+            </div>
+        </div>
+        "##,
+        canonical_id = escape_html_text(&audit.canonical_id.to_string()),
+        association_id = escape_html_text(&audit.id.to_string()),
+        author = escape_html_text(audit.author.display()),
+        principal_id = escape_html_text(&audit.author.principal_id.to_string()),
+        direction = escape_html_text(audit.direction.as_str()),
+        role = escape_html_text(audit.role.as_str()),
+        correlation_id = escape_html_text(&audit.correlation_id.to_string()),
+        created_at = super::format_date_time(audit.created_at),
+        keys = keys,
     )
 }

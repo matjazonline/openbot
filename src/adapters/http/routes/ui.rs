@@ -1091,13 +1091,16 @@ async fn send_reply(
         return Ok(reply_error("A message is required.".to_string()));
     }
 
-    // Threading is by header, so the reply hangs off the newest message the thread already has.
-    let history = thread_use_cases.get_thread_history(thread.id).await?;
-    // Only a message mail actually carried has a `Message-ID` to thread onto; a schedule prompt
-    // or a system note has none, and the reply then starts its own mail conversation.
-    let in_reply_to = history
-        .last()
-        .and_then(|message| message.rfc_message_id())
+    // Threading is by header, so the reply hangs off the newest message the thread already has --
+    // and only a message mail actually carried has a `Message-ID` to thread onto. A schedule
+    // prompt, a system note or a Slack turn has none, and the reply then starts its own mail
+    // conversation rather than being given a header nobody sent.
+    let reply_context = thread_use_cases
+        .latest_email_reply_context(thread.id)
+        .await?;
+    let in_reply_to = reply_context
+        .as_ref()
+        .and_then(|context| context.rfc_message_id.as_ref())
         .map(|id| id.as_str());
 
     let payload = RawInboundPayload {

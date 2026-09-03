@@ -15,7 +15,8 @@ use crate::{
         channel::Channel,
         company::Company,
         email_message::EmailMessageMetadata,
-        message::{AttachmentMetadata, Message},
+        message::AttachmentMetadata,
+        message_view::AgentHistoryMessage,
         participant::PrincipalAccessContext,
         quoted_text,
         transport::QualifiedIdentity,
@@ -135,14 +136,17 @@ pub(super) fn rfc_message_id(envelope: &InboundEnvelope) -> Option<&MessageId> {
 
 /// Strip quoted history from a reply, falling back to matching against the thread's own stored
 /// bodies when the heuristic can't find a quote marker.
-pub(super) fn strip_quoted_history(draft: &InboundDraft, history: &[Message]) -> String {
+pub(super) fn strip_quoted_history(
+    draft: &InboundDraft,
+    history: &[AgentHistoryMessage],
+) -> String {
     let body = draft.content.body_text();
     if draft.directives.is_forwarded || history.is_empty() {
         return body.to_string();
     }
     let history_bodies: Vec<&str> = history
         .iter()
-        .map(|message| message.clean_text_body.as_str())
+        .map(|message| message.body.as_str())
         .collect();
     quoted_text::strip(body, &history_bodies)
 }

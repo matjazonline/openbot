@@ -16,15 +16,11 @@ use crate::{
         },
         correlation::CorrelationId,
         message::{MessageDirection, MessageRole},
-        participant::{IdentityClaimMetadata, IdentityProvenance},
         task::{ResumeActor, StopActor},
     },
     infra::config::AppConfig,
     services::outbound_dispatcher::OutboundEmail,
-    use_cases::{
-        participant::IdentityObservation,
-        thread::{MessageAuthorWrite, MessageWrite, ThreadPersistence, qualified_email_identity},
-    },
+    use_cases::thread::{MessageAuthorWrite, MessageWrite, ThreadPersistence},
 };
 
 pub struct ApprovalUseCases {
@@ -340,24 +336,17 @@ impl ApprovalUseCases {
                 return;
             }
         };
-        // Nothing was sent and nothing arrived: this note is the platform recording a decision in
-        // the thread, so it carries no mail headers and no recipients at all. It *is* attributed
-        // to the approver, whose address is the handle they decided through.
-        let Ok(approver) = qualified_email_identity(approval.approver_email.clone()) else {
-            warn!(
-                approval_id = %approval.id,
-                "Approval decision note skipped: the approver address is not a usable handle"
-            );
-            return;
-        };
+        // Nothing was sent and nothing arrived: this note is the *platform* recording that a
+        // decision was made, so it is authored by the company's system principal and carries no
+        // headers and no recipients at all.
+        //
+        // Deliberately not attributed to the approver's mailbox. An approval link proves that
+        // whoever held the token acted; it does not authenticate an address, and minting a
+        // principal for that address here would turn a click on a link into a company-scoped
+        // identity. Who decided is stated in the note's own text -- as data, which is what it is.
         let note = MessageWrite::internal(
             thread_id,
-            MessageAuthorWrite::Observed(IdentityObservation {
-                identity: approver,
-                display_label: None,
-                claim_metadata: IdentityClaimMetadata::observation(),
-                provenance: IdentityProvenance::Account,
-            }),
+            MessageAuthorWrite::Platform,
             format!("[{}]: {}", subject_tag, approval.action_title),
             body,
             MessageDirection::Inbound,
@@ -709,6 +698,15 @@ mod tests {
     struct MockTaskPersistence;
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
+        async fn record_outreach_request_message(
+            &self,
+            _outbox_id: Uuid,
+            _write: &crate::use_cases::thread::MessageWrite,
+        ) -> AppResult<crate::entities::message::CanonicalMessageId> {
+            unreachable!("no fixture here sends an outreach")
+        }
+
         /// This fixture enqueues no task, so a run that asked for targets would be a bug in the
         /// test rather than an empty conversation.
         async fn list_task_channel_targets(
@@ -741,11 +739,12 @@ mod tests {
         ) -> AppResult<crate::entities::task::BackgroundTask> {
             unimplemented!()
         }
+        /// The chain a decision note joins comes from the task, so the task has to exist.
         async fn get_task_by_id(
             &self,
-            _id: Uuid,
+            id: Uuid,
         ) -> AppResult<Option<crate::entities::task::BackgroundTask>> {
-            unimplemented!()
+            Ok(Some(suspended_task(id)))
         }
         async fn update_task_payload(
             &self,
@@ -785,10 +784,10 @@ mod tests {
         }
         async fn resume_task(
             &self,
-            _id: Uuid,
+            id: Uuid,
             _actor: ResumeActor,
         ) -> AppResult<crate::entities::task::BackgroundTask> {
-            unimplemented!()
+            Ok(suspended_task(id))
         }
         async fn list_company_tasks(
             &self,
@@ -798,6 +797,30 @@ mod tests {
             _sort_asc: bool,
         ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
             unimplemented!()
+        }
+    }
+
+    /// The task one approval is parked on. Only its id and its correlation id are read.
+    fn suspended_task(id: Uuid) -> crate::entities::task::BackgroundTask {
+        crate::entities::task::BackgroundTask {
+            correlation_id: CorrelationId::new(),
+            id,
+            company_id: Uuid::new_v4(),
+            channel_id: Uuid::new_v4(),
+            thread_id: None,
+            task_type: "email_agent_dispatch".to_string(),
+            status: crate::entities::task::TaskStatus::PendingApproval,
+            payload: serde_json::json!({}),
+            retry_count: 0,
+            max_retries: 3,
+            last_error: None,
+            worker_id: None,
+            execution_generation: None,
+            locked_at: None,
+            lock_expires_at: None,
+            run_at: chrono::Utc::now(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
         }
     }
 
@@ -939,6 +962,80 @@ mod tests {
             .unwrap();
         assert_eq!(updated_again.status, ApprovalStatus::Approved);
         assert!(msg_again.contains("already processed as 'approved'"));
+    }
+
+    /// The decision note is the *platform* recording that a decision happened, not the approver
+    /// speaking.
+    ///
+    /// An approval link proves that whoever held the token acted; it authenticates no address. The
+    /// note used to be attributed to `approver_email` as an observed identity, which minted a
+    /// company-scoped principal for whatever address the approval had been sent to. Who decided is
+    /// in the note's own text instead -- as data, which is what it is.
+    #[tokio::test]
+    async fn an_approval_decision_note_is_authored_by_the_platform_and_names_the_approver() {
+        let thread_persistence = Arc::new(InMemoryThreads::new());
+        let use_cases = ApprovalUseCases::new(
+            Arc::new(MockApprovalPersistence {
+                approvals: Mutex::new(Vec::new()),
+            }),
+            Arc::new(MockTaskPersistence),
+            thread_persistence.clone(),
+            test_config(),
+        );
+
+        let thread_id = Uuid::new_v4();
+        thread_persistence.insert_thread(crate::entities::thread::Thread {
+            id: thread_id,
+            channel_id: Uuid::new_v4(),
+            subject: "Deploy".into(),
+            participant_principal_ids: Vec::new(),
+            participant_projection: Default::default(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        });
+
+        let approval = use_cases
+            .create_and_send_approval_request(
+                &ApprovalSubject {
+                    company_id: Uuid::new_v4(),
+                    channel_id: Uuid::new_v4(),
+                    channel_name: "Support Channel".to_string(),
+                    channel_slug: ChannelSlug::from("support"),
+                    company_slug: CompanySlug::from("acme"),
+                    thread_id: Some(thread_id),
+                    suspension: Some(crate::entities::task::TaskSuspension::AlreadySuspended {
+                        task_id: Uuid::new_v4(),
+                    }),
+                    correlation_id: CorrelationId::new(),
+                    approver_email: EmailAddress::from("manager@acme.com"),
+                },
+                ApprovalAction {
+                    step_key: "step".to_string(),
+                    action_type: "tool".to_string(),
+                    title: "Deploy".to_string(),
+                    summary: "Run the deploy".to_string(),
+                    payload: serde_json::json!({}),
+                },
+            )
+            .await
+            .unwrap();
+
+        use_cases
+            .process_link_action(&approval.token, "confirm")
+            .await
+            .unwrap();
+
+        let note = thread_persistence
+            .messages()
+            .into_iter()
+            .find(|message| message.role == crate::entities::message::MessageRole::System)
+            .expect("the decision is recorded in the thread");
+
+        assert_eq!(note.author.identity, None, "no handle authored this");
+        assert_eq!(note.author.label, "System");
+        assert!(note.clean_text_body.contains("manager@acme.com"));
+        assert_eq!(note.rfc_message_id(), None, "nothing carried the note");
+        assert!(note.participants.is_empty(), "it is addressed to nobody");
     }
 
     #[tokio::test]

@@ -123,15 +123,15 @@ fn streamed_message(thread_id: Uuid, body: &str, created_at: DateTime<Utc>) -> M
     .created_at(created_at)
 }
 
-fn bodies(messages: &[Message]) -> Vec<&str> {
+fn bodies(messages: &[ThreadMessageView]) -> Vec<&str> {
     messages
         .iter()
-        .map(|message| message.clean_text_body.as_str())
+        .map(|message| message.body.as_str())
         .collect()
 }
 
 #[tokio::test]
-async fn list_messages_after_reads_forward_from_a_cursor() {
+async fn thread_message_views_read_forward_from_a_cursor() {
     let Some(fixture) = Fixture::new("stream_forward").await else {
         return;
     };
@@ -155,7 +155,7 @@ async fn list_messages_after_reads_forward_from_a_cursor() {
     // No cursor: a reader joining an empty pane gets the whole thread, oldest first.
     let all = fixture
         .persistence
-        .list_messages_after(fixture.thread.id, None, 50)
+        .list_thread_message_views_after(fixture.thread.id, None, 50)
         .await
         .unwrap();
     assert_eq!(bodies(&all), ["first", "second", "third"]);
@@ -163,7 +163,7 @@ async fn list_messages_after_reads_forward_from_a_cursor() {
     // Resuming excludes the message the cursor names -- it has already been rendered.
     let after_first = fixture
         .persistence
-        .list_messages_after(fixture.thread.id, Some(saved[0].cursor()), 50)
+        .list_thread_message_views_after(fixture.thread.id, Some(saved[0].cursor()), 50)
         .await
         .unwrap();
     assert_eq!(bodies(&after_first), ["second", "third"]);
@@ -171,7 +171,7 @@ async fn list_messages_after_reads_forward_from_a_cursor() {
     // A reader who is up to date gets nothing, rather than the thread again.
     let after_last = fixture
         .persistence
-        .list_messages_after(fixture.thread.id, Some(saved[2].cursor()), 50)
+        .list_thread_message_views_after(fixture.thread.id, Some(saved[2].cursor()), 50)
         .await
         .unwrap();
     assert!(after_last.is_empty());
@@ -179,7 +179,7 @@ async fn list_messages_after_reads_forward_from_a_cursor() {
     // The batch limit is what stops one wake-up loading an unbounded backlog.
     let limited = fixture
         .persistence
-        .list_messages_after(fixture.thread.id, None, 2)
+        .list_thread_message_views_after(fixture.thread.id, None, 2)
         .await
         .unwrap();
     assert_eq!(bodies(&limited), ["first", "second"]);
@@ -190,7 +190,7 @@ async fn list_messages_after_reads_forward_from_a_cursor() {
 /// Messages saved in one transaction share a timestamp, so a timestamp-only cursor would skip or
 /// repeat them. This is the case the `(created_at, id)` comparison exists for.
 #[tokio::test]
-async fn list_messages_after_breaks_timestamp_ties_by_id() {
+async fn thread_message_views_break_timestamp_ties_by_id() {
     let Some(fixture) = Fixture::new("stream_ties").await else {
         return;
     };
@@ -210,7 +210,7 @@ async fn list_messages_after_breaks_timestamp_ties_by_id() {
 
     let all = fixture
         .persistence
-        .list_messages_after(fixture.thread.id, None, 50)
+        .list_thread_message_views_after(fixture.thread.id, None, 50)
         .await
         .unwrap();
     assert_eq!(
@@ -221,7 +221,7 @@ async fn list_messages_after_breaks_timestamp_ties_by_id() {
 
     let rest = fixture
         .persistence
-        .list_messages_after(fixture.thread.id, Some(saved[0].cursor()), 50)
+        .list_thread_message_views_after(fixture.thread.id, Some(saved[0].cursor()), 50)
         .await
         .unwrap();
     assert_eq!(
@@ -371,7 +371,7 @@ async fn a_rolled_back_message_is_not_announced() {
     listener.listen("thread_message").await.unwrap();
 
     let mut tx = fixture.pool.begin().await.unwrap();
-    let association_id = insert_message_on(
+    let inserted = insert_message_on(
         &mut tx,
         &streamed_message(fixture.thread.id, "rolled back", Utc::now()),
     )
@@ -379,7 +379,7 @@ async fn a_rolled_back_message_is_not_announced() {
     .unwrap();
     // Without this the rollback below would prove nothing: the row has to have really been written
     // for its absence afterwards to mean anything.
-    assert!(!association_id.is_nil());
+    assert!(!inserted.association_id.is_nil());
 
     tx.rollback().await.unwrap();
 

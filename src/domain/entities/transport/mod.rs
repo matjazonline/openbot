@@ -350,7 +350,42 @@ pub enum ChannelSelector {
     },
 }
 
+/// A selector text that names no channel, or names one in a shape this platform cannot address.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum InvalidChannelSelector {
+    #[error("a channel selector cannot be empty")]
+    Empty,
+    #[error("a channel selector is 'channel' or 'company/channel', not '{0}'")]
+    Shape(String),
+}
+
 impl ChannelSelector {
+    /// Read a selector as an agent or an operator writes it: `support`, or `acme/support`.
+    ///
+    /// This is the whole grammar. It deliberately does not accept an address: an address is one
+    /// transport's way of reaching a channel, and parsing one here is how the routing key came to
+    /// be an email string. A caller holding an address resolves it through that transport's
+    /// adapter instead.
+    pub fn parse(value: &str) -> Result<Self, InvalidChannelSelector> {
+        let value = value.trim();
+        if value.is_empty() {
+            return Err(InvalidChannelSelector::Empty);
+        }
+        let mut parts = value.split('/');
+        let first = parts.next().unwrap_or_default().trim();
+        let second = parts.next().map(str::trim);
+        if parts.next().is_some() || first.is_empty() || second.is_some_and(str::is_empty) {
+            return Err(InvalidChannelSelector::Shape(value.to_string()));
+        }
+        Ok(match second {
+            Some(channel) => Self::Qualified {
+                company: CompanySlug::from(first.to_lowercase()),
+                channel: ChannelSlug::from(channel.to_lowercase()),
+            },
+            None => Self::CurrentCompany(ChannelSlug::from(first.to_lowercase())),
+        })
+    }
+
     pub fn channel(&self) -> &ChannelSlug {
         match self {
             Self::CurrentCompany(channel) | Self::Qualified { channel, .. } => channel,
@@ -407,6 +442,51 @@ pub struct ReplyThreadKeyCandidate {
 mod tests {
     use super::*;
     use serde::de::DeserializeOwned;
+
+    /// The grammar is two shapes, and an address is not one of them: accepting
+    /// `support@acme.example.com` here is exactly how a transport's addressing became the
+    /// platform's routing key.
+    #[test]
+    fn a_channel_selector_reads_a_channel_or_a_company_and_channel_and_nothing_else() {
+        assert_eq!(
+            ChannelSelector::parse("  Support "),
+            Ok(ChannelSelector::CurrentCompany(ChannelSlug::from(
+                "support"
+            )))
+        );
+        assert_eq!(
+            ChannelSelector::parse("Acme/Support"),
+            Ok(ChannelSelector::Qualified {
+                company: CompanySlug::from("acme"),
+                channel: ChannelSlug::from("support"),
+            })
+        );
+
+        for rejected in ["", "   ", "/", "support/", "/support", "a/b/c"] {
+            assert!(
+                ChannelSelector::parse(rejected).is_err(),
+                "expected {rejected:?} to be refused"
+            );
+        }
+    }
+
+    /// Round-trips through the text the directory tool hands a model, so an agent copying a
+    /// selector back gets the channel it was shown.
+    #[test]
+    fn a_selector_round_trips_through_its_displayed_form() {
+        for selector in [
+            ChannelSelector::CurrentCompany(ChannelSlug::from("support")),
+            ChannelSelector::Qualified {
+                company: CompanySlug::from("acme"),
+                channel: ChannelSlug::from("support"),
+            },
+        ] {
+            assert_eq!(
+                ChannelSelector::parse(&selector.to_string()),
+                Ok(selector.clone())
+            );
+        }
+    }
 
     fn assert_round_trip<T>(value: T)
     where

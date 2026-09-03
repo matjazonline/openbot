@@ -53,8 +53,14 @@ pub struct OutreachToolContext {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct OutreachInput {
-    /// Email addresses to contact. Each recipient receives a separate email. A same-company agent
-    /// channel address delegates to that agent, when tool policy permits it.
+    /// Same-company agent channels to delegate to, as the `channel` value from
+    /// `list_company_agents` (`channel` or `company/channel`). Not an address: how the request
+    /// reaches that channel is decided from its own interfaces.
+    #[serde(default)]
+    target_channels: Vec<String>,
+    /// People outside the platform to contact, by email address. Each recipient receives a
+    /// separate email. A platform channel address is refused here -- use `target_channels`.
+    #[serde(default)]
     target_emails: Vec<String>,
     /// Percentage of distinct recipients that must reply before the task resumes. Omit for 100,
     /// which is what a single delegated request wants.
@@ -152,15 +158,17 @@ impl Tool for OutreachAndAwaitQuorumTool {
             Err(error) => return ToolResult::error(format!("Invalid input: {error}")),
         };
 
-        let max_targets = config_usize(&ctx.custom_config, "max_targets", 50);
         let limits = OutreachLimits::from_config(&ctx.custom_config);
-        let target_emails = match normalize_targets(
-            input.target_emails.clone(),
-            max_targets,
-            &self.context.app_domain_name,
-            self.context.company_id,
-            self.context.channel_id,
-            &ctx.custom_config,
+        let resolved = match resolve_targets(
+            &input,
+            TargetPolicy {
+                max_targets: config_usize(&ctx.custom_config, "max_targets", 50),
+                scope: match configured_target_scope(&ctx.custom_config) {
+                    Ok(scope) => scope,
+                    Err(error) => return ToolResult::error(error),
+                },
+            },
+            &self.context,
             self.channel_persistence.as_ref(),
         )
         .await
@@ -168,16 +176,15 @@ impl Tool for OutreachAndAwaitQuorumTool {
             Ok(targets) => targets,
             Err(error) => return ToolResult::error(error),
         };
-        let canonical_emails: Vec<String> = target_emails
-            .iter()
-            .map(|target| target.email.as_str().to_string())
-            .collect();
+        // The idempotency key is hashed over the *resolved* destinations, so the short and long
+        // forms of one request re-attach instead of mailing everybody twice.
+        let canonical_targets: Vec<String> = resolved.iter().map(|target| target.key()).collect();
         let request = match ValidatedOutreach::from_input(&input, limits) {
             Ok(request) => request,
             Err(error) => return ToolResult::error(error),
         };
 
-        let targets = match self.build_target_requests(&target_emails, &request) {
+        let targets = match self.build_target_requests(&resolved, &request) {
             Ok(targets) => targets,
             Err(error) => return ToolResult::error(error),
         };
@@ -191,7 +198,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
                 channel_id: self.context.channel_id,
                 correlation_id: self.context.correlation_id,
                 worker_id: self.context.worker_id,
-                outreach_key: request.idempotency_key(self.context.task_id, &canonical_emails),
+                outreach_key: request.idempotency_key(self.context.task_id, &canonical_targets),
                 required_threshold_percent: request.threshold_percent,
                 expires_at: Utc::now() + Duration::hours(request.timeout_hours as i64),
                 subject: request.subject.to_string(),
@@ -294,10 +301,10 @@ impl<'a> ValidatedOutreach<'a> {
 
     /// Hash of everything that defines this outreach, so an agent retrying the same tool call
     /// re-attaches to the existing outreach instead of mailing everyone twice.
-    fn idempotency_key(&self, task_id: Uuid, target_emails: &[String]) -> String {
+    fn idempotency_key(&self, task_id: Uuid, targets: &[String]) -> String {
         let canonical = serde_json::json!({
             "task_id": task_id,
-            "target_emails": target_emails,
+            "targets": targets,
             "completion_threshold_percent": self.threshold_percent,
             "timeout_hours": self.timeout_hours,
             "subject": self.subject,
@@ -318,7 +325,7 @@ impl OutreachAndAwaitQuorumTool {
         targets
             .iter()
             .map(|target| {
-                let email = target.email.clone();
+                let email = target.delivery_address().clone();
                 let payload = serde_json::to_value(OutboundEmail {
                     channel_id: self.context.channel_id,
                     channel_name: self.context.channel_name.clone(),
@@ -352,19 +359,65 @@ enum AllowedTargetScope {
     Any,
 }
 
+/// The two bounds a request is checked against before anything is resolved.
+///
+/// Named because both come from tool policy rather than from the model, and because a count and
+/// an enum next to each other in a signature are the classic transposition.
+#[derive(Clone, Copy)]
+struct TargetPolicy {
+    max_targets: usize,
+    scope: AllowedTargetScope,
+}
+
+/// Where one outreach request goes.
+///
+/// The two arms are the split this type exists for. A business channel is named by its own
+/// selector and reached through whichever interfaces it has; somebody outside the platform is
+/// named by an address on one transport. Collapsing them -- classifying a model-supplied string
+/// and discovering an address was "really" a channel -- is what made a mailbox the internal
+/// identity of a channel.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum NormalizedOutreachDestination {
+enum OutreachDestination {
     Channel {
         selector: ChannelSelector,
         channel_id: Uuid,
+        /// The channel's own inbound address.
+        ///
+        /// Still needed because delivery and reply correlation are still email-keyed until the
+        /// generic delivery model lands: `task_outreach_targets` is keyed by address, and a reply
+        /// is matched by its sender. Carried as the *delivery* address of a destination that is
+        /// already identified by `channel_id`, never as the thing that identifies it.
+        delivery_address: EmailAddress,
     },
     External(ExternalDestination),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct NormalizedOutreachTarget {
-    email: EmailAddress,
-    destination: NormalizedOutreachDestination,
+    destination: OutreachDestination,
+}
+
+impl NormalizedOutreachTarget {
+    /// The address this request is delivered to today.
+    fn delivery_address(&self) -> &EmailAddress {
+        match &self.destination {
+            OutreachDestination::Channel {
+                delivery_address, ..
+            } => delivery_address,
+            OutreachDestination::External(ExternalDestination::Email(address)) => address,
+        }
+    }
+
+    /// What this target is in the idempotency key: the canonical destination, so renaming a
+    /// channel's mailbox does not look like a different request.
+    fn key(&self) -> String {
+        match &self.destination {
+            OutreachDestination::Channel { channel_id, .. } => format!("channel:{channel_id}"),
+            OutreachDestination::External(ExternalDestination::Email(address)) => {
+                format!("email:{address}")
+            }
+        }
+    }
 }
 
 fn configured_target_scope(config: &Value) -> Result<AllowedTargetScope, String> {
@@ -382,92 +435,115 @@ fn configured_target_scope(config: &Value) -> Result<AllowedTargetScope, String>
     }
 }
 
-async fn normalize_targets(
-    values: Vec<String>,
-    max_targets: usize,
-    app_domain_name: &str,
-    company_id: Uuid,
-    source_channel_id: Uuid,
-    config: &Value,
-    channel_persistence: &dyn ChannelPersistence,
+/// Turn what the model asked for into destinations this tool policy permits.
+///
+/// Every allowlist decision here is taken against something the *server* resolved -- a channel row
+/// it loaded, an address it parsed -- and never against the model's text. The two lists are checked
+/// separately because they are separately permitted: a policy may allow delegating to colleagues
+/// and forbid mailing strangers, or the reverse.
+///
+/// A free function, not a method: nothing about resolving a target touches task state, and a test
+/// of the policy should not have to stand up a task store to make one.
+async fn resolve_targets(
+    input: &OutreachInput,
+    policy: TargetPolicy,
+    context: &OutreachToolContext,
+    channels: &dyn ChannelPersistence,
 ) -> Result<Vec<NormalizedOutreachTarget>, String> {
-    if values.is_empty() || values.len() > max_targets {
+    let requested = input.target_channels.len() + input.target_emails.len();
+    if requested == 0 || requested > policy.max_targets {
         return Err(format!(
-            "target_emails must contain between 1 and {max_targets} addresses"
+            "an outreach must name between 1 and {} targets across target_channels and \
+             target_emails",
+            policy.max_targets
         ));
     }
-    let scope = configured_target_scope(config)?;
-    let selector_parser = EmailChannelSelectorParser::new(app_domain_name);
-    let mut targets = Vec::with_capacity(values.len());
-    for value in values {
-        let mailbox: Mailbox = value
-            .trim()
-            .parse()
-            .map_err(|_| format!("Invalid target email address: {value}"))?;
-        let email = mailbox.email.to_string().to_lowercase();
 
-        let email = EmailAddress::from(email);
-        let destination = match selector_parser.classify(email.clone()) {
-            EmailRecipientDestination::External(_)
-                if scope == AllowedTargetScope::SameCompanyChannels =>
-            {
-                return Err(format!(
-                    "Only same-company platform channels are permitted by this tool policy: {email}"
-                ));
-            }
-            EmailRecipientDestination::External(destination) => {
-                NormalizedOutreachDestination::External(destination)
-            }
-            EmailRecipientDestination::InvalidPlatformAddress => {
-                return Err(format!("Invalid platform channel address: {email}"));
-            }
-            EmailRecipientDestination::Channel(selection)
-                if selection.delivery().is_context_only() || selection.selectors().len() != 1 =>
-            {
-                return Err(format!(
-                    "Internal outreach requires one direct channel address without pipeline or context-only suffix: {email}"
-                ));
-            }
-            EmailRecipientDestination::Channel(_) if scope == AllowedTargetScope::ExternalOnly => {
-                return Err(format!(
-                    "Platform address cannot be an external outreach target: {email}"
-                ));
-            }
-            EmailRecipientDestination::Channel(selection) => {
-                let selector = selection
-                    .into_selectors()
-                    .into_iter()
-                    .next()
-                    .expect("length checked above");
-                let outcome = resolve_internal_target(
-                    &selector,
-                    company_id,
-                    source_channel_id,
-                    channel_persistence,
-                )
-                .await
-                .map_err(|error| format!("Failed to resolve platform channel {email}: {error}"))?;
-                match outcome {
-                    InternalTargetOutcome::Callable(channel) => {
-                        NormalizedOutreachDestination::Channel {
-                            selector,
-                            channel_id: channel.id,
-                        }
-                    }
-                    InternalTargetOutcome::Rejected(reason) => return Err(reason),
-                }
-            }
-        };
+    let mut targets: Vec<NormalizedOutreachTarget> = Vec::with_capacity(requested);
+    for value in &input.target_channels {
+        let target = resolve_channel_target(value, policy.scope, context, channels).await?;
+        push_unique(&mut targets, target);
+    }
+    for value in &input.target_emails {
+        push_unique(
+            &mut targets,
+            resolve_email_target(value, policy.scope, context)?,
+        );
+    }
+    targets.sort_by_key(NormalizedOutreachTarget::key);
+    Ok(targets)
+}
 
-        if !targets
-            .iter()
-            .any(|target: &NormalizedOutreachTarget| target.email == email)
-        {
-            targets.push(NormalizedOutreachTarget { email, destination });
+/// One same-company channel, resolved from its selector.
+async fn resolve_channel_target(
+    value: &str,
+    scope: AllowedTargetScope,
+    context: &OutreachToolContext,
+    channels: &dyn ChannelPersistence,
+) -> Result<NormalizedOutreachTarget, String> {
+    if scope == AllowedTargetScope::ExternalOnly {
+        return Err(format!(
+            "This tool policy permits no platform channels as targets: {value}"
+        ));
+    }
+    let selector = ChannelSelector::parse(value).map_err(|error| error.to_string())?;
+    let outcome =
+        resolve_internal_target(&selector, context.company_id, context.channel_id, channels)
+            .await
+            .map_err(|error| format!("Failed to resolve platform channel {selector}: {error}"))?;
+    match outcome {
+        InternalTargetOutcome::Callable(channel) => Ok(NormalizedOutreachTarget {
+            destination: OutreachDestination::Channel {
+                // The channel decides its own address; the selector does not spell it.
+                delivery_address: channel
+                    .inbound_address(&context.company_slug, &context.app_domain_name),
+                selector,
+                channel_id: channel.id,
+            },
+        }),
+        InternalTargetOutcome::Rejected(reason) => Err(reason),
+    }
+}
+
+/// One recipient outside the platform.
+///
+/// A platform address is refused rather than quietly routed internally: the two are different
+/// requests under different policy, and accepting one here would let the model reach a colleague
+/// through the list meant for strangers.
+fn resolve_email_target(
+    value: &str,
+    scope: AllowedTargetScope,
+    context: &OutreachToolContext,
+) -> Result<NormalizedOutreachTarget, String> {
+    if scope == AllowedTargetScope::SameCompanyChannels {
+        return Err(format!(
+            "Only same-company platform channels are permitted by this tool policy: {value}"
+        ));
+    }
+    let mailbox: Mailbox = value
+        .trim()
+        .parse()
+        .map_err(|_| format!("Invalid target email address: {value}"))?;
+    let email = EmailAddress::from(mailbox.email.to_string().to_lowercase());
+    match EmailChannelSelectorParser::new(&context.app_domain_name).classify(email.clone()) {
+        EmailRecipientDestination::External(destination) => Ok(NormalizedOutreachTarget {
+            destination: OutreachDestination::External(destination),
+        }),
+        EmailRecipientDestination::Channel(_) => Err(format!(
+            "{email} is a platform channel address; name it in target_channels instead"
+        )),
+        EmailRecipientDestination::InvalidPlatformAddress => {
+            Err(format!("Invalid platform channel address: {email}"))
         }
     }
-    targets.sort_by(|left, right| left.email.cmp(&right.email));
-    Ok(targets)
+}
+
+/// Keep the first mention of a destination and drop a repeat, so naming somebody twice mails them
+/// once.
+fn push_unique(targets: &mut Vec<NormalizedOutreachTarget>, target: NormalizedOutreachTarget) {
+    if !targets.iter().any(|seen| seen.key() == target.key()) {
+        targets.push(target);
+    }
 }
 
 fn config_usize(config: &Value, key: &str, default: usize) -> usize {
@@ -559,94 +635,169 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn normalizes_and_deduplicates_targets() {
-        let company_id = Uuid::new_v4();
-        let targets = normalize_targets(
-            vec!["User@Example.com".into(), "user@example.com".into()],
-            10,
-            "mailagents.test",
+    /// Target resolution needs a caller and a channel directory, and nothing else -- which is why
+    /// it is a free function rather than a method on the tool.
+    async fn resolve(
+        company_id: Uuid,
+        source_channel_id: Uuid,
+        channel: Option<Channel>,
+        input: &OutreachInput,
+        scope: AllowedTargetScope,
+    ) -> Result<Vec<NormalizedOutreachTarget>, String> {
+        let context = OutreachToolContext {
+            task_id: Uuid::new_v4(),
+            correlation_id: CorrelationId::new(),
+            worker_id: Uuid::new_v4(),
             company_id,
+            channel_id: source_channel_id,
+            channel_name: "Source".into(),
+            channel_slug: "source".into(),
+            company_slug: "acme".into(),
+            trigger_message_id: MessageId::new("<trigger@acme.mailagents.test>"),
+            thread_references: Vec::new(),
+            hop_count: 0,
+            trace_channels: Vec::new(),
+            app_domain_name: "mailagents.test".into(),
+        };
+        resolve_targets(
+            input,
+            TargetPolicy {
+                max_targets: 10,
+                scope,
+            },
+            &context,
+            &MockChannelPersistence { channel },
+        )
+        .await
+    }
+
+    fn request(channels: &[&str], emails: &[&str]) -> OutreachInput {
+        OutreachInput {
+            target_channels: channels.iter().map(|value| value.to_string()).collect(),
+            target_emails: emails.iter().map(|value| value.to_string()).collect(),
+            completion_threshold_percent: None,
+            timeout_hours: None,
+            subject: "Subject".into(),
+            body: "Body".into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn external_addresses_are_normalized_and_deduplicated() {
+        let targets = resolve(
             Uuid::new_v4(),
-            &serde_json::json!({}),
-            &MockChannelPersistence { channel: None },
+            Uuid::new_v4(),
+            None,
+            &request(&[], &["User@Example.com", "user@example.com"]),
+            AllowedTargetScope::ExternalOnly,
         )
         .await
         .unwrap();
+
         assert_eq!(targets.len(), 1);
-        assert_eq!(targets[0].email, "user@example.com");
+        assert_eq!(targets[0].delivery_address(), "user@example.com");
         assert!(matches!(
             targets[0].destination,
-            NormalizedOutreachDestination::External(ExternalDestination::Email(_))
+            OutreachDestination::External(ExternalDestination::Email(_))
         ));
     }
 
+    /// The split, stated: a channel is named by its selector and reached at whatever address the
+    /// channel itself decides. Nothing here parses an address to discover a channel.
     #[tokio::test]
-    async fn rejects_platform_targets_for_external_scope() {
-        let company_id = Uuid::new_v4();
-        let result = normalize_targets(
-            vec!["support@acme.mailagents.test".into()],
-            10,
-            "mailagents.test",
-            company_id,
-            Uuid::new_v4(),
-            &serde_json::json!({}),
-            &MockChannelPersistence {
-                channel: Some(channel(Uuid::new_v4(), company_id, "support")),
-            },
-        )
-        .await;
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
-    async fn accepts_same_company_agent_channel_for_internal_scope() {
+    async fn a_channel_target_is_named_by_its_selector_and_carries_its_own_address() {
         let company_id = Uuid::new_v4();
         let target = channel(Uuid::new_v4(), company_id, "support");
-        let result = normalize_targets(
-            vec!["support@acme.mailagents.test".into()],
-            10,
-            "mailagents.test",
+        let targets = resolve(
             company_id,
             Uuid::new_v4(),
-            &serde_json::json!({"allowed_target_scope": "same_company_channels"}),
-            &MockChannelPersistence {
-                channel: Some(target),
-            },
+            Some(target.clone()),
+            &request(&["support"], &[]),
+            AllowedTargetScope::SameCompanyChannels,
         )
         .await
         .unwrap();
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].email, "support@acme.mailagents.test");
-        assert!(matches!(
-            result[0].destination,
-            NormalizedOutreachDestination::Channel { .. }
-        ));
+
+        assert_eq!(targets.len(), 1);
+        assert_eq!(
+            targets[0].destination,
+            OutreachDestination::Channel {
+                selector: ChannelSelector::CurrentCompany("support".into()),
+                channel_id: target.id,
+                delivery_address: EmailAddress::from("support@acme.mailagents.test"),
+            }
+        );
+    }
+
+    /// A colleague reached through the strangers list would be governed by the wrong policy, so
+    /// the address is refused rather than quietly routed internally.
+    #[tokio::test]
+    async fn a_platform_address_in_the_email_list_is_refused_not_rerouted() {
+        let company_id = Uuid::new_v4();
+        let target = channel(Uuid::new_v4(), company_id, "support");
+        let error = resolve(
+            company_id,
+            Uuid::new_v4(),
+            Some(target),
+            &request(&[], &["support@acme.mailagents.test"]),
+            AllowedTargetScope::Any,
+        )
+        .await
+        .unwrap_err();
+
+        assert!(error.contains("target_channels"), "{error}");
     }
 
     #[tokio::test]
-    async fn canonical_target_order_is_stable() {
+    async fn each_list_is_permitted_separately_by_tool_policy() {
         let company_id = Uuid::new_v4();
-        let persistence = MockChannelPersistence { channel: None };
-        let first = normalize_targets(
-            vec!["b@example.com".into(), "a@example.com".into()],
-            10,
-            "mailagents.test",
-            company_id,
+        let target = channel(Uuid::new_v4(), company_id, "support");
+
+        assert!(
+            resolve(
+                company_id,
+                Uuid::new_v4(),
+                Some(target.clone()),
+                &request(&["support"], &[]),
+                AllowedTargetScope::ExternalOnly,
+            )
+            .await
+            .is_err(),
+            "no channels under external_only"
+        );
+        assert!(
+            resolve(
+                company_id,
+                Uuid::new_v4(),
+                Some(target),
+                &request(&[], &["stranger@example.com"]),
+                AllowedTargetScope::SameCompanyChannels,
+            )
+            .await
+            .is_err(),
+            "no strangers under same_company_channels"
+        );
+    }
+
+    /// The idempotency key is hashed over this order, so a retry that lists the same targets
+    /// differently must re-attach rather than mail everybody again.
+    #[tokio::test]
+    async fn resolved_target_order_does_not_depend_on_how_they_were_listed() {
+        let first = resolve(
             Uuid::new_v4(),
-            &serde_json::json!({}),
-            &persistence,
+            Uuid::new_v4(),
+            None,
+            &request(&[], &["b@example.com", "a@example.com"]),
+            AllowedTargetScope::ExternalOnly,
         )
         .await
         .unwrap();
-        let second = normalize_targets(
-            vec!["a@example.com".into(), "b@example.com".into()],
-            10,
-            "mailagents.test",
-            company_id,
+        let second = resolve(
             Uuid::new_v4(),
-            &serde_json::json!({}),
-            &persistence,
+            Uuid::new_v4(),
+            None,
+            &request(&[], &["a@example.com", "b@example.com"]),
+            AllowedTargetScope::ExternalOnly,
         )
         .await
         .unwrap();
@@ -654,94 +805,96 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejects_self_calling_channel() {
+    async fn an_uncallable_channel_is_refused_with_its_reason() {
         let company_id = Uuid::new_v4();
-        let channel_id = Uuid::new_v4();
-        let self_target = channel(channel_id, company_id, "support");
-        let result = normalize_targets(
-            vec!["support@acme.mailagents.test".into()],
-            10,
-            "mailagents.test",
-            company_id,
-            channel_id,
-            &serde_json::json!({"allowed_target_scope": "same_company_channels"}),
-            &MockChannelPersistence {
-                channel: Some(self_target),
-            },
-        )
-        .await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("cannot call itself"));
+        let source_channel_id = Uuid::new_v4();
+
+        let cases: Vec<(Channel, &str)> = vec![
+            (
+                channel(source_channel_id, company_id, "support"),
+                "cannot call itself",
+            ),
+            (
+                channel(Uuid::new_v4(), Uuid::new_v4(), "support"),
+                "Cross-company channel calls are not allowed",
+            ),
+            (
+                Channel {
+                    agent_ids: None,
+                    ..channel(Uuid::new_v4(), company_id, "support")
+                },
+                "has no configured agent",
+            ),
+        ];
+
+        for (target, expected) in cases {
+            let error = resolve(
+                company_id,
+                source_channel_id,
+                Some(target),
+                &request(&["support"], &[]),
+                AllowedTargetScope::SameCompanyChannels,
+            )
+            .await
+            .unwrap_err();
+            assert!(error.contains(expected), "{error}");
+        }
     }
 
+    /// A selector is `channel` or `company/channel`. An address is not a selector -- accepting one
+    /// here is exactly how a transport's addressing became the platform's routing key.
     #[tokio::test]
-    async fn rejects_cross_company_channel_call() {
-        let source_company_id = Uuid::new_v4();
-        let other_company_id = Uuid::new_v4();
-        let cross_target = channel(Uuid::new_v4(), other_company_id, "support");
-        let result = normalize_targets(
-            vec!["support@acme.mailagents.test".into()],
-            10,
-            "mailagents.test",
-            source_company_id,
-            Uuid::new_v4(),
-            &serde_json::json!({"allowed_target_scope": "same_company_channels"}),
-            &MockChannelPersistence {
-                channel: Some(cross_target),
-            },
-        )
-        .await;
-        assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .contains("Cross-company channel calls are not allowed")
-        );
-    }
-
-    #[tokio::test]
-    async fn rejects_channel_without_configured_agent() {
-        let company_id = Uuid::new_v4();
-        let mut target = channel(Uuid::new_v4(), company_id, "support");
-        target.agent_ids = None;
-        let result = normalize_targets(
-            vec!["support@acme.mailagents.test".into()],
-            10,
-            "mailagents.test",
-            company_id,
-            Uuid::new_v4(),
-            &serde_json::json!({"allowed_target_scope": "same_company_channels"}),
-            &MockChannelPersistence {
-                channel: Some(target),
-            },
-        )
-        .await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("has no configured agent"));
-    }
-
-    #[tokio::test]
-    async fn rejects_pipeline_or_context_only_suffix_for_internal_outreach() {
+    async fn an_address_or_a_malformed_selector_is_not_a_channel() {
         let company_id = Uuid::new_v4();
         let target = channel(Uuid::new_v4(), company_id, "support");
-        let result = normalize_targets(
-            vec!["support+context@acme.mailagents.test".into()],
-            10,
-            "mailagents.test",
-            company_id,
-            Uuid::new_v4(),
-            &serde_json::json!({"allowed_target_scope": "same_company_channels"}),
-            &MockChannelPersistence {
-                channel: Some(target),
-            },
-        )
-        .await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("one direct channel address"));
+        for value in ["support@acme.mailagents.test", "a/b/c", "  "] {
+            let error = resolve(
+                company_id,
+                Uuid::new_v4(),
+                Some(target.clone()),
+                &request(&[value], &[]),
+                AllowedTargetScope::SameCompanyChannels,
+            )
+            .await
+            .unwrap_err();
+            assert!(!error.is_empty(), "expected {value:?} to be refused");
+        }
+    }
+
+    #[tokio::test]
+    async fn an_outreach_must_name_at_least_one_and_at_most_the_configured_number_of_targets() {
+        assert!(
+            resolve(
+                Uuid::new_v4(),
+                Uuid::new_v4(),
+                None,
+                &request(&[], &[]),
+                AllowedTargetScope::Any,
+            )
+            .await
+            .is_err()
+        );
+
+        let too_many: Vec<String> = (0..11).map(|n| format!("p{n}@example.com")).collect();
+        assert!(
+            resolve(
+                Uuid::new_v4(),
+                Uuid::new_v4(),
+                None,
+                &OutreachInput {
+                    target_emails: too_many,
+                    ..request(&[], &[])
+                },
+                AllowedTargetScope::Any,
+            )
+            .await
+            .is_err()
+        );
     }
 
     fn input(threshold: Option<f64>, timeout: Option<u32>) -> OutreachInput {
         OutreachInput {
+            target_channels: Vec::new(),
             target_emails: vec!["b@acme.example".into()],
             completion_threshold_percent: threshold,
             timeout_hours: timeout,

@@ -598,7 +598,7 @@ pub(crate) struct MessageTaskContext<'a> {
 /// The real task payload when one matches, otherwise a synthesized stand-in so the message still
 /// renders its execution parameters.
 pub(crate) fn message_task_payload(
-    msg: &Message,
+    msg: &ThreadMessageView,
     is_agent: bool,
     created_at_fmt: &str,
     ctx: &MessageTaskContext<'_>,
@@ -606,19 +606,22 @@ pub(crate) fn message_task_payload(
     if let Some(task) = find_task_for_message(msg, ctx.tasks, ctx.task_id, ctx.thread_id) {
         return task.payload.clone();
     }
+    // Names the message by its canonical id in both branches. The stand-in is shown where a real
+    // task payload would be, so it has to be the same shape a real one now is -- a provider header
+    // here would put a value in the pane that no task ever wrote.
     if is_agent {
         serde_json::json!({
             "task_type": "email_agent_dispatch",
             "execution_parameters": {
                 "provider": ctx.provider,
                 "model": ctx.model,
-                "prompt": ctx.agent_prompt.unwrap_or(msg.clean_text_body.as_str()),
+                "prompt": ctx.agent_prompt.unwrap_or(msg.body.as_str()),
                 "config": ctx.resolved_config.clone(),
                 "executed_at": created_at_fmt
             },
             "execution_result": {
-                "response": msg.clean_text_body,
-                "outbound_message_id": msg.rfc_message_id()
+                "response": msg.body,
+                "reply_message_id": msg.canonical_id
             },
             "channel": ctx.channel,
             "company": ctx.company
@@ -626,19 +629,15 @@ pub(crate) fn message_task_payload(
     } else {
         serde_json::json!({
             "task_type": "email_agent_dispatch",
-            "parsed_email": {
-                "sender": msg.author.display(),
-                "subject": msg.subject,
-                "prompt_text": msg.clean_text_body,
-                "message_id": msg.rfc_message_id()
-            },
+            "source_message_id": msg.canonical_id,
             "inbound_message": {
                 "id": msg.id,
                 "canonical_id": msg.canonical_id,
-                "message_id": msg.rfc_message_id(),
+                "author": msg.author.display(),
+                "subject": msg.subject,
                 "direction": "inbound",
                 "role": "human",
-                "clean_text_body": msg.clean_text_body
+                "clean_text_body": msg.body
             },
             "channel": ctx.channel,
             "company": ctx.company
@@ -647,8 +646,8 @@ pub(crate) fn message_task_payload(
 }
 
 /// One message in the thread history: an indigo agent card or a slate inbound card.
-pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> String {
-    let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
+pub(crate) fn message_bubble(msg: &ThreadMessageView, ctx: &MessageTaskContext<'_>) -> String {
+    let is_agent = msg.is_agent();
     let created_at = super::format_date_time(msg.created_at);
     let created_at_utc = msg.created_at.to_rfc3339();
     let params_html = render_message_task_parameters_html(&message_task_payload(
@@ -659,7 +658,7 @@ pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> Str
     ));
 
     if is_agent {
-        let body = render_markdown(&msg.clean_text_body);
+        let body = render_markdown(&msg.body);
         format!(
             r##"
                     <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 space-y-2 shadow-sm">
@@ -717,7 +716,7 @@ pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> Str
             sender = super::escape_html_text(msg.author.display()),
             msg_id = super::escape_html_text(&msg.canonical_id.to_string()),
             subject = super::escape_html_text(&msg.subject),
-            body = super::escape_html_text(&msg.clean_text_body),
+            body = super::escape_html_text(&msg.body),
             params_html = params_html,
         )
     }
@@ -725,7 +724,7 @@ pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> Str
 
 /// The full "Thread History" card, or `empty_state` when the thread has no messages yet.
 pub(crate) fn thread_history_section(
-    messages: &[Message],
+    messages: &[ThreadMessageView],
     thread_id_str: &str,
     wrapper_extra_class: &str,
     empty_state: &str,
@@ -911,15 +910,34 @@ pub fn simulation_live_view(
     )
 }
 
-pub fn channel_simulation_loaded_thread_fragment(
-    company: &Company,
-    channel: &Channel,
-    app_domain_name: &str,
-    thread: &Thread,
-    messages: &[Message],
-    tasks: &[BackgroundTask],
-    include_oob: bool,
-) -> String {
+/// Everything the loaded-thread fragment renders from.
+///
+/// A struct rather than seven positional arguments: `&Company`, `&Channel` and `&str` in a row are
+/// exactly what a call site can transpose without the compiler noticing.
+pub struct SimulationThreadView<'a> {
+    pub company: &'a Company,
+    pub channel: &'a Channel,
+    pub app_domain_name: &'a str,
+    pub thread: &'a Thread,
+    pub messages: &'a [ThreadMessageView],
+    /// The headers a simulated reply threads onto, when mail carried this thread's newest turn.
+    /// `None` -- a schedule prompt, a Slack turn -- starts a fresh mail conversation.
+    pub reply_context: Option<&'a EmailReplyContext>,
+    pub tasks: &'a [BackgroundTask],
+    pub include_oob: bool,
+}
+
+pub fn channel_simulation_loaded_thread_fragment(view: &SimulationThreadView<'_>) -> String {
+    let SimulationThreadView {
+        company,
+        channel,
+        app_domain_name,
+        thread,
+        messages,
+        reply_context,
+        tasks,
+        include_oob,
+    } = *view;
     let thread_id_str = thread.id.to_string();
     let target_recipient = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
 
@@ -965,9 +983,8 @@ pub fn channel_simulation_loaded_thread_fragment(
         company_id: company.id,
         channel_id: channel.id,
         thread_id_str: &thread_id_str,
-        last_msg_id: &messages
-            .last()
-            .and_then(|message| message.rfc_message_id())
+        last_msg_id: &reply_context
+            .and_then(|context| context.rfc_message_id.as_ref())
             .map(|id| id.to_string())
             .unwrap_or_default(),
         to_value: &target_recipient,

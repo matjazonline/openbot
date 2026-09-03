@@ -295,13 +295,19 @@ pub(crate) fn sanitize_json_mut(value: &mut serde_json::Value) {
     }
 }
 
+/// The background task that produced or answered one message.
+///
+/// Matched on canonical ids: a task payload names the message it answers by
+/// `source_message_id` and the reply it produced by `reply_message_id`, both of which are this
+/// platform's own identifiers. Nothing here reads a provider header, so a Slack turn and a
+/// scheduled run match on exactly the same path as mail.
 pub fn find_task_for_message<'a>(
-    msg: &Message,
+    msg: &ThreadMessageView,
     tasks: &'a [BackgroundTask],
     preferred_task_id: Option<Uuid>,
     thread_id: Option<Uuid>,
 ) -> Option<&'a BackgroundTask> {
-    let is_agent = msg.role == MessageRole::Agent || msg.direction == MessageDirection::Outbound;
+    let canonical = msg.canonical_id.to_string();
 
     for task in tasks {
         if let Some(tid) = thread_id
@@ -313,56 +319,23 @@ pub fn find_task_for_message<'a>(
 
         let payload = &task.payload;
 
-        if is_agent {
-            if let Some(outbound_id) = payload
-                .get("execution_result")
-                .and_then(|r| r.get("outbound_message_id"))
-                .and_then(|v| v.as_str())
-                .or_else(|| payload.get("outbound_message_id").and_then(|v| v.as_str()))
-                && msg
-                    .rfc_message_id()
-                    .is_some_and(|id| outbound_id == id.as_str())
+        if msg.is_agent() {
+            if payload_string(payload, &["execution_result", "reply_message_id"])
+                == Some(canonical.as_str())
             {
                 return Some(task);
             }
 
-            if let Some(resp) = payload
-                .get("execution_result")
-                .and_then(|r| r.get("response"))
-                .and_then(|v| v.as_str())
-                .or_else(|| payload.get("response").and_then(|v| v.as_str()))
-                && !resp.is_empty()
-                && resp == msg.clean_text_body
+            if let Some(response) = payload_string(payload, &["execution_result", "response"])
+                && !response.is_empty()
+                && response == msg.body
             {
                 return Some(task);
             }
-        } else {
-            if let Some(inbound_msg_id) = payload
-                .get("inbound_message")
-                .and_then(|m| m.get("message_id"))
-                .and_then(|v| v.as_str())
-                .or_else(|| {
-                    payload
-                        .get("parsed_email")
-                        .and_then(|p| p.get("message_id"))
-                        .and_then(|v| v.as_str())
-                })
-                .or_else(|| payload.get("inbound_message_id").and_then(|v| v.as_str()))
-                && msg
-                    .rfc_message_id()
-                    .is_some_and(|id| inbound_msg_id == id.as_str())
-            {
-                return Some(task);
-            }
-
-            if let Some(inbound_id_str) = payload
-                .get("inbound_message")
-                .and_then(|m| m.get("id"))
-                .and_then(|v| v.as_str())
-                && inbound_id_str == msg.id.to_string()
-            {
-                return Some(task);
-            }
+        } else if payload_string(payload, &["source_message_id"]) == Some(canonical.as_str())
+            || payload_string(payload, &["prompt_message_id"]) == Some(canonical.as_str())
+        {
+            return Some(task);
         }
     }
 
@@ -389,6 +362,14 @@ pub fn find_task_for_message<'a>(
     }
 
     tasks.first()
+}
+
+/// One string out of a task payload, by path. Returns `None` for any shape that is not a string
+/// at that path, so a payload from another task type simply does not match.
+fn payload_string<'a>(payload: &'a serde_json::Value, path: &[&str]) -> Option<&'a str> {
+    path.iter()
+        .try_fold(payload, |value, key| value.get(key))?
+        .as_str()
 }
 
 const BADGE_INDIGO: &str = "bg-indigo-950/80 text-indigo-300 border border-indigo-800/50";

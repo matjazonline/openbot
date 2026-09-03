@@ -12,6 +12,7 @@ pub mod dashboard;
 pub mod email_message;
 pub mod memory;
 pub mod message;
+pub mod message_view;
 pub mod outbox;
 pub mod outreach;
 pub mod participant;

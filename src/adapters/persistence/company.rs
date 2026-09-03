@@ -14,6 +14,7 @@ use crate::{
         },
         company_member::{CompanyAccessRole, CompanyMembership},
         memory::{MEMORY_DELETION_QUIESCENCE_SECONDS, MemoryProviderKind},
+        transport::PrincipalId,
         value_objects::{AvatarUrl, CompanySlug, EmailAddress, ModelName, ModelProvider},
     },
     use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence, CompanyWrite},
@@ -499,9 +500,14 @@ impl CompanyPersistence for PostgresPersistence {
                    ORDER BY account_id, rank
                )
                SELECT account.id AS "user_id!", account.email::text AS "email!",
-                      account.username::text AS "username!", ranked.membership AS "membership!"
+                      account.username::text AS "username!", ranked.membership AS "membership!",
+                      -- Read here rather than by a second query per caller: the principal is what
+                      -- anything scoping work to this person names.
+                      principal.id AS "principal_id?"
                FROM ranked
                JOIN users AS account ON account.id = ranked.account_id
+               LEFT JOIN principals AS principal
+                 ON principal.company_id = $1 AND principal.user_id = ranked.account_id
                ORDER BY ranked.rank, LOWER(account.email::text)
                LIMIT 200"#,
             company_id
@@ -524,6 +530,7 @@ impl CompanyPersistence for PostgresPersistence {
                     email: EmailAddress::from(row.email),
                     username: Some(row.username),
                     membership,
+                    principal_id: row.principal_id.map(PrincipalId::new),
                 })
             })
             .collect()

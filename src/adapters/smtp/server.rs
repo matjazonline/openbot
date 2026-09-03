@@ -1345,6 +1345,15 @@ mod tests {
 
     #[async_trait]
     impl crate::adapters::persistence::task::TaskPersistence for MockTaskPersistence {
+        /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
+        async fn record_outreach_request_message(
+            &self,
+            _outbox_id: Uuid,
+            _write: &crate::use_cases::thread::MessageWrite,
+        ) -> AppResult<crate::entities::message::CanonicalMessageId> {
+            unreachable!("no fixture here sends an outreach")
+        }
+
         /// This fixture enqueues no task, so a run that asked for targets would be a bug in the
         /// test rather than an empty conversation.
         async fn list_task_channel_targets(

@@ -21,7 +21,8 @@ use crate::entities::{
         MemoryPersistenceMode, MemoryProviderKind, MemoryProvisioningPhase, MemoryRecallMode,
         default_memory_max_results,
     },
-    message::{AttachmentMetadata, Message, MessageDirection, MessageRole},
+    message::{AttachmentMetadata, MessageDirection, MessageRole},
+    message_view::{EmailReplyContext, MessageAuditView, ThreadMessageView},
     outbox::{OutboxEntry, OutboxFilter, OutboxStatus},
     task::{
         BackgroundTask, ChainStage, TaskAttemptRecord, TaskAttemptRecordStatus, TaskBoardFilter,
@@ -29,6 +30,7 @@ use crate::entities::{
         TaskFilter, TaskStatus, ThreadActivity,
     },
     thread::Thread,
+    transport::TransportKind,
     user::User,
     value_objects::{AvatarUrl, EmailAddress, ModelName},
 };

@@ -190,6 +190,25 @@ impl Fixture {
         ChannelBindingId::new(binding_id)
     }
 
+    /// An agent in the fixture's company, for a message authored by one.
+    ///
+    /// Created through the ordinary path so it gets its principal the way a real agent does; a
+    /// hand-written `principals` row would not exercise the author resolution at all.
+    pub(super) async fn agent(&self) -> Uuid {
+        crate::use_cases::agent::AgentPersistence::create(
+            &self.persistence,
+            self.company_id,
+            crate::use_cases::agent::AgentWrite {
+                name: "Triage Agent".to_string(),
+                slug: format!("triage-{}", self.suffix),
+                ..crate::use_cases::agent::AgentWrite::default()
+            },
+        )
+        .await
+        .unwrap()
+        .id
+    }
+
     pub(super) async fn cleanup(&self) {
         let _ = CompanyPersistence::delete(&self.persistence, self.company_id).await;
     }
@@ -249,6 +268,7 @@ pub(super) fn inbound_email(
     body: &str,
 ) -> MessageWrite {
     MessageWrite {
+        id: CanonicalMessageId::random(),
         thread_id,
         author: observed("sender@partner.test", IdentityProvenance::EmailIngress),
         subject: "Subject".into(),

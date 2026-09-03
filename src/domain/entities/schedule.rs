@@ -8,7 +8,8 @@ use crate::entities::{
     company::CompanyTeamAccount,
     message::CanonicalMessageId,
     task::{TaskStatus, ThreadActivity},
-    value_objects::{EmailAddress, MessageId},
+    transport::PrincipalId,
+    value_objects::EmailAddress,
 };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -279,13 +280,17 @@ pub struct ScheduleWrite {
 /// The identity one scheduled run acts as, resolved from the schedule's `run_as_user_id` when the
 /// run is materialized.
 ///
-/// The account and its address travel together because both are needed and neither is derivable
-/// from the other in the worker: the address keys user-scoped memory and stands as the prompt's
-/// sender, and the account id is what the run is traced by.
+/// All three travel together because none is derivable from the others in the worker: the
+/// principal scopes the run's memory, the address is where its answer is mailed, and the account
+/// id is what the run is traced by.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ScheduleRunAs {
     pub user_id: Uuid,
     pub email: EmailAddress,
+    /// The company-scoped actor the run acts as. This, not the address, is what scopes the run's
+    /// user memory: an account reachable at two addresses is still one actor, and a recycled
+    /// address must not inherit the previous holder's memories.
+    pub principal_id: Option<PrincipalId>,
 }
 
 /// Who a schedule may be made to run as, and which of those this caller may choose.
@@ -373,9 +378,14 @@ pub struct ScheduledRunPayload {
     /// attribution existed, which are the same thing to the worker.
     #[serde(default)]
     pub run_as: Option<ScheduleRunAs>,
-    /// The `Message-ID` the answer email threads onto. Email transport only -- it is not how the
-    /// prompt message is identified.
-    pub trigger_message_id: MessageId,
+    /// This run's stable identity: the durable schedule-run slot where there is one, and a
+    /// materialization-time id otherwise.
+    ///
+    /// Transport-neutral on purpose. It used to be an RFC `Message-ID` the mail renderer needed,
+    /// which put a synthetic mail header inside the task protocol for a run no mail ever carried.
+    /// The renderer derives its headers from this instead, so a run delivered over another
+    /// transport needs nothing here to change.
+    pub run_key: Uuid,
     /// The canonical prompt message this run answers.
     ///
     /// The worker's idempotency guard asks "did a previous attempt already answer this?", which is
@@ -409,10 +419,14 @@ impl ScheduledRunPayload {
         !matches!(self.delivery_mode, ScheduleDeliveryMode::MailboxOnly)
     }
 
-    /// The address this run's memory is scoped to and its prompt is attributed to, or `None` when
-    /// the run acts as nobody.
+    /// The address this run's answer is mailed to, or `None` when the run acts as nobody.
     pub fn run_as_email(&self) -> Option<&EmailAddress> {
         self.run_as.as_ref().map(|run_as| &run_as.email)
+    }
+
+    /// The actor this run acts as, for anything scoped to a person rather than addressed to one.
+    pub fn run_as_principal(&self) -> Option<PrincipalId> {
+        self.run_as.as_ref().and_then(|run_as| run_as.principal_id)
     }
 }
 

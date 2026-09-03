@@ -114,13 +114,12 @@ async fn download_attachment(
 
 /// One attachment of these messages, by the hash of its contents.
 fn find_attachment(
-    messages: &[crate::entities::message::Message],
+    messages: &[crate::entities::message_view::ThreadMessageView],
     sha256: &str,
 ) -> Option<AttachmentMetadata> {
     messages
         .iter()
-        .filter_map(|message| message.attachments.as_ref())
-        .flatten()
+        .flat_map(|message| message.attachments.iter())
         .find(|attachment| attachment.sha256_hash.eq_ignore_ascii_case(sha256))
         .cloned()
 }
@@ -204,11 +203,12 @@ fn percent_encode(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::message_view::ThreadMessageView;
     use crate::entities::{
-        message::{Message, MessageDirection, MessageRole},
+        message::{MessageDirection, MessageRole},
         value_objects::ObjectKey,
     };
-    use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email};
+    use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email_view};
 
     fn attachment(sha: &str, filename: &str, key: Option<&str>) -> AttachmentMetadata {
         AttachmentMetadata {
@@ -220,8 +220,8 @@ mod tests {
         }
     }
 
-    fn message(attachments: Vec<AttachmentMetadata>) -> Message {
-        stored_email(EmailMessageDraft {
+    fn message(attachments: Vec<AttachmentMetadata>) -> ThreadMessageView {
+        stored_email_view(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id: Uuid::new_v4(),
             message_id: "<a@example.test>".into(),

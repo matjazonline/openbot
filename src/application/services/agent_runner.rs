@@ -5,7 +5,8 @@ use crate::entities::agent::Agent as AgentEntity;
 use crate::entities::approval::{ApprovalAction, ApprovalStatus, ApprovalSubject};
 use crate::entities::company::Company;
 use crate::entities::correlation::CorrelationId;
-use crate::entities::message::{Message, MessageRole};
+use crate::entities::message::MessageRole;
+use crate::entities::message_view::AgentHistoryMessage;
 use crate::entities::task::TokenUsage;
 use crate::entities::value_objects::{EmailAddress, ModelName, ModelProvider};
 use crate::services::agent_channel_tool::{
@@ -21,6 +22,7 @@ use crate::use_cases::approval::ApprovalUseCases;
 use crate::use_cases::{
     agent::AgentPersistence,
     channel::{ChannelPersistence, InternalTargetOutcome, resolve_internal_target},
+    integration::ChannelBindingPersistence,
     thread::RecipientRole,
 };
 use ai_agents::{Agent, AgentBuilder};
@@ -797,7 +799,7 @@ pub struct AgentRunner<'a> {
     prompt: &'a str,
     /// Subject of the message `prompt` came from, if it has one.
     subject: Option<&'a str>,
-    history: &'a [Message],
+    history: &'a [AgentHistoryMessage],
     params: &'a ResolvedAgentParams,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     approval_context: Option<ApprovalSubject>,
@@ -813,6 +815,7 @@ pub struct AgentRunner<'a> {
     task_persistence: Option<Arc<dyn TaskPersistence>>,
     channel_persistence: Option<Arc<dyn ChannelPersistence>>,
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
+    binding_persistence: Option<Arc<dyn ChannelBindingPersistence>>,
     outreach_context: Option<OutreachToolContext>,
     agent_channel_tool: Option<(Arc<dyn AgentChannelProvisioning>, AgentChannelToolContext)>,
     /// Set when the run belongs to a durable chain, which is every run driven by a task. Absent
@@ -841,6 +844,7 @@ impl<'a> AgentRunner<'a> {
             task_persistence: None,
             channel_persistence: None,
             agent_persistence: None,
+            binding_persistence: None,
             outreach_context: None,
             agent_channel_tool: None,
             trace: None,
@@ -857,7 +861,7 @@ impl<'a> AgentRunner<'a> {
         self
     }
 
-    pub fn history(mut self, history: &'a [Message]) -> Self {
+    pub fn history(mut self, history: &'a [AgentHistoryMessage]) -> Self {
         self.history = history;
         self
     }
@@ -946,8 +950,16 @@ impl<'a> AgentRunner<'a> {
     ///
     /// Separate from [`AgentRunner::outreach_tool`] because the directory is a read, not a send:
     /// an agent can be given the address book without being given the ability to write to it.
-    pub fn agent_directory(mut self, agent_persistence: Arc<dyn AgentPersistence>) -> Self {
+    ///
+    /// The bindings come along because a directory entry says which interfaces a channel is
+    /// reachable on -- display data an agent can mention, never the routing key it delegates by.
+    pub fn agent_directory(
+        mut self,
+        agent_persistence: Arc<dyn AgentPersistence>,
+        binding_persistence: Arc<dyn ChannelBindingPersistence>,
+    ) -> Self {
         self.agent_persistence = Some(agent_persistence);
+        self.binding_persistence = Some(binding_persistence);
         self
     }
 
@@ -1035,6 +1047,7 @@ impl<'a> AgentRunner<'a> {
                     },
                 ),
             agent_persistence: self.agent_persistence.clone(),
+            binding_persistence: self.binding_persistence.clone(),
             agent_channel_tool: self.agent_channel_tool.clone(),
             trace: self.trace.clone(),
             monitoring: self.monitoring.clone(),
@@ -1152,10 +1165,7 @@ impl<'a> AgentRunner<'a> {
             };
             rendered.push_str(&format!(
                 "[{} ({}){}]: {}\n",
-                role_label,
-                msg.author.display(),
-                subject_label,
-                msg.clean_text_body
+                role_label, msg.author_display, subject_label, msg.body
             ));
         }
         format!(
@@ -1209,6 +1219,7 @@ struct AgentTask {
     outreach: Option<AgentOutreach>,
     /// Present when the run may list its sibling agent channels.
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
+    binding_persistence: Option<Arc<dyn ChannelBindingPersistence>>,
     agent_channel_tool: Option<(Arc<dyn AgentChannelProvisioning>, AgentChannelToolContext)>,
     trace: Option<AgentTraceContext>,
     monitoring: Option<Arc<dyn MonitoringService>>,
@@ -1363,15 +1374,18 @@ impl AgentTask {
                 channel_persistence,
                 context,
             } = outreach;
-            if let Some(agent_persistence) = self.agent_persistence.clone() {
+            if let Some((agent_persistence, binding_persistence)) = self
+                .agent_persistence
+                .clone()
+                .zip(self.binding_persistence.clone())
+            {
                 builder = builder.tool(Arc::new(ListCompanyAgentsTool::new(
                     channel_persistence.clone(),
                     agent_persistence,
+                    binding_persistence,
                     AgentDirectoryContext {
                         company_id: context.company_id,
-                        company_slug: context.company_slug.clone(),
                         source_channel_id: context.channel_id,
-                        app_domain_name: context.app_domain_name.clone(),
                     },
                 )));
             }
@@ -1490,9 +1504,7 @@ fn count_tokens(
 mod tests {
     use super::*;
     use crate::entities::channel::Channel;
-    use crate::entities::message::MessageDirection;
     use crate::entities::value_objects::{ChannelSlug, CompanySlug};
-    use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email};
 
     #[tokio::test]
     async fn test_agent_runner_returns_error_when_provider_missing() -> anyhow::Result<()> {
@@ -2266,6 +2278,7 @@ mod tests {
             approval: None,
             outreach: None,
             agent_persistence: None,
+            binding_persistence: None,
             agent_channel_tool: None,
             trace: None,
             monitoring: None,
@@ -2552,29 +2565,18 @@ system_prompt: Hello
         ResolvedAgentParams::new(Some(&company), None).expect("params resolve")
     }
 
-    fn history_message(role: MessageRole, sender: &str, subject: &str, body: &str) -> Message {
-        stored_email(EmailMessageDraft {
-            id: Uuid::new_v4(),
-            thread_id: Uuid::new_v4(),
-            message_id: format!("<{}@test>", Uuid::new_v4()).into(),
-            in_reply_to: None,
-            references_list: Vec::new(),
-            sender: sender.into(),
-            recipients_to: Vec::new(),
-            recipients_cc: Vec::new(),
-            subject: subject.to_string(),
-            clean_text_body: body.to_string(),
-            raw_text_body: None,
-            raw_html_body: None,
-            attachments: None,
-            direction: match role {
-                MessageRole::Agent => MessageDirection::Outbound,
-                _ => MessageDirection::Inbound,
-            },
+    fn history_message(
+        role: MessageRole,
+        sender: &str,
+        subject: &str,
+        body: &str,
+    ) -> AgentHistoryMessage {
+        AgentHistoryMessage {
             role,
-            thread_index: None,
-            created_at: chrono::Utc::now(),
-        })
+            author_display: sender.to_string(),
+            subject: subject.to_string(),
+            body: body.to_string(),
+        }
     }
 
     #[test]

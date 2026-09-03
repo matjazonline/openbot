@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use crate::entities::transport::PrincipalId;
+
 pub const MAX_MEMORY_CONTEXT_CHARS: usize = 16_000;
 pub const MAX_MEMORY_RECALL_QUERY_CHARS: usize = 16_000;
 pub const MAX_MEMORY_PERSIST_USER_CONTEXT_CHARS: usize = 32_000;
@@ -325,13 +327,18 @@ pub struct ResolvedMemoryScopes {
     pub unavailable: Vec<UnavailableMemoryScope>,
 }
 
-pub fn normalize_sender_email(email: &str) -> String {
-    email.trim().to_lowercase()
-}
-
-fn user_collection(email: &str) -> String {
+/// Where one principal's memories live.
+///
+/// Keyed on the principal id, not on a handle. A provider identity string is a *name* a person
+/// arrived under, and two of them -- a mailbox and a Slack account -- can belong to one person;
+/// hashing the string would give that person two disjoint memories and would give whoever next
+/// holds a recycled address the previous holder's. The principal is the actor, so it is the scope.
+///
+/// Still hashed, so a collection name carries no identifier out to the provider.
+fn user_collection(principal: PrincipalId) -> String {
     let mut hash = Sha256::new();
-    hash.update(normalize_sender_email(email).as_bytes());
+    hash.update(b"principal:");
+    hash.update(principal.as_uuid().as_bytes());
     format!("user_{:x}", hash.finalize())
 }
 
@@ -340,7 +347,7 @@ pub fn resolve_scopes(
     agent: bool,
     user: bool,
     agent_id: Option<Uuid>,
-    sender_email: Option<&str>,
+    subject_principal: Option<PrincipalId>,
 ) -> ResolvedMemoryScopes {
     let mut result = ResolvedMemoryScopes::default();
     if company {
@@ -361,13 +368,10 @@ pub fn resolve_scopes(
         }
     }
     if user {
-        match sender_email
-            .map(normalize_sender_email)
-            .filter(|email| !email.is_empty())
-        {
-            Some(email) => result.resolved.push(ResolvedMemoryScope {
+        match subject_principal {
+            Some(principal) => result.resolved.push(ResolvedMemoryScope {
                 scope: MemoryScope::User,
-                collection: user_collection(&email),
+                collection: user_collection(principal),
                 weight: 3.0,
             }),
             None => result.unavailable.push(UnavailableMemoryScope::User),
@@ -464,7 +468,7 @@ mod tests {
     #[test]
     fn all_available_scopes_are_additive() {
         let agent = Uuid::nil();
-        let scopes = resolve_scopes(true, true, true, Some(agent), Some(" USER@Example.COM "));
+        let scopes = resolve_scopes(true, true, true, Some(agent), Some(PrincipalId::random()));
         assert_eq!(scopes.resolved.len(), 3);
         assert!(scopes.unavailable.is_empty());
         assert!(
@@ -495,7 +499,7 @@ mod tests {
                 agent_enabled,
                 user,
                 Some(agent),
-                Some("user@example.com"),
+                Some(PrincipalId::random()),
             );
             assert_eq!(scopes.resolved.len(), 1);
             assert_eq!(scopes.resolved[0].scope, expected);
@@ -515,13 +519,21 @@ mod tests {
         );
     }
 
+    /// The scope key is the actor, so two sightings of one principal share a memory and two
+    /// principals never do -- and the key itself carries no identifier out to the provider.
     #[test]
-    fn user_collection_is_normalized_stable_and_pii_free() {
-        let first = resolve_scopes(false, false, true, None, Some(" User@Example.COM "));
-        let second = resolve_scopes(false, false, true, None, Some("user@example.com"));
+    fn user_collection_follows_the_principal_and_leaks_nothing() {
+        let principal = PrincipalId::random();
+        let first = resolve_scopes(false, false, true, None, Some(principal));
+        let second = resolve_scopes(false, false, true, None, Some(principal));
         assert_eq!(first.resolved[0].collection, second.resolved[0].collection);
-        assert!(!first.resolved[0].collection.contains('@'));
-        assert!(!first.resolved[0].collection.contains("example"));
+
+        let other = resolve_scopes(false, false, true, None, Some(PrincipalId::random()));
+        assert_ne!(first.resolved[0].collection, other.resolved[0].collection);
+
+        let collection = &first.resolved[0].collection;
+        assert!(!collection.contains('@'));
+        assert!(!collection.contains(&principal.to_string()));
     }
 
     #[test]

@@ -255,7 +255,7 @@ struct MockTaskPersistence {
     /// Reply messages committed through `commit_agent_dispatch`. They arrive here rather than at
     /// the thread double because the dispatch commits them as one transaction with the outbox
     /// row and the task payload.
-    committed_messages: Mutex<Vec<MessageWrite>>,
+    committed_replies: Mutex<Vec<MessageWrite>>,
 }
 
 struct MockAgentPersistence {
@@ -295,6 +295,15 @@ impl AgentPersistence for MockAgentPersistence {
 
 #[async_trait]
 impl TaskPersistence for MockTaskPersistence {
+    /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
+    async fn record_outreach_request_message(
+        &self,
+        _outbox_id: Uuid,
+        _write: &crate::use_cases::thread::MessageWrite,
+    ) -> AppResult<crate::entities::message::CanonicalMessageId> {
+        unreachable!("no fixture here sends an outreach")
+    }
+
     async fn list_task_channel_targets(
         &self,
         _company_id: Uuid,
@@ -320,10 +329,10 @@ impl TaskPersistence for MockTaskPersistence {
         &self,
         commit: AgentDispatchCommit<'_>,
     ) -> AppResult<DispatchCommit> {
-        self.committed_messages
+        self.committed_replies
             .lock()
             .unwrap()
-            .extend(commit.messages.iter().cloned());
+            .push(commit.reply.message.clone());
         let outbox_id = commit.outbound.map(|send| {
             self.outbox.lock().unwrap().push(send);
             Uuid::new_v4()
@@ -4559,7 +4568,7 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
 
     assert!(
         task_persistence
-            .committed_messages
+            .committed_replies
             .lock()
             .unwrap()
             .is_empty(),

@@ -19,6 +19,7 @@ use crate::{
     entities::{
         company::CompanyChannelDefaults,
         creation::CreationProvenance,
+        transport::{ChannelSelector, TransportKind},
         value_objects::{ChannelSlug, CompanySlug},
     },
     use_cases::{
@@ -153,7 +154,7 @@ impl Tool for CreateAgentChannelTool {
         "Create Agent Channel"
     }
     fn description(&self) -> &str {
-        "Permanently create a specialist agent and a callable channel for it in this company. The new agent inherits company model settings. After creation, delegate to the returned address with outreach_and_await_quorum."
+        "Permanently create a specialist agent and a callable channel for it in this company. The new agent inherits company model settings. After creation, delegate to the returned `channel` selector with outreach_and_await_quorum."
     }
     fn input_schema(&self) -> Value {
         generate_schema::<CreateAgentChannelInput>()
@@ -189,6 +190,9 @@ impl Tool for CreateAgentChannelTool {
         let slug = ChannelSlug::from(request.channel.slug.clone());
         match self.persistence.provision_agent_channel(request).await {
             Ok(result) => {
+                // What the caller delegates by is the selector and the id, not the address. The
+                // address is reported because a person reading the transcript wants it, and is
+                // labelled as display data so it is not copied back as a routing key.
                 let address = crate::entities::channel::Channel::address_for(
                     &slug,
                     &self.context.company_slug,
@@ -196,9 +200,14 @@ impl Tool for CreateAgentChannelTool {
                 );
                 ToolResult::ok(
                     serde_json::json!({
-                        "created": result.created, "agent_id": result.agent_id,
-                        "channel_id": result.channel_id, "name": name, "slug": slug.as_str(),
-                        "address": address.as_str(),
+                        "created": result.created,
+                        "agent_id": result.agent_id,
+                        "channel_id": result.channel_id,
+                        "channel": ChannelSelector::CurrentCompany(slug.clone()).to_string(),
+                        "name": name,
+                        "slug": slug.as_str(),
+                        "interfaces": [{ "transport": TransportKind::Email.as_str(),
+                                         "display_address": address.as_str() }],
                         "warnings": result.warnings,
                     })
                     .to_string(),

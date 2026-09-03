@@ -9,6 +9,7 @@ mod email_metadata;
 mod external;
 mod inbound;
 mod message;
+mod views;
 
 #[cfg(test)]
 #[path = "test_support.rs"]
@@ -26,7 +27,11 @@ mod read_tests;
 #[path = "inbound_tests.rs"]
 mod inbound_tests;
 
-pub(crate) use message::insert_message_on;
+#[cfg(test)]
+#[path = "view_tests.rs"]
+mod view_tests;
+
+pub(crate) use message::{associate_message_on, insert_message_on};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -45,6 +50,9 @@ use crate::{
     entities::{
         cursor::{MessageCursor, ThreadCursor},
         message::{CanonicalMessageId, Message, MessageRole},
+        message_view::{
+            AgentHistoryMessage, EmailReplyContext, MessageAuditView, ThreadMessageView,
+        },
         participant::{IdentityClaimMetadata, IdentityProvenance, ThreadPrincipalRole},
         thread::{Thread, ThreadParticipantProjection},
         transport::PrincipalId,
@@ -521,9 +529,9 @@ impl ThreadPersistence for PostgresPersistence {
 
     async fn create_message(&self, write: &MessageWrite) -> AppResult<Message> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let association_id = insert_message_on(&mut tx, write).await?;
+        let inserted = insert_message_on(&mut tx, write).await?;
         tx.commit().await.map_err(AppError::from)?;
-        load_message(&self.pool, association_id).await
+        load_message(&self.pool, inserted.association_id).await
     }
 
     async fn find_outbound_reply_after(
@@ -539,14 +547,12 @@ impl ThreadPersistence for PostgresPersistence {
                      (SELECT answered.created_at, answered.id
                         FROM thread_messages AS answered
                        WHERE answered.thread_id = $1 AND answered.message_id = $2)
+                 -- The agent asking a third party something is not the agent answering this
+                 -- turn. Recognised by the canonical relation the outreach recorded, so a
+                 -- transport with no message header of its own is excluded on the same terms.
                  AND NOT EXISTS (
-                     SELECT 1
-                     FROM email_message_metadata AS sent
-                     JOIN email_outbox AS outbox
-                       ON outbox.provider_message_id = sent.rfc_message_id
-                     JOIN task_outreach_targets AS target ON target.outbox_id = outbox.id
-                     WHERE (sent.company_id, sent.message_id) =
-                           (message.company_id, message.id)
+                     SELECT 1 FROM task_outreach_targets AS target
+                     WHERE target.request_message_id = message.id
                  )
                ORDER BY association.created_at DESC, association.id DESC
                LIMIT 1"#
@@ -566,57 +572,51 @@ impl ThreadPersistence for PostgresPersistence {
         message: CanonicalMessageId,
     ) -> AppResult<Message> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let association_id = message::associate_message_on(&mut tx, thread_id, message).await?;
+        let association_id = associate_message_on(&mut tx, thread_id, message).await?;
         tx.commit().await.map_err(AppError::from)?;
         load_message(&self.pool, association_id).await
     }
 
-    async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-        let query = format!(
-            r#"SELECT * FROM (
-                   {MESSAGE_SELECT}
-                   WHERE association.thread_id = $1
-                   ORDER BY association.created_at DESC, association.id DESC
-                   LIMIT 200
-               ) recent
-               ORDER BY recent.created_at ASC, recent.id ASC"#
-        );
-        let db = sqlx::query_as::<_, MessageDb>(&query)
-            .bind(thread_id)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(AppError::from)?;
-        db.into_iter().map(TryInto::try_into).collect()
+    async fn list_thread_message_views(
+        &self,
+        thread_id: Uuid,
+    ) -> AppResult<Vec<ThreadMessageView>> {
+        views::list_thread_messages(&self.pool, thread_id).await
     }
 
-    async fn list_messages_after(
+    async fn list_thread_message_views_after(
         &self,
         thread_id: Uuid,
         after: Option<MessageCursor>,
         limit: usize,
-    ) -> AppResult<Vec<Message>> {
-        // Ascending and unwrapped, unlike `list_messages_by_thread_id`: this reads *forwards* from
-        // a known point, so there is no newest-N window to reverse. `(created_at, id)` as a row
-        // comparison matches `thread_messages_thread_created_idx` exactly.
-        let query = format!(
-            r#"{MESSAGE_SELECT}
-               WHERE association.thread_id = $1
-                 AND ($2::timestamptz IS NULL
-                      OR (association.created_at, association.id) > ($2, $3))
-               ORDER BY association.created_at ASC, association.id ASC
-               LIMIT $4"#
-        );
-        let db = sqlx::query_as::<_, MessageDb>(&query)
-            .bind(thread_id)
-            // Both sides stay `timestamptz`. Binding a naive value instead would make Postgres
-            // promote it through the *session* `TimeZone` to compare it, so the same cursor would
-            // mean different instants on a UTC server and a local one.
-            .bind(after.map(|cursor| cursor.created_at))
-            .bind(after.map(|cursor| cursor.id))
-            .bind(limit as i64)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(AppError::from)?;
-        db.into_iter().map(TryInto::try_into).collect()
+    ) -> AppResult<Vec<ThreadMessageView>> {
+        views::list_thread_messages_after(&self.pool, thread_id, after, limit).await
+    }
+
+    async fn get_thread_message_view(
+        &self,
+        thread_id: Uuid,
+        message_id: CanonicalMessageId,
+    ) -> AppResult<Option<ThreadMessageView>> {
+        views::get_thread_message(&self.pool, thread_id, message_id).await
+    }
+
+    async fn list_agent_history(&self, thread_id: Uuid) -> AppResult<Vec<AgentHistoryMessage>> {
+        views::list_agent_history(&self.pool, thread_id).await
+    }
+
+    async fn latest_email_reply_context(
+        &self,
+        thread_id: Uuid,
+    ) -> AppResult<Option<EmailReplyContext>> {
+        views::latest_email_reply_context(&self.pool, thread_id).await
+    }
+
+    async fn get_message_audit(
+        &self,
+        company_id: Uuid,
+        association_id: Uuid,
+    ) -> AppResult<Option<MessageAuditView>> {
+        views::get_message_audit(&self.pool, company_id, association_id).await
     }
 }

@@ -33,6 +33,10 @@ use crate::{
             AttachmentMetadata, CanonicalMessageId, Message, MessageAuthor, MessageDirection,
             MessageParticipant, MessageParticipantKind, MessageRole,
         },
+        message_view::{
+            AgentHistoryMessage, AuthorView, EmailReplyContext, MessageAuditView,
+            THREAD_HISTORY_LIMIT, ThreadMessageView,
+        },
         task::{NewTask, TaskSource, TaskTarget},
         thread::{Thread, ThreadParticipantProjection},
         transport::{
@@ -201,6 +205,19 @@ impl InMemoryThreads {
         })
     }
 
+    /// One thread's stored messages, oldest first.
+    fn thread_messages(&self, thread_id: Uuid) -> Vec<Message> {
+        let store = self.store.lock().unwrap();
+        let mut messages: Vec<Message> = store
+            .associations
+            .iter()
+            .filter(|association| association.thread_id == thread_id)
+            .filter_map(|association| self.read(&store, association))
+            .collect();
+        messages.sort_by_key(Message::cursor);
+        messages
+    }
+
     fn thread_channel(store: &Store, thread_id: Uuid) -> AppResult<Uuid> {
         store
             .threads
@@ -225,6 +242,14 @@ impl InMemoryThreads {
                 principal_id: *principal_id,
                 identity_id: None,
                 label: principal_id.to_string(),
+                identity: None,
+            },
+            // Mirrors the writer's upsert: the agent's principal is stable per agent, so two
+            // answers from one agent read as one author.
+            MessageAuthorWrite::Agent(agent) => MessageAuthor {
+                principal_id: PrincipalId::new(agent.agent_id),
+                identity_id: None,
+                label: agent.display_label.clone(),
                 identity: None,
             },
             MessageAuthorWrite::Platform => MessageAuthor {
@@ -564,35 +589,116 @@ impl ThreadPersistence for InMemoryThreads {
         Ok(candidates.pop())
     }
 
-    async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-        let store = self.store.lock().unwrap();
-        let mut messages: Vec<Message> = store
-            .associations
-            .iter()
-            .filter(|association| association.thread_id == thread_id)
-            .filter_map(|association| self.read(&store, association))
-            .collect();
-        messages.sort_by_key(Message::cursor);
-        Ok(messages)
+    async fn list_thread_message_views(
+        &self,
+        thread_id: Uuid,
+    ) -> AppResult<Vec<ThreadMessageView>> {
+        let mut messages = self.thread_messages(thread_id);
+        // The newest window, then oldest-first, exactly as the SQL read does it.
+        if messages.len() > THREAD_HISTORY_LIMIT {
+            messages.drain(..messages.len() - THREAD_HISTORY_LIMIT);
+        }
+        Ok(messages.iter().map(thread_message_view).collect())
     }
 
-    async fn list_messages_after(
+    async fn list_thread_message_views_after(
         &self,
         thread_id: Uuid,
         after: Option<MessageCursor>,
         limit: usize,
-    ) -> AppResult<Vec<Message>> {
-        let store = self.store.lock().unwrap();
-        let mut messages: Vec<Message> = store
-            .associations
+    ) -> AppResult<Vec<ThreadMessageView>> {
+        let mut messages = self.thread_messages(thread_id);
+        messages.retain(|message| after.is_none_or(|cursor| message.cursor() > cursor));
+        messages.truncate(limit.min(THREAD_HISTORY_LIMIT));
+        Ok(messages.iter().map(thread_message_view).collect())
+    }
+
+    async fn get_thread_message_view(
+        &self,
+        thread_id: Uuid,
+        message_id: CanonicalMessageId,
+    ) -> AppResult<Option<ThreadMessageView>> {
+        Ok(self
+            .thread_messages(thread_id)
             .iter()
-            .filter(|association| association.thread_id == thread_id)
-            .filter_map(|association| self.read(&store, association))
-            .filter(|message| after.is_none_or(|cursor| message.cursor() > cursor))
-            .collect();
-        messages.sort_by_key(Message::cursor);
-        messages.truncate(limit);
-        Ok(messages)
+            .find(|message| message.canonical_id == message_id)
+            .map(thread_message_view))
+    }
+
+    async fn list_agent_history(&self, thread_id: Uuid) -> AppResult<Vec<AgentHistoryMessage>> {
+        let mut messages = self.thread_messages(thread_id);
+        if messages.len() > THREAD_HISTORY_LIMIT {
+            messages.drain(..messages.len() - THREAD_HISTORY_LIMIT);
+        }
+        Ok(messages
+            .iter()
+            .map(|message| AgentHistoryMessage {
+                role: message.role,
+                author_display: message.author.display().to_string(),
+                subject: message.subject.clone(),
+                body: message.clean_text_body.clone(),
+            })
+            .collect())
+    }
+
+    async fn latest_email_reply_context(
+        &self,
+        thread_id: Uuid,
+    ) -> AppResult<Option<EmailReplyContext>> {
+        Ok(self
+            .thread_messages(thread_id)
+            .last()
+            .map(|message| EmailReplyContext {
+                canonical_id: message.canonical_id,
+                author_email: message.author.email_address(),
+                rfc_message_id: message.rfc_message_id().cloned(),
+                references: message
+                    .email
+                    .as_ref()
+                    .map(|email| email.references.clone())
+                    .unwrap_or_default(),
+                cc: message.email_recipients(MessageParticipantKind::Cc),
+            }))
+    }
+
+    async fn get_message_audit(
+        &self,
+        _company_id: Uuid,
+        _association_id: Uuid,
+    ) -> AppResult<Option<MessageAuditView>> {
+        // Only the diagnostic pane reads this, and no in-memory test exercises it. Stated rather
+        // than defaulted, so a test that starts needing it fails here instead of seeing "no such
+        // message" and concluding the authorization worked.
+        unimplemented!("MessageAuditView is exercised against the database, not this double")
+    }
+}
+
+/// The email-shaped stored message projected the way the SQL reads project it.
+fn thread_message_view(message: &Message) -> ThreadMessageView {
+    ThreadMessageView {
+        id: message.id,
+        canonical_id: message.canonical_id,
+        thread_id: message.thread_id,
+        author: AuthorView {
+            principal_id: message.author.principal_id,
+            label: message.author.label.clone(),
+            handle: message
+                .author
+                .identity
+                .as_ref()
+                .map(|identity| identity.subject().as_str().to_string()),
+            transport: message
+                .author
+                .identity
+                .as_ref()
+                .map(|identity| identity.transport()),
+        },
+        subject: message.subject.clone(),
+        body: message.clean_text_body.clone(),
+        attachments: message.attachments.clone().unwrap_or_default(),
+        direction: message.direction,
+        role: message.role,
+        created_at: message.created_at,
     }
 }
 
@@ -730,6 +836,25 @@ pub fn stored_email(draft: EmailMessageDraft) -> Message {
     }
 }
 
+/// The stored message a draft describes, as a page reads it.
+///
+/// Projected from [`stored_email`] rather than built beside it, so a fixture and the thing it
+/// stands for cannot drift.
+pub fn stored_email_view(draft: EmailMessageDraft) -> ThreadMessageView {
+    thread_message_view(&stored_email(draft))
+}
+
+/// The stored message a draft describes, as an agent prompt reads it.
+pub fn stored_email_history(draft: EmailMessageDraft) -> AgentHistoryMessage {
+    let message = stored_email(draft);
+    AgentHistoryMessage {
+        role: message.role,
+        author_display: message.author.display().to_string(),
+        subject: message.subject.clone(),
+        body: message.clean_text_body,
+    }
+}
+
 /// The write a draft describes: what a producer hands to `create_message`.
 pub fn email_write(draft: EmailMessageDraft) -> MessageWrite {
     let sender = super::qualified_email_identity(draft.sender.as_str())
@@ -752,6 +877,7 @@ pub fn email_write(draft: EmailMessageDraft) -> MessageWrite {
     }
 
     MessageWrite {
+        id: CanonicalMessageId::random(),
         thread_id: draft.thread_id,
         author: MessageAuthorWrite::Observed(IdentityObservation {
             identity: sender,
@@ -1133,6 +1259,7 @@ fn inbound_message_write(envelope: &InboundEnvelope, thread_id: Uuid) -> Message
         ));
     }
     MessageWrite {
+        id: CanonicalMessageId::random(),
         thread_id,
         author: MessageAuthorWrite::Observed(IdentityObservation {
             identity: envelope.author.clone(),

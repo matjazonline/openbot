@@ -18,10 +18,8 @@ use crate::{
         channel::{Channel, PUBLIC_PARTICIPANT},
         company::Company,
         correlation::CorrelationId,
-        email_message::EmailMessageMetadata,
-        message::{MessageDirection, MessageParticipantKind, MessageRole},
+        message::{MessageDirection, MessageRole},
         outreach::DueOutreach,
-        participant::{IdentityClaimMetadata, IdentityProvenance},
         schedule::ScheduledRunPayload,
         stuck_work::StuckWorkThresholds,
         task::{
@@ -40,12 +38,8 @@ use crate::{
     },
     transport::InboundTaskPayload,
     use_cases::{
-        participant::IdentityObservation,
         schedule::{SCHEDULED_AGENT_RUN_TASK, ScheduleUseCases},
-        thread::{
-            DispatchOutcome, MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite,
-            MessageWrite, ThreadUseCases, qualified_email_identity,
-        },
+        thread::{AgentAuthor, DispatchOutcome, MessageAuthorWrite, MessageWrite, ThreadUseCases},
     },
 };
 
@@ -231,10 +225,24 @@ struct ScheduledRunContext {
     agent: Agent,
 }
 
-/// The Message-ID of a scheduled run's reply, derived from the task so a retry reuses it and the
-/// saved message and the emailed copy always agree.
+/// The `Message-ID` the mail carrying a scheduled run's answer goes out under.
+///
+/// Derived from the task -- the delivery key -- rather than stored on the message. The answer
+/// itself is a canonical message with no headers on it, so a run that one day delivers to Slack
+/// instead needs nothing here; this is the *renderer* deciding what to put on an envelope, and a
+/// retry that re-renders the same envelope gets the same id.
 fn scheduled_reply_message_id(task_id: Uuid, domain: &str) -> MessageId {
     MessageId::new(format!("<schedule-reply-{task_id}@{domain}>"))
+}
+
+/// The `Message-ID` a scheduled run's mail threads onto: the run itself, named by its durable slot
+/// where it has one and by its schedule and firing time otherwise.
+///
+/// Nothing carried the prompt this answers -- the platform asked because a slot came due -- so
+/// there is no header to reply to and one is derived here instead of being fabricated onto the
+/// prompt message.
+fn scheduled_thread_root_message_id(payload: &ScheduledRunPayload, domain: &str) -> MessageId {
+    MessageId::new(format!("<schedule-run-{}@{domain}>", payload.run_key))
 }
 
 /// `Re:` a subject without stacking a second prefix.
@@ -1173,7 +1181,7 @@ impl TaskWorker {
                     // A run that acts as a member writes into that member's own memory, which is
                     // the whole point of attributing it to them; an unattributed run has no user
                     // scope, exactly as before.
-                    sender: payload.run_as_email().map(EmailAddress::as_str),
+                    subject_principal: payload.run_as_principal(),
                     task_id: task.id,
                     user_context: &payload.prompt,
                     final_answer: &answer,
@@ -1239,8 +1247,7 @@ impl TaskWorker {
     ) -> Result<String, RunFailure> {
         let history = self
             .thread_use_cases
-            .thread_persistence()
-            .list_messages_by_thread_id(payload.thread_id)
+            .get_agent_history(payload.thread_id)
             .await
             .map_err(|e| e.to_string())?;
 
@@ -1261,7 +1268,7 @@ impl TaskWorker {
                     company: &context.company,
                     channel: &context.channel,
                     agent: Some(&context.agent),
-                    sender: payload.run_as_email().map(EmailAddress::as_str),
+                    subject_principal: payload.run_as_principal(),
                     audience: MemoryRecallAudience::MemberOrSystem,
                     task_id,
                     latest_prompt: &payload.prompt,
@@ -1308,50 +1315,22 @@ impl TaskWorker {
         context: &ScheduledRunContext,
         answer: &str,
     ) -> Result<(), String> {
-        let channel_address = context
-            .channel
-            .inbound_address(&context.company.slug, &self.config.app_domain_name);
-        // Addressed to whoever asked: the member an attributed run acts as, and otherwise the
-        // channel itself, which is what a run belonging to nobody has always replied to.
-        let addressee = payload
-            .run_as_email()
-            .cloned()
-            .unwrap_or_else(|| channel_address.clone());
-
-        let reply_message_id = scheduled_reply_message_id(task.id, &self.config.app_domain_name);
-        // The answer is mail: it threads onto the schedule's prompt and goes out to the addressee,
-        // so it carries email headers and a sender/to projection.
-        let metadata = EmailMessageMetadata::new(reply_message_id)
-            .in_reply_to(Some(payload.trigger_message_id.clone()))
-            .references(vec![payload.trigger_message_id.clone()])
-            .raw_bodies(Some(answer.to_string()), None);
-        let sender =
-            qualified_email_identity(channel_address.clone()).map_err(|e| e.to_string())?;
-
-        let message = MessageWrite {
-            thread_id: payload.thread_id,
-            author: MessageAuthorWrite::Observed(IdentityObservation {
-                identity: sender.clone(),
-                display_label: Some(context.channel.name.clone()),
-                claim_metadata: IdentityClaimMetadata::observation(),
-                provenance: IdentityProvenance::Agent,
+        // The agent wrote it, so the agent's principal owns it. No sender address, no `To:` and no
+        // `Message-ID`: a scheduled answer is a canonical message that this run happens to also
+        // mail on, and everything about that mail -- who it goes to, which headers it carries --
+        // belongs to the delivery, which derives it from the task's own key.
+        let message = MessageWrite::internal(
+            payload.thread_id,
+            MessageAuthorWrite::Agent(AgentAuthor {
+                agent_id: context.agent.id,
+                display_label: context.agent.name.clone(),
             }),
-            subject: reply_subject(&payload.subject),
-            clean_text_body: answer.to_string(),
-            attachments: Vec::new(),
-            direction: MessageDirection::Outbound,
-            role: MessageRole::Agent,
-            correlation_id: task.correlation_id,
-            participants: vec![
-                MessageParticipantWrite::new(MessageParticipantKind::Sender, sender),
-                MessageParticipantWrite::new(
-                    MessageParticipantKind::To,
-                    qualified_email_identity(addressee).map_err(|e| e.to_string())?,
-                ),
-            ],
-            correlation: MessageCorrelation::Email(metadata),
-            created_at: chrono::Utc::now(),
-        };
+            reply_subject(&payload.subject),
+            answer.to_string(),
+            MessageDirection::Outbound,
+            MessageRole::Agent,
+            task.correlation_id,
+        );
 
         self.thread_use_cases
             .save_message(&message)
@@ -1393,7 +1372,10 @@ impl TaskWorker {
             channel_name: channel.name.clone(),
             channel_slug: channel.slug.clone(),
             company_slug: company.slug.clone(),
-            trigger_message_id: payload.trigger_message_id.clone(),
+            trigger_message_id: scheduled_thread_root_message_id(
+                payload,
+                &self.config.app_domain_name,
+            ),
             thread_references: vec![reply_message_id],
             recipient_to: primary_to.clone(),
             recipients_cc: cc_list.to_vec(),
@@ -1560,15 +1542,20 @@ impl TaskWorker {
         else {
             return Ok(());
         };
-        let history = self
+        // The mail-shaped facts of the thread's newest turn, and only those: a notice is an email,
+        // so this is the one projection that has headers in it.
+        let Some(reply_to) = self
             .thread_use_cases
-            .get_thread_history(thread_id)
+            .latest_email_reply_context(thread_id)
             .await
-            .map_err(|error| error.to_string())?;
-        let Some(latest) = history.last() else {
+            .map_err(|error| error.to_string())?
+        else {
             return Ok(());
         };
-        let Some(recipient) = latest.author.email_address() else {
+        // Nobody to mail. A thread whose newest turn came over a transport with no mailbox behind
+        // it is not told by email that its task stopped -- it is shown in the app like every other
+        // message, and inventing an address here would send the notice to a stranger.
+        let Some(recipient) = reply_to.author_email.clone() else {
             return Ok(());
         };
 
@@ -1577,17 +1564,13 @@ impl TaskWorker {
             channel_name: channel.name.clone(),
             channel_slug: channel.slug.clone(),
             company_slug: company.slug.clone(),
-            trigger_message_id: latest
-                .rfc_message_id()
-                .cloned()
-                .unwrap_or_else(|| latest.canonical_id.to_string().into()),
-            thread_references: latest
-                .email
-                .as_ref()
-                .map(|metadata| metadata.references.clone())
-                .unwrap_or_default(),
+            trigger_message_id: reply_to
+                .rfc_message_id
+                .clone()
+                .unwrap_or_else(|| reply_to.canonical_id.to_string().into()),
+            thread_references: reply_to.references.clone(),
             recipient_to: recipient,
-            recipients_cc: latest.email_recipients(MessageParticipantKind::Cc),
+            recipients_cc: reply_to.cc.clone(),
             subject: format!("[STOPPED] Re: {}", thread.subject),
             body_text: format!(
                 "Notice: The automated channel processing for thread '{}' has been manually \
@@ -1872,6 +1855,15 @@ mod tests {
 
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
+        async fn record_outreach_request_message(
+            &self,
+            _outbox_id: Uuid,
+            _write: &crate::use_cases::thread::MessageWrite,
+        ) -> AppResult<crate::entities::message::CanonicalMessageId> {
+            unreachable!("no fixture here sends an outreach")
+        }
+
         /// The task's own channel and thread. These fixtures never enqueue a multi-channel run, so
         /// stating one target is the honest answer rather than an empty list the worker would read
         /// as "answer nowhere".
@@ -2880,7 +2872,7 @@ mod tests {
             "prompt": "Run audit",
             "delivery_mode": "mailbox_only",
             "recipient_emails": [],
-            "trigger_message_id": "<TRIGGER123@domain.com>",
+            "run_key": Uuid::new_v4(),
             "prompt_message_id": Uuid::new_v4(),
         });
 
@@ -3069,7 +3061,7 @@ mod tests {
                     "prompt": "Run audit",
                     "delivery_mode": "email_custom",
                     "recipient_emails": ["ops@example.com", "cc@example.com"],
-                    "trigger_message_id": trigger.to_string(),
+                    "run_key": Uuid::new_v4(),
                     "prompt_message_id": prompt.canonical_id,
                 }),
             ))
@@ -3122,13 +3114,64 @@ mod tests {
         assert_eq!(reply_subject("RE: Audit Report"), "RE: Audit Report");
     }
 
+    /// The RFC ids a scheduled run's mail goes out under are derived from delivery keys -- the
+    /// task, and the run -- so a retry re-renders the same envelope. Nothing about them is stored
+    /// on the answer, which is why the answer no longer needs a synthetic `<scheduled-...>` id.
     #[test]
-    fn a_scheduled_reply_message_id_is_stable_across_retries() {
+    fn a_scheduled_runs_mail_headers_are_derived_from_its_delivery_keys() {
         let task_id = Uuid::new_v4();
         assert_eq!(
             scheduled_reply_message_id(task_id, "mailagents.com"),
             scheduled_reply_message_id(task_id, "mailagents.com"),
-            "the saved reply and the emailed copy must agree, on every attempt"
+            "a retry must re-render the same envelope"
         );
+        assert_ne!(
+            scheduled_reply_message_id(task_id, "mailagents.com"),
+            scheduled_reply_message_id(Uuid::new_v4(), "mailagents.com"),
+            "a different run is a different mail"
+        );
+
+        let payload = scheduled_payload();
+        assert_eq!(
+            scheduled_thread_root_message_id(&payload, "mailagents.com"),
+            scheduled_thread_root_message_id(&payload, "mailagents.com")
+        );
+        assert!(
+            scheduled_thread_root_message_id(&payload, "mailagents.com")
+                .as_str()
+                .contains(&payload.run_key.to_string()),
+            "the thread root names the run, not the prompt message"
+        );
+    }
+
+    /// The payload carries the run's own identity, not a mail header. A run delivered over
+    /// another transport changes nothing here.
+    #[test]
+    fn a_scheduled_payload_carries_no_transport_identifier() {
+        let encoded = serde_json::to_value(scheduled_payload()).unwrap();
+        assert!(encoded.get("run_key").is_some());
+        assert!(encoded.get("trigger_message_id").is_none());
+        assert!(
+            !encoded.to_string().contains('<'),
+            "no RFC id may appear in a scheduled payload: {encoded}"
+        );
+    }
+
+    fn scheduled_payload() -> ScheduledRunPayload {
+        ScheduledRunPayload {
+            schedule_run_id: None,
+            schedule_id: Uuid::new_v4(),
+            schedule_name: "Nightly Audit".into(),
+            channel_id: Uuid::new_v4(),
+            company_id: Uuid::new_v4(),
+            thread_id: Uuid::new_v4(),
+            subject: "Audit Report".into(),
+            prompt: "Run audit".into(),
+            delivery_mode: crate::entities::schedule::ScheduleDeliveryMode::MailboxOnly,
+            recipient_emails: Vec::new(),
+            run_as: None,
+            run_key: Uuid::new_v4(),
+            prompt_message_id: crate::entities::message::CanonicalMessageId::random(),
+        }
     }
 }

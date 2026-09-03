@@ -860,15 +860,20 @@ async fn load_simulation_thread_fragment(
         .await
         .unwrap_or_default();
 
-    let fragment = pages::channel_simulation_loaded_thread_fragment(
+    let reply_context = thread_use_cases
+        .latest_email_reply_context(thread.id)
+        .await
+        .unwrap_or_default();
+    let fragment = pages::channel_simulation_loaded_thread_fragment(&pages::SimulationThreadView {
         company,
         channel,
         app_domain_name,
-        &thread,
-        &messages,
-        &tasks,
+        thread: &thread,
+        messages: &messages,
+        reply_context: reply_context.as_ref(),
+        tasks: &tasks,
         include_oob,
-    );
+    });
     Ok((thread, fragment))
 }
 
@@ -1531,7 +1536,7 @@ async fn delete_channel_json(
 #[cfg(test)]
 mod tests {
     use crate::entities::{company::Company, thread::Thread};
-    use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email};
+    use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email_view};
     use chrono::Utc;
 
     use super::*;
@@ -1731,7 +1736,7 @@ mod tests {
             pages::channel_simulation_result_fragment(company.id, channel.id, &sim_result);
         assert!(sim_result_html.contains("Webhook Triggered &amp; Channel Resolved Successfully!"));
 
-        let test_message = stored_email(EmailMessageDraft {
+        let test_message = stored_email_view(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id: Uuid::new_v4(),
             message_id: "<msg1@test>".into(),
@@ -1750,11 +1755,11 @@ mod tests {
             thread_index: None,
             created_at: Utc::now(),
         });
-        let test_agent_message = stored_email(EmailMessageDraft {
+        let test_agent_message = stored_email_view(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id: test_message.thread_id,
             message_id: "<out1@test>".into(),
-            in_reply_to: test_message.rfc_message_id().cloned(),
+            in_reply_to: None,
             references_list: vec![],
             sender: "auto-dispatcher@acme.example.com".into(),
             recipients_to: vec!["agent@test.com".into()],
@@ -1800,15 +1805,17 @@ mod tests {
             updated_at: Utc::now(),
         };
 
-        let loaded_thread_html = pages::channel_simulation_loaded_thread_fragment(
-            &company,
-            &channel,
-            "example.com",
-            &sample_thread,
-            &[test_message, test_agent_message],
-            &[],
-            true,
-        );
+        let loaded_thread_html =
+            pages::channel_simulation_loaded_thread_fragment(&pages::SimulationThreadView {
+                company: &company,
+                channel: &channel,
+                app_domain_name: "example.com",
+                thread: &sample_thread,
+                messages: &[test_message, test_agent_message],
+                reply_context: None,
+                tasks: &[],
+                include_oob: true,
+            });
         assert!(loaded_thread_html.contains("Thread Loaded & Active"));
         assert!(loaded_thread_html.contains("Existing Thread Subject"));
         assert!(loaded_thread_html.contains("Task Execution Parameters"));

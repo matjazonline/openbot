@@ -580,6 +580,7 @@ fn message_write(
     }
 
     Ok(MessageWrite {
+        id: CanonicalMessageId::random(),
         thread_id: primary_thread_id,
         author: MessageAuthorWrite::Observed(observation(author)),
         subject: envelope.content.subject().to_string(),

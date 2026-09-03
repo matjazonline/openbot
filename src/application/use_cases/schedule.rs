@@ -17,9 +17,8 @@ use crate::{
             ScheduleType, ScheduleWrite, ScheduledRunPayload,
         },
         task::{NewTask, TaskSource},
-        value_objects::{EmailAddress, MessageId},
+        value_objects::EmailAddress,
     },
-    infra::config::AppConfig,
     use_cases::{
         channel::ChannelPersistence,
         company::{CompanyPersistence, managed_company},
@@ -50,7 +49,6 @@ pub struct ScheduleUseCases {
     channel_persistence: Arc<dyn ChannelPersistence>,
     thread_persistence: Arc<dyn ThreadPersistence>,
     task_persistence: Arc<dyn TaskPersistence>,
-    config: Arc<AppConfig>,
 }
 
 impl ScheduleUseCases {
@@ -60,7 +58,6 @@ impl ScheduleUseCases {
         channel_persistence: Arc<dyn ChannelPersistence>,
         thread_persistence: Arc<dyn ThreadPersistence>,
         task_persistence: Arc<dyn TaskPersistence>,
-        config: Arc<AppConfig>,
     ) -> Self {
         Self {
             schedule_persistence,
@@ -68,7 +65,6 @@ impl ScheduleUseCases {
             channel_persistence,
             thread_persistence,
             task_persistence,
-            config,
         }
     }
 
@@ -449,6 +445,7 @@ impl ScheduleUseCases {
         Ok(Some(ScheduleRunAs {
             user_id: account.user_id,
             email: account.email,
+            principal_id: account.principal_id,
         }))
     }
 
@@ -563,17 +560,11 @@ impl ScheduleUseCases {
             ),
             None => (MessageAuthorWrite::Platform, MessageRole::System),
         };
-        // What the answer email threads onto. Derived from the run, not from the prompt message:
-        // no mail carried the prompt, so it has no `Message-ID` of its own.
-        let email_thread_root = MessageId::new(match run_id {
-            Some(run_id) => format!("<schedule-run-{run_id}@{}>", self.config.app_domain_name),
-            None => format!(
-                "<schedule-{}-{}@{}>",
-                schedule.id,
-                now.timestamp(),
-                self.config.app_domain_name
-            ),
-        });
+        // This run's stable identity, for anything that has to name the run rather than the
+        // message: the durable slot where there is one, and a fresh id otherwise. The mail
+        // renderer derives its thread-root header from it -- no mail carried the prompt, so
+        // nothing here is a header.
+        let run_key = run_id.unwrap_or_else(Uuid::new_v4);
 
         let prompt_message = self
             .thread_persistence
@@ -604,7 +595,7 @@ impl ScheduleUseCases {
             delivery_mode: schedule.delivery_mode,
             recipient_emails: schedule.recipient_emails.clone(),
             run_as,
-            trigger_message_id: email_thread_root,
+            run_key,
             prompt_message_id: prompt_message.canonical_id,
         };
         let task_payload = serde_json::to_value(&task_payload).map_err(|err| {
@@ -718,6 +709,7 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
     use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
+    use crate::entities::transport::PrincipalId;
     use crate::entities::{
         channel::{Channel, ChannelAccessMode},
         company::{Company, CompanyAccess, CompanyTeamAccount},
@@ -1073,6 +1065,8 @@ mod tests {
                     email: EmailAddress::new(format!("{user_id}@example.com")),
                     username: None,
                     membership,
+                    // Derived from the account so a fixture's run-as principal is predictable.
+                    principal_id: Some(PrincipalId::new(user_id)),
                 })
                 .collect())
         }
@@ -1154,6 +1148,15 @@ mod tests {
 
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
+        async fn record_outreach_request_message(
+            &self,
+            _outbox_id: Uuid,
+            _write: &crate::use_cases::thread::MessageWrite,
+        ) -> AppResult<crate::entities::message::CanonicalMessageId> {
+            unreachable!("no fixture here sends an outreach")
+        }
+
         /// The task's own channel and thread. These fixtures never enqueue a multi-channel run, so
         /// stating one target is the honest answer rather than an empty list the worker would read
         /// as "answer nowhere".
@@ -1324,39 +1327,6 @@ mod tests {
         }
     }
 
-    fn test_config() -> Arc<AppConfig> {
-        Arc::new(AppConfig {
-            jwt_secret: "secret".into(),
-            sendgrid_inbound: None,
-            hydradb: None,
-            hindsight: None,
-            refresh_token_ttl: time::Duration::days(30),
-            app_domain_name: "mailagents.com".into(),
-            cors_allowed_origins: vec![],
-            smtp_host: "localhost".into(),
-            smtp_port: 1025,
-            smtp_username: "".into(),
-            smtp_password: "".into(),
-            smtp_from_address: "noreply@mailagents.com".into(),
-            incoming_smtp_enabled: true,
-            incoming_smtp_host: "0.0.0.0".into(),
-            incoming_smtp_port: 2525,
-            max_spam_score: 5.0,
-            dnsbl_enabled: false,
-            dnsbl_servers: vec![],
-            smtp_rate_limit_conns_per_ip: 30,
-            reject_self_domain_helo: true,
-            enable_heuristic_scanner: true,
-            enable_spam_scanner: false,
-            spam_scanner_type: "rspamd".to_string(),
-            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            enable_llm_spam_guardrail: false,
-            secure_cookies: false,
-            gcs: None,
-            operator_emails: Vec::new(),
-        })
-    }
-
     /// A schedule belongs to exactly one company. Every entry point has to say so *before* it
     /// reads or writes the row, or a caller who owns one company reaches another's schedules by
     /// pairing their own company id with a borrowed channel or schedule id.
@@ -1391,7 +1361,6 @@ mod tests {
             Arc::new(MockTaskPersistence {
                 tasks: Mutex::new(vec![]),
             }),
-            test_config(),
         );
 
         let theirs = use_cases
@@ -1545,7 +1514,6 @@ mod tests {
             channel_persistence.clone(),
             thread_persistence.clone(),
             task_persistence.clone(),
-            test_config(),
         );
 
         // 1. Create schedule
@@ -1707,7 +1675,6 @@ mod tests {
                 }),
                 thread_persistence.clone(),
                 task_persistence.clone(),
-                test_config(),
             );
 
             Self {
@@ -1913,6 +1880,7 @@ mod tests {
             Some(ScheduleRunAs {
                 user_id: fixture.member_id,
                 email: member_email,
+                principal_id: Some(PrincipalId::new(fixture.member_id)),
             })
         );
     }

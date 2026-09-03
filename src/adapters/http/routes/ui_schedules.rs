@@ -349,8 +349,7 @@ async fn schedules_page(
         let thread_pane = if let Some(thread_id) = selected_thread_id {
             let messages = workspace
                 .thread_use_cases
-                .thread_persistence()
-                .list_messages_by_thread_id(thread_id)
+                .get_thread_history(thread_id)
                 .await?;
 
             let subject = display_runs
@@ -502,8 +501,7 @@ async fn thread_pane(
 
     let messages = workspace
         .thread_use_cases
-        .thread_persistence()
-        .list_messages_by_thread_id(thread_id)
+        .get_thread_history(thread_id)
         .await?;
 
     let subject = messages
@@ -580,17 +578,20 @@ async fn reply_in_thread(
 
     // A reply here takes the same route as one sent from the mailbox: writing the row directly
     // would store a message no agent ever answers, and with no threading headers on it.
-    let history = workspace
-        .thread_use_cases
-        .thread_persistence()
-        .list_messages_by_thread_id(thread_id)
-        .await?;
     // Only a message mail actually carried has a `Message-ID` to thread onto; the schedule's own
     // prompt has none, so the first reply starts the mail conversation.
-    let in_reply_to = history
-        .last()
-        .and_then(|message| message.rfc_message_id())
+    let reply_context = workspace
+        .thread_use_cases
+        .latest_email_reply_context(thread_id)
+        .await?;
+    let in_reply_to = reply_context
+        .as_ref()
+        .and_then(|context| context.rfc_message_id.as_ref())
         .map(|id| id.as_str());
+    let history = workspace
+        .thread_use_cases
+        .get_thread_history(thread_id)
+        .await?;
     let subject = history
         .first()
         .map(|message| reply_subject(&message.subject))
@@ -622,8 +623,7 @@ async fn reply_in_thread(
     // Load full messages
     let messages = workspace
         .thread_use_cases
-        .thread_persistence()
-        .list_messages_by_thread_id(thread_id)
+        .get_thread_history(thread_id)
         .await?;
 
     let first_agent =
@@ -905,7 +905,7 @@ mod tests {
         task::TaskStatus,
         value_objects::MessageId,
     };
-    use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email};
+    use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email_view};
     use chrono::Utc;
 
     fn test_company() -> Company {
@@ -1193,7 +1193,7 @@ mod tests {
         let schedule = test_schedule(company_id, channel_id);
         let thread_id = Uuid::new_v4();
 
-        let prompt_msg = stored_email(EmailMessageDraft {
+        let prompt_msg = stored_email_view(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id,
             message_id: MessageId::new("<prompt1@domain.com>"),
@@ -1213,7 +1213,7 @@ mod tests {
             created_at: Utc::now(),
         });
 
-        let agent_reply_msg = stored_email(EmailMessageDraft {
+        let agent_reply_msg = stored_email_view(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id,
             message_id: MessageId::new("<reply1@domain.com>"),
@@ -1365,12 +1365,14 @@ mod tests {
         let company = test_company();
         let channel_id = Uuid::new_v4();
         let owner = CompanyTeamAccount {
+            principal_id: None,
             user_id: company.user_id,
             email: EmailAddress::from("owner@example.com"),
             username: Some("owner".into()),
             membership: CompanyMembership::Owner,
         };
         let admin = CompanyTeamAccount {
+            principal_id: None,
             user_id: Uuid::new_v4(),
             email: EmailAddress::from("admin@example.com"),
             username: Some("admin".into()),

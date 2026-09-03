@@ -27,6 +27,9 @@ use crate::{
         message::{
             CanonicalMessageId, Message, MessageDirection, MessageParticipantKind, MessageRole,
         },
+        message_view::{
+            AgentHistoryMessage, EmailReplyContext, MessageAuditView, ThreadMessageView,
+        },
         participant::{IdentityClaimMetadata, IdentityProvenance},
         task::{ThreadActivity, TokenUsage},
         thread::Thread,
@@ -58,13 +61,13 @@ use crate::{
 };
 
 mod dispatch;
-pub use dispatch::DispatchOutcome;
+pub use dispatch::{AgentReply, DispatchOutcome};
 mod ingest;
 pub use ingest::{InboundMessage, IngestRejection, IngressOrigin, UnusableHint};
 mod message_write;
 mod reload;
 pub use message_write::{
-    MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
+    AgentAuthor, MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
 };
 mod support;
 
@@ -233,16 +236,51 @@ pub trait ThreadPersistence: Send + Sync {
         message: CanonicalMessageId,
     ) -> AppResult<Message>;
 
-    async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>>;
+    /// The newest turns of a thread, oldest first, as a page renders them.
+    ///
+    /// Bounded by `THREAD_HISTORY_LIMIT` at the query: a thread is appended to by everyone who can
+    /// reach the channel, so an unbounded read is a page whose size a correspondent chooses.
+    async fn list_thread_message_views(&self, thread_id: Uuid)
+    -> AppResult<Vec<ThreadMessageView>>;
 
-    /// The thread's messages newer than `after`, oldest first — what a live reader has not seen
-    /// yet. `None` means from the start of the thread.
-    async fn list_messages_after(
+    /// The turns newer than `after`, oldest first — what a live reader has not seen yet. `None`
+    /// means from the start of the thread.
+    async fn list_thread_message_views_after(
         &self,
         thread_id: Uuid,
         after: Option<MessageCursor>,
         limit: usize,
-    ) -> AppResult<Vec<Message>>;
+    ) -> AppResult<Vec<ThreadMessageView>>;
+
+    /// One message as a page renders it, reached through the thread it is being read from.
+    async fn get_thread_message_view(
+        &self,
+        thread_id: Uuid,
+        message_id: CanonicalMessageId,
+    ) -> AppResult<Option<ThreadMessageView>>;
+
+    /// The thread so far, as an agent prompt reads it: role, author name, topic, words.
+    async fn list_agent_history(&self, thread_id: Uuid) -> AppResult<Vec<AgentHistoryMessage>>;
+
+    /// What the mail renderer needs to answer this thread's newest turn.
+    ///
+    /// `Some` with empty header fields is the honest answer for a thread whose newest turn came
+    /// over a transport that has none; a caller that needs a `Message-ID` must say what it does
+    /// instead rather than be handed a fabricated one.
+    async fn latest_email_reply_context(
+        &self,
+        thread_id: Uuid,
+    ) -> AppResult<Option<EmailReplyContext>>;
+
+    /// One message's operational detail, including the provider keys that reach it.
+    ///
+    /// Company-scoped in the query rather than by the caller's belief: this is the read that would
+    /// otherwise let a guessed association id return another tenant's correlation trail.
+    async fn get_message_audit(
+        &self,
+        company_id: Uuid,
+        association_id: Uuid,
+    ) -> AppResult<Option<MessageAuditView>>;
 }
 
 #[derive(Clone)]
@@ -684,25 +722,31 @@ impl ThreadUseCases {
             .references(sent.references.to_vec())
             .raw_bodies(Some(sent.body_text.clone()), None);
 
-        self.thread_persistence
-            .create_message(&MessageWrite {
-                thread_id,
-                author: MessageAuthorWrite::Observed(IdentityObservation {
-                    identity: sender,
-                    display_label: sent.from_name.clone(),
-                    claim_metadata: IdentityClaimMetadata::observation(),
-                    provenance: IdentityProvenance::Agent,
-                }),
-                subject: sent.subject.clone(),
-                clean_text_body: sent.body_text.clone(),
-                attachments: Vec::new(),
-                direction: MessageDirection::Outbound,
-                role: MessageRole::Agent,
-                correlation_id: sent.correlation_id,
-                participants,
-                correlation: MessageCorrelation::Email(metadata),
-                created_at: chrono::Utc::now(),
-            })
+        let write = MessageWrite {
+            id: CanonicalMessageId::random(),
+            thread_id,
+            author: MessageAuthorWrite::Observed(IdentityObservation {
+                identity: sender,
+                display_label: sent.from_name.clone(),
+                claim_metadata: IdentityClaimMetadata::observation(),
+                provenance: IdentityProvenance::Agent,
+            }),
+            subject: sent.subject.clone(),
+            clean_text_body: sent.body_text.clone(),
+            attachments: Vec::new(),
+            direction: MessageDirection::Outbound,
+            role: MessageRole::Agent,
+            correlation_id: sent.correlation_id,
+            participants,
+            correlation: MessageCorrelation::Email(metadata),
+            created_at: chrono::Utc::now(),
+        };
+
+        // Stored *and* marked as the question rather than the answer, in one transaction. The mark
+        // is what stops the reply guard reading an outreach the agent sent as the answer it owes
+        // this thread; an unmarked outreach mail in the thread would complete the task without one.
+        self.task_persistence
+            .record_outreach_request_message(outbox_id, &write)
             .await?;
         Ok(())
     }
@@ -769,9 +813,36 @@ impl ThreadUseCases {
             .await
     }
 
-    pub async fn get_thread_history(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
+    /// The newest turns of a thread, oldest first, as a page renders them.
+    pub async fn get_thread_history(&self, thread_id: Uuid) -> AppResult<Vec<ThreadMessageView>> {
         self.thread_persistence
-            .list_messages_by_thread_id(thread_id)
+            .list_thread_message_views(thread_id)
+            .await
+    }
+
+    /// The thread so far, as an agent prompt reads it.
+    pub async fn get_agent_history(&self, thread_id: Uuid) -> AppResult<Vec<AgentHistoryMessage>> {
+        self.thread_persistence.list_agent_history(thread_id).await
+    }
+
+    /// What the mail renderer needs to answer this thread's newest turn.
+    pub async fn latest_email_reply_context(
+        &self,
+        thread_id: Uuid,
+    ) -> AppResult<Option<EmailReplyContext>> {
+        self.thread_persistence
+            .latest_email_reply_context(thread_id)
+            .await
+    }
+
+    /// One message's operational detail, for an authorized diagnostic pane.
+    pub async fn get_message_audit(
+        &self,
+        company_id: Uuid,
+        association_id: Uuid,
+    ) -> AppResult<Option<MessageAuditView>> {
+        self.thread_persistence
+            .get_message_audit(company_id, association_id)
             .await
     }
 
@@ -785,9 +856,9 @@ impl ThreadUseCases {
         thread_id: Uuid,
         after: Option<MessageCursor>,
         limit: usize,
-    ) -> AppResult<Vec<Message>> {
+    ) -> AppResult<Vec<ThreadMessageView>> {
         self.thread_persistence
-            .list_messages_after(thread_id, after, limit)
+            .list_thread_message_views_after(thread_id, after, limit)
             .await
     }
 
@@ -1287,7 +1358,9 @@ pub enum SimulationMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentExecutionResult {
-    pub outbound_message_id: Option<String>,
+    /// The canonical reply this run produced, named by its own id rather than by the RFC header of
+    /// whichever mail happened to carry it.
+    pub reply_message_id: Option<CanonicalMessageId>,
     pub agent_response: String,
     pub email_sent: bool,
     pub token_usage: Option<TokenUsage>,

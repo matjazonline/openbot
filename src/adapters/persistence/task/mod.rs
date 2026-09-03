@@ -23,6 +23,7 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         correlation::CorrelationId,
+        message::CanonicalMessageId,
         outbox::{OutboxEntry, OutboxStatus},
         outreach::{CreateOutreachRequest, DueOutreach, OutreachProgress, OutreachReplyMatch},
         stuck_work::{StuckWorkCensus, StuckWorkThresholds},
@@ -34,7 +35,7 @@ use crate::{
         value_objects::MessageId,
     },
     transport::RecipientRole,
-    use_cases::thread::{MessageWrite, TaskChannelTarget},
+    use_cases::thread::{AgentReply, MessageWrite, TaskChannelTarget},
 };
 
 mod board;
@@ -174,8 +175,8 @@ pub struct OutboundSend {
 pub struct AgentDispatchCommit<'a> {
     /// Proof this run still owns the task. The whole transaction is fenced on it.
     pub lease: TaskLeaseRef,
-    /// The reply, stored once per thread it answered.
-    pub messages: &'a [MessageWrite],
+    /// The reply: one canonical message, plus the further threads it also answered.
+    pub reply: &'a AgentReply,
     /// The email to hand to the outbox, or `None` for a simulated run that sends nothing.
     pub outbound: Option<OutboundSend>,
     /// The run's audit payload, written back onto the task.
@@ -386,6 +387,21 @@ pub trait TaskPersistence: Send + Sync {
     async fn get_outreach_thread_for_outbox(&self, _outbox_id: Uuid) -> AppResult<Option<Uuid>> {
         Ok(None)
     }
+
+    /// Store the message an outreach asked with, and mark the target row as having asked it.
+    ///
+    /// One transaction, because the mark is what tells the reply guard that this outbound message
+    /// is the agent asking rather than the agent answering. Written separately, a failure between
+    /// them leaves an unmarked outreach mail in the thread -- which the guard would then read as
+    /// the answer this turn owed, and complete the task without one.
+    ///
+    /// Deliberately not defaulted away: a double that accepted it silently would let a test pass
+    /// while every outreach request looked like an answer.
+    async fn record_outreach_request_message(
+        &self,
+        outbox_id: Uuid,
+        write: &MessageWrite,
+    ) -> AppResult<CanonicalMessageId>;
 
     async fn is_outbox_delivery_active(&self, _outbox_id: Uuid) -> AppResult<bool> {
         Ok(true)

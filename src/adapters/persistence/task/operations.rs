@@ -867,6 +867,26 @@ impl TaskPersistence for PostgresPersistence {
         .map(Option::flatten)
     }
 
+    async fn record_outreach_request_message(
+        &self,
+        outbox_id: Uuid,
+        write: &MessageWrite,
+    ) -> AppResult<CanonicalMessageId> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let stored =
+            crate::adapters::persistence::thread::insert_message_on(&mut tx, write).await?;
+        sqlx::query(
+            "UPDATE task_outreach_targets SET request_message_id = $2 WHERE outbox_id = $1",
+        )
+        .bind(outbox_id)
+        .bind(stored.canonical_id.as_uuid())
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        tx.commit().await.map_err(AppError::from)?;
+        Ok(stored.canonical_id)
+    }
+
     async fn is_outbox_delivery_active(&self, outbox_id: Uuid) -> AppResult<bool> {
         sqlx::query_scalar::<_, bool>(
             r#"SELECT CASE
@@ -1050,8 +1070,19 @@ impl TaskPersistence for PostgresPersistence {
             return Ok(DispatchCommit::LeaseLost);
         }
 
-        for message in commit.messages {
-            crate::adapters::persistence::thread::insert_message_on(&mut tx, message).await?;
+        // One canonical row, then one association per further thread the reply answered. Writing
+        // the message again per thread is what used to make "the answer" several different rows
+        // that had to be kept identical to still read as one.
+        let stored =
+            crate::adapters::persistence::thread::insert_message_on(&mut tx, &commit.reply.message)
+                .await?;
+        for &thread_id in &commit.reply.also_in_threads {
+            crate::adapters::persistence::thread::associate_message_on(
+                &mut tx,
+                thread_id,
+                stored.canonical_id,
+            )
+            .await?;
         }
 
         let outbox_id = match commit.outbound {

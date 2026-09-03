@@ -577,6 +577,15 @@ mod tests {
 
     #[async_trait]
     impl crate::adapters::persistence::task::TaskPersistence for MockTaskPersistence {
+        /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
+        async fn record_outreach_request_message(
+            &self,
+            _outbox_id: Uuid,
+            _write: &crate::use_cases::thread::MessageWrite,
+        ) -> AppResult<crate::entities::message::CanonicalMessageId> {
+            unreachable!("no fixture here sends an outreach")
+        }
+
         /// The task's own channel and thread. These fixtures never enqueue a multi-channel run, so
         /// stating one target is the honest answer rather than an empty list the worker would read
         /// as "answer nowhere".
@@ -1252,7 +1261,6 @@ mod tests {
                 channel_persistence.clone(),
                 thread_persistence.clone(),
                 task_persistence.clone(),
-                config.clone(),
             )),
             agent_use_cases: Arc::new(crate::use_cases::agent::AgentUseCases::new(
                 company_persistence.clone(),

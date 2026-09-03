@@ -13,7 +13,10 @@ use crate::{
     entities::{
         correlation::CorrelationId,
         email_message::EmailMessageMetadata,
-        message::{AttachmentMetadata, MessageDirection, MessageParticipantKind, MessageRole},
+        message::{
+            AttachmentMetadata, CanonicalMessageId, MessageDirection, MessageParticipantKind,
+            MessageRole,
+        },
         participant::{IdentityClaimMetadata, IdentityProvenance},
         transport::{PrincipalId, QualifiedIdentity},
     },
@@ -27,11 +30,27 @@ pub enum MessageAuthorWrite {
     /// for a handle seen for the first time -- in the same transaction as the message, so a
     /// message never lands attributed to nobody.
     Observed(IdentityObservation),
-    /// An actor already resolved: an agent answering, or a member acting through the application.
+    /// An actor already resolved: a member acting through the application.
     Principal(PrincipalId),
+    /// An agent answering, named by the agent it is.
+    ///
+    /// Resolved to the agent's own principal -- created alongside the agent and kept in step with
+    /// its name -- rather than to whatever mailbox the answer happened to leave through. An
+    /// answer delivered over three transports is still one author.
+    Agent(AgentAuthor),
     /// The platform itself. A schedule that runs for nobody in particular and an approval note are
     /// authored by the company's one system principal rather than by a fabricated mailbox.
     Platform,
+}
+
+/// The agent an answer is attributed to.
+///
+/// The label travels with the id because the writer upserts the agent's principal and a renamed
+/// agent should not leave its old name on every later message.
+#[derive(Debug, Clone)]
+pub struct AgentAuthor {
+    pub agent_id: Uuid,
+    pub display_label: String,
 }
 
 /// One handle's part in a message. Position is assigned from the order these are given, per kind,
@@ -66,6 +85,15 @@ pub enum MessageCorrelation {
 /// One canonical message, and its association with one thread, as its producer states it.
 #[derive(Debug, Clone)]
 pub struct MessageWrite {
+    /// The identity this message is written under.
+    ///
+    /// Minted by the producer rather than by the writer, so a producer that must record what it
+    /// wrote *in the same transaction* -- the agent dispatch names its reply in the task's audit
+    /// payload -- has a name for it before the row exists. The one exception is a provider
+    /// redelivery: when [`MessageCorrelation::Email`] finds the key already mapped, the stored
+    /// message keeps its own id and this one is not used, because a redelivery is the message that
+    /// is already there rather than a new one.
+    pub id: CanonicalMessageId,
     pub thread_id: Uuid,
     pub author: MessageAuthorWrite,
     pub subject: String,
@@ -93,6 +121,7 @@ impl MessageWrite {
         correlation_id: CorrelationId,
     ) -> Self {
         Self {
+            id: CanonicalMessageId::random(),
             thread_id,
             author,
             subject: subject.into(),

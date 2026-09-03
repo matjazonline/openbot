@@ -25,6 +25,7 @@ use crate::{
         },
         value_objects::MessageId,
     },
+    use_cases::thread::{AgentReply, MessageAuthorWrite, MessageWrite},
 };
 
 /// What a fixture that forces a status writes instead of an attribution. It has no cause to
@@ -1618,26 +1619,19 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
     let claimed = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
     let lease = TaskLeaseRef::of(&claimed).expect("a claim records its lease");
 
-    let reply = |message_id: &str| {
-        email_write(EmailMessageDraft {
-            id: Uuid::new_v4(),
-            thread_id: thread.id,
-            message_id: MessageId::from(message_id.to_string()),
-            in_reply_to: None,
-            references_list: Vec::new(),
-            sender: crate::entities::value_objects::EmailAddress::from("agent@example.com"),
-            recipients_to: vec![email_addr.clone()],
-            recipients_cc: Vec::new(),
-            subject: "Re: Commit".to_string(),
-            clean_text_body: "the answer".to_string(),
-            raw_text_body: None,
-            raw_html_body: None,
-            attachments: None,
-            direction: MessageDirection::Outbound,
-            role: MessageRole::Agent,
-            thread_index: None,
-            created_at: Utc::now(),
-        })
+    // The agent's answer as the dispatch now writes it: one canonical message, authored by the
+    // platform, with no mail headers on it at all.
+    let reply = |thread_id: Uuid| AgentReply {
+        message: MessageWrite::internal(
+            thread_id,
+            MessageAuthorWrite::Platform,
+            "Re: Commit",
+            "the answer",
+            MessageDirection::Outbound,
+            MessageRole::Agent,
+            CorrelationId::new(),
+        ),
+        also_in_threads: Vec::new(),
     };
     let send = |key: &str| OutboundSend {
         correlation_id: CorrelationId::new(),
@@ -1678,7 +1672,7 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
     let outcome = persistence
         .commit_agent_dispatch(AgentDispatchCommit {
             lease: stale,
-            messages: &[reply("<stale@example.com>")],
+            reply: &reply(thread.id),
             outbound: Some(send("stale-key")),
             payload: serde_json::json!({"stale": true}),
             complete_outreach: false,
@@ -1700,7 +1694,7 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
     let outcome = persistence
         .commit_agent_dispatch(AgentDispatchCommit {
             lease,
-            messages: &[reply("<live@example.com>")],
+            reply: &reply(thread.id),
             outbound: Some(send("live-key")),
             payload: serde_json::json!({"committed": true}),
             complete_outreach: false,
@@ -1724,7 +1718,7 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
     let outcome = persistence
         .commit_agent_dispatch(AgentDispatchCommit {
             lease,
-            messages: &[],
+            reply: &reply(thread.id),
             outbound: Some(send("live-key")),
             payload: serde_json::json!({"committed": true}),
             complete_outreach: false,
@@ -1741,14 +1735,11 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
     // A failure part-way must roll back what already succeeded in the same transaction. The
     // payload write happens first, so a message that cannot be stored has to undo it: this is
     // the case three separate commits could not handle at all.
-    let orphan = MessageWrite {
-        thread_id: Uuid::new_v4(),
-        ..reply("<orphan@example.com>")
-    };
+    let orphan = reply(Uuid::new_v4());
     let failed = persistence
         .commit_agent_dispatch(AgentDispatchCommit {
             lease,
-            messages: &[orphan],
+            reply: &orphan,
             outbound: Some(send("orphan-key")),
             payload: serde_json::json!({"rolled_back": true}),
             complete_outreach: false,
@@ -2774,6 +2765,136 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
         .find(|event| event.reason == TaskTransitionReason::OutreachReplyReceived)
         .expect("outreach reply records the exact resumption reason");
     assert_eq!(replied.related_outreach_id, Some(outreach_id));
+
+    CompanyPersistence::delete(&persistence, company.id)
+        .await
+        .unwrap();
+}
+
+/// The outreach mail the agent sent lands in the thread *and* is marked as the question, in one
+/// transaction.
+///
+/// The mark is what stops the reply guard reading it as the answer this turn owed. Written
+/// separately, a failure between the two would leave an unmarked outreach mail in the thread, and
+/// the next attempt would find it, call the work done, and complete the task with no answer.
+#[tokio::test]
+async fn an_outreach_request_message_and_its_mark_land_together() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let (company, channel) = seed_company_and_channel(&persistence).await;
+    let thread = persistence
+        .create_thread(channel.id, "Need response", &[])
+        .await
+        .unwrap();
+    let task = persistence
+        .enqueue_task(NewTask::starting_new_chain(
+            company.id,
+            channel.id,
+            Some(thread.id),
+            "email_agent_dispatch",
+            serde_json::json!({}),
+        ))
+        .await
+        .unwrap();
+    let worker_id = Uuid::new_v4();
+    assert!(
+        persistence
+            .claim_task(
+                task.id,
+                worker_id,
+                chrono::Utc::now() + chrono::Duration::minutes(5),
+            )
+            .await
+            .unwrap()
+    );
+
+    let outbox_id = Uuid::new_v4();
+    persistence
+        .create_outreach_and_pause(CreateOutreachRequest {
+            correlation_id: CorrelationId::new(),
+            id: Uuid::new_v4(),
+            task_id: task.id,
+            company_id: company.id,
+            channel_id: channel.id,
+            worker_id,
+            outreach_key: format!("mark-{outbox_id}"),
+            required_threshold_percent: 100.0,
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
+            subject: "Question".into(),
+            body: "Please respond".into(),
+            targets: vec![crate::entities::outreach::OutreachTargetRequest {
+                email: "vendor@supplier.example".into(),
+                outbox_id,
+                outbox_payload: serde_json::json!({}),
+            }],
+        })
+        .await
+        .unwrap();
+
+    let trigger = persistence
+        .create_message(&email_write(EmailMessageDraft {
+            id: Uuid::new_v4(),
+            thread_id: thread.id,
+            message_id: format!("<trigger-{outbox_id}@example.com>").into(),
+            sender: "asker@example.com".into(),
+            subject: "Question".into(),
+            clean_text_body: "Please find out".into(),
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            ..EmailMessageDraft::default()
+        }))
+        .await
+        .unwrap();
+
+    let asked = persistence
+        .record_outreach_request_message(
+            outbox_id,
+            &email_write(EmailMessageDraft {
+                id: Uuid::new_v4(),
+                thread_id: thread.id,
+                message_id: format!("<outreach-{outbox_id}@mailagents.test>").into(),
+                sender: "support@acme.mailagents.test".into(),
+                recipients_to: vec!["vendor@supplier.example".into()],
+                subject: "Question".into(),
+                clean_text_body: "Please respond".into(),
+                direction: MessageDirection::Outbound,
+                role: MessageRole::Agent,
+                created_at: chrono::Utc::now() + chrono::Duration::seconds(1),
+                ..EmailMessageDraft::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    // The mail is in the thread, so somebody reading the conversation sees what was asked.
+    assert!(
+        persistence
+            .list_thread_message_views(thread.id)
+            .await
+            .unwrap()
+            .iter()
+            .any(|view| view.canonical_id == asked),
+        "the outreach's own mail belongs in the thread"
+    );
+    // And it is marked as the question, so the guard does not read it as the answer.
+    let marked: Option<Uuid> = sqlx::query_scalar(
+        "SELECT request_message_id FROM task_outreach_targets WHERE outbox_id = $1",
+    )
+    .bind(outbox_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(marked, Some(asked.as_uuid()));
+    assert!(
+        persistence
+            .find_outbound_reply_after(thread.id, trigger.canonical_id)
+            .await
+            .unwrap()
+            .is_none(),
+        "an outreach's own mail is the agent asking, not the agent answering"
+    );
 
     CompanyPersistence::delete(&persistence, company.id)
         .await

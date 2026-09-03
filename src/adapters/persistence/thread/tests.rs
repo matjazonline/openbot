@@ -444,7 +444,7 @@ async fn unreadable_stored_json_surfaces_as_an_application_error() {
 
     let read = fixture
         .persistence
-        .list_messages_by_thread_id(fixture.thread.id)
+        .list_thread_message_views(fixture.thread.id)
         .await;
     assert!(
         matches!(read, Err(AppError::Internal(_))),
@@ -597,6 +597,7 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
     let outreach = fixture
         .persistence
         .create_message(&MessageWrite {
+            id: CanonicalMessageId::random(),
             thread_id: fixture.thread.id,
             author: observed("primary@example.com", IdentityProvenance::Agent),
             subject: "Outreach".into(),
@@ -614,6 +615,10 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
         })
         .await
         .unwrap();
+    // The whole point of the canonical link: this message has an RFC id, but the guard is not
+    // going to look at it. Give the outreach target the *message*, and drop the outbox row's
+    // provider id entirely -- the exclusion must still hold.
+    let outreach_message_id = outreach.canonical_id;
 
     // Wire the outreach bookkeeping that marks this send as "the agent asking", not "the answer".
     let task_id = Uuid::new_v4();
@@ -648,24 +653,24 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
     sqlx::query(
         r#"INSERT INTO email_outbox (
                 id, company_id, channel_id, task_id, correlation_id, idempotency_key, payload,
-                status, provider_message_id
-           ) VALUES ($1, $2, $3, $4, gen_random_uuid(), $5, '{}', 'sent', $6)"#,
+                status
+           ) VALUES ($1, $2, $3, $4, gen_random_uuid(), $5, '{}', 'sent')"#,
     )
     .bind(outbox_id)
     .bind(fixture.company_id)
     .bind(fixture.channel_id)
     .bind(task_id)
     .bind(format!("outreach:{}:target:0", fixture.suffix))
-    .bind(&outreach_rfc)
     .execute(&fixture.pool)
     .await
     .unwrap();
     sqlx::query(
-        "INSERT INTO task_outreach_targets (outreach_id, email, outbox_id) \
-         VALUES ($1, 'target@partner.test', $2)",
+        "INSERT INTO task_outreach_targets (outreach_id, email, outbox_id, request_message_id) \
+         VALUES ($1, 'target@partner.test', $2, $3)",
     )
     .bind(outreach_id)
     .bind(outbox_id)
+    .bind(outreach_message_id.as_uuid())
     .execute(&fixture.pool)
     .await
     .unwrap();
@@ -683,6 +688,7 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
     let answer = fixture
         .persistence
         .create_message(&MessageWrite {
+            id: CanonicalMessageId::random(),
             thread_id: fixture.thread.id,
             author: observed("primary@example.com", IdentityProvenance::Agent),
             subject: "Re: Subject".into(),

@@ -518,7 +518,7 @@ impl ThreadUseCases {
             Some(thread) => {
                 let history = self
                     .thread_persistence
-                    .list_messages_by_thread_id(thread.id)
+                    .list_agent_history(thread.id)
                     .await?;
                 strip_quoted_history(draft, &history)
             }

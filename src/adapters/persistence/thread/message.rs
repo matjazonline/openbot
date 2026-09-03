@@ -16,7 +16,8 @@ use uuid::Uuid;
 use super::{email_metadata, external};
 use crate::{
     adapters::persistence::participant::{
-        ensure_system_principal_on, resolve_or_create_external_identity_on,
+        create_agent_principal_on, ensure_system_principal_on,
+        resolve_or_create_external_identity_on,
     },
     app_error::{AppError, AppResult},
     entities::{
@@ -223,7 +224,9 @@ fn decode_participants(value: Value) -> AppResult<Vec<MessageParticipant>> {
 ///
 /// Fallible on purpose: this is untrusted, long-lived JSON, and a shape a rolling deploy has not
 /// learned yet must surface as an application error rather than as a panic in a request handler.
-fn decode_attachments(value: Option<Value>) -> AppResult<Option<Vec<AttachmentMetadata>>> {
+pub(super) fn decode_attachments(
+    value: Option<Value>,
+) -> AppResult<Option<Vec<AttachmentMetadata>>> {
     let Some(value) = value.filter(|value| !value.is_null()) else {
         return Ok(None);
     };
@@ -299,6 +302,20 @@ pub(super) async fn resolve_author(
         }
         MessageAuthorWrite::Principal(principal_id) => Ok(ResolvedAuthor {
             principal_id: *principal_id,
+            identity_id: None,
+            identity: None,
+        }),
+        // Upserted rather than looked up: the principal is created with the agent, so this is the
+        // same row every time, and writing the current name here is what keeps a renamed agent
+        // from signing its next message with its old one.
+        MessageAuthorWrite::Agent(agent) => Ok(ResolvedAuthor {
+            principal_id: create_agent_principal_on(
+                connection,
+                company_id,
+                agent.agent_id,
+                &agent.display_label,
+            )
+            .await?,
             identity_id: None,
             identity: None,
         }),
@@ -407,11 +424,14 @@ pub(super) fn canonical_message_hash(
 /// dispatch commits its reply, its outbox row and its task payload as one transaction -- can reuse
 /// exactly this path rather than keep a second copy of it in step with this one.
 ///
-/// Returns the `thread_messages` row id.
+/// Returns both identities the write produced: the canonical payload and its association with
+/// this thread. Callers need different ones -- a reader loads by association, a caller attaching
+/// the same message to further threads needs the canonical id -- and deriving either from the
+/// other would be a second query.
 pub(crate) async fn insert_message_on(
     connection: &mut sqlx::PgConnection,
     write: &MessageWrite,
-) -> AppResult<Uuid> {
+) -> AppResult<InsertedMessage> {
     let scope = thread_scope(connection, write.thread_id).await?;
     let author = resolve_author(connection, scope.company_id, &write.author).await?;
     let participants = resolve_participants(connection, scope.company_id, write).await?;
@@ -465,14 +485,26 @@ pub(crate) async fn insert_message_on(
         .execute(&mut *connection)
         .await
         .map_err(AppError::from)?;
-    Ok(association_id)
+    Ok(InsertedMessage {
+        canonical_id,
+        association_id,
+    })
+}
+
+/// What one message write produced.
+///
+/// `canonical_id` is not always `MessageWrite::id`: a provider redelivery resolves to the message
+/// already stored under that key, and this is the id it actually has.
+pub(crate) struct InsertedMessage {
+    pub canonical_id: CanonicalMessageId,
+    pub association_id: Uuid,
 }
 
 /// Attach a canonical message that already exists to another thread.
 ///
 /// The composite foreign key on `thread_messages` is what enforces tenancy: naming a thread in
 /// another company fails the constraint rather than quietly widening who can read the message.
-pub(super) async fn associate_message_on(
+pub(crate) async fn associate_message_on(
     connection: &mut sqlx::PgConnection,
     thread_id: Uuid,
     message_id: CanonicalMessageId,
@@ -590,7 +622,7 @@ pub(super) async fn insert_canonical_message(
     attachments: Option<&Value>,
     content_hash: &[u8],
 ) -> AppResult<CanonicalMessageId> {
-    let id = CanonicalMessageId::random();
+    let id = write.id;
     sqlx::query(
         r#"INSERT INTO messages (
                 id, company_id, author_principal_id, authored_identity_id, subject,

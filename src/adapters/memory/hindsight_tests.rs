@@ -77,13 +77,14 @@ fn bank_ids_compose_the_company_namespace_with_the_scope() {
 #[test]
 fn the_widest_bank_id_we_generate_stays_inside_the_bound() {
     // The user scope is the worst case: a sha256 collection under a company namespace. Hindsight
-    // publishes no limit, so this pins the headroom we are actually relying on.
+    // publishes no limit, so this pins the headroom we are actually relying on. The collection is
+    // a fixed-width hash of the principal, so any principal gives the widest case.
     let scopes = resolve_scopes(
         false,
         false,
         true,
         None,
-        Some("a-very-long-sender-address@an-equally-long-domain.example.com"),
+        Some(crate::entities::transport::PrincipalId::random()),
     );
     let widest = HindsightProvider::bank_id(
         &remote_memory_database_id(Uuid::new_v4()),

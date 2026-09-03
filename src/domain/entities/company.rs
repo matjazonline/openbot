@@ -4,6 +4,7 @@ use uuid::Uuid;
 use crate::entities::{
     company_member::CompanyMembership,
     memory::MemoryProviderKind,
+    transport::PrincipalId,
     value_objects::{AvatarUrl, CompanySlug, EmailAddress, ModelName, ModelProvider},
 };
 
@@ -83,6 +84,14 @@ pub struct CompanyTeamAccount {
     pub email: EmailAddress,
     pub username: Option<String>,
     pub membership: CompanyMembership,
+    /// The company-scoped actor this account is, when it has one.
+    ///
+    /// Read alongside the account rather than looked up per caller: anything that has to *scope*
+    /// something to this person -- their memories, their thread participation, a schedule that
+    /// runs as them -- names the principal, and re-deriving it from the address at each call site
+    /// is how an address came to be used as a key. `None` for an account that has never been
+    /// observed in this company at all.
+    pub principal_id: Option<PrincipalId>,
 }
 
 impl CompanyTeamAccount {

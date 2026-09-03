@@ -14,6 +14,7 @@ use crate::{
             MemoryPersistenceMode, MemoryScope, deduplicate_chunks, resolve_scopes,
             stable_memory_id,
         },
+        transport::PrincipalId,
     },
     services::memory_provider::{
         MemoryAdditionalContext, MemoryConversation, MemoryPersistenceTarget,
@@ -29,7 +30,10 @@ pub struct MemoryRecallInput<'a> {
     pub company: &'a Company,
     pub channel: &'a Channel,
     pub agent: Option<&'a Agent>,
-    pub sender: Option<&'a str>,
+    /// Whose user-scoped memory this run may read: the *principal* asking, never the handle they
+    /// arrived under. A handle is a name; the principal is the actor, and one actor reached over
+    /// two transports must not have two memories.
+    pub subject_principal: Option<PrincipalId>,
     pub audience: MemoryRecallAudience,
     pub task_id: Uuid,
     pub latest_prompt: &'a str,
@@ -45,7 +49,8 @@ pub struct MemoryPersistInput<'a> {
     pub company: &'a Company,
     pub channel: &'a Channel,
     pub agent: Option<&'a Agent>,
-    pub sender: Option<&'a str>,
+    /// Whose user-scoped memory this run may write. See [`MemoryRecallInput::subject_principal`].
+    pub subject_principal: Option<PrincipalId>,
     pub task_id: Uuid,
     /// Original user and pipeline context only; never the recall-augmented model prompt.
     pub user_context: &'a str,
@@ -97,7 +102,7 @@ impl MemoryCoordinator {
             channel.retrieve_agent_memory,
             channel.retrieve_user_memory,
             Some(agent.id),
-            input.sender,
+            input.subject_principal,
         );
         for unavailable in resolution.unavailable {
             warn!(
@@ -230,7 +235,7 @@ impl MemoryCoordinator {
             channel.persist_agent_memory,
             channel.persist_user_memory,
             Some(agent.id),
-            input.sender,
+            input.subject_principal,
         );
         for unavailable in resolution.unavailable {
             warn!(
@@ -768,7 +773,7 @@ mod tests {
                 company: &company,
                 channel: &channel,
                 agent: None,
-                sender: Some("sender@example.com"),
+                subject_principal: Some(PrincipalId::random()),
                 audience: MemoryRecallAudience::MemberOrSystem,
                 task_id: Uuid::new_v4(),
                 latest_prompt: "hello",
@@ -780,7 +785,7 @@ mod tests {
                 company: &company,
                 channel: &channel,
                 agent: None,
-                sender: Some("sender@example.com"),
+                subject_principal: Some(PrincipalId::random()),
                 task_id: Uuid::new_v4(),
                 user_context: "hello",
                 final_answer: "hi",
@@ -820,7 +825,7 @@ mod tests {
                     company: &company,
                     channel: &channel,
                     agent: None,
-                    sender: None,
+                    subject_principal: None,
                     audience: MemoryRecallAudience::MemberOrSystem,
                     task_id: Uuid::new_v4(),
                     latest_prompt: "hello",
@@ -845,7 +850,7 @@ mod tests {
                 company: &company,
                 channel: &channel,
                 agent: Some(&agent),
-                sender: Some("external@example.com"),
+                subject_principal: Some(PrincipalId::random()),
                 audience: MemoryRecallAudience::External,
                 task_id: Uuid::new_v4(),
                 latest_prompt: "hello",
@@ -875,7 +880,7 @@ mod tests {
                 company: &company,
                 channel: &channel,
                 agent: None,
-                sender: None,
+                subject_principal: None,
                 audience: MemoryRecallAudience::MemberOrSystem,
                 task_id: Uuid::new_v4(),
                 latest_prompt: "scheduled",
@@ -887,7 +892,7 @@ mod tests {
                 company: &company,
                 channel: &channel,
                 agent: None,
-                sender: None,
+                subject_principal: None,
                 task_id: Uuid::new_v4(),
                 user_context: "scheduled",
                 final_answer: "done",
@@ -916,7 +921,7 @@ mod tests {
                 company: &company,
                 channel: &channel,
                 agent: Some(&agent),
-                sender: Some("user@example.com"),
+                subject_principal: Some(PrincipalId::random()),
                 task_id: Uuid::new_v4(),
                 user_context: "request",
                 final_answer: "answer",
@@ -949,7 +954,7 @@ mod tests {
                 company: &company,
                 channel: &channel,
                 agent: Some(&agent),
-                sender: Some("user@example.com"),
+                subject_principal: Some(PrincipalId::random()),
                 audience: MemoryRecallAudience::MemberOrSystem,
                 task_id: Uuid::new_v4(),
                 latest_prompt: "question",
@@ -961,7 +966,7 @@ mod tests {
                 company: &company,
                 channel: &channel,
                 agent: Some(&agent),
-                sender: Some("user@example.com"),
+                subject_principal: Some(PrincipalId::random()),
                 task_id: Uuid::new_v4(),
                 user_context: "question",
                 final_answer: "answer",
@@ -989,7 +994,7 @@ mod tests {
                 company: &company,
                 channel: &channel,
                 agent: Some(&agent),
-                sender: Some("user@example.com"),
+                subject_principal: Some(PrincipalId::random()),
                 task_id: Uuid::new_v4(),
                 user_context: "request",
                 final_answer: "answer",

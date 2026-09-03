@@ -3,7 +3,6 @@ use crate::entities::{
     agent::Agent,
     channel::Channel,
     company::Company,
-    message::Message,
     schedule::{
         ChannelSchedule, RunAsSelection, ScheduleDeliveryMode, ScheduleRun, ScheduleRunAsChoices,
         ScheduleType,
@@ -39,7 +38,7 @@ pub struct ScheduleThreadPaneProps<'a> {
     pub agent: Option<&'a Agent>,
     pub thread_id: Uuid,
     pub subject: &'a str,
-    pub messages: &'a [Message],
+    pub messages: &'a [ThreadMessageView],
 }
 
 pub struct ScheduleFormPaneProps<'a> {

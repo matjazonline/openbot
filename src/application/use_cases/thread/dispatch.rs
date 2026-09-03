@@ -26,11 +26,10 @@ use crate::{
         approval::ApprovalSubject,
         channel::{PUBLIC_PARTICIPANT, ParticipantAccess},
         correlation::CorrelationId,
-        email_message::EmailMessageMetadata,
         memory::{MAX_MEMORY_UPSTREAM_CONTEXT_CHARS, truncate_memory_text},
-        message::{MessageDirection, MessageParticipantKind, MessageRole},
-        participant::{IdentityClaimMetadata, IdentityProvenance},
+        message::{CanonicalMessageId, MessageDirection, MessageRole},
         task::TokenUsage,
+        transport::PrincipalId,
         value_objects::{EmailAddress, MessageId},
     },
     services::{
@@ -43,13 +42,12 @@ use crate::{
         outreach_tool::OutreachToolContext,
     },
     transport::InboundEnvelope,
-    use_cases::participant::IdentityObservation,
 };
 
 use super::{
-    AgentExecutionResult, ChannelMatch, InboundIngestResult, MessageAuthorWrite,
-    MessageCorrelation, MessageParticipantWrite, MessageWrite, PipelineStep, RecipientRole,
-    ReplyDelivery, ThreadUseCases, scrub_json_secrets,
+    AgentAuthor, AgentExecutionResult, ChannelMatch, InboundIngestResult, MessageAuthorWrite,
+    MessageCorrelation, MessageWrite, PipelineStep, RecipientRole, ReplyDelivery, ThreadUseCases,
+    scrub_json_secrets,
     support::{DirectoryCache, build_prompt_text, outbound_reference_ids, rfc_message_id},
 };
 
@@ -109,6 +107,11 @@ fn guardrail_may_be_skipped(access: &ParticipantAccess, envelope: &InboundEnvelo
 
 /// The RFC id an outbound reply answers.
 ///
+/// One of the three helpers below that are deliberately email-shaped: they build the *delivery
+/// intent* -- the `In-Reply-To`, the `From` and the `Cc` a mail goes out with -- and no longer
+/// touch the stored reply, which carries none of it. They are here rather than in the mail adapter
+/// only until the generic delivery model gives them somewhere better to live.
+///
 /// A transport with no message key of its own is unreachable here -- every dispatch answers
 /// something that arrived -- so the source key is used directly rather than defaulted.
 fn trigger_message_id(envelope: &InboundEnvelope) -> MessageId {
@@ -143,6 +146,9 @@ fn reply_subject(subject: &str) -> String {
 struct AgentOutput<'a> {
     channel_match: &'a ChannelMatch,
     agent: Option<Agent>,
+    /// The actor this turn is attributed to, so persisting memory names the same principal recall
+    /// read from rather than re-deriving it from a handle.
+    subject_principal: Option<PrincipalId>,
     memory_user_context: String,
     content: String,
     metadata: Option<serde_json::Value>,
@@ -181,18 +187,29 @@ struct PreparedDispatch {
     delivery: OutboundDelivery,
     /// `None` for a simulated run, and for a task-less caller that already sent inline.
     outbound: Option<OutboundSend>,
-    messages: Vec<MessageWrite>,
+    reply: AgentReply,
+}
+
+/// The agent's answer: one canonical message, and every other thread it also answered.
+///
+/// The split is the point. `message` is written once; `also_in_threads` gets associations onto
+/// that same row, so three channels reading the same answer are reading one message rather than
+/// three copies that have to be kept byte-identical to stay recognisable as one.
+pub struct AgentReply {
+    pub message: MessageWrite,
+    pub also_in_threads: Vec<Uuid>,
 }
 
 /// The outbound side of the reply, real or simulated.
+///
+/// What the *message* takes from a delivery, and nothing else. The addresses, the RFC ids and the
+/// recipient lines used to travel through here on their way onto the stored reply; they now stop
+/// at the delivery intent, which is where a fact about how an answer was sent belongs.
 struct OutboundDelivery {
-    message_id: String,
-    in_reply_to: String,
-    references: Vec<String>,
-    from_address: String,
-    recipients_to: Vec<String>,
-    recipients_cc: Vec<String>,
+    /// The subject the answer went out under, which is also the subject it is filed under.
     subject: String,
+    /// Whether anything was really handed to a transport. A simulated run answers in the thread
+    /// and sends nothing, and the audit payload has to be able to say so.
     email_sent: bool,
 }
 
@@ -204,6 +221,21 @@ struct AgentDelivery<'a> {
     response: &'a str,
     mode: ReplyDeliveryMode,
     correlation_id: CorrelationId,
+}
+
+/// What the task's audit payload is assembled from.
+///
+/// A struct because seven arguments of which three are references to run state is exactly the
+/// call site nobody can read -- and because `response` and the delivery's own subject are both
+/// `&str`.
+struct DispatchAudit<'a, 'run> {
+    ingest: &'a InboundIngestResult,
+    envelope: &'a InboundEnvelope,
+    run: &'a AgentRun<'run>,
+    reply: &'a AgentReply,
+    delivery: &'a OutboundDelivery,
+    response: &'a str,
+    metadata: &'a Option<serde_json::Value>,
 }
 
 struct DispatchCommitInput<'a, 'run> {
@@ -283,9 +315,15 @@ impl ThreadUseCases {
                 correlation_id,
             })
             .await?;
-        let messages = Self::outbound_messages(&matches, &delivery, &response, correlation_id)?;
+        let reply = Self::agent_reply_write(
+            &matches,
+            run.primary_agent.as_ref(),
+            &delivery,
+            &response,
+            correlation_id,
+        )?;
 
-        let outbound_message_id = delivery.message_id.clone();
+        let reply_message_id = reply.message.id;
         let email_sent = delivery.email_sent;
         self.commit_dispatch(DispatchCommitInput {
             ingest,
@@ -295,16 +333,16 @@ impl ThreadUseCases {
             commit: PreparedDispatch {
                 delivery,
                 outbound,
-                messages,
+                reply,
             },
             response: &response,
             metadata: &metadata,
         })
         .await?;
-        self.persist_memories(ingest, envelope, &run).await;
+        self.persist_memories(ingest, &run).await;
 
         Ok(DispatchOutcome::Replied(Box::new(AgentExecutionResult {
-            outbound_message_id: Some(outbound_message_id),
+            reply_message_id: Some(reply_message_id),
             agent_response: response,
             email_sent,
             token_usage: Some(TokenUsage::new(run.prompt_tokens, run.completion_tokens)),
@@ -335,7 +373,7 @@ impl ThreadUseCases {
         for (index, channel_match) in matches.iter().enumerate() {
             let history = self
                 .thread_persistence
-                .list_messages_by_thread_id(channel_match.thread.id)
+                .list_agent_history(channel_match.thread.id)
                 .await?;
             let agent = Some(
                 self.first_agent_for(channel_match, &mut agent_cache)
@@ -354,12 +392,14 @@ impl ThreadUseCases {
                 run.primary_agent = agent.clone();
             }
 
-            let sender = envelope.author.subject().as_str();
             let prompt_text = build_prompt_text(envelope);
             let context = self
                 .observe_ingress_identity(channel_match.company.id, &envelope.author)
                 .await?;
             let membership = context.membership;
+            // The actor behind the handle, resolved once here. Memory is scoped to it and nothing
+            // downstream reads the handle string as a key.
+            let subject_principal = context.principal_id;
             let access = channel_match.channel.participant_access(context);
 
             let upstream_context = self
@@ -380,7 +420,7 @@ impl ThreadUseCases {
                         company: &channel_match.company,
                         channel: &channel_match.channel,
                         agent: agent.as_ref(),
-                        sender: Some(sender),
+                        subject_principal,
                         audience: if membership.is_team() {
                             MemoryRecallAudience::MemberOrSystem
                         } else {
@@ -438,7 +478,10 @@ impl ThreadUseCases {
                         );
                         // The address book only makes sense alongside the tool that uses it.
                         if let Some(agent_persistence) = self.agent_persistence() {
-                            runner = runner.agent_directory(agent_persistence.clone());
+                            runner = runner.agent_directory(
+                                agent_persistence.clone(),
+                                self.binding_persistence.clone(),
+                            );
                         }
                         if let (Some(provisioning), Some(agent)) =
                             (self.agent_channel_provisioning.clone(), agent.as_ref())
@@ -492,6 +535,7 @@ impl ThreadUseCases {
                     run.outputs.push(AgentOutput {
                         channel_match,
                         agent,
+                        subject_principal,
                         memory_user_context,
                         content: output.content,
                         metadata: output.metadata,
@@ -511,26 +555,20 @@ impl ThreadUseCases {
         Ok(Some(run))
     }
 
-    async fn persist_memories(
-        &self,
-        ingest: &InboundIngestResult,
-        envelope: &InboundEnvelope,
-        run: &AgentRun<'_>,
-    ) {
+    async fn persist_memories(&self, ingest: &InboundIngestResult, run: &AgentRun<'_>) {
         if run.failure.is_some() {
             return;
         }
         let (Some(memory), Some(task_id)) = (self.memory.as_ref(), ingest.task_id) else {
             return;
         };
-        let sender = envelope.author.subject().as_str();
         for output in &run.outputs {
             memory
                 .persist(MemoryPersistInput {
                     company: &output.channel_match.company,
                     channel: &output.channel_match.channel,
                     agent: output.agent.as_ref(),
-                    sender: Some(sender),
+                    subject_principal: output.subject_principal,
                     task_id,
                     user_context: &output.memory_user_context,
                     final_answer: &output.content,
@@ -784,24 +822,6 @@ impl ThreadUseCases {
 
         Ok((
             OutboundDelivery {
-                message_id: sent.outbound_message_id.into_string(),
-                in_reply_to: sent.in_reply_to.into_string(),
-                references: sent
-                    .references
-                    .into_iter()
-                    .map(MessageId::into_string)
-                    .collect(),
-                from_address: sent.from_address.into_string(),
-                recipients_to: sent
-                    .recipients_to
-                    .into_iter()
-                    .map(EmailAddress::into_string)
-                    .collect(),
-                recipients_cc: sent
-                    .recipients_cc
-                    .into_iter()
-                    .map(EmailAddress::into_string)
-                    .collect(),
                 subject: sent.subject,
                 email_sent: true,
             },
@@ -954,98 +974,77 @@ impl ThreadUseCases {
         primary: &ChannelMatch,
         envelope: &InboundEnvelope,
     ) -> AppResult<OutboundDelivery> {
-        let message_id = format!(
-            "<simulated-test-{}@{}>",
-            Uuid::new_v4(),
-            self.config.app_domain_name
-        );
         info!(
-            "Simulation test mode (Run_Test): Skipped SMTP email dispatch for Message-ID {message_id}"
+            channel = %primary.channel.slug,
+            "Simulation test mode (Run_Test): skipped SMTP dispatch for the agent reply"
         );
         Ok(OutboundDelivery {
-            message_id,
-            in_reply_to: trigger_message_id(envelope).into_string(),
-            references: outbound_reference_ids(envelope)
-                .into_iter()
-                .map(MessageId::into_string)
-                .collect(),
-            from_address: format!(
-                "{}@{}.{}",
-                primary.reply_slug(),
-                primary.company.slug,
-                self.config.app_domain_name
-            ),
-            recipients_to: vec![envelope.author.subject().as_str().to_string()],
-            recipients_cc: self.outbound_cc_for(primary, envelope).await?,
             subject: reply_subject(envelope.content.subject()),
             email_sent: false,
         })
     }
 
-    /// The reply as it will be stored in every thread it answered, so each channel's history
-    /// stays complete.
+    /// The agent's answer, as one canonical message associated with every thread it answered.
     ///
-    /// Built rather than written: these go into the dispatch commit alongside the outbox row and
+    /// One message, not one per channel. A dispatch that answered three channels' threads used to
+    /// write three canonical rows carrying the same body and the same RFC `Message-ID`, which made
+    /// "the reply" three different things to anything reading it back and forced the outbound
+    /// header into the message model to keep them recognisable as one.
+    ///
+    /// So the header is gone from here: the reply is authored by the *agent's* principal, over no
+    /// transport, and everything about how it goes out -- the sender address, the To and Cc lines,
+    /// the RFC ids -- belongs to the delivery intent that carries it. A reply that also goes to
+    /// Slack is then the same message with a second intent, rather than a second body.
+    ///
+    /// Built rather than written: this goes into the dispatch commit alongside the outbox row and
     /// the task payload, because a reply visible in a thread but never queued for delivery -- or
     /// queued but invisible -- is worse than neither.
-    fn outbound_messages(
+    fn agent_reply_write(
         matches: &[ChannelMatch],
+        agent: Option<&Agent>,
         delivery: &OutboundDelivery,
         response: &str,
         correlation_id: CorrelationId,
-    ) -> AppResult<Vec<MessageWrite>> {
-        let metadata = EmailMessageMetadata::new(MessageId::from(delivery.message_id.clone()))
-            .in_reply_to(Some(MessageId::from(delivery.in_reply_to.clone())))
-            .references(
-                delivery
-                    .references
-                    .iter()
-                    .cloned()
-                    .map(MessageId::from)
-                    .collect(),
-            );
-        let sender = super::qualified_email_identity(delivery.from_address.clone())?;
-        let mut participants = vec![MessageParticipantWrite::new(
-            MessageParticipantKind::Sender,
-            sender.clone(),
-        )];
-        for (kind, addresses) in [
-            (MessageParticipantKind::To, &delivery.recipients_to),
-            (MessageParticipantKind::Cc, &delivery.recipients_cc),
-        ] {
-            for address in addresses {
-                participants.push(MessageParticipantWrite::new(
-                    kind,
-                    super::qualified_email_identity(address.clone())?,
-                ));
-            }
-        }
+    ) -> AppResult<AgentReply> {
+        let primary = matches.first().ok_or_else(|| {
+            AppError::Internal("An agent dispatch answered no channel at all".into())
+        })?;
+        // An agent ran, so there is an agent to attribute the answer to. Falling back to the
+        // platform's system principal rather than to the channel's mailbox keeps the claim honest
+        // when a run somehow produced an answer without one.
+        let author = match agent {
+            Some(agent) => MessageAuthorWrite::Agent(AgentAuthor {
+                agent_id: agent.id,
+                display_label: agent.name.clone(),
+            }),
+            None => MessageAuthorWrite::Platform,
+        };
 
-        matches
-            .iter()
-            .map(|channel_match| {
-                Ok(MessageWrite {
-                    thread_id: channel_match.thread.id,
-                    // The channel's own address is the handle the reply went out under; the
-                    // principal behind it is resolved by the writer.
-                    author: MessageAuthorWrite::Observed(IdentityObservation {
-                        identity: sender.clone(),
-                        display_label: Some(channel_match.channel.name.clone()),
-                        claim_metadata: IdentityClaimMetadata::observation(),
-                        provenance: IdentityProvenance::Agent,
-                    }),
-                    subject: delivery.subject.clone(),
-                    clean_text_body: response.to_string(),
-                    attachments: Vec::new(),
-                    direction: MessageDirection::Outbound,
-                    role: MessageRole::Agent,
-                    correlation_id,
-                    participants: participants.clone(),
-                    correlation: MessageCorrelation::Email(metadata.clone()),
-                    created_at: chrono::Utc::now(),
-                })
-            })
-            .collect()
+        let message = MessageWrite {
+            id: CanonicalMessageId::random(),
+            thread_id: primary.thread.id,
+            author,
+            subject: delivery.subject.clone(),
+            clean_text_body: response.to_string(),
+            attachments: Vec::new(),
+            direction: MessageDirection::Outbound,
+            role: MessageRole::Agent,
+            correlation_id,
+            // No sender/to/cc rows: who this went out to is a fact of the delivery, and the
+            // delivery holds it. A reply fanned out to two transports has two recipient lists and
+            // one body.
+            participants: Vec::new(),
+            correlation: MessageCorrelation::Internal,
+            created_at: chrono::Utc::now(),
+        };
+
+        Ok(AgentReply {
+            also_in_threads: matches[1..]
+                .iter()
+                .map(|channel_match| channel_match.thread.id)
+                .collect(),
+            message,
+        })
     }
 
     /// Make this dispatch durable: the reply in every thread it answered, the outbox row that
@@ -1066,26 +1065,39 @@ impl ThreadUseCases {
         let PreparedDispatch {
             delivery,
             outbound,
-            messages,
+            reply,
         } = commit;
 
         // A task-less caller (direct ingest) has no lease to fence on and no payload to write, so
         // its reply is stored on its own. It also has no outbox row: it sent inline.
         let Some(task_id) = ingest.task_id else {
-            for message in &messages {
-                self.thread_persistence.create_message(message).await?;
+            let stored = self
+                .thread_persistence
+                .create_message(&reply.message)
+                .await?;
+            for thread_id in &reply.also_in_threads {
+                self.thread_persistence
+                    .associate_message(*thread_id, stored.canonical_id)
+                    .await?;
             }
             return Ok(());
         };
 
-        let payload =
-            self.dispatch_audit_payload(ingest, envelope, run, &delivery, response, metadata);
+        let payload = self.dispatch_audit_payload(DispatchAudit {
+            ingest,
+            envelope,
+            run,
+            reply: &reply,
+            delivery: &delivery,
+            response,
+            metadata,
+        });
 
         match self
             .task_persistence
             .commit_agent_dispatch(AgentDispatchCommit {
                 lease,
-                messages: &messages,
+                reply: &reply,
                 outbound,
                 payload,
                 complete_outreach: true,
@@ -1111,15 +1123,16 @@ impl ThreadUseCases {
         }
     }
 
-    fn dispatch_audit_payload(
-        &self,
-        ingest: &InboundIngestResult,
-        envelope: &InboundEnvelope,
-        run: &AgentRun<'_>,
-        delivery: &OutboundDelivery,
-        response: &str,
-        metadata: &Option<serde_json::Value>,
-    ) -> serde_json::Value {
+    fn dispatch_audit_payload(&self, audit: DispatchAudit<'_, '_>) -> serde_json::Value {
+        let DispatchAudit {
+            ingest,
+            envelope,
+            run,
+            reply,
+            delivery,
+            response,
+            metadata,
+        } = audit;
         let execution_parameters = match &run.primary_params {
             Some(params) => {
                 let mut config = params.config().clone();
@@ -1143,7 +1156,10 @@ impl ThreadUseCases {
         let mut execution_result = serde_json::json!({
             "response": response,
             "email_sent": delivery.email_sent,
-            "outbound_message_id": delivery.message_id,
+            // The canonical reply, named by the id it is about to be written under in this same
+            // transaction. The mail this run also queued is named by its own delivery key, which
+            // belongs to the outbox row rather than to the message.
+            "reply_message_id": reply.message.id,
             "error": run.failure.as_ref().map(ToString::to_string),
             "token_usage": TokenUsage::new(run.prompt_tokens, run.completion_tokens),
         });
@@ -1281,5 +1297,231 @@ mod guardrail_trust_tests {
     fn an_untrusted_sender_never_skips_it() {
         assert!(!guardrail_may_be_skipped(&access(false), &envelope(false)));
         assert!(!guardrail_may_be_skipped(&access(false), &envelope(true)));
+    }
+}
+
+#[cfg(test)]
+mod agent_reply_tests {
+    use super::*;
+    use crate::entities::{
+        channel::{Channel, ChannelAccessMode},
+        company::Company,
+        creation::CreationProvenance,
+        thread::Thread,
+    };
+
+    fn company() -> Company {
+        Company {
+            channel_defaults: Default::default(),
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme".into(),
+            slug: "acme".into(),
+            enable_llm_spam_guardrail: None,
+            avatar_url: None,
+            memory_provider: None,
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    fn channel(company_id: Uuid, slug: &str) -> Channel {
+        Channel {
+            owner_agent_id: None,
+            enabled: true,
+            add_3rd_party: true,
+            id: Uuid::new_v4(),
+            company_id,
+            name: slug.to_string(),
+            description: None,
+            slug: slug.into(),
+            alias_slugs: Vec::new(),
+            participant_emails: None,
+            access_mode: ChannelAccessMode::Team,
+            principal_grants: Vec::new(),
+            agent_ids: Some(vec![Uuid::new_v4()]),
+            retrieve_company_memory: false,
+            retrieve_agent_memory: false,
+            retrieve_user_memory: false,
+            persist_company_memory: false,
+            persist_agent_memory: false,
+            persist_user_memory: false,
+            created_by: CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    fn matched(company: &Company, slug: &str, index: usize, total: usize) -> ChannelMatch {
+        let channel = channel(company.id, slug);
+        let thread = Thread {
+            id: Uuid::new_v4(),
+            channel_id: channel.id,
+            subject: "Hello".into(),
+            participant_principal_ids: Vec::new(),
+            participant_projection: Default::default(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        ChannelMatch {
+            company: company.clone(),
+            channel,
+            matched_slug: None,
+            inbound_message: super::super::test_support::stored_email(
+                super::super::test_support::EmailMessageDraft {
+                    thread_id: thread.id,
+                    ..Default::default()
+                },
+            ),
+            thread,
+            recipient_role: RecipientRole::To,
+            step: PipelineStep { index, total },
+        }
+    }
+
+    fn agent(id: Uuid) -> Agent {
+        Agent {
+            memory_enabled: false,
+            id,
+            company_id: Some(Uuid::new_v4()),
+            name: "Triage Agent".into(),
+            slug: "triage".into(),
+            provider: None,
+            model: None,
+            run_timeout_secs: None,
+            system_prompt: None,
+            description: None,
+            config_json: None,
+            avatar_url: None,
+            memory_persistence_mode: Default::default(),
+            memory_recall_mode: Default::default(),
+            memory_max_results: crate::entities::memory::default_memory_max_results(),
+            created_by: CreationProvenance::system(),
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    fn delivery() -> OutboundDelivery {
+        OutboundDelivery {
+            subject: "Re: Hello".into(),
+            email_sent: true,
+        }
+    }
+
+    /// The heart of it: three channels' threads answered by one canonical message, associated
+    /// three times. Three writes carrying the same body -- and, before this, the same RFC
+    /// `Message-ID` -- made "the reply" three different rows that anything reading it back had to
+    /// keep in step by hand.
+    #[test]
+    fn one_dispatch_produces_one_canonical_reply_and_one_association_per_answered_thread() {
+        let company = company();
+        let matches = vec![
+            matched(&company, "support", 0, 3),
+            matched(&company, "billing", 1, 3),
+            matched(&company, "legal", 2, 3),
+        ];
+        let responder = agent(Uuid::new_v4());
+
+        let reply = ThreadUseCases::agent_reply_write(
+            &matches,
+            Some(&responder),
+            &delivery(),
+            "Here is the answer.",
+            CorrelationId::new(),
+        )
+        .unwrap();
+
+        assert_eq!(reply.message.thread_id, matches[0].thread.id);
+        assert_eq!(
+            reply.also_in_threads,
+            vec![matches[1].thread.id, matches[2].thread.id]
+        );
+        assert_eq!(reply.message.clean_text_body, "Here is the answer.");
+        assert_eq!(reply.message.subject, "Re: Hello");
+    }
+
+    /// Attribution is the agent's own principal. It used to be the channel's mailbox, observed as
+    /// an external identity -- which made every agent in a channel one actor, and made the actor a
+    /// mailbox.
+    #[test]
+    fn the_reply_is_attributed_to_the_agent_that_wrote_it() {
+        let company = company();
+        let matches = vec![matched(&company, "support", 0, 1)];
+        let agent_id = Uuid::new_v4();
+
+        let reply = ThreadUseCases::agent_reply_write(
+            &matches,
+            Some(&agent(agent_id)),
+            &delivery(),
+            "Answer",
+            CorrelationId::new(),
+        )
+        .unwrap();
+
+        match &reply.message.author {
+            MessageAuthorWrite::Agent(author) => {
+                assert_eq!(author.agent_id, agent_id);
+                assert_eq!(author.display_label, "Triage Agent");
+            }
+            other => panic!("expected an agent author, got {other:?}"),
+        }
+    }
+
+    /// A run that somehow produced an answer with no agent behind it is attributed to the
+    /// platform, not to a mailbox invented for the occasion.
+    #[test]
+    fn an_answer_with_no_agent_behind_it_is_attributed_to_the_platform() {
+        let company = company();
+        let matches = vec![matched(&company, "support", 0, 1)];
+
+        let reply = ThreadUseCases::agent_reply_write(
+            &matches,
+            None,
+            &delivery(),
+            "Answer",
+            CorrelationId::new(),
+        )
+        .unwrap();
+
+        assert!(matches!(reply.message.author, MessageAuthorWrite::Platform));
+    }
+
+    /// Nothing about how the answer went out is on the message: no headers, no sender, no `To`.
+    /// Those are facts of the delivery, and the delivery intent holds them -- which is what lets
+    /// one reply be delivered over two transports without becoming two bodies.
+    #[test]
+    fn the_reply_carries_no_transport_facts_at_all() {
+        let company = company();
+        let matches = vec![matched(&company, "support", 0, 1)];
+
+        let reply = ThreadUseCases::agent_reply_write(
+            &matches,
+            Some(&agent(Uuid::new_v4())),
+            &delivery(),
+            "Answer",
+            CorrelationId::new(),
+        )
+        .unwrap();
+
+        assert!(matches!(
+            reply.message.correlation,
+            MessageCorrelation::Internal
+        ));
+        assert_eq!(reply.message.email_metadata(), None);
+        assert!(reply.message.participants.is_empty());
+    }
+
+    /// A dispatch that answered nothing has no thread to file a reply in, and says so rather than
+    /// writing one somewhere arbitrary.
+    #[test]
+    fn a_dispatch_that_answered_no_channel_is_an_error() {
+        assert!(
+            ThreadUseCases::agent_reply_write(
+                &[],
+                None,
+                &delivery(),
+                "Answer",
+                CorrelationId::new(),
+            )
+            .is_err()
+        );
     }
 }
