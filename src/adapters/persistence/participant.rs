@@ -367,6 +367,32 @@ pub(crate) async fn create_person_principal_on(
     Ok(principal_id)
 }
 
+/// The company's one system principal: the platform itself, as an author.
+///
+/// A schedule that runs for nobody in particular and an approval note are said by the platform,
+/// not by a mailbox, so they are attributed here rather than to a synthesized channel address.
+/// Idempotent by `principals_company_system_key`, so every such message across the company's whole
+/// history is attributed to the same actor.
+pub(crate) async fn ensure_system_principal_on(
+    connection: &mut sqlx::PgConnection,
+    company_id: Uuid,
+) -> AppResult<PrincipalId> {
+    let id = PrincipalId::random();
+    let stored: Uuid = sqlx::query_scalar(
+        r#"INSERT INTO principals (id, company_id, kind, display_label)
+           VALUES ($1, $2, 'system', 'System')
+           ON CONFLICT (company_id) WHERE kind = 'system'
+           DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+           RETURNING id"#,
+    )
+    .bind(id.as_uuid())
+    .bind(company_id)
+    .fetch_one(&mut *connection)
+    .await
+    .map_err(AppError::from)?;
+    Ok(PrincipalId::new(stored))
+}
+
 pub(crate) async fn create_agent_principal_on(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,

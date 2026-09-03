@@ -9,16 +9,15 @@ use crate::entities::company_member::CompanyMembership;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::task::NewTask;
 use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
-use crate::entities::thread::ThreadParticipantProjection;
-use crate::entities::transport::PrincipalId;
 use crate::services::email_parser::{EmailParser, MAX_CHANNEL_HOPS};
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::CompanyWrite;
 use crate::use_cases::participant::test_support::{
     InMemoryParticipantDirectory, TeamFixture, email_allowlist_grants, email_allowlist_policy,
-    principal_for_email,
 };
+use crate::use_cases::thread::test_support::InMemoryThreads;
+use crate::use_cases::thread::test_support::{EmailMessageDraft, email_write};
 use chrono::Utc;
 use std::sync::Mutex;
 
@@ -241,258 +240,6 @@ impl ChannelPersistence for MockChannelPersistence {
     }
 }
 
-struct MockThreadPersistence {
-    /// The tenant every thread here belongs to. Real persistence reads it off the channel; the
-    /// mock is told, because principal ids are company-scoped and the fixtures must agree with
-    /// the channel grants they seeded.
-    company_id: Uuid,
-    threads: Mutex<Vec<Thread>>,
-    messages: Mutex<Vec<Message>>,
-}
-
-impl MockThreadPersistence {
-    fn new(company_id: Uuid) -> Self {
-        Self {
-            company_id,
-            threads: Mutex::new(Vec::new()),
-            messages: Mutex::new(Vec::new()),
-        }
-    }
-
-    fn participants(&self, participant_emails: &[EmailAddress]) -> ThreadParticipants {
-        ThreadParticipants {
-            principal_ids: participant_emails
-                .iter()
-                .map(|email| principal_for_email(self.company_id, email))
-                .collect(),
-            projection: ThreadParticipantProjection {
-                email_addresses: participant_emails.to_vec(),
-            },
-        }
-    }
-}
-
-/// The two halves `insert_thread_email_principals` writes: the stable ids policy reads, and the
-/// address projection the UI and email delivery render.
-struct ThreadParticipants {
-    principal_ids: Vec<PrincipalId>,
-    projection: ThreadParticipantProjection,
-}
-
-#[async_trait]
-impl ThreadPersistence for MockThreadPersistence {
-    async fn create_thread(
-        &self,
-        channel_id: Uuid,
-        subject: &str,
-        participant_emails: &[EmailAddress],
-    ) -> AppResult<Thread> {
-        let participants = self.participants(participant_emails);
-        let thread = Thread {
-            id: Uuid::new_v4(),
-            channel_id,
-            subject: subject.to_string(),
-            participant_principal_ids: participants.principal_ids,
-            participant_projection: participants.projection,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
-        self.threads.lock().unwrap().push(thread.clone());
-        Ok(thread)
-    }
-
-    async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>> {
-        Ok(self
-            .threads
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|t| t.id == id)
-            .cloned())
-    }
-
-    async fn list_threads_by_channel_id(
-        &self,
-        channel_id: Uuid,
-        before: Option<ThreadCursor>,
-        limit: usize,
-    ) -> AppResult<Vec<Thread>> {
-        let mut threads: Vec<_> = self
-            .threads
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|thread| thread.channel_id == channel_id)
-            .filter(|thread| {
-                before.is_none_or(|cursor| {
-                    (thread.updated_at, thread.id) < (cursor.updated_at, cursor.id)
-                })
-            })
-            .cloned()
-            .collect();
-        threads.sort_by_key(|thread| std::cmp::Reverse((thread.updated_at, thread.id)));
-        threads.truncate(limit);
-        Ok(threads)
-    }
-
-    async fn list_threads_updated_after(
-        &self,
-        channel_id: Uuid,
-        after: Option<ThreadCursor>,
-        limit: usize,
-    ) -> AppResult<Vec<Thread>> {
-        let mut threads: Vec<Thread> = self
-            .threads
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|t| t.channel_id == channel_id)
-            .filter(|t| after.is_none_or(|cursor| t.cursor() > cursor))
-            .cloned()
-            .collect();
-        threads.sort_by_key(|t| t.cursor());
-        threads.truncate(limit);
-        Ok(threads)
-    }
-
-    async fn update_thread_participants(
-        &self,
-        id: Uuid,
-        participant_emails: &[EmailAddress],
-    ) -> AppResult<Thread> {
-        let participants = self.participants(participant_emails);
-        let mut list = self.threads.lock().unwrap();
-        let thread = list.iter_mut().find(|t| t.id == id).unwrap();
-        thread.participant_principal_ids = participants.principal_ids;
-        thread.participant_projection = participants.projection;
-        Ok(thread.clone())
-    }
-
-    async fn find_thread_by_message_ids(
-        &self,
-        channel_id: Uuid,
-        message_ids: &[MessageId],
-    ) -> AppResult<Option<Thread>> {
-        let thread_id = {
-            let msgs = self.messages.lock().unwrap();
-            msgs.iter()
-                .find(|m| message_ids.contains(&m.message_id))
-                .map(|m| m.thread_id)
-        };
-        if let Some(tid) = thread_id {
-            return Ok(self
-                .get_thread_by_id(tid)
-                .await?
-                .filter(|thread| thread.channel_id == channel_id));
-        }
-        Ok(None)
-    }
-
-    async fn find_thread_by_thread_index(
-        &self,
-        channel_id: Uuid,
-        thread_index: &ThreadIndex,
-    ) -> AppResult<Option<Thread>> {
-        let ancestors = thread_index.ancestor_chain().unwrap_or_default();
-        let thread_id = {
-            let msgs = self.messages.lock().unwrap();
-            msgs.iter()
-                .filter(|message| {
-                    message
-                        .thread_index
-                        .as_ref()
-                        .is_some_and(|stored| ancestors.contains(stored))
-                })
-                .max_by_key(|message| message.thread_index.as_ref().map_or(0, |index| index.len()))
-                .map(|m| m.thread_id)
-        };
-        if let Some(tid) = thread_id {
-            return Ok(self
-                .get_thread_by_id(tid)
-                .await?
-                .filter(|thread| thread.channel_id == channel_id));
-        }
-        Ok(None)
-    }
-
-    async fn count_recent_messages(
-        &self,
-        thread_id: Uuid,
-        _duration_secs: i64,
-    ) -> AppResult<usize> {
-        let msgs = self.messages.lock().unwrap();
-        Ok(msgs.iter().filter(|m| m.thread_id == thread_id).count())
-    }
-
-    async fn create_message(&self, message: &Message) -> AppResult<Message> {
-        self.messages.lock().unwrap().push(message.clone());
-        Ok(message.clone())
-    }
-
-    async fn get_message_by_message_id(
-        &self,
-        _company_id: Uuid,
-        message_id: &MessageId,
-    ) -> AppResult<Option<Message>> {
-        Ok(self
-            .messages
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|m| &m.message_id == message_id)
-            .cloned())
-    }
-
-    async fn find_outbound_reply(
-        &self,
-        thread_id: Uuid,
-        in_reply_to: &MessageId,
-    ) -> AppResult<Option<Message>> {
-        Ok(self
-            .messages
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|message| {
-                message.thread_id == thread_id
-                    && message.direction == MessageDirection::Outbound
-                    && message.in_reply_to.as_ref() == Some(in_reply_to)
-            })
-            .cloned())
-    }
-
-    async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-        Ok(self
-            .messages
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|m| m.thread_id == thread_id)
-            .cloned()
-            .collect())
-    }
-
-    async fn list_messages_after(
-        &self,
-        thread_id: Uuid,
-        after: Option<MessageCursor>,
-        limit: usize,
-    ) -> AppResult<Vec<Message>> {
-        let mut messages: Vec<Message> = self
-            .messages
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|m| m.thread_id == thread_id)
-            .filter(|m| after.is_none_or(|cursor| m.cursor() > cursor))
-            .cloned()
-            .collect();
-        messages.sort_by_key(|m| m.cursor());
-        messages.truncate(limit);
-        Ok(messages)
-    }
-}
-
 #[derive(Default)]
 struct MockTaskPersistence {
     tasks: Mutex<Vec<crate::entities::task::BackgroundTask>>,
@@ -503,7 +250,7 @@ struct MockTaskPersistence {
     /// Reply messages committed through `commit_agent_dispatch`. They arrive here rather than at
     /// the thread double because the dispatch commits them as one transaction with the outbox
     /// row and the task payload.
-    committed_messages: Mutex<Vec<Message>>,
+    committed_messages: Mutex<Vec<MessageWrite>>,
 }
 
 struct MockAgentPersistence {
@@ -635,6 +382,7 @@ impl TaskPersistence for MockTaskPersistence {
             thread_id,
             task_type,
             payload,
+            source: _,
             correlation_id,
         }: NewTask,
     ) -> AppResult<crate::entities::task::BackgroundTask> {
@@ -950,7 +698,7 @@ async fn test_inter_channel_hop_limit_rejection() {
         ]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1070,7 +818,7 @@ async fn test_spf_authentication_failure_rejection() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1179,7 +927,7 @@ async fn test_high_spam_score_rejection() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1286,7 +1034,7 @@ async fn test_dmarc_authentication_failure_rejection() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1393,7 +1141,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1501,7 +1249,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1607,7 +1355,7 @@ async fn test_channel_in_cc_resolves_properly() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1670,7 +1418,7 @@ async fn test_channel_in_cc_resolves_properly() {
     assert!(result.parsed_email.as_ref().unwrap().is_context_only);
     assert_eq!(result.channel_matches.len(), 1);
     assert_eq!(result.channel_matches[0].recipient_role, RecipientRole::Cc);
-    assert_eq!(thread_persistence.messages.lock().unwrap().len(), 1);
+    assert_eq!(thread_persistence.messages().len(), 1);
     assert!(task_persistence.tasks.lock().unwrap().is_empty());
 }
 
@@ -1743,7 +1491,7 @@ async fn test_multi_channel_to_and_cc_execution() {
         ]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1809,7 +1557,7 @@ async fn test_multi_channel_to_and_cc_execution() {
     assert_eq!(ingest.channel_matches[1].recipient_role, RecipientRole::Cc);
 
     // Verify thread creation for both channels
-    let threads = thread_persistence.threads.lock().unwrap();
+    let threads = thread_persistence.threads();
     assert_eq!(threads.len(), 2);
     drop(threads);
 
@@ -1913,7 +1661,7 @@ async fn test_pipeline_address_chaining_execution() {
         ]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -1981,7 +1729,7 @@ async fn test_pipeline_address_chaining_execution() {
     assert_eq!(ingest.channel_matches[2].step_index, 2);
 
     // Verify threads were created for all 3 step channels
-    let threads = thread_persistence.threads.lock().unwrap();
+    let threads = thread_persistence.threads();
     assert_eq!(threads.len(), 3);
 }
 
@@ -2052,7 +1800,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         ]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -2187,7 +1935,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -2393,7 +2141,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
         ]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -2553,7 +2301,7 @@ async fn test_sender_verification_and_delegation_target_check() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -2768,7 +2516,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
             },
         ]),
     });
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
     let task_persistence = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::new(
         thread_persistence.clone(),
@@ -2816,7 +2564,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
         .unwrap();
     let call_message_id = call.outbound_message_id.clone();
     thread_persistence
-        .create_message(&Message {
+        .create_message(&email_write(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id: thread_a.id,
             message_id: call_message_id.clone(),
@@ -2834,7 +2582,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
             role: MessageRole::Agent,
             thread_index: None,
             created_at: Utc::now(),
-        })
+        }))
         .await
         .unwrap();
     let outreach_id = Uuid::new_v4();
@@ -2974,7 +2722,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
             },
         ]),
     });
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
     let task_persistence = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::new(
         thread_persistence,
@@ -3086,7 +2834,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
             },
         ]),
     });
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
     let task_persistence = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::new(
         thread_persistence,
@@ -3178,7 +2926,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -3401,7 +3149,7 @@ async fn test_context_only_quiet_mode_ingestion() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
     let config = Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
@@ -3581,7 +3329,7 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
     });
 
     let thread_use_cases = ThreadUseCases::new(
-        Arc::new(MockThreadPersistence::new(company_id)),
+        Arc::new(InMemoryThreads::for_company(company_id)),
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
@@ -4207,7 +3955,7 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
         .collect();
 
     ThreadUseCases::new(
-        Arc::new(MockThreadPersistence::new(company_id)),
+        Arc::new(InMemoryThreads::for_company(company_id)),
         Arc::new(MockChannelPersistence {
             channels: Mutex::new(channels),
         }),
@@ -4714,7 +4462,7 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
         }]),
     });
 
-    let thread_persistence = Arc::new(MockThreadPersistence::new(company_id));
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::new(
@@ -4739,8 +4487,8 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
     assert!(ingest.accepted);
     assert_eq!(ingest.channel_matches.len(), 1);
 
-    let inbound_messages = thread_persistence.messages.lock().unwrap().len();
-    drop(thread_persistence.messages.lock().unwrap());
+    let inbound_messages = thread_persistence.messages().len();
+    drop(thread_persistence.messages());
 
     let dispatched = thread_use_cases
         .execute_claimed_agent_task_and_dispatch(
@@ -4763,7 +4511,7 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
     );
 
     // Nothing was committed: no agent message in any thread, and nothing queued for delivery.
-    let messages = thread_persistence.messages.lock().unwrap();
+    let messages = thread_persistence.messages();
     assert_eq!(
         messages.len(),
         inbound_messages,

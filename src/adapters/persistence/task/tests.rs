@@ -1,4 +1,5 @@
 use super::*;
+use crate::use_cases::thread::test_support::{EmailMessageDraft, email_write};
 use chrono::{DateTime, Utc};
 use sqlx::postgres::types::PgInterval;
 use std::str::FromStr;
@@ -6,7 +7,7 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use crate::adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool};
-use crate::entities::message::{Message, MessageDirection, MessageRole};
+use crate::entities::message::{MessageDirection, MessageRole};
 use crate::entities::task::TaskFailureOutcome;
 use crate::{
     adapters::persistence::PostgresPersistence,
@@ -18,9 +19,9 @@ use crate::{
         task::{
             BackgroundTask, ChainStage, NewTask, ResumeActor, StopActor, TaskAttemptOutcome,
             TaskAttemptRecordStatus, TaskAttemptRef, TaskAttemptStatus, TaskBoardFilter,
-            TaskChainCard, TaskChainCounts, TaskFailure, TaskLeaseRef, TaskStatus, TaskStatusEvent,
-            TaskStopReason, TaskTransitionActorKind, TaskTransitionReason, ThreadActivity,
-            TokenUsage,
+            TaskChainCard, TaskChainCounts, TaskFailure, TaskLeaseRef, TaskSource, TaskStatus,
+            TaskStatusEvent, TaskStopReason, TaskTransitionActorKind, TaskTransitionReason,
+            ThreadActivity, TokenUsage,
         },
         value_objects::MessageId,
     },
@@ -124,6 +125,7 @@ async fn task_chain_board_groups_by_correlation_and_keeps_complete_chain_under_c
         .unwrap();
     let nested = persistence
         .enqueue_task(NewTask {
+            source: TaskSource::Unattributed,
             company_id: company.id,
             channel_id: second_channel.id,
             thread_id: None,
@@ -1615,24 +1617,26 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
     let claimed = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
     let lease = TaskLeaseRef::of(&claimed).expect("a claim records its lease");
 
-    let reply = |message_id: &str| Message {
-        id: Uuid::new_v4(),
-        thread_id: thread.id,
-        message_id: MessageId::from(message_id.to_string()),
-        in_reply_to: None,
-        references_list: Vec::new(),
-        sender: crate::entities::value_objects::EmailAddress::from("agent@example.com"),
-        recipients_to: vec![email_addr.clone()],
-        recipients_cc: Vec::new(),
-        subject: "Re: Commit".to_string(),
-        clean_text_body: "the answer".to_string(),
-        raw_text_body: None,
-        raw_html_body: None,
-        attachments: None,
-        direction: MessageDirection::Outbound,
-        role: MessageRole::Agent,
-        thread_index: None,
-        created_at: Utc::now(),
+    let reply = |message_id: &str| {
+        email_write(EmailMessageDraft {
+            id: Uuid::new_v4(),
+            thread_id: thread.id,
+            message_id: MessageId::from(message_id.to_string()),
+            in_reply_to: None,
+            references_list: Vec::new(),
+            sender: crate::entities::value_objects::EmailAddress::from("agent@example.com"),
+            recipients_to: vec![email_addr.clone()],
+            recipients_cc: Vec::new(),
+            subject: "Re: Commit".to_string(),
+            clean_text_body: "the answer".to_string(),
+            raw_text_body: None,
+            raw_html_body: None,
+            attachments: None,
+            direction: MessageDirection::Outbound,
+            role: MessageRole::Agent,
+            thread_index: None,
+            created_at: Utc::now(),
+        })
     };
     let send = |key: &str| OutboundSend {
         correlation_id: CorrelationId::new(),
@@ -1652,7 +1656,12 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
     };
     let thread_rows = async || -> i64 {
         sqlx::query_scalar(
-            "SELECT COUNT(*) FROM thread_messages WHERE thread_id = $1 AND direction = 'outbound'",
+            r#"SELECT COUNT(*)
+               FROM thread_messages AS association
+               JOIN messages AS message
+                 ON (message.company_id, message.id) =
+                    (association.company_id, association.message_id)
+               WHERE association.thread_id = $1 AND message.direction = 'outbound'"#,
         )
         .bind(thread.id)
         .fetch_one(&pool)
@@ -1731,7 +1740,7 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
     // A failure part-way must roll back what already succeeded in the same transaction. The
     // payload write happens first, so a message that cannot be stored has to undo it: this is
     // the case three separate commits could not handle at all.
-    let orphan = Message {
+    let orphan = MessageWrite {
         thread_id: Uuid::new_v4(),
         ..reply("<orphan@example.com>")
     };
@@ -2720,7 +2729,7 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
         .unwrap()
         .unwrap();
     let response = persistence
-        .create_message(&Message {
+        .create_message(&email_write(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id: thread.id,
             message_id: "<vendor-response@supplier.example>".into(),
@@ -2738,7 +2747,7 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
             role: MessageRole::Human,
             thread_index: None,
             created_at: chrono::Utc::now(),
-        })
+        }))
         .await
         .unwrap();
     let progress = persistence
@@ -3359,6 +3368,7 @@ async fn chain_detail_attaches_every_attempt_and_delivery_to_its_own_task() {
         tasks.push(
             persistence
                 .enqueue_task(NewTask {
+                    source: TaskSource::Unattributed,
                     company_id: company.id,
                     channel_id: channel.id,
                     thread_id: None,
@@ -4097,6 +4107,7 @@ async fn a_chain_is_inherited_by_children_and_readable_in_one_query() {
 
     let parent = persistence
         .enqueue_task(NewTask {
+            source: TaskSource::Unattributed,
             company_id: company.id,
             channel_id: channel.id,
             thread_id: None,
@@ -4123,6 +4134,7 @@ async fn a_chain_is_inherited_by_children_and_readable_in_one_query() {
 
     let unrelated = persistence
         .enqueue_task(NewTask {
+            source: TaskSource::Unattributed,
             company_id: company.id,
             channel_id: channel.id,
             thread_id: None,
@@ -4178,12 +4190,24 @@ async fn a_redelivered_message_rejoins_its_original_chain() {
     let persistence = PostgresPersistence::new(pool);
     let (company, channel) = seed_company_and_channel(&persistence).await;
 
-    let message_id = format!("<redelivery-{}@example.com>", Uuid::new_v4());
-    let payload = serde_json::json!({ "inbound_message": { "message_id": message_id } });
+    let thread = ThreadPersistence::create_thread(&persistence, channel.id, "Redelivery", &[])
+        .await
+        .unwrap();
+    let message = persistence
+        .create_message(&email_write(EmailMessageDraft {
+            thread_id: thread.id,
+            message_id: MessageId::from(format!("<redelivery-{}@example.com>", Uuid::new_v4())),
+            clean_text_body: "Please answer".into(),
+            ..Default::default()
+        }))
+        .await
+        .unwrap();
+    let payload = serde_json::json!({ "inbound_message": { "id": message.id } });
     let first_chain = CorrelationId::new();
 
     let first = persistence
         .enqueue_task(NewTask {
+            source: TaskSource::Message(message.canonical_id),
             company_id: company.id,
             channel_id: channel.id,
             thread_id: None,
@@ -4194,9 +4218,11 @@ async fn a_redelivered_message_rejoins_its_original_chain() {
         .await
         .unwrap();
 
-    // The same message arrives again and is given a fresh id by ingress.
+    // The same message is delivered again, and ingress resolves it to the canonical message it
+    // already stored -- so the queue must hand back the task that message already has.
     let second = persistence
         .enqueue_task(NewTask {
+            source: TaskSource::Message(message.canonical_id),
             company_id: company.id,
             channel_id: channel.id,
             thread_id: None,

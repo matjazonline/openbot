@@ -319,7 +319,9 @@ pub fn find_task_for_message<'a>(
                 .and_then(|r| r.get("outbound_message_id"))
                 .and_then(|v| v.as_str())
                 .or_else(|| payload.get("outbound_message_id").and_then(|v| v.as_str()))
-                && outbound_id == msg.message_id.as_str()
+                && msg
+                    .rfc_message_id()
+                    .is_some_and(|id| outbound_id == id.as_str())
             {
                 return Some(task);
             }
@@ -346,7 +348,9 @@ pub fn find_task_for_message<'a>(
                         .and_then(|v| v.as_str())
                 })
                 .or_else(|| payload.get("inbound_message_id").and_then(|v| v.as_str()))
-                && inbound_msg_id == msg.message_id.as_str()
+                && msg
+                    .rfc_message_id()
+                    .is_some_and(|id| inbound_msg_id == id.as_str())
             {
                 return Some(task);
             }

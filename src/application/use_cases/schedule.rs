@@ -10,19 +10,21 @@ use crate::{
         channel::Channel,
         company::Company,
         correlation::CorrelationId,
-        message::{Message, MessageDirection, MessageRole},
+        message::{MessageDirection, MessageRole},
+        participant::{IdentityClaimMetadata, IdentityProvenance},
         schedule::{
             ChannelSchedule, ScheduleDeliveryMode, ScheduleRunAs, ScheduleRunAsChoices,
             ScheduleType, ScheduleWrite, ScheduledRunPayload,
         },
-        task::NewTask,
+        task::{NewTask, TaskSource},
         value_objects::{EmailAddress, MessageId},
     },
     infra::config::AppConfig,
     use_cases::{
         channel::ChannelPersistence,
         company::{CompanyPersistence, managed_company},
-        thread::ThreadPersistence,
+        participant::IdentityObservation,
+        thread::{MessageAuthorWrite, MessageWrite, ThreadPersistence, qualified_email_identity},
     },
 };
 
@@ -542,15 +544,28 @@ impl ScheduleUseCases {
             thread.id, rendered_subject, schedule.name
         );
 
-        // 2. Save the initial prompt message into the thread
-        let channel_address = channel.inbound_address(&company.slug, &self.config.app_domain_name);
-        // A run that acts as a member is that member's standing request, so the prompt is from
-        // them and reads as a person's turn rather than the channel talking to itself.
-        let (sender, role) = match run_as.as_ref() {
-            Some(run_as) => (run_as.email.clone(), MessageRole::Human),
-            None => (channel_address.clone(), MessageRole::System),
+        // 2. Save the initial prompt message into the thread.
+        //
+        // Nothing delivered this prompt: the platform asked the question because a slot came due.
+        // So it is an internal message with no mail headers and no recipients -- a run that acts
+        // as a member is attributed to that member's handle, and an unattributed one to the
+        // company's system principal, which is what "the channel talking to itself" really was.
+        let correlation_id = CorrelationId::new();
+        let (author, role) = match run_as.as_ref() {
+            Some(run_as) => (
+                MessageAuthorWrite::Observed(IdentityObservation {
+                    identity: qualified_email_identity(run_as.email.clone())?,
+                    display_label: None,
+                    claim_metadata: IdentityClaimMetadata::observation(),
+                    provenance: IdentityProvenance::Account,
+                }),
+                MessageRole::Human,
+            ),
+            None => (MessageAuthorWrite::Platform, MessageRole::System),
         };
-        let prompt_message_id = MessageId::new(match run_id {
+        // What the answer email threads onto. Derived from the run, not from the prompt message:
+        // no mail carried the prompt, so it has no `Message-ID` of its own.
+        let email_thread_root = MessageId::new(match run_id {
             Some(run_id) => format!("<schedule-run-{run_id}@{}>", self.config.app_domain_name),
             None => format!(
                 "<schedule-{}-{}@{}>",
@@ -562,25 +577,18 @@ impl ScheduleUseCases {
 
         let prompt_message = self
             .thread_persistence
-            .create_message(&Message {
-                id: Uuid::new_v4(),
-                thread_id: thread.id,
-                message_id: prompt_message_id.clone(),
-                in_reply_to: None,
-                references_list: vec![],
-                sender,
-                recipients_to: vec![channel_address],
-                recipients_cc: vec![],
-                subject: rendered_subject.clone(),
-                clean_text_body: rendered_prompt.clone(),
-                raw_text_body: Some(rendered_prompt.clone()),
-                raw_html_body: None,
-                attachments: None,
-                direction: MessageDirection::Inbound,
-                role,
-                thread_index: None,
-                created_at: now,
-            })
+            .create_message(
+                &MessageWrite::internal(
+                    thread.id,
+                    author,
+                    rendered_subject.clone(),
+                    rendered_prompt.clone(),
+                    MessageDirection::Inbound,
+                    role,
+                    correlation_id,
+                )
+                .created_at(now),
+            )
             .await?;
 
         // 3. Enqueue background task for the TaskWorker to execute the agent pipeline
@@ -596,7 +604,8 @@ impl ScheduleUseCases {
             delivery_mode: schedule.delivery_mode,
             recipient_emails: schedule.recipient_emails.clone(),
             run_as,
-            trigger_message_id: prompt_message.message_id.clone(),
+            trigger_message_id: email_thread_root,
+            prompt_message_id: prompt_message.canonical_id,
         };
         let task_payload = serde_json::to_value(&task_payload).map_err(|err| {
             AppError::Internal(format!("Failed to encode schedule payload: {err}"))
@@ -610,9 +619,16 @@ impl ScheduleUseCases {
                 thread_id: Some(thread.id),
                 task_type: SCHEDULED_AGENT_RUN_TASK.to_string(),
                 payload: task_payload,
+                // A second scheduler waking for the same slot finds this task rather than running
+                // the agent twice. A run without a durable slot behind it has nothing to dedup on.
+                source: match run_id {
+                    Some(run_id) => TaskSource::ScheduleRun(run_id),
+                    None => TaskSource::Unattributed,
+                },
                 // A schedule firing is an ingress of its own: nothing outside caused this run, so
-                // this is one of the few places a chain legitimately begins.
-                correlation_id: CorrelationId::new(),
+                // this is one of the few places a chain legitimately begins. The prompt message
+                // above already joined it.
+                correlation_id,
             })
             .await?;
 
@@ -705,14 +721,13 @@ mod tests {
         channel::{Channel, ChannelAccessMode},
         company::{Company, CompanyAccess, CompanyTeamAccount},
         company_member::CompanyMembership,
-        cursor::{MessageCursor, ThreadCursor},
         schedule::ScheduleTimezone,
         task::{BackgroundTask, TaskStatus},
-        thread::{Thread, ThreadParticipantProjection},
         value_objects::ChannelSlug,
     };
     use crate::use_cases::company::CompanyWrite;
     use crate::use_cases::participant::test_support::email_allowlist_grants;
+    use crate::use_cases::thread::test_support::InMemoryThreads;
     use async_trait::async_trait;
     use std::sync::Mutex;
 
@@ -1132,118 +1147,6 @@ mod tests {
         }
     }
 
-    struct MockThreadPersistence {
-        threads: Mutex<Vec<Thread>>,
-        messages: Mutex<Vec<Message>>,
-    }
-
-    #[async_trait]
-    impl ThreadPersistence for MockThreadPersistence {
-        async fn create_thread(
-            &self,
-            channel_id: Uuid,
-            subject: &str,
-            participant_emails: &[EmailAddress],
-        ) -> AppResult<Thread> {
-            let thread = Thread {
-                id: Uuid::new_v4(),
-                channel_id,
-                subject: subject.to_string(),
-                participant_principal_ids: Vec::new(),
-                participant_projection: ThreadParticipantProjection {
-                    email_addresses: participant_emails.to_vec(),
-                },
-                created_at: Utc::now(),
-                updated_at: Utc::now(),
-            };
-            self.threads.lock().unwrap().push(thread.clone());
-            Ok(thread)
-        }
-        async fn get_thread_by_id(&self, _id: Uuid) -> AppResult<Option<Thread>> {
-            unimplemented!()
-        }
-        async fn list_threads_by_channel_id(
-            &self,
-            _channel_id: Uuid,
-            _before: Option<ThreadCursor>,
-            _limit: usize,
-        ) -> AppResult<Vec<Thread>> {
-            unimplemented!()
-        }
-        async fn list_threads_updated_after(
-            &self,
-            _channel_id: Uuid,
-            _after: Option<ThreadCursor>,
-            _limit: usize,
-        ) -> AppResult<Vec<Thread>> {
-            unimplemented!()
-        }
-        async fn update_thread_participants(
-            &self,
-            _id: Uuid,
-            _participant_emails: &[EmailAddress],
-        ) -> AppResult<Thread> {
-            unimplemented!()
-        }
-        async fn find_thread_by_message_ids(
-            &self,
-            _channel_id: Uuid,
-            _message_ids: &[MessageId],
-        ) -> AppResult<Option<Thread>> {
-            unimplemented!()
-        }
-        async fn find_thread_by_thread_index(
-            &self,
-            _channel_id: Uuid,
-            _thread_index_prefix: &crate::entities::value_objects::ThreadIndex,
-        ) -> AppResult<Option<Thread>> {
-            unimplemented!()
-        }
-        async fn count_recent_messages(
-            &self,
-            _thread_id: Uuid,
-            _duration_secs: i64,
-        ) -> AppResult<usize> {
-            unimplemented!()
-        }
-        async fn create_message(&self, message: &Message) -> AppResult<Message> {
-            self.messages.lock().unwrap().push(message.clone());
-            Ok(message.clone())
-        }
-        async fn get_message_by_message_id(
-            &self,
-            _company_id: Uuid,
-            _message_id: &MessageId,
-        ) -> AppResult<Option<Message>> {
-            unimplemented!()
-        }
-        async fn find_outbound_reply(
-            &self,
-            _thread_id: Uuid,
-            _in_reply_to: &MessageId,
-        ) -> AppResult<Option<Message>> {
-            unimplemented!()
-        }
-        async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-            Ok(self
-                .messages
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|m| m.thread_id == thread_id)
-                .cloned()
-                .collect())
-        }
-        async fn list_messages_after(
-            &self,
-            _thread_id: Uuid,
-            _after: Option<MessageCursor>,
-            _limit: usize,
-        ) -> AppResult<Vec<Message>> {
-            unimplemented!()
-        }
-    }
-
     struct MockTaskPersistence {
         tasks: Mutex<Vec<BackgroundTask>>,
     }
@@ -1274,6 +1177,7 @@ mod tests {
                 thread_id,
                 task_type,
                 payload,
+                source: _,
                 correlation_id,
             }: NewTask,
         ) -> AppResult<BackgroundTask> {
@@ -1455,10 +1359,7 @@ mod tests {
                     channel_of(theirs_channel, theirs_company),
                 ]),
             }),
-            Arc::new(MockThreadPersistence {
-                threads: Mutex::new(vec![]),
-                messages: Mutex::new(vec![]),
-            }),
+            Arc::new(InMemoryThreads::new()),
             Arc::new(MockTaskPersistence {
                 tasks: Mutex::new(vec![]),
             }),
@@ -1605,10 +1506,7 @@ mod tests {
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![channel.clone(), target_channel.clone()]),
         });
-        let thread_persistence = Arc::new(MockThreadPersistence {
-            threads: Mutex::new(vec![]),
-            messages: Mutex::new(vec![]),
-        });
+        let thread_persistence = Arc::new(InMemoryThreads::new());
         let task_persistence = Arc::new(MockTaskPersistence {
             tasks: Mutex::new(vec![]),
         });
@@ -1714,11 +1612,11 @@ mod tests {
 
         // Verify thread, message, and background task were created
         {
-            let threads = thread_persistence.threads.lock().unwrap();
+            let threads = thread_persistence.threads();
             assert_eq!(threads.len(), 1);
             assert!(threads[0].subject.contains("[Daily] Digest"));
 
-            let messages = thread_persistence.messages.lock().unwrap();
+            let messages = thread_persistence.messages();
             assert_eq!(messages.len(), 1);
             assert_eq!(messages[0].thread_id, threads[0].id);
             assert!(messages[0].clean_text_body.contains("Analyze tickets for"));
@@ -1747,7 +1645,7 @@ mod tests {
         channel_id: Uuid,
         use_cases: ScheduleUseCases,
         company_persistence: Arc<MockCompanyPersistence>,
-        thread_persistence: Arc<MockThreadPersistence>,
+        thread_persistence: Arc<InMemoryThreads>,
         task_persistence: Arc<MockTaskPersistence>,
     }
 
@@ -1766,10 +1664,7 @@ mod tests {
                     (member_id, company_id, CompanyMembership::Member),
                 ]),
             });
-            let thread_persistence = Arc::new(MockThreadPersistence {
-                threads: Mutex::new(vec![]),
-                messages: Mutex::new(vec![]),
-            });
+            let thread_persistence = Arc::new(InMemoryThreads::new());
             let task_persistence = Arc::new(MockTaskPersistence {
                 tasks: Mutex::new(vec![]),
             });
@@ -1967,12 +1862,12 @@ mod tests {
             .await
             .unwrap();
 
-        let messages = fixture.thread_persistence.messages.lock().unwrap();
+        let messages = fixture.thread_persistence.messages();
         let prompt = messages.first().expect("the run opens with its prompt");
-        assert_eq!(prompt.sender, member_email);
+        assert_eq!(prompt.author.email_address(), Some(member_email.clone()));
         assert_eq!(prompt.role, MessageRole::Human);
 
-        let threads = fixture.thread_persistence.threads.lock().unwrap();
+        let threads = fixture.thread_persistence.threads();
         assert!(
             threads[0]
                 .participant_projection

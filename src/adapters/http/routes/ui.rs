@@ -1090,7 +1090,12 @@ async fn send_reply(
 
     // Threading is by header, so the reply hangs off the newest message the thread already has.
     let history = thread_use_cases.get_thread_history(thread.id).await?;
-    let in_reply_to = history.last().map(|message| message.message_id.as_str());
+    // Only a message mail actually carried has a `Message-ID` to thread onto; a schedule prompt
+    // or a system note has none, and the reply then starts its own mail conversation.
+    let in_reply_to = history
+        .last()
+        .and_then(|message| message.rfc_message_id())
+        .map(|id| id.as_str());
 
     let payload = RawInboundPayload {
         to: address.to_string(),

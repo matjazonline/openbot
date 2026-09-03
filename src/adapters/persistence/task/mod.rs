@@ -23,7 +23,6 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         correlation::CorrelationId,
-        message::Message,
         outbox::{OutboxEntry, OutboxStatus},
         outreach::{CreateOutreachRequest, DueOutreach, OutreachProgress, OutreachReplyMatch},
         stuck_work::{StuckWorkCensus, StuckWorkThresholds},
@@ -34,6 +33,7 @@ use crate::{
         },
         value_objects::MessageId,
     },
+    use_cases::thread::MessageWrite,
 };
 
 mod board;
@@ -174,7 +174,7 @@ pub struct AgentDispatchCommit<'a> {
     /// Proof this run still owns the task. The whole transaction is fenced on it.
     pub lease: TaskLeaseRef,
     /// The reply, stored once per thread it answered.
-    pub messages: &'a [Message],
+    pub messages: &'a [MessageWrite],
     /// The email to hand to the outbox, or `None` for a simulated run that sends nothing.
     pub outbound: Option<OutboundSend>,
     /// The run's audit payload, written back onto the task.
@@ -410,10 +410,14 @@ pub trait TaskPersistence: Send + Sync {
         Ok(Vec::new())
     }
 
-    async fn get_task_by_source_message_id(
+    /// The task an email already caused, found through the canonical message it was stored as.
+    ///
+    /// The lookup goes through `email_message_metadata` rather than a text column on the task, so
+    /// "have we run this message" and "have we stored this message" are the same fact.
+    async fn find_task_for_email_message(
         &self,
         _company_id: Uuid,
-        _message_id: &str,
+        _rfc_message_id: &MessageId,
     ) -> AppResult<Option<BackgroundTask>> {
         Ok(None)
     }

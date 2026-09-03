@@ -208,6 +208,7 @@ mod tests {
         message::{Message, MessageDirection, MessageRole},
         value_objects::ObjectKey,
     };
+    use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email};
 
     fn attachment(sha: &str, filename: &str, key: Option<&str>) -> AttachmentMetadata {
         AttachmentMetadata {
@@ -220,7 +221,7 @@ mod tests {
     }
 
     fn message(attachments: Vec<AttachmentMetadata>) -> Message {
-        Message {
+        stored_email(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id: Uuid::new_v4(),
             message_id: "<a@example.test>".into(),
@@ -238,7 +239,7 @@ mod tests {
             role: MessageRole::Human,
             thread_index: None,
             created_at: chrono::Utc::now(),
-        }
+        })
     }
 
     #[test]

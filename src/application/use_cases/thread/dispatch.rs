@@ -26,9 +26,11 @@ use crate::{
         approval::ApprovalSubject,
         channel::{PUBLIC_PARTICIPANT, ParticipantAccess},
         correlation::CorrelationId,
+        email_message::EmailMessageMetadata,
         memory::{MAX_MEMORY_UPSTREAM_CONTEXT_CHARS, truncate_memory_text},
-        message::{Message, MessageDirection, MessageRole},
+        message::{MessageDirection, MessageParticipantKind, MessageRole},
         message_contract::NormalizedOutboundMessage,
+        participant::{IdentityClaimMetadata, IdentityProvenance},
         task::TokenUsage,
         transport::TransportKind,
         value_objects::{EmailAddress, MessageId},
@@ -43,10 +45,12 @@ use crate::{
         outbound_dispatcher::{OutboundEmail, SentEmailResult, agent_response_email_body},
         outreach_tool::OutreachToolContext,
     },
+    use_cases::participant::IdentityObservation,
 };
 
 use super::{
-    AgentExecutionResult, ChannelMatch, InboundIngestResult, RecipientRole, ThreadUseCases,
+    AgentExecutionResult, ChannelMatch, InboundIngestResult, MessageAuthorWrite,
+    MessageCorrelation, MessageParticipantWrite, MessageWrite, RecipientRole, ThreadUseCases,
     durable_ingest_payload, scrub_json_secrets,
     support::{DirectoryCache, outbound_reference_ids},
 };
@@ -109,7 +113,7 @@ struct PreparedDispatch {
     delivery: OutboundDelivery,
     /// `None` for a simulated run, and for a task-less caller that already sent inline.
     outbound: Option<OutboundSend>,
-    messages: Vec<Message>,
+    messages: Vec<MessageWrite>,
 }
 
 /// The outbound side of the reply, real or simulated.
@@ -210,7 +214,7 @@ impl ThreadUseCases {
                 correlation_id,
             })
             .await?;
-        let messages = Self::outbound_messages(&matches, &delivery, &response);
+        let messages = Self::outbound_messages(&matches, &delivery, &response, correlation_id)?;
 
         let outbound_message_id = delivery.message_id.clone();
         let email_sent = delivery.email_sent;
@@ -939,42 +943,58 @@ impl ThreadUseCases {
         matches: &[ChannelMatch],
         delivery: &OutboundDelivery,
         response: &str,
-    ) -> Vec<Message> {
-        matches
-            .iter()
-            .map(|channel_match| Message {
-                id: Uuid::new_v4(),
-                thread_id: channel_match.thread.id,
-                message_id: MessageId::from(delivery.message_id.clone()),
-                in_reply_to: Some(MessageId::from(delivery.in_reply_to.clone())),
-                references_list: delivery
+        correlation_id: CorrelationId,
+    ) -> AppResult<Vec<MessageWrite>> {
+        let metadata = EmailMessageMetadata::new(MessageId::from(delivery.message_id.clone()))
+            .in_reply_to(Some(MessageId::from(delivery.in_reply_to.clone())))
+            .references(
+                delivery
                     .references
                     .iter()
                     .cloned()
                     .map(MessageId::from)
                     .collect(),
-                sender: EmailAddress::from(delivery.from_address.clone()),
-                recipients_to: delivery
-                    .recipients_to
-                    .iter()
-                    .cloned()
-                    .map(EmailAddress::from)
-                    .collect(),
-                recipients_cc: delivery
-                    .recipients_cc
-                    .iter()
-                    .cloned()
-                    .map(EmailAddress::from)
-                    .collect(),
-                subject: delivery.subject.clone(),
-                clean_text_body: response.to_string(),
-                raw_text_body: None,
-                raw_html_body: None,
-                attachments: None,
-                direction: MessageDirection::Outbound,
-                role: MessageRole::Agent,
-                thread_index: None,
-                created_at: chrono::Utc::now(),
+            );
+        let sender = super::qualified_email_identity(delivery.from_address.clone())?;
+        let mut participants = vec![MessageParticipantWrite::new(
+            MessageParticipantKind::Sender,
+            sender.clone(),
+        )];
+        for (kind, addresses) in [
+            (MessageParticipantKind::To, &delivery.recipients_to),
+            (MessageParticipantKind::Cc, &delivery.recipients_cc),
+        ] {
+            for address in addresses {
+                participants.push(MessageParticipantWrite::new(
+                    kind,
+                    super::qualified_email_identity(address.clone())?,
+                ));
+            }
+        }
+
+        matches
+            .iter()
+            .map(|channel_match| {
+                Ok(MessageWrite {
+                    thread_id: channel_match.thread.id,
+                    // The channel's own address is the handle the reply went out under; the
+                    // principal behind it is resolved by the writer.
+                    author: MessageAuthorWrite::Observed(IdentityObservation {
+                        identity: sender.clone(),
+                        display_label: Some(channel_match.channel.name.clone()),
+                        claim_metadata: IdentityClaimMetadata::observation(),
+                        provenance: IdentityProvenance::Agent,
+                    }),
+                    subject: delivery.subject.clone(),
+                    clean_text_body: response.to_string(),
+                    attachments: Vec::new(),
+                    direction: MessageDirection::Outbound,
+                    role: MessageRole::Agent,
+                    correlation_id,
+                    participants: participants.clone(),
+                    correlation: MessageCorrelation::Email(metadata.clone()),
+                    created_at: chrono::Utc::now(),
+                })
             })
             .collect()
     }

@@ -11,9 +11,12 @@ use uuid::Uuid;
 use super::*;
 use crate::{
     app_error::{AppError, AppResult},
-    entities::task::{
-        BackgroundTask, NewTask, ResumeActor, StopActor, TaskFailure, TaskStopReason,
-        TaskTransitionReason, TransitionActor,
+    entities::{
+        message::CanonicalMessageId,
+        task::{
+            BackgroundTask, NewTask, ResumeActor, StopActor, TaskFailure, TaskSource,
+            TaskStopReason, TaskTransitionReason, TransitionActor,
+        },
     },
 };
 
@@ -278,39 +281,44 @@ pub(crate) async fn insert_task(
         thread_id,
         task_type,
         payload,
+        source,
         correlation_id,
     } = new_task;
     let id = Uuid::new_v4();
-    let source_message_id = payload
-        .pointer("/inbound_message/message_id")
-        .and_then(Value::as_str)
-        .map(str::to_owned)
-        .or_else(|| {
-            payload
-                .get("schedule_run_id")
-                .and_then(Value::as_str)
-                .map(|id| format!("schedule-run:{id}"))
-        });
     let targets = task_targets(&payload, company_id, channel_id, thread_id)?;
-    let db = sqlx::query_as::<_, BackgroundTaskDb>(
+    // Two `ON CONFLICT` targets cannot be named in one statement, and only one of the two source
+    // columns is ever set, so the conflict target follows the source the caller stated. An
+    // unattributed task has nothing to collide on and always inserts.
+    //
+    // Neither branch touches `correlation_id`: a redelivered cause joins the chain its first
+    // delivery started rather than overwriting it with a fresher one.
+    const RETURNING: &str = "RETURNING id, company_id, channel_id, thread_id, correlation_id, \
+         task_type, status, payload, retry_count, max_retries, last_error, worker_id, \
+         execution_generation, locked_at, lock_expires_at, run_at, created_at, updated_at";
+    let conflict = match source {
+        TaskSource::Message(_) => {
+            "ON CONFLICT (company_id, source_message_uuid)              DO UPDATE SET source_message_uuid = EXCLUDED.source_message_uuid"
+        }
+        TaskSource::ScheduleRun(_) => {
+            "ON CONFLICT (company_id, source_schedule_run_id)              DO UPDATE SET source_schedule_run_id = EXCLUDED.source_schedule_run_id"
+        }
+        TaskSource::Unattributed => "",
+    };
+    let db = sqlx::query_as::<_, BackgroundTaskDb>(&format!(
         r#"INSERT INTO background_tasks (
-                id, company_id, channel_id, thread_id, source_message_id,
-                correlation_id, task_type, status, payload
+                id, company_id, channel_id, thread_id, source_message_uuid,
+                source_schedule_run_id, correlation_id, task_type, status, payload
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8)
-           ON CONFLICT (company_id, source_message_id)
-           -- Deliberately does not touch `correlation_id`: a redelivered message joins the chain
-           -- its first delivery started rather than overwriting it with a fresher one.
-           DO UPDATE SET source_message_id = EXCLUDED.source_message_id
-           RETURNING id, company_id, channel_id, thread_id, correlation_id, task_type, status, payload,
-                      retry_count, max_retries, last_error, worker_id, execution_generation, locked_at, lock_expires_at,
-                      run_at, created_at, updated_at"#,
-    )
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
+           {conflict}
+           {RETURNING}"#
+    ))
     .bind(id)
     .bind(company_id)
     .bind(channel_id)
     .bind(thread_id)
-    .bind(source_message_id)
+    .bind(source.message_id().map(CanonicalMessageId::as_uuid))
+    .bind(source.schedule_run_id())
     .bind(correlation_id.as_uuid())
     .bind(&task_type)
     .bind(payload)

@@ -618,7 +618,7 @@ pub(crate) fn message_task_payload(
             },
             "execution_result": {
                 "response": msg.clean_text_body,
-                "outbound_message_id": msg.message_id
+                "outbound_message_id": msg.rfc_message_id()
             },
             "channel": ctx.channel,
             "company": ctx.company
@@ -627,14 +627,15 @@ pub(crate) fn message_task_payload(
         serde_json::json!({
             "task_type": "email_agent_dispatch",
             "parsed_email": {
-                "sender": msg.sender,
+                "sender": msg.author.display(),
                 "subject": msg.subject,
                 "prompt_text": msg.clean_text_body,
-                "message_id": msg.message_id
+                "message_id": msg.rfc_message_id()
             },
             "inbound_message": {
                 "id": msg.id,
-                "message_id": msg.message_id,
+                "canonical_id": msg.canonical_id,
+                "message_id": msg.rfc_message_id(),
                 "direction": "inbound",
                 "role": "human",
                 "clean_text_body": msg.clean_text_body
@@ -681,7 +682,7 @@ pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> Str
                     "##,
             author_glyph = icon(Icon::Hubot, BUTTON_ICON),
             created_at = created_at,
-            msg_id = super::escape_html_text(&msg.message_id),
+            msg_id = super::escape_html_text(&msg.canonical_id.to_string()),
             body = body,
             markdown_styles = MARKDOWN_CONTENT_STYLES,
             params_html = params_html,
@@ -713,8 +714,8 @@ pub(crate) fn message_bubble(msg: &Message, ctx: &MessageTaskContext<'_>) -> Str
                     "##,
             author_glyph = icon(Icon::Person, BUTTON_ICON),
             created_at = created_at,
-            sender = super::escape_html_text(&msg.sender),
-            msg_id = super::escape_html_text(&msg.message_id),
+            sender = super::escape_html_text(msg.author.display()),
+            msg_id = super::escape_html_text(&msg.canonical_id.to_string()),
             subject = super::escape_html_text(&msg.subject),
             body = super::escape_html_text(&msg.clean_text_body),
             params_html = params_html,
@@ -966,7 +967,8 @@ pub fn channel_simulation_loaded_thread_fragment(
         thread_id_str: &thread_id_str,
         last_msg_id: &messages
             .last()
-            .map(|m| m.message_id.to_string())
+            .and_then(|message| message.rfc_message_id())
+            .map(|id| id.to_string())
             .unwrap_or_default(),
         to_value: &target_recipient,
         from_value: &default_sender,

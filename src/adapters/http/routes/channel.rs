@@ -1500,6 +1500,7 @@ async fn delete_channel_json(
 #[cfg(test)]
 mod tests {
     use crate::entities::{company::Company, thread::Thread};
+    use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email};
     use chrono::Utc;
 
     use super::*;
@@ -1699,7 +1700,7 @@ mod tests {
             pages::channel_simulation_result_fragment(company.id, channel.id, &sim_result);
         assert!(sim_result_html.contains("Webhook Triggered &amp; Channel Resolved Successfully!"));
 
-        let test_message = crate::entities::message::Message {
+        let test_message = stored_email(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id: Uuid::new_v4(),
             message_id: "<msg1@test>".into(),
@@ -1717,12 +1718,12 @@ mod tests {
             role: crate::entities::message::MessageRole::Human,
             thread_index: None,
             created_at: Utc::now(),
-        };
-        let test_agent_message = crate::entities::message::Message {
+        });
+        let test_agent_message = stored_email(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id: test_message.thread_id,
             message_id: "<out1@test>".into(),
-            in_reply_to: Some(test_message.message_id.clone()),
+            in_reply_to: test_message.rfc_message_id().cloned(),
             references_list: vec![],
             sender: "auto-dispatcher@acme.example.com".into(),
             recipients_to: vec!["agent@test.com".into()],
@@ -1736,7 +1737,7 @@ mod tests {
             role: crate::entities::message::MessageRole::Agent,
             thread_index: None,
             created_at: Utc::now(),
-        };
+        });
 
         let fail_html =
             pages::channel_simulation_failure_fragment(&pages::ChannelSimulationFailure {

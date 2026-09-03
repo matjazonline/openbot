@@ -18,8 +18,10 @@ use crate::{
         channel::{Channel, PUBLIC_PARTICIPANT},
         company::Company,
         correlation::CorrelationId,
-        message::{Message, MessageDirection, MessageRole},
+        email_message::EmailMessageMetadata,
+        message::{MessageDirection, MessageParticipantKind, MessageRole},
         outreach::DueOutreach,
+        participant::{IdentityClaimMetadata, IdentityProvenance},
         schedule::ScheduledRunPayload,
         stuck_work::StuckWorkThresholds,
         task::{
@@ -37,8 +39,12 @@ use crate::{
         runtime_metrics::ActiveTaskExecutions,
     },
     use_cases::{
+        participant::IdentityObservation,
         schedule::{SCHEDULED_AGENT_RUN_TASK, ScheduleUseCases},
-        thread::{DispatchOutcome, InboundIngestResult, ThreadUseCases},
+        thread::{
+            DispatchOutcome, InboundIngestResult, MessageAuthorWrite, MessageCorrelation,
+            MessageParticipantWrite, MessageWrite, ThreadUseCases, qualified_email_identity,
+        },
     },
 };
 
@@ -1074,7 +1080,7 @@ impl TaskWorker {
         for thread_id in target_thread_ids {
             match self
                 .thread_use_cases
-                .find_outbound_reply(thread_id, &inbound_msg.message_id)
+                .find_outbound_reply_after(thread_id, inbound_msg.canonical_id)
                 .await
                 .map_err(|e| e.to_string())?
             {
@@ -1084,13 +1090,11 @@ impl TaskWorker {
         }
 
         if let Some(outbound) = outbound_reply {
+            // The reply is one canonical message; a thread that is missing it needs the
+            // association, not a second copy of the body.
             for thread_id in missing_threads {
                 self.thread_use_cases
-                    .save_message(&crate::entities::message::Message {
-                        id: uuid::Uuid::new_v4(),
-                        thread_id,
-                        ..outbound.clone()
-                    })
+                    .associate_message(thread_id, outbound.canonical_id)
                     .await
                     .map_err(|error| error.to_string())?;
             }
@@ -1100,7 +1104,7 @@ impl TaskWorker {
             // answer and the task is complete.
             info!(
                 "Idempotency Guard: Outbound reply already sent for message {}, completing task",
-                inbound_msg.message_id
+                inbound_msg.canonical_id
             );
             return Ok(TaskExecutionOutcome::Replied);
         }
@@ -1152,7 +1156,7 @@ impl TaskWorker {
         // last time may have been the send.
         let answer = match self
             .thread_use_cases
-            .find_outbound_reply(payload.thread_id, &payload.trigger_message_id)
+            .find_outbound_reply_after(payload.thread_id, payload.prompt_message_id)
             .await
             .map_err(|e| e.to_string())?
         {
@@ -1327,23 +1331,38 @@ impl TaskWorker {
             .cloned()
             .unwrap_or_else(|| channel_address.clone());
 
-        let message = Message {
-            id: Uuid::new_v4(),
+        let reply_message_id = scheduled_reply_message_id(task.id, &self.config.app_domain_name);
+        // The answer is mail: it threads onto the schedule's prompt and goes out to the addressee,
+        // so it carries email headers and a sender/to projection.
+        let metadata = EmailMessageMetadata::new(reply_message_id)
+            .in_reply_to(Some(payload.trigger_message_id.clone()))
+            .references(vec![payload.trigger_message_id.clone()])
+            .raw_bodies(Some(answer.to_string()), None);
+        let sender =
+            qualified_email_identity(channel_address.clone()).map_err(|e| e.to_string())?;
+
+        let message = MessageWrite {
             thread_id: payload.thread_id,
-            message_id: scheduled_reply_message_id(task.id, &self.config.app_domain_name),
-            in_reply_to: Some(payload.trigger_message_id.clone()),
-            references_list: vec![payload.trigger_message_id.clone()],
-            sender: channel_address,
-            recipients_to: vec![addressee],
-            recipients_cc: vec![],
+            author: MessageAuthorWrite::Observed(IdentityObservation {
+                identity: sender.clone(),
+                display_label: Some(context.channel.name.clone()),
+                claim_metadata: IdentityClaimMetadata::observation(),
+                provenance: IdentityProvenance::Agent,
+            }),
             subject: reply_subject(&payload.subject),
             clean_text_body: answer.to_string(),
-            raw_text_body: Some(answer.to_string()),
-            raw_html_body: None,
-            attachments: None,
+            attachments: Vec::new(),
             direction: MessageDirection::Outbound,
             role: MessageRole::Agent,
-            thread_index: None,
+            correlation_id: task.correlation_id,
+            participants: vec![
+                MessageParticipantWrite::new(MessageParticipantKind::Sender, sender),
+                MessageParticipantWrite::new(
+                    MessageParticipantKind::To,
+                    qualified_email_identity(addressee).map_err(|e| e.to_string())?,
+                ),
+            ],
+            correlation: MessageCorrelation::Email(metadata),
             created_at: chrono::Utc::now(),
         };
 
@@ -1593,6 +1612,8 @@ mod tests {
     use crate::entities::task::NewTask;
     use crate::entities::task::TaskLeaseRef;
     use crate::use_cases::participant::test_support::{InMemoryParticipantDirectory, TeamFixture};
+    use crate::use_cases::thread::test_support::InMemoryThreads;
+    use crate::use_cases::thread::test_support::{EmailMessageDraft, email_write, stored_email};
     use async_trait::async_trait;
     use chrono::Utc;
     use std::sync::{
@@ -1608,8 +1629,6 @@ mod tests {
             agent::Agent,
             channel::Channel,
             company::Company,
-            cursor::{MessageCursor, ThreadCursor},
-            message::Message,
             task::{BackgroundTask, TaskStatus},
             thread::Thread,
         },
@@ -1789,140 +1808,6 @@ mod tests {
         }
     }
 
-    struct MockThreadPersistence {
-        messages: Mutex<Vec<Message>>,
-        threads: Mutex<Vec<Thread>>,
-    }
-
-    #[async_trait]
-    impl ThreadPersistence for MockThreadPersistence {
-        async fn create_thread(
-            &self,
-            _channel_id: Uuid,
-            _subject: &str,
-            _participant_emails: &[crate::entities::value_objects::EmailAddress],
-        ) -> AppResult<Thread> {
-            unimplemented!()
-        }
-        async fn get_thread_by_id(&self, _id: Uuid) -> AppResult<Option<Thread>> {
-            unimplemented!()
-        }
-        async fn list_threads_by_channel_id(
-            &self,
-            _channel_id: Uuid,
-            _before: Option<ThreadCursor>,
-            _limit: usize,
-        ) -> AppResult<Vec<Thread>> {
-            unimplemented!()
-        }
-
-        async fn list_threads_updated_after(
-            &self,
-            channel_id: Uuid,
-            after: Option<ThreadCursor>,
-            limit: usize,
-        ) -> AppResult<Vec<Thread>> {
-            let mut threads: Vec<Thread> = self
-                .threads
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|t| t.channel_id == channel_id)
-                .filter(|t| after.is_none_or(|cursor| t.cursor() > cursor))
-                .cloned()
-                .collect();
-            threads.sort_by_key(|t| t.cursor());
-            threads.truncate(limit);
-            Ok(threads)
-        }
-        async fn update_thread_participants(
-            &self,
-            _id: Uuid,
-            _participant_emails: &[crate::entities::value_objects::EmailAddress],
-        ) -> AppResult<Thread> {
-            unimplemented!()
-        }
-        async fn find_thread_by_message_ids(
-            &self,
-            _channel_id: Uuid,
-            _message_ids: &[crate::entities::value_objects::MessageId],
-        ) -> AppResult<Option<Thread>> {
-            unimplemented!()
-        }
-        async fn find_thread_by_thread_index(
-            &self,
-            _channel_id: Uuid,
-            _thread_index_prefix: &crate::entities::value_objects::ThreadIndex,
-        ) -> AppResult<Option<Thread>> {
-            unimplemented!()
-        }
-        async fn count_recent_messages(
-            &self,
-            _thread_id: Uuid,
-            _duration_secs: i64,
-        ) -> AppResult<usize> {
-            unimplemented!()
-        }
-        async fn create_message(&self, message: &Message) -> AppResult<Message> {
-            self.messages.lock().unwrap().push(message.clone());
-            Ok(message.clone())
-        }
-        async fn get_message_by_message_id(
-            &self,
-            _company_id: Uuid,
-            _message_id: &crate::entities::value_objects::MessageId,
-        ) -> AppResult<Option<Message>> {
-            unimplemented!()
-        }
-        async fn find_outbound_reply(
-            &self,
-            thread_id: Uuid,
-            in_reply_to: &crate::entities::value_objects::MessageId,
-        ) -> AppResult<Option<Message>> {
-            Ok(self
-                .messages
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|message| {
-                    message.thread_id == thread_id
-                        && message.direction == crate::entities::message::MessageDirection::Outbound
-                        && message.in_reply_to.as_ref() == Some(in_reply_to)
-                })
-                .cloned())
-        }
-        async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-            Ok(self
-                .messages
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|m| m.thread_id == thread_id)
-                .cloned()
-                .collect())
-        }
-
-        async fn list_messages_after(
-            &self,
-            thread_id: Uuid,
-            after: Option<MessageCursor>,
-            limit: usize,
-        ) -> AppResult<Vec<Message>> {
-            let mut messages: Vec<Message> = self
-                .messages
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|m| m.thread_id == thread_id)
-                .filter(|m| after.is_none_or(|cursor| m.cursor() > cursor))
-                .cloned()
-                .collect();
-            messages.sort_by_key(|m| m.cursor());
-            messages.truncate(limit);
-            Ok(messages)
-        }
-    }
-
     #[derive(Default)]
     struct MockTaskPersistence {
         tasks: Mutex<Vec<BackgroundTask>>,
@@ -1972,6 +1857,7 @@ mod tests {
                 thread_id,
                 task_type,
                 payload,
+                source: _,
                 correlation_id,
             }: NewTask,
         ) -> AppResult<BackgroundTask> {
@@ -2551,10 +2437,7 @@ mod tests {
     #[tokio::test]
     async fn test_task_worker_stop_and_resume_flow() {
         let task_persistence = Arc::new(MockTaskPersistence::default());
-        let thread_persistence = Arc::new(MockThreadPersistence {
-            messages: Mutex::new(Vec::new()),
-            threads: Mutex::new(Vec::new()),
-        });
+        let thread_persistence = Arc::new(InMemoryThreads::new());
         let company_persistence = Arc::new(MockCompanyPersistence { company: None });
         let channel_persistence = Arc::new(MockChannelPersistence { channel: None });
 
@@ -2648,10 +2531,7 @@ mod tests {
         let agent_id = Uuid::new_v4();
 
         let task_persistence = Arc::new(MockTaskPersistence::default());
-        let thread_persistence = Arc::new(MockThreadPersistence {
-            messages: Mutex::new(Vec::new()),
-            threads: Mutex::new(Vec::new()),
-        });
+        let thread_persistence = Arc::new(InMemoryThreads::new());
 
         let company = crate::entities::company::Company {
             channel_defaults: Default::default(),
@@ -2773,7 +2653,7 @@ mod tests {
                 created_at: chrono::Utc::now(),
                 updated_at: chrono::Utc::now(),
             }),
-            inbound_message: Some(crate::entities::message::Message {
+            inbound_message: Some(stored_email(EmailMessageDraft {
                 id: Uuid::new_v4(),
                 thread_id,
                 message_id: "<msg1@test.com>".into(),
@@ -2791,7 +2671,7 @@ mod tests {
                 role: crate::entities::message::MessageRole::Human,
                 thread_index: Some("1".into()),
                 created_at: chrono::Utc::now(),
-            }),
+            })),
             company: Some(company),
             channel: Some(channel),
             parsed_email: Some(parsed_email),
@@ -2875,10 +2755,7 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
-        let thread_persistence = Arc::new(MockThreadPersistence {
-            messages: Mutex::new(vec![]),
-            threads: Mutex::new(vec![]),
-        });
+        let thread_persistence = Arc::new(InMemoryThreads::new());
         let company_persistence = Arc::new(MockCompanyPersistence {
             company: Some(company.clone()),
         });
@@ -2947,6 +2824,7 @@ mod tests {
             "delivery_mode": "mailbox_only",
             "recipient_emails": [],
             "trigger_message_id": "<TRIGGER123@domain.com>",
+            "prompt_message_id": Uuid::new_v4(),
         });
 
         let task = task_persistence
@@ -3022,31 +2900,45 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
-        // The answer a previous attempt already saved, threaded onto the schedule's prompt.
-        let existing_reply = Message {
-            id: Uuid::new_v4(),
-            thread_id,
-            message_id: MessageId::new("<already-answered@domain.com>"),
-            in_reply_to: Some(trigger.clone()),
-            references_list: vec![trigger.clone()],
-            sender: EmailAddress::from("audit@test-co.mailagents.com"),
-            recipients_to: vec![],
-            recipients_cc: vec![],
-            subject: "Re: Audit Report".into(),
-            clean_text_body: "Audit complete: nothing to report.".into(),
-            raw_text_body: None,
-            raw_html_body: None,
-            attachments: None,
-            direction: MessageDirection::Outbound,
-            role: MessageRole::Agent,
-            thread_index: None,
+        let thread_persistence = Arc::new(InMemoryThreads::new());
+        thread_persistence.insert_thread(Thread {
+            id: thread_id,
+            channel_id,
+            subject: "Audit Report".into(),
+            participant_principal_ids: Vec::new(),
+            participant_projection: Default::default(),
             created_at: chrono::Utc::now(),
-        };
-
-        let thread_persistence = Arc::new(MockThreadPersistence {
-            messages: Mutex::new(vec![existing_reply]),
-            threads: Mutex::new(vec![]),
+            updated_at: chrono::Utc::now(),
         });
+        // The schedule's own prompt, and the answer a previous attempt already saved after it.
+        let prompt = thread_persistence
+            .create_message(&MessageWrite::internal(
+                thread_id,
+                MessageAuthorWrite::Platform,
+                "Audit Report",
+                "Run audit",
+                MessageDirection::Inbound,
+                MessageRole::System,
+                CorrelationId::new(),
+            ))
+            .await
+            .unwrap();
+        thread_persistence
+            .create_message(&email_write(EmailMessageDraft {
+                thread_id,
+                message_id: MessageId::new("<already-answered@domain.com>"),
+                in_reply_to: Some(trigger.clone()),
+                references_list: vec![trigger.clone()],
+                sender: EmailAddress::from("audit@test-co.mailagents.com"),
+                subject: "Re: Audit Report".into(),
+                clean_text_body: "Audit complete: nothing to report.".into(),
+                direction: MessageDirection::Outbound,
+                role: MessageRole::Agent,
+                created_at: chrono::Utc::now() + chrono::Duration::seconds(1),
+                ..Default::default()
+            }))
+            .await
+            .unwrap();
         let company_persistence = Arc::new(MockCompanyPersistence {
             company: Some(company.clone()),
         });
@@ -3121,6 +3013,7 @@ mod tests {
                     "delivery_mode": "email_custom",
                     "recipient_emails": ["ops@example.com", "cc@example.com"],
                     "trigger_message_id": trigger.to_string(),
+                    "prompt_message_id": prompt.canonical_id,
                 }),
             ))
             .await
@@ -3142,10 +3035,10 @@ mod tests {
             processed.last_error
         );
 
-        // Exactly one reply in the thread -- the retry appended nothing.
+        // The prompt and one answer -- the retry appended nothing.
         assert_eq!(
-            thread_persistence.messages.lock().unwrap().len(),
-            1,
+            thread_persistence.messages().len(),
+            2,
             "a retry must not append a second answer"
         );
 

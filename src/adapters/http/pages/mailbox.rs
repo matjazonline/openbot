@@ -2250,8 +2250,12 @@ pub fn message_bubble_chat(
     // source channel. Nothing arriving from the wire can reach this combination.
     let from_other_channel =
         message.direction == MessageDirection::Inbound && message.role == MessageRole::Agent;
-    let is_viewer =
-        viewer_email.is_some_and(|email| message.sender.eq_ignore_ascii_case(email.as_ref()));
+    // "Mine" is decided on the handle the message was written with, so a message a member sent
+    // over mail and one they composed in the app both read as theirs.
+    let is_viewer = match (viewer_email, message.author.email_address()) {
+        (Some(viewer), Some(author)) => author.eq_ignore_ascii_case(viewer.as_ref()),
+        _ => false,
+    };
     let body = if is_agent {
         format!(
             r##"<div class="{MARKDOWN_CONTENT_STYLES}">{}</div>"##,
@@ -2268,7 +2272,7 @@ pub fn message_bubble_chat(
     // put the wrong name and face on work a different agent did, so that one keeps its address.
     let (writer, avatar_url) = match (is_agent && !from_other_channel, agent) {
         (true, Some(agent)) => (agent.name.as_str(), agent.avatar_url.as_ref()),
-        _ => (message.sender.as_str(), None),
+        _ => (message.author.display(), None),
     };
 
     format!(

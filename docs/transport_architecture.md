@@ -179,6 +179,14 @@ Both keys are opaque outside their adapter. `(binding_id, external_thread_key)` 
 one canonical thread. `(binding_id, external_message_key)` identifies at most one canonical
 message, while the same key text may safely occur in another binding.
 
+A Message-ID is therefore not a company-wide identity. The case that settles it is inter-channel
+delegation: when one channel's agent mails another, the same Message-ID is one *outbound* message
+on the sending channel's binding and one *inbound* message on the receiving channel's, with
+different bodies, directions and threads. The pre-canonical schema keyed one row on
+`(company_id, message_id)` and had to demand that both writers produce byte-identical content,
+which silently broke every delegation hop whose two halves disagreed. Qualifying the key by the
+binding that carried it removes that coupling.
+
 Reply-before-root is valid. The inbound transaction resolves or upserts the external thread map
 before it creates the canonical message. Therefore a Slack reply received before its root creates
 the canonical thread; the later root joins the same thread through the shared external thread key.

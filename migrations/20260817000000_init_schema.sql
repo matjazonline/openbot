@@ -331,6 +331,10 @@ CREATE UNIQUE INDEX principals_company_user_key
     ON principals (company_id, user_id) WHERE user_id IS NOT NULL;
 CREATE UNIQUE INDEX principals_company_agent_key
     ON principals (company_id, agent_id) WHERE agent_id IS NOT NULL;
+-- The platform itself is one actor per company, so a schedule prompt and an approval note written
+-- months apart are attributed to the same principal rather than to a growing pile of look-alikes.
+CREATE UNIQUE INDEX principals_company_system_key
+    ON principals (company_id) WHERE kind = 'system';
 
 -- One transport-qualified handle for a principal.  `(transport, namespace, subject)` is the whole
 -- key: an email mailbox and a Slack user id in two workspaces are three distinct rows that never
@@ -820,17 +824,20 @@ CREATE TRIGGER binding_audit_events_append_only
 BEFORE UPDATE ON binding_audit_events
 FOR EACH ROW EXECUTE FUNCTION reject_binding_audit_rewrite();
 
+-- One conversation inside one business channel.
+--
+-- Deliberately carries no provider key of its own: a thread may be bound to email and to several
+-- Slack conversations at once, so the mapping lives one-to-many in `external_threads`.
 CREATE TABLE threads (
     id UUID PRIMARY KEY,
     company_id UUID NOT NULL,
     channel_id UUID NOT NULL,
     subject TEXT NOT NULL,
-    external_thread_key TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT threads_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT threads_company_channel_id_key UNIQUE (company_id, channel_id, id),
     CONSTRAINT threads_channel_id_key UNIQUE (channel_id, id),
-    CONSTRAINT threads_channel_external_key UNIQUE (channel_id, external_thread_key),
     CONSTRAINT threads_channel_fk
         FOREIGN KEY (company_id, channel_id)
         REFERENCES channels(company_id, id) ON DELETE CASCADE
@@ -861,79 +868,259 @@ CREATE TABLE thread_principals (
 CREATE INDEX thread_principals_principal_idx
     ON thread_principals (company_id, principal_id, thread_id, role);
 
-CREATE TABLE email_messages (
+-- The canonical payload of one message, whatever carried it: an email, a Slack post, a schedule's
+-- prompt, an approval note, or an agent's answer.
+--
+-- Nothing here is email-shaped. The author is a principal, not an address; the subject is a plain
+-- string; protocol headers and provider keys live in `email_message_metadata`, `external_messages`
+-- and `external_threads`. A message stored once may be associated with several threads through
+-- `thread_messages` and delivered through several bindings without a second copy of its body.
+CREATE TABLE messages (
     id UUID PRIMARY KEY,
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    message_id TEXT NOT NULL,
-    content_hash BYTEA NOT NULL,
-    in_reply_to TEXT,
-    references_list TEXT[] NOT NULL DEFAULT '{}',
-    sender CITEXT NOT NULL,
-    recipients_to TEXT[] NOT NULL DEFAULT '{}',
-    recipients_cc TEXT[] NOT NULL DEFAULT '{}',
+    -- Who said it. Always a principal, so "the same person over two transports" is one actor.
+    author_principal_id UUID NOT NULL,
+    -- Which of that principal's handles said it, when a transport named one. A schedule prompt
+    -- and a system note have an author but no handle, which is why this is nullable.
+    authored_identity_id UUID,
     subject TEXT NOT NULL,
-    raw_text_body TEXT,
-    raw_html_body TEXT,
+    clean_text_body TEXT NOT NULL,
     attachments JSONB,
-    thread_index TEXT,
-    received_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT email_messages_company_message_key UNIQUE (company_id, message_id),
-    CONSTRAINT email_messages_company_id_id_key UNIQUE (company_id, id),
-    CONSTRAINT email_messages_attachments_array_check CHECK (
-        attachments IS NULL OR jsonb_typeof(attachments) = 'array'
+    direction TEXT NOT NULL,
+    role TEXT NOT NULL,
+    -- The chain this message belongs to, minted at ingress and shared with the task it causes.
+    correlation_id UUID NOT NULL,
+    -- Over one canonical payload, so a provider redelivering the same key with different content
+    -- is a detectable collision rather than a silent rewrite. See `canonical_message_hash`.
+    content_hash BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT messages_company_id_id_key UNIQUE (company_id, id),
+    -- Composite, so a message can never name an author or handle from another company.
+    CONSTRAINT messages_author_principal_fk
+        FOREIGN KEY (company_id, author_principal_id)
+        REFERENCES principals(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT messages_authored_identity_fk
+        FOREIGN KEY (company_id, authored_identity_id)
+        REFERENCES participant_identities(company_id, id)
+        ON DELETE SET NULL (authored_identity_id),
+    CONSTRAINT messages_direction_check CHECK (direction IN ('inbound', 'outbound')),
+    CONSTRAINT messages_role_check CHECK (role IN ('human', 'agent', 'system')),
+    CONSTRAINT messages_content_hash_check CHECK (octet_length(content_hash) = 32),
+    CONSTRAINT messages_subject_check CHECK (octet_length(subject) <= 2048),
+    -- Attachment metadata arrives from outside and is decoded long after it was written, so it is
+    -- stored as a versioned, discriminated, bounded envelope and decoded fallibly in Rust -- a
+    -- structurally valid object may still carry a version a rolling deploy has not learned yet.
+    CONSTRAINT messages_attachments_check CHECK (
+        attachments IS NULL
+        OR (
+            jsonb_typeof(attachments) = 'object'
+            -- The discriminator is a JSON *string* because `MessageAttachments` is an
+            -- internally-tagged Rust enum, whose variant name is what serde writes here. A
+            -- number would decode as a different shape entirely.
+            AND attachments->'version' = '"1"'::JSONB
+            AND jsonb_typeof(attachments->'items') = 'array'
+            AND octet_length(attachments::text) <= 262144
+        )
     )
 );
 
-CREATE INDEX email_messages_in_reply_to_idx
-    ON email_messages (in_reply_to) WHERE in_reply_to IS NOT NULL;
+CREATE INDEX messages_company_created_idx ON messages (company_id, created_at DESC, id DESC);
+CREATE INDEX messages_author_idx ON messages (company_id, author_principal_id);
+
+-- The sender/to/cc projection of a message, for the transports that have one.
+--
+-- `position` is what makes a rendered `To:` header reproducible: the order a message was addressed
+-- in is data, not an accident of how a query happened to sort. A transport without recipient
+-- vocabulary -- Slack, a schedule prompt -- simply writes no rows here.
+CREATE TABLE message_participants (
+    company_id UUID NOT NULL,
+    message_id UUID NOT NULL,
+    participant_identity_id UUID NOT NULL,
+    kind TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    PRIMARY KEY (message_id, kind, position),
+    CONSTRAINT message_participants_message_fk
+        FOREIGN KEY (company_id, message_id)
+        REFERENCES messages(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT message_participants_identity_fk
+        FOREIGN KEY (company_id, participant_identity_id)
+        REFERENCES participant_identities(company_id, id) ON DELETE CASCADE,
+    -- One handle appears at most once per role, so a duplicated `Cc` cannot become two rows that
+    -- render the same address twice.
+    CONSTRAINT message_participants_identity_kind_key
+        UNIQUE (message_id, kind, participant_identity_id),
+    CONSTRAINT message_participants_kind_check CHECK (kind IN ('sender', 'to', 'cc')),
+    CONSTRAINT message_participants_position_check CHECK (position >= 0)
+);
+
+CREATE INDEX message_participants_identity_idx
+    ON message_participants (company_id, participant_identity_id, message_id);
+
+-- The email protocol extension of a canonical message: the headers and raw representations that
+-- only mail has, kept out of `messages` so a Slack post needs none of them.
+--
+-- `rfc_message_id` is deliberately *not* unique per company. A Message-ID identifies a mail on the
+-- wire, not a message this company holds: when one channel's agent mails another, the same
+-- Message-ID is one outbound message on the sending channel's binding and one inbound message on
+-- the receiving channel's, with different bodies, different directions and different threads. The
+-- pre-canonical schema forced those into one row keyed by Message-ID and then had to demand that
+-- both writers produce byte-identical content -- a coupling that silently broke every
+-- inter-channel delegation the moment one side stored a raw body the other did not. Dedup belongs
+-- to `external_messages (binding_id, external_message_key)`, which is the provider key qualified
+-- by the interface that carried it.
+--
+-- Email authentication (SPF/DKIM/DMARC) and spam scoring are deliberately absent. They are ingress
+-- guards, consumed before a message exists at all -- see `check_inbound_guards` -- and nothing
+-- downstream reads them back. A field is retained here only because something reads it.
+CREATE TABLE email_message_metadata (
+    company_id UUID NOT NULL,
+    message_id UUID NOT NULL,
+    rfc_message_id TEXT NOT NULL,
+    in_reply_to TEXT,
+    references_list TEXT[] NOT NULL DEFAULT '{}',
+    thread_index TEXT,
+    raw_text_body TEXT,
+    raw_html_body TEXT,
+    PRIMARY KEY (message_id),
+    CONSTRAINT email_message_metadata_message_fk
+        FOREIGN KEY (company_id, message_id)
+        REFERENCES messages(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT email_message_metadata_rfc_message_id_check CHECK (
+        btrim(rfc_message_id) <> '' AND octet_length(rfc_message_id) <= 998
+    ),
+    CONSTRAINT email_message_metadata_in_reply_to_check CHECK (
+        in_reply_to IS NULL OR octet_length(in_reply_to) <= 998
+    ),
+    CONSTRAINT email_message_metadata_thread_index_check CHECK (
+        thread_index IS NULL OR octet_length(thread_index) <= 998
+    ),
+    -- Bounded because the whole array is read into memory to build a threading lookup key.
+    CONSTRAINT email_message_metadata_references_check CHECK (
+        array_length(references_list, 1) IS NULL OR array_length(references_list, 1) <= 100
+    )
+);
+
+-- Thread resolution and the ingress duplicate check both look a Message-ID up inside one company.
+CREATE INDEX email_message_metadata_company_rfc_idx
+    ON email_message_metadata (company_id, rfc_message_id);
+CREATE INDEX email_message_metadata_in_reply_to_idx
+    ON email_message_metadata (company_id, in_reply_to) WHERE in_reply_to IS NOT NULL;
+CREATE INDEX email_message_metadata_thread_index_idx
+    ON email_message_metadata (company_id, thread_index) WHERE thread_index IS NOT NULL;
+
+-- Which provider conversation, on which binding, a canonical thread is reachable as.
+--
+-- One thread may have many rows: the same conversation can run over the channel's email binding
+-- and over two Slack conversations at once. The key is opaque here -- the owning adapter decides
+-- what a thread key is (`thread_ts.unwrap_or(ts)` for Slack, an RFC root for mail) -- so nothing
+-- in the database or the application parses it.
+CREATE TABLE external_threads (
+    id UUID PRIMARY KEY,
+    company_id UUID NOT NULL,
+    binding_id UUID NOT NULL,
+    external_thread_key TEXT NOT NULL,
+    thread_id UUID NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT external_threads_company_id_id_key UNIQUE (company_id, id),
+    -- One provider conversation resolves to exactly one internal thread; the same key in another
+    -- binding is a different conversation and collides with nothing.
+    CONSTRAINT external_threads_binding_key_key UNIQUE (binding_id, external_thread_key),
+    CONSTRAINT external_threads_binding_fk
+        FOREIGN KEY (company_id, binding_id)
+        REFERENCES channel_bindings(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT external_threads_thread_fk
+        FOREIGN KEY (company_id, thread_id)
+        REFERENCES threads(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT external_threads_key_check CHECK (
+        btrim(external_thread_key) <> '' AND octet_length(external_thread_key) <= 998
+    )
+);
+
+CREATE INDEX external_threads_thread_idx
+    ON external_threads (company_id, thread_id, binding_id);
+
+-- Which provider message, on which binding, a canonical message was carried as.
+--
+-- This is the dedup key for redelivery: a provider replaying an event finds its own key here and
+-- the existing canonical message is returned instead of a second one being written.
+CREATE TABLE external_messages (
+    id UUID PRIMARY KEY,
+    company_id UUID NOT NULL,
+    binding_id UUID NOT NULL,
+    external_message_key TEXT NOT NULL,
+    message_id UUID NOT NULL,
+    -- Which part of an outbound delivery produced this provider message. A long answer is sent as
+    -- several provider messages, so the mapping is per part rather than per message. Step 9
+    -- introduces `message_delivery_parts` and the foreign key onto it; until then this records
+    -- nothing and is written by no path.
+    delivery_part_id UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT external_messages_company_id_id_key UNIQUE (company_id, id),
+    CONSTRAINT external_messages_binding_key_key UNIQUE (binding_id, external_message_key),
+    CONSTRAINT external_messages_binding_fk
+        FOREIGN KEY (company_id, binding_id)
+        REFERENCES channel_bindings(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT external_messages_message_fk
+        FOREIGN KEY (company_id, message_id)
+        REFERENCES messages(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT external_messages_key_check CHECK (
+        btrim(external_message_key) <> '' AND octet_length(external_message_key) <= 998
+    )
+);
+
+CREATE INDEX external_messages_message_idx
+    ON external_messages (company_id, message_id, binding_id);
+
+-- One canonical message's membership of one thread.
+--
+-- Carries no payload of its own: the body, role and direction belong to the message, and this row
+-- says only that the message is part of this conversation. `id` is the association identity the
+-- UI and `task_outreach_targets.response_message_id` name, so a message in two threads has two
+-- addressable rows.
 CREATE TABLE thread_messages (
     id UUID PRIMARY KEY,
     company_id UUID NOT NULL,
     channel_id UUID NOT NULL,
     thread_id UUID NOT NULL,
-    email_message_id UUID NOT NULL,
-    clean_text_body TEXT NOT NULL,
-    direction TEXT NOT NULL,
-    role TEXT NOT NULL,
+    message_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT thread_messages_thread_email_key UNIQUE (thread_id, email_message_id),
-    CONSTRAINT thread_messages_channel_email_key UNIQUE (channel_id, email_message_id),
+    CONSTRAINT thread_messages_thread_message_key UNIQUE (thread_id, message_id),
+    -- A message lands in at most one thread per channel: a second thread in the same channel would
+    -- split one conversation in two for the same audience.
+    CONSTRAINT thread_messages_channel_message_key UNIQUE (channel_id, message_id),
     -- All three tenancy columns are in the key, so a message cannot name a thread that belongs to
     -- another company or another channel than the one it recorded.
     CONSTRAINT thread_messages_thread_fk
         FOREIGN KEY (company_id, channel_id, thread_id)
         REFERENCES threads(company_id, channel_id, id) ON DELETE CASCADE,
-    CONSTRAINT thread_messages_email_fk
-        FOREIGN KEY (company_id, email_message_id)
-        REFERENCES email_messages(company_id, id) ON DELETE CASCADE,
-    CONSTRAINT thread_messages_direction_check CHECK (direction IN ('inbound', 'outbound')),
-    CONSTRAINT thread_messages_role_check CHECK (role IN ('human', 'agent', 'system'))
+    CONSTRAINT thread_messages_message_fk
+        FOREIGN KEY (company_id, message_id)
+        REFERENCES messages(company_id, id) ON DELETE CASCADE
 );
 
 CREATE INDEX thread_messages_thread_created_idx
     ON thread_messages (thread_id, created_at, id);
-CREATE INDEX thread_messages_email_thread_idx
-    ON thread_messages (email_message_id, thread_id);
-CREATE INDEX thread_messages_outbound_thread_idx
-    ON thread_messages (thread_id, email_message_id, created_at DESC)
-    WHERE direction = 'outbound';
+CREATE INDEX thread_messages_message_thread_idx
+    ON thread_messages (message_id, thread_id);
 
-CREATE FUNCTION delete_orphan_email_message() RETURNS trigger
+CREATE FUNCTION delete_orphan_message() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-    DELETE FROM email_messages em
-    WHERE em.id = OLD.email_message_id
+    DELETE FROM messages message
+    WHERE message.id = OLD.message_id
       AND NOT EXISTS (
-          SELECT 1 FROM thread_messages tm
-          WHERE tm.email_message_id = OLD.email_message_id
+          SELECT 1 FROM thread_messages association
+          WHERE association.message_id = OLD.message_id
       );
     RETURN NULL;
 END;
 $$;
 
-CREATE TRIGGER thread_messages_delete_orphan_email
+CREATE TRIGGER thread_messages_delete_orphan_message
 AFTER DELETE ON thread_messages
-FOR EACH ROW EXECUTE FUNCTION delete_orphan_email_message();
+FOR EACH ROW EXECUTE FUNCTION delete_orphan_message();
 
 -- Announce every persisted message so open `/ui` mailboxes can append it live.
 --
@@ -971,7 +1158,15 @@ CREATE TABLE background_tasks (
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     channel_id UUID NOT NULL,
     thread_id UUID,
-    source_message_id TEXT,
+    -- The canonical message this task was queued for, when one caused it. Tenant-scoped and
+    -- unique, so a redelivered provider message finds the task its first delivery created instead
+    -- of starting a second run of the same work.
+    source_message_uuid UUID,
+    -- The same guarantee for the one source that is not a message: a schedule slot coming due.
+    -- No foreign key, because `schedule_runs` names `background_tasks` and Postgres cannot create
+    -- the pair in either order; `schedule_runs_schedule_slot_key` is what makes the slot unique in
+    -- the first place, and this makes the task it materializes unique too.
+    source_schedule_run_id UUID,
     -- The inbound event this task descends from, minted once at ingress and inherited by every
     -- task the run goes on to spawn (an outreach in another channel, an approval resume, a
     -- schedule's next occurrence). Never re-minted here: the `ON CONFLICT` below returns the
@@ -1012,7 +1207,18 @@ CREATE TABLE background_tasks (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT background_tasks_company_id_id_key UNIQUE (company_id, id),
-    CONSTRAINT background_tasks_company_source_key UNIQUE (company_id, source_message_id),
+    CONSTRAINT background_tasks_company_source_message_key
+        UNIQUE (company_id, source_message_uuid),
+    CONSTRAINT background_tasks_company_source_schedule_run_key
+        UNIQUE (company_id, source_schedule_run_id),
+    -- A task names at most one source. Both set would make "which redelivery does this dedup
+    -- against?" ambiguous, and the two unique keys above would each answer differently.
+    CONSTRAINT background_tasks_single_source_check CHECK (
+        source_message_uuid IS NULL OR source_schedule_run_id IS NULL
+    ),
+    CONSTRAINT background_tasks_source_message_fk
+        FOREIGN KEY (company_id, source_message_uuid)
+        REFERENCES messages(company_id, id) ON DELETE SET NULL (source_message_uuid),
     CONSTRAINT background_tasks_channel_fk
         FOREIGN KEY (company_id, channel_id)
         REFERENCES channels(company_id, id) ON DELETE CASCADE,

@@ -4,6 +4,7 @@ use std::{collections::HashMap, str::FromStr};
 use uuid::Uuid;
 
 use crate::entities::correlation::CorrelationId;
+use crate::entities::message::CanonicalMessageId;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -435,6 +436,39 @@ impl TokenUsage {
 /// One value rather than six positional parameters: `company_id`, `channel_id` and the optional
 /// `thread_id` are all bare `Uuid`s that the compiler would happily let a caller swap, and
 /// `correlation_id` joining them made that worse rather than better.
+/// What caused a task, when the cause is something that can be delivered twice.
+///
+/// This is the task queue's idempotency key. A provider redelivering a message, or a second
+/// scheduler waking for the same slot, must find the task the first delivery created rather than
+/// start a second run of the same work -- so the cause is stated as a typed value the queue can put
+/// a unique constraint on, not fished out of the payload JSON by a string pointer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TaskSource {
+    /// Nothing repeatable caused it: an approval resuming, an outreach starting, a test.
+    #[default]
+    Unattributed,
+    /// A canonical message. Every delivery of that message resolves to this one task.
+    Message(CanonicalMessageId),
+    /// A schedule slot coming due.
+    ScheduleRun(Uuid),
+}
+
+impl TaskSource {
+    pub fn message_id(self) -> Option<CanonicalMessageId> {
+        match self {
+            Self::Message(id) => Some(id),
+            Self::Unattributed | Self::ScheduleRun(_) => None,
+        }
+    }
+
+    pub fn schedule_run_id(self) -> Option<Uuid> {
+        match self {
+            Self::ScheduleRun(id) => Some(id),
+            Self::Unattributed | Self::Message(_) => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct NewTask {
     pub company_id: Uuid,
@@ -442,6 +476,8 @@ pub struct NewTask {
     pub thread_id: Option<Uuid>,
     pub task_type: String,
     pub payload: serde_json::Value,
+    /// What this task is the work for, when redelivering that thing must not run it twice.
+    pub source: TaskSource,
     /// The chain this task belongs to.
     ///
     /// A task enqueued *by* a running task must pass that task's id through, so an outreach into
@@ -470,6 +506,7 @@ impl NewTask {
             thread_id,
             task_type: task_type.into(),
             payload,
+            source: TaskSource::Unattributed,
             correlation_id: CorrelationId::new(),
         }
     }
@@ -488,8 +525,15 @@ impl NewTask {
             thread_id,
             task_type: task_type.into(),
             payload,
+            source: TaskSource::Unattributed,
             correlation_id: parent.correlation_id,
         }
+    }
+
+    /// Name what this task is the work for, so a redelivery of that cause finds this task.
+    pub fn caused_by_source(mut self, source: TaskSource) -> Self {
+        self.source = source;
+        self
     }
 }
 

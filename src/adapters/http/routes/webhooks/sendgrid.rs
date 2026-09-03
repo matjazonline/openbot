@@ -199,7 +199,10 @@ async fn sendgrid_inbound_webhook(
         "processed": ingest.accepted,
         "reason": ingest.reason,
         "thread_id": ingest.thread.as_ref().map(|t| t.id),
-        "inbound_message_id": ingest.inbound_message.as_ref().map(|m| m.message_id.clone()),
+        "inbound_message_id": ingest
+            .inbound_message
+            .as_ref()
+            .map(|message| message.canonical_id),
     });
 
     // Return HTTP 200 OK immediately to prevent SendGrid webhook timeouts
@@ -300,6 +303,7 @@ mod tests {
     use crate::entities::task::NewTask;
     use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
     use crate::use_cases::participant::test_support::{InMemoryParticipantDirectory, TeamFixture};
+    use crate::use_cases::thread::test_support::InMemoryThreads;
     use async_trait::async_trait;
     use axum::body::Body;
     use axum::http::Request;
@@ -344,19 +348,12 @@ mod tests {
 
     use crate::{
         app_error::AppResult,
-        entities::{
-            channel::Channel,
-            company::Company,
-            cursor::{MessageCursor, ThreadCursor},
-            message::Message,
-            thread::Thread,
-        },
+        entities::{channel::Channel, company::Company},
         infra::config::AppConfig,
         use_cases::{
             channel::{ChannelPersistence, ChannelUseCases, ChannelWrite},
             company::{CompanyPersistence, CompanyWrite},
             company_invite::CompanyInvitePersistence,
-            thread::ThreadPersistence,
             user::UserPersistence,
         },
     };
@@ -555,208 +552,6 @@ mod tests {
         }
     }
 
-    struct MockThreadPersistence {
-        threads: Mutex<Vec<Thread>>,
-        messages: Mutex<Vec<Message>>,
-    }
-
-    #[async_trait]
-    impl ThreadPersistence for MockThreadPersistence {
-        async fn create_thread(
-            &self,
-            channel_id: Uuid,
-            subject: &str,
-            participant_emails: &[crate::entities::value_objects::EmailAddress],
-        ) -> AppResult<Thread> {
-            let thread = Thread {
-                id: Uuid::new_v4(),
-                channel_id,
-                subject: subject.to_string(),
-                participant_principal_ids: Vec::new(),
-                participant_projection: crate::entities::thread::ThreadParticipantProjection {
-                    email_addresses: participant_emails.to_vec(),
-                },
-                created_at: Utc::now(),
-                updated_at: Utc::now(),
-            };
-            self.threads.lock().unwrap().push(thread.clone());
-            Ok(thread)
-        }
-
-        async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>> {
-            Ok(self
-                .threads
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|t| t.id == id)
-                .cloned())
-        }
-
-        async fn list_threads_by_channel_id(
-            &self,
-            _channel_id: Uuid,
-            _before: Option<ThreadCursor>,
-            _limit: usize,
-        ) -> AppResult<Vec<Thread>> {
-            unimplemented!()
-        }
-
-        async fn list_threads_updated_after(
-            &self,
-            channel_id: Uuid,
-            after: Option<ThreadCursor>,
-            limit: usize,
-        ) -> AppResult<Vec<Thread>> {
-            let mut threads: Vec<Thread> = self
-                .threads
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|t| t.channel_id == channel_id)
-                .filter(|t| after.is_none_or(|cursor| t.cursor() > cursor))
-                .cloned()
-                .collect();
-            threads.sort_by_key(|t| t.cursor());
-            threads.truncate(limit);
-            Ok(threads)
-        }
-
-        async fn update_thread_participants(
-            &self,
-            id: Uuid,
-            participant_emails: &[crate::entities::value_objects::EmailAddress],
-        ) -> AppResult<Thread> {
-            let mut list = self.threads.lock().unwrap();
-            let thread = list.iter_mut().find(|t| t.id == id).unwrap();
-            thread.participant_projection.email_addresses = participant_emails.to_vec();
-            Ok(thread.clone())
-        }
-
-        async fn find_thread_by_message_ids(
-            &self,
-            _channel_id: Uuid,
-            message_ids: &[crate::entities::value_objects::MessageId],
-        ) -> AppResult<Option<Thread>> {
-            let thread_id = {
-                let msgs = self.messages.lock().unwrap();
-                msgs.iter()
-                    .find(|m| message_ids.contains(&m.message_id))
-                    .map(|m| m.thread_id)
-            };
-            if let Some(tid) = thread_id {
-                return self.get_thread_by_id(tid).await;
-            }
-            Ok(None)
-        }
-
-        async fn find_thread_by_thread_index(
-            &self,
-            channel_id: Uuid,
-            thread_index: &crate::entities::value_objects::ThreadIndex,
-        ) -> AppResult<Option<Thread>> {
-            let ancestors = thread_index.ancestor_chain().unwrap_or_default();
-            let thread_id = {
-                let msgs = self.messages.lock().unwrap();
-                msgs.iter()
-                    .filter(|message| {
-                        message
-                            .thread_index
-                            .as_ref()
-                            .is_some_and(|stored| ancestors.contains(stored))
-                    })
-                    .max_by_key(|message| {
-                        message.thread_index.as_ref().map_or(0, |index| index.len())
-                    })
-                    .map(|m| m.thread_id)
-            };
-            if let Some(tid) = thread_id {
-                return Ok(self
-                    .get_thread_by_id(tid)
-                    .await?
-                    .filter(|thread| thread.channel_id == channel_id));
-            }
-            Ok(None)
-        }
-
-        async fn count_recent_messages(
-            &self,
-            thread_id: Uuid,
-            _duration_secs: i64,
-        ) -> AppResult<usize> {
-            let msgs = self.messages.lock().unwrap();
-            Ok(msgs.iter().filter(|m| m.thread_id == thread_id).count())
-        }
-
-        async fn create_message(&self, message: &Message) -> AppResult<Message> {
-            self.messages.lock().unwrap().push(message.clone());
-            Ok(message.clone())
-        }
-
-        async fn get_message_by_message_id(
-            &self,
-            _company_id: Uuid,
-            message_id: &crate::entities::value_objects::MessageId,
-        ) -> AppResult<Option<Message>> {
-            Ok(self
-                .messages
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|m| &m.message_id == message_id)
-                .cloned())
-        }
-
-        async fn find_outbound_reply(
-            &self,
-            thread_id: Uuid,
-            in_reply_to: &crate::entities::value_objects::MessageId,
-        ) -> AppResult<Option<Message>> {
-            Ok(self
-                .messages
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|message| {
-                    message.thread_id == thread_id
-                        && message.direction == crate::entities::message::MessageDirection::Outbound
-                        && message.in_reply_to.as_ref() == Some(in_reply_to)
-                })
-                .cloned())
-        }
-
-        async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
-            Ok(self
-                .messages
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|m| m.thread_id == thread_id)
-                .cloned()
-                .collect())
-        }
-
-        async fn list_messages_after(
-            &self,
-            thread_id: Uuid,
-            after: Option<MessageCursor>,
-            limit: usize,
-        ) -> AppResult<Vec<Message>> {
-            let mut messages: Vec<Message> = self
-                .messages
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|m| m.thread_id == thread_id)
-                .filter(|m| after.is_none_or(|cursor| m.cursor() > cursor))
-                .cloned()
-                .collect();
-            messages.sort_by_key(|m| m.cursor());
-            messages.truncate(limit);
-            Ok(messages)
-        }
-    }
-
     struct MockTaskPersistence {
         tasks: Mutex<Vec<crate::entities::task::BackgroundTask>>,
     }
@@ -786,6 +581,7 @@ mod tests {
                 thread_id,
                 task_type,
                 payload,
+                source: _,
                 correlation_id,
             }: NewTask,
         ) -> AppResult<crate::entities::task::BackgroundTask> {
@@ -1284,10 +1080,7 @@ mod tests {
             }]),
         });
 
-        let thread_persistence = Arc::new(MockThreadPersistence {
-            threads: Mutex::new(Vec::new()),
-            messages: Mutex::new(Vec::new()),
-        });
+        let thread_persistence = Arc::new(InMemoryThreads::new());
 
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
@@ -1460,9 +1253,9 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        let threads = thread_persistence.threads.lock().unwrap();
+        let threads = thread_persistence.threads();
         assert!(threads.is_empty());
-        let messages = thread_persistence.messages.lock().unwrap();
+        let messages = thread_persistence.messages();
         assert!(messages.is_empty());
     }
 }

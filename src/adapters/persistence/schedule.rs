@@ -726,7 +726,7 @@ mod tests {
     use super::*;
     use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool};
-    use crate::entities::task::NewTask;
+    use crate::entities::task::{NewTask, TaskSource};
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
         company::{CompanyPersistence, CompanyWrite},
@@ -1081,6 +1081,8 @@ mod tests {
             "schedule_run_id": durable_run.id,
             "schedule_id": one_off.id,
         });
+        // The slot is the dedup key: a second scheduler waking for it must find the task the
+        // first one queued rather than run the agent twice.
         let first_task = TaskPersistence::enqueue_task(
             &persistence,
             NewTask::starting_new_chain(
@@ -1089,7 +1091,8 @@ mod tests {
                 Some(first_thread.id),
                 "scheduled_agent_run",
                 payload.clone(),
-            ),
+            )
+            .caused_by_source(TaskSource::ScheduleRun(durable_run.id)),
         )
         .await
         .unwrap();
@@ -1101,7 +1104,8 @@ mod tests {
                 Some(first_thread.id),
                 "scheduled_agent_run",
                 payload,
-            ),
+            )
+            .caused_by_source(TaskSource::ScheduleRun(durable_run.id)),
         )
         .await
         .unwrap();

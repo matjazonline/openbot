@@ -26,6 +26,14 @@ pub enum AppError {
 
 pub type AppResult<T> = Result<T, AppError>;
 
+/// A provider redelivering a key with different content is a conflict, not an internal fault:
+/// the request is well-formed and the stored state is what refuses it.
+impl From<crate::entities::message::ExternalMessageCollision> for AppError {
+    fn from(error: crate::entities::message::ExternalMessageCollision) -> Self {
+        AppError::Conflict(error.to_string())
+    }
+}
+
 impl From<anyhow::Error> for AppError {
     fn from(err: anyhow::Error) -> Self {
         AppError::Internal(err.to_string())

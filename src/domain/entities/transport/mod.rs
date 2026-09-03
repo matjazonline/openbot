@@ -112,13 +112,17 @@ macro_rules! uuid_id {
             }
         }
 
-        impl fmt::Display for $name {
-            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                fmt::Display::fmt(&self.0, formatter)
+        impl ::std::fmt::Display for $name {
+            fn fmt(&self, formatter: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                ::std::fmt::Display::fmt(&self.0, formatter)
             }
         }
     };
 }
+
+// Re-exported so sibling entity modules can mint their own id newtypes from the same definition
+// rather than hand-rolling a fourth variant of it.
+pub(crate) use uuid_id;
 
 uuid_id!(InstallationId);
 uuid_id!(ChannelBindingId);

@@ -1,0 +1,630 @@
+//! Threads, and the canonical messages associated with them.
+//!
+//! The module is split along the boundaries the storage model has: [`message`] owns the canonical
+//! payload and its thread associations, [`external`] owns the provider keys those rows are reached
+//! by, and [`email_metadata`] owns the headers only mail has. This file owns threads themselves and
+//! the [`ThreadPersistence`] port that ties the three together.
+
+mod email_metadata;
+mod external;
+mod message;
+
+#[cfg(test)]
+#[path = "test_support.rs"]
+mod test_support;
+
+#[cfg(test)]
+#[path = "tests.rs"]
+mod tests;
+
+#[cfg(test)]
+#[path = "read_tests.rs"]
+mod read_tests;
+
+pub(crate) use message::insert_message_on;
+
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use sqlx::PgPool;
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
+use uuid::Uuid;
+
+use crate::adapters::persistence::participant::resolve_or_create_external_identity_on;
+use crate::adapters::protocols::email::EmailIdentity;
+use crate::{
+    adapters::persistence::PostgresPersistence,
+    app_error::{AppError, AppResult},
+    entities::{
+        cursor::{MessageCursor, ThreadCursor},
+        message::{CanonicalMessageId, Message, MessageRole},
+        participant::{IdentityClaimMetadata, IdentityProvenance, ThreadPrincipalRole},
+        thread::{Thread, ThreadParticipantProjection},
+        transport::PrincipalId,
+        value_objects::{EmailAddress, MessageId, ThreadIndex},
+    },
+    use_cases::{
+        participant::IdentityObservation,
+        thread::{MessageWrite, ThreadPersistence},
+    },
+};
+
+use message::{MESSAGE_SELECT, MessageDb};
+
+#[derive(sqlx::FromRow, Debug)]
+pub struct ThreadDb {
+    pub id: Uuid,
+    pub channel_id: Uuid,
+    pub subject: String,
+    pub participant_principal_ids: Vec<Uuid>,
+    pub participant_emails: Vec<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<ThreadDb> for Thread {
+    fn from(db: ThreadDb) -> Self {
+        Thread {
+            id: db.id,
+            channel_id: db.channel_id,
+            subject: db.subject,
+            participant_principal_ids: db
+                .participant_principal_ids
+                .into_iter()
+                .map(PrincipalId::new)
+                .collect(),
+            participant_projection: ThreadParticipantProjection {
+                email_addresses: db
+                    .participant_emails
+                    .into_iter()
+                    .map(EmailAddress::from)
+                    .collect(),
+            },
+            created_at: db.created_at,
+            updated_at: db.updated_at,
+        }
+    }
+}
+
+const THREAD_SELECT: &str = r#"
+    SELECT thread.id, thread.channel_id, thread.subject,
+           COALESCE(
+               (SELECT array_agg(DISTINCT thread_principal.principal_id)
+                  FROM thread_principals AS thread_principal
+                 WHERE thread_principal.company_id = thread.company_id
+                   AND thread_principal.thread_id = thread.id),
+               ARRAY[]::uuid[]
+           ) AS participant_principal_ids,
+           COALESCE(
+               (SELECT array_agg(DISTINCT identity.subject ORDER BY identity.subject)
+                  FROM thread_principals AS thread_principal
+                  JOIN participant_identities AS identity
+                    ON (identity.company_id, identity.principal_id) =
+                       (thread_principal.company_id, thread_principal.principal_id)
+                 WHERE thread_principal.company_id = thread.company_id
+                   AND thread_principal.thread_id = thread.id
+                   AND identity.transport = 'email' AND identity.status <> 'disabled'),
+               ARRAY[]::text[]
+           ) AS participant_emails,
+           thread.created_at, thread.updated_at
+      FROM threads AS thread
+"#;
+
+async fn load_thread(pool: &PgPool, id: Uuid) -> AppResult<Option<Thread>> {
+    let query = format!("{THREAD_SELECT} WHERE thread.id = $1");
+    let db = sqlx::query_as::<_, ThreadDb>(&query)
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .map_err(AppError::from)?;
+    Ok(db.map(Into::into))
+}
+
+async fn load_message(pool: &PgPool, association_id: Uuid) -> AppResult<Message> {
+    let query = format!("{MESSAGE_SELECT} WHERE association.id = $1");
+    sqlx::query_as::<_, MessageDb>(&query)
+        .bind(association_id)
+        .fetch_one(pool)
+        .await
+        .map_err(AppError::from)?
+        .try_into()
+}
+
+async fn load_thread_by_id_on(pool: &PgPool, id: Option<Uuid>) -> AppResult<Option<Thread>> {
+    match id {
+        Some(id) => load_thread(pool, id).await,
+        None => Ok(None),
+    }
+}
+
+fn normalized_participants(participants: &[EmailAddress]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    participants
+        .iter()
+        .filter_map(|email| {
+            let normalized = email.trim().to_lowercase();
+            (!normalized.is_empty() && seen.insert(normalized.clone())).then_some(normalized)
+        })
+        .collect()
+}
+
+async fn insert_thread_email_principals(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company_id: Uuid,
+    channel_id: Uuid,
+    thread_id: Uuid,
+    participant_emails: &[EmailAddress],
+    first_is_author: bool,
+) -> AppResult<()> {
+    for (index, email) in normalized_participants(participant_emails)
+        .into_iter()
+        .enumerate()
+    {
+        let identity = EmailIdentity::parse(EmailAddress::from(email))
+            .map(EmailIdentity::qualify_default)
+            .map_err(|error| {
+                AppError::BadRequest(format!("Invalid thread participant: {error}"))
+            })?;
+        let resolved = resolve_or_create_external_identity_on(
+            transaction,
+            company_id,
+            IdentityObservation {
+                identity,
+                display_label: None,
+                claim_metadata: IdentityClaimMetadata::observation(),
+                provenance: IdentityProvenance::EmailIngress,
+            },
+        )
+        .await?;
+        let roles: &[ThreadPrincipalRole] = if first_is_author && index == 0 {
+            &[
+                ThreadPrincipalRole::Author,
+                ThreadPrincipalRole::Participant,
+            ]
+        } else {
+            &[ThreadPrincipalRole::Participant]
+        };
+        for role in roles {
+            sqlx::query(
+                r#"INSERT INTO thread_principals
+                       (company_id, channel_id, thread_id, principal_id, role)
+                   VALUES ($1, $2, $3, $4, $5)
+                   ON CONFLICT DO NOTHING"#,
+            )
+            .bind(company_id)
+            .bind(channel_id)
+            .bind(thread_id)
+            .bind(resolved.principal.id.as_uuid())
+            .bind(role.as_str())
+            .execute(&mut **transaction)
+            .await
+            .map_err(AppError::from)?;
+        }
+    }
+    Ok(())
+}
+
+#[async_trait]
+impl ThreadPersistence for PostgresPersistence {
+    async fn create_thread(
+        &self,
+        channel_id: Uuid,
+        subject: &str,
+        participant_emails: &[EmailAddress],
+    ) -> AppResult<Thread> {
+        let id = Uuid::new_v4();
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let scope: Option<(Uuid, Uuid)> = sqlx::query_as(
+            r#"INSERT INTO threads (id, company_id, channel_id, subject)
+               SELECT $1, company_id, id, $3 FROM channels WHERE id = $2
+               RETURNING company_id, channel_id"#,
+        )
+        .bind(id)
+        .bind(channel_id)
+        .bind(subject)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+
+        let Some((company_id, channel_id)) = scope else {
+            return Err(AppError::Internal("Channel not found".into()));
+        };
+
+        insert_thread_email_principals(
+            &mut tx,
+            company_id,
+            channel_id,
+            id,
+            participant_emails,
+            true,
+        )
+        .await?;
+
+        tx.commit().await.map_err(AppError::from)?;
+        load_thread(&self.pool, id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Created thread was not found".into()))
+    }
+
+    async fn ensure_schedule_run_thread(
+        &self,
+        run_id: Uuid,
+        channel_id: Uuid,
+        subject: &str,
+        participant_emails: &[EmailAddress],
+    ) -> AppResult<Thread> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let run: Option<(Option<Uuid>,)> =
+            sqlx::query_as("SELECT thread_id FROM schedule_runs WHERE id = $1 FOR UPDATE")
+                .bind(run_id)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+        let (existing,) =
+            run.ok_or_else(|| AppError::Internal("Durable schedule run was not found".into()))?;
+
+        if let Some(thread_id) = existing {
+            tx.commit().await.map_err(AppError::from)?;
+            return load_thread(&self.pool, thread_id).await?.ok_or_else(|| {
+                AppError::Internal("Durable schedule run references a missing thread".into())
+            });
+        }
+
+        let id = Uuid::new_v4();
+        let scope: Option<(Uuid, Uuid)> = sqlx::query_as(
+            r#"INSERT INTO threads (id, company_id, channel_id, subject)
+               SELECT $1, company_id, id, $3 FROM channels WHERE id = $2
+               RETURNING company_id, channel_id"#,
+        )
+        .bind(id)
+        .bind(channel_id)
+        .bind(subject)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        let Some((company_id, channel_id)) = scope else {
+            return Err(AppError::Internal("Channel not found".into()));
+        };
+        insert_thread_email_principals(
+            &mut tx,
+            company_id,
+            channel_id,
+            id,
+            participant_emails,
+            true,
+        )
+        .await?;
+        sqlx::query(
+            "UPDATE schedule_runs SET thread_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+        )
+        .bind(run_id)
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+        tx.commit().await.map_err(AppError::from)?;
+
+        load_thread(&self.pool, id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Created thread was not found".into()))
+    }
+
+    async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>> {
+        load_thread(&self.pool, id).await
+    }
+
+    async fn list_threads_by_channel_id(
+        &self,
+        channel_id: Uuid,
+        before: Option<ThreadCursor>,
+        limit: usize,
+    ) -> AppResult<Vec<Thread>> {
+        let db = if let Some(ThreadCursor { updated_at, id }) = before {
+            let query = format!(
+                r#"{THREAD_SELECT}
+                   WHERE thread.channel_id = $1
+                     AND (thread.updated_at, thread.id) < ($2, $3)
+                   ORDER BY thread.updated_at DESC, thread.id DESC
+                   LIMIT $4"#
+            );
+            sqlx::query_as::<_, ThreadDb>(&query)
+                .bind(channel_id)
+                .bind(updated_at)
+                .bind(id)
+                .bind(limit as i64)
+                .fetch_all(&self.pool)
+                .await
+        } else {
+            let query = format!(
+                r#"{THREAD_SELECT}
+                   WHERE thread.channel_id = $1
+                   ORDER BY thread.updated_at DESC, thread.id DESC
+                   LIMIT $2"#
+            );
+            sqlx::query_as::<_, ThreadDb>(&query)
+                .bind(channel_id)
+                .bind(limit as i64)
+                .fetch_all(&self.pool)
+                .await
+        }
+        .map_err(AppError::from)?;
+
+        Ok(db.into_iter().map(Into::into).collect())
+    }
+
+    async fn list_thread_last_roles(
+        &self,
+        thread_ids: &[Uuid],
+    ) -> AppResult<HashMap<Uuid, MessageRole>> {
+        if thread_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        // `DISTINCT ON` with the column's own sort key, so this rides
+        // `thread_messages_thread_created_idx` instead of reading each thread's history.
+        let rows: Vec<(Uuid, String)> = sqlx::query_as(
+            r#"SELECT DISTINCT ON (association.thread_id) association.thread_id, message.role
+               FROM thread_messages AS association
+               JOIN messages AS message
+                 ON (message.company_id, message.id) =
+                    (association.company_id, association.message_id)
+               WHERE association.thread_id = ANY($1)
+               ORDER BY association.thread_id, association.created_at DESC, association.id DESC"#,
+        )
+        .bind(thread_ids)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        rows.into_iter()
+            .map(|(thread_id, role)| {
+                let role = MessageRole::from_str(&role)
+                    .map_err(|error| AppError::Internal(error.to_string()))?;
+                Ok((thread_id, role))
+            })
+            .collect()
+    }
+
+    async fn list_threads_updated_after(
+        &self,
+        channel_id: Uuid,
+        after: Option<ThreadCursor>,
+        limit: usize,
+    ) -> AppResult<Vec<Thread>> {
+        // The mirror of the paging query above: that one reads *backwards* into history, this one
+        // reads forwards from what a live column has already shown. Ascending, so a batch can be
+        // applied in order and the newest ends up on top.
+        let query = format!(
+            r#"{THREAD_SELECT}
+               WHERE thread.channel_id = $1
+                 AND ($2::timestamptz IS NULL
+                      OR (thread.updated_at, thread.id) > ($2, $3))
+               ORDER BY thread.updated_at ASC, thread.id ASC
+               LIMIT $4"#
+        );
+        let db = sqlx::query_as::<_, ThreadDb>(&query)
+            .bind(channel_id)
+            .bind(after.map(|cursor| cursor.updated_at))
+            .bind(after.map(|cursor| cursor.id))
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+
+        Ok(db.into_iter().map(Into::into).collect())
+    }
+
+    async fn update_thread_participants(
+        &self,
+        id: Uuid,
+        participant_emails: &[EmailAddress],
+    ) -> AppResult<Thread> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let scope: Option<(Uuid, Uuid)> =
+            sqlx::query_as("SELECT company_id, channel_id FROM threads WHERE id = $1 FOR UPDATE")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+        let Some((company_id, channel_id)) = scope else {
+            return Err(AppError::Internal("Thread not found".into()));
+        };
+        insert_thread_email_principals(
+            &mut tx,
+            company_id,
+            channel_id,
+            id,
+            participant_emails,
+            false,
+        )
+        .await?;
+
+        let updated =
+            sqlx::query("UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1")
+                .bind(id)
+                .execute(&mut *tx)
+                .await
+                .map_err(AppError::from)?;
+        if updated.rows_affected() == 0 {
+            return Err(AppError::Internal("Thread not found".into()));
+        }
+
+        tx.commit().await.map_err(AppError::from)?;
+        load_thread(&self.pool, id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Updated thread was not found".into()))
+    }
+
+    /// Which conversation these provider keys belong to, through the external maps.
+    ///
+    /// Two lookups because there are two ways a key can already be known: the conversation itself
+    /// may be bound (`external_threads`), or one of its messages may be
+    /// (`external_messages`). The conversation binding is tried first -- it is the answer that
+    /// survives reply-before-root, where the root's own id was recorded as the conversation key
+    /// before any message carrying it existed.
+    async fn find_thread_by_message_ids(
+        &self,
+        channel_id: Uuid,
+        message_ids: &[MessageId],
+    ) -> AppResult<Option<Thread>> {
+        let keys: Vec<&str> = message_ids.iter().map(MessageId::as_str).collect();
+        if let Some(thread_id) =
+            external::find_thread_by_external_thread_keys(&self.pool, channel_id, &keys).await?
+        {
+            return load_thread(&self.pool, thread_id).await;
+        }
+        let thread_id =
+            external::find_thread_by_external_message_keys(&self.pool, channel_id, &keys).await?;
+        load_thread_by_id_on(&self.pool, thread_id).await
+    }
+
+    async fn find_thread_by_thread_index(
+        &self,
+        channel_id: Uuid,
+        thread_index: &ThreadIndex,
+    ) -> AppResult<Option<Thread>> {
+        let candidates = match thread_index.ancestor_chain() {
+            Ok(candidates) => candidates,
+            Err(_) => return Ok(None),
+        };
+        let candidate_values: Vec<&str> = candidates.iter().map(ThreadIndex::as_str).collect();
+
+        let query = format!(
+            r#"{THREAD_SELECT}
+               JOIN thread_messages AS association ON association.thread_id = thread.id
+               JOIN email_message_metadata AS email
+                 ON (email.company_id, email.message_id) =
+                    (association.company_id, association.message_id)
+               WHERE thread.channel_id = $1
+                 AND email.thread_index IS NOT NULL
+                 AND email.thread_index = ANY($2)
+               ORDER BY length(email.thread_index) DESC,
+                        association.created_at DESC
+               LIMIT 1"#
+        );
+        let db = sqlx::query_as::<_, ThreadDb>(&query)
+            .bind(channel_id)
+            .bind(&candidate_values)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        Ok(db.map(Into::into))
+    }
+
+    async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize> {
+        let count: i64 = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM thread_messages
+               WHERE thread_id = $1
+                 AND created_at >= CURRENT_TIMESTAMP - make_interval(secs => $2)"#,
+        )
+        .bind(thread_id)
+        .bind(duration_secs as f64)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(count as usize)
+    }
+
+    async fn create_message(&self, write: &MessageWrite) -> AppResult<Message> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let association_id = insert_message_on(&mut tx, write).await?;
+        tx.commit().await.map_err(AppError::from)?;
+        load_message(&self.pool, association_id).await
+    }
+
+    async fn find_outbound_reply_after(
+        &self,
+        thread_id: Uuid,
+        answering: CanonicalMessageId,
+    ) -> AppResult<Option<Message>> {
+        let query = format!(
+            r#"{MESSAGE_SELECT}
+               WHERE association.thread_id = $1
+                 AND message.direction = 'outbound'
+                 AND (association.created_at, association.id) >
+                     (SELECT answered.created_at, answered.id
+                        FROM thread_messages AS answered
+                       WHERE answered.thread_id = $1 AND answered.message_id = $2)
+                 AND NOT EXISTS (
+                     SELECT 1
+                     FROM email_message_metadata AS sent
+                     JOIN email_outbox AS outbox
+                       ON outbox.provider_message_id = sent.rfc_message_id
+                     JOIN task_outreach_targets AS target ON target.outbox_id = outbox.id
+                     WHERE (sent.company_id, sent.message_id) =
+                           (message.company_id, message.id)
+                 )
+               ORDER BY association.created_at DESC, association.id DESC
+               LIMIT 1"#
+        );
+        let db = sqlx::query_as::<_, MessageDb>(&query)
+            .bind(thread_id)
+            .bind(answering.as_uuid())
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        db.map(TryInto::try_into).transpose()
+    }
+
+    async fn associate_message(
+        &self,
+        thread_id: Uuid,
+        message: CanonicalMessageId,
+    ) -> AppResult<Message> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let association_id = message::associate_message_on(&mut tx, thread_id, message).await?;
+        tx.commit().await.map_err(AppError::from)?;
+        load_message(&self.pool, association_id).await
+    }
+
+    async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>> {
+        let query = format!(
+            r#"SELECT * FROM (
+                   {MESSAGE_SELECT}
+                   WHERE association.thread_id = $1
+                   ORDER BY association.created_at DESC, association.id DESC
+                   LIMIT 200
+               ) recent
+               ORDER BY recent.created_at ASC, recent.id ASC"#
+        );
+        let db = sqlx::query_as::<_, MessageDb>(&query)
+            .bind(thread_id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        db.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn list_messages_after(
+        &self,
+        thread_id: Uuid,
+        after: Option<MessageCursor>,
+        limit: usize,
+    ) -> AppResult<Vec<Message>> {
+        // Ascending and unwrapped, unlike `list_messages_by_thread_id`: this reads *forwards* from
+        // a known point, so there is no newest-N window to reverse. `(created_at, id)` as a row
+        // comparison matches `thread_messages_thread_created_idx` exactly.
+        let query = format!(
+            r#"{MESSAGE_SELECT}
+               WHERE association.thread_id = $1
+                 AND ($2::timestamptz IS NULL
+                      OR (association.created_at, association.id) > ($2, $3))
+               ORDER BY association.created_at ASC, association.id ASC
+               LIMIT $4"#
+        );
+        let db = sqlx::query_as::<_, MessageDb>(&query)
+            .bind(thread_id)
+            // Both sides stay `timestamptz`. Binding a naive value instead would make Postgres
+            // promote it through the *session* `TimeZone` to compare it, so the same cursor would
+            // mean different instants on a UTC server and a local one.
+            .bind(after.map(|cursor| cursor.created_at))
+            .bind(after.map(|cursor| cursor.id))
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        db.into_iter().map(TryInto::try_into).collect()
+    }
+}

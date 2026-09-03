@@ -5,6 +5,7 @@ use crate::entities::task::{
     TaskAttemptRecord, TaskAttemptRecordStatus, TaskStatusEvent, TaskStopReason,
     TaskTransitionActorKind, TaskTransitionReason,
 };
+use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email};
 use crate::use_cases::user::LoginMethods;
 use chrono::Utc;
 use serde_json::json;
@@ -97,8 +98,10 @@ fn simulation_attribute_values_and_message_ids_are_escaped() {
     assert!(html.contains("data-server-sender=\"sender@example.com&quot;"));
 
     let thread = mailbox_thread(channel.id);
-    let mut message = mailbox_message(thread.id, "body");
-    message.message_id = "<id><script>alert(1)</script>".into();
+    let message = stored_email(EmailMessageDraft {
+        message_id: "<id><script>alert(1)</script>".into(),
+        ..mailbox_message_draft(thread.id, "body")
+    });
     let rendered = channel_simulation_loaded_thread_fragment(
         &company,
         &channel,
@@ -202,7 +205,7 @@ fn test_find_task_for_message_multi_task_matching() {
 
     let tasks = vec![task1, task2];
 
-    let msg_in1 = Message {
+    let msg_in1 = stored_email(EmailMessageDraft {
         id: Uuid::new_v4(),
         thread_id,
         message_id: "<in1@test.com>".into(),
@@ -220,9 +223,9 @@ fn test_find_task_for_message_multi_task_matching() {
         role: MessageRole::Human,
         thread_index: None,
         created_at: Utc::now(),
-    };
+    });
 
-    let msg_out1 = Message {
+    let msg_out1 = stored_email(EmailMessageDraft {
         id: Uuid::new_v4(),
         thread_id,
         message_id: "<out1@test.com>".into(),
@@ -240,9 +243,9 @@ fn test_find_task_for_message_multi_task_matching() {
         role: MessageRole::Agent,
         thread_index: None,
         created_at: Utc::now(),
-    };
+    });
 
-    let msg_in2 = Message {
+    let msg_in2 = stored_email(EmailMessageDraft {
         id: Uuid::new_v4(),
         thread_id,
         message_id: "<in2@test.com>".into(),
@@ -260,9 +263,9 @@ fn test_find_task_for_message_multi_task_matching() {
         role: MessageRole::Human,
         thread_index: None,
         created_at: Utc::now(),
-    };
+    });
 
-    let msg_out2 = Message {
+    let msg_out2 = stored_email(EmailMessageDraft {
         id: Uuid::new_v4(),
         thread_id,
         message_id: "<out2@test.com>".into(),
@@ -280,7 +283,7 @@ fn test_find_task_for_message_multi_task_matching() {
         role: MessageRole::Agent,
         thread_index: None,
         created_at: Utc::now(),
-    };
+    });
 
     let matched_in1 = find_task_for_message(&msg_in1, &tasks, None, Some(thread_id)).unwrap();
     assert_eq!(matched_in1.id, task1_id);
@@ -2382,7 +2385,7 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
     let channel = mailbox_channel(company.id);
     let thread = mailbox_thread(channel.id);
 
-    let inbound = Message {
+    let inbound = stored_email(EmailMessageDraft {
         id: Uuid::new_v4(),
         thread_id: thread.id,
         message_id: "<in@test.com>".into(),
@@ -2400,8 +2403,8 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
         role: MessageRole::Human,
         thread_index: None,
         created_at: Utc::now(),
-    };
-    let outbound = Message {
+    });
+    let outbound = stored_email(EmailMessageDraft {
         id: Uuid::new_v4(),
         thread_id: thread.id,
         message_id: "<out@test.com>".into(),
@@ -2419,7 +2422,7 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
         role: MessageRole::Agent,
         thread_index: None,
         created_at: Utc::now(),
-    };
+    });
 
     let html = message_pane(&MessagePane {
         company_id: company.id,
@@ -2454,7 +2457,12 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
 
 /// One message, so the live-stream tests below can say what they mean without 18 lines of struct.
 fn mailbox_message(thread_id: Uuid, body: &str) -> Message {
-    Message {
+    stored_email(mailbox_message_draft(thread_id, body))
+}
+
+/// The same message, still as a draft, for a scenario that overrides a field or two.
+fn mailbox_message_draft(thread_id: Uuid, body: &str) -> EmailMessageDraft {
+    EmailMessageDraft {
         id: Uuid::new_v4(),
         thread_id,
         message_id: "<live@test.com>".into(),
@@ -2893,12 +2901,12 @@ fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
         ..settings_agent(company.id, "Triage", "triage")
     };
 
-    let reply = Message {
+    let reply = stored_email(EmailMessageDraft {
         role: MessageRole::Agent,
         direction: MessageDirection::Outbound,
         sender: EmailAddress::from("support@acme.mailagents.com"),
-        ..mailbox_message(thread.id, "The reply.")
-    };
+        ..mailbox_message_draft(thread.id, "The reply.")
+    });
     let html = message_bubble_chat(
         &reply,
         Some(&agent),
@@ -2937,7 +2945,7 @@ fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
         },
     );
     assert!(!inbound_html.contains("<img"));
-    assert!(inbound_html.contains(inbound.sender.as_str()));
+    assert!(inbound_html.contains(inbound.author.display()));
 
     // Who wrote it is on the bubble, because only the agent's reply quiets the thread's row.
     assert!(html.contains(r#"data-role="agent""#));
@@ -2962,12 +2970,12 @@ fn a_message_from_another_channel_is_marked_and_keeps_its_own_sender() {
     };
 
     // Inbound *and* agent: only the internal delivery path writes that pair.
-    let delegated = Message {
+    let delegated = stored_email(EmailMessageDraft {
         role: MessageRole::Agent,
         direction: MessageDirection::Inbound,
         sender: EmailAddress::from("legal@acme.mailagents.test"),
-        ..mailbox_message(thread.id, "Here is the contract review.")
-    };
+        ..mailbox_message_draft(thread.id, "Here is the contract review.")
+    });
     let html = message_bubble_chat(&delegated, Some(&agent), None, scope);
 
     assert!(html.contains(&icon(Icon::Hubot, BUTTON_ICON)));

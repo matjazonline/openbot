@@ -585,7 +585,12 @@ async fn reply_in_thread(
         .thread_persistence()
         .list_messages_by_thread_id(thread_id)
         .await?;
-    let in_reply_to = history.last().map(|message| message.message_id.as_str());
+    // Only a message mail actually carried has a `Message-ID` to thread onto; the schedule's own
+    // prompt has none, so the first reply starts the mail conversation.
+    let in_reply_to = history
+        .last()
+        .and_then(|message| message.rfc_message_id())
+        .map(|id| id.as_str());
     let subject = history
         .first()
         .map(|message| reply_subject(&message.subject))
@@ -891,13 +896,14 @@ mod tests {
     use crate::entities::{
         company::{Company, CompanyTeamAccount},
         company_member::CompanyMembership,
-        message::{Message, MessageDirection, MessageRole},
+        message::{MessageDirection, MessageRole},
         schedule::{
             ChannelSchedule, ScheduleDeliveryMode, ScheduleRun, ScheduleTimezone, ScheduleType,
         },
         task::TaskStatus,
         value_objects::MessageId,
     };
+    use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email};
     use chrono::Utc;
 
     fn test_company() -> Company {
@@ -1185,7 +1191,7 @@ mod tests {
         let schedule = test_schedule(company_id, channel_id);
         let thread_id = Uuid::new_v4();
 
-        let prompt_msg = Message {
+        let prompt_msg = stored_email(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id,
             message_id: MessageId::new("<prompt1@domain.com>"),
@@ -1203,9 +1209,9 @@ mod tests {
             role: MessageRole::System,
             thread_index: None,
             created_at: Utc::now(),
-        };
+        });
 
-        let agent_reply_msg = Message {
+        let agent_reply_msg = stored_email(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id,
             message_id: MessageId::new("<reply1@domain.com>"),
@@ -1223,7 +1229,7 @@ mod tests {
             role: MessageRole::Agent,
             thread_index: None,
             created_at: Utc::now(),
-        };
+        });
 
         let html = schedule_thread_pane(&ScheduleThreadPaneProps {
             company_id,

@@ -1,6 +1,6 @@
 use chrono::Utc;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -14,12 +14,17 @@ use crate::{
             ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval, QUORUM_TIMEOUT_ACTION,
             QuorumTimeoutAction,
         },
-        message::{Message, MessageDirection, MessageRole},
+        correlation::CorrelationId,
+        message::{MessageDirection, MessageRole},
+        participant::{IdentityClaimMetadata, IdentityProvenance},
         task::{ResumeActor, StopActor},
     },
     infra::config::AppConfig,
     services::outbound_dispatcher::OutboundEmail,
-    use_cases::thread::ThreadPersistence,
+    use_cases::{
+        participant::IdentityObservation,
+        thread::{MessageAuthorWrite, MessageWrite, ThreadPersistence, qualified_email_identity},
+    },
 };
 
 pub struct ApprovalUseCases {
@@ -210,7 +215,6 @@ impl ApprovalUseCases {
             LinkAction::QuorumTimeout(QuorumTimeoutAction::ProceedPartial) => {
                 self.record_decision_note(
                     approval,
-                    "quorum-partial",
                     "HITL Proceed Partial",
                     format!(
                         "Human decision by {}: Proceeding with partial quorum responses.",
@@ -226,7 +230,6 @@ impl ApprovalUseCases {
             LinkAction::QuorumTimeout(QuorumTimeoutAction::Extend { hours }) => {
                 self.record_decision_note(
                     approval,
-                    "quorum-extended",
                     "HITL Timeout Extended",
                     format!(
                         "Human decision by {}: Outreach response timeout extended by {} hours.",
@@ -255,7 +258,6 @@ impl ApprovalUseCases {
                 }
                 self.record_decision_note(
                     approval,
-                    "approval-granted",
                     "HITL Granted",
                     format!(
                         "Human approval GRANTED by {} for action '{}'.",
@@ -300,7 +302,6 @@ impl ApprovalUseCases {
     async fn record_rejection(&self, approval: &HumanApproval) -> String {
         self.record_decision_note(
             approval,
-            "approval-rejected",
             "HITL Rejected",
             format!(
                 "Human approval REJECTED by {} for action '{}'.",
@@ -320,37 +321,62 @@ impl ApprovalUseCases {
     async fn record_decision_note(
         &self,
         approval: &HumanApproval,
-        message_id_prefix: &str,
         subject_tag: &str,
         body: String,
     ) {
         let Some(thread_id) = approval.thread_id else {
             return;
         };
-        let note = Message {
-            id: Uuid::new_v4(),
-            thread_id,
-            message_id: format!(
-                "<{}-{}@{}>",
-                message_id_prefix, approval.id, self.config.app_domain_name
-            )
-            .into(),
-            in_reply_to: None,
-            references_list: vec![],
-            sender: approval.approver_email.clone().into(),
-            recipients_to: vec![],
-            recipients_cc: vec![],
-            subject: format!("[{}]: {}", subject_tag, approval.action_title),
-            clean_text_body: body,
-            raw_text_body: None,
-            raw_html_body: None,
-            attachments: None,
-            direction: MessageDirection::Inbound,
-            role: MessageRole::System,
-            thread_index: None,
-            created_at: Utc::now(),
+        // The note belongs to the chain the approval interrupted, and a correlation id is
+        // inherited rather than minted -- so an approval with no task behind it has no chain to
+        // join and records nothing.
+        let correlation_id = match self.chain_of(approval).await {
+            Some(correlation_id) => correlation_id,
+            None => {
+                warn!(
+                    approval_id = %approval.id,
+                    "Approval decision note skipped: no task chain to attribute it to"
+                );
+                return;
+            }
         };
+        // Nothing was sent and nothing arrived: this note is the platform recording a decision in
+        // the thread, so it carries no mail headers and no recipients at all. It *is* attributed
+        // to the approver, whose address is the handle they decided through.
+        let Ok(approver) = qualified_email_identity(approval.approver_email.clone()) else {
+            warn!(
+                approval_id = %approval.id,
+                "Approval decision note skipped: the approver address is not a usable handle"
+            );
+            return;
+        };
+        let note = MessageWrite::internal(
+            thread_id,
+            MessageAuthorWrite::Observed(IdentityObservation {
+                identity: approver,
+                display_label: None,
+                claim_metadata: IdentityClaimMetadata::observation(),
+                provenance: IdentityProvenance::Account,
+            }),
+            format!("[{}]: {}", subject_tag, approval.action_title),
+            body,
+            MessageDirection::Inbound,
+            MessageRole::System,
+            correlation_id,
+        );
         let _ = self.thread_persistence.create_message(&note).await;
+    }
+
+    /// The chain the approval's task belongs to, so the decision note joins it.
+    async fn chain_of(&self, approval: &HumanApproval) -> Option<CorrelationId> {
+        let task_id = approval.task_id?;
+        match self.task_persistence.get_task_by_id(task_id).await {
+            Ok(task) => task.map(|task| task.correlation_id),
+            Err(error) => {
+                warn!(approval_id = %approval.id, %error, "Could not read the approval's task");
+                None
+            }
+        }
     }
 
     async fn require_approval(&self, token: &str) -> AppResult<HumanApproval> {
@@ -447,6 +473,7 @@ fn already_processed_message(approval: &HumanApproval) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::use_cases::thread::test_support::InMemoryThreads;
 
     /// The two approval kinds offer disjoint verbs, and a verb borrowed from the other kind is
     /// refused rather than reinterpreted. `reject` is the only one both accept, and it resolves to
@@ -514,10 +541,7 @@ mod tests {
         ResumeActor, StopActor, TaskFailure, TaskLeaseRef, TaskSuspension,
     };
     use crate::entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress};
-    use crate::entities::{
-        cursor::{MessageCursor, ThreadCursor},
-        thread::Thread,
-    };
+
     use async_trait::async_trait;
     use std::sync::Mutex;
 
@@ -767,99 +791,6 @@ mod tests {
         }
     }
 
-    struct MockThreadPersistence;
-    #[async_trait]
-    impl ThreadPersistence for MockThreadPersistence {
-        async fn create_thread(
-            &self,
-            _channel_id: Uuid,
-            _subject: &str,
-            _participant_emails: &[crate::entities::value_objects::EmailAddress],
-        ) -> AppResult<crate::entities::thread::Thread> {
-            unimplemented!()
-        }
-        async fn get_thread_by_id(
-            &self,
-            _id: Uuid,
-        ) -> AppResult<Option<crate::entities::thread::Thread>> {
-            unimplemented!()
-        }
-        async fn list_threads_by_channel_id(
-            &self,
-            _channel_id: Uuid,
-            _before: Option<ThreadCursor>,
-            _limit: usize,
-        ) -> AppResult<Vec<crate::entities::thread::Thread>> {
-            unimplemented!()
-        }
-
-        async fn list_threads_updated_after(
-            &self,
-            _channel_id: Uuid,
-            _after: Option<ThreadCursor>,
-            _limit: usize,
-        ) -> AppResult<Vec<Thread>> {
-            unimplemented!()
-        }
-        async fn update_thread_participants(
-            &self,
-            _id: Uuid,
-            _participant_emails: &[crate::entities::value_objects::EmailAddress],
-        ) -> AppResult<crate::entities::thread::Thread> {
-            unimplemented!()
-        }
-        async fn find_thread_by_message_ids(
-            &self,
-            _channel_id: Uuid,
-            _message_ids: &[crate::entities::value_objects::MessageId],
-        ) -> AppResult<Option<crate::entities::thread::Thread>> {
-            unimplemented!()
-        }
-        async fn find_thread_by_thread_index(
-            &self,
-            _channel_id: Uuid,
-            _thread_index_prefix: &crate::entities::value_objects::ThreadIndex,
-        ) -> AppResult<Option<crate::entities::thread::Thread>> {
-            unimplemented!()
-        }
-        async fn count_recent_messages(
-            &self,
-            _thread_id: Uuid,
-            _duration_secs: i64,
-        ) -> AppResult<usize> {
-            unimplemented!()
-        }
-        async fn create_message(&self, message: &Message) -> AppResult<Message> {
-            Ok(message.clone())
-        }
-        async fn get_message_by_message_id(
-            &self,
-            _company_id: Uuid,
-            _message_id: &crate::entities::value_objects::MessageId,
-        ) -> AppResult<Option<Message>> {
-            unimplemented!()
-        }
-        async fn find_outbound_reply(
-            &self,
-            _thread_id: Uuid,
-            _in_reply_to: &crate::entities::value_objects::MessageId,
-        ) -> AppResult<Option<Message>> {
-            Ok(None)
-        }
-        async fn list_messages_by_thread_id(&self, _thread_id: Uuid) -> AppResult<Vec<Message>> {
-            unimplemented!()
-        }
-
-        async fn list_messages_after(
-            &self,
-            _thread_id: Uuid,
-            _after: Option<MessageCursor>,
-            _limit: usize,
-        ) -> AppResult<Vec<Message>> {
-            unimplemented!()
-        }
-    }
-
     /// A stale link out of somebody's inbox is routine, not a server fault: it must not answer 500
     /// with the reason swallowed by `AppError::Internal`.
     #[tokio::test]
@@ -869,7 +800,7 @@ mod tests {
                 approvals: Mutex::new(Vec::new()),
             }),
             Arc::new(MockTaskPersistence),
-            Arc::new(MockThreadPersistence),
+            Arc::new(InMemoryThreads::new()),
             test_config(),
         );
 
@@ -891,7 +822,7 @@ mod tests {
             approvals: Mutex::new(Vec::new()),
         });
         let task_persistence = Arc::new(MockTaskPersistence);
-        let thread_persistence = Arc::new(MockThreadPersistence);
+        let thread_persistence = Arc::new(InMemoryThreads::new());
         let config = test_config();
 
         let use_cases = ApprovalUseCases::new(
@@ -1010,7 +941,7 @@ mod tests {
             approvals: Mutex::new(Vec::new()),
         });
         let task_persistence = Arc::new(MockTaskPersistence);
-        let thread_persistence = Arc::new(MockThreadPersistence);
+        let thread_persistence = Arc::new(InMemoryThreads::new());
         let config = test_config();
 
         let company_id = Uuid::new_v4();
@@ -1125,7 +1056,7 @@ mod tests {
             approvals: Mutex::new(Vec::new()),
         });
         let task_persistence = Arc::new(MockTaskPersistence);
-        let thread_persistence = Arc::new(MockThreadPersistence);
+        let thread_persistence = Arc::new(InMemoryThreads::new());
         let config = test_config();
 
         let use_cases = ApprovalUseCases::new(

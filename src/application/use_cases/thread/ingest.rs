@@ -27,11 +27,13 @@ use crate::{
     entities::{
         channel::Channel,
         company::Company,
-        message::{Message, MessageDirection, MessageRole},
+        correlation::CorrelationId,
+        email_message::EmailMessageMetadata,
+        message::{MessageDirection, MessageParticipantKind, MessageRole},
         message_contract::NormalizedInboundMessage,
         outreach::OutreachReplyMatch,
-        participant::PrincipalAccessContext,
-        task::NewTask,
+        participant::{IdentityClaimMetadata, IdentityProvenance, PrincipalAccessContext},
+        task::{NewTask, TaskSource},
         thread::Thread,
         transport::PrincipalId,
         value_objects::{
@@ -39,16 +41,20 @@ use crate::{
         },
     },
     services::email_parser::{ParsedEmail, RawInboundPayload},
-    use_cases::channel::{
-        SystemAddress, find_similar_channel_slugs, parse_platform_address,
-        parse_recipient_address_pipeline,
+    use_cases::{
+        channel::{
+            SystemAddress, find_similar_channel_slugs, parse_platform_address,
+            parse_recipient_address_pipeline,
+        },
+        participant::IdentityObservation,
     },
 };
 
 use super::{
     BounceInfo, BounceSuggestion, ChannelDirectoryEntry, ChannelMatch, EmailIngressAdapter,
     InboundIngestResult, InboundOrigin, InternalChannelSource, MAX_THREAD_MESSAGES_PER_HOUR,
-    RecipientRole, ThreadUseCases, durable_ingest_payload, format_help_email_body,
+    MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite, RecipientRole,
+    ThreadUseCases, durable_ingest_payload, format_help_email_body, qualified_email_identity,
     support::{
         DirectoryCache, body_mentions_email, body_mentions_slug, build_prompt_text,
         check_inbound_guards, parsed_email_from_normalized, reference_ids, strip_quoted_history,
@@ -372,6 +378,7 @@ impl ThreadUseCases {
                     candidate,
                     &mut parsed,
                     internal_source,
+                    norm.correlation_id,
                     &mut resolved.outreach_by_channel,
                     &mut directory,
                 )
@@ -907,7 +914,7 @@ impl ThreadUseCases {
     ) -> AppResult<Option<InboundIngestResult>> {
         let existing = self
             .task_persistence
-            .get_task_by_source_message_id(company_id, &parsed.message_id)
+            .find_task_for_email_message(company_id, &MessageId::from(parsed.message_id.clone()))
             .await?;
         if existing.is_none() {
             return Ok(None);
@@ -927,6 +934,7 @@ impl ThreadUseCases {
         candidate: CandidateMatch,
         parsed: &mut ParsedEmail,
         internal_source: Option<InternalChannelSource>,
+        correlation_id: CorrelationId,
         outreach_by_channel: &mut HashMap<Uuid, OutreachReplyMatch>,
         directory: &mut DirectoryCache<'_>,
     ) -> AppResult<ControlFlow<InboundIngestResult, MaterializedMatch>> {
@@ -1051,7 +1059,8 @@ impl ThreadUseCases {
                 parsed,
                 clean_text_body,
                 internal_source.is_some(),
-            ))
+                correlation_id,
+            )?)
             .await?;
 
         // Recording the reply satisfies the awaiting outreach; the agent must not be re-run for it.
@@ -1316,7 +1325,7 @@ impl ThreadUseCases {
         if context_only {
             info!(
                 "Ingested message ID '{}' for thread '{}' in context-only / quiet mode. Skipping background task creation and agent execution.",
-                first.inbound_message.message_id, first.thread.id
+                first.inbound_message.canonical_id, first.thread.id
             );
             return Ok(result);
         }
@@ -1340,6 +1349,9 @@ impl ThreadUseCases {
                 thread_id: Some(primary.thread.id),
                 task_type: AGENT_DISPATCH_TASK.to_string(),
                 payload: durable_ingest_payload(&durable_result),
+                // A redelivery of this message resolves to the task its first delivery created,
+                // rather than running the agent a second time on the same turn.
+                source: TaskSource::Message(primary.inbound_message.canonical_id),
                 // The chain starts at the message, not here: an inter-channel reply carrying a
                 // correlation header keeps the chain its sender was already on.
                 correlation_id,
@@ -1350,41 +1362,59 @@ impl ThreadUseCases {
     }
 }
 
+/// The canonical form of an arriving email, ready to be stored.
+///
+/// The address in every header becomes a *handle*: the writer resolves each one to the company's
+/// principal for it inside the same transaction, so nothing here has to know whether the sender is
+/// a teammate, an agent or a stranger.
 fn build_inbound_message(
     thread: &Thread,
     parsed: &ParsedEmail,
     clean_text_body: String,
     is_inter_channel: bool,
-) -> Message {
-    Message {
-        id: Uuid::new_v4(),
+    correlation_id: CorrelationId,
+) -> AppResult<MessageWrite> {
+    let metadata = EmailMessageMetadata::new(MessageId::from(parsed.message_id.clone()))
+        .in_reply_to(parsed.in_reply_to.clone().map(MessageId::from))
+        .references(
+            parsed
+                .references
+                .iter()
+                .cloned()
+                .map(MessageId::from)
+                .collect(),
+        )
+        .thread_index(parsed.thread_index.clone())
+        .raw_bodies(parsed.raw_text_body.clone(), parsed.raw_html_body.clone());
+
+    let sender = qualified_email_identity(parsed.sender.clone())?;
+    let mut participants = vec![MessageParticipantWrite::new(
+        MessageParticipantKind::Sender,
+        sender.clone(),
+    )];
+    for (kind, addresses) in [
+        (MessageParticipantKind::To, &parsed.recipients_to),
+        (MessageParticipantKind::Cc, &parsed.recipients_cc),
+    ] {
+        for address in addresses {
+            participants.push(MessageParticipantWrite::new(
+                kind,
+                qualified_email_identity(address.clone())?,
+            ));
+        }
+    }
+
+    Ok(MessageWrite {
         thread_id: thread.id,
-        message_id: MessageId::from(parsed.message_id.clone()),
-        in_reply_to: parsed.in_reply_to.clone().map(MessageId::from),
-        references_list: parsed
-            .references
-            .iter()
-            .cloned()
-            .map(MessageId::from)
-            .collect(),
-        sender: EmailAddress::from(parsed.sender.clone()),
-        recipients_to: parsed
-            .recipients_to
-            .iter()
-            .cloned()
-            .map(EmailAddress::from)
-            .collect(),
-        recipients_cc: parsed
-            .recipients_cc
-            .iter()
-            .cloned()
-            .map(EmailAddress::from)
-            .collect(),
+        author: MessageAuthorWrite::Observed(IdentityObservation {
+            identity: sender,
+            display_label: None,
+            claim_metadata: IdentityClaimMetadata::observation(),
+            provenance: IdentityProvenance::EmailIngress,
+        }),
         subject: parsed.subject.clone(),
         clean_text_body,
-        raw_text_body: parsed.raw_text_body.clone(),
-        raw_html_body: parsed.raw_html_body.clone(),
-        attachments: (!parsed.attachments.is_empty()).then(|| parsed.attachments.clone()),
+        attachments: parsed.attachments.clone(),
         direction: MessageDirection::Inbound,
         // An inter-channel message is another agent talking, not a human.
         role: if is_inter_channel {
@@ -1392,7 +1422,9 @@ fn build_inbound_message(
         } else {
             MessageRole::Human
         },
-        thread_index: parsed.thread_index.clone(),
+        correlation_id,
+        participants,
+        correlation: MessageCorrelation::Email(metadata),
         created_at: chrono::Utc::now(),
-    }
+    })
 }

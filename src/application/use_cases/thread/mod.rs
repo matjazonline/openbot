@@ -28,9 +28,12 @@ use crate::{
         company::Company,
         correlation::CorrelationId,
         cursor::{MessageCursor, ThreadCursor},
-        message::{Message, MessageDirection, MessageRole},
+        email_message::EmailMessageMetadata,
+        message::{
+            CanonicalMessageId, Message, MessageDirection, MessageParticipantKind, MessageRole,
+        },
         message_contract::NormalizedInboundMessage,
-        participant::PrincipalAccessContext,
+        participant::{IdentityClaimMetadata, IdentityProvenance, PrincipalAccessContext},
         task::{ThreadActivity, TokenUsage},
         thread::Thread,
         transport::{ChannelSelector, QualifiedIdentity, TransportKind},
@@ -47,7 +50,7 @@ use crate::{
         approval::ApprovalUseCases,
         channel::ChannelPersistence,
         company::CompanyPersistence,
-        participant::{ParticipantPersistence, observe_email_access_context},
+        participant::{IdentityObservation, ParticipantPersistence, observe_email_access_context},
     },
 };
 
@@ -55,7 +58,14 @@ mod dispatch;
 pub use dispatch::DispatchOutcome;
 mod ingest;
 pub use ingest::{ReplyDelivery, SYSTEM_ADDRESS_ANSWERED};
+mod message_write;
+pub use message_write::{
+    MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
+};
 mod support;
+
+#[cfg(test)]
+pub mod test_support;
 
 #[cfg(test)]
 mod tests;
@@ -66,7 +76,7 @@ mod inter_channel_tests;
 
 pub const MAX_THREAD_MESSAGES_PER_HOUR: usize = 60;
 
-fn qualified_email_identity(address: impl Into<String>) -> AppResult<QualifiedIdentity> {
+pub fn qualified_email_identity(address: impl Into<String>) -> AppResult<QualifiedIdentity> {
     EmailIdentity::parse(EmailAddress::from(address.into()))
         .map(EmailIdentity::qualify_default)
         .map_err(|error| AppError::Internal(format!("Invalid email identity: {error}")))
@@ -162,19 +172,36 @@ pub trait ThreadPersistence: Send + Sync {
 
     async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize>;
 
-    async fn create_message(&self, message: &Message) -> AppResult<Message>;
+    /// Store one canonical message and associate it with its thread.
+    ///
+    /// Idempotent per provider key: a redelivery of a message already stored returns what is
+    /// stored. A redelivery whose content changed is refused rather than allowed to rewrite a
+    /// message agents have already read -- see `ExternalMessageCollision`.
+    async fn create_message(&self, write: &MessageWrite) -> AppResult<Message>;
 
-    async fn get_message_by_message_id(
-        &self,
-        company_id: Uuid,
-        message_id: &MessageId,
-    ) -> AppResult<Option<Message>>;
-
-    async fn find_outbound_reply(
+    /// The newest outbound message this thread gained *after* the message named here, if any.
+    ///
+    /// This is the idempotency guard for "has the agent already answered?", and it is deliberately
+    /// positional rather than header-based: a scheduled run and a Slack reply have no `In-Reply-To`
+    /// to match on, and one dispatch produces one reply per thread. Outbound messages that an
+    /// outreach sent are excluded -- those are the agent asking a third party something, not the
+    /// answer to this turn.
+    async fn find_outbound_reply_after(
         &self,
         thread_id: Uuid,
-        in_reply_to: &MessageId,
+        answering: CanonicalMessageId,
     ) -> AppResult<Option<Message>>;
+
+    /// Associate a canonical message that already exists with another thread of its own company.
+    ///
+    /// One message, several conversations: an email addressed to three channels is stored once and
+    /// associated three times. The composite foreign key refuses a thread in another company, so a
+    /// caller cannot leak a message across tenants by naming the wrong thread.
+    async fn associate_message(
+        &self,
+        thread_id: Uuid,
+        message: CanonicalMessageId,
+    ) -> AppResult<Message>;
 
     async fn list_messages_by_thread_id(&self, thread_id: Uuid) -> AppResult<Vec<Message>>;
 
@@ -551,29 +578,49 @@ impl ThreadUseCases {
         else {
             return Ok(());
         };
+        let sender = qualified_email_identity(sent.from_address.clone())?;
+        let mut participants = vec![MessageParticipantWrite::new(
+            MessageParticipantKind::Sender,
+            sender.clone(),
+        )];
+        for (kind, addresses) in [
+            (MessageParticipantKind::To, &sent.recipients_to),
+            (MessageParticipantKind::Cc, &sent.recipients_cc),
+        ] {
+            for address in addresses.iter() {
+                participants.push(MessageParticipantWrite::new(
+                    kind,
+                    qualified_email_identity(address.clone())?,
+                ));
+            }
+        }
+        // The email extension must match what `ingest_prepared_internal_message` stores for the
+        // very same mail: both sides key one canonical message on the same `Message-ID`, and the
+        // stored message is only reused when the content hashes agree. Leaving `raw_text_body`
+        // `None` here while the receiving side wrote `Some(body)` made every internal delegation
+        // hop fail its outbox delivery and retry forever.
+        let metadata = EmailMessageMetadata::new(sent.outbound_message_id.clone())
+            .in_reply_to(Some(sent.in_reply_to.clone()))
+            .references(sent.references.to_vec())
+            .raw_bodies(Some(sent.body_text.clone()), None);
+
         self.thread_persistence
-            .create_message(&Message {
-                id: Uuid::new_v4(),
+            .create_message(&MessageWrite {
                 thread_id,
-                message_id: sent.outbound_message_id.clone(),
-                in_reply_to: Some(sent.in_reply_to.clone()),
-                references_list: sent.references.to_vec(),
-                sender: sent.from_address.clone(),
-                recipients_to: sent.recipients_to.to_vec(),
-                recipients_cc: sent.recipients_cc.to_vec(),
+                author: MessageAuthorWrite::Observed(IdentityObservation {
+                    identity: sender,
+                    display_label: sent.from_name.clone(),
+                    claim_metadata: IdentityClaimMetadata::observation(),
+                    provenance: IdentityProvenance::Agent,
+                }),
                 subject: sent.subject.clone(),
                 clean_text_body: sent.body_text.clone(),
-                // Must match what `ingest_prepared_internal_message` stores for the very same
-                // mail. Both sides write one canonical `email_messages` row keyed by Message-ID,
-                // and its upsert only returns a row when the content hashes agree — leaving this
-                // `None` while the receiving side wrote `Some(body)` made every internal
-                // delegation hop fail its outbox delivery and retry forever.
-                raw_text_body: Some(sent.body_text.clone()),
-                raw_html_body: None,
-                attachments: None,
+                attachments: Vec::new(),
                 direction: MessageDirection::Outbound,
                 role: MessageRole::Agent,
-                thread_index: None,
+                correlation_id: sent.correlation_id,
+                participants,
+                correlation: MessageCorrelation::Email(metadata),
                 created_at: chrono::Utc::now(),
             })
             .await?;
@@ -674,18 +721,29 @@ impl ThreadUseCases {
             .await
     }
 
-    pub async fn find_outbound_reply(
+    pub async fn find_outbound_reply_after(
         &self,
         thread_id: Uuid,
-        in_reply_to: &MessageId,
+        answering: CanonicalMessageId,
     ) -> AppResult<Option<Message>> {
         self.thread_persistence
-            .find_outbound_reply(thread_id, in_reply_to)
+            .find_outbound_reply_after(thread_id, answering)
             .await
     }
 
-    pub async fn save_message(&self, message: &Message) -> AppResult<Message> {
+    pub async fn save_message(&self, message: &MessageWrite) -> AppResult<Message> {
         self.thread_persistence.create_message(message).await
+    }
+
+    /// Attach a message that is already stored to another of its company's threads.
+    pub async fn associate_message(
+        &self,
+        thread_id: Uuid,
+        message: CanonicalMessageId,
+    ) -> AppResult<Message> {
+        self.thread_persistence
+            .associate_message(thread_id, message)
+            .await
     }
 
     pub async fn hydrate_ingest_configuration(

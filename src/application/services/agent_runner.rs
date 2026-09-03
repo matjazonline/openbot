@@ -1152,7 +1152,10 @@ impl<'a> AgentRunner<'a> {
             };
             rendered.push_str(&format!(
                 "[{} ({}){}]: {}\n",
-                role_label, msg.sender, subject_label, msg.clean_text_body
+                role_label,
+                msg.author.display(),
+                subject_label,
+                msg.clean_text_body
             ));
         }
         format!(
@@ -1489,6 +1492,7 @@ mod tests {
     use crate::entities::channel::Channel;
     use crate::entities::message::MessageDirection;
     use crate::entities::value_objects::{ChannelSlug, CompanySlug};
+    use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email};
 
     #[tokio::test]
     async fn test_agent_runner_returns_error_when_provider_missing() -> anyhow::Result<()> {
@@ -2549,7 +2553,7 @@ system_prompt: Hello
     }
 
     fn history_message(role: MessageRole, sender: &str, subject: &str, body: &str) -> Message {
-        Message {
+        stored_email(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id: Uuid::new_v4(),
             message_id: format!("<{}@test>", Uuid::new_v4()).into(),
@@ -2570,7 +2574,7 @@ system_prompt: Hello
             role,
             thread_index: None,
             created_at: chrono::Utc::now(),
-        }
+        })
     }
 
     #[test]

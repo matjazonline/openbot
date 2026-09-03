@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::entities::{
     company::CompanyTeamAccount,
+    message::CanonicalMessageId,
     task::{TaskStatus, ThreadActivity},
     value_objects::{EmailAddress, MessageId},
 };
@@ -372,7 +373,15 @@ pub struct ScheduledRunPayload {
     /// attribution existed, which are the same thing to the worker.
     #[serde(default)]
     pub run_as: Option<ScheduleRunAs>,
+    /// The `Message-ID` the answer email threads onto. Email transport only -- it is not how the
+    /// prompt message is identified.
     pub trigger_message_id: MessageId,
+    /// The canonical prompt message this run answers.
+    ///
+    /// The worker's idempotency guard asks "did a previous attempt already answer this?", which is
+    /// a question about canonical messages in a thread, not about mail headers -- so the prompt is
+    /// named by its canonical id and a run over a transport with no headers at all works the same.
+    pub prompt_message_id: CanonicalMessageId,
 }
 
 /// A durable logical slot waiting to be materialized into a thread, prompt, and task.

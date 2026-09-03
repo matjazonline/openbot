@@ -9,6 +9,7 @@ pub mod correlation;
 pub mod creation;
 pub mod cursor;
 pub mod dashboard;
+pub mod email_message;
 pub mod memory;
 pub mod message;
 pub mod message_contract;

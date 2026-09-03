@@ -385,7 +385,8 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         .inbound_message
         .as_ref()
         .expect("M1 is stored on B's thread")
-        .message_id
+        .rfc_message_id()
+        .expect("mail carried M1, so it has a Message-ID")
         .clone();
 
     // M4: B answers A, quoting M1 so the reply correlates to A's outstanding outreach.
