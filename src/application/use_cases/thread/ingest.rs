@@ -53,8 +53,9 @@ use crate::{
 use super::{
     BounceInfo, BounceSuggestion, ChannelDirectoryEntry, ChannelMatch, EmailIngressAdapter,
     InboundIngestResult, InboundOrigin, InternalChannelSource, MAX_THREAD_MESSAGES_PER_HOUR,
-    MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite, RecipientRole,
-    ThreadUseCases, durable_ingest_payload, format_help_email_body, qualified_email_identity,
+    MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite, PipelineStep,
+    RecipientRole, ThreadUseCases, durable_ingest_payload, format_help_email_body,
+    qualified_email_identity,
     support::{
         DirectoryCache, body_mentions_email, body_mentions_slug, build_prompt_text,
         check_inbound_guards, parsed_email_from_normalized, reference_ids, strip_quoted_history,
@@ -106,18 +107,13 @@ fn system_address_of(address: &str, app_domain: &str) -> Option<(CompanySlug, Sy
 /// This is a property of the *message*, not of the run, which is why it has to survive into the
 /// durable payload: the worker that eventually answers is a different process from the one that
 /// took the message in, and it has no other way to know what was asked for.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ReplyDelivery {
     /// Answer for real. Every message that arrived over SMTP or a webhook, and every internal hop.
     Send,
     /// Run the agent but keep the answer in the mailbox — a send the user marked as a test.
     InAppOnly,
-}
-
-impl ReplyDelivery {
-    fn sends_email(self) -> bool {
-        matches!(self, ReplyDelivery::Send)
-    }
 }
 
 /// A company/channel pair that passed authorization, before its thread exists.
@@ -129,8 +125,7 @@ struct CandidateMatch {
     /// The complete To/Cc address that produced this match. Pipeline steps share this address.
     delivery_address: EmailAddress,
     role: RecipientRole,
-    step_index: usize,
-    total_steps: usize,
+    step: PipelineStep,
 }
 
 /// Everything phase 2 learned about the addresses on the message.
@@ -467,9 +462,9 @@ impl ThreadUseCases {
             }
 
             let available_channels = directory.channels(company.id).await?;
-            let total_steps = channel_slugs.len();
+            let total = channel_slugs.len();
 
-            for (step_index, channel_slug) in channel_slugs.into_iter().enumerate() {
+            for (index, channel_slug) in channel_slugs.into_iter().enumerate() {
                 let Some(channel) = available_channels
                     .iter()
                     .find(|c| c.matches_slug(&channel_slug))
@@ -515,8 +510,7 @@ impl ThreadUseCases {
                             matched_slug: channel_slug,
                             delivery_address: EmailAddress::from(address.clone()),
                             role,
-                            step_index,
-                            total_steps,
+                            step: PipelineStep { index, total },
                         });
                     }
                 }
@@ -944,8 +938,7 @@ impl ThreadUseCases {
             matched_slug,
             delivery_address,
             role,
-            step_index,
-            total_steps,
+            step,
         } = candidate;
         let sender = parsed.sender.trim().to_string();
         let context = directory
@@ -1082,8 +1075,7 @@ impl ThreadUseCases {
                 thread,
                 inbound_message,
                 recipient_role: role,
-                step_index,
-                total_steps,
+                step,
             },
             executes_agent,
             marks_context_only,
@@ -1317,7 +1309,7 @@ impl ThreadUseCases {
             parsed_email: Some(parsed),
             normalized_message: Some(norm),
             task_id: None,
-            deliver: delivery.sends_email(),
+            reply_delivery: delivery,
             channel_matches,
             bounce_info: None,
         };

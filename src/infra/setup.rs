@@ -3,7 +3,6 @@ use crate::{
         http::{app_state::AppState, session::SessionAuthority},
         memory::{hindsight::HindsightProvider, hydradb::HydraDbProvider},
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
-        protocols::{EgressRegistry, email::EmailEgressAdapter},
         smtp::LettreMailTransport,
         storage::{FileStorage, gcs::GcsFileStorage},
     },
@@ -153,10 +152,6 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         config.clone(),
     ));
 
-    let egress_registry = Arc::new(
-        EgressRegistry::new().register(Arc::new(EmailEgressAdapter::new(mail_dispatcher))),
-    );
-
     let thread_use_cases = Arc::new(
         ThreadUseCases::new(
             postgres_arc.clone(),
@@ -168,7 +163,6 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         )
         .with_agent_run_timeout(agent_run_timeout)
         .with_mail_transport(mail_transport)
-        .with_egress_registry(egress_registry)
         .with_agent_persistence(postgres_arc.clone())
         .with_agent_channel_provisioning(postgres_arc.clone())
         .with_approval_use_cases(approval_use_cases.clone())

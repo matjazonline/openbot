@@ -1116,14 +1116,14 @@ impl TaskWorker {
         // Whether the reply is really sent was decided when the message came in, not here: a
         // mailbox send can ask to stay in-app, and this worker is a different process from the one
         // that took the request.
-        let deliver = ingest_exec.deliver;
+        let reply_delivery = ingest_exec.reply_delivery;
         // Boxed for the same reason as the scheduled branch above: both descend into the agent, and
         // both would otherwise be stored inline in this frame.
         let dispatch = Box::pin(
             self.thread_use_cases
                 .execute_claimed_agent_task_and_dispatch(
                     &ingest_exec,
-                    deliver,
+                    reply_delivery,
                     lease,
                     task.correlation_id,
                 ),
@@ -2677,7 +2677,7 @@ mod tests {
             parsed_email: Some(parsed_email),
             normalized_message: None,
             task_id: None,
-            deliver: true,
+            reply_delivery: crate::use_cases::thread::ReplyDelivery::Send,
             channel_matches: vec![],
             bounce_info: None,
         };

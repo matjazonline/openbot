@@ -78,6 +78,14 @@ impl FromStr for TransportKind {
 #[error("unsupported transport '{0}'")]
 pub struct UnsupportedTransport(String);
 
+impl UnsupportedTransport {
+    /// Names a transport this deployment cannot speak. Also raised for a [`TransportKind`] with no
+    /// registered adapter, which is the same fact one step later.
+    pub fn new(transport: impl Into<String>) -> Self {
+        Self(transport.into())
+    }
+}
+
 macro_rules! uuid_id {
     ($name:ident) => {
         #[derive(
@@ -130,6 +138,10 @@ uuid_id!(BindingAuditEventId);
 uuid_id!(PrincipalId);
 uuid_id!(ParticipantIdentityId);
 uuid_id!(DeliveryId);
+// `InboundEventId` names one row of the durable inbound inbox: a bounded, authenticated provider
+// event awaiting ingestion. Declared here with the other correlation ids so a lease over it is
+// typed from the day the port that claims it is written.
+uuid_id!(InboundEventId);
 
 pub const MAX_IDENTITY_NAMESPACE_BYTES: usize = 255;
 pub const MAX_IDENTITY_SUBJECT_BYTES: usize = 320;
@@ -150,7 +162,12 @@ pub enum TransportValueError {
     ControlCharacter,
 }
 
-fn validate_bounded(value: &str, max_bytes: usize) -> Result<(), TransportValueError> {
+/// The single definition of "bounded, non-empty, no control characters".
+///
+/// `pub(crate)` rather than private because [`bounded_string`] is re-exported for the application
+/// layer's own bounded values, and a second copy of these three rules is exactly how one of them
+/// drifts.
+pub(crate) fn validate_bounded(value: &str, max_bytes: usize) -> Result<(), TransportValueError> {
     if value.trim().is_empty() {
         return Err(TransportValueError::Empty);
     }
@@ -165,14 +182,16 @@ fn validate_bounded(value: &str, max_bytes: usize) -> Result<(), TransportValueE
 
 macro_rules! bounded_string {
     ($name:ident, $max:ident) => {
-        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, ::serde::Serialize)]
         #[serde(transparent)]
         pub struct $name(String);
 
         impl $name {
-            pub fn parse(value: impl Into<String>) -> Result<Self, TransportValueError> {
+            pub fn parse(
+                value: impl Into<String>,
+            ) -> Result<Self, $crate::entities::transport::TransportValueError> {
                 let value = value.into();
-                validate_bounded(&value, $max)?;
+                $crate::entities::transport::validate_bounded(&value, $max)?;
                 Ok(Self(value))
             }
 
@@ -185,14 +204,14 @@ macro_rules! bounded_string {
             }
         }
 
-        impl fmt::Display for $name {
-            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        impl ::std::fmt::Display for $name {
+            fn fmt(&self, formatter: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                 formatter.write_str(&self.0)
             }
         }
 
         impl TryFrom<String> for $name {
-            type Error = TransportValueError;
+            type Error = $crate::entities::transport::TransportValueError;
 
             fn try_from(value: String) -> Result<Self, Self::Error> {
                 Self::parse(value)
@@ -205,17 +224,21 @@ macro_rules! bounded_string {
             }
         }
 
-        impl<'de> Deserialize<'de> for $name {
+        impl<'de> ::serde::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
-                D: serde::Deserializer<'de>,
+                D: ::serde::Deserializer<'de>,
             {
-                let value = String::deserialize(deserializer)?;
-                Self::parse(value).map_err(serde::de::Error::custom)
+                let value = <String as ::serde::Deserialize>::deserialize(deserializer)?;
+                Self::parse(value).map_err(::serde::de::Error::custom)
             }
         }
     };
 }
+
+// Re-exported for the same reason as `uuid_id`: the application layer's transport contracts mint
+// their own bounded strings, and they must be bounded by these rules rather than by a second copy.
+pub(crate) use bounded_string;
 
 bounded_string!(IdentityNamespace, MAX_IDENTITY_NAMESPACE_BYTES);
 bounded_string!(EndpointNamespace, MAX_ENDPOINT_NAMESPACE_BYTES);

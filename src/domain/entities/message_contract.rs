@@ -44,20 +44,3 @@ pub struct NormalizedInboundMessage {
     pub spam_score: Option<f64>,
     pub is_context_only: bool,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NormalizedOutboundMessage {
-    pub thread_id: Uuid,
-    pub in_reply_to_ref: Option<MessageId>,
-    pub references: Vec<MessageId>,
-    pub recipients_to: Vec<QualifiedIdentity>,
-    pub recipients_cc: Vec<QualifiedIdentity>,
-    pub subject: String,
-    pub content: String,
-    pub attachments: Vec<AttachmentMetadata>,
-    pub transport: TransportKind,
-    pub channel_id: Uuid,
-    pub hop_count: u32,
-    pub trace_channels: Vec<Uuid>,
-    pub correlation_id: CorrelationId,
-}

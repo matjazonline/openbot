@@ -29,10 +29,8 @@ use crate::{
         email_message::EmailMessageMetadata,
         memory::{MAX_MEMORY_UPSTREAM_CONTEXT_CHARS, truncate_memory_text},
         message::{MessageDirection, MessageParticipantKind, MessageRole},
-        message_contract::NormalizedOutboundMessage,
         participant::{IdentityClaimMetadata, IdentityProvenance},
         task::TokenUsage,
-        transport::TransportKind,
         value_objects::{EmailAddress, MessageId},
     },
     services::{
@@ -50,10 +48,48 @@ use crate::{
 
 use super::{
     AgentExecutionResult, ChannelMatch, InboundIngestResult, MessageAuthorWrite,
-    MessageCorrelation, MessageParticipantWrite, MessageWrite, RecipientRole, ThreadUseCases,
-    durable_ingest_payload, scrub_json_secrets,
+    MessageCorrelation, MessageParticipantWrite, MessageWrite, PipelineStep, RecipientRole,
+    ReplyDelivery, ThreadUseCases, durable_ingest_payload, scrub_json_secrets,
     support::{DirectoryCache, outbound_reference_ids},
 };
+
+/// How this dispatch's reply reaches the outside world.
+///
+/// Replaces a `send_email: bool` crossed with `ingest.task_id: Option<Uuid>`. That matrix had two
+/// combinations nothing could mean -- a durable send with no task to key it on, and a simulated
+/// send that still queued an outbox row -- and both compiled. Here the task id lives inside the one
+/// variant that has one, so a durable send cannot be requested without it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReplyDeliveryMode {
+    /// The agents run and their answer is recorded, but nothing is handed to a transport: a
+    /// mailbox send the user marked as a test, or a simulation.
+    Simulated,
+    /// Nothing durable to key an idempotent send on, so the send happens inline in this call.
+    /// Only a direct ingest with no task row takes this path.
+    Direct,
+    /// Queued in the same transaction as the reply and delivered by the outbox poller, under a key
+    /// derived from the task so two workers racing the same task queue one send.
+    Durable { task_id: Uuid },
+}
+
+impl ReplyDeliveryMode {
+    /// What the message asked for at ingest, crossed with whether this run owns a durable task.
+    ///
+    /// One place, so no call site re-derives it: the ingest decision alone cannot tell direct from
+    /// durable, and the task id alone cannot tell either from simulated.
+    const fn resolve(delivery: ReplyDelivery, task_id: Option<Uuid>) -> Self {
+        match (delivery, task_id) {
+            (ReplyDelivery::InAppOnly, _) => Self::Simulated,
+            (ReplyDelivery::Send, Some(task_id)) => Self::Durable { task_id },
+            (ReplyDelivery::Send, None) => Self::Direct,
+        }
+    }
+
+    /// Whether anything is actually handed to a transport.
+    const fn reaches_a_transport(self) -> bool {
+        !matches!(self, Self::Simulated)
+    }
+}
 
 /// Whether a run may skip the inbound guardrail.
 ///
@@ -134,7 +170,7 @@ struct AgentDelivery<'a> {
     ingest: &'a InboundIngestResult,
     lease: TaskLeaseRef,
     response: &'a str,
-    send_email: bool,
+    mode: ReplyDeliveryMode,
     correlation_id: CorrelationId,
 }
 
@@ -156,7 +192,7 @@ impl ThreadUseCases {
     pub async fn execute_claimed_agent_task_and_dispatch(
         &self,
         ingest: &InboundIngestResult,
-        send_email: bool,
+        delivery: ReplyDelivery,
         lease: TaskLeaseRef,
         correlation_id: CorrelationId,
     ) -> AppResult<DispatchOutcome> {
@@ -164,10 +200,11 @@ impl ThreadUseCases {
             info!("Skipping agent execution for context-only message ID {message_id}");
             return Ok(DispatchOutcome::Skipped);
         }
+        let mode = ReplyDeliveryMode::resolve(delivery, ingest.task_id);
         // The guard above is the whole reason this function exists, so the dispatch it delegates to
         // is boxed rather than stored inline -- an `async fn` that only forwards still pays its
         // child future's size in stack. See `scripts/stack-frames.sh`.
-        Box::pin(self.run_claimed_dispatch(ingest, send_email, lease, correlation_id)).await
+        Box::pin(self.run_claimed_dispatch(ingest, mode, lease, correlation_id)).await
     }
 
     /// The dispatch proper: run the agents, deliver the reply, and record what happened on the
@@ -175,7 +212,7 @@ impl ThreadUseCases {
     async fn run_claimed_dispatch(
         &self,
         ingest: &InboundIngestResult,
-        send_email: bool,
+        mode: ReplyDeliveryMode,
         lease: TaskLeaseRef,
         correlation_id: CorrelationId,
     ) -> AppResult<DispatchOutcome> {
@@ -210,7 +247,7 @@ impl ThreadUseCases {
                 ingest,
                 lease,
                 response: &response,
-                send_email,
+                mode,
                 correlation_id,
             })
             .await?;
@@ -595,7 +632,7 @@ impl ThreadUseCases {
         for output in previous {
             let header = format!(
                 "--- Step {step}: {name} ({slug}) ---\n",
-                step = output.channel_match.step_index + 1,
+                step = output.channel_match.step.index + 1,
                 name = output.channel_match.channel.name,
                 slug = output.channel_match.channel.slug,
             );
@@ -663,11 +700,11 @@ impl ThreadUseCases {
             ingest,
             lease,
             response,
-            send_email,
+            mode,
             correlation_id,
         } = delivery;
         let primary = &matches[0];
-        if !send_email {
+        if !mode.reaches_a_transport() {
             return Ok((self.simulated_delivery(primary, parsed).await?, None));
         }
 
@@ -711,30 +748,8 @@ impl ThreadUseCases {
         }
 
         let (sent, pending) = self
-            .prepare_agent_reply(outbound_email, ingest, primary.company.id)
+            .prepare_agent_reply(outbound_email, mode, primary.company.id)
             .await?;
-
-        // Registered egress adapters observe the normalized form of what we just sent.
-        let norm_outbound = NormalizedOutboundMessage {
-            thread_id: primary.thread.id,
-            in_reply_to_ref: Some(MessageId::from(parsed.message_id.clone())),
-            references: references.into_iter().map(MessageId::from).collect(),
-            recipients_to: vec![super::qualified_email_identity(parsed.sender.clone())?],
-            recipients_cc: recipients_cc
-                .iter()
-                .cloned()
-                .map(super::qualified_email_identity)
-                .collect::<AppResult<Vec<_>>>()?,
-            subject: parsed.subject.clone(),
-            content: response.to_string(),
-            attachments: vec![],
-            transport: TransportKind::Email,
-            channel_id: primary.channel.id,
-            hop_count: parsed.hop_count,
-            trace_channels: parsed.trace_channels.clone(),
-            correlation_id,
-        };
-        let _ = self.egress_registry.get(&norm_outbound.transport);
 
         Ok((
             OutboundDelivery {
@@ -871,10 +886,10 @@ impl ThreadUseCases {
     async fn prepare_agent_reply(
         &self,
         outbound_email: OutboundEmail,
-        ingest: &InboundIngestResult,
+        mode: ReplyDeliveryMode,
         company_id: Uuid,
     ) -> AppResult<(SentEmailResult, Option<OutboundSend>)> {
-        let Some(task_id) = ingest.task_id else {
+        let ReplyDeliveryMode::Durable { task_id } = mode else {
             let sent = self.send_or_route_internally(outbound_email, None).await?;
             return Ok((sent, None));
         };
@@ -1155,8 +1170,7 @@ fn channel_matches_of(ingest: &InboundIngestResult) -> Option<Vec<ChannelMatch>>
         thread: thread.clone(),
         inbound_message: inbound_message.clone(),
         recipient_role: RecipientRole::To,
-        step_index: 0,
-        total_steps: 1,
+        step: PipelineStep::only(),
     }])
 }
 

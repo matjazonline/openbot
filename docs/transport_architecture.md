@@ -221,6 +221,35 @@ and content digest. A match commits the normal success mapping. Bounded exhausti
 part for operator action; it never automatically reposts. A manual retry despite duplicate risk
 requires company-manager confirmation and an audited reason.
 
+## Application ports
+
+The contracts above live in `src/application/transport`, in the layer that consumes them. Adapters
+implement them; nothing under `src/adapters` declares an abstraction the application depends on,
+and `the_application_layer_imports_no_adapter_framework_or_provider_type` fails the build if that
+reverses. Its exception list is the remaining work, each entry naming the step that retires it.
+
+| Contract | What it is | Who produces it | Who consumes it |
+|---|---|---|---|
+| `InboundEnvelope` | One inbound provider message: qualified author, addressed identities, bounded canonical content, attachment metadata, binding-qualified event/message/thread keys, reply candidates, typed policy facts, correlation ID, protocol extension | Protocol ingress adapter | Ingest use case |
+| `IngressPolicyFacts` | `Email(EmailIngressFacts)` / `TrustedApplication` / `InstalledConversation` | Protocol ingress adapter | Ingress guard phase |
+| `ProtocolExtension` | Bounded, versioned email metadata, or a reference to an already-durable stored event | Protocol ingress adapter | Canonical commit |
+| `InboundCommitRequest` / `InboundCommitOutcome` | Every row one accepted message makes durable together: claimed-event fence, thread associations, task, delivery intents | Ingest use case | `InboundMessageCommitter` |
+| `DeliveryIntent` | Canonical message, source binding, destination binding or explicit external destination, purpose, stable key | `DeliveryPlanner` | Delivery queue |
+| `DeliveryEnvelope` / `RenderedPart` | Versioned protocol-neutral content plus a typed, bounded adapter payload, produced only after destination resolution | `TransportRenderer` | `TransportSender` |
+| `ProviderSendOutcome` | `Delivered` / `RetryAfter` / `Retryable` / `OutcomeUnknown` / `Terminal` | `TransportSender` | Delivery state machine |
+| `ExecutionLease<Row>` | Row ID, execution UUID, owner, expiry — typed per queue | Queue claim | Every fenced transition |
+
+Two properties are load-bearing. `TransportSender::send` returns a `ProviderSendOutcome` rather
+than a `Result`, because an `Err` erases the difference between a definite refusal and an
+ambiguous one, and only the second forbids an automatic retry. And a delivery's idempotency key is
+derived from purpose, canonical message and destination — the destination included, because
+deduplication is by `(destination_binding_id, key)` and an explicitly named external destination
+has no binding id to separate it from another recipient of the same message.
+
+Durable task payloads carry canonical identifiers only (`InboundTaskPayloadV1`: company, channel,
+thread, source message, correlation). Workers reload current entities with tenant-scoped queries.
+No entity snapshot, parsed email, or raw provider content enters `background_tasks.payload`.
+
 ## Slack representation and routing
 
 The installed Slack bot represents the bound business channel. Agent display names may appear in

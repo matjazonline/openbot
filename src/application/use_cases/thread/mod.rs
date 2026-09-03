@@ -13,12 +13,8 @@ use uuid::Uuid;
 use crate::services::agent_channel_tool::AgentChannelProvisioning;
 use crate::{
     adapters::persistence::task::TaskPersistence,
-    adapters::protocols::{
-        EgressRegistry,
-        email::{
-            EmailChannelSelectorParser, EmailEgressAdapter, EmailIdentity, EmailIngressAdapter,
-            EmailRecipientDestination,
-        },
+    adapters::protocols::email::{
+        EmailChannelSelectorParser, EmailIdentity, EmailIngressAdapter, EmailRecipientDestination,
     },
     adapters::storage::FileStorage,
     app_error::{AppError, AppResult},
@@ -63,6 +59,10 @@ pub use message_write::{
     MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
 };
 mod support;
+
+/// Addressing role and multi-channel pipeline position are transport vocabulary; they are declared
+/// with the other transport contracts and re-exported here so call sites read unchanged.
+pub use crate::transport::{PipelineStep, RecipientRole};
 
 #[cfg(test)]
 pub mod test_support;
@@ -226,7 +226,6 @@ pub struct ThreadUseCases {
     agent_channel_provisioning: Option<Arc<dyn AgentChannelProvisioning>>,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
-    egress_registry: Arc<EgressRegistry>,
     mail_dispatcher: Arc<OutboundDispatcher>,
     /// Where inbound attachments are kept; `None` on a deployment with no private bucket.
     file_storage: Option<Arc<dyn FileStorage>>,
@@ -245,10 +244,6 @@ impl ThreadUseCases {
         config: Arc<AppConfig>,
     ) -> Self {
         let mail_dispatcher = Arc::new(OutboundDispatcher::disabled(config.clone()));
-        let egress_registry = Arc::new(
-            EgressRegistry::new()
-                .register(Arc::new(EmailEgressAdapter::new(mail_dispatcher.clone()))),
-        );
 
         Self {
             thread_persistence,
@@ -260,7 +255,6 @@ impl ThreadUseCases {
             agent_channel_provisioning: None,
             approval_use_cases: None,
             monitoring: None,
-            egress_registry,
             mail_dispatcher,
             file_storage: None,
             memory: None,
@@ -296,11 +290,6 @@ impl ThreadUseCases {
     pub fn with_agent_run_timeout(mut self, timeout: std::time::Duration) -> Self {
         assert!(!timeout.is_zero(), "agent run timeout must be positive");
         self.agent_run_timeout = timeout;
-        self
-    }
-
-    pub fn with_egress_registry(mut self, egress_registry: Arc<EgressRegistry>) -> Self {
-        self.egress_registry = egress_registry;
         self
     }
 
@@ -645,17 +634,25 @@ impl ThreadUseCases {
         self.ingest_composed_message(raw_payload, delivery).await
     }
 
+    /// Tell a sender their message could not be routed.
+    ///
+    /// Fire and forget, deliberately: a relay that is down must not turn an undeliverable message
+    /// into retried work. This is a notification delivery in the target model, and becomes one in
+    /// step 9 when the generic outbox exists to carry it.
     pub async fn handle_bounce_dispatch(&self, ingest: &InboundIngestResult) {
-        if let Some(ref bounce) = ingest.bounce_info {
-            if let Some(adapter) = self.egress_registry.get(&TransportKind::Email) {
-                let _ = adapter.dispatch_bounce(bounce).await;
-            } else {
-                let bounce_body = format_bounce_email_body(bounce, &self.config.app_domain_name);
-                let _ = self
-                    .mail_dispatcher
-                    .send_bounce(&bounce.recipient_to, &bounce.original_subject, &bounce_body)
-                    .await;
-            }
+        let Some(bounce) = ingest.bounce_info.as_ref() else {
+            return;
+        };
+        let body = format_bounce_email_body(bounce, &self.config.app_domain_name);
+        if let Err(error) = self
+            .mail_dispatcher
+            .send_bounce(&bounce.recipient_to, &bounce.original_subject, &body)
+            .await
+        {
+            tracing::warn!(
+                "Could not deliver a bounce to '{}': {error}",
+                bounce.recipient_to
+            );
         }
     }
 
@@ -867,22 +864,6 @@ impl ThreadUseCases {
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum RecipientRole {
-    To,
-    Cc,
-}
-
-impl RecipientRole {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            RecipientRole::To => "to",
-            RecipientRole::Cc => "cc",
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChannelMatch {
     pub company: Company,
@@ -897,10 +878,8 @@ pub struct ChannelMatch {
     pub thread: Thread,
     pub inbound_message: Message,
     pub recipient_role: RecipientRole,
-    #[serde(default)]
-    pub step_index: usize,
-    #[serde(default)]
-    pub total_steps: usize,
+    /// Where this match sits in a multi-channel pipeline.
+    pub step: PipelineStep,
 }
 
 impl ChannelMatch {
@@ -1144,10 +1123,12 @@ pub struct InboundIngestResult {
     pub normalized_message: Option<NormalizedInboundMessage>,
     pub task_id: Option<Uuid>,
     /// Whether the agent's reply should actually leave the building. Real inbound mail always gets
-    /// a real answer; a mailbox send can ask to stay in-app. Defaults true so task rows written
-    /// before this field existed still deliver.
-    #[serde(default = "delivers_by_default")]
-    pub deliver: bool,
+    /// a real answer; a mailbox send can ask to stay in-app.
+    ///
+    /// Required rather than defaulted: the worker that eventually answers is a different process
+    /// from the one that took the message in, and a payload it cannot read this from is one it
+    /// must refuse rather than guess at.
+    pub reply_delivery: ReplyDelivery,
     #[serde(default)]
     pub channel_matches: Vec<ChannelMatch>,
     #[serde(default)]
@@ -1177,7 +1158,7 @@ impl InboundIngestResult {
             parsed_email: None,
             normalized_message: None,
             task_id: None,
-            deliver: true,
+            reply_delivery: ReplyDelivery::Send,
             channel_matches: Vec::new(),
             bounce_info: None,
         }
@@ -1194,7 +1175,7 @@ impl InboundIngestResult {
             parsed_email: None,
             normalized_message: None,
             task_id: None,
-            deliver: true,
+            reply_delivery: ReplyDelivery::Send,
             channel_matches: Vec::new(),
             bounce_info: Some(bounce),
         }
@@ -1216,9 +1197,4 @@ pub struct AgentExecutionResult {
     pub token_usage: Option<TokenUsage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
-}
-
-/// Real mail is always answered for real; only a mailbox send can ask otherwise.
-fn delivers_by_default() -> bool {
-    true
 }

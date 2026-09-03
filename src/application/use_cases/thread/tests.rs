@@ -594,12 +594,13 @@ impl TaskPersistence for MockTaskPersistence {
     }
 }
 
-/// A task row written before the delivery choice was persisted has no `deliver` key, and the
-/// worker that picks it up must answer it for real. Defaulting the other way would silently
-/// swallow every reply still sitting in the queue across a deploy.
+/// Whether a reply leaves the building is a property of the message, decided at ingest and read
+/// back by a different process. A payload that does not state it is refused rather than defaulted:
+/// guessing "send" would mail out an answer the user asked to keep in the app, and guessing
+/// "in-app" would silently swallow a real customer's reply.
 #[test]
-fn a_payload_without_a_delivery_choice_still_delivers() {
-    let legacy: InboundIngestResult = serde_json::from_value(serde_json::json!({
+fn a_payload_that_does_not_state_its_delivery_choice_is_refused() {
+    let without_choice = serde_json::json!({
         "accepted": true,
         "reason": null,
         "thread": null,
@@ -609,11 +610,10 @@ fn a_payload_without_a_delivery_choice_still_delivers() {
         "parsed_email": null,
         "normalized_message": null,
         "task_id": null,
-    }))
-    .expect("a payload predating the field must still deserialize");
-    assert!(legacy.deliver);
+    });
+    assert!(serde_json::from_value::<InboundIngestResult>(without_choice).is_err());
 
-    let in_app: InboundIngestResult = serde_json::from_value(serde_json::json!({
+    let mut stated = serde_json::json!({
         "accepted": true,
         "reason": null,
         "thread": null,
@@ -623,10 +623,16 @@ fn a_payload_without_a_delivery_choice_still_delivers() {
         "parsed_email": null,
         "normalized_message": null,
         "task_id": null,
-        "deliver": false,
-    }))
-    .expect("an in-app-only payload must deserialize");
-    assert!(!in_app.deliver);
+        "reply_delivery": "in_app_only",
+    });
+    let in_app: InboundIngestResult =
+        serde_json::from_value(stated.clone()).expect("an in-app-only payload must deserialize");
+    assert_eq!(in_app.reply_delivery, ReplyDelivery::InAppOnly);
+
+    stated["reply_delivery"] = serde_json::Value::String("send".into());
+    let sending: InboundIngestResult =
+        serde_json::from_value(stated).expect("a sending payload must deserialize");
+    assert_eq!(sending.reply_delivery, ReplyDelivery::Send);
 }
 
 #[tokio::test]
@@ -1721,12 +1727,12 @@ async fn test_pipeline_address_chaining_execution() {
     assert!(ingest.accepted);
     assert_eq!(ingest.channel_matches.len(), 3);
     assert_eq!(ingest.channel_matches[0].channel.slug, "support");
-    assert_eq!(ingest.channel_matches[0].step_index, 0);
-    assert_eq!(ingest.channel_matches[0].total_steps, 3);
+    assert_eq!(ingest.channel_matches[0].step.index, 0);
+    assert_eq!(ingest.channel_matches[0].step.total, 3);
     assert_eq!(ingest.channel_matches[1].channel.slug, "billing");
-    assert_eq!(ingest.channel_matches[1].step_index, 1);
+    assert_eq!(ingest.channel_matches[1].step.index, 1);
     assert_eq!(ingest.channel_matches[2].channel.slug, "legal");
-    assert_eq!(ingest.channel_matches[2].step_index, 2);
+    assert_eq!(ingest.channel_matches[2].step.index, 2);
 
     // Verify threads were created for all 3 step channels
     let threads = thread_persistence.threads();
@@ -4493,7 +4499,7 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
     let dispatched = thread_use_cases
         .execute_claimed_agent_task_and_dispatch(
             &ingest,
-            true,
+            ReplyDelivery::Send,
             TaskLeaseRef {
                 task_id: ingest.task_id.unwrap_or_else(Uuid::new_v4),
                 worker_id: Uuid::new_v4(),

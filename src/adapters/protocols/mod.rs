@@ -1,40 +1,11 @@
-use async_trait::async_trait;
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use crate::{
-    app_error::AppResult,
-    entities::{message_contract::NormalizedOutboundMessage, transport::TransportKind},
-    use_cases::thread::BounceInfo,
-};
+//! Protocol adapters: they parse what a provider sent, render what it will accept, and make the
+//! provider call.
+//!
+//! Nothing here declares an abstraction the application consumes. The transport ports live in
+//! [`crate::transport`], with the workers and use cases that drive them; an adapter's job is to
+//! implement them. The `ProtocolEgressAdapter`/`EgressRegistry` pair that used to live in this
+//! module was an abstraction inside the layer it abstracted -- and its one implementation had to
+//! invent a channel name and a company slug because the normalized message it was handed carried
+//! neither. `DeliveryEnvelope` exists so a renderer is given a resolved destination instead.
 
 pub mod email;
-
-#[async_trait]
-pub trait ProtocolEgressAdapter: Send + Sync {
-    fn transport(&self) -> TransportKind;
-    async fn dispatch(&self, message: &NormalizedOutboundMessage) -> AppResult<()>;
-    async fn dispatch_bounce(&self, bounce_info: &BounceInfo) -> AppResult<()>;
-}
-
-#[derive(Clone, Default)]
-pub struct EgressRegistry {
-    adapters: HashMap<TransportKind, Arc<dyn ProtocolEgressAdapter>>,
-}
-
-impl EgressRegistry {
-    pub fn new() -> Self {
-        Self {
-            adapters: HashMap::new(),
-        }
-    }
-
-    pub fn register(mut self, adapter: Arc<dyn ProtocolEgressAdapter>) -> Self {
-        self.adapters.insert(adapter.transport(), adapter);
-        self
-    }
-
-    pub fn get(&self, transport: &TransportKind) -> Option<Arc<dyn ProtocolEgressAdapter>> {
-        self.adapters.get(transport).cloned()
-    }
-}
