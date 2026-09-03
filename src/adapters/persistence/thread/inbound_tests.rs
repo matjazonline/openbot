@@ -472,8 +472,8 @@ async fn a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_b
     fixture.cleanup().await;
 }
 
-/// Nothing this deployment can do with a delivery intent or a claimed inbound event yet, so the
-/// commit refuses one rather than dropping it. An intent that vanishes is a message nobody sends.
+/// A claimed inbound event has no durable inbox until step 10, so the commit refuses one rather
+/// than completing it silently. An event that stays claimed is work that never runs again.
 #[tokio::test]
 async fn work_this_build_has_no_durable_queue_for_is_refused_rather_than_dropped() {
     let Some(fixture) = Fixture::new("inbound_unsupported").await else {
@@ -482,15 +482,11 @@ async fn work_this_build_has_no_durable_queue_for_is_refused_rather_than_dropped
     let rfc = format!("<unsupported-{}@example.com>", fixture.suffix);
 
     let mut request = request(&fixture, &rfc, "Anyone there?").await;
-    request.deliveries = vec![crate::transport::DeliveryIntent {
-        message_id: crate::entities::message::CanonicalMessageId::random(),
-        source_binding_id: request.envelope.source.binding_id,
-        destination: crate::transport::DeliveryDestination::Binding(
-            request.envelope.source.binding_id,
-        ),
-        purpose: crate::transport::DeliveryPurpose::Mirror,
-        key: crate::transport::DeliveryKey::parse("mirror:test").unwrap(),
-    }];
+    request.claimed_event = Some(crate::transport::ExecutionLease::new(
+        crate::entities::transport::InboundEventId::random(),
+        crate::transport::WorkerId::random(),
+        chrono::Utc::now() + chrono::Duration::minutes(5),
+    ));
 
     assert!(fixture.persistence.commit_inbound(request).await.is_err());
     assert_eq!(message_count(&fixture).await, 0);

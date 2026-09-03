@@ -45,8 +45,8 @@ use crate::{
     infra::{config::AppConfig, events::MailboxEvents},
     services::task_worker::TaskWorker,
     use_cases::{
-        channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases,
-        user::UserUseCases,
+        channel::ChannelUseCases, company::CompanyUseCases, delivery::DeliveryReader,
+        thread::ThreadUseCases, user::UserUseCases,
     },
 };
 
@@ -122,6 +122,7 @@ struct Workspace {
     channel_use_cases: Arc<ChannelUseCases>,
     thread_use_cases: Arc<ThreadUseCases>,
     user_use_cases: Arc<UserUseCases>,
+    deliveries: Arc<dyn DeliveryReader>,
     config: Arc<AppConfig>,
     monitoring: Arc<dyn MonitoringService>,
     user_id: Uuid,
@@ -141,6 +142,7 @@ impl FromRequestParts<AppState> for Workspace {
             channel_use_cases: state.channel_use_cases.clone(),
             thread_use_cases: state.thread_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
+            deliveries: state.deliveries.clone(),
             config: state.config.clone(),
             monitoring: state.monitoring.clone(),
             user_id: user.id,
@@ -161,6 +163,7 @@ impl Workspace {
         TaskMonitorView {
             channel_use_cases: &self.channel_use_cases,
             thread_use_cases: &self.thread_use_cases,
+            deliveries: self.deliveries.as_ref(),
             config: &self.config,
             monitoring: self.monitoring.as_ref(),
             user_id: self.user_id,
@@ -311,7 +314,7 @@ async fn task_chain_pane(
     Ok(Html(pages::task_chain_detail_pane(&detail, None)))
 }
 
-/// How long one logical transaction's burst of task/outbox/approval rows is absorbed before the
+/// How long one logical transaction's burst of task/delivery/approval rows is absorbed before the
 /// board is redrawn once for all of them.
 const WAKE_COALESCE_WINDOW: Duration = Duration::from_millis(75);
 
@@ -350,7 +353,7 @@ enum BoardRedraw {
 
 /// Wait for the next reason to redraw, absorbing a burst of wake-ups into one answer.
 ///
-/// A single logical transaction commits task, outbox and approval rows together, so the wake-ups
+/// A single logical transaction commits task, delivery and approval rows together, so the wake-ups
 /// arrive in a clump; redrawing per row would send the client several fragments describing the
 /// same instant. Returning the decision rather than taking it inline is also what lets a
 /// paused-time test drive the timer and the coalescing window with no HTTP request or database
@@ -519,6 +522,7 @@ async fn resume_task(
 struct TaskMonitorView<'a> {
     channel_use_cases: &'a ChannelUseCases,
     thread_use_cases: &'a Arc<ThreadUseCases>,
+    deliveries: &'a dyn DeliveryReader,
     config: &'a Arc<AppConfig>,
     monitoring: &'a dyn MonitoringService,
     user_id: Uuid,
@@ -627,7 +631,11 @@ impl TaskMonitorView<'_> {
         // The transport is a separate process and never writes back into the task, so its state is
         // joined in here, at render time.
         let persistence = self.thread_use_cases.get_task_persistence().await;
-        let (deliveries, delivery_error) = match persistence.list_task_deliveries(task.id).await {
+        let (deliveries, delivery_error) = match self
+            .deliveries
+            .list_task_deliveries(self.company.id, task.id)
+            .await
+        {
             Ok(deliveries) => (deliveries, None),
             Err(error) => {
                 warn!(task_id = %task.id, %error, "Could not load task delivery details");

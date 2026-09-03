@@ -2,9 +2,14 @@
 //!
 //! This module owns the [`TaskPersistence`] trait and the lease types the worker drives it with.
 //! The implementation is split by topic alongside it: [`queue`] for the task lifecycle, [`board`]
-//! for the correlation-chain read model, [`outbox`] and [`outreach`] for the delivery and
-//! third-party paths, [`rows`] for the stored shapes, and [`operations`] for the trait impl that
-//! ties them together.
+//! for the correlation-chain read model, [`outreach`] for the third-party path, [`rows`] for the
+//! stored shapes, and [`operations`] for the trait impl that ties them together.
+//!
+//! Delivery lives one directory over, in `persistence::delivery`. It used to live here because
+//! there was one queue and it carried email: the queue row, its lease and its retry clause were
+//! all task-shaped. They are not task-shaped -- a delivery outlives the task that produced it and
+//! a schedule or an approval produces one with no task at all -- so what remains here is the join
+//! (`task_id`) and nothing else.
 //!
 //! The tests are one sibling `tests.rs`, following `use_cases/thread`: they share fixtures across
 //! every topic here, so splitting them per module would mean a shared test-support module before
@@ -24,29 +29,27 @@ use crate::{
     entities::{
         correlation::CorrelationId,
         message::CanonicalMessageId,
-        outbox::{OutboxEntry, OutboxStatus},
-        outreach::{CreateOutreachRequest, DueOutreach, OutreachProgress, OutreachReplyMatch},
+        outreach::{DueOutreach, OutreachProgress, OutreachReplyMatch},
         stuck_work::{StuckWorkCensus, StuckWorkThresholds},
         task::{
             BackgroundTask, NewTask, ResumeActor, StopActor, TaskAttemptOutcome, TaskAttemptRecord,
             TaskAttemptRef, TaskBoardFilter, TaskChainBoard, TaskChainDetail, TaskFailure,
             TaskLeaseRef, TaskStatus, TaskStatusEvent, TaskStatusEventCursor, ThreadActivity,
         },
-        value_objects::MessageId,
+        transport::DeliveryId,
+        value_objects::{EmailAddress, MessageId},
     },
-    transport::RecipientRole,
+    transport::{DeliveryCreation, NewDelivery, RecipientRole},
     use_cases::thread::{AgentReply, MessageWrite, TaskChannelTarget},
 };
 
 mod board;
 mod operations;
-mod outbox;
 mod outreach;
 mod queue;
 mod rows;
 
 pub(crate) use board::*;
-pub(crate) use outbox::*;
 pub(crate) use outreach::*;
 pub(crate) use queue::*;
 pub(crate) use rows::*;
@@ -144,41 +147,56 @@ pub async fn while_leased<F: Future>(
         }
     }
 }
-/// One email handed to the transport for delivery.
+/// One recipient of an outreach: the question it was asked, and the mail that carries it.
 ///
-/// A struct rather than four positional parameters, two of which are `Uuid`.
-pub struct OutboundSend {
+/// Both are built by the caller and written by the same transaction that creates the outreach, so
+/// a target row can never exist without the message it was asked with or the delivery that sends
+/// it. They live here rather than in `entities::outreach` because a `MessageWrite` and a
+/// `NewDelivery` are application vocabulary, and the domain may not reach upward for them.
+#[derive(Debug, Clone)]
+pub struct OutreachTargetRequest {
+    pub email: EmailAddress,
+    /// The question, as a canonical message in the task's thread. `request_message_id` on the
+    /// target row points at it, which is how the reply guard tells the agent asking a third party
+    /// something from the agent answering this turn.
+    pub request: MessageWrite,
+    pub delivery: NewDelivery,
+}
+
+/// One outreach to create, with every target already composed.
+#[derive(Debug, Clone)]
+pub struct CreateOutreachRequest {
+    pub id: Uuid,
+    pub task_id: Uuid,
     pub company_id: Uuid,
-    /// The channel this email goes out as. Unlike `task_id` it is not a lifecycle join — it is the
-    /// dimension the outbox is filtered by.
+    /// The channel every target is asked as.
     pub channel_id: Uuid,
-    /// The task whose work produced this email. Carries no lifecycle meaning — it is the join the
-    /// task view uses to show delivery state, nothing writes back through it.
-    pub task_id: Option<Uuid>,
-    /// The chain this email belongs to, inherited from the task that produced it. Unlike
-    /// `task_id` it is never cleared, so a delivered email stays attached to its trail even after
-    /// the task row is gone.
+    /// The chain the outreaching task belongs to, so the mail this sends and the replies it
+    /// provokes stay on the same trail as the run that asked for them.
     pub correlation_id: CorrelationId,
-    /// Stable across every retry of the same logical send — that is what makes it a lock, and what
-    /// the delivered Message-ID is derived from.
-    pub idempotency_key: String,
-    /// The `OutboundEmail` for the poller to deliver.
-    pub payload: serde_json::Value,
+    pub worker_id: Uuid,
+    pub outreach_key: String,
+    pub required_threshold_percent: f64,
+    pub expires_at: DateTime<Utc>,
+    pub subject: String,
+    pub body: String,
+    pub targets: Vec<OutreachTargetRequest>,
 }
 
 /// Everything one agent dispatch makes durable, so it can land as a single transaction.
 ///
-/// The reply message in each answered thread, the outbox row that delivers it, and the audit
-/// payload on the task are one result. Committed separately, a crash or a lost lease between
-/// them leaves the thread showing an answer that was never sent, or an email going out for a
-/// task whose payload says it never ran -- and the retry then has to reconcile the difference.
+/// The reply message in each answered thread, the delivery that carries it, and the audit payload
+/// on the task are one result. Committed separately, a crash or a lost lease between them leaves
+/// the thread showing an answer that was never sent, or a delivery going out for a task whose
+/// payload says it never ran -- and the retry then has to reconcile the difference.
 pub struct AgentDispatchCommit<'a> {
     /// Proof this run still owns the task. The whole transaction is fenced on it.
     pub lease: TaskLeaseRef,
     /// The reply: one canonical message, plus the further threads it also answered.
     pub reply: &'a AgentReply,
-    /// The email to hand to the outbox, or `None` for a simulated run that sends nothing.
-    pub outbound: Option<OutboundSend>,
+    /// The deliveries the reply is owed, already rendered. Empty for a simulated run, which
+    /// stores its answer and sends nothing.
+    pub deliveries: Vec<NewDelivery>,
     /// The run's audit payload, written back onto the task.
     pub payload: Value,
     /// Whether this dispatch also closes the task's outreach.
@@ -186,11 +204,12 @@ pub struct AgentDispatchCommit<'a> {
 }
 
 /// What [`TaskPersistence::commit_agent_dispatch`] did.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DispatchCommit {
-    /// Everything landed. `outbox_id` is `None` when an equivalent send was already queued, which
-    /// is the idempotency key doing its job rather than a failure.
-    Committed { outbox_id: Option<Uuid> },
+    /// Everything landed, and these are the deliveries the reply will go out through -- including
+    /// any that were absorbed onto a delivery an earlier run of this task had already queued,
+    /// which is the idempotency key doing its job rather than a failure.
+    Committed { deliveries: Vec<DeliveryCreation> },
     /// This run no longer owns the task, so nothing was written at all.
     LeaseLost,
 }
@@ -262,55 +281,6 @@ pub trait TaskPersistence: Send + Sync {
         Ok(())
     }
 
-    async fn claim_outbox_emails(
-        &self,
-        _worker_id: Uuid,
-        _lock_expires_at: DateTime<Utc>,
-        _limit: i64,
-    ) -> AppResult<Vec<OutboxEmail>> {
-        Ok(Vec::new())
-    }
-
-    async fn mark_outbox_email_sent(
-        &self,
-        _id: Uuid,
-        _worker_id: Uuid,
-        _provider_message_id: &str,
-    ) -> AppResult<bool> {
-        Ok(true)
-    }
-
-    async fn mark_outbox_email_failed(
-        &self,
-        _id: Uuid,
-        _worker_id: Uuid,
-        _error: &str,
-    ) -> AppResult<bool> {
-        Ok(true)
-    }
-
-    /// Dead-letter one claimed delivery outright, without spending its remaining attempts.
-    ///
-    /// For a failure that cannot come out differently next time — a payload that will not
-    /// deserialize, say. Retrying those only delays the same verdict by five backoffs.
-    async fn mark_outbox_email_dead(
-        &self,
-        _id: Uuid,
-        _worker_id: Uuid,
-        _error: &str,
-    ) -> AppResult<bool> {
-        Ok(true)
-    }
-
-    /// End every delivery whose lease has run out, counting each as a spent attempt.
-    ///
-    /// A claimed row whose worker died — or whose status write never landed — is otherwise stuck
-    /// in `sending` with its attempt count untouched, so it is redelivered every lease period and
-    /// never reaches the dead-letter cap. Returns how many rows were reaped.
-    async fn reap_expired_outbox_leases(&self) -> AppResult<u64> {
-        Ok(0)
-    }
-
     /// Give back every task whose lease lapsed without the run reporting anything, charging each
     /// one an attempt.
     ///
@@ -339,52 +309,25 @@ pub trait TaskPersistence: Send + Sync {
         Ok(StuckWorkCensus::default())
     }
 
-    /// Every delivery this task handed to the transport, oldest first.
+    /// Queue one delivery that no other durable write has to land with.
     ///
-    /// Exists so the task view can show delivery state without the transport writing back into the
-    /// task. The default returns nothing, which renders as "no deliveries".
-    /// What the transport did with the emails one task produced.
-    ///
-    /// Read-only, and deliberately so — the task and the transport are separate processes, and
-    /// this is the join the UI makes at render time, not a channel either one writes through.
-    async fn list_task_deliveries(&self, _task_id: Uuid) -> AppResult<Vec<OutboxEntry>> {
-        Ok(Vec::new())
-    }
-
-    /// One filtered page of the company's outbox, newest first unless `sort_asc`.
-    ///
-    /// `limit` is the caller's probe size, so whether a further page exists comes back with the
-    /// page itself; see [`crate::entities::outbox::OutboxFilter::probe_limit`].
-    async fn list_company_outbox_page(
-        &self,
-        _company_id: Uuid,
-        _channel_id: Option<Uuid>,
-        _status: Option<OutboxStatus>,
-        _sort_asc: bool,
-        _offset: i64,
-        _limit: i64,
-    ) -> AppResult<Vec<OutboxEntry>> {
-        Ok(Vec::new())
-    }
-
-    /// One outbox row by id. The caller checks its `company_id` before showing it — the id comes
-    /// from a URL.
-    async fn get_outbox_entry(&self, _outbox_id: Uuid) -> AppResult<Option<OutboxEntry>> {
-        Ok(None)
-    }
-
-    /// Hand one email to the transport, exactly once per `idempotency_key`.
-    ///
-    /// `Some(outbox_id)` means this caller queued it; `None` means an equivalent send is already
-    /// queued or delivered and this caller must not queue a second one. Delivery itself happens
-    /// later, in the outbox poller, on whichever instance claims the row.
+    /// The narrow case: a scheduled run's mail, whose canonical answer is written by the same
+    /// call. Everything else -- an agent reply, an approval, an outreach -- has state that must
+    /// become visible with its delivery, and so goes through the purpose-specific method that
+    /// commits both.
     ///
     /// The default accepts without recording, so test doubles are unaffected.
-    async fn enqueue_outbound_send(&self, _send: OutboundSend) -> AppResult<Option<Uuid>> {
-        Ok(Some(Uuid::new_v4()))
+    async fn enqueue_delivery(&self, _delivery: NewDelivery) -> AppResult<DeliveryCreation> {
+        Err(AppError::Internal(
+            "Delivery persistence is not configured".into(),
+        ))
     }
 
-    async fn get_outreach_thread_for_outbox(&self, _outbox_id: Uuid) -> AppResult<Option<Uuid>> {
+    /// The thread an outreach's question was asked in, for the delivery that carried it.
+    async fn get_outreach_thread_for_delivery(
+        &self,
+        _delivery_id: DeliveryId,
+    ) -> AppResult<Option<Uuid>> {
         Ok(None)
     }
 
@@ -399,17 +342,9 @@ pub trait TaskPersistence: Send + Sync {
     /// while every outreach request looked like an answer.
     async fn record_outreach_request_message(
         &self,
-        outbox_id: Uuid,
+        delivery_id: DeliveryId,
         write: &MessageWrite,
     ) -> AppResult<CanonicalMessageId>;
-
-    async fn is_outbox_delivery_active(&self, _outbox_id: Uuid) -> AppResult<bool> {
-        Ok(true)
-    }
-
-    async fn cancel_claimed_outbox(&self, _outbox_id: Uuid, _worker_id: Uuid) -> AppResult<bool> {
-        Ok(false)
-    }
 
     async fn enqueue_task(&self, new_task: NewTask) -> AppResult<BackgroundTask>;
 

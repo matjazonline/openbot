@@ -22,12 +22,12 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         dashboard::{
-            AttemptStats, DashboardSnapshot, DashboardWindow, LatencyBucket, OUTSTANDING_LIMIT,
-            OutboxHealth, OutboxStatusCount, OutstandingTask, QueueDepthBucket, RetryRateBucket,
+            AttemptStats, DashboardSnapshot, DashboardWindow, DeliveryHealth, DeliveryStatusCount,
+            LatencyBucket, OUTSTANDING_LIMIT, OutstandingTask, QueueDepthBucket, RetryRateBucket,
             TaskQueueHealth, TaskStatusCount, ThroughputBucket,
         },
-        outbox::OutboxStatus,
         task::TaskStatus,
+        transport::DeliveryStatus,
     },
 };
 
@@ -66,29 +66,31 @@ const TASK_PRESSURE_SQL: &str = r#"
       FROM background_tasks
      WHERE ($1::uuid IS NULL OR company_id = $1)"#;
 
-const OUTBOX_QUEUE_SQL: &str = r#"
+const DELIVERY_QUEUE_SQL: &str = r#"
     SELECT status,
            COUNT(*)::bigint AS count
-      FROM email_outbox
+      FROM message_deliveries
      WHERE ($1::uuid IS NULL OR company_id = $1)
      GROUP BY status
      ORDER BY status"#;
 
 /// Deliveries claimed under a lease that has already run out, and the ready-to-send backlog.
 ///
-/// Unlike the task queue, nothing renews an outbox lease, so `expired_leases` counts rows the next
-/// maintenance pass will fail with `'Delivery lease expired without a result'`.
-const OUTBOX_PRESSURE_SQL: &str = r#"
+/// `expired_leases` counts rows the next maintenance sweep will charge an attempt. `due_now` is
+/// the backlog actually waiting on a worker: both claimable statuses, and only the rows whose
+/// backoff has elapsed.
+const DELIVERY_PRESSURE_SQL: &str = r#"
     SELECT COUNT(*) FILTER (
                WHERE status = 'sending'
-                 AND (worker_id IS NULL OR locked_at IS NULL OR lock_expires_at IS NULL
+                 AND (execution_id IS NULL OR owner_worker_id IS NULL OR locked_at IS NULL
+                      OR lock_expires_at IS NULL
                       OR lock_expires_at <= locked_at
                       OR lock_expires_at <= CURRENT_TIMESTAMP)
            )::bigint AS expired_leases,
            COUNT(*) FILTER (
-               WHERE status = 'pending' AND available_at <= CURRENT_TIMESTAMP
+               WHERE status IN ('pending', 'retryable') AND available_at <= CURRENT_TIMESTAMP
            )::bigint AS due_now
-      FROM email_outbox
+      FROM message_deliveries
      WHERE ($1::uuid IS NULL OR company_id = $1)"#;
 
 /// Every bucket boundary in the window, whether or not anything happened in it.
@@ -325,11 +327,11 @@ impl DashboardPersistence for PostgresPersistence {
         company: Option<Uuid>,
         window: DashboardWindow,
     ) -> AppResult<DashboardSnapshot> {
-        // Sequential rather than joined: these are seven unrelated aggregates over two tables, and a
-        // single query producing all of them would be a cross join nobody could read or index.
+        // Sequential rather than joined: these are eight unrelated aggregates over two tables, and
+        // a single query producing all of them would be a cross join nobody could read or index.
         Ok(DashboardSnapshot {
             tasks: self.task_queue_health(company).await?,
-            outbox: self.outbox_health(company).await?,
+            deliveries: self.delivery_health(company).await?,
             throughput: self.throughput(company, window).await?,
             latency: self.latency(company, window).await?,
             retry_rate: self.retry_rate(company, window).await?,
@@ -371,8 +373,8 @@ impl PostgresPersistence {
         })
     }
 
-    async fn outbox_health(&self, company: Option<Uuid>) -> AppResult<OutboxHealth> {
-        let rows = sqlx::query(OUTBOX_QUEUE_SQL)
+    async fn delivery_health(&self, company: Option<Uuid>) -> AppResult<DeliveryHealth> {
+        let rows = sqlx::query(DELIVERY_QUEUE_SQL)
             .bind(company)
             .fetch_all(&self.pool)
             .await
@@ -381,20 +383,20 @@ impl PostgresPersistence {
         let mut by_status = Vec::with_capacity(rows.len());
         for row in rows {
             let raw: String = row.try_get("status").map_err(AppError::from)?;
-            by_status.push(OutboxStatusCount {
-                status: OutboxStatus::from_str(&raw)
+            by_status.push(DeliveryStatusCount {
+                status: DeliveryStatus::from_str(&raw)
                     .map_err(|err| AppError::Internal(err.to_string()))?,
                 count: row.try_get("count").map_err(AppError::from)?,
             });
         }
 
-        let pressure = sqlx::query(OUTBOX_PRESSURE_SQL)
+        let pressure = sqlx::query(DELIVERY_PRESSURE_SQL)
             .bind(company)
             .fetch_one(&self.pool)
             .await
             .map_err(AppError::from)?;
 
-        Ok(OutboxHealth {
+        Ok(DeliveryHealth {
             by_status,
             expired_leases: pressure.try_get("expired_leases").map_err(AppError::from)?,
             due_now: pressure.try_get("due_now").map_err(AppError::from)?,
@@ -689,7 +691,7 @@ mod tests {
 
         assert_eq!(snapshot.tasks.total(), 0, "{:?}", snapshot.tasks);
         assert_eq!(snapshot.tasks.stalled, 0);
-        assert_eq!(snapshot.outbox.total(), 0, "{:?}", snapshot.outbox);
+        assert_eq!(snapshot.deliveries.total(), 0, "{:?}", snapshot.deliveries);
         // Gap-filled, so "owns nothing" reads as a full series of zeroes rather than no series at
         // all: `SLOTS_CTE` generates one bucket per slice of the window from `CURRENT_TIMESTAMP`
         // alone, and never sees `$1`. An emptiness check here would assert the chart has no x-axis.

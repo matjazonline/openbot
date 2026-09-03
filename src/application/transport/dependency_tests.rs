@@ -24,44 +24,48 @@ struct KnownException {
 ///
 /// Every entry here is a port trait or a protocol helper declared in `src/adapters` and consumed
 /// by the application. Step 7 moved the mail parser, attachment storage and identity
-/// normalization into the email adapter; what remains is the *egress* side -- the reply renderer
-/// and the outreach tool still ask an email parser whether an address is one of ours -- plus the
-/// queue ports, which move next to their workers with the delivery outbox.
+/// normalization into the email adapter, and step 9 moved the *delivery* queue: `DeliveryQueue`
+/// lives beside its worker in `src/application/transport/queue.rs`, and the email renderer and
+/// sender implement application ports rather than declaring them.
+///
+/// What is left is the `TaskPersistence` trait -- the other queue, which step 11 moves the same
+/// way -- and the address classification the internal relay and the outreach tool still ask an
+/// email parser for.
 const KNOWN_EXCEPTIONS: &[KnownException] = &[
     KnownException {
         file: "use_cases/thread/mod.rs",
         fragment: "adapters::persistence::task::TaskPersistence",
-        removed_by: "step 9: the queue port moves next to the worker that claims it",
+        removed_by: "step 11: the task queue port moves next to the worker that claims it",
     },
     KnownException {
         file: "use_cases/thread/mod.rs",
         fragment: "adapters::protocols::email::{",
-        removed_by: "step 9: the reply renderer stops resolving addresses for itself",
+        removed_by: "step 11: the internal relay stops classifying addresses for itself",
     },
     KnownException {
         file: "use_cases/thread/dispatch.rs",
         fragment: "adapters::persistence::task::{",
-        removed_by: "step 9: the dispatch commit becomes a delivery-queue port",
+        removed_by: "step 11: the dispatch commit moves with the task queue port",
     },
     KnownException {
         file: "use_cases/schedule.rs",
         fragment: "adapters::persistence::{schedule::SchedulePersistence, task::TaskPersistence}",
-        removed_by: "step 9: schedules enqueue deliveries through application ports",
+        removed_by: "step 11: schedules reach the task queue through an application port",
     },
     KnownException {
         file: "use_cases/approval.rs",
         fragment: "adapters::persistence::{",
-        removed_by: "step 9: approvals enqueue deliveries through application ports",
+        removed_by: "step 11: approvals reach the task queue through an application port",
     },
     KnownException {
         file: "use_cases/channel.rs",
         fragment: "adapters::protocols::email::EmailChannelSelectorParser",
-        removed_by: "step 9: outreach and reply Cc stop asking whether an address is ours",
+        removed_by: "step 11: outreach and reply Cc stop asking whether an address is ours",
     },
     KnownException {
         file: "services/agent_runner.rs",
         fragment: "adapters::persistence::task::TaskPersistence",
-        removed_by: "step 9: the queue port moves next to the worker that claims it",
+        removed_by: "step 11: the task queue port moves next to the worker that claims it",
     },
     KnownException {
         file: "services/agent_runner.rs",
@@ -71,12 +75,12 @@ const KNOWN_EXCEPTIONS: &[KnownException] = &[
     KnownException {
         file: "services/task_worker.rs",
         fragment: "adapters::persistence::task::{",
-        removed_by: "step 9: the queue port moves next to this worker",
+        removed_by: "step 11: the task queue port moves next to this worker",
     },
     KnownException {
         file: "services/outreach_tool.rs",
-        fragment: "adapters::persistence::task::TaskPersistence",
-        removed_by: "step 9: the queue port moves next to the worker that claims it",
+        fragment: "adapters::persistence::task::{CreateOutreachRequest, OutreachTargetRequest, TaskPersistence}",
+        removed_by: "step 11: the task queue port moves next to the worker that claims it",
     },
     KnownException {
         file: "services/outreach_tool.rs",

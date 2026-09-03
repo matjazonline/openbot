@@ -30,6 +30,7 @@ use mail_agents::{
         setup::{init_app_state, init_tracing},
     },
     services::{
+        delivery_worker::DeliveryWorker,
         runtime_metrics::{ActiveTaskExecutions, RuntimeMetricSampler},
         task_worker::TaskWorker,
     },
@@ -182,6 +183,18 @@ async fn serve() -> anyhow::Result<()> {
     let task_worker_handle = tokio::spawn(task_worker.start_worker_loop(shutdown_rx.resubscribe()));
     let mut memory_worker_handle = tokio::spawn(memory_worker.run(shutdown_rx.resubscribe()));
 
+    // The delivery queue is drained by its own worker rather than by the task loop. A delivery
+    // outlives the task that produced it, plenty of deliveries have no task behind them at all,
+    // and a long agent run must not hold up a queued reply.
+    let delivery_worker = Arc::new(
+        DeliveryWorker::new(
+            app_state.delivery_queue.clone(),
+            app_state.transports.clone(),
+        )
+        .with_monitoring(app_state.monitoring.clone()),
+    );
+    let mut delivery_worker_handle = tokio::spawn(delivery_worker.run(shutdown_rx.resubscribe()));
+
     // Initialize Incoming SMTP Server loop
     let smtp_server = Arc::new(
         SmtpServer::new(app_state.thread_use_cases.clone(), app_state.config.clone())
@@ -242,6 +255,7 @@ async fn serve() -> anyhow::Result<()> {
         join_background("runtime metric sampler", &mut runtime_sampler_handle),
         join_background("memory worker", &mut memory_worker_handle),
         join_background("task worker", &mut task_worker_handle),
+        join_background("delivery worker", &mut delivery_worker_handle),
         join_background("SMTP listener", &mut smtp_handle),
         join_background("mailbox listener", &mut mailbox_listener_handle),
     );

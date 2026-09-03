@@ -18,73 +18,9 @@ use uuid::Uuid;
 
 use super::{
     BindingAuditEventId, ChannelBindingId, EndpointNamespace, ExternalEndpointKey,
-    ExternalTenantKey, InstallationId, TransportKind,
+    ExternalTenantKey, InstallationId, InvalidTransportValue, TransportKind, stored_enum,
 };
 use crate::entities::creation::CreationProvenance;
-
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("invalid {field} '{value}'")]
-pub struct InvalidTransportValue {
-    field: &'static str,
-    value: String,
-}
-
-impl InvalidTransportValue {
-    fn new(field: &'static str, value: impl Into<String>) -> Self {
-        Self {
-            field,
-            value: value.into(),
-        }
-    }
-}
-
-/// A closed set of stored strings, with the parse, render and inventory sides written once.
-///
-/// The inventory (`ALL`) is what the database-equivalence tests iterate: a variant added here but
-/// not to the matching SQL `CHECK` fails a test instead of failing an insert in production.
-macro_rules! stored_enum {
-    (
-        $(#[$enum_meta:meta])*
-        $name:ident as $label:literal {
-            $( $(#[$variant_meta:meta])* $variant:ident => $stored:literal ),+ $(,)?
-        }
-    ) => {
-        $(#[$enum_meta])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-        #[serde(rename_all = "snake_case")]
-        pub enum $name {
-            $( $(#[$variant_meta])* $variant ),+
-        }
-
-        impl $name {
-            /// Every variant, so a test can assert the whole set against the database at once.
-            pub const ALL: &'static [Self] = &[ $( Self::$variant ),+ ];
-
-            pub const fn as_str(self) -> &'static str {
-                match self {
-                    $( Self::$variant => $stored ),+
-                }
-            }
-        }
-
-        impl FromStr for $name {
-            type Err = InvalidTransportValue;
-
-            fn from_str(value: &str) -> Result<Self, Self::Err> {
-                match value {
-                    $( $stored => Ok(Self::$variant), )+
-                    _ => Err(InvalidTransportValue::new($label, value)),
-                }
-            }
-        }
-
-        impl fmt::Display for $name {
-            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str(self.as_str())
-            }
-        }
-    };
-}
 
 stored_enum! {
     /// Whether a provider account can currently be used, and if not, why not.

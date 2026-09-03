@@ -18,7 +18,7 @@ macro_rules! skeleton_shapes {
         /// The placeholder a swap target shows while it is being replaced.
         ///
         /// One variant per *shape* on screen, not per page: the Agents, Channels, Companies, Team,
-        /// Tasks and Outbox panes are the same rectangle in the same place, and a reader should not
+        /// Tasks and Deliveries panes are the same rectangle in the same place, and a reader should not
         /// be able to tell which workspace they are waiting in from the way it loads.
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         pub(crate) enum Skeleton {

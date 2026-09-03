@@ -14,12 +14,16 @@ use crate::{
             ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval, QUORUM_TIMEOUT_ACTION,
             QuorumTimeoutAction,
         },
+        channel::Channel,
         correlation::CorrelationId,
         message::{MessageDirection, MessageRole},
-        task::{ResumeActor, StopActor},
+        task::{ResumeActor, StopActor, TaskSuspension},
     },
     infra::config::AppConfig,
-    services::outbound_dispatcher::OutboundEmail,
+    transport::{
+        CanonicalContent, DeliveryComposer, DeliveryContext, DeliveryPurpose, DeliveryRequest,
+        EmailDeliveryContext, NewDelivery,
+    },
     use_cases::thread::{MessageAuthorWrite, MessageWrite, ThreadPersistence},
 };
 
@@ -27,6 +31,10 @@ pub struct ApprovalUseCases {
     approval_persistence: Arc<dyn ApprovalPersistence>,
     task_persistence: Arc<dyn TaskPersistence>,
     thread_persistence: Arc<dyn ThreadPersistence>,
+    /// Freezes the approval mail so the request row, the note in the thread and the delivery land
+    /// as one transaction. An approval that parked a task but never mailed anybody is a task
+    /// nobody can un-park.
+    deliveries: DeliveryComposer,
     config: Arc<AppConfig>,
 }
 
@@ -35,12 +43,14 @@ impl ApprovalUseCases {
         approval_persistence: Arc<dyn ApprovalPersistence>,
         task_persistence: Arc<dyn TaskPersistence>,
         thread_persistence: Arc<dyn ThreadPersistence>,
+        deliveries: DeliveryComposer,
         config: Arc<AppConfig>,
     ) -> Self {
         Self {
             approval_persistence,
             task_persistence,
             thread_persistence,
+            deliveries,
             config,
         }
     }
@@ -49,7 +59,7 @@ impl ApprovalUseCases {
         &self,
         company_id: Uuid,
         channel_id: Uuid,
-        thread_id: Option<Uuid>,
+        thread_id: Uuid,
         step_key: &str,
     ) -> AppResult<Option<ApprovalStatus>> {
         let approval = self
@@ -92,33 +102,31 @@ impl ApprovalUseCases {
             )
         };
 
-        let notification = serde_json::to_value(OutboundEmail {
-            channel_id: subject.channel_id,
-            channel_name: subject.channel_name.clone(),
-            channel_slug: subject.channel_slug.clone(),
-            company_slug: subject.company_slug.clone(),
-            trigger_message_id: format!("<approval-{token}@{domain}>").into(),
-            thread_references: vec![],
-            recipient_to: subject.approver_email.clone(),
-            recipients_cc: vec![],
-            subject: format!("[APPROVAL REQUIRED] {}", action.title),
-            body_text,
-            hop_count: 0,
-            trace_channels: vec![subject.channel_id],
-            correlation_id: subject.correlation_id,
-        })
-        .map_err(|error| {
-            AppError::Internal(format!(
-                "Failed to serialize approval notification: {error}"
-            ))
-        })?;
+        // The request is a message in the thread first and a mail second. Written as the
+        // platform's own system principal, so the people reading the conversation can see that a
+        // human was asked -- which the fire-and-forget notification this replaces never showed
+        // them -- and so the delivery has a canonical message to expose.
+        let subject_line = format!("[APPROVAL REQUIRED] {}", action.title);
+        let message = MessageWrite::internal(
+            subject.thread_id,
+            MessageAuthorWrite::Platform,
+            subject_line.clone(),
+            body_text.clone(),
+            MessageDirection::Outbound,
+            MessageRole::System,
+            subject.correlation_id,
+        );
+        let delivery = self
+            .approval_delivery(subject, message.id, &subject_line, &body_text)
+            .await?;
 
         let (approval, created) = self
             .approval_persistence
             .create_approval(NewApproval {
                 subject,
                 action: &action,
-                notification,
+                message: &message,
+                delivery,
                 token,
                 expires_at,
             })
@@ -142,6 +150,54 @@ impl ApprovalUseCases {
         }
 
         Ok(approval)
+    }
+
+    /// The mail one approval request goes out as.
+    ///
+    /// A notice, not a reply: it carries no relay trace, so it emits no `X-MailAgents-*` headers
+    /// and nothing on the receiving side can answer it into a loop. What the approver acts on is
+    /// the links in the body, which the token already authenticates.
+    async fn approval_delivery(
+        &self,
+        subject: &ApprovalSubject,
+        message_id: crate::entities::message::CanonicalMessageId,
+        subject_line: &str,
+        body_text: &str,
+    ) -> AppResult<NewDelivery> {
+        let context = EmailDeliveryContext {
+            from: Channel::address_for(
+                &subject.channel_slug,
+                &subject.company_slug,
+                &self.config.app_domain_name,
+            ),
+            from_name: Some(subject.channel_name.clone()),
+            recipient_to: subject.approver_email.clone(),
+            recipients_cc: Vec::new(),
+            in_reply_to: None,
+            references: Vec::new(),
+            relay: None,
+        };
+        let content = CanonicalContent::parse(subject_line, body_text)?;
+        // The predicted provider key is discarded: an approval notice is a dead end. It carries no
+        // relay trace, so nothing may answer it into a loop, and no reply has to find its way back
+        // to a message quoting it.
+        let composed = self
+            .deliveries
+            .compose(DeliveryRequest {
+                company_id: subject.company_id,
+                channel_id: subject.channel_id,
+                message_id,
+                task_id: subject.suspension.map(TaskSuspension::task_id),
+                correlation_id: subject.correlation_id,
+                purpose: DeliveryPurpose::Notification,
+                // The approval row, not the message: asking twice about the same step reuses the
+                // standing approval, and its notification must not be mailed a second time.
+                source_key: format!("approval:{}:{}", subject.channel_id, message_id),
+                content: &content,
+                context: DeliveryContext::Email(context),
+            })
+            .await?;
+        Ok(composed.delivery)
     }
 
     pub async fn process_link_action(
@@ -320,9 +376,6 @@ impl ApprovalUseCases {
         subject_tag: &str,
         body: String,
     ) {
-        let Some(thread_id) = approval.thread_id else {
-            return;
-        };
         // The note belongs to the chain the approval interrupted, and a correlation id is
         // inherited rather than minted -- so an approval with no task behind it has no chain to
         // join and records nothing.
@@ -345,7 +398,7 @@ impl ApprovalUseCases {
         // principal for that address here would turn a click on a link into a company-scoped
         // identity. Who decided is stated in the note's own text -- as data, which is what it is.
         let note = MessageWrite::internal(
-            thread_id,
+            approval.thread_id,
             MessageAuthorWrite::Platform,
             format!("[{}]: {}", subject_tag, approval.action_title),
             body,
@@ -568,6 +621,55 @@ mod tests {
         })
     }
 
+    /// The use cases as a test drives them, plus the thread every approval is raised in.
+    ///
+    /// An approval writes its request into a conversation before it is mailed, so a fixture needs
+    /// a real thread and a real interface to compose against -- which is exactly what production
+    /// needs, and what a double returning `Ok(())` would let a test stop checking.
+    async fn approval_fixture(
+        approval_persistence: Arc<MockApprovalPersistence>,
+        thread_persistence: Arc<InMemoryThreads>,
+        channel_id: Uuid,
+    ) -> (ApprovalUseCases, Uuid) {
+        let thread = crate::use_cases::thread::ThreadPersistence::create_thread(
+            thread_persistence.as_ref(),
+            channel_id,
+            "Approval",
+            &[],
+        )
+        .await
+        .expect("the fixture thread is created");
+
+        let config = test_config();
+        let renderers = Arc::new(
+            crate::transport::ports::TransportRenderers::new()
+                .register(Arc::new(
+                    crate::adapters::protocols::email::EmailRenderer::new(&config.app_domain_name),
+                ))
+                .expect("one renderer registers"),
+        );
+        let task_persistence = Arc::new(MockTaskPersistence);
+        let deliveries = crate::transport::DeliveryComposer::new(
+            renderers,
+            crate::use_cases::thread::test_support::InMemoryIngress::ports(
+                thread_persistence.clone(),
+                task_persistence.clone(),
+            )
+            .bindings,
+        );
+
+        (
+            ApprovalUseCases::new(
+                approval_persistence,
+                task_persistence,
+                thread_persistence,
+                deliveries,
+                config,
+            ),
+            thread.id,
+        )
+    }
+
     struct MockApprovalPersistence {
         approvals: Mutex<Vec<HumanApproval>>,
     }
@@ -619,7 +721,7 @@ mod tests {
             &self,
             company_id: Uuid,
             channel_id: Uuid,
-            thread_id: Option<Uuid>,
+            thread_id: Uuid,
             step_key: &str,
         ) -> AppResult<Option<HumanApproval>> {
             Ok(self
@@ -701,7 +803,7 @@ mod tests {
         /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
         async fn record_outreach_request_message(
             &self,
-            _outbox_id: Uuid,
+            _delivery_id: crate::entities::transport::DeliveryId,
             _write: &crate::use_cases::thread::MessageWrite,
         ) -> AppResult<crate::entities::message::CanonicalMessageId> {
             unreachable!("no fixture here sends an outreach")
@@ -722,7 +824,9 @@ mod tests {
             commit: AgentDispatchCommit<'_>,
         ) -> AppResult<DispatchCommit> {
             let _ = commit;
-            Ok(DispatchCommit::Committed { outbox_id: None })
+            Ok(DispatchCommit::Committed {
+                deliveries: Vec::new(),
+            })
         }
 
         async fn renew_task_lease(
@@ -828,14 +932,14 @@ mod tests {
     /// with the reason swallowed by `AppError::Internal`.
     #[tokio::test]
     async fn an_unknown_approval_token_is_not_found_rather_than_an_internal_error() {
-        let use_cases = ApprovalUseCases::new(
+        let (use_cases, _thread_id) = approval_fixture(
             Arc::new(MockApprovalPersistence {
                 approvals: Mutex::new(Vec::new()),
             }),
-            Arc::new(MockTaskPersistence),
             Arc::new(InMemoryThreads::new()),
-            test_config(),
-        );
+            Uuid::new_v4(),
+        )
+        .await;
 
         let error = use_cases
             .process_link_action("no-such-token", "approve")
@@ -854,20 +958,11 @@ mod tests {
         let approval_persistence = Arc::new(MockApprovalPersistence {
             approvals: Mutex::new(Vec::new()),
         });
-        let task_persistence = Arc::new(MockTaskPersistence);
         let thread_persistence = Arc::new(InMemoryThreads::new());
-        let config = test_config();
-
-        let use_cases = ApprovalUseCases::new(
-            approval_persistence.clone(),
-            task_persistence,
-            thread_persistence,
-            config,
-        );
-
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
-        let thread_id = Uuid::new_v4();
+        let (use_cases, thread_id) =
+            approval_fixture(approval_persistence.clone(), thread_persistence, channel_id).await;
         // One subject, reused across every request this test raises -- which is the point of
         // splitting it out: only the action differs between them.
         let subject = ApprovalSubject {
@@ -876,7 +971,7 @@ mod tests {
             channel_name: "Support Channel".to_string(),
             channel_slug: ChannelSlug::from("support"),
             company_slug: CompanySlug::from("acme"),
-            thread_id: Some(thread_id),
+            thread_id,
             suspension: None,
             correlation_id: CorrelationId::new(),
             approver_email: EmailAddress::from("manager@acme.com"),
@@ -917,7 +1012,7 @@ mod tests {
 
         // Check step approval before link click -> Pending
         let check_res = use_cases
-            .check_step_approval(company_id, channel_id, Some(thread_id), "step_key_hash_123")
+            .check_step_approval(company_id, channel_id, thread_id, "step_key_hash_123")
             .await
             .unwrap();
         assert_eq!(check_res, Some(ApprovalStatus::Pending));
@@ -950,7 +1045,7 @@ mod tests {
 
         // Check step approval after link click -> Approved
         let check_res2 = use_cases
-            .check_step_approval(company_id, channel_id, Some(thread_id), "step_key_hash_123")
+            .check_step_approval(company_id, channel_id, thread_id, "step_key_hash_123")
             .await
             .unwrap();
         assert_eq!(check_res2, Some(ApprovalStatus::Approved));
@@ -974,35 +1069,25 @@ mod tests {
     #[tokio::test]
     async fn an_approval_decision_note_is_authored_by_the_platform_and_names_the_approver() {
         let thread_persistence = Arc::new(InMemoryThreads::new());
-        let use_cases = ApprovalUseCases::new(
+        let channel_id = Uuid::new_v4();
+        let (use_cases, thread_id) = approval_fixture(
             Arc::new(MockApprovalPersistence {
                 approvals: Mutex::new(Vec::new()),
             }),
-            Arc::new(MockTaskPersistence),
             thread_persistence.clone(),
-            test_config(),
-        );
-
-        let thread_id = Uuid::new_v4();
-        thread_persistence.insert_thread(crate::entities::thread::Thread {
-            id: thread_id,
-            channel_id: Uuid::new_v4(),
-            subject: "Deploy".into(),
-            participant_principal_ids: Vec::new(),
-            participant_projection: Default::default(),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-        });
+            channel_id,
+        )
+        .await;
 
         let approval = use_cases
             .create_and_send_approval_request(
                 &ApprovalSubject {
                     company_id: Uuid::new_v4(),
-                    channel_id: Uuid::new_v4(),
+                    channel_id,
                     channel_name: "Support Channel".to_string(),
                     channel_slug: ChannelSlug::from("support"),
                     company_slug: CompanySlug::from("acme"),
-                    thread_id: Some(thread_id),
+                    thread_id,
                     suspension: Some(crate::entities::task::TaskSuspension::AlreadySuspended {
                         task_id: Uuid::new_v4(),
                     }),
@@ -1047,21 +1132,15 @@ mod tests {
         let shared_db = Arc::new(MockApprovalPersistence {
             approvals: Mutex::new(Vec::new()),
         });
-        let task_persistence = Arc::new(MockTaskPersistence);
         let thread_persistence = Arc::new(InMemoryThreads::new());
-        let config = test_config();
 
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
-        let thread_id = Uuid::new_v4();
 
         // --- SERVER INSTANCE 1 ---
-        let server1_approval_use_cases = Arc::new(ApprovalUseCases::new(
-            shared_db.clone(),
-            task_persistence.clone(),
-            thread_persistence.clone(),
-            config.clone(),
-        ));
+        let (server1, thread_id) =
+            approval_fixture(shared_db.clone(), thread_persistence.clone(), channel_id).await;
+        let server1_approval_use_cases = Arc::new(server1);
 
         let ctx1 = ApprovalSubject {
             correlation_id: CorrelationId::new(),
@@ -1070,7 +1149,7 @@ mod tests {
             channel_name: "Deploy Agent".into(),
             channel_slug: "deploy".into(),
             company_slug: "acme".into(),
-            thread_id: Some(thread_id),
+            thread_id,
             suspension: None,
             approver_email: "devops@acme.com".into(),
         };
@@ -1106,12 +1185,10 @@ mod tests {
         drop(handler1);
 
         // --- SERVER INSTANCE 2 (After Restart) ---
-        let server2_approval_use_cases = Arc::new(ApprovalUseCases::new(
-            shared_db.clone(),
-            task_persistence.clone(),
-            thread_persistence.clone(),
-            config.clone(),
-        ));
+        // A second process over the same stores: nothing about the approval lives in memory.
+        let (server2, _) =
+            approval_fixture(shared_db.clone(), thread_persistence.clone(), channel_id).await;
+        let server2_approval_use_cases = Arc::new(server2);
 
         // 1. User clicks confirmation link on Server 2
         let (processed_approval, result_msg) = server2_approval_use_cases
@@ -1130,7 +1207,7 @@ mod tests {
             channel_name: "Deploy Agent".into(),
             channel_slug: "deploy".into(),
             company_slug: "acme".into(),
-            thread_id: Some(thread_id),
+            thread_id,
             suspension: None,
             approver_email: "devops@acme.com".into(),
         };
@@ -1162,20 +1239,11 @@ mod tests {
         let approval_persistence = Arc::new(MockApprovalPersistence {
             approvals: Mutex::new(Vec::new()),
         });
-        let task_persistence = Arc::new(MockTaskPersistence);
         let thread_persistence = Arc::new(InMemoryThreads::new());
-        let config = test_config();
-
-        let use_cases = ApprovalUseCases::new(
-            approval_persistence,
-            task_persistence,
-            thread_persistence,
-            config,
-        );
-
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
-        let thread_id = Uuid::new_v4();
+        let (use_cases, thread_id) =
+            approval_fixture(approval_persistence, thread_persistence, channel_id).await;
         // One subject, two requests: only the step key and the decision differ.
         let subject = ApprovalSubject {
             company_id,
@@ -1183,7 +1251,7 @@ mod tests {
             channel_name: "Support".to_string(),
             channel_slug: ChannelSlug::from("support"),
             company_slug: CompanySlug::from("acme"),
-            thread_id: Some(thread_id),
+            thread_id,
             suspension: None,
             correlation_id: CorrelationId::new(),
             approver_email: EmailAddress::from("manager@acme.com"),

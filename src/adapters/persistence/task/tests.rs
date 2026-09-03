@@ -6,15 +6,18 @@ use std::str::FromStr;
 use std::time::Duration;
 use uuid::Uuid;
 
-use crate::adapters::persistence::test_support::{UNSCOPED_CLAIM, test_pool};
+use crate::adapters::persistence::test_support::{
+    DeliveryFixtureRequest, UNSCOPED_CLAIM, delivery_fixture, test_pool,
+};
 use crate::entities::message::{MessageDirection, MessageRole};
 use crate::entities::task::TaskFailureOutcome;
+use crate::entities::transport::{DeliveryPurpose, DeliveryStatus};
+use crate::transport::{DeliveryCreation, NewDelivery};
 use crate::{
     adapters::persistence::PostgresPersistence,
     entities::{
         correlation::CorrelationId,
-        outbox::OutboxStatus,
-        outreach::{CreateOutreachRequest, OutreachStatus},
+        outreach::OutreachStatus,
         stuck_work::StuckWorkThresholds,
         task::{
             BackgroundTask, ChainStage, NewTask, ResumeActor, StopActor, TaskAttemptOutcome,
@@ -37,7 +40,6 @@ use crate::{
 /// lifecycle assertion still expects no `unknown` rows of its own.
 const CLEAR_TRANSITION: &str = "transition_reason = NULL, transition_actor_kind = NULL, \
          transition_actor_id = NULL, transition_approval_id = NULL, transition_outreach_id = NULL";
-use crate::services::outbound_dispatcher::OutboundEmail;
 use crate::use_cases::{
     channel::{ChannelPersistence, ChannelWrite},
     company::{CompanyPersistence, CompanyWrite},
@@ -386,7 +388,14 @@ async fn consecutive_transitions_never_inherit_the_previous_actor_or_source() {
     // worker -> approval.
     let first_worker = Uuid::new_v4();
     let lease = claim_as(&persistence, task.id, first_worker).await;
-    let approval_id = park_for_approval(&persistence, &company, &channel, lease).await;
+    let approval_id = park_for_approval(
+        &persistence,
+        &company,
+        &channel,
+        task.thread_id.unwrap(),
+        lease,
+    )
+    .await;
 
     // approval -> worker: the claim must not carry the approval id that parked the task.
     persistence
@@ -628,7 +637,14 @@ async fn approval_resume_continues_the_attempt_without_refunding_the_budget() {
             .unwrap()
     );
     let lease = claim(&persistence, task.id).await;
-    let approval_id = park_for_approval(&persistence, &company, &channel, lease).await;
+    let approval_id = park_for_approval(
+        &persistence,
+        &company,
+        &channel,
+        task.thread_id.unwrap(),
+        lease,
+    )
+    .await;
     let parked = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
     assert_eq!(parked.status, TaskStatus::PendingApproval);
 
@@ -689,7 +705,14 @@ async fn a_resume_cause_used_against_the_wrong_state_changes_nothing() {
 
     let parked = enqueue_chain(&persistence, company.id, channel.id, "wrong_state").await;
     let lease = claim(&persistence, parked.id).await;
-    park_for_approval(&persistence, &company, &channel, lease).await;
+    park_for_approval(
+        &persistence,
+        &company,
+        &channel,
+        parked.thread_id.unwrap(),
+        lease,
+    )
+    .await;
     assert!(
         persistence
             .resume_task(parked.id, ResumeActor::Operator(operator))
@@ -800,7 +823,14 @@ async fn an_approval_rejection_stops_only_the_task_it_parked() {
     let (company, channel) = seed_company_and_channel(&persistence).await;
     let task = enqueue_chain(&persistence, company.id, channel.id, "approval-reject").await;
     let lease = claim_as(&persistence, task.id, Uuid::new_v4()).await;
-    let approval_id = park_for_approval(&persistence, &company, &channel, lease).await;
+    let approval_id = park_for_approval(
+        &persistence,
+        &company,
+        &channel,
+        task.thread_id.unwrap(),
+        lease,
+    )
+    .await;
 
     persistence
         .stop_task(task.id, StopActor::Approval(approval_id))
@@ -1547,14 +1577,15 @@ async fn a_superseded_run_cannot_renew_write_or_close_the_task() {
         .unwrap();
 }
 
-/// One dispatch's reply, its outbox row and its task payload land together or not at all.
+/// One dispatch's reply, the delivery that carries it and its task payload land together or not
+/// at all.
 ///
-/// They used to be three independent commits: the outbox row, then a `create_message` per
+/// They used to be three independent commits: the queue row, then a `create_message` per
 /// answered thread, then the payload. A crash or a lost lease part-way left a thread showing
 /// an answer that was never sent, or an email going out for a task whose payload said it had
 /// never run -- and the retry then had to reconcile the difference.
 #[tokio::test]
-async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_all() {
+async fn a_dispatch_commits_its_reply_delivery_and_payload_together_or_not_at_all() {
     let Some(pool) = test_pool().await else {
         return;
     };
@@ -1633,17 +1664,33 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
         ),
         also_in_threads: Vec::new(),
     };
-    let send = |key: &str| OutboundSend {
-        correlation_id: CorrelationId::new(),
-        company_id: company.id,
-        channel_id: channel.id,
-        task_id: Some(task.id),
-        idempotency_key: key.to_string(),
-        payload: serde_json::json!({"body": "the answer"}),
+    // One delivery per logical send. Two distinct keys, and then the *same* key twice, which is
+    // what proves the unique index absorbs a re-run rather than queueing the answer again.
+    // The fixture writes a message of its own, so it goes in a side thread: the assertions below
+    // count outbound messages in `thread`, and a fixture that wrote there would be counting itself.
+    let side_thread = persistence
+        .create_thread(channel.id, "Fixtures", &[])
+        .await
+        .unwrap();
+    let delivery = async |key: &str, message_id| -> NewDelivery {
+        let mut queued = delivery_fixture(
+            &persistence,
+            DeliveryFixtureRequest {
+                task_id: Some(task.id),
+                ..DeliveryFixtureRequest::new(company.id, channel.id, side_thread.id, key)
+            },
+        )
+        .await
+        .delivery;
+        // The delivery carries the reply the commit is about to store, not the fixture's own
+        // message: `create_message_with_deliveries` and the dispatch commit both refuse a
+        // delivery that names anything else.
+        queued.message_id = message_id;
+        queued
     };
 
-    let outbound_rows = async || -> i64 {
-        sqlx::query_scalar("SELECT COUNT(*) FROM email_outbox WHERE task_id = $1")
+    let delivery_rows = async || -> i64 {
+        sqlx::query_scalar("SELECT COUNT(*) FROM message_deliveries WHERE task_id = $1")
             .bind(task.id)
             .fetch_one(&pool)
             .await
@@ -1669,11 +1716,12 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
         execution_generation: Uuid::new_v4(),
         ..lease
     };
+    let stale_reply = reply(thread.id);
     let outcome = persistence
         .commit_agent_dispatch(AgentDispatchCommit {
             lease: stale,
-            reply: &reply(thread.id),
-            outbound: Some(send("stale-key")),
+            reply: &stale_reply,
+            deliveries: vec![delivery("stale-key", stale_reply.message.id).await],
             payload: serde_json::json!({"stale": true}),
             complete_outreach: false,
         })
@@ -1683,7 +1731,7 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
 
     // Not one of the three parts may have landed.
     assert_eq!(thread_rows().await, 0, "no reply may be stored");
-    assert_eq!(outbound_rows().await, 0, "no email may be queued");
+    assert_eq!(delivery_rows().await, 0, "nothing may be queued");
     let after_stale = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
     assert!(
         after_stale.payload.get("stale").is_none(),
@@ -1691,43 +1739,56 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
     );
 
     // The run that actually owns the lease commits all three.
+    let live_reply = reply(thread.id);
+    let live_delivery = delivery("live-key", live_reply.message.id).await;
     let outcome = persistence
         .commit_agent_dispatch(AgentDispatchCommit {
             lease,
-            reply: &reply(thread.id),
-            outbound: Some(send("live-key")),
+            reply: &live_reply,
+            deliveries: vec![live_delivery.clone()],
             payload: serde_json::json!({"committed": true}),
             complete_outreach: false,
         })
         .await
         .unwrap();
-    assert!(matches!(
+    assert_eq!(
         outcome,
-        DispatchCommit::Committed { outbox_id: Some(_) }
-    ));
+        DispatchCommit::Committed {
+            deliveries: vec![DeliveryCreation::Created(live_delivery.id)]
+        }
+    );
     assert_eq!(thread_rows().await, 1);
-    assert_eq!(outbound_rows().await, 1);
+    assert_eq!(delivery_rows().await, 1);
     let after = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
     assert_eq!(
         after.payload.get("committed"),
         Some(&serde_json::json!(true))
     );
 
-    // Re-queueing the same logical send is the idempotency key doing its job, not a failure,
-    // and it must not duplicate the outbox row.
+    // Re-queueing the same logical send is the idempotency key doing its job, not a failure, and
+    // it must not duplicate the delivery. A superseded run mints a *new* message id, which is
+    // exactly why the key is derived from the task rather than from the message.
+    let rerun_reply = reply(thread.id);
+    let rerun_delivery = delivery("live-key", rerun_reply.message.id).await;
     let outcome = persistence
         .commit_agent_dispatch(AgentDispatchCommit {
             lease,
-            reply: &reply(thread.id),
-            outbound: Some(send("live-key")),
+            reply: &rerun_reply,
+            deliveries: vec![rerun_delivery],
             payload: serde_json::json!({"committed": true}),
             complete_outreach: false,
         })
         .await
         .unwrap();
-    assert_eq!(outcome, DispatchCommit::Committed { outbox_id: None });
     assert_eq!(
-        outbound_rows().await,
+        outcome,
+        DispatchCommit::Committed {
+            deliveries: vec![DeliveryCreation::Absorbed(live_delivery.id)]
+        },
+        "the second run must attach to the delivery the first one queued"
+    );
+    assert_eq!(
+        delivery_rows().await,
         1,
         "the same send must not queue twice"
     );
@@ -1736,11 +1797,12 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
     // payload write happens first, so a message that cannot be stored has to undo it: this is
     // the case three separate commits could not handle at all.
     let orphan = reply(Uuid::new_v4());
+    let orphan_delivery = delivery("orphan-key", orphan.message.id).await;
     let failed = persistence
         .commit_agent_dispatch(AgentDispatchCommit {
             lease,
             reply: &orphan,
-            outbound: Some(send("orphan-key")),
+            deliveries: vec![orphan_delivery],
             payload: serde_json::json!({"rolled_back": true}),
             complete_outreach: false,
         })
@@ -1758,9 +1820,9 @@ async fn a_dispatch_commits_its_reply_outbox_row_and_payload_together_or_not_at_
         "and the previously committed payload must survive untouched"
     );
     assert_eq!(
-        outbound_rows().await,
+        delivery_rows().await,
         1,
-        "the failed dispatch must not leave an outbox row behind"
+        "the failed dispatch must not leave a delivery behind"
     );
 
     CompanyPersistence::delete(&persistence, company.id)
@@ -1949,631 +2011,6 @@ async fn concurrent_workers_claim_once_and_a_failed_task_is_not_immediately_recl
 }
 
 #[tokio::test]
-async fn only_one_worker_queues_an_outbound_send() {
-    let Some(pool) = test_pool().await else {
-        return;
-    };
-    let persistence = PostgresPersistence::new(pool.clone());
-    let suffix = Uuid::new_v4().simple().to_string();
-    let username = format!("enqueue_owner_{suffix}");
-    let email = format!("{username}@example.com");
-    persistence
-        .create_user(&username, &email, "hash")
-        .await
-        .unwrap();
-    let owner = UserPersistence::get_by_email(&persistence, &email)
-        .await
-        .unwrap()
-        .unwrap();
-    let company = CompanyPersistence::create(
-        &persistence,
-        owner.id,
-        CompanyWrite {
-            name: "Enqueue Test".to_string(),
-            slug: format!("enqueue-test-{suffix}"),
-            ..CompanyWrite::default()
-        },
-    )
-    .await
-    .unwrap();
-
-    let channel = ChannelPersistence::create(
-        &persistence,
-        company.id,
-        ChannelWrite {
-            name: "Enqueue".into(),
-            slug: "enqueue".into(),
-            enabled: false,
-            ..ChannelWrite::default()
-        },
-    )
-    .await
-    .unwrap();
-
-    let key = format!("task:{suffix}:agent-reply");
-    let send = || OutboundSend {
-        correlation_id: CorrelationId::new(),
-        company_id: company.id,
-        channel_id: channel.id,
-        task_id: None,
-        idempotency_key: key.clone(),
-        payload: serde_json::json!({}),
-    };
-
-    // Two workers race to hand the transport the same logical reply; only one may queue it,
-    // or the customer receives the answer twice.
-    let (first, second) = tokio::join!(
-        persistence.enqueue_outbound_send(send()),
-        persistence.enqueue_outbound_send(send())
-    );
-    let queued: Vec<_> = [first.unwrap(), second.unwrap()]
-        .into_iter()
-        .flatten()
-        .collect();
-    assert_eq!(
-        queued.len(),
-        1,
-        "the unique idempotency key must admit exactly one send"
-    );
-
-    // Put the row out of reach before asking what state it is in. Claiming is unscoped by
-    // design — `claim_outbox_emails` takes any `pending` row whose `available_at` has arrived,
-    // because that is what a real poller does — so a concurrent test would otherwise claim this
-    // row and the assertions below would be reporting on that, not on what queueing did.
-    // Pushing `available_at` out excludes it from every claim set without changing the columns
-    // under test.
-    sqlx::query(
-        "UPDATE email_outbox SET available_at = CURRENT_TIMESTAMP + interval '1 hour'
-             WHERE id = $1",
-    )
-    .bind(queued[0])
-    .execute(&pool)
-    .await
-    .unwrap();
-
-    // The row is left for the poller to claim: 'pending', unleased, and not owned by anyone.
-    let (status, worker_id): (String, Option<Uuid>) =
-        sqlx::query_as("SELECT status, worker_id FROM email_outbox WHERE id = $1")
-            .bind(queued[0])
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(status, "pending");
-    assert!(
-        worker_id.is_none(),
-        "queueing must not claim the row; the outbox poller does that"
-    );
-
-    CompanyPersistence::delete(&persistence, company.id)
-        .await
-        .unwrap();
-}
-
-#[tokio::test]
-async fn the_outbox_lists_one_channel_at_a_time() {
-    let Some(pool) = test_pool().await else {
-        return;
-    };
-
-    let persistence = PostgresPersistence::new(pool.clone());
-    let suffix = Uuid::new_v4().simple().to_string();
-    let username = format!("outbox_channel_owner_{suffix}");
-    let email = format!("{username}@example.com");
-    persistence
-        .create_user(&username, &email, "hash")
-        .await
-        .unwrap();
-    let owner = UserPersistence::get_by_email(&persistence, &email)
-        .await
-        .unwrap()
-        .unwrap();
-    let company = CompanyPersistence::create(
-        &persistence,
-        owner.id,
-        CompanyWrite {
-            name: "Outbox Channel Test".to_string(),
-            slug: format!("outbox-channel-{suffix}"),
-            ..CompanyWrite::default()
-        },
-    )
-    .await
-    .unwrap();
-
-    let mut channels = Vec::new();
-    for name in ["Support", "Billing"] {
-        let channel = ChannelPersistence::create(
-            &persistence,
-            company.id,
-            ChannelWrite {
-                name: name.into(),
-                slug: name.to_lowercase(),
-                enabled: false,
-                ..ChannelWrite::default()
-            },
-        )
-        .await
-        .unwrap();
-        persistence
-            .enqueue_outbound_send(OutboundSend {
-                correlation_id: CorrelationId::new(),
-                company_id: company.id,
-                channel_id: channel.id,
-                task_id: None,
-                idempotency_key: format!("{suffix}:{name}"),
-                payload: serde_json::json!({ "subject": name }),
-            })
-            .await
-            .unwrap()
-            .unwrap();
-        channels.push(channel);
-    }
-
-    // Unfiltered, the company sees both channels' mail.
-    let all = persistence
-        .list_company_outbox_page(company.id, None, None, false, 0, 50)
-        .await
-        .unwrap();
-    assert_eq!(all.len(), 2);
-
-    // Filtered, it sees exactly one — the whole point of promoting the channel out of the
-    // payload and indexing it.
-    let support = persistence
-        .list_company_outbox_page(company.id, Some(channels[0].id), None, false, 0, 50)
-        .await
-        .unwrap();
-    assert_eq!(support.len(), 1);
-    assert_eq!(support[0].channel_id, Some(channels[0].id));
-    assert_eq!(support[0].subject(), Some("Support"));
-
-    // Deleting the channel must not delete the record that mail went out for it.
-    ChannelPersistence::delete(&persistence, channels[0].id)
-        .await
-        .unwrap();
-    let orphaned = persistence
-        .list_company_outbox_page(company.id, None, None, false, 0, 50)
-        .await
-        .unwrap();
-    assert_eq!(orphaned.len(), 2);
-    assert!(
-        orphaned
-            .iter()
-            .any(|entry| entry.subject() == Some("Support") && entry.channel_id.is_none()),
-        "a deleted channel must null the column, not cascade the send record away"
-    );
-
-    CompanyPersistence::delete(&persistence, company.id)
-        .await
-        .unwrap();
-}
-
-#[tokio::test]
-async fn failed_outbox_batch_is_backed_off_and_expired_leases_reach_the_cap() {
-    let Some(pool) = test_pool().await else {
-        return;
-    };
-
-    let persistence = PostgresPersistence::new(pool.clone());
-    let suffix = Uuid::new_v4().simple().to_string();
-    let username = format!("reap_owner_{suffix}");
-    let email = format!("{username}@example.com");
-    persistence
-        .create_user(&username, &email, "hash")
-        .await
-        .unwrap();
-    let owner = UserPersistence::get_by_email(&persistence, &email)
-        .await
-        .unwrap()
-        .unwrap();
-    let company = CompanyPersistence::create(
-        &persistence,
-        owner.id,
-        CompanyWrite {
-            name: "Reap Test".to_string(),
-            slug: format!("reap-test-{suffix}"),
-            ..CompanyWrite::default()
-        },
-    )
-    .await
-    .unwrap();
-    let channel = ChannelPersistence::create(
-        &persistence,
-        company.id,
-        ChannelWrite {
-            name: "Reap".into(),
-            slug: "reap".into(),
-            enabled: false,
-            ..ChannelWrite::default()
-        },
-    )
-    .await
-    .unwrap();
-
-    let outbox_id = persistence
-        .enqueue_outbound_send(OutboundSend {
-            correlation_id: CorrelationId::new(),
-            company_id: company.id,
-            channel_id: channel.id,
-            task_id: None,
-            idempotency_key: format!("reap:{suffix}"),
-            payload: serde_json::json!({}),
-        })
-        .await
-        .unwrap()
-        .unwrap();
-
-    let state = async |id: Uuid| -> (String, i32, bool) {
-        sqlx::query_as::<_, (String, i32, bool)>(
-            "SELECT status, retry_count, available_at > CURRENT_TIMESTAMP
-                 FROM email_outbox WHERE id = $1",
-        )
-        .bind(id)
-        .fetch_one(&pool)
-        .await
-        .unwrap()
-    };
-    // Claiming is the subject here, so this calls the real query rather than leasing the row
-    // by hand — but the query is unscoped by design and would take whatever else is queued.
-    // `claim_outbox_emails` orders by `(available_at, id)`, so this row has to sort ahead of
-    // every neighbour for a LIMIT of 1 to claim precisely it. Backdating by a fixed hour does
-    // not achieve that: the test database accumulates `pending` rows from earlier runs, and one
-    // left behind yesterday is older than any constant offset from now. So the offset is taken
-    // from the queue's own minimum, which puts this row strictly first whatever is already
-    // there. The release below covers the rest: once the backoff pushes this row into the
-    // future it stops sorting first, and the claim would otherwise carry off whichever row did.
-    sqlx::query(
-        "UPDATE email_outbox
-                SET available_at =
-                    (SELECT LEAST(MIN(available_at), CURRENT_TIMESTAMP) FROM email_outbox)
-                    - interval '1 hour'
-              WHERE id = $1",
-    )
-    .bind(outbox_id)
-    .execute(&pool)
-    .await
-    .unwrap();
-
-    let worker_id = Uuid::new_v4();
-    let claimed_ours = async |limit: i64| -> bool {
-        let claimed = persistence
-            .claim_outbox_emails(worker_id, Utc::now() + chrono::Duration::minutes(15), limit)
-            .await
-            .unwrap();
-        let ours = claimed.iter().any(|email| email.id == outbox_id);
-
-        let borrowed: Vec<Uuid> = claimed
-            .iter()
-            .map(|email| email.id)
-            .filter(|id| *id != outbox_id)
-            .collect();
-        if !borrowed.is_empty() {
-            sqlx::query(
-                "UPDATE email_outbox
-                        SET status = 'pending', worker_id = NULL, locked_at = NULL,
-                            lock_expires_at = NULL
-                      WHERE id = ANY($1) AND worker_id = $2",
-            )
-            .bind(&borrowed)
-            .bind(worker_id)
-            .execute(&pool)
-            .await
-            .unwrap();
-        }
-
-        ours
-    };
-
-    assert!(
-        claimed_ours(1).await,
-        "a pending row is the poller's to take"
-    );
-
-    // One row fills this test's batch. A retryable delivery failure must make it unavailable
-    // before `MoreWaiting` drives the next iteration, so the unchanged clock cannot feed the
-    // same poison email back to the worker.
-    assert!(
-        persistence
-            .mark_outbox_email_failed(outbox_id, worker_id, "poison delivery")
-            .await
-            .unwrap()
-    );
-    assert!(
-        !claimed_ours(1).await,
-        "a failed full batch must not reclaim the same email on the zero-delay iteration"
-    );
-
-    // Make the same row due again so the remainder of the test can exercise lease expiry.
-    sqlx::query(
-        "UPDATE email_outbox SET available_at = CURRENT_TIMESTAMP - interval '1 second'
-              WHERE id = $1",
-    )
-    .bind(outbox_id)
-    .execute(&pool)
-    .await
-    .unwrap();
-    assert!(claimed_ours(1).await);
-
-    // A lease that is still running belongs to the worker holding it.
-    persistence.reap_expired_outbox_leases().await.unwrap();
-    assert_eq!(state(outbox_id).await.0, "sending");
-
-    // Now the worker dies mid-delivery: the lease lapses with no result ever written. Before
-    // expiry was counted, this row came back every lease period at retry_count 0, forever.
-    // Two attempts are already spent so the backoff is long enough to observe.
-    sqlx::query(
-        "UPDATE email_outbox SET retry_count = 2,
-                 locked_at = CURRENT_TIMESTAMP - interval '2 minutes',
-                 lock_expires_at = CURRENT_TIMESTAMP - interval '1 minute' WHERE id = $1",
-    )
-    .bind(outbox_id)
-    .execute(&pool)
-    .await
-    .unwrap();
-
-    assert!(persistence.reap_expired_outbox_leases().await.unwrap() >= 1);
-    assert_eq!(
-        state(outbox_id).await,
-        ("pending".to_string(), 3, true),
-        "a lapsed lease spends an attempt and backs the row off"
-    );
-    assert!(
-        !claimed_ours(1).await,
-        "the backoff must hold the row back, or the reaper is just a slower redelivery loop"
-    );
-
-    // One attempt short of the cap: the next lapse is terminal, without any worker having
-    // managed to write a failure.
-    sqlx::query(
-        "UPDATE email_outbox SET status = 'sending', retry_count = 4, worker_id = $2,
-                 locked_at = CURRENT_TIMESTAMP - interval '2 minutes',
-                 lock_expires_at = CURRENT_TIMESTAMP - interval '1 minute' WHERE id = $1",
-    )
-    .bind(outbox_id)
-    .bind(worker_id)
-    .execute(&pool)
-    .await
-    .unwrap();
-
-    persistence.reap_expired_outbox_leases().await.unwrap();
-    assert_eq!(state(outbox_id).await.0, "failed");
-    assert!(!claimed_ours(1).await);
-
-    let incoherent = sqlx::query("UPDATE email_outbox SET status = 'sending' WHERE id = $1")
-        .bind(outbox_id)
-        .execute(&pool)
-        .await;
-    assert!(
-        incoherent.is_err(),
-        "a sending row without complete lease ownership must be rejected"
-    );
-
-    CompanyPersistence::delete(&persistence, company.id)
-        .await
-        .unwrap();
-}
-
-#[tokio::test]
-async fn an_undeliverable_payload_is_dead_lettered_on_the_first_attempt() {
-    let Some(pool) = test_pool().await else {
-        return;
-    };
-
-    let persistence = PostgresPersistence::new(pool.clone());
-    let suffix = Uuid::new_v4().simple().to_string();
-    let username = format!("dead_owner_{suffix}");
-    let email = format!("{username}@example.com");
-    persistence
-        .create_user(&username, &email, "hash")
-        .await
-        .unwrap();
-    let owner = UserPersistence::get_by_email(&persistence, &email)
-        .await
-        .unwrap()
-        .unwrap();
-    let company = CompanyPersistence::create(
-        &persistence,
-        owner.id,
-        CompanyWrite {
-            name: "Dead Letter Test".to_string(),
-            slug: format!("dead-letter-{suffix}"),
-            ..CompanyWrite::default()
-        },
-    )
-    .await
-    .unwrap();
-    let channel = ChannelPersistence::create(
-        &persistence,
-        company.id,
-        ChannelWrite {
-            name: "Dead".into(),
-            slug: "dead".into(),
-            enabled: false,
-            ..ChannelWrite::default()
-        },
-    )
-    .await
-    .unwrap();
-
-    let outbox_id = persistence
-        .enqueue_outbound_send(OutboundSend {
-            correlation_id: CorrelationId::new(),
-            company_id: company.id,
-            channel_id: channel.id,
-            task_id: None,
-            idempotency_key: format!("dead:{suffix}"),
-            payload: serde_json::json!({ "not": "an OutboundEmail" }),
-        })
-        .await
-        .unwrap()
-        .unwrap();
-
-    // Take the lease on this row alone, rather than calling `claim_outbox_emails`. Claiming is
-    // setup here, not the subject — what is under test is the `worker_id` guard below — and the
-    // real claim is unscoped: it would take up to `limit` rows belonging to whatever else is
-    // running, and could equally lose this row to another claimer before the guard is reached.
-    let worker_id = Uuid::new_v4();
-    let leased = sqlx::query(
-        "UPDATE email_outbox
-                SET status = 'sending', worker_id = $2, locked_at = CURRENT_TIMESTAMP,
-                    lock_expires_at = CURRENT_TIMESTAMP + interval '15 minutes'
-              WHERE id = $1",
-    )
-    .bind(outbox_id)
-    .bind(worker_id)
-    .execute(&pool)
-    .await
-    .unwrap();
-    assert_eq!(leased.rows_affected(), 1, "the row exists and is now ours");
-
-    // Only the worker holding the lease may dead-letter the row.
-    assert!(
-        !persistence
-            .mark_outbox_email_dead(outbox_id, Uuid::new_v4(), "wrong worker")
-            .await
-            .unwrap()
-    );
-    assert!(
-        persistence
-            .mark_outbox_email_dead(outbox_id, worker_id, "payload will never deserialize")
-            .await
-            .unwrap()
-    );
-
-    let entry = persistence
-        .get_outbox_entry(outbox_id)
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(entry.status, OutboxStatus::Failed);
-    assert_eq!(
-        entry.last_error.as_deref(),
-        Some("payload will never deserialize")
-    );
-
-    CompanyPersistence::delete(&persistence, company.id)
-        .await
-        .unwrap();
-}
-
-#[tokio::test]
-async fn task_deliveries_are_visible_without_the_transport_writing_back() {
-    let Some(pool) = test_pool().await else {
-        return;
-    };
-    let persistence = PostgresPersistence::new(pool.clone());
-    let suffix = Uuid::new_v4().simple().to_string();
-    let username = format!("delivery_owner_{suffix}");
-    let email = format!("{username}@example.com");
-    persistence
-        .create_user(&username, &email, "hash")
-        .await
-        .unwrap();
-    let owner = UserPersistence::get_by_email(&persistence, &email)
-        .await
-        .unwrap()
-        .unwrap();
-    let company = CompanyPersistence::create(
-        &persistence,
-        owner.id,
-        CompanyWrite {
-            name: "Delivery Test".to_string(),
-            slug: format!("delivery-test-{suffix}"),
-            ..CompanyWrite::default()
-        },
-    )
-    .await
-    .unwrap();
-    let channel = ChannelPersistence::create(
-        &persistence,
-        company.id,
-        ChannelWrite {
-            name: "Delivery".into(),
-            slug: "delivery".into(),
-            enabled: false,
-            ..ChannelWrite::default()
-        },
-    )
-    .await
-    .unwrap();
-    let task = persistence
-        .enqueue_task(NewTask::starting_new_chain(
-            company.id,
-            channel.id,
-            None,
-            "test",
-            serde_json::json!({}),
-        ))
-        .await
-        .unwrap();
-
-    // A task that sent nothing shows no delivery section at all.
-    assert!(
-        persistence
-            .list_task_deliveries(task.id)
-            .await
-            .unwrap()
-            .is_empty()
-    );
-
-    let outbox_id = persistence
-        .enqueue_outbound_send(OutboundSend {
-            correlation_id: CorrelationId::new(),
-            company_id: company.id,
-            channel_id: channel.id,
-            task_id: Some(task.id),
-            idempotency_key: format!("task:{}:agent-reply", task.id),
-            payload: serde_json::json!({}),
-        })
-        .await
-        .unwrap()
-        .unwrap();
-
-    // This test asserts the row is still `Pending`, so it must not be claimable while it does:
-    // claiming is unscoped, and a concurrent poller taking the row would move it to 'sending'.
-    // A future `available_at` puts it outside every claim set without touching `status`.
-    sqlx::query(
-        "UPDATE email_outbox SET available_at = CURRENT_TIMESTAMP + interval '1 hour'
-             WHERE id = $1",
-    )
-    .bind(outbox_id)
-    .execute(&pool)
-    .await
-    .unwrap();
-
-    let deliveries = persistence.list_task_deliveries(task.id).await.unwrap();
-    assert_eq!(deliveries.len(), 1);
-    assert_eq!(deliveries[0].id, outbox_id);
-    assert_eq!(deliveries[0].status, OutboxStatus::Pending);
-    assert_eq!(deliveries[0].retry_count, 0);
-    assert!(deliveries[0].sent_at.is_none());
-
-    // A dead-lettered delivery stays visible against a task that is not itself failed — that
-    // separation is the whole point of joining transport state in at read time.
-    sqlx::query(
-            "UPDATE email_outbox SET status = 'failed', retry_count = 5, last_error = 'no route' WHERE id = $1",
-        )
-        .bind(outbox_id)
-        .execute(&pool)
-        .await
-        .unwrap();
-
-    let deliveries = persistence.list_task_deliveries(task.id).await.unwrap();
-    assert_eq!(deliveries[0].status, OutboxStatus::Failed);
-    assert_eq!(deliveries[0].retry_count, 5);
-    assert_eq!(deliveries[0].last_error.as_deref(), Some("no route"));
-
-    let task_after = persistence.get_task_by_id(task.id).await.unwrap().unwrap();
-    assert_ne!(
-        task_after.status,
-        TaskStatus::Failed,
-        "a failed delivery must not fail the task that produced it"
-    );
-
-    CompanyPersistence::delete(&persistence, company.id)
-        .await
-        .unwrap();
-}
-
-#[tokio::test]
 async fn outreach_reply_reaches_quorum_and_resumes_task() {
     let Some(pool) = test_pool().await else {
         return;
@@ -2644,24 +2081,20 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
             .unwrap()
     );
     let outreach_id = Uuid::new_v4();
-    let outbox_id = Uuid::new_v4();
     let target_email = "vendor@supplier.example";
-    let outbox_payload = serde_json::to_value(OutboundEmail {
-        correlation_id: CorrelationId::new(),
-        channel_id: channel.id,
-        channel_name: channel.name.clone(),
-        channel_slug: channel.slug.clone(),
-        company_slug: company.slug.clone(),
-        trigger_message_id: "<request@example.com>".into(),
-        thread_references: Vec::new(),
-        recipient_to: target_email.into(),
-        recipients_cc: Vec::new(),
-        subject: "Question".into(),
-        body_text: "Please respond".into(),
-        hop_count: 0,
-        trace_channels: Vec::new(),
-    })
-    .unwrap();
+    let asked = delivery_fixture(
+        &persistence,
+        DeliveryFixtureRequest {
+            task_id: Some(task.id),
+            recipient: target_email,
+            subject: "Question",
+            body: "Please respond",
+            purpose: DeliveryPurpose::Outreach,
+            ..DeliveryFixtureRequest::new(company.id, channel.id, thread.id, "outreach-target-0")
+        },
+    )
+    .await;
+    let delivery_id = asked.delivery.id;
     let progress = persistence
         .create_outreach_and_pause(CreateOutreachRequest {
             correlation_id: CorrelationId::new(),
@@ -2675,10 +2108,21 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
             expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
             subject: "Question".into(),
             body: "Please respond".into(),
-            targets: vec![crate::entities::outreach::OutreachTargetRequest {
+            targets: vec![crate::adapters::persistence::task::OutreachTargetRequest {
                 email: target_email.into(),
-                outbox_id,
-                outbox_payload,
+                request: email_write(EmailMessageDraft {
+                    id: Uuid::new_v4(),
+                    thread_id: thread.id,
+                    message_id: "<asked-vendor@mailagents.test>".into(),
+                    sender: "support@acme.mailagents.test".into(),
+                    recipients_to: vec![target_email.into()],
+                    subject: "Question".into(),
+                    clean_text_body: "Please respond".into(),
+                    direction: MessageDirection::Outbound,
+                    role: MessageRole::Agent,
+                    ..EmailMessageDraft::default()
+                }),
+                delivery: asked.delivery.clone(),
             }],
         })
         .await
@@ -2702,13 +2146,20 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
         .expect("outreach suspension records its source");
     assert_eq!(started.related_outreach_id, Some(outreach_id));
 
+    // The reply guard matches on the provider key the question actually went out under, so the
+    // part has to be delivered before a reply can be correlated to it.
     let outbound_message_id = "<outreach-vendor@mailagents.test>";
-    sqlx::query("UPDATE email_outbox SET status = 'sent', provider_message_id = $2 WHERE id = $1")
-        .bind(outbox_id)
-        .bind(outbound_message_id)
-        .execute(&persistence.pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE message_delivery_parts
+            SET status = 'delivered', provider_message_key = $2,
+                request_started_at = CURRENT_TIMESTAMP, delivered_at = CURRENT_TIMESTAMP
+          WHERE delivery_id = $1",
+    )
+    .bind(delivery_id.as_uuid())
+    .bind(outbound_message_id)
+    .execute(&persistence.pool)
+    .await
+    .unwrap();
     let matched = persistence
         .find_correlated_outreach_reply(
             company.id,
@@ -2777,6 +2228,169 @@ async fn outreach_reply_reaches_quorum_and_resumes_task() {
 /// The mark is what stops the reply guard reading it as the answer this turn owed. Written
 /// separately, a failure between the two would leave an unmarked outreach mail in the thread, and
 /// the next attempt would find it, call the work done, and complete the task with no answer.
+/// Reaching quorum retires the questions the outreach never sent.
+///
+/// The shape this replaces asked "is this delivery still wanted?" once per claimed row -- a round
+/// trip per send, answering from state that could change a millisecond later. Deciding in the
+/// transaction that closes the outreach is both cheaper and correct: a worker cannot claim a
+/// question in between.
+#[tokio::test]
+async fn quorum_retires_the_outreach_questions_that_were_never_sent() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let (company, channel) = seed_company_and_channel(&persistence).await;
+    let thread = persistence
+        .create_thread(channel.id, "Quorum", &[])
+        .await
+        .unwrap();
+    let task = persistence
+        .enqueue_task(NewTask::starting_new_chain(
+            company.id,
+            channel.id,
+            Some(thread.id),
+            "email_agent_dispatch",
+            serde_json::json!({}),
+        ))
+        .await
+        .unwrap();
+    let worker_id = Uuid::new_v4();
+    assert!(
+        persistence
+            .claim_task(
+                task.id,
+                worker_id,
+                Utc::now() + chrono::Duration::minutes(5)
+            )
+            .await
+            .unwrap()
+    );
+
+    // Two targets, a quorum of one: the second question is queued and then never wanted.
+    let suffix = Uuid::new_v4().simple().to_string();
+    let mut targets = Vec::new();
+    let mut deliveries = Vec::new();
+    for (index, address) in ["first@partner.test", "second@partner.test"]
+        .into_iter()
+        .enumerate()
+    {
+        let queued = delivery_fixture(
+            &persistence,
+            DeliveryFixtureRequest {
+                task_id: Some(task.id),
+                recipient: address,
+                purpose: DeliveryPurpose::Outreach,
+                ..DeliveryFixtureRequest::new(
+                    company.id,
+                    channel.id,
+                    thread.id,
+                    &format!("quorum-{suffix}-{index}"),
+                )
+            },
+        )
+        .await;
+        deliveries.push(queued.delivery.id);
+        targets.push(crate::adapters::persistence::task::OutreachTargetRequest {
+            email: address.into(),
+            request: email_write(EmailMessageDraft {
+                id: Uuid::new_v4(),
+                thread_id: thread.id,
+                message_id: format!("<quorum-{suffix}-{index}@mailagents.test>").into(),
+                sender: "support@acme.mailagents.test".into(),
+                recipients_to: vec![address.into()],
+                subject: "Question".into(),
+                clean_text_body: "Please respond".into(),
+                direction: MessageDirection::Outbound,
+                role: MessageRole::Agent,
+                ..EmailMessageDraft::default()
+            }),
+            delivery: queued.delivery,
+        });
+    }
+
+    let outreach_id = Uuid::new_v4();
+    persistence
+        .create_outreach_and_pause(CreateOutreachRequest {
+            correlation_id: task.correlation_id,
+            id: outreach_id,
+            task_id: task.id,
+            company_id: company.id,
+            channel_id: channel.id,
+            worker_id,
+            outreach_key: format!("quorum-{suffix}"),
+            required_threshold_percent: 50.0,
+            expires_at: Utc::now() + chrono::Duration::hours(24),
+            subject: "Question".into(),
+            body: "Please respond".into(),
+            targets,
+        })
+        .await
+        .unwrap();
+
+    // The first target's question goes out and is answered.
+    mark_delivered(&pool, deliveries[0].as_uuid()).await;
+    let response = persistence
+        .create_message(&email_write(EmailMessageDraft {
+            id: Uuid::new_v4(),
+            thread_id: thread.id,
+            message_id: format!("<answer-{suffix}@partner.test>").into(),
+            sender: "first@partner.test".into(),
+            subject: "Re: Question".into(),
+            clean_text_body: "Confirmed".into(),
+            direction: MessageDirection::Inbound,
+            role: MessageRole::Human,
+            ..EmailMessageDraft::default()
+        }))
+        .await
+        .unwrap();
+    let progress = persistence
+        .record_outreach_reply(
+            &crate::entities::outreach::OutreachReplyMatch {
+                outreach_id,
+                task_id: task.id,
+                target_email: "first@partner.test".into(),
+            },
+            response.id,
+        )
+        .await
+        .unwrap();
+    assert_eq!(progress.status, OutreachStatus::ThresholdMet);
+
+    let second: String = sqlx::query_scalar("SELECT status FROM message_deliveries WHERE id = $1")
+        .bind(deliveries[1].as_uuid())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        second,
+        DeliveryStatus::DeadLetter.as_str(),
+        "a question nobody is waiting on any more must not go out"
+    );
+    let reason: Option<String> =
+        sqlx::query_scalar("SELECT last_error_class FROM message_deliveries WHERE id = $1")
+            .bind(deliveries[1].as_uuid())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        reason.as_deref(),
+        Some("superseded"),
+        "and it must say why, rather than reading as a delivery that failed"
+    );
+    // The one that did go out keeps its result: cancelling is not a sweep over everything.
+    let first: String = sqlx::query_scalar("SELECT status FROM message_deliveries WHERE id = $1")
+        .bind(deliveries[0].as_uuid())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(first, DeliveryStatus::Delivered.as_str());
+
+    CompanyPersistence::delete(&persistence, company.id)
+        .await
+        .unwrap();
+}
+
 #[tokio::test]
 async fn an_outreach_request_message_and_its_mark_land_together() {
     let Some(pool) = test_pool().await else {
@@ -2810,34 +2424,29 @@ async fn an_outreach_request_message_and_its_mark_land_together() {
             .unwrap()
     );
 
-    let outbox_id = Uuid::new_v4();
-    persistence
-        .create_outreach_and_pause(CreateOutreachRequest {
-            correlation_id: CorrelationId::new(),
-            id: Uuid::new_v4(),
-            task_id: task.id,
-            company_id: company.id,
-            channel_id: channel.id,
-            worker_id,
-            outreach_key: format!("mark-{outbox_id}"),
-            required_threshold_percent: 100.0,
-            expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
-            subject: "Question".into(),
-            body: "Please respond".into(),
-            targets: vec![crate::entities::outreach::OutreachTargetRequest {
-                email: "vendor@supplier.example".into(),
-                outbox_id,
-                outbox_payload: serde_json::json!({}),
-            }],
-        })
-        .await
-        .unwrap();
+    let suffix = Uuid::new_v4().simple().to_string();
+    let queued = delivery_fixture(
+        &persistence,
+        DeliveryFixtureRequest {
+            task_id: Some(task.id),
+            recipient: "vendor@supplier.example",
+            purpose: DeliveryPurpose::Outreach,
+            ..DeliveryFixtureRequest::new(
+                company.id,
+                channel.id,
+                thread.id,
+                &format!("mark-{suffix}"),
+            )
+        },
+    )
+    .await;
+    let delivery_id = queued.delivery.id;
 
     let trigger = persistence
         .create_message(&email_write(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id: thread.id,
-            message_id: format!("<trigger-{outbox_id}@example.com>").into(),
+            message_id: format!("<trigger-{suffix}@example.com>").into(),
             sender: "asker@example.com".into(),
             subject: "Question".into(),
             clean_text_body: "Please find out".into(),
@@ -2848,23 +2457,41 @@ async fn an_outreach_request_message_and_its_mark_land_together() {
         .await
         .unwrap();
 
-    let asked = persistence
-        .record_outreach_request_message(
-            outbox_id,
-            &email_write(EmailMessageDraft {
-                id: Uuid::new_v4(),
-                thread_id: thread.id,
-                message_id: format!("<outreach-{outbox_id}@mailagents.test>").into(),
-                sender: "support@acme.mailagents.test".into(),
-                recipients_to: vec!["vendor@supplier.example".into()],
-                subject: "Question".into(),
-                clean_text_body: "Please respond".into(),
-                direction: MessageDirection::Outbound,
-                role: MessageRole::Agent,
-                created_at: chrono::Utc::now() + chrono::Duration::seconds(1),
-                ..EmailMessageDraft::default()
-            }),
-        )
+    // The question, the mail that carries it, and the mark that says it *is* the question, all in
+    // the one transaction that creates the outreach.
+    let question = email_write(EmailMessageDraft {
+        id: Uuid::new_v4(),
+        thread_id: thread.id,
+        message_id: format!("<outreach-{suffix}@mailagents.test>").into(),
+        sender: "support@acme.mailagents.test".into(),
+        recipients_to: vec!["vendor@supplier.example".into()],
+        subject: "Question".into(),
+        clean_text_body: "Please respond".into(),
+        direction: MessageDirection::Outbound,
+        role: MessageRole::Agent,
+        created_at: chrono::Utc::now() + chrono::Duration::seconds(1),
+        ..EmailMessageDraft::default()
+    });
+    let asked = question.id;
+    persistence
+        .create_outreach_and_pause(CreateOutreachRequest {
+            correlation_id: CorrelationId::new(),
+            id: Uuid::new_v4(),
+            task_id: task.id,
+            company_id: company.id,
+            channel_id: channel.id,
+            worker_id,
+            outreach_key: format!("mark-{suffix}"),
+            required_threshold_percent: 100.0,
+            expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
+            subject: "Question".into(),
+            body: "Please respond".into(),
+            targets: vec![crate::adapters::persistence::task::OutreachTargetRequest {
+                email: "vendor@supplier.example".into(),
+                request: question,
+                delivery: queued.delivery.clone(),
+            }],
+        })
         .await
         .unwrap();
 
@@ -2880,9 +2507,9 @@ async fn an_outreach_request_message_and_its_mark_land_together() {
     );
     // And it is marked as the question, so the guard does not read it as the answer.
     let marked: Option<Uuid> = sqlx::query_scalar(
-        "SELECT request_message_id FROM task_outreach_targets WHERE outbox_id = $1",
+        "SELECT request_message_id FROM task_outreach_targets WHERE delivery_id = $1",
     )
-    .bind(outbox_id)
+    .bind(delivery_id.as_uuid())
     .fetch_one(&pool)
     .await
     .unwrap();
@@ -2961,7 +2588,7 @@ async fn age_chain_tasks(pool: &sqlx::PgPool, correlation_id: CorrelationId) {
 }
 
 async fn age_chain_deliveries(pool: &sqlx::PgPool, correlation_id: CorrelationId) {
-    sqlx::query("UPDATE email_outbox SET updated_at = $1 WHERE correlation_id = $2")
+    sqlx::query("UPDATE message_deliveries SET updated_at = $1 WHERE correlation_id = $2")
         .bind(Utc::now() - chrono::Duration::days(30))
         .bind(correlation_id.as_uuid())
         .execute(pool)
@@ -2992,17 +2619,29 @@ async fn board_cards(
     cards
 }
 
+/// One chain-starting task, on a thread of its own.
+///
+/// The thread is real rather than `None`: a delivery names the canonical message it carries, an
+/// approval writes its request into the conversation it concerns, and both need somewhere to live.
 async fn enqueue_chain(
     persistence: &PostgresPersistence,
     company_id: Uuid,
     channel_id: Uuid,
     task_type: &str,
 ) -> BackgroundTask {
+    let thread = ThreadPersistence::create_thread(
+        persistence,
+        channel_id,
+        &format!("{task_type} chain"),
+        &[],
+    )
+    .await
+    .unwrap();
     persistence
         .enqueue_task(NewTask::starting_new_chain(
             company_id,
             channel_id,
-            None,
+            Some(thread.id),
             task_type,
             serde_json::json!({}),
         ))
@@ -3036,34 +2675,65 @@ async fn park_for_approval(
     persistence: &PostgresPersistence,
     company: &crate::entities::company::Company,
     channel: &crate::entities::channel::Channel,
+    thread_id: Uuid,
     lease: TaskLeaseRef,
 ) -> Uuid {
     use crate::adapters::persistence::approval::{ApprovalPersistence, NewApproval};
     use crate::entities::approval::{ApprovalAction, ApprovalSubject};
     use crate::entities::task::TaskSuspension;
 
+    let step_key = format!("step-{}", Uuid::new_v4().simple());
     let subject = ApprovalSubject {
         company_id: company.id,
         channel_id: channel.id,
         channel_name: channel.name.clone(),
         channel_slug: channel.slug.clone(),
         company_slug: company.slug.clone(),
-        thread_id: None,
+        thread_id,
         suspension: Some(TaskSuspension::Leased(lease)),
         correlation_id: CorrelationId::new(),
         approver_email: "approver@example.com".into(),
     };
+    // The request is a message in the thread and a delivery carrying it, written by the same
+    // transaction that parks the task -- so an approval nobody could be told about is not a state
+    // this can reach.
+    let queued = delivery_fixture(
+        persistence,
+        DeliveryFixtureRequest {
+            recipient: "approver@example.com",
+            subject: "Approve",
+            body: "Please approve",
+            purpose: DeliveryPurpose::Notification,
+            ..DeliveryFixtureRequest::new(company.id, channel.id, thread_id, &step_key)
+        },
+    )
+    .await;
+    let notice = MessageWrite::internal(
+        thread_id,
+        MessageAuthorWrite::Platform,
+        "Approve",
+        "Please approve",
+        MessageDirection::Outbound,
+        MessageRole::System,
+        subject.correlation_id,
+    );
+    let delivery = NewDelivery {
+        message_id: notice.id,
+        ..queued.delivery
+    };
+
     let (approval, created) = persistence
         .create_approval(NewApproval {
             subject: &subject,
             action: &ApprovalAction {
-                step_key: format!("step-{}", Uuid::new_v4().simple()),
+                step_key,
                 action_type: "generic".into(),
                 title: "Approve".into(),
                 summary: "Please approve".into(),
                 payload: serde_json::json!({}),
             },
-            notification: serde_json::json!({}),
+            message: &notice,
+            delivery,
             token: Uuid::new_v4(),
             expires_at: Utc::now() + chrono::Duration::hours(24),
         })
@@ -3142,7 +2812,8 @@ async fn board_window_pushdown_selects_the_same_chains_as_the_aggregate_filter()
     let delivery_recent = enqueue_chain(&persistence, company.id, channel.id, "delivery-in").await;
     let lease = claim(&persistence, delivery_recent.id).await;
     persistence.mark_task_completed(lease).await.unwrap();
-    let delivered_recently = queue_one_email(&persistence, &delivery_recent, "delivery-in").await;
+    let delivered_recently =
+        queue_one_delivery(&persistence, &delivery_recent, "delivery-in").await;
     mark_delivered(&pool, delivered_recently).await;
     age_chain_tasks(&pool, delivery_recent.correlation_id).await;
 
@@ -3150,7 +2821,7 @@ async fn board_window_pushdown_selects_the_same_chains_as_the_aggregate_filter()
     let delivery_old = enqueue_chain(&persistence, company.id, channel.id, "delivery-out").await;
     let lease = claim(&persistence, delivery_old.id).await;
     persistence.mark_task_completed(lease).await.unwrap();
-    let delivered_long_ago = queue_one_email(&persistence, &delivery_old, "delivery-out").await;
+    let delivered_long_ago = queue_one_delivery(&persistence, &delivery_old, "delivery-out").await;
     mark_delivered(&pool, delivered_long_ago).await;
     age_chain_tasks(&pool, delivery_old.correlation_id).await;
     age_chain_deliveries(&pool, delivery_old.correlation_id).await;
@@ -3266,7 +2937,7 @@ fn stage_matrix() -> Vec<TaskChainCounts> {
             ..Default::default()
         },
         TaskChainCounts {
-            delivery_pending: 1,
+            delivery_queued: 1,
             ..Default::default()
         },
         TaskChainCounts {
@@ -3274,11 +2945,11 @@ fn stage_matrix() -> Vec<TaskChainCounts> {
             ..Default::default()
         },
         TaskChainCounts {
-            delivery_sent: 1,
+            delivery_delivered: 1,
             ..Default::default()
         },
         TaskChainCounts {
-            delivery_failed: 1,
+            delivery_unresolved: 1,
             ..Default::default()
         },
         // Needs-attention outranks everything below it, by each of its five triggers.
@@ -3312,7 +2983,7 @@ fn stage_matrix() -> Vec<TaskChainCounts> {
             total_tasks: 1,
             completed: 1,
             total_deliveries: 1,
-            delivery_failed: 1,
+            delivery_unresolved: 1,
             pending_approval: 1,
             ..Default::default()
         },
@@ -3349,7 +3020,7 @@ fn stage_matrix() -> Vec<TaskChainCounts> {
             total_tasks: 1,
             completed: 1,
             total_deliveries: 1,
-            delivery_pending: 1,
+            delivery_queued: 1,
             ..Default::default()
         },
         // Completed needs every task *and* every delivery to have landed.
@@ -3357,7 +3028,7 @@ fn stage_matrix() -> Vec<TaskChainCounts> {
             total_tasks: 2,
             completed: 2,
             total_deliveries: 1,
-            delivery_sent: 1,
+            delivery_delivered: 1,
             ..Default::default()
         },
         TaskChainCounts {
@@ -3375,7 +3046,7 @@ fn stage_matrix() -> Vec<TaskChainCounts> {
             total_tasks: 1,
             completed: 1,
             total_deliveries: 2,
-            delivery_sent: 1,
+            delivery_delivered: 1,
             ..Default::default()
         },
     ]
@@ -3391,9 +3062,9 @@ async fn stage_from_sql(pool: &sqlx::PgPool, counts: &TaskChainCounts) -> ChainS
                         $5::bigint AS pending_approval, $6::bigint AS waiting_reply,
                         $7::bigint AS completed, $8::bigint AS failed,
                         $9::bigint AS dead_letter, $10::bigint AS stopped,
-                        $11::bigint AS total_deliveries, $12::bigint AS delivery_pending,
-                        $13::bigint AS delivery_sending, $14::bigint AS delivery_sent,
-                        $15::bigint AS delivery_failed
+                        $11::bigint AS total_deliveries, $12::bigint AS delivery_queued,
+                        $13::bigint AS delivery_sending, $14::bigint AS delivery_delivered,
+                        $15::bigint AS delivery_unresolved
              ) AS combined"
     ))
     .bind(counts.total_tasks)
@@ -3407,10 +3078,10 @@ async fn stage_from_sql(pool: &sqlx::PgPool, counts: &TaskChainCounts) -> ChainS
     .bind(counts.dead_letter)
     .bind(counts.stopped)
     .bind(counts.total_deliveries)
-    .bind(counts.delivery_pending)
+    .bind(counts.delivery_queued)
     .bind(counts.delivery_sending)
-    .bind(counts.delivery_sent)
-    .bind(counts.delivery_failed)
+    .bind(counts.delivery_delivered)
+    .bind(counts.delivery_unresolved)
     .fetch_one(pool)
     .await
     .unwrap();
@@ -3439,37 +3110,64 @@ async fn chain_stage_sql_matches_rust_derivation() {
     }
 }
 
-async fn queue_one_email(
+/// One queued delivery for a task, carrying a message in its own thread.
+async fn queue_one_delivery(
     persistence: &PostgresPersistence,
     task: &BackgroundTask,
     key: &str,
 ) -> Uuid {
-    persistence
-        .enqueue_outbound_send(OutboundSend {
-            company_id: task.company_id,
-            channel_id: task.channel_id,
+    let thread_id = task
+        .thread_id
+        .expect("a chain fixture task runs on a thread");
+    let queued = delivery_fixture(
+        persistence,
+        DeliveryFixtureRequest {
             task_id: Some(task.id),
-            correlation_id: task.correlation_id,
-            idempotency_key: format!("{key}-{}", Uuid::new_v4()),
-            payload: serde_json::json!({"to": ["someone@example.com"]}),
-        })
+            ..DeliveryFixtureRequest::new(
+                task.company_id,
+                task.channel_id,
+                thread_id,
+                &format!("{key}-{}", Uuid::new_v4()),
+            )
+        },
+    )
+    .await;
+    let id = queued.delivery.id;
+    persistence.enqueue_delivery(queued.delivery).await.unwrap();
+    // The chain rollups read `correlation_id`, and a fixture that minted its own would sort into a
+    // chain of one.
+    sqlx::query("UPDATE message_deliveries SET correlation_id = $2 WHERE id = $1")
+        .bind(id.as_uuid())
+        .bind(task.correlation_id.as_uuid())
+        .execute(&persistence.pool)
         .await
-        .unwrap()
-        .unwrap()
+        .unwrap();
+    id.as_uuid()
 }
 
-/// Land one queued email as delivered.
+/// Land one queued delivery as delivered.
 ///
-/// Written directly rather than through `claim_outbox_emails`, which claims from the whole
-/// table: these tests share a database with everything else running in parallel, and a claim
-/// would take rows they do not own.
-async fn mark_delivered(pool: &sqlx::PgPool, outbox_id: Uuid) {
+/// Written directly rather than through `claim_deliveries`, which claims from the whole table:
+/// these tests share a database with everything else running in parallel, and a claim would take
+/// rows they do not own.
+async fn mark_delivered(pool: &sqlx::PgPool, delivery_id: Uuid) {
+    sqlx::query(
+        "UPDATE message_delivery_parts
+            SET status = 'delivered', request_started_at = CURRENT_TIMESTAMP,
+                delivered_at = CURRENT_TIMESTAMP
+          WHERE delivery_id = $1",
+    )
+    .bind(delivery_id)
+    .execute(pool)
+    .await
+    .unwrap();
     let updated = sqlx::query(
-        "UPDATE email_outbox
-                SET status = 'sent', sent_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        "UPDATE message_deliveries
+                SET status = 'delivered', delivered_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
               WHERE id = $1",
     )
-    .bind(outbox_id)
+    .bind(delivery_id)
     .execute(pool)
     .await
     .unwrap();
@@ -3487,6 +3185,14 @@ async fn chain_detail_attaches_every_attempt_and_delivery_to_its_own_task() {
     let first = enqueue_chain(&persistence, company.id, channel.id, "grouped-first").await;
     let mut tasks = vec![first.clone()];
     for index in 1..3 {
+        let thread = ThreadPersistence::create_thread(
+            &persistence,
+            channel.id,
+            &format!("grouped-{index}"),
+            &[],
+        )
+        .await
+        .unwrap();
         tasks.push(
             persistence
                 .enqueue_task(NewTask {
@@ -3494,7 +3200,7 @@ async fn chain_detail_attaches_every_attempt_and_delivery_to_its_own_task() {
                     source: TaskSource::Unattributed,
                     company_id: company.id,
                     channel_id: channel.id,
-                    thread_id: None,
+                    thread_id: Some(thread.id),
                     task_type: format!("grouped-{index}"),
                     payload: serde_json::json!({}),
                     correlation_id: first.correlation_id,
@@ -3517,7 +3223,7 @@ async fn chain_detail_attaches_every_attempt_and_delivery_to_its_own_task() {
             persistence.begin_task_attempt(attempt).await.unwrap();
         }
         for _ in 0..expected {
-            queue_one_email(&persistence, task, "grouped").await;
+            queue_one_delivery(&persistence, task, "grouped").await;
         }
     }
 
@@ -3589,21 +3295,32 @@ async fn bulk_attempts(pool: &sqlx::PgPool, task_id: Uuid, count: i32) {
     .unwrap();
 }
 
-async fn bulk_deliveries(pool: &sqlx::PgPool, task: &BackgroundTask, count: i32) {
+/// Many delivered rows for one task, cloned off a real one.
+///
+/// The clone is what keeps the foreign keys satisfiable without building a message and an
+/// interface per row: every copy names the same canonical message and the same binding, which is
+/// exactly what a chain of mirrors would look like anyway.
+async fn bulk_deliveries(pool: &sqlx::PgPool, task: &BackgroundTask, template: Uuid, count: i32) {
     sqlx::query(
-        "INSERT INTO email_outbox
-                 (id, company_id, task_id, correlation_id, idempotency_key, payload, status)
-             SELECT gen_random_uuid(), $1, $2, $3, $4 || '-' || series, '{}'::jsonb, 'sent'
-               FROM generate_series(1, $5::int) AS series",
+        "INSERT INTO message_deliveries
+                 (id, company_id, channel_id, message_id, source_binding_id,
+                  destination_binding_id, external_destination, task_id, correlation_id,
+                  transport, purpose, idempotency_key, status, max_attempts, delivered_at)
+             SELECT gen_random_uuid(), template.company_id, template.channel_id,
+                    template.message_id, template.source_binding_id,
+                    template.destination_binding_id, template.external_destination,
+                    template.task_id, template.correlation_id, template.transport,
+                    template.purpose, template.idempotency_key || '-' || series,
+                    'delivered', template.max_attempts, CURRENT_TIMESTAMP
+               FROM message_deliveries AS template, generate_series(1, $2::int) AS series
+              WHERE template.id = $1",
     )
-    .bind(task.company_id)
-    .bind(task.id)
-    .bind(task.correlation_id.as_uuid())
-    .bind(Uuid::new_v4().to_string())
+    .bind(template)
     .bind(count)
     .execute(pool)
     .await
     .unwrap();
+    let _ = task;
 }
 
 /// Extra ledger rows past the one the enqueue already wrote, hence the sequence offset.
@@ -3628,15 +3345,19 @@ async fn bulk_status_events(pool: &sqlx::PgPool, task: &BackgroundTask, count: i
 async fn bulk_approvals(pool: &sqlx::PgPool, task: &BackgroundTask, count: i32) {
     sqlx::query(
         "INSERT INTO human_approvals
-                 (id, company_id, channel_id, task_id, step_key, approver_email, action_type,
-                  action_title, action_summary, token, expires_at)
-             SELECT gen_random_uuid(), $1, $2, $3, $4 || '-' || series, 'approver@example.com',
-                    'send', 'Bulk approval', 'Bulk summary', gen_random_uuid(),
-                    CURRENT_TIMESTAMP + interval '1 day'
-               FROM generate_series(1, $5::int) AS series",
+                 (id, company_id, channel_id, thread_id, task_id, step_key, approver_email,
+                  action_type, action_title, action_summary, token, expires_at)
+             SELECT gen_random_uuid(), $1, $2, $3, $4, $5 || '-' || series,
+                    'approver@example.com', 'send', 'Bulk approval', 'Bulk summary',
+                    gen_random_uuid(), CURRENT_TIMESTAMP + interval '1 day'
+               FROM generate_series(1, $6::int) AS series",
     )
     .bind(task.company_id)
     .bind(task.channel_id)
+    .bind(
+        task.thread_id
+            .expect("an approval belongs to the conversation it concerns"),
+    )
     .bind(task.id)
     .bind(Uuid::new_v4().to_string())
     .bind(count)
@@ -3715,10 +3436,12 @@ async fn chain_detail_bounds_every_collection_and_reports_the_truncation() {
     // Deliveries.
     let many_deliveries =
         enqueue_chain(&persistence, company.id, channel.id, "limit-deliveries").await;
+    let template = queue_one_delivery(&persistence, &many_deliveries, "limit-deliveries").await;
     bulk_deliveries(
         &pool,
         &many_deliveries,
-        CHAIN_DETAIL_MAX_DELIVERIES as i32 + 1,
+        template,
+        CHAIN_DETAIL_MAX_DELIVERIES as i32,
     )
     .await;
     let detail = detail_of(many_deliveries.correlation_id).await;
@@ -3791,11 +3514,11 @@ async fn a_status_write_that_changes_nothing_wakes_no_board() {
     // Everything is in place before the listener attaches, so the only notifications it can
     // see are the ones this test provokes.
     let quiet = enqueue_chain(&persistence, company.id, channel.id, "quiet").await;
-    let outbox_id = queue_one_email(&persistence, &quiet, "quiet").await;
+    let delivery_id = queue_one_delivery(&persistence, &quiet, "quiet").await;
     bulk_approvals(&pool, &quiet, 1).await;
     bulk_outreaches(&pool, quiet.id, 1).await;
     let fence = enqueue_chain(&persistence, company.id, channel.id, "fence").await;
-    let fence_outbox = queue_one_email(&persistence, &fence, "fence").await;
+    let fence_delivery = queue_one_delivery(&persistence, &fence, "fence").await;
 
     let mut listener = sqlx::postgres::PgListener::connect_with(&pool)
         .await
@@ -3804,14 +3527,15 @@ async fn a_status_write_that_changes_nothing_wakes_no_board() {
 
     // `UPDATE OF status` fires whenever the column is in the SET list, value unchanged or not.
     for statement in [
-        "UPDATE email_outbox SET status = status, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+        "UPDATE message_deliveries SET status = status, updated_at = CURRENT_TIMESTAMP
+              WHERE id = $1",
         "UPDATE human_approvals SET status = status, updated_at = CURRENT_TIMESTAMP
               WHERE task_id = $1",
         "UPDATE task_outreaches SET status = status, updated_at = CURRENT_TIMESTAMP
               WHERE task_id = $1",
     ] {
-        let target = if statement.contains("email_outbox") {
-            outbox_id
+        let target = if statement.contains("message_deliveries") {
+            delivery_id
         } else {
             quiet.id
         };
@@ -3825,7 +3549,7 @@ async fn a_status_write_that_changes_nothing_wakes_no_board() {
 
     // A real change on another chain, committed after all three no-ops. Notifications arrive
     // in commit order on one connection, so reaching this one means the no-ops sent nothing.
-    mark_delivered(&pool, fence_outbox).await;
+    mark_delivered(&pool, fence_delivery).await;
 
     let quiet_wakes = drain_chain_notifications(&mut listener, company.id, fence.correlation_id)
         .await
@@ -3838,7 +3562,7 @@ async fn a_status_write_that_changes_nothing_wakes_no_board() {
     );
 
     // The same three tables, actually changing status, still do wake it.
-    mark_delivered(&pool, outbox_id).await;
+    mark_delivered(&pool, delivery_id).await;
     for statement in [
         "UPDATE human_approvals SET status = 'approved' WHERE task_id = $1",
         "UPDATE task_outreaches SET status = 'completed' WHERE task_id = $1",
@@ -3851,7 +3575,7 @@ async fn a_status_write_that_changes_nothing_wakes_no_board() {
     }
     mark_delivered(
         &pool,
-        queue_one_email(&persistence, &fence, "fence-2").await,
+        queue_one_delivery(&persistence, &fence, "fence-2").await,
     )
     .await;
     let real_wakes = drain_chain_notifications(&mut listener, company.id, fence.correlation_id)
@@ -3861,7 +3585,7 @@ async fn a_status_write_that_changes_nothing_wakes_no_board() {
         .count();
     assert_eq!(
         real_wakes, 3,
-        "outbox, approval and outreach each moved status"
+        "delivery, approval and outreach each moved status"
     );
 
     CompanyPersistence::delete(&persistence, company.id)
@@ -4228,13 +3952,16 @@ async fn a_chain_is_inherited_by_children_and_readable_in_one_query() {
     let chain = CorrelationId::new();
     let other_chain = CorrelationId::new();
 
+    let parent_thread = ThreadPersistence::create_thread(&persistence, channel.id, "Chain", &[])
+        .await
+        .unwrap();
     let parent = persistence
         .enqueue_task(NewTask {
             targets: Vec::new(),
             source: TaskSource::Unattributed,
             company_id: company.id,
             channel_id: channel.id,
-            thread_id: None,
+            thread_id: Some(parent_thread.id),
             task_type: "email_agent_dispatch".to_string(),
             payload: serde_json::json!({}),
             correlation_id: chain,
@@ -4270,18 +3997,8 @@ async fn a_chain_is_inherited_by_children_and_readable_in_one_query() {
         .await
         .unwrap();
 
-    // The email the run sends carries the chain too, so the outbound leg is on the trail.
-    persistence
-        .enqueue_outbound_send(OutboundSend {
-            company_id: company.id,
-            channel_id: channel.id,
-            task_id: Some(parent.id),
-            correlation_id: chain,
-            idempotency_key: format!("chain-test:{}", parent.id),
-            payload: serde_json::json!({}),
-        })
-        .await
-        .unwrap();
+    // The delivery the run queues carries the chain too, so the outbound leg is on the trail.
+    queue_one_delivery(&persistence, &parent, "chain-test").await;
 
     let task_ids: Vec<Uuid> = sqlx::query_scalar(
         "SELECT id FROM background_tasks WHERE correlation_id = $1 ORDER BY created_at",
@@ -4298,7 +4015,7 @@ async fn a_chain_is_inherited_by_children_and_readable_in_one_query() {
     );
 
     let sent: i64 =
-        sqlx::query_scalar("SELECT count(*) FROM email_outbox WHERE correlation_id = $1")
+        sqlx::query_scalar("SELECT count(*) FROM message_deliveries WHERE correlation_id = $1")
             .bind(chain.as_uuid())
             .fetch_one(&pool)
             .await

@@ -6,24 +6,30 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::{PostgresPersistence, task::TransitionAttribution},
+    adapters::persistence::{
+        PostgresPersistence, delivery::enqueue::insert_delivery_on, task::TransitionAttribution,
+        thread::insert_message_on,
+    },
     app_error::{AppError, AppResult},
     entities::approval::{
         ApprovalAction, ApprovalStatus, ApprovalSubject, HumanApproval, QuorumTimeoutAction,
     },
+    transport::NewDelivery,
+    use_cases::thread::MessageWrite,
 };
 
-/// One approval to write, and the notification to queue alongside it.
+/// One approval to write, with the note and the delivery that tell a human about it.
 ///
-/// Borrows the two halves of the request rather than copying them: the caller has just built the
-/// notification body out of both and still owns them.
+/// Borrows the halves of the request rather than copying them: the caller has just built the
+/// notification body out of both and still owns them. All three rows land in one transaction, so
+/// a crash cannot leave an approval nobody was ever told about -- or, worse, a task parked on one.
 pub struct NewApproval<'a> {
     pub subject: &'a ApprovalSubject,
     pub action: &'a ApprovalAction,
-    /// The serialized [`OutboundEmail`](crate::services::outbound_dispatcher::OutboundEmail) that
-    /// carries the decision links. Written in the same transaction as the approval row, so a
-    /// crash cannot leave an approval nobody was ever told about.
-    pub notification: Value,
+    /// The request as a message in its thread, written in the same transaction as the approval.
+    pub message: &'a MessageWrite,
+    /// The mail it goes out as, already rendered.
+    pub delivery: NewDelivery,
     /// The secret in the decision URLs. A `Uuid` end to end -- the column is one, so taking a
     /// `&str` here only added a parse that could fail on a value this code had just generated.
     pub token: Uuid,
@@ -35,7 +41,7 @@ pub struct HumanApprovalDb {
     pub id: Uuid,
     pub company_id: Uuid,
     pub channel_id: Uuid,
-    pub thread_id: Option<Uuid>,
+    pub thread_id: Uuid,
     pub task_id: Option<Uuid>,
     pub step_key: String,
     pub approver_email: String,
@@ -97,7 +103,7 @@ pub trait ApprovalPersistence: Send + Sync {
         &self,
         company_id: Uuid,
         channel_id: Uuid,
-        thread_id: Option<Uuid>,
+        thread_id: Uuid,
         step_key: &str,
     ) -> AppResult<Option<HumanApproval>>;
 
@@ -143,7 +149,8 @@ impl ApprovalPersistence for PostgresPersistence {
         let NewApproval {
             subject,
             action,
-            notification,
+            message,
+            delivery,
             token,
             expires_at,
         } = new_approval;
@@ -246,22 +253,11 @@ impl ApprovalPersistence for PostgresPersistence {
                 }
             }
 
-            sqlx::query(
-                r#"INSERT INTO email_outbox (
-                        id, company_id, channel_id, task_id, correlation_id,
-                        idempotency_key, payload
-                   ) VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
-            )
-            .bind(Uuid::new_v4())
-            .bind(subject.company_id)
-            .bind(subject.channel_id)
-            .bind(task_id)
-            .bind(subject.correlation_id.as_uuid())
-            .bind(format!("approval:{}", db.id))
-            .bind(notification)
-            .execute(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
+            // The note in the thread, then the mail that carries it. Both inside the same
+            // transaction as the approval and the task it parked: an approval that parked a run
+            // and then failed to tell anyone is a run nobody can un-park.
+            insert_message_on(&mut tx, message).await?;
+            insert_delivery_on(&mut tx, &delivery).await?;
         }
         tx.commit().await.map_err(AppError::from)?;
         Ok((db.try_into()?, created))
@@ -271,14 +267,13 @@ impl ApprovalPersistence for PostgresPersistence {
         &self,
         company_id: Uuid,
         channel_id: Uuid,
-        thread_id: Option<Uuid>,
+        thread_id: Uuid,
         step_key: &str,
     ) -> AppResult<Option<HumanApproval>> {
         let db = sqlx::query_as::<_, HumanApprovalDb>(&format!(
             r#"
             SELECT {APPROVAL_COLUMNS} FROM human_approvals
-            WHERE company_id = $1 AND channel_id = $2
-              AND (thread_id = $3 OR ($3 IS NULL AND thread_id IS NULL))
+            WHERE company_id = $1 AND channel_id = $2 AND thread_id = $3
               AND step_key = $4
             ORDER BY created_at DESC, id DESC
             LIMIT 1
@@ -439,10 +434,16 @@ impl ApprovalPersistence for PostgresPersistence {
                 .execute(&mut *tx)
                 .await
                 .map_err(AppError::from)?;
+                // The questions this outreach had not yet sent are no longer wanted. Claimable
+                // rows only: one already in flight is owned by a worker holding a live lease, and
+                // writing past that fence would overwrite an outcome a provider had already given.
                 sqlx::query(
-                    r#"UPDATE email_outbox SET status = 'failed', last_error = 'Outreach rejected',
-                           updated_at = CURRENT_TIMESTAMP
-                       WHERE task_id = $1 AND status = 'pending'"#,
+                    r#"UPDATE message_deliveries
+                          SET status = 'dead_letter', attempt_count = max_attempts,
+                              last_error_class = 'superseded',
+                              last_error_detail = 'The outreach this delivery belonged to was rejected',
+                              updated_at = CURRENT_TIMESTAMP
+                        WHERE task_id = $1 AND status IN ('pending', 'retryable')"#,
                 )
                 .bind(task_id)
                 .execute(&mut *tx)
@@ -540,12 +541,16 @@ impl ApprovalPersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::persistence::task::CreateOutreachRequest;
     use crate::adapters::persistence::task::TaskPersistence;
     use crate::adapters::persistence::test_support::test_pool;
+    use crate::adapters::persistence::test_support::{DeliveryFixtureRequest, delivery_fixture};
     use crate::entities::approval::QUORUM_TIMEOUT_ACTION;
     use crate::entities::correlation::CorrelationId;
-    use crate::entities::outreach::CreateOutreachRequest;
+    use crate::entities::message::{MessageDirection, MessageRole};
     use crate::entities::task::{NewTask, TaskTransitionReason};
+    use crate::entities::transport::DeliveryPurpose;
+    use crate::use_cases::thread::{MessageAuthorWrite, MessageWrite};
     use crate::use_cases::{
         channel::{ChannelPersistence, ChannelWrite},
         company::{CompanyPersistence, CompanyWrite},
@@ -559,6 +564,47 @@ mod tests {
     /// whose lease had already been reaped could still park the task, suspending work the run
     /// that now owns it was actively doing -- and the quorum-timeout sweep, which legitimately
     /// holds no lease, was what made that guard look sufficient.
+    /// The request as a message in its thread, and the mail that carries it.
+    ///
+    /// Every approval writes these two rows now, in the transaction that parks the task -- so a
+    /// fixture that skipped them would be exercising a path production does not have.
+    async fn approval_notice(
+        persistence: &PostgresPersistence,
+        subject: &ApprovalSubject,
+        step: &str,
+    ) -> (MessageWrite, NewDelivery) {
+        let notice = MessageWrite::internal(
+            subject.thread_id,
+            MessageAuthorWrite::Platform,
+            "[APPROVAL REQUIRED] Deploy",
+            "Please approve",
+            MessageDirection::Outbound,
+            MessageRole::System,
+            subject.correlation_id,
+        );
+        let queued = delivery_fixture(
+            persistence,
+            DeliveryFixtureRequest {
+                recipient: subject.approver_email.as_str(),
+                subject: "[APPROVAL REQUIRED] Deploy",
+                body: "Please approve",
+                purpose: DeliveryPurpose::Notification,
+                ..DeliveryFixtureRequest::new(
+                    subject.company_id,
+                    subject.channel_id,
+                    subject.thread_id,
+                    step,
+                )
+            },
+        )
+        .await;
+        let delivery = NewDelivery {
+            message_id: notice.id,
+            ..queued.delivery
+        };
+        (notice, delivery)
+    }
+
     /// The "who and where" half of an approval, which every test here shares.
     fn approval_subject(
         company: &crate::entities::company::Company,
@@ -572,7 +618,7 @@ mod tests {
             channel_name: channel.name.clone(),
             channel_slug: channel.slug.clone(),
             company_slug: company.slug.clone(),
-            thread_id: Some(thread_id),
+            thread_id,
             suspension: None,
             correlation_id: CorrelationId::new(),
             approver_email: approver.into(),
@@ -658,14 +704,17 @@ mod tests {
         let lease = crate::entities::task::TaskLeaseRef::of(&claimed).expect("claim records lease");
 
         let park = async |suspension, step: &str| {
+            let subject = ApprovalSubject {
+                suspension,
+                ..approval_subject(&company, &channel, thread.id, &email)
+            };
+            let (notice, delivery) = approval_notice(&persistence, &subject, step).await;
             persistence
                 .create_approval(NewApproval {
-                    subject: &ApprovalSubject {
-                        suspension,
-                        ..approval_subject(&company, &channel, thread.id, &email)
-                    },
+                    subject: &subject,
                     action: &deploy_action(step),
-                    notification: serde_json::json!({}),
+                    message: &notice,
+                    delivery,
                     token: Uuid::new_v4(),
                     expires_at: Utc::now() + chrono::Duration::hours(1),
                 })
@@ -793,11 +842,15 @@ mod tests {
             .await
             .unwrap();
         let token = Uuid::new_v4();
+        let subject = approval_subject(&company, &channel, thread.id, &email);
+        let (notice, delivery) = approval_notice(&persistence, &subject, "deploy-step").await;
+        let delivery_key = delivery.idempotency_key.clone();
         let (approval, created) = persistence
             .create_approval(NewApproval {
-                subject: &approval_subject(&company, &channel, thread.id, &email),
+                subject: &subject,
                 action: &deploy_action("deploy-step"),
-                notification: serde_json::json!({}),
+                message: &notice,
+                delivery,
                 token,
                 expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
             })
@@ -806,19 +859,30 @@ mod tests {
         assert!(created);
 
         // Counted by key alone, with no `status` filter. What is under test is that creating an
-        // approval queues exactly one notification; whether a poller has since claimed it is the
-        // poller's business, and asserting it is still 'pending' would be asserting that no
+        // approval queues exactly one notification; whether a worker has since claimed it is the
+        // worker's business, and asserting it is still 'pending' would be asserting that no
         // unscoped claim ran in between — which is not a property this code has.
-        let queued_notifications: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM email_outbox WHERE idempotency_key = $1")
-                .bind(format!("approval:{}", approval.id))
-                .fetch_one(&persistence.pool)
-                .await
-                .unwrap();
+        let queued_notifications: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM message_deliveries WHERE idempotency_key = $1",
+        )
+        .bind(delivery_key.as_str())
+        .fetch_one(&persistence.pool)
+        .await
+        .unwrap();
         assert_eq!(queued_notifications, 1);
+        // And the request is in the thread, so the conversation shows that a human was asked.
+        let noticed: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM thread_messages WHERE thread_id = $1 AND message_id = $2",
+        )
+        .bind(thread.id)
+        .bind(notice.id.as_uuid())
+        .fetch_one(&persistence.pool)
+        .await
+        .unwrap();
+        assert_eq!(noticed, 1);
         assert_eq!(
             persistence
-                .find_approval_by_step_key(company.id, channel.id, Some(thread.id), "deploy-step",)
+                .find_approval_by_step_key(company.id, channel.id, thread.id, "deploy-step",)
                 .await
                 .unwrap()
                 .unwrap()
@@ -959,12 +1023,15 @@ mod tests {
         );
 
         let token = Uuid::new_v4();
+        let quorum_subject = ApprovalSubject {
+            suspension: Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
+            ..approval_subject(&company, &channel, thread.id, &email)
+        };
+        let (notice, delivery) =
+            approval_notice(&persistence, &quorum_subject, &format!("quorum-{suffix}")).await;
         let (approval, created) = persistence
             .create_approval(NewApproval {
-                subject: &ApprovalSubject {
-                    suspension: Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
-                    ..approval_subject(&company, &channel, thread.id, &email)
-                },
+                subject: &quorum_subject,
                 action: &ApprovalAction {
                     step_key: format!("quorum-{suffix}"),
                     action_type: QUORUM_TIMEOUT_ACTION.to_string(),
@@ -972,7 +1039,8 @@ mod tests {
                     summary: "Received 1/4 responses.".to_string(),
                     payload: serde_json::json!({}),
                 },
-                notification: serde_json::json!({}),
+                message: &notice,
+                delivery,
                 token,
                 expires_at: Utc::now() + chrono::Duration::hours(1),
             })

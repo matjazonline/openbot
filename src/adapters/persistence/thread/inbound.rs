@@ -30,7 +30,9 @@ use uuid::Uuid;
 
 use super::{email_metadata, external, message};
 use crate::{
-    adapters::persistence::{PostgresPersistence, task::insert_task},
+    adapters::persistence::{
+        PostgresPersistence, delivery::enqueue::insert_delivery_on, task::insert_task,
+    },
     app_error::{AppError, AppResult},
     entities::{
         email_message::EmailMessageMetadata,
@@ -98,7 +100,7 @@ async fn commit_on(
     map_provider_message(tx, request, &threads, message_id).await?;
 
     let task_id = create_task(tx, request, &threads, message_id).await?;
-    let delivery_ids = create_deliveries(request)?;
+    let delivery_ids = create_deliveries(tx, request).await?;
     complete_claimed_event(request)?;
 
     Ok(InboundCommitOutcome {
@@ -529,16 +531,29 @@ fn task_targets(
 /// The immediate delivery fan-out this commit owes.
 ///
 /// Empty for every path that exists today: email is the only interface a channel speaks, and
-/// delivering a message back to the interface it arrived on is an echo. The durable delivery queue
-/// arrives in step 9, so a non-empty list here is a caller that has run ahead of its storage and is
-/// refused rather than silently dropped -- an intent that vanishes is a message nobody ever sends.
-fn create_deliveries(request: &InboundCommitRequest) -> AppResult<Vec<DeliveryId>> {
-    if request.deliveries.is_empty() {
-        return Ok(Vec::new());
+/// delivering a message back to the interface it arrived on is an echo. It is written here anyway,
+/// in this transaction, because that is the property the whole commit exists for -- a mirror queued
+/// separately could be lost by a crash that kept the message, and a mirror written first could be
+/// sent for a message that was rolled back.
+///
+/// Two workers racing one provider redelivery both reach this, and the unique index on
+/// `(destination_binding_id, idempotency_key)` absorbs the loser -- but only one of them gets past
+/// the advisory lock and the redelivery check above, so in practice this writes once.
+async fn create_deliveries(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+) -> AppResult<Vec<DeliveryId>> {
+    let mut created = Vec::with_capacity(request.deliveries.len());
+    for delivery in &request.deliveries {
+        if delivery.company_id != request.company_id {
+            return Err(AppError::Internal(format!(
+                "Delivery '{}' belongs to another company than the message it carries",
+                delivery.idempotency_key
+            )));
+        }
+        created.push(insert_delivery_on(tx, delivery).await?.delivery_id());
     }
-    Err(AppError::Internal(
-        "Inbound delivery fan-out has no durable queue until the generic outbox exists".into(),
-    ))
+    Ok(created)
 }
 
 /// Mark the durable inbound event this commit consumed as complete.

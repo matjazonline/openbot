@@ -187,10 +187,16 @@ pub(crate) async fn stop_task_on(
     .execute(&mut *tx)
     .await
     .map_err(AppError::from)?;
+    // Stopping a task cancels the mail it queued and has not sent. Only *claimable* rows: one
+    // already in flight belongs to a worker holding a live lease, and reaching past that fence
+    // here would let a stop overwrite an outcome the provider had already given.
     sqlx::query(
-        r#"UPDATE email_outbox SET status = 'failed', last_error = 'Task stopped',
-               updated_at = CURRENT_TIMESTAMP
-           WHERE task_id = $1 AND status = 'pending'"#,
+        r#"UPDATE message_deliveries
+              SET status = 'dead_letter', attempt_count = max_attempts,
+                  last_error_class = 'superseded',
+                  last_error_detail = 'The task that produced this delivery was stopped',
+                  updated_at = CURRENT_TIMESTAMP
+            WHERE task_id = $1 AND status IN ('pending', 'retryable')"#,
     )
     .bind(id)
     .execute(&mut *tx)

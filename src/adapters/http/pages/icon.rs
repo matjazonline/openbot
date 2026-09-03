@@ -60,7 +60,7 @@ pub enum Icon {
     Mail,
     /// Settings, and the task queue behind them.
     Gear,
-    /// The outbox: what has been sent.
+    /// Deliveries: what has been handed to a transport.
     PaperAirplane,
     /// A company.
     Organization,

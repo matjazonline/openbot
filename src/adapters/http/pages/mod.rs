@@ -16,6 +16,7 @@ use crate::entities::{
     company_invite::CompanyInvite,
     company_member::{CompanyAccessRole, CompanyMember, CompanyMembership},
     correlation::CorrelationId,
+    delivery::{DeliveryEntry, DeliveryFilter},
     memory::{
         MEMORY_READINESS_TIMEOUT_ERROR, MemoryConnection, MemoryConnectionReadiness,
         MemoryPersistenceMode, MemoryProviderKind, MemoryProvisioningPhase, MemoryRecallMode,
@@ -23,14 +24,13 @@ use crate::entities::{
     },
     message::{AttachmentMetadata, MessageDirection, MessageRole},
     message_view::{EmailReplyContext, MessageAuditView, ThreadMessageView},
-    outbox::{OutboxEntry, OutboxFilter, OutboxStatus},
     task::{
         BackgroundTask, ChainStage, TaskAttemptRecord, TaskAttemptRecordStatus, TaskBoardFilter,
         TaskChainBoard, TaskChainCard, TaskChainCounts, TaskChainDetail, TaskChainTaskDetail,
         TaskFilter, TaskStatus, ThreadActivity,
     },
     thread::Thread,
-    transport::TransportKind,
+    transport::{DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, TransportKind},
     user::User,
     value_objects::{AvatarUrl, EmailAddress, ModelName},
 };
@@ -54,6 +54,7 @@ mod company_settings;
 mod dashboard;
 mod dashboard_query_health;
 mod dashboard_runtime;
+mod deliveries;
 mod fragment;
 mod icon;
 mod invite_settings;
@@ -61,7 +62,6 @@ mod layout;
 mod mailbox;
 mod model_connection;
 mod onboarding;
-mod outbox;
 mod profile;
 mod schedules;
 mod simulation;
@@ -83,6 +83,7 @@ pub use channels::*;
 pub use companies::*;
 pub use company_settings::*;
 pub use dashboard::*;
+pub use deliveries::*;
 pub use fragment::*;
 pub use icon::*;
 pub use invite_settings::*;
@@ -90,7 +91,6 @@ pub use layout::*;
 pub use mailbox::*;
 pub(crate) use model_connection::*;
 pub use onboarding::*;
-pub use outbox::*;
 pub use profile::*;
 pub use schedules::*;
 pub use simulation::*;

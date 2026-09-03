@@ -9,7 +9,7 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::entities::{outbox::OutboxStatus, task::TaskStatus};
+use crate::entities::{task::TaskStatus, transport::DeliveryStatus};
 
 /// The trailing period the rate panels cover, and how finely it is sliced.
 ///
@@ -114,10 +114,10 @@ pub struct TaskStatusCount {
     pub count: i64,
 }
 
-/// How many queued emails sit in one status.
+/// How many queued deliveries sit in one status.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OutboxStatusCount {
-    pub status: OutboxStatus,
+pub struct DeliveryStatusCount {
+    pub status: DeliveryStatus,
     pub count: i64,
 }
 
@@ -148,21 +148,20 @@ impl TaskQueueHealth {
 
 /// The delivery queue as it stands.
 #[derive(Debug, Clone, Default)]
-pub struct OutboxHealth {
-    pub by_status: Vec<OutboxStatusCount>,
-    /// Being sent under a lease that has already expired. The maintenance pass fails these with
-    /// `'Delivery lease expired without a result'`, so a non-zero count means deliveries are being
-    /// reaped mid-flight.
+pub struct DeliveryHealth {
+    pub by_status: Vec<DeliveryStatusCount>,
+    /// Being sent under a lease that has already expired. The maintenance pass charges these an
+    /// attempt, so a non-zero count means deliveries are being reaped mid-flight.
     pub expired_leases: i64,
     pub due_now: i64,
 }
 
-impl OutboxHealth {
+impl DeliveryHealth {
     pub fn total(&self) -> i64 {
         self.by_status.iter().map(|entry| entry.count).sum()
     }
 
-    pub fn count_of(&self, status: OutboxStatus) -> i64 {
+    pub fn count_of(&self, status: DeliveryStatus) -> i64 {
         self.by_status
             .iter()
             .find(|entry| entry.status == status)
@@ -314,7 +313,7 @@ pub struct ProcessGauges {
     pub ai_total_tokens: u64,
     pub ai_avg_latency_ms: u64,
     pub deep_task_pagination: u64,
-    pub deep_outbox_pagination: u64,
+    pub deep_delivery_pagination: u64,
     pub active_dashboard_sse_connections: u64,
 }
 
@@ -362,7 +361,7 @@ impl ProcessGauges {
             ai_total_tokens: count("ai_executions", "total_tokens"),
             ai_avg_latency_ms: rounded("ai_executions", "avg_latency_ms"),
             deep_task_pagination: custom("deep_pagination_observed{endpoint=tasks}"),
-            deep_outbox_pagination: custom("deep_pagination_observed{endpoint=outbox}"),
+            deep_delivery_pagination: custom("deep_pagination_observed{endpoint=deliveries}"),
             active_dashboard_sse_connections: gauge("active_dashboard_sse_connections"),
         }
     }
@@ -377,7 +376,7 @@ impl ProcessGauges {
 #[derive(Debug, Clone, Default)]
 pub struct DashboardSnapshot {
     pub tasks: TaskQueueHealth,
-    pub outbox: OutboxHealth,
+    pub deliveries: DeliveryHealth,
     pub throughput: Vec<ThroughputBucket>,
     pub latency: Vec<LatencyBucket>,
     pub retry_rate: Vec<RetryRateBucket>,

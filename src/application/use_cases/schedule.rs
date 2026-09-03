@@ -1151,7 +1151,7 @@ mod tests {
         /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
         async fn record_outreach_request_message(
             &self,
-            _outbox_id: Uuid,
+            _delivery_id: crate::entities::transport::DeliveryId,
             _write: &crate::use_cases::thread::MessageWrite,
         ) -> AppResult<crate::entities::message::CanonicalMessageId> {
             unreachable!("no fixture here sends an outreach")
@@ -1188,7 +1188,9 @@ mod tests {
             commit: AgentDispatchCommit<'_>,
         ) -> AppResult<DispatchCommit> {
             let _ = commit;
-            Ok(DispatchCommit::Committed { outbox_id: None })
+            Ok(DispatchCommit::Committed {
+                deliveries: Vec::new(),
+            })
         }
 
         async fn renew_task_lease(

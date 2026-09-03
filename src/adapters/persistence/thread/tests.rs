@@ -616,7 +616,7 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
         .await
         .unwrap();
     // The whole point of the canonical link: this message has an RFC id, but the guard is not
-    // going to look at it. Give the outreach target the *message*, and drop the outbox row's
+    // going to look at it. Give the outreach target the *message*, and stop joining a delivery's
     // provider id entirely -- the exclusion must still hold.
     let outreach_message_id = outreach.canonical_id;
 
@@ -649,27 +649,44 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
     .execute(&fixture.pool)
     .await
     .unwrap();
-    let outbox_id = Uuid::new_v4();
-    sqlx::query(
-        r#"INSERT INTO email_outbox (
-                id, company_id, channel_id, task_id, correlation_id, idempotency_key, payload,
-                status
-           ) VALUES ($1, $2, $3, $4, gen_random_uuid(), $5, '{}', 'sent')"#,
+    let side_thread =
+        ThreadPersistence::create_thread(&fixture.persistence, fixture.channel_id, "Fixtures", &[])
+            .await
+            .unwrap();
+    // The delivery that carried the question. It names the same canonical message the target row
+    // marks, which is the relation the guard reads -- no RFC header is involved, so a transport
+    // with none is excluded on exactly the same terms.
+    let delivery = crate::adapters::persistence::test_support::delivery_fixture(
+        &fixture.persistence,
+        crate::adapters::persistence::test_support::DeliveryFixtureRequest {
+            task_id: Some(task_id),
+            recipient: "target@partner.test",
+            purpose: crate::entities::transport::DeliveryPurpose::Outreach,
+            // The fixture writes an outbound message of its own, and the guard under test is
+            // "what is the newest outbound message in this thread" -- so it goes somewhere else.
+            ..crate::adapters::persistence::test_support::DeliveryFixtureRequest::new(
+                fixture.company_id,
+                fixture.channel_id,
+                side_thread.id,
+                &format!("outreach-{}", fixture.suffix),
+            )
+        },
     )
-    .bind(outbox_id)
-    .bind(fixture.company_id)
-    .bind(fixture.channel_id)
-    .bind(task_id)
-    .bind(format!("outreach:{}:target:0", fixture.suffix))
-    .execute(&fixture.pool)
     .await
-    .unwrap();
+    .delivery;
+    let delivery_id = delivery.id;
+    let mut tx = fixture.pool.begin().await.unwrap();
+    crate::adapters::persistence::delivery::enqueue::insert_delivery_on(&mut tx, &delivery)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+
     sqlx::query(
-        "INSERT INTO task_outreach_targets (outreach_id, email, outbox_id, request_message_id) \
+        "INSERT INTO task_outreach_targets (outreach_id, email, delivery_id, request_message_id) \
          VALUES ($1, 'target@partner.test', $2, $3)",
     )
     .bind(outreach_id)
-    .bind(outbox_id)
+    .bind(delivery_id.as_uuid())
     .bind(outreach_message_id.as_uuid())
     .execute(&fixture.pool)
     .await

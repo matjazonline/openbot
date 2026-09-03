@@ -13,6 +13,7 @@ use uuid::Uuid;
 use crate::{
     app_error::AppResult,
     entities::{
+        correlation::CorrelationId,
         creation::CreationProvenance,
         message::CanonicalMessageId,
         transport::{
@@ -23,11 +24,11 @@ use crate::{
         value_objects::EmailAddress,
     },
     transport::{
-        CanonicalContent, DeliveryCandidate, DeliveryDestination, DeliveryEnvelope, DeliveryIntent,
-        DeliveryPlanRequest, DeliveryPlanner, DeliveryPurpose, FailureClass, FailureDetail,
-        PartIndex, PartKey, PolicyDeliveryPlanner, ProviderSendOutcome, RenderedPart,
-        TransportPayload, TransportRegistrationError, TransportRegistry, TransportRenderer,
-        TransportSender, delivery::ContentDigest,
+        DeliveryCandidate, DeliveryDestination, DeliveryEnvelope, DeliveryIntent,
+        DeliveryPlanRequest, DeliveryPlanner, DeliveryPurpose, DeliveryRecord, FailureClass,
+        FailureDetail, MAX_DELIVERY_ATTEMPTS, PartIndex, PartKey, PolicyDeliveryPlanner,
+        ProviderSendOutcome, RenderedPart, TransportPayload, TransportRegistrationError,
+        TransportRegistry, TransportRenderer, TransportSender, delivery::ContentDigest,
     },
 };
 
@@ -274,9 +275,9 @@ struct FakePayload {
 
 const FAKE_PAYLOAD_VERSION: u16 = 1;
 
-fn envelope(transport: TransportKind) -> DeliveryEnvelope {
-    let content = CanonicalContent::parse("Subject", "Body").unwrap();
-    let part = RenderedPart {
+/// One frozen part, in a shape only the fake adapter below understands.
+fn part(transport: TransportKind) -> RenderedPart {
+    RenderedPart {
         index: PartIndex::new(0),
         key: PartKey::parse("part-0").unwrap(),
         payload: TransportPayload::encode(
@@ -288,25 +289,34 @@ fn envelope(transport: TransportKind) -> DeliveryEnvelope {
         )
         .unwrap(),
         digest: ContentDigest::sha256_of(b"Body"),
-    };
-    DeliveryEnvelope::new(
-        DeliveryId::random(),
-        DeliveryIntent {
-            message_id: CanonicalMessageId::random(),
-            source_binding_id: ChannelBindingId::random(),
-            destination: DeliveryDestination::Binding(ChannelBindingId::random()),
-            purpose: DeliveryPurpose::Reply,
-            key: DeliveryIntent::stable_key(
-                DeliveryPurpose::Reply,
-                CanonicalMessageId::random(),
-                &DeliveryDestination::Binding(ChannelBindingId::random()),
-            ),
-        },
+    }
+}
+
+/// The durable identity a sender is given: identifiers, and nothing that only exists at render
+/// time.
+fn record(transport: TransportKind) -> DeliveryRecord {
+    let destination = DeliveryDestination::Binding(ChannelBindingId::random());
+    let message_id = CanonicalMessageId::random();
+    DeliveryRecord {
+        id: DeliveryId::random(),
+        company_id: uuid::Uuid::new_v4(),
+        channel_id: uuid::Uuid::new_v4(),
+        message_id,
+        source_binding_id: ChannelBindingId::random(),
+        destination_binding_id: ChannelBindingId::random(),
+        external_destination: None,
+        task_id: None,
+        correlation_id: CorrelationId::new(),
         transport,
-        &content,
-        vec![part],
-    )
-    .unwrap()
+        purpose: DeliveryPurpose::Reply,
+        idempotency_key: DeliveryIntent::stable_key(
+            DeliveryPurpose::Reply,
+            message_id,
+            &destination,
+        ),
+        attempt_count: 0,
+        max_attempts: MAX_DELIVERY_ATTEMPTS,
+    }
 }
 
 /// A sender that answers with whatever the test queued. It cannot return a bare `Err`, because the
@@ -322,11 +332,7 @@ impl TransportSender for ScriptedSender {
         self.transport
     }
 
-    async fn send(
-        &self,
-        _envelope: &DeliveryEnvelope,
-        _part: &RenderedPart,
-    ) -> ProviderSendOutcome {
+    async fn send(&self, _delivery: &DeliveryRecord, _part: &RenderedPart) -> ProviderSendOutcome {
         self.outcome.clone()
     }
 }
@@ -341,14 +347,19 @@ impl TransportRenderer for EchoRenderer {
     }
 
     fn render(&self, envelope: &DeliveryEnvelope) -> AppResult<Vec<RenderedPart>> {
-        Ok(envelope.parts.to_vec())
+        Ok(vec![part(envelope.transport)])
+    }
+
+    /// A provider whose key is its own answer. Slack's timestamp cannot be known before the post.
+    fn predicted_provider_key(&self, _part: &RenderedPart) -> Option<ExternalMessageKey> {
+        None
     }
 }
 
 #[tokio::test]
 async fn a_sender_reports_rate_limits_and_ambiguity_as_distinct_outcomes() {
-    let envelope = envelope(TransportKind::Slack);
-    let part = &envelope.parts[0];
+    let delivery = record(TransportKind::Slack);
+    let part = &part(TransportKind::Slack);
 
     let rate_limited = ScriptedSender {
         transport: TransportKind::Slack,
@@ -358,7 +369,7 @@ async fn a_sender_reports_rate_limits_and_ambiguity_as_distinct_outcomes() {
             detail: FailureDetail::parse("retry_after=30").unwrap(),
         },
     };
-    let outcome = rate_limited.send(&envelope, part).await;
+    let outcome = rate_limited.send(&delivery, part).await;
     assert_eq!(outcome.retry_after(), Some(Duration::from_secs(30)));
     assert!(outcome.is_safely_retryable());
     assert_eq!(outcome.class(), Some(FailureClass::RateLimited));
@@ -371,7 +382,7 @@ async fn a_sender_reports_rate_limits_and_ambiguity_as_distinct_outcomes() {
                 .unwrap(),
         },
     };
-    let outcome = ambiguous.send(&envelope, part).await;
+    let outcome = ambiguous.send(&delivery, part).await;
     // The distinction the whole delivery state machine rests on: this may already have been
     // accepted, so it is never re-sent automatically.
     assert!(!outcome.is_safely_retryable());
@@ -383,13 +394,12 @@ async fn a_sender_reports_rate_limits_and_ambiguity_as_distinct_outcomes() {
             provider_key: Some(ExternalMessageKey::parse("1712345678.123456").unwrap()),
         },
     };
-    assert_eq!(delivered.send(&envelope, part).await.class(), None);
+    assert_eq!(delivered.send(&delivery, part).await.class(), None);
 }
 
 #[test]
 fn a_payload_is_read_back_only_by_the_transport_and_version_that_wrote_it() {
-    let envelope = envelope(TransportKind::Slack);
-    let payload = &envelope.parts[0].payload;
+    let payload = part(TransportKind::Slack).payload;
 
     assert_eq!(
         payload

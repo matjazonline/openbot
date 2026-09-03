@@ -200,9 +200,9 @@ There is no separate `delegate_to_third_party` or `delegate_to_agent` tool. Dele
 2. The configured HITL policy sends an approval request and pauses the task.
 3. Approval resumes the original task, and the model repeats the approved tool call.
 4. The tool validates and normalizes its arguments.
-5. One database transaction creates the outreach, target records, and outbox emails and changes the task to `waiting_for_third_party_reply`.
+5. One database transaction creates the outreach, its target rows, the question each target was asked, and the delivery that carries it, and changes the task to `waiting_for_third_party_reply`.
 6. The tool returns immediately. It does not hold an invocation open while waiting for people.
-7. The outbox worker sends one message per target and records each outbound `Message-ID`.
+7. The delivery worker sends one message per target and records the provider key each went out under.
 8. Correlated replies are added to the thread as context without creating separate agent tasks.
 9. Reaching quorum changes the parent task to `pending` exactly once.
 10. The resumed agent receives the original request, collected replies, and an outreach progress summary.

@@ -18,6 +18,7 @@ use crate::services::outreach_tool::{
     OUTREACH_TOOL_ID, OutreachAndAwaitQuorumTool, OutreachToolContext,
 };
 use crate::services::prompt_fence::{UNTRUSTED_INPUT_SYSTEM_PROMPT, UntrustedFence, UntrustedKind};
+use crate::transport::DeliveryComposer;
 use crate::use_cases::approval::ApprovalUseCases;
 use crate::use_cases::{
     agent::AgentPersistence,
@@ -661,11 +662,7 @@ impl ai_agents::hitl::ApprovalHandler for AgentApprovalHandler {
             }
         };
 
-        let thread_str = self
-            .context
-            .thread_id
-            .map(|t| t.to_string())
-            .unwrap_or_default();
+        let thread_str = self.context.thread_id.to_string();
         let task_str = self
             .context
             .suspension
@@ -816,6 +813,10 @@ pub struct AgentRunner<'a> {
     channel_persistence: Option<Arc<dyn ChannelPersistence>>,
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
     binding_persistence: Option<Arc<dyn ChannelBindingPersistence>>,
+    /// Freezes what an outreach question will be mailed as. Set with the outreach tool, because
+    /// the two are the same capability: an agent that may ask a third party a question is an agent
+    /// that may queue mail.
+    delivery_composer: Option<DeliveryComposer>,
     outreach_context: Option<OutreachToolContext>,
     agent_channel_tool: Option<(Arc<dyn AgentChannelProvisioning>, AgentChannelToolContext)>,
     /// Set when the run belongs to a durable chain, which is every run driven by a task. Absent
@@ -843,6 +844,7 @@ impl<'a> AgentRunner<'a> {
             upstream_pipeline_context: None,
             task_persistence: None,
             channel_persistence: None,
+            delivery_composer: None,
             agent_persistence: None,
             binding_persistence: None,
             outreach_context: None,
@@ -938,10 +940,12 @@ impl<'a> AgentRunner<'a> {
         mut self,
         persistence: Arc<dyn TaskPersistence>,
         channel_persistence: Arc<dyn ChannelPersistence>,
+        deliveries: DeliveryComposer,
         context: OutreachToolContext,
     ) -> Self {
         self.task_persistence = Some(persistence);
         self.channel_persistence = Some(channel_persistence);
+        self.delivery_composer = Some(deliveries);
         self.outreach_context = Some(context);
         self
     }
@@ -1038,12 +1042,16 @@ impl<'a> AgentRunner<'a> {
                 .task_persistence
                 .clone()
                 .zip(self.channel_persistence.clone())
+                .zip(self.delivery_composer.clone())
                 .zip(self.outreach_context.clone())
                 .map(
-                    |((task_persistence, channel_persistence), context)| AgentOutreach {
-                        task_persistence,
-                        channel_persistence,
-                        context,
+                    |(((task_persistence, channel_persistence), deliveries), context)| {
+                        AgentOutreach {
+                            task_persistence,
+                            channel_persistence,
+                            deliveries,
+                            context,
+                        }
                     },
                 ),
             agent_persistence: self.agent_persistence.clone(),
@@ -1204,6 +1212,7 @@ impl<'a> AgentRunner<'a> {
 struct AgentOutreach {
     task_persistence: Arc<dyn TaskPersistence>,
     channel_persistence: Arc<dyn ChannelPersistence>,
+    deliveries: DeliveryComposer,
     context: OutreachToolContext,
 }
 
@@ -1372,6 +1381,7 @@ impl AgentTask {
             let AgentOutreach {
                 task_persistence,
                 channel_persistence,
+                deliveries,
                 context,
             } = outreach;
             if let Some((agent_persistence, binding_persistence)) = self
@@ -1392,6 +1402,7 @@ impl AgentTask {
             builder = builder.tool(Arc::new(OutreachAndAwaitQuorumTool::new(
                 task_persistence,
                 channel_persistence,
+                deliveries,
                 context,
                 self.suspended.clone(),
             )));

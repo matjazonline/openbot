@@ -1,7 +1,7 @@
 //! Work that has stopped moving, counted so somebody can be told about it.
 //!
 //! Every kind of stall here is already visible in the queue tables -- a dead-lettered task, an
-//! outbox row that failed, an approval nobody answered. What was missing is anything that *looks*.
+//! delivery that failed, an approval nobody answered. What was missing is anything that *looks*.
 //! The dashboard shows these numbers to a human who opens the page; this is for the case where
 //! nobody opens the page.
 //!
@@ -68,21 +68,25 @@ pub enum StuckWorkKind {
     ApprovalOverdue,
     /// Parked on a third party who has not replied, past the point the outreach allowed for.
     ReplyOverdue,
-    /// Email that will not be delivered without intervention.
-    OutboxFailed,
-    /// Email queued and past due. Delivery is not draining.
-    OutboxOverdue,
+    /// Deliveries that will not go out without intervention.
+    DeliveryDeadLettered,
+    /// Deliveries queued and past due. The delivery worker is not draining.
+    DeliveryOverdue,
+    /// Deliveries whose provider outcome was never resolved. Nothing will retry these -- doing so
+    /// is exactly how a duplicate is sent -- so they wait for a reconciler or for a human.
+    DeliveryUnconfirmed,
 }
 
 impl StuckWorkKind {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::DeadLettered,
         Self::QueueOverdue,
         Self::LeaseExpired,
         Self::ApprovalOverdue,
         Self::ReplyOverdue,
-        Self::OutboxFailed,
-        Self::OutboxOverdue,
+        Self::DeliveryDeadLettered,
+        Self::DeliveryOverdue,
+        Self::DeliveryUnconfirmed,
     ];
 
     /// The metric label, and the machine-readable name in the log line.
@@ -93,8 +97,9 @@ impl StuckWorkKind {
             Self::LeaseExpired => "lease_expired",
             Self::ApprovalOverdue => "approval_overdue",
             Self::ReplyOverdue => "reply_overdue",
-            Self::OutboxFailed => "outbox_failed",
-            Self::OutboxOverdue => "outbox_overdue",
+            Self::DeliveryDeadLettered => "delivery_dead_lettered",
+            Self::DeliveryOverdue => "delivery_overdue",
+            Self::DeliveryUnconfirmed => "delivery_unconfirmed",
         }
     }
 
@@ -106,8 +111,15 @@ impl StuckWorkKind {
             Self::LeaseExpired => "tasks hold an expired lease and have not been reaped",
             Self::ApprovalOverdue => "tasks are parked on an approval nobody has answered",
             Self::ReplyOverdue => "tasks are parked on a third party past their reply deadline",
-            Self::OutboxFailed => "emails failed delivery and will not be retried",
-            Self::OutboxOverdue => "emails are queued past their send time and are not going out",
+            Self::DeliveryDeadLettered => {
+                "deliveries exhausted their attempts and will not be retried"
+            }
+            Self::DeliveryOverdue => {
+                "deliveries are queued past their send time and are not going out"
+            }
+            Self::DeliveryUnconfirmed => {
+                "deliveries reached no definite provider outcome and are awaiting reconciliation"
+            }
         }
     }
 }
@@ -120,8 +132,9 @@ pub struct StuckWorkCensus {
     pub lease_expired: i64,
     pub approval_overdue: i64,
     pub reply_overdue: i64,
-    pub outbox_failed: i64,
-    pub outbox_overdue: i64,
+    pub delivery_dead_lettered: i64,
+    pub delivery_overdue: i64,
+    pub delivery_unconfirmed: i64,
 }
 
 impl StuckWorkCensus {
@@ -132,8 +145,9 @@ impl StuckWorkCensus {
             StuckWorkKind::LeaseExpired => self.lease_expired,
             StuckWorkKind::ApprovalOverdue => self.approval_overdue,
             StuckWorkKind::ReplyOverdue => self.reply_overdue,
-            StuckWorkKind::OutboxFailed => self.outbox_failed,
-            StuckWorkKind::OutboxOverdue => self.outbox_overdue,
+            StuckWorkKind::DeliveryDeadLettered => self.delivery_dead_lettered,
+            StuckWorkKind::DeliveryOverdue => self.delivery_overdue,
+            StuckWorkKind::DeliveryUnconfirmed => self.delivery_unconfirmed,
         }
     }
 
@@ -195,8 +209,9 @@ mod tests {
                 StuckWorkKind::LeaseExpired => census.lease_expired = 1,
                 StuckWorkKind::ApprovalOverdue => census.approval_overdue = 1,
                 StuckWorkKind::ReplyOverdue => census.reply_overdue = 1,
-                StuckWorkKind::OutboxFailed => census.outbox_failed = 1,
-                StuckWorkKind::OutboxOverdue => census.outbox_overdue = 1,
+                StuckWorkKind::DeliveryDeadLettered => census.delivery_dead_lettered = 1,
+                StuckWorkKind::DeliveryOverdue => census.delivery_overdue = 1,
+                StuckWorkKind::DeliveryUnconfirmed => census.delivery_unconfirmed = 1,
             }
             assert_eq!(census.count(kind), 1, "{} is not wired up", kind.as_str());
             assert!(!census.is_quiet());

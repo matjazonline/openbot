@@ -18,9 +18,9 @@ pub mod ui_attachments;
 pub mod ui_channels;
 pub mod ui_companies;
 pub mod ui_dashboard;
+pub mod ui_deliveries;
 pub mod ui_invites;
 pub mod ui_message_diagnostics;
-pub mod ui_outbox;
 pub mod ui_profile;
 pub mod ui_schedules;
 pub mod ui_tasks;
@@ -84,7 +84,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(ui_companies::router())
         .merge(ui_dashboard::router())
         .merge(ui_invites::router())
-        .merge(ui_outbox::router())
+        .merge(ui_deliveries::router())
         .merge(ui_profile::router())
         .merge(ui_tasks::router())
         .merge(ui_team::router())

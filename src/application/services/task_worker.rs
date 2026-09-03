@@ -8,8 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     adapters::persistence::task::{
-        Leased, OutboundSend, OutboxEmail, TASK_LEASE_SECONDS, TaskLease, TaskPersistence,
-        report_outcome, while_leased,
+        Leased, TASK_LEASE_SECONDS, TaskLease, TaskPersistence, report_outcome, while_leased,
     },
     domain::monitoring::{MonitoringService, TaskExecutionMetrics, TaskStatusMetric},
     entities::{
@@ -18,7 +17,7 @@ use crate::{
         channel::{Channel, PUBLIC_PARTICIPANT},
         company::Company,
         correlation::CorrelationId,
-        message::{MessageDirection, MessageRole},
+        message::{CanonicalMessageId, MessageDirection, MessageRole},
         outreach::DueOutreach,
         schedule::ScheduledRunPayload,
         stuck_work::StuckWorkThresholds,
@@ -33,10 +32,13 @@ use crate::{
     services::{
         agent_runner::{AgentRunner, resolve_agent_params},
         memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
-        outbound_dispatcher::{OutboundEmail, agent_response_email_body},
+        outbound_dispatcher::agent_response_email_body,
         runtime_metrics::ActiveTaskExecutions,
     },
-    transport::InboundTaskPayload,
+    transport::{
+        CanonicalContent, DeliveryContext, DeliveryPurpose, DeliveryRequest, EmailDeliveryContext,
+        EmailRelayTrace, InboundTaskPayload, NewDelivery,
+    },
     use_cases::{
         schedule::{SCHEDULED_AGENT_RUN_TASK, ScheduleUseCases},
         thread::{AgentAuthor, DispatchOutcome, MessageAuthorWrite, MessageWrite, ThreadUseCases},
@@ -48,10 +50,6 @@ use crate::{
 /// against `background_tasks_pending_ready_idx`, which costs nothing to run twice a second against
 /// an empty queue.
 const TASK_POLL_INTERVAL: Duration = Duration::from_millis(500);
-
-/// How long the outbox loop waits. It runs on its own cadence rather than behind an agent run, so a
-/// queued reply goes out within half a second instead of whenever the current task happens to end.
-const OUTBOX_POLL_INTERVAL: Duration = Duration::from_millis(500);
 
 /// How often the schedule loop checks for due recurring or one-off runs.
 const SCHEDULE_POLL_INTERVAL: Duration = Duration::from_secs(2);
@@ -67,9 +65,6 @@ const MAINTENANCE_INTERVAL: Duration = Duration::from_secs(30);
 /// How long to wait after an iteration that failed outright. Without it a Postgres outage fills the
 /// log twice a second per loop rather than once every few seconds.
 const ERROR_BACKOFF: Duration = Duration::from_secs(5);
-
-/// How many queued emails one iteration claims.
-const OUTBOX_CLAIM_BATCH: i64 = 10;
 
 /// What one poll iteration found, and therefore whether its loop should pause before the next one.
 #[derive(Debug, PartialEq, Eq)]
@@ -271,20 +266,6 @@ impl From<String> for RunFailure {
     }
 }
 
-/// Why one outbox delivery did not happen, and therefore whether trying again could help.
-enum DeliveryFailure {
-    /// Transport or database trouble: costs an attempt, comes back after a backoff.
-    Retryable(String),
-    /// Nothing about a later attempt would be different, so spend none of them.
-    Permanent(String),
-}
-
-impl DeliveryFailure {
-    fn retryable(error: impl std::fmt::Display) -> Self {
-        Self::Retryable(error.to_string())
-    }
-}
-
 pub struct TaskWorker {
     task_persistence: Arc<dyn TaskPersistence>,
     thread_use_cases: Arc<ThreadUseCases>,
@@ -346,30 +327,23 @@ impl TaskWorker {
     /// Run the worker's poll loops until shutdown.
     ///
     /// They are separate on purpose. Agent runs occupy bounded task slots for seconds or minutes,
-    /// while outbox delivery must continue independently. Maintenance is split off for the opposite
+    /// while schedules must keep firing regardless. Maintenance is split off for the opposite
     /// reason: its deadlines are minutes away, so it must not be re-run every time the queue loops
     /// look.
+    ///
+    /// Delivery is not here at all: it is a queue of its own, drained by
+    /// [`crate::services::delivery_worker::DeliveryWorker`], because a delivery outlives the task
+    /// that produced it and plenty of deliveries have no task behind them.
     pub async fn start_worker_loop(
         self: Arc<Self>,
         shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     ) {
         info!(
-            "Starting Background Task Worker (task concurrency {}, tasks every {:?}, outbox every {:?}, schedules every {:?}, maintenance every {:?})...",
-            self.task_concurrency,
-            TASK_POLL_INTERVAL,
-            OUTBOX_POLL_INTERVAL,
-            SCHEDULE_POLL_INTERVAL,
-            MAINTENANCE_INTERVAL
+            "Starting Background Task Worker (task concurrency {}, tasks every {:?}, schedules every {:?}, maintenance every {:?})...",
+            self.task_concurrency, TASK_POLL_INTERVAL, SCHEDULE_POLL_INTERVAL, MAINTENANCE_INTERVAL
         );
 
         let tasks = Arc::clone(&self).run_task_loop(shutdown_rx.resubscribe());
-        let outbox = poll_until_shutdown(
-            "outbox",
-            OUTBOX_POLL_INTERVAL,
-            shutdown_rx.resubscribe(),
-            Arc::clone(&self),
-            |worker| async move { worker.process_outbox_emails().await },
-        );
         let schedules = if self.schedule_use_cases.is_some() {
             futures::future::Either::Left(poll_until_shutdown(
                 "schedule",
@@ -389,7 +363,7 @@ impl TaskWorker {
             |worker| async move { worker.run_maintenance().await },
         );
 
-        let _ = tokio::join!(tasks, outbox, schedules, maintenance);
+        let _ = tokio::join!(tasks, schedules, maintenance);
     }
 
     /// Claim and advance any due recurring or one-off channel schedules.
@@ -495,18 +469,7 @@ impl TaskWorker {
     /// The slow lane: work whose deadlines are minutes away, kept off the queue loops so that
     /// shortening their interval does not multiply it.
     async fn run_maintenance(&self) -> Result<Polled, String> {
-        // Give back the outbox rows whose delivery never reported a result, so each of those
-        // redeliveries costs an attempt and a poison row eventually dead-letters.
-        match self.task_persistence.reap_expired_outbox_leases().await {
-            Ok(0) => {}
-            Ok(reaped) => warn!(
-                "Reaped {} outbox deliveries whose lease had expired",
-                reaped
-            ),
-            Err(error) => warn!("Failed to reap expired outbox leases: {}", error),
-        }
-
-        // And the same for tasks whose run vanished mid-flight. Claims take pending rows only, so
+        // Tasks whose run vanished mid-flight. Claims take pending rows only, so
         // without this an expired `processing` row is never picked up again by anyone.
         match self.task_persistence.reap_expired_task_leases().await {
             Ok(0) => {}
@@ -735,149 +698,6 @@ impl TaskWorker {
         }
     }
 
-    /// Deliver the next batch of queued emails. Reaping expired delivery leases belongs to
-    /// [`Self::run_maintenance`], which runs on the lease's own timescale rather than this one.
-    async fn process_outbox_emails(&self) -> Result<Polled, String> {
-        let emails = self
-            .task_persistence
-            .claim_outbox_emails(
-                self.worker_id,
-                chrono::Utc::now() + chrono::Duration::seconds(TASK_LEASE_SECONDS),
-                OUTBOX_CLAIM_BATCH,
-            )
-            .await
-            .map_err(|error| error.to_string())?;
-
-        let claimed = emails.len();
-        for queued in emails {
-            let outbox_id = queued.id;
-            // The outreach behind this email may have been answered or cancelled since it queued.
-            match self
-                .task_persistence
-                .is_outbox_delivery_active(outbox_id)
-                .await
-            {
-                Ok(true) => {}
-                Ok(false) => {
-                    let outcome = self
-                        .task_persistence
-                        .cancel_claimed_outbox(outbox_id, self.worker_id)
-                        .await;
-                    report_outcome("Outbox", outbox_id, "cancellation", outcome);
-                    continue;
-                }
-                // Unknown is not closed: fail the attempt so it comes back with backoff, rather
-                // than cancelling an email the outreach may still be waiting on.
-                Err(error) => {
-                    warn!(
-                        "Could not tell whether outbox {} is still wanted: {}",
-                        outbox_id, error
-                    );
-                    self.record_outbox_failure(outbox_id, &error.to_string())
-                        .await;
-                    continue;
-                }
-            }
-
-            match self.deliver_outbox_email(queued).await {
-                Ok(sent_message_id) => {
-                    let outcome = self
-                        .task_persistence
-                        .mark_outbox_email_sent(outbox_id, self.worker_id, &sent_message_id)
-                        .await;
-                    report_outcome("Outbox", outbox_id, "delivery", outcome);
-                }
-                Err(DeliveryFailure::Retryable(error)) => {
-                    self.record_outbox_failure(outbox_id, &error).await;
-                }
-                Err(DeliveryFailure::Permanent(error)) => {
-                    warn!("Outbox {} can never be delivered: {}", outbox_id, error);
-                    let outcome = self
-                        .task_persistence
-                        .mark_outbox_email_dead(outbox_id, self.worker_id, &error)
-                        .await;
-                    report_outcome("Outbox", outbox_id, "dead-lettering", outcome);
-                }
-            }
-        }
-        Ok(polled(claimed, OUTBOX_CLAIM_BATCH))
-    }
-
-    /// End this delivery attempt: back off and retry, or dead-letter once the attempts run out.
-    async fn record_outbox_failure(&self, outbox_id: Uuid, error: &str) {
-        let outcome = self
-            .task_persistence
-            .mark_outbox_email_failed(outbox_id, self.worker_id, error)
-            .await;
-        report_outcome("Outbox", outbox_id, "failure", outcome);
-    }
-
-    /// Send one queued outreach email, preferring the trusted internal transport when the
-    /// recipient is another platform channel. Returns the delivered Message-ID.
-    async fn deliver_outbox_email(
-        &self,
-        queued: OutboxEmail,
-    ) -> Result<MessageId, DeliveryFailure> {
-        let outbox_id = queued.id;
-        // Derive from the row's own key, not from its id: the key is stable across every attempt
-        // *and* known to whoever queued the row, so a queuer can persist the outbound message
-        // before delivery and still match the Message-ID that eventually goes out.
-        let idempotency_key = queued.idempotency_key.clone();
-        // A payload that will not deserialize will not deserialize on the fifth attempt either.
-        let email: OutboundEmail = serde_json::from_value(queued.payload)
-            .map_err(|error| DeliveryFailure::Permanent(error.to_string()))?;
-
-        let internal = self
-            .thread_use_cases
-            .prepare_internal_channel_delivery(email.clone(), Some(&idempotency_key))
-            .await
-            .map_err(DeliveryFailure::retryable)?;
-
-        if let Some(sent) = internal {
-            self.thread_use_cases
-                .record_outreach_outbound_message(outbox_id, &sent)
-                .await
-                .map_err(DeliveryFailure::retryable)?;
-            let ingest = self
-                .thread_use_cases
-                .ingest_prepared_internal_message(&sent)
-                .await
-                .map_err(DeliveryFailure::retryable)?;
-            if !ingest.accepted {
-                return Err(DeliveryFailure::Retryable(
-                    ingest
-                        .reason()
-                        .unwrap_or("Internal channel delivery was rejected")
-                        .to_string(),
-                ));
-            }
-            info!(
-                "Delivered outreach outbox {} through trusted internal channel transport",
-                outbox_id
-            );
-            return Ok(sent.outbound_message_id);
-        }
-
-        let sent = self
-            .thread_use_cases
-            .mail_dispatcher()
-            .send_idempotent(email, &idempotency_key)
-            .await
-            .map_err(DeliveryFailure::retryable)?;
-        // The email is out; failing to log it in the thread must not re-send it.
-        if let Err(error) = self
-            .thread_use_cases
-            .record_outreach_outbound_message(outbox_id, &sent)
-            .await
-        {
-            warn!(
-                "Failed to record sent outreach outbox {} in thread history: {}",
-                outbox_id, error
-            );
-        }
-        Ok(sent.outbound_message_id)
-    }
-
     /// Ask a human what to do about outreaches that ran out of time below their response quorum.
     pub async fn check_quorum_timeouts(&self) -> Result<(), String> {
         let now = chrono::Utc::now();
@@ -946,13 +766,23 @@ impl TaskWorker {
             outreach.task_id, current_percent, outreach.required_threshold_percent
         );
 
+        let Some(thread_id) = task.thread_id else {
+            // The approval is written into the thread it concerns before it is mailed, so a task
+            // with none has nowhere to raise it. Every production path that can reach a quorum
+            // timeout runs on a thread; saying so is what keeps that assumption checkable.
+            warn!(
+                task_id = %task.id,
+                "Cannot raise a quorum-timeout approval for a task with no thread"
+            );
+            return Ok(());
+        };
         let subject = ApprovalSubject {
             company_id: task.company_id,
             channel_id: task.channel_id,
             channel_name: channel.name.clone(),
             channel_slug: channel.slug.clone(),
             company_slug: company.slug.clone(),
-            thread_id: task.thread_id,
+            thread_id,
             // The sweep holds no lease: this task is already parked awaiting third-party replies,
             // and the quorum timeout is what moves it on to awaiting a human.
             suspension: Some(TaskSuspension::AlreadySuspended { task_id: task.id }),
@@ -1160,6 +990,17 @@ impl TaskWorker {
                     "Idempotency Guard: schedule '{}' already answered in thread {}, skipping the agent",
                     payload.schedule_name, payload.thread_id
                 );
+                // The answer stands; only the delivery may have been what failed. Queued on its
+                // own here, against the message that already exists, and absorbed by its
+                // idempotency key when the previous attempt did get that far.
+                self.queue_scheduled_delivery(
+                    task,
+                    &payload,
+                    &context,
+                    existing.canonical_id,
+                    &existing.clean_text_body,
+                )
+                .await?;
                 existing.clean_text_body
             }
             None => {
@@ -1189,9 +1030,7 @@ impl TaskWorker {
                 .await;
         }
 
-        self.deliver_scheduled_reply(task, &payload, &context, &answer)
-            .await
-            .map_err(RunFailure::from)
+        Ok(())
     }
 
     /// Everything a scheduled run needs loaded before the agent can be built.
@@ -1307,7 +1146,12 @@ impl TaskWorker {
         Ok(output.content)
     }
 
-    /// Record the answer in the schedule's thread, threaded onto the prompt that asked for it.
+    /// Record the answer in the schedule's thread, together with the mail it goes out as.
+    ///
+    /// One transaction. The pair used to be two calls with the memory write between them, so a
+    /// crash in the middle left a thread showing an answer that nobody would ever be sent -- and
+    /// the retry's idempotency guard then found the answer, skipped the agent, and had to be
+    /// trusted to reach the send on its own.
     async fn save_scheduled_reply(
         &self,
         task: &BackgroundTask,
@@ -1332,25 +1176,56 @@ impl TaskWorker {
             task.correlation_id,
         );
 
+        let deliveries = self
+            .scheduled_delivery(task, payload, context, message.id, answer)
+            .await?
+            .into_iter()
+            .collect::<Vec<_>>();
+
         self.thread_use_cases
-            .save_message(&message)
+            .save_message_with_deliveries(&message, &deliveries)
             .await
             .map_err(|e| e.to_string())?;
-
         Ok(())
     }
 
-    /// Queue the answer for email, when the schedule delivers anywhere beyond its mailbox. The
-    /// idempotency key makes this safe to reach on a retry that skipped the agent.
-    async fn deliver_scheduled_reply(
+    /// Queue the mail for an answer that is already stored.
+    async fn queue_scheduled_delivery(
         &self,
         task: &BackgroundTask,
         payload: &ScheduledRunPayload,
         context: &ScheduledRunContext,
+        message_id: CanonicalMessageId,
         answer: &str,
     ) -> Result<(), String> {
-        if !payload.wants_email() {
+        let Some(delivery) = self
+            .scheduled_delivery(task, payload, context, message_id, answer)
+            .await?
+        else {
             return Ok(());
+        };
+        self.thread_use_cases
+            .task_persistence()
+            .enqueue_delivery(delivery)
+            .await
+            .map_err(|error| error.to_string())?;
+        Ok(())
+    }
+
+    /// The mail a scheduled answer goes out as, when the schedule asked for one.
+    ///
+    /// `None` when the schedule delivers only into its own mailbox, or when it asked for email and
+    /// resolved no recipient at all -- which is a misconfiguration to log rather than a run to fail.
+    async fn scheduled_delivery(
+        &self,
+        task: &BackgroundTask,
+        payload: &ScheduledRunPayload,
+        context: &ScheduledRunContext,
+        message_id: CanonicalMessageId,
+        answer: &str,
+    ) -> Result<Option<NewDelivery>, String> {
+        if !payload.wants_email() {
+            return Ok(None);
         }
 
         let ScheduledRunContext {
@@ -1363,43 +1238,54 @@ impl TaskWorker {
                 "Schedule '{}' asked for email delivery but resolved no recipients",
                 payload.schedule_name
             );
-            return Ok(());
+            return Ok(None);
         };
 
-        let reply_message_id = scheduled_reply_message_id(task.id, &self.config.app_domain_name);
-        let outbound_email = OutboundEmail {
-            channel_id: channel.id,
-            channel_name: channel.name.clone(),
-            channel_slug: channel.slug.clone(),
-            company_slug: company.slug.clone(),
-            trigger_message_id: scheduled_thread_root_message_id(
-                payload,
-                &self.config.app_domain_name,
-            ),
-            thread_references: vec![reply_message_id],
+        let context = EmailDeliveryContext {
+            from: Channel::address_for(&channel.slug, &company.slug, &self.config.app_domain_name),
+            from_name: Some(channel.name.clone()),
             recipient_to: primary_to.clone(),
             recipients_cc: cc_list.to_vec(),
-            subject: reply_subject(&payload.subject),
-            body_text: agent_response_email_body(answer),
-            hop_count: 0,
-            trace_channels: vec![channel.id],
-            correlation_id: task.correlation_id,
+            in_reply_to: Some(scheduled_thread_root_message_id(
+                payload,
+                &self.config.app_domain_name,
+            )),
+            references: vec![scheduled_reply_message_id(
+                task.id,
+                &self.config.app_domain_name,
+            )],
+            // A schedule's answer starts its own conversation rather than continuing an inbound
+            // one, so it opens the hop budget rather than inheriting a spent one.
+            relay: Some(EmailRelayTrace {
+                source_channel_id: channel.id,
+                hop_count: 0,
+                trace_channels: vec![channel.id],
+            }),
         };
 
-        self.task_persistence
-            .enqueue_outbound_send(OutboundSend {
+        let content = CanonicalContent::parse(
+            reply_subject(&payload.subject),
+            agent_response_email_body(answer),
+        )
+        .map_err(|error| error.to_string())?;
+
+        self.thread_use_cases
+            .compose_delivery(DeliveryRequest {
                 company_id: company.id,
                 channel_id: channel.id,
+                message_id,
                 task_id: Some(task.id),
                 correlation_id: task.correlation_id,
-                idempotency_key: format!("task:{}:scheduled-email", task.id),
-                payload: serde_json::to_value(&outbound_email)
-                    .map_err(|e| format!("Serialization error: {e}"))?,
+                purpose: DeliveryPurpose::Notification,
+                // The task, so a retry that skipped the agent re-derives the key the first attempt
+                // used and is absorbed rather than mailing the digest twice.
+                source_key: format!("task:{}:scheduled-email", task.id),
+                content: &content,
+                context: DeliveryContext::Email(context),
             })
             .await
-            .map_err(|e| e.to_string())?;
-
-        Ok(())
+            .map(|composed| Some(composed.delivery))
+            .map_err(|error| error.to_string())
     }
 
     /// Who the answer is emailed to: the schedule's own list, or the channel's participants with
@@ -1451,7 +1337,7 @@ impl TaskWorker {
             );
         }
 
-        // One span for the whole run, so every event the agent, its tools and the outbox emit
+        // One span for the whole run, so every event the agent and its tools emit
         // underneath it carries the chain without each of them having to know about it.
         let run_span = tracing::info_span!(
             "task-run",
@@ -1559,51 +1445,67 @@ impl TaskWorker {
             return Ok(());
         };
 
-        let stop_email = OutboundEmail {
-            channel_id: channel.id,
-            channel_name: channel.name.clone(),
-            channel_slug: channel.slug.clone(),
-            company_slug: company.slug.clone(),
-            trigger_message_id: reply_to
-                .rfc_message_id
-                .clone()
-                .unwrap_or_else(|| reply_to.canonical_id.to_string().into()),
-            thread_references: reply_to.references.clone(),
+        let subject = format!("[STOPPED] Re: {}", thread.subject);
+        let body = format!(
+            "Notice: The automated channel processing for thread '{}' has been manually stopped \
+             by the system administrator.",
+            thread.subject
+        );
+
+        // The notice is a message in the thread first and a delivery second. It used to be neither
+        // -- it was composed, sent fire-and-forget, and left no trace anyone reading the thread
+        // could see -- which meant a stopped task looked, in the app, exactly like one still
+        // thinking.
+        let message = MessageWrite::internal(
+            thread_id,
+            MessageAuthorWrite::Platform,
+            subject.clone(),
+            body.clone(),
+            MessageDirection::Outbound,
+            MessageRole::System,
+            task.correlation_id,
+        );
+
+        let context = EmailDeliveryContext {
+            from: Channel::address_for(&channel.slug, &company.slug, &self.config.app_domain_name),
+            from_name: Some(channel.name.clone()),
             recipient_to: recipient,
             recipients_cc: reply_to.cc.clone(),
-            subject: format!("[STOPPED] Re: {}", thread.subject),
-            body_text: format!(
-                "Notice: The automated channel processing for thread '{}' has been manually \
-                 stopped by the system administrator.",
-                thread.subject
+            in_reply_to: Some(
+                reply_to
+                    .rfc_message_id
+                    .clone()
+                    .unwrap_or_else(|| reply_to.canonical_id.to_string().into()),
             ),
-            // The notice ends the chain rather than continuing it, so it takes no further hop and
-            // traces through no channel: nothing may answer it.
-            hop_count: 0,
-            trace_channels: Vec::new(),
-            correlation_id: task.correlation_id,
+            references: reply_to.references.clone(),
+            // The notice ends the chain rather than continuing it: with no relay trace it carries
+            // no hop count and no channel id, so nothing on the receiving side may answer it.
+            relay: None,
         };
 
-        match self
+        let content = CanonicalContent::parse(subject, body).map_err(|error| error.to_string())?;
+        let delivery = self
             .thread_use_cases
-            .prepare_internal_channel_delivery(stop_email.clone(), None)
+            .compose_delivery(DeliveryRequest {
+                company_id: company.id,
+                channel_id: channel.id,
+                message_id: message.id,
+                task_id: Some(task.id),
+                correlation_id: task.correlation_id,
+                purpose: DeliveryPurpose::Notification,
+                // Keyed on the task, so stopping an already-stopped task does not send a second
+                // notice.
+                source_key: format!("task:{}:stopped", task.id),
+                content: &content,
+                context: DeliveryContext::Email(context),
+            })
             .await
-        {
-            Ok(Some(prepared)) => {
-                let _ = self
-                    .thread_use_cases
-                    .ingest_prepared_internal_message(&prepared)
-                    .await;
-            }
-            Ok(None) => {
-                let _ = self
-                    .thread_use_cases
-                    .mail_dispatcher()
-                    .send(stop_email)
-                    .await;
-            }
-            Err(error) => warn!(%error, "Could not prepare a stop notification"),
-        }
+            .map_err(|error| error.to_string())?;
+
+        self.thread_use_cases
+            .save_message_with_deliveries(&message, &[delivery.delivery])
+            .await
+            .map_err(|error| error.to_string())?;
         Ok(())
     }
 
@@ -1848,9 +1750,10 @@ mod tests {
         renewals: Mutex<usize>,
         /// How many renewals to grant before reporting the lease gone. `None` grants every one.
         renewals_before_loss: Option<usize>,
-        /// Emails queued for delivery. The trait's default discards them, which would let a test
-        /// claiming a send happened pass without one.
-        outbound_sends: Mutex<Vec<OutboundSend>>,
+        /// Deliveries queued on their own -- a scheduled digest whose answer was already stored.
+        /// The trait's default refuses, which would let a test claiming a send happened fail for
+        /// the wrong reason.
+        queued_deliveries: Mutex<Vec<NewDelivery>>,
     }
 
     #[async_trait]
@@ -1858,7 +1761,7 @@ mod tests {
         /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
         async fn record_outreach_request_message(
             &self,
-            _outbox_id: Uuid,
+            _delivery_id: crate::entities::transport::DeliveryId,
             _write: &crate::use_cases::thread::MessageWrite,
         ) -> AppResult<crate::entities::message::CanonicalMessageId> {
             unreachable!("no fixture here sends an outreach")
@@ -1895,13 +1798,18 @@ mod tests {
             commit: AgentDispatchCommit<'_>,
         ) -> AppResult<DispatchCommit> {
             let _ = commit;
-            Ok(DispatchCommit::Committed { outbox_id: None })
+            Ok(DispatchCommit::Committed {
+                deliveries: Vec::new(),
+            })
         }
 
-        async fn enqueue_outbound_send(&self, send: OutboundSend) -> AppResult<Option<Uuid>> {
-            let id = Uuid::new_v4();
-            self.outbound_sends.lock().unwrap().push(send);
-            Ok(Some(id))
+        async fn enqueue_delivery(
+            &self,
+            delivery: NewDelivery,
+        ) -> AppResult<crate::transport::DeliveryCreation> {
+            let created = crate::transport::DeliveryCreation::Created(delivery.id);
+            self.queued_deliveries.lock().unwrap().push(delivery);
+            Ok(created)
         }
 
         async fn renew_task_lease(
@@ -3091,11 +2999,16 @@ mod tests {
             "a retry must not append a second answer"
         );
 
-        // Delivery still ran, addressed from the schedule's own recipient list.
-        let sends = task_persistence.outbound_sends.lock().unwrap();
-        assert_eq!(sends.len(), 1);
-        let email: OutboundEmail = serde_json::from_value(sends[0].payload.clone()).unwrap();
-        assert_eq!(email.recipient_to, EmailAddress::from("ops@example.com"));
+        // Delivery still ran, addressed from the schedule's own recipient list -- and it was
+        // queued on its own rather than with a second copy of the answer, because the answer was
+        // already there.
+        let queued = task_persistence.queued_deliveries.lock().unwrap();
+        assert_eq!(queued.len(), 1);
+        let email = frozen_email(&queued[0]);
+        assert_eq!(
+            email.recipients_to,
+            vec![EmailAddress::from("ops@example.com")]
+        );
         assert_eq!(
             email.recipients_cc,
             vec![EmailAddress::from("cc@example.com")]
@@ -3105,6 +3018,27 @@ mod tests {
             "Audit complete: nothing to report.\n\nDone by busybots.net"
         );
         assert_eq!(email.subject, "Re: Audit Report");
+        // Keyed on the task, so the retry that skipped the agent re-derived the first attempt's
+        // key rather than mailing the digest twice.
+        assert!(
+            queued[0]
+                .idempotency_key
+                .as_str()
+                .contains("scheduled-email"),
+            "{}",
+            queued[0].idempotency_key
+        );
+    }
+
+    /// The one part an email delivery freezes, decoded back into the adapter's own shape.
+    fn frozen_email(delivery: &NewDelivery) -> crate::adapters::protocols::email::OutboundEmailV1 {
+        delivery.parts[0]
+            .payload
+            .decode(
+                crate::entities::transport::TransportKind::Email,
+                crate::adapters::protocols::email::OUTBOUND_EMAIL_VERSION,
+            )
+            .expect("the email renderer froze this part")
     }
 
     #[test]

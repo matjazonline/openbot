@@ -120,7 +120,7 @@ Do not weaken these patterns while refactoring adjacent persistence code:
 - completion, failure, payload replacement, and lease renewal stay conditional on the current
   worker owning a live lease;
 - approval consumption stays atomic, status-checked, and expiry-checked;
-- approval, outreach, task, and outbox changes that must agree stay transactionally grouped;
+- approval, outreach, task, and delivery changes that must agree stay transactionally grouped;
 - message deduplication verifies the canonical content hash before reusing an existing message id;
 - dynamic list filters remain bound parameters (for example through `QueryBuilder`), never string
   interpolation; and
@@ -294,9 +294,9 @@ let Some(pool) = test_pool().await else { return };
 `test_pool` (`test_support.rs`) resolves `TEST_DATABASE_URL`, or else redirects `DATABASE_URL` onto
 its `_test` sibling, and applies the migrations once per test binary. **Never point these tests at
 the development database.** The queue operations they exercise are unscoped on purpose —
-`claim_pending_tasks` and `claim_outbox_emails` sweep every row, because that is what a worker does —
+`claim_pending_tasks` and `claim_deliveries` sweep every row, because that is what a worker does —
 so against your dev database a test run competes with any `cargo run` server polling the same queues
-twice a second, and `reap_expired_outbox_leases` can mark real deliveries failed.
+twice a second, and `reap_expired_deliveries` can charge real deliveries an attempt.
 
 Create the database once:
 
@@ -344,14 +344,15 @@ one — so a new DB-backed test has to be written to tolerate that:
 - **Do not assert that your row is still `pending`, or still unclaimed.** That asserts no unscoped
   claim ran in between, which is not a property this code has. Either drop the status from the
   assertion — `approval_lookup_is_scoped_and_token_is_consumed_once` counts its notification by
-  `idempotency_key` alone — or put the row out of reach first: `claim_outbox_emails` only takes rows
+  `idempotency_key` alone — or put the row out of reach first: `claim_deliveries` only takes rows
   whose `available_at` has arrived, so pushing that forward excludes it from every claim set without
   touching the columns under test.
 - **If you must call a real claim, make it deterministic and give back what is not yours.** Both
   claims order by their due column, so backdating your own row sorts it ahead of every neighbour and
   a `LIMIT 1` then takes precisely it. Where a claim can still catch a foreign row —
-  `only_one_worker_queues_an_outbound_send` runs two concurrent claims, so the second is guaranteed
-  to — release it back to `pending` with its worker and lease cleared. A test that leaves a
+  `two_claimants_never_own_the_same_delivery` runs two concurrent claims, so the second is
+  guaranteed to — release it back to `pending` with its worker and lease cleared. The delivery
+  tests keep `claim_mine` and `release_foreign` for exactly this. A test that leaves a
   five-minute lease on someone else's row makes *their* test fail, several files away.
 - **Leave no claimable residue.** A test that creates a globally claimable queue row must complete
   it, delete its owner when safe, or move it beyond the claim horizon before releasing the test
@@ -370,9 +371,9 @@ one — so a new DB-backed test has to be written to tolerate that:
 If a test still cannot be isolated, run just that test rather than reaching for `--test-threads=1`
 for the whole suite — serialising everything hides the next isolation bug instead of surfacing it.
 
-This blind spot is not hypothetical: `find_outbound_reply_excludes_outreach_outbox_messages` in
+This blind spot is not hypothetical: `find_outbound_reply_excludes_outreach_messages` in
 `thread.rs` had three INSERTs naming columns that no migration creates (`task_outreaches.target_count`,
-`email_outbox.channel_id`, `task_outreach_targets.id`) and failed unnoticed because CI never sets
+the outbox's `channel_id`, `task_outreach_targets.id`) and failed unnoticed because CI never sets
 `DATABASE_URL`.
 
 Finally, extend the round-trip assertion rather than only adding the field. A model change is not
@@ -385,9 +386,9 @@ then re-read, as `postgres_channel_persistence_works` does for `enabled`. A fiel
 The runtime queries in step 7 have no compile-time check, so the *reader* is the type system.
 Optional syntax that a human has to reconstruct is not worth the keystrokes it saves.
 
-**Always write `AS` for a table alias.** `UPDATE email_outbox outbox` (`task.rs:854`) reads as two
-table names before it reads as one aliased one; `UPDATE background_tasks AS task` (`task.rs:1171`) —
-the same query shape, three hundred lines away — does not. Same rule for `FROM` and `JOIN` targets
+**Always write `AS` for a table alias.** `UPDATE email_outbox outbox` read as two table names
+before it read as one aliased one; `UPDATE background_tasks AS task` — the same query shape, three
+hundred lines away — does not. Same rule for `FROM` and `JOIN` targets
 and for CTE column lists. Column aliases in the `SELECT` list already use `AS` throughout
 (`em.sender::text AS sender`, `CASE ch.access_mode ... END AS participant_emails`); table aliases get
 the same treatment.
@@ -397,7 +398,7 @@ tm.email_message_id` forces the reader to hold a decoder ring for the length of 
 ring is per-query — `a` is `agents` in `agent.rs:100` and `accepted` in `company_invite.rs:196`. The
 anti-examples are `t`/`tm` (`thread.rs:129,138`), `ch`/`cs`/`cp`/`ca` (`channel.rs:57-83`) and
 `i`/`a`/`m` (`company_invite.rs`). The model to copy is `task.rs`: `task_outreaches AS outreach`,
-`email_outbox AS outbox`, `task_outreach_targets AS target`.
+`message_deliveries AS delivery`, `task_outreach_targets AS target`.
 
 These aliases leak. The shared `SELECT` consts from step 3 are `format!`ed into a `WHERE`/`JOIN`
 clause at thirteen call sites that spell the alias themselves —

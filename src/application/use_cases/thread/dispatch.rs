@@ -4,8 +4,8 @@
 //!
 //! 1. [`ThreadUseCases::run_agents`] — run each matched channel's agent, threading each step's
 //!    output into the next as upstream pipeline context.
-//! 2. [`ThreadUseCases::deliver_agent_response`] — send the combined reply (or fabricate a
-//!    simulated delivery when the caller is only testing).
+//! 2. [`ThreadUseCases::plan_agent_deliveries`] — freeze what the combined reply will be sent as
+//!    (or nothing at all, when the caller is only testing).
 //! 3. [`ThreadUseCases::record_dispatch_outcome`] — persist outbound messages and close out the
 //!    task, failing it loudly if the primary agent errored.
 
@@ -17,9 +17,7 @@ use uuid::Uuid;
 use crate::entities::task::{TaskLeaseRef, TaskSuspension};
 
 use crate::{
-    adapters::persistence::task::{
-        AgentDispatchCommit, DispatchCommit, OutboundSend, TASK_LEASE_SECONDS,
-    },
+    adapters::persistence::task::{AgentDispatchCommit, DispatchCommit, TASK_LEASE_SECONDS},
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
@@ -38,10 +36,13 @@ use crate::{
             AgentExecutionDisposition, AgentRunner, ResolvedAgentParams, resolve_agent_params,
         },
         memory_coordinator::{MemoryPersistInput, MemoryRecallAudience, MemoryRecallInput},
-        outbound_dispatcher::{OutboundEmail, SentEmailResult, agent_response_email_body},
+        outbound_dispatcher::agent_response_email_body,
         outreach_tool::OutreachToolContext,
     },
-    transport::InboundEnvelope,
+    transport::{
+        CanonicalContent, DeliveryContext, DeliveryPurpose, DeliveryRequest, EmailDeliveryContext,
+        EmailRelayTrace, InboundEnvelope, NewDelivery,
+    },
 };
 
 use super::{
@@ -55,17 +56,18 @@ use super::{
 ///
 /// Replaces a `send_email: bool` crossed with `ingest.task_id: Option<Uuid>`. That matrix had two
 /// combinations nothing could mean -- a durable send with no task to key it on, and a simulated
-/// send that still queued an outbox row -- and both compiled. Here the task id lives inside the one
+/// send that still queued a delivery -- and both compiled. Here the task id lives inside the one
 /// variant that has one, so a durable send cannot be requested without it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReplyDeliveryMode {
     /// The agents run and their answer is recorded, but nothing is handed to a transport: a
     /// mailbox send the user marked as a test, or a simulation.
     Simulated,
-    /// Nothing durable to key an idempotent send on, so the send happens inline in this call.
-    /// Only a direct ingest with no task row takes this path.
+    /// No task row to key an idempotent send on: a direct ingest. The delivery is still durable
+    /// and still queued -- what it lacks is a stable key across re-runs, because there is no
+    /// re-run to survive.
     Direct,
-    /// Queued in the same transaction as the reply and delivered by the outbox poller, under a key
+    /// Queued in the same transaction as the reply and drained by the delivery worker, under a key
     /// derived from the task so two workers racing the same task queue one send.
     Durable { task_id: Uuid },
 }
@@ -83,9 +85,18 @@ impl ReplyDeliveryMode {
         }
     }
 
-    /// Whether anything is actually handed to a transport.
-    const fn reaches_a_transport(self) -> bool {
-        !matches!(self, Self::Simulated)
+    /// What makes this reply's delivery unique across retries of the same work.
+    ///
+    /// The *task*, not the message, for durable work: a superseded run re-executing the task mints
+    /// a fresh canonical message id, so a message-derived key would let the replacement run queue
+    /// a second copy of the same answer. A direct ingest is never re-run, so its own message is as
+    /// stable as anything it has.
+    fn source_key(self, message_id: CanonicalMessageId) -> Option<String> {
+        match self {
+            Self::Simulated => None,
+            Self::Direct => Some(format!("message:{message_id}")),
+            Self::Durable { task_id } => Some(format!("task:{task_id}:reply")),
+        }
     }
 }
 
@@ -181,12 +192,12 @@ pub enum DispatchOutcome {
 
 /// One dispatch's result, worked out but not yet written.
 ///
-/// Kept together because the three parts are one effect: the messages describe the reply, the
-/// outbound send delivers it, and both are derived from the same `delivery`.
+/// Kept together because the three parts are one effect: the message describes the reply, the
+/// deliveries carry it, and both are derived from the same `delivery`.
 struct PreparedDispatch {
     delivery: OutboundDelivery,
-    /// `None` for a simulated run, and for a task-less caller that already sent inline.
-    outbound: Option<OutboundSend>,
+    /// Empty for a simulated run, which answers in the thread and sends nothing.
+    deliveries: Vec<NewDelivery>,
     reply: AgentReply,
 }
 
@@ -202,12 +213,10 @@ pub struct AgentReply {
 
 /// The outbound side of the reply, real or simulated.
 ///
-/// What the *message* takes from a delivery, and nothing else. The addresses, the RFC ids and the
-/// recipient lines used to travel through here on their way onto the stored reply; they now stop
-/// at the delivery intent, which is where a fact about how an answer was sent belongs.
+/// One fact, because one fact is all that is left: the addresses, the RFC ids and the recipient
+/// lines used to travel through here on their way onto the stored reply, and they now stop at the
+/// delivery that carries them -- which is where a fact about how an answer was sent belongs.
 struct OutboundDelivery {
-    /// The subject the answer went out under, which is also the subject it is filed under.
-    subject: String,
     /// Whether anything was really handed to a transport. A simulated run answers in the thread
     /// and sends nothing, and the audit payload has to be able to say so.
     email_sent: bool,
@@ -295,8 +304,8 @@ impl ThreadUseCases {
             return Ok(DispatchOutcome::Suspended);
         };
 
-        // Nothing is committed for a failed run. The reply, the thread messages and the outbox
-        // row are one logical effect: if any matched agent failed, none of them may land, or a
+        // Nothing is committed for a failed run. The reply, the thread messages and the delivery
+        // are one logical effect: if any matched agent failed, none of them may land, or a
         // retry would deliver a second, contradictory answer into the same thread.
         if let Some(error) = run.failure {
             return Err(error);
@@ -304,24 +313,33 @@ impl ThreadUseCases {
 
         let response = self.combine_responses(&run.outputs);
         let metadata = combine_metadata(&run.outputs);
-        let (delivery, outbound) = self
-            .deliver_agent_response(AgentDelivery {
-                matches: &matches,
-                envelope,
-                ingest,
-                lease,
-                response: &response,
-                mode,
-                correlation_id,
-            })
-            .await?;
+        // The reply is built before its deliveries, not after: a delivery names the canonical
+        // message it exposes, and that id is minted here so the message and the queue rows can be
+        // written in one transaction.
         let reply = Self::agent_reply_write(
             &matches,
             run.primary_agent.as_ref(),
-            &delivery,
+            reply_subject(envelope.content.subject()),
             &response,
             correlation_id,
         )?;
+        let deliveries = self
+            .plan_agent_deliveries(
+                AgentDelivery {
+                    matches: &matches,
+                    envelope,
+                    ingest,
+                    lease,
+                    response: &response,
+                    mode,
+                    correlation_id,
+                },
+                &reply,
+            )
+            .await?;
+        let delivery = OutboundDelivery {
+            email_sent: !deliveries.is_empty(),
+        };
 
         let reply_message_id = reply.message.id;
         let email_sent = delivery.email_sent;
@@ -332,7 +350,7 @@ impl ThreadUseCases {
             run: &run,
             commit: PreparedDispatch {
                 delivery,
-                outbound,
+                deliveries,
                 reply,
             },
             response: &response,
@@ -468,6 +486,7 @@ impl ThreadUseCases {
                         runner = runner.outreach_tool(
                             self.task_persistence.clone(),
                             self.channel_persistence.clone(),
+                            self.deliveries.clone(),
                             self.outreach_context_for(
                                 channel_match,
                                 envelope,
@@ -544,7 +563,7 @@ impl ThreadUseCases {
                 Err(err) => {
                     // Deliberately no `AgentOutput`: a provider failure is an operational fact,
                     // not something an agent said. Pushing it here is how it used to reach the
-                    // reply body, the thread history and the outbox.
+                    // reply body, the thread history and the delivery queue.
                     if run.failure.is_none() {
                         run.failure = Some(err);
                     }
@@ -652,7 +671,7 @@ impl ThreadUseCases {
             channel_name: channel_match.channel.name.clone(),
             channel_slug: channel_match.reply_slug(),
             company_slug: channel_match.company.slug.clone(),
-            thread_id: Some(channel_match.thread.id),
+            thread_id: channel_match.thread.id,
             // Only a task-driven run has a task to park; a direct ingest has no task row at
             // all. When it does, it parks itself under its own lease.
             correlation_id,
@@ -678,6 +697,7 @@ impl ThreadUseCases {
             worker_id,
             company_id: channel_match.company.id,
             channel_id: channel_match.channel.id,
+            thread_id: channel_match.thread.id,
             channel_name: channel_match.channel.name.clone(),
             channel_slug: channel_match.reply_slug(),
             company_slug: channel_match.company.slug.clone(),
@@ -759,10 +779,23 @@ impl ThreadUseCases {
             .join("\n\n--------------------------------------------------\n\n")
     }
 
-    async fn deliver_agent_response(
+    /// Freeze what the agent's answer will be sent as, without writing anything.
+    ///
+    /// Nothing is sent here and nothing is queued here: the caller commits the returned deliveries
+    /// together with the reply message and the task payload, so the three land or fail as one. The
+    /// delivery worker then sends it, which is why a delivery problem is retried on its own --
+    /// never by re-running the agent, which would mean a second provider call and possibly
+    /// different reply text for the same customer message.
+    ///
+    /// Two workers racing the same task compute the same idempotency key, so the unique index
+    /// admits one delivery -- and because the part key, and through it the outbound `Message-ID`,
+    /// is derived from that same key, the loser's thread write collapses onto the winner's rather
+    /// than duplicating.
+    async fn plan_agent_deliveries(
         &self,
         delivery: AgentDelivery<'_>,
-    ) -> AppResult<(OutboundDelivery, Option<OutboundSend>)> {
+        reply: &AgentReply,
+    ) -> AppResult<Vec<NewDelivery>> {
         let AgentDelivery {
             matches,
             envelope,
@@ -773,34 +806,16 @@ impl ThreadUseCases {
             correlation_id,
         } = delivery;
         let primary = &matches[0];
-        if !mode.reaches_a_transport() {
-            return Ok((self.simulated_delivery(primary, envelope).await?, None));
-        }
-
-        let references = outbound_reference_ids(envelope);
-        let recipients_cc = self.outbound_cc_for(primary, envelope).await?;
-
-        let outbound_email = OutboundEmail {
-            channel_id: primary.channel.id,
-            channel_name: primary.channel.name.clone(),
-            channel_slug: primary.reply_slug(),
-            company_slug: primary.company.slug.clone(),
-            trigger_message_id: trigger_message_id(envelope),
-            thread_references: references.clone(),
-            recipient_to: sender_address(envelope),
-            recipients_cc: recipients_cc
-                .iter()
-                .cloned()
-                .map(EmailAddress::from)
-                .collect(),
-            subject: envelope.content.subject().to_string(),
-            body_text: agent_response_email_body(response),
-            hop_count: envelope.directives.hop_count,
-            trace_channels: envelope.directives.trace_channels.clone(),
-            correlation_id,
+        let Some(source_key) = mode.source_key(reply.message.id) else {
+            info!(
+                channel = %primary.channel.slug,
+                "Simulation test mode (Run_Test): the answer is recorded and nothing is delivered"
+            );
+            return Ok(Vec::new());
         };
 
-        // The lease must still be ours at the moment of sending, or two workers could both reply.
+        // The lease must still be ours at the moment the answer is frozen, or two workers could
+        // both reply.
         if ingest.task_id.is_some() {
             let renewed = self
                 .task_persistence
@@ -816,17 +831,46 @@ impl ThreadUseCases {
             }
         }
 
-        let (sent, pending) = self
-            .prepare_agent_reply(outbound_email, mode, primary.company.id)
-            .await?;
+        let recipients_cc = self.outbound_cc_for(primary, envelope).await?;
+        let context = EmailDeliveryContext {
+            from: crate::entities::channel::Channel::address_for(
+                &primary.reply_slug(),
+                &primary.company.slug,
+                &self.config.app_domain_name,
+            ),
+            from_name: Some(primary.channel.name.clone()),
+            recipient_to: sender_address(envelope),
+            recipients_cc: recipients_cc.into_iter().map(EmailAddress::from).collect(),
+            in_reply_to: Some(trigger_message_id(envelope)),
+            references: outbound_reference_ids(envelope),
+            // An agent's answer continues the chain, so it carries the hop budget: the receiving
+            // side needs it to stop two channels answering each other for ever.
+            relay: Some(EmailRelayTrace {
+                source_channel_id: primary.channel.id,
+                hop_count: envelope.directives.hop_count,
+                trace_channels: envelope.directives.trace_channels.clone(),
+            }),
+        };
 
-        Ok((
-            OutboundDelivery {
-                subject: sent.subject,
-                email_sent: true,
-            },
-            pending,
-        ))
+        let content = CanonicalContent::parse(
+            reply.message.subject.clone(),
+            agent_response_email_body(response),
+        )?;
+        let composed = self
+            .deliveries
+            .compose(DeliveryRequest {
+                company_id: primary.company.id,
+                channel_id: primary.channel.id,
+                message_id: reply.message.id,
+                task_id: ingest.task_id,
+                correlation_id,
+                purpose: DeliveryPurpose::Reply,
+                source_key,
+                content: &content,
+                context: DeliveryContext::Email(context),
+            })
+            .await?;
+        Ok(vec![composed.delivery])
     }
 
     /// Who the agent's reply is copied to: whoever the inbound mail copied, plus this channel's
@@ -882,108 +926,6 @@ impl ThreadUseCases {
         Ok(kept)
     }
 
-    /// Deliver over the trusted in-process transport when the recipient is another platform
-    /// channel, otherwise hand the mail to SMTP.
-    async fn send_or_route_internally(
-        &self,
-        outbound_email: OutboundEmail,
-        idempotency_key: Option<&str>,
-    ) -> AppResult<crate::services::outbound_dispatcher::SentEmailResult> {
-        if let Some(prepared) = self
-            .prepare_internal_channel_delivery(outbound_email.clone(), idempotency_key)
-            .await?
-        {
-            // A redelivery is accepted and returns the first delivery's ids, so there is no
-            // duplicate case to special-case here any more: the commit recognises it.
-            let ingest = self.ingest_prepared_internal_message(&prepared).await?;
-            if !ingest.accepted {
-                return Err(AppError::Internal(
-                    ingest
-                        .reason()
-                        .unwrap_or("Internal channel delivery was rejected")
-                        .to_string(),
-                ));
-            }
-            info!(
-                "Delivered agent response {} through trusted internal channel transport",
-                prepared.outbound_message_id
-            );
-            return Ok(prepared);
-        }
-        match idempotency_key {
-            Some(key) => {
-                self.mail_dispatcher
-                    .send_idempotent(outbound_email, key)
-                    .await
-            }
-            None => self.mail_dispatcher.send(outbound_email).await,
-        }
-    }
-
-    /// Work out how the agent's reply will go out, without writing anything.
-    ///
-    /// Nothing is sent here, and for a task-driven run nothing is queued here either: the caller
-    /// commits the returned [`OutboundSend`] together with the reply messages and the task
-    /// payload, so the three land or fail as one. The poller then delivers it, which is why a
-    /// delivery problem is retried on its own -- never by re-running the agent, which would mean
-    /// a second LLM call and possibly different reply text for the same customer email.
-    ///
-    /// The returned [`SentEmailResult`] is *prepared*, not sent: `prepare_idempotent` derives the
-    /// Message-ID from the same stable key the poller will send under, so the caller can persist
-    /// the outbound message immediately and still match the mail that eventually goes out.
-    ///
-    /// Two workers racing the same task both compute the same key, so the unique index admits one
-    /// row — and because they also compute the same Message-ID, the loser's thread write collapses
-    /// on `ON CONFLICT (company_id, message_id)` rather than duplicating.
-    ///
-    /// A task-less caller (direct ingest) has nothing to key on and sends inline as before, so it
-    /// gets back no pending send.
-    async fn prepare_agent_reply(
-        &self,
-        outbound_email: OutboundEmail,
-        mode: ReplyDeliveryMode,
-        company_id: Uuid,
-    ) -> AppResult<(SentEmailResult, Option<OutboundSend>)> {
-        let ReplyDeliveryMode::Durable { task_id } = mode else {
-            let sent = self.send_or_route_internally(outbound_email, None).await?;
-            return Ok((sent, None));
-        };
-        let idempotency_key = format!("task:{task_id}:agent-reply");
-        let prepared = self
-            .mail_dispatcher
-            .prepare_idempotent(outbound_email.clone(), &idempotency_key)?;
-
-        let pending = OutboundSend {
-            company_id,
-            channel_id: outbound_email.channel_id,
-            task_id: Some(task_id),
-            correlation_id: outbound_email.correlation_id,
-            idempotency_key,
-            payload: serde_json::to_value(&outbound_email).map_err(|error| {
-                AppError::Internal(format!(
-                    "Could not serialise the reply for delivery: {error}"
-                ))
-            })?,
-        };
-
-        Ok((prepared, Some(pending)))
-    }
-
-    async fn simulated_delivery(
-        &self,
-        primary: &ChannelMatch,
-        envelope: &InboundEnvelope,
-    ) -> AppResult<OutboundDelivery> {
-        info!(
-            channel = %primary.channel.slug,
-            "Simulation test mode (Run_Test): skipped SMTP dispatch for the agent reply"
-        );
-        Ok(OutboundDelivery {
-            subject: reply_subject(envelope.content.subject()),
-            email_sent: false,
-        })
-    }
-
     /// The agent's answer, as one canonical message associated with every thread it answered.
     ///
     /// One message, not one per channel. A dispatch that answered three channels' threads used to
@@ -996,13 +938,13 @@ impl ThreadUseCases {
     /// the RFC ids -- belongs to the delivery intent that carries it. A reply that also goes to
     /// Slack is then the same message with a second intent, rather than a second body.
     ///
-    /// Built rather than written: this goes into the dispatch commit alongside the outbox row and
+    /// Built rather than written: this goes into the dispatch commit alongside the deliveries and
     /// the task payload, because a reply visible in a thread but never queued for delivery -- or
     /// queued but invisible -- is worse than neither.
     fn agent_reply_write(
         matches: &[ChannelMatch],
         agent: Option<&Agent>,
-        delivery: &OutboundDelivery,
+        subject: String,
         response: &str,
         correlation_id: CorrelationId,
     ) -> AppResult<AgentReply> {
@@ -1024,7 +966,7 @@ impl ThreadUseCases {
             id: CanonicalMessageId::random(),
             thread_id: primary.thread.id,
             author,
-            subject: delivery.subject.clone(),
+            subject,
             clean_text_body: response.to_string(),
             attachments: Vec::new(),
             direction: MessageDirection::Outbound,
@@ -1047,8 +989,8 @@ impl ThreadUseCases {
         })
     }
 
-    /// Make this dispatch durable: the reply in every thread it answered, the outbox row that
-    /// delivers it, and the audit payload on the task, as one lease-fenced transaction.
+    /// Make this dispatch durable: the reply in every thread it answered, the deliveries that
+    /// carry it, and the audit payload on the task, as one lease-fenced transaction.
     ///
     /// A failed run never reaches here -- it is rejected before delivery -- so this only ever
     /// commits a run that produced a real reply.
@@ -1064,16 +1006,17 @@ impl ThreadUseCases {
         } = input;
         let PreparedDispatch {
             delivery,
-            outbound,
+            deliveries,
             reply,
         } = commit;
 
-        // A task-less caller (direct ingest) has no lease to fence on and no payload to write, so
-        // its reply is stored on its own. It also has no outbox row: it sent inline.
+        // A task-less caller (direct ingest) has no lease to fence on and no payload to write, but
+        // its reply and its delivery still have to land together -- the shape this replaces sent
+        // inline here, so a crash after the provider call left an answer nobody could see.
         let Some(task_id) = ingest.task_id else {
-            let stored = self
+            let (stored, _) = self
                 .thread_persistence
-                .create_message(&reply.message)
+                .create_message_with_deliveries(&reply.message, &deliveries)
                 .await?;
             for thread_id in &reply.also_in_threads {
                 self.thread_persistence
@@ -1098,20 +1041,27 @@ impl ThreadUseCases {
             .commit_agent_dispatch(AgentDispatchCommit {
                 lease,
                 reply: &reply,
-                outbound,
+                deliveries,
                 payload,
                 complete_outreach: true,
             })
             .await?
         {
-            DispatchCommit::Committed { outbox_id } => {
-                match outbox_id {
-                    Some(outbox_id) => {
-                        info!("Queued agent reply for task {task_id} as outbox {outbox_id}")
+            DispatchCommit::Committed { deliveries } => {
+                for created in deliveries {
+                    if created.was_created() {
+                        info!(
+                            task_id = %task_id,
+                            delivery_id = %created.delivery_id(),
+                            "Queued the agent reply for delivery"
+                        );
+                    } else {
+                        warn!(
+                            task_id = %task_id,
+                            delivery_id = %created.delivery_id(),
+                            "The agent reply was already queued; not queueing it again"
+                        );
                     }
-                    None => warn!(
-                        "Agent reply for task {task_id} was already queued or delivered; not queueing again"
-                    ),
                 }
                 Ok(())
             }
@@ -1158,7 +1108,7 @@ impl ThreadUseCases {
             "email_sent": delivery.email_sent,
             // The canonical reply, named by the id it is about to be written under in this same
             // transaction. The mail this run also queued is named by its own delivery key, which
-            // belongs to the outbox row rather than to the message.
+            // belongs to the queue row rather than to the message.
             "reply_message_id": reply.message.id,
             "error": run.failure.as_ref().map(ToString::to_string),
             "token_usage": TokenUsage::new(run.prompt_tokens, run.completion_tokens),
@@ -1399,11 +1349,10 @@ mod agent_reply_tests {
         }
     }
 
-    fn delivery() -> OutboundDelivery {
-        OutboundDelivery {
-            subject: "Re: Hello".into(),
-            email_sent: true,
-        }
+    /// The subject the reply is filed under, which the caller now computes before the reply is
+    /// built rather than reading back off a prepared send.
+    fn reply_subject_fixture() -> String {
+        "Re: Hello".to_string()
     }
 
     /// The heart of it: three channels' threads answered by one canonical message, associated
@@ -1423,7 +1372,7 @@ mod agent_reply_tests {
         let reply = ThreadUseCases::agent_reply_write(
             &matches,
             Some(&responder),
-            &delivery(),
+            reply_subject_fixture(),
             "Here is the answer.",
             CorrelationId::new(),
         )
@@ -1450,7 +1399,7 @@ mod agent_reply_tests {
         let reply = ThreadUseCases::agent_reply_write(
             &matches,
             Some(&agent(agent_id)),
-            &delivery(),
+            reply_subject_fixture(),
             "Answer",
             CorrelationId::new(),
         )
@@ -1475,7 +1424,7 @@ mod agent_reply_tests {
         let reply = ThreadUseCases::agent_reply_write(
             &matches,
             None,
-            &delivery(),
+            reply_subject_fixture(),
             "Answer",
             CorrelationId::new(),
         )
@@ -1495,7 +1444,7 @@ mod agent_reply_tests {
         let reply = ThreadUseCases::agent_reply_write(
             &matches,
             Some(&agent(Uuid::new_v4())),
-            &delivery(),
+            reply_subject_fixture(),
             "Answer",
             CorrelationId::new(),
         )
@@ -1517,7 +1466,7 @@ mod agent_reply_tests {
             ThreadUseCases::agent_reply_write(
                 &[],
                 None,
-                &delivery(),
+                reply_subject_fixture(),
                 "Answer",
                 CorrelationId::new(),
             )

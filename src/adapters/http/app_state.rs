@@ -16,10 +16,12 @@ use crate::{
         memory_worker::MemoryWorker,
         runtime_metrics::{MemoryProviderActivity, RuntimeMetricPersistence},
     },
+    transport::{DeliveryQueue, TransportRegistry},
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
-        company::CompanyUseCases, company_invite::CompanyInviteUseCases, memory::MemoryUseCases,
-        schedule::ScheduleUseCases, thread::ThreadUseCases, user::UserUseCases,
+        company::CompanyUseCases, company_invite::CompanyInviteUseCases, delivery::DeliveryReader,
+        memory::MemoryUseCases, schedule::ScheduleUseCases, thread::ThreadUseCases,
+        user::UserUseCases,
     },
 };
 
@@ -54,6 +56,16 @@ pub struct AppState {
     /// Where a picked file is stored; `None` when no bucket is configured, which is what the
     /// avatar pickers report instead of failing at upload time.
     pub file_storage: Option<Arc<dyn FileStorage>>,
+    /// Which transports this deployment can render for and send through.
+    ///
+    /// Carried on the state because `main` builds the delivery worker from it, and because a
+    /// deployment's registered transports are what the integrations page reports as available.
+    pub transports: Arc<TransportRegistry>,
+    /// Reads the delivery queue for `/ui/deliveries` and the task board's delivery column.
+    pub deliveries: Arc<dyn DeliveryReader>,
+    /// Claims and fences the same queue. Not used by any handler -- `main` builds the delivery
+    /// worker from it, the way it builds the memory worker from `memory_worker`.
+    pub delivery_queue: Arc<dyn DeliveryQueue>,
     /// Committed messages, for the mailbox's live message stream.
     pub events: MailboxEvents,
 }

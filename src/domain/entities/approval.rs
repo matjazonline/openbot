@@ -47,7 +47,13 @@ pub struct HumanApproval {
     pub id: Uuid,
     pub company_id: Uuid,
     pub channel_id: Uuid,
-    pub thread_id: Option<Uuid>,
+    /// The conversation the approval concerns.
+    ///
+    /// Required, not optional: the request is written as a system message in this thread before it
+    /// is mailed, so the people reading the conversation can see that a human was asked. Every
+    /// production caller derives it from a real thread; making it a `Uuid` is what stops a fourth
+    /// one from being written that cannot.
+    pub thread_id: Uuid,
     pub task_id: Option<Uuid>,
     pub step_key: String,
     pub approver_email: String,
@@ -78,7 +84,13 @@ pub struct ApprovalSubject {
     pub channel_name: String,
     pub channel_slug: ChannelSlug,
     pub company_slug: CompanySlug,
-    pub thread_id: Option<Uuid>,
+    /// The conversation the approval concerns.
+    ///
+    /// Required, not optional: the request is written as a system message in this thread before it
+    /// is mailed, so the people reading the conversation can see that a human was asked. Every
+    /// production caller derives it from a real thread; making it a `Uuid` is what stops a fourth
+    /// one from being written that cannot.
+    pub thread_id: Uuid,
     /// Which task this parks if the approval is raised, and on what authority.
     ///
     /// Carries the task id, so nothing is lost against the bare `Option<Uuid>` this replaced --

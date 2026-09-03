@@ -24,12 +24,12 @@ use super::{
 use crate::entities::{
     company::Company,
     dashboard::{
-        AttemptStats, DashboardSnapshot, DashboardWindow, LatencyBucket, OUTSTANDING_LIMIT,
-        OutboxHealth, OutstandingTask, ProcessGauges, RetryRateBucket, TaskQueueHealth,
+        AttemptStats, DashboardSnapshot, DashboardWindow, DeliveryHealth, LatencyBucket,
+        OUTSTANDING_LIMIT, OutstandingTask, ProcessGauges, RetryRateBucket, TaskQueueHealth,
     },
-    outbox::OutboxStatus,
     runtime_metrics::{MachineIdentity, RuntimeMetricSnapshot},
     task::TaskStatus,
+    transport::DeliveryStatus,
 };
 use crate::services::database_query_health::DatabaseQueryHealth;
 
@@ -186,7 +186,7 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
                 <h2 class="mb-3 text-lg font-semibold">Queues right now</h2>
                 <div class="flex flex-col gap-3">
                     {tasks}
-                    {outbox}
+                    {deliveries}
                     {outstanding}
                 </div>
             </div>
@@ -205,9 +205,9 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
         </div>
         "##,
         chart_style = chart::STYLE,
-        alerts = health_alerts(&page.snapshot.tasks, &page.snapshot.outbox),
+        alerts = health_alerts(&page.snapshot.tasks, &page.snapshot.deliveries),
         tasks = task_queue_panel(&page.snapshot.tasks, linked_company),
-        outbox = outbox_panel(&page.snapshot.outbox, linked_company),
+        deliveries = delivery_panel(&page.snapshot.deliveries, linked_company),
         outstanding = outstanding_panel(page),
         window_label = page.window.label(),
         attempts = attempt_panel(&page.snapshot.attempts),
@@ -223,9 +223,10 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
 /// The two conditions worth interrupting someone over, shown only when they are non-zero.
 ///
 /// A stalled task is a lease nobody is renewing: the row will be re-claimed and its agent will run
-/// a second time, having already had its effects. An expired delivery lease is a send that will be
-/// failed by the reaper without anyone knowing whether it went out.
-fn health_alerts(tasks: &TaskQueueHealth, outbox: &OutboxHealth) -> String {
+/// a second time, having already had its effects. An expired delivery lease is a send the sweep
+/// will charge an attempt for without anyone knowing whether it went out, and an unconfirmed
+/// outcome is one nothing will ever retry.
+fn health_alerts(tasks: &TaskQueueHealth, deliveries: &DeliveryHealth) -> String {
     let mut alerts = String::new();
 
     if tasks.stalled > 0 {
@@ -239,18 +240,33 @@ fn health_alerts(tasks: &TaskQueueHealth, outbox: &OutboxHealth) -> String {
         ));
     }
 
-    if outbox.expired_leases > 0 {
+    if deliveries.expired_leases > 0 {
         alerts.push_str(&alert_row(
             &format!(
                 "{} deliver{} past its lease",
-                outbox.expired_leases,
-                if outbox.expired_leases == 1 {
+                deliveries.expired_leases,
+                if deliveries.expired_leases == 1 {
                     "y"
                 } else {
                     "ies"
                 }
             ),
-            "The next maintenance pass will fail these without a delivery result.",
+            "The next sweep will charge each an attempt without a provider result.",
+        ));
+    }
+
+    // Nothing retries these, by design: an ambiguous provider outcome is exactly what must not be
+    // re-sent. They are therefore stuck until a human or a reconciler clears them, which is why
+    // they are worth interrupting someone over.
+    let unconfirmed = deliveries.count_of(DeliveryStatus::OutcomeUnknown);
+    if unconfirmed > 0 {
+        alerts.push_str(&alert_row(
+            &format!(
+                "{} deliver{} with an unconfirmed provider outcome",
+                unconfirmed,
+                if unconfirmed == 1 { "y" } else { "ies" }
+            ),
+            "Nothing will retry these -- re-sending is how a duplicate is created. They need              reconciling by hand.",
         ));
     }
 
@@ -517,22 +533,29 @@ fn task_queue_panel(tasks: &TaskQueueHealth, company_id: Option<Uuid>) -> String
     )
 }
 
-fn outbox_panel(outbox: &OutboxHealth, company_id: Option<Uuid>) -> String {
-    let link = company_id.map(|company_id| format!("/ui/outbox?company_id={company_id}"));
-    let failed = outbox.count_of(OutboxStatus::Failed);
+/// The delivery queue, transport-neutral.
+///
+/// "Unconfirmed" gets a column of its own rather than being folded into the failures: nothing
+/// retries an ambiguous provider outcome -- doing so is how one message becomes two -- so it is a
+/// distinct thing for a human to resolve, and a panel that could not tell it from a dead letter
+/// would ask for the wrong action.
+fn delivery_panel(deliveries: &DeliveryHealth, company_id: Option<Uuid>) -> String {
+    let link = company_id.map(|company_id| format!("/ui/deliveries?company_id={company_id}"));
+    let dead = deliveries.count_of(DeliveryStatus::DeadLetter);
+    let unconfirmed = deliveries.count_of(DeliveryStatus::OutcomeUnknown);
 
     stat_row(
-        "Email outbox",
+        "Deliveries",
         &format!(
-            "{due}{sending}{expired}{sent}{failed}",
+            "{due}{sending}{expired}{delivered}{unconfirmed}{dead}",
             due = stat(
-                Stat::new("Due now", &outbox.due_now.to_string(), "queued & ready")
+                Stat::new("Due now", &deliveries.due_now.to_string(), "queued & ready")
                     .linked(link.clone())
             ),
             sending = stat(
                 Stat::new(
                     "Sending",
-                    &outbox.count_of(OutboxStatus::Sending).to_string(),
+                    &deliveries.count_of(DeliveryStatus::Sending).to_string(),
                     "claimed",
                 )
                 .linked(link.clone())
@@ -540,23 +563,28 @@ fn outbox_panel(outbox: &OutboxHealth, company_id: Option<Uuid>) -> String {
             expired = stat(
                 Stat::new(
                     "Lease expired",
-                    &outbox.expired_leases.to_string(),
+                    &deliveries.expired_leases.to_string(),
                     "will be reaped",
                 )
-                .alarming(outbox.expired_leases > 0)
+                .alarming(deliveries.expired_leases > 0)
                 .linked(link.clone())
             ),
-            sent = stat(
+            delivered = stat(
                 Stat::new(
-                    "Sent",
-                    &outbox.count_of(OutboxStatus::Sent).to_string(),
+                    "Delivered",
+                    &deliveries.count_of(DeliveryStatus::Delivered).to_string(),
                     "all time",
                 )
                 .linked(link.clone())
             ),
-            failed = stat(
-                Stat::new("Failed", &failed.to_string(), "all time")
-                    .alarming(failed > 0)
+            unconfirmed = stat(
+                Stat::new("Unconfirmed", &unconfirmed.to_string(), "needs reconciling")
+                    .alarming(unconfirmed > 0)
+                    .linked(link.clone())
+            ),
+            dead = stat(
+                Stat::new("Dead letter", &dead.to_string(), "all time")
+                    .alarming(dead > 0)
                     .linked(link)
             ),
         ),
@@ -874,15 +902,15 @@ pub(super) fn process_panel(process: &ProcessGauges) -> String {
     let evidence = stat_row(
         "Operator evidence signals",
         &format!(
-            "{tasks}{outbox}{connections}",
+            "{tasks}{deliveries}{connections}",
             tasks = stat(Stat::new(
                 "Deep task pages",
                 &thousands(process.deep_task_pagination as i64),
                 "1000+ offset observations since boot",
             )),
-            outbox = stat(Stat::new(
-                "Deep outbox pages",
-                &thousands(process.deep_outbox_pagination as i64),
+            deliveries = stat(Stat::new(
+                "Deep delivery pages",
+                &thousands(process.deep_delivery_pagination as i64),
                 "1000+ offset observations since boot",
             )),
             connections = stat(Stat::new(
@@ -1163,7 +1191,7 @@ mod tests {
     #[test]
     fn a_healthy_system_raises_no_alerts() {
         let snapshot = snapshot();
-        assert_eq!(health_alerts(&snapshot.tasks, &snapshot.outbox), "");
+        assert_eq!(health_alerts(&snapshot.tasks, &snapshot.deliveries), "");
     }
 
     #[test]
@@ -1171,7 +1199,7 @@ mod tests {
         let mut snapshot = snapshot();
         snapshot.tasks.stalled = 2;
 
-        let alerts = health_alerts(&snapshot.tasks, &snapshot.outbox);
+        let alerts = health_alerts(&snapshot.tasks, &snapshot.deliveries);
         assert!(
             alerts.contains("2 tasks claimed under a lapsed lease"),
             "{alerts}"
@@ -1185,7 +1213,7 @@ mod tests {
         snapshot.tasks.stalled = 1;
 
         assert!(
-            health_alerts(&snapshot.tasks, &snapshot.outbox)
+            health_alerts(&snapshot.tasks, &snapshot.deliveries)
                 .contains("1 task claimed under a lapsed lease")
         );
     }
@@ -1193,9 +1221,9 @@ mod tests {
     #[test]
     fn an_expired_delivery_lease_is_called_out() {
         let mut snapshot = snapshot();
-        snapshot.outbox.expired_leases = 1;
+        snapshot.deliveries.expired_leases = 1;
 
-        let alerts = health_alerts(&snapshot.tasks, &snapshot.outbox);
+        let alerts = health_alerts(&snapshot.tasks, &snapshot.deliveries);
         assert!(alerts.contains("1 delivery past its lease"), "{alerts}");
     }
 

@@ -24,13 +24,10 @@ use crate::{
         correlation::CorrelationId,
         cursor::{MessageCursor, ThreadCursor},
         email_message::EmailMessageMetadata,
-        message::{
-            CanonicalMessageId, Message, MessageDirection, MessageParticipantKind, MessageRole,
-        },
+        message::{CanonicalMessageId, Message, MessageRole},
         message_view::{
             AgentHistoryMessage, EmailReplyContext, MessageAuditView, ThreadMessageView,
         },
-        participant::{IdentityClaimMetadata, IdentityProvenance},
         task::{ThreadActivity, TokenUsage},
         thread::Thread,
         transport::{
@@ -42,21 +39,20 @@ use crate::{
     infra::config::AppConfig,
     services::{
         memory_coordinator::MemoryCoordinator,
-        outbound_dispatcher::{MailTransport, OutboundDispatcher, OutboundEmail, SentEmailResult},
+        outbound_dispatcher::{MailTransport, OutboundDispatcher},
     },
     transport::{
         AddressedIdentity, AddressedRecipient, AddressedTarget, BoundedVec, CanonicalContent,
+        ComposedDelivery, DeliveryComposer, DeliveryCreation, DeliveryRequest,
         ExternalCorrelationStore, InboundDraft, InboundEnvelope, InboundMessageCommitter,
-        InboundRouting, IngressDirectives, IngressPolicyFacts, MessageDisposition,
-        ProtocolExtension,
+        InboundRouting, IngressDirectives, IngressPolicyFacts, InternalMailRelay,
+        InternalRelayMail, MessageDisposition, NewDelivery, ProtocolExtension, RelayDisposition,
+        ports::TransportRenderers,
     },
     use_cases::{
-        agent::AgentPersistence,
-        approval::ApprovalUseCases,
-        channel::ChannelPersistence,
-        company::CompanyPersistence,
-        integration::ChannelBindingPersistence,
-        participant::{IdentityObservation, ParticipantPersistence},
+        agent::AgentPersistence, approval::ApprovalUseCases, channel::ChannelPersistence,
+        company::CompanyPersistence, integration::ChannelBindingPersistence,
+        participant::ParticipantPersistence,
     },
 };
 
@@ -74,6 +70,39 @@ mod support;
 /// Addressing role and multi-channel pipeline position are transport vocabulary; they are declared
 /// with the other transport contracts and re-exported here so call sites read unchanged.
 pub use crate::transport::{PipelineStep, RecipientRole, ReplyDelivery};
+
+/// One channel's agent answering another channel of the same company.
+///
+/// Registered with the email sender, which reaches it *before* SMTP: a message addressed to one of
+/// this deployment's own channels never leaves the building, so there is no DMARC verdict to earn
+/// and no mail to parse back. Rendering it to RFC 5322 and re-ingesting the result was how a
+/// mailbox became the internal identity of a channel.
+#[async_trait]
+impl InternalMailRelay for ThreadUseCases {
+    async fn relay_internal(&self, mail: &InternalRelayMail<'_>) -> AppResult<RelayDisposition> {
+        // A recipient outside this deployment, or one whose channel this source may not address,
+        // is not a fault: it is the ordinary case, and the sender posts it over SMTP.
+        let Some((selector, company_id)) = self.authorize_relay(mail).await? else {
+            return Ok(RelayDisposition::NotInternal);
+        };
+
+        let ingest = self
+            .ingest_relayed_message(mail, &selector, company_id)
+            .await?;
+        if ingest.accepted {
+            return Ok(RelayDisposition::Relayed);
+        }
+        // A refusal by one of our own channels -- a spent hop budget, a disabled channel, an ACL
+        // -- will read the same way on every retry, so it is reported as definite rather than left
+        // to burn five attempts reaching the same verdict.
+        Ok(RelayDisposition::Refused(
+            ingest
+                .reason()
+                .unwrap_or("The receiving channel refused the message")
+                .to_string(),
+        ))
+    }
+}
 
 #[cfg(test)]
 pub mod test_support;
@@ -212,6 +241,22 @@ pub trait ThreadPersistence: Send + Sync {
     /// message agents have already read -- see `ExternalMessageCollision`.
     async fn create_message(&self, write: &MessageWrite) -> AppResult<Message>;
 
+    /// Store one canonical message together with every delivery it is owed.
+    ///
+    /// One transaction, because a message visible in a thread but never queued for delivery -- or
+    /// queued but invisible -- is worse than neither. This is the shape for producers with no task
+    /// row to fence on: a schedule's answer, a stop notice, a direct ingest's reply. Work driven
+    /// by a task commits through `TaskPersistence::commit_agent_dispatch` instead, which fences
+    /// the same pair on the run's lease.
+    ///
+    /// Not defaulted: a double that stored the message and quietly dropped the deliveries would
+    /// let a test assert the reply exists while nothing would ever send it.
+    async fn create_message_with_deliveries(
+        &self,
+        write: &MessageWrite,
+        deliveries: &[NewDelivery],
+    ) -> AppResult<(Message, Vec<DeliveryCreation>)>;
+
     /// The newest outbound message this thread gained *after* the message named here, if any.
     ///
     /// This is the idempotency guard for "has the agent already answered?", and it is deliberately
@@ -293,37 +338,58 @@ pub struct ThreadUseCases {
     committer: Arc<dyn InboundMessageCommitter>,
     correlation_store: Arc<dyn ExternalCorrelationStore>,
     binding_persistence: Arc<dyn ChannelBindingPersistence>,
+    /// Resolves an interface and freezes what will be sent, so a reply is queued in the same
+    /// transaction that records it. Required rather than optional: a deployment that forgot to
+    /// wire it would answer every customer in the thread and mail nobody.
+    deliveries: DeliveryComposer,
     agent_persistence: Option<Arc<dyn AgentPersistence>>,
     agent_channel_provisioning: Option<Arc<dyn AgentChannelProvisioning>>,
     approval_use_cases: Option<Arc<ApprovalUseCases>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
+    /// The direct SMTP path, for the three notices that deliberately stay off the delivery queue:
+    /// a bounce, a reply from a reserved `_` address, and an account confirmation code. Each
+    /// answers something that has no channel, no interface and no stored message -- see
+    /// `handle_bounce_dispatch`.
     mail_dispatcher: Arc<OutboundDispatcher>,
     memory: Option<Arc<MemoryCoordinator>>,
     config: Arc<AppConfig>,
     agent_run_timeout: std::time::Duration,
 }
 
+/// The stores one [`ThreadUseCases`] reads and writes.
+///
+/// A named struct rather than five positional `Arc<dyn ...>` parameters: they are all the same
+/// shape at the call site, so a transposed pair compiles and then reads companies out of the
+/// channel store. `src/adapters/persistence/AGENTS.md` names this exact fix.
+#[derive(Clone)]
+pub struct ThreadStores {
+    pub threads: Arc<dyn ThreadPersistence>,
+    pub channels: Arc<dyn ChannelPersistence>,
+    pub companies: Arc<dyn CompanyPersistence>,
+    pub participants: Arc<dyn ParticipantPersistence>,
+    pub tasks: Arc<dyn TaskPersistence>,
+}
+
 impl ThreadUseCases {
     pub fn new(
-        thread_persistence: Arc<dyn ThreadPersistence>,
-        channel_persistence: Arc<dyn ChannelPersistence>,
-        company_persistence: Arc<dyn CompanyPersistence>,
-        participant_persistence: Arc<dyn ParticipantPersistence>,
-        task_persistence: Arc<dyn TaskPersistence>,
+        stores: ThreadStores,
         ingest: InboundIngestPorts,
+        renderers: Arc<TransportRenderers>,
         config: Arc<AppConfig>,
     ) -> Self {
         let mail_dispatcher = Arc::new(OutboundDispatcher::disabled(config.clone()));
+        let deliveries = DeliveryComposer::new(renderers, ingest.bindings.clone());
 
         Self {
-            thread_persistence,
-            channel_persistence,
-            company_persistence,
-            participant_persistence,
-            task_persistence,
+            thread_persistence: stores.threads,
+            channel_persistence: stores.channels,
+            company_persistence: stores.companies,
+            participant_persistence: stores.participants,
+            task_persistence: stores.tasks,
             committer: ingest.committer,
             correlation_store: ingest.correlation,
             binding_persistence: ingest.bindings,
+            deliveries,
             agent_persistence: None,
             agent_channel_provisioning: None,
             approval_use_cases: None,
@@ -353,13 +419,25 @@ impl ThreadUseCases {
             thread_persistence.clone(),
             task_persistence.clone(),
         );
+        // The real email renderer, not a stand-in: the frozen part a test asserts on has to be the
+        // one production would freeze, or the tests prove nothing about what actually goes out.
+        let renderers = std::sync::Arc::new(
+            crate::transport::ports::TransportRenderers::new()
+                .register(std::sync::Arc::new(
+                    crate::adapters::protocols::email::EmailRenderer::new(&config.app_domain_name),
+                ))
+                .expect("one renderer registers"),
+        );
         Self::new(
-            thread_persistence,
-            channel_persistence,
-            company_persistence,
-            participant_persistence,
-            task_persistence,
+            ThreadStores {
+                threads: thread_persistence,
+                channels: channel_persistence,
+                companies: company_persistence,
+                participants: participant_persistence,
+                tasks: task_persistence,
+            },
             ingest,
+            renderers,
             config,
         )
     }
@@ -388,10 +466,6 @@ impl ThreadUseCases {
     pub fn with_mail_transport(mut self, transport: Arc<dyn MailTransport>) -> Self {
         self.mail_dispatcher = Arc::new(OutboundDispatcher::new(self.config.clone(), transport));
         self
-    }
-
-    pub fn mail_dispatcher(&self) -> &Arc<OutboundDispatcher> {
-        &self.mail_dispatcher
     }
 
     pub fn with_agent_persistence(mut self, agent_persistence: Arc<dyn AgentPersistence>) -> Self {
@@ -539,23 +613,6 @@ impl ThreadUseCases {
         Ok(Some((source, target, company)))
     }
 
-    pub async fn prepare_internal_channel_delivery(
-        &self,
-        email: OutboundEmail,
-        idempotency_key: Option<&str>,
-    ) -> AppResult<Option<SentEmailResult>> {
-        let Some(selector) = self.internal_channel_selector(&email.recipient_to)? else {
-            return Ok(None);
-        };
-        self.resolve_internal_destination(email.channel_id, &selector)
-            .await?;
-        let prepared = match idempotency_key {
-            Some(key) => self.mail_dispatcher.prepare_idempotent(email, key)?,
-            None => self.mail_dispatcher.prepare(email)?,
-        };
-        Ok(Some(prepared))
-    }
-
     /// Ingest a message one channel's agent addressed to another channel of the same company.
     ///
     /// The relay is a *transport*, so it produces exactly what any other transport produces: an
@@ -566,36 +623,13 @@ impl ThreadUseCases {
     /// Authentication is the relay's own identity, not a header and not a fabricated DMARC pass:
     /// [`IngressOrigin::InternalChannel`] can only be constructed by this path, and the guard
     /// checks the stated source channel against it.
-    pub async fn ingest_prepared_internal_message(
+    async fn ingest_relayed_message(
         &self,
-        sent: &SentEmailResult,
+        mail: &InternalRelayMail<'_>,
+        selector: &ChannelSelector,
+        company_id: Uuid,
     ) -> AppResult<InboundIngestResult> {
-        let source_channel_id = sent.source_channel_id.ok_or_else(|| {
-            AppError::Internal("Internal delivery has no source channel identity".into())
-        })?;
-        let recipient = sent
-            .recipients_to
-            .first()
-            .ok_or_else(|| AppError::Internal("Internal delivery has no recipient".into()))?;
-        let selector = self
-            .internal_channel_selector(recipient)?
-            .ok_or_else(|| AppError::Internal("Recipient is not an internal channel".into()))?;
-        let (source, _, company) = self
-            .resolve_internal_destination(source_channel_id, &selector)
-            .await?
-            .ok_or_else(|| AppError::Internal("Recipient is not an internal channel".into()))?;
-        let expected_sender = format!(
-            "{}@{}.{}",
-            source.slug, company.slug, self.config.app_domain_name
-        );
-        if !sent.from_address.eq_ignore_ascii_case(&expected_sender) {
-            return Err(AppError::Internal(
-                "Internal sender address does not match its source channel".into(),
-            ));
-        }
-
-        let message =
-            self.internal_inbound_message(sent, &selector, source_channel_id, company.id)?;
+        let message = self.internal_inbound_message(mail, selector, company_id)?;
         self.ingest(message).await
     }
 
@@ -605,21 +639,16 @@ impl ThreadUseCases {
     /// deduplicates a repeated hop exactly as it would a repeated delivery from outside.
     fn internal_inbound_message(
         &self,
-        sent: &SentEmailResult,
+        mail: &InternalRelayMail<'_>,
         selector: &ChannelSelector,
-        source_channel_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<InboundMessage> {
-        let metadata = EmailMessageMetadata::new(sent.outbound_message_id.clone())
-            .in_reply_to(Some(sent.in_reply_to.clone()))
-            .references(sent.references.clone())
-            .raw_bodies(Some(sent.body_text.clone()), None);
-        let author = qualified_email_identity(sent.from_address.clone())?;
-        let recipient = sent
-            .recipients_to
-            .first()
-            .ok_or_else(|| AppError::Internal("Internal delivery has no recipient".into()))?;
-        let recipient_handle = qualified_email_identity(recipient.clone())?;
+        let metadata = EmailMessageMetadata::new(mail.message_id.clone())
+            .in_reply_to(mail.in_reply_to.cloned())
+            .references(mail.references.to_vec())
+            .raw_bodies(Some(mail.body_text.to_string()), None);
+        let author = qualified_email_identity(mail.from.clone())?;
+        let recipient_handle = qualified_email_identity(mail.recipient_to.clone())?;
 
         let draft = InboundDraft {
             // No durable inbound event: the relay hands the message over in-process, and this
@@ -647,13 +676,13 @@ impl ThreadUseCases {
                     recipient_handle.clone(),
                 )],
             )?,
-            content: CanonicalContent::parse(&sent.subject, &sent.body_text)?,
+            content: CanonicalContent::parse(mail.subject, mail.body_text)?,
             attachments: BoundedVec::empty(),
             directives: IngressDirectives {
-                hop_count: sent.hop_count,
-                trace_channels: sent.trace_channels.clone(),
+                hop_count: mail.hop_count,
+                trace_channels: mail.trace.clone(),
                 disposition: MessageDisposition::Answer,
-                source_channel_id: Some(source_channel_id),
+                source_channel_id: Some(mail.source_channel_id),
                 // An agent answering another agent is machine-generated by construction; the guard
                 // exempts the internal path precisely because this is expected here.
                 is_auto_reply: true,
@@ -663,7 +692,7 @@ impl ThreadUseCases {
             // fabricate. There is no `AuthVerdict` on this path at all.
             policy: IngressPolicyFacts::TrustedApplication,
             // Carried, never re-minted: agent A's run and agent B's run are one chain.
-            correlation_id: sent.correlation_id,
+            correlation_id: mail.correlation_id,
             extension: ProtocolExtension::email(metadata),
         };
 
@@ -679,83 +708,50 @@ impl ThreadUseCases {
             routing,
             IngressOrigin::InternalChannel {
                 company_id,
-                channel_id: source_channel_id,
+                channel_id: mail.source_channel_id,
             },
         ))
     }
 
-    pub async fn record_outreach_outbound_message(
+    /// Everything an internal hop has to be true for before it is ingested on the target channel.
+    ///
+    /// The sender address is checked against the channel the mail *claims* to come from, so a
+    /// relayed message cannot borrow another channel's identity: the ingress guard trusts
+    /// [`IngressOrigin::InternalChannel`] absolutely, and this is what earns that trust.
+    async fn authorize_relay(
         &self,
-        outbox_id: Uuid,
-        sent: &crate::services::outbound_dispatcher::SentEmailResult,
-    ) -> AppResult<()> {
-        let Some(thread_id) = self
-            .task_persistence
-            .get_outreach_thread_for_outbox(outbox_id)
+        mail: &InternalRelayMail<'_>,
+    ) -> AppResult<Option<(ChannelSelector, Uuid)>> {
+        let Some(selector) = self.internal_channel_selector(mail.recipient_to)? else {
+            return Ok(None);
+        };
+        let Some((source, _target, company)) = self
+            .resolve_internal_destination(mail.source_channel_id, &selector)
             .await?
         else {
-            return Ok(());
+            return Ok(None);
         };
-        let sender = qualified_email_identity(sent.from_address.clone())?;
-        let mut participants = vec![MessageParticipantWrite::new(
-            MessageParticipantKind::Sender,
-            sender.clone(),
-        )];
-        for (kind, addresses) in [
-            (MessageParticipantKind::To, &sent.recipients_to),
-            (MessageParticipantKind::Cc, &sent.recipients_cc),
-        ] {
-            for address in addresses.iter() {
-                participants.push(MessageParticipantWrite::new(
-                    kind,
-                    qualified_email_identity(address.clone())?,
-                ));
-            }
+        let expected_sender =
+            Channel::address_for(&source.slug, &company.slug, &self.config.app_domain_name);
+        if !mail.from.eq_ignore_ascii_case(&expected_sender) {
+            return Err(AppError::Internal(
+                "Internal sender address does not match its source channel".into(),
+            ));
         }
-        // The email extension must match what `ingest_prepared_internal_message` stores for the
-        // very same mail: both sides key one canonical message on the same `Message-ID`, and the
-        // stored message is only reused when the content hashes agree. Leaving `raw_text_body`
-        // `None` here while the receiving side wrote `Some(body)` made every internal delegation
-        // hop fail its outbox delivery and retry forever.
-        let metadata = EmailMessageMetadata::new(sent.outbound_message_id.clone())
-            .in_reply_to(Some(sent.in_reply_to.clone()))
-            .references(sent.references.to_vec())
-            .raw_bodies(Some(sent.body_text.clone()), None);
-
-        let write = MessageWrite {
-            id: CanonicalMessageId::random(),
-            thread_id,
-            author: MessageAuthorWrite::Observed(IdentityObservation {
-                identity: sender,
-                display_label: sent.from_name.clone(),
-                claim_metadata: IdentityClaimMetadata::observation(),
-                provenance: IdentityProvenance::Agent,
-            }),
-            subject: sent.subject.clone(),
-            clean_text_body: sent.body_text.clone(),
-            attachments: Vec::new(),
-            direction: MessageDirection::Outbound,
-            role: MessageRole::Agent,
-            correlation_id: sent.correlation_id,
-            participants,
-            correlation: MessageCorrelation::Email(metadata),
-            created_at: chrono::Utc::now(),
-        };
-
-        // Stored *and* marked as the question rather than the answer, in one transaction. The mark
-        // is what stops the reply guard reading an outreach the agent sent as the answer it owes
-        // this thread; an unmarked outreach mail in the thread would complete the task without one.
-        self.task_persistence
-            .record_outreach_request_message(outbox_id, &write)
-            .await?;
-        Ok(())
+        Ok(Some((selector, company.id)))
     }
 
     /// Tell a sender their message could not be routed.
     ///
     /// Fire and forget, deliberately: a relay that is down must not turn an undeliverable message
-    /// into retried work. This is a notification delivery in the target model, and becomes one in
-    /// step 9 when the generic outbox exists to carry it.
+    /// into retried work.
+    ///
+    /// One of the three notices that deliberately stay off the delivery queue, and for the same
+    /// reason: a queue row names a company, a channel, an interface and a canonical message, and a
+    /// bounce has none of them. It answers a message this deployment *refused* -- nothing was
+    /// stored, no channel was matched (that is what a bounce is), and it goes out from the
+    /// deployment's own mailer-daemon address rather than any channel's. The others are the `_`
+    /// system reply and the confirmation code; see `docs/transport_architecture.md`.
     pub async fn handle_bounce_dispatch(&self, ingest: &InboundIngestResult) {
         let Some(bounce) = ingest.bounce_info() else {
             return;
@@ -870,6 +866,42 @@ impl ThreadUseCases {
         self.thread_persistence
             .find_outbound_reply_after(thread_id, answering)
             .await
+    }
+
+    /// Store one message together with every delivery it is owed, in one transaction.
+    ///
+    /// The shape for a producer with no task lease to fence on. A caller that wrote the two
+    /// separately would leave a thread showing an answer nobody will be sent, or a delivery
+    /// pointing at a message that is not there.
+    pub async fn save_message_with_deliveries(
+        &self,
+        message: &MessageWrite,
+        deliveries: &[NewDelivery],
+    ) -> AppResult<Message> {
+        let (stored, created) = self
+            .thread_persistence
+            .create_message_with_deliveries(message, deliveries)
+            .await?;
+        for delivery in created {
+            if !delivery.was_created() {
+                tracing::info!(
+                    delivery_id = %delivery.delivery_id(),
+                    "An equivalent delivery was already queued; not queueing it again"
+                );
+            }
+        }
+        Ok(stored)
+    }
+
+    /// Resolve an interface and freeze what a delivery will be sent as, without writing anything.
+    ///
+    /// The caller commits the result inside whichever transaction creates the state the delivery
+    /// answers for.
+    pub async fn compose_delivery(
+        &self,
+        request: DeliveryRequest<'_>,
+    ) -> AppResult<ComposedDelivery> {
+        self.deliveries.compose(request).await
     }
 
     pub async fn save_message(&self, message: &MessageWrite) -> AppResult<Message> {

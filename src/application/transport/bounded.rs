@@ -27,6 +27,11 @@ pub enum BoundsError {
         actual: usize,
         max: usize,
     },
+    /// The bound at the other end. A list whose emptiness is a defect rather than a legitimate
+    /// "nothing to say" -- the parts of a delivery, which is unfinishable without them -- says so
+    /// through the same error as every other broken limit.
+    #[error("{field} is empty, and at least one item is required")]
+    Empty { field: &'static str },
 }
 
 /// Input that breaks a documented limit is the caller's fault, not the server's.

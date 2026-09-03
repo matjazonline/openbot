@@ -3,13 +3,16 @@
 //! Provider-specific syntax is validated by the owning adapter.  The types in this module make
 //! qualification and bounds unavoidable once a value crosses into the domain.
 
+mod delivery;
 mod integration;
 
+pub use delivery::{
+    DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, FailureClass, aggregate_parent_status,
+};
 pub use integration::{
     BindingAccessPolicy, BindingAccessSnapshot, BindingAuditAction, BindingAuditEvent,
     BindingAuditMetadata, BindingChangeReason, BindingDeliveryPolicy, BindingStatus,
     ChannelBinding, InstallationStatus, IntegrationCredentialKind, IntegrationInstallation,
-    InvalidTransportValue,
 };
 
 use std::{fmt, str::FromStr};
@@ -38,6 +41,14 @@ impl TransportKind {
         match self {
             Self::Email => "email",
             Self::Slack => "slack",
+        }
+    }
+
+    /// What a reader calls this, so a transport reads the same in a filter, a list and a pane.
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Email => "Email",
+            Self::Slack => "Slack",
         }
     }
 
@@ -88,6 +99,79 @@ impl UnsupportedTransport {
         Self(transport.into())
     }
 }
+
+/// A stored string that is not one of the values its vocabulary allows.
+///
+/// One error type for every [`stored_enum`], so a caller parsing a row does not have to know
+/// which column it came from to report it.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("invalid {field} '{value}'")]
+pub struct InvalidTransportValue {
+    field: &'static str,
+    value: String,
+}
+
+impl InvalidTransportValue {
+    pub(crate) fn new(field: &'static str, value: impl Into<String>) -> Self {
+        Self {
+            field,
+            value: value.into(),
+        }
+    }
+}
+
+/// A closed set of stored strings, with the parse, render and inventory sides written once.
+///
+/// The inventory (`ALL`) is what the database-equivalence tests iterate: a variant added here but
+/// not to the matching SQL `CHECK` fails a test instead of failing an insert in production.
+macro_rules! stored_enum {
+    (
+        $(#[$enum_meta:meta])*
+        $name:ident as $label:literal {
+            $( $(#[$variant_meta:meta])* $variant:ident => $stored:literal ),+ $(,)?
+        }
+    ) => {
+        $(#[$enum_meta])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        pub enum $name {
+            $( $(#[$variant_meta])* $variant ),+
+        }
+
+        impl $name {
+            /// Every variant, so a test can assert the whole set against the database at once.
+            pub const ALL: &'static [Self] = &[ $( Self::$variant ),+ ];
+
+            pub const fn as_str(self) -> &'static str {
+                match self {
+                    $( Self::$variant => $stored ),+
+                }
+            }
+        }
+
+        impl FromStr for $name {
+            type Err = InvalidTransportValue;
+
+            fn from_str(value: &str) -> Result<Self, Self::Err> {
+                match value {
+                    $( $stored => Ok(Self::$variant), )+
+                    _ => Err(InvalidTransportValue::new($label, value)),
+                }
+            }
+        }
+
+        impl fmt::Display for $name {
+            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str(self.as_str())
+            }
+        }
+    };
+}
+
+// Re-exported for the same reason as `uuid_id` and `bounded_string`: sibling modules mint their
+// own stored vocabularies, and a second copy of the parse/render/inventory triple is how one of
+// them drifts from its SQL `CHECK`.
+pub(crate) use stored_enum;
 
 macro_rules! uuid_id {
     ($name:ident) => {
@@ -141,6 +225,10 @@ uuid_id!(BindingAuditEventId);
 uuid_id!(PrincipalId);
 uuid_id!(ParticipantIdentityId);
 uuid_id!(DeliveryId);
+// One frozen piece of a delivery. Named separately from `DeliveryId` because
+// `external_messages.delivery_part_id` points at a *part*: a long answer is several provider
+// messages, and a lease on the parent must not be confusable with the part it is sending.
+uuid_id!(DeliveryPartId);
 // `InboundEventId` names one row of the durable inbound inbox: a bounded, authenticated provider
 // event awaiting ingestion. Declared here with the other correlation ids so a lease over it is
 // typed from the day the port that claims it is written.
@@ -413,6 +501,37 @@ impl fmt::Display for ChannelSelector {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ExternalDestination {
     Email(EmailAddress),
+}
+
+impl ExternalDestination {
+    /// The transport whose namespace this address belongs to.
+    pub const fn transport(&self) -> TransportKind {
+        match self {
+            Self::Email(_) => TransportKind::Email,
+        }
+    }
+
+    /// The address as one stored string. The transport is stored beside it, so this carries no
+    /// discriminator of its own -- see [`Self::parse`].
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Email(address) => address.as_str(),
+        }
+    }
+
+    /// Reads a stored destination back, given the transport whose namespace it was written in.
+    ///
+    /// The discriminator is *carried*, not re-asserted: a delivery row stores its transport, and
+    /// reading the destination with a literal `Email` here is how a Slack delivery's recipient
+    /// would come back as a mailbox. Fallible rather than defaulting, because a transport that
+    /// addresses only conversations has no address namespace at all -- for those, a stored
+    /// destination is a row nothing should have written, and saying so beats guessing.
+    pub fn parse(transport: TransportKind, value: &str) -> Result<Self, UnsupportedTransport> {
+        match transport {
+            TransportKind::Email => Ok(Self::Email(EmailAddress::from(value))),
+            TransportKind::Slack => Err(UnsupportedTransport::new(transport.as_str())),
+        }
+    }
 }
 
 /// Binding-qualified source correlation for one inbound provider message.

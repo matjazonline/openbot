@@ -6,16 +6,24 @@
 //!
 //! The LLM is the only thing left out. A real run reaches `create_outreach_and_pause` because a
 //! model chose to call the outreach tool; here the test calls it directly with the arguments the
-//! tool would have built, so everything downstream — the outbox, the trusted internal transport,
-//! reply correlation, and the resume — is the production code path.
+//! tool would have built, so everything downstream — the delivery queue, the real email sender and
+//! the trusted internal transport it reaches first, reply correlation, and the resume — is the
+//! production code path.
 
 use super::*;
 use crate::adapters::persistence::PostgresPersistence;
+use crate::adapters::persistence::task::{CreateOutreachRequest, OutreachTargetRequest};
 use crate::adapters::persistence::test_support::test_pool;
 use crate::adapters::protocols::email::parser::RawInboundPayload;
-use crate::entities::outreach::{CreateOutreachRequest, OutreachTargetRequest};
+use crate::adapters::protocols::email::{EmailRenderer, EmailSender};
+use crate::entities::message::{MessageDirection, MessageRole};
 use crate::entities::task::TaskStatus;
-use crate::services::outbound_dispatcher::OutboundEmail;
+use crate::entities::transport::{DeliveryId, DeliveryPurpose, TransportKind};
+use crate::transport::{
+    CanonicalContent, ComposedDelivery, DeliveryComposer, DeliveryContext, DeliveryRequest,
+    EmailDeliveryContext, EmailRelayTrace, NewDelivery, ProviderSendOutcome, TransportSender,
+    ports::TransportRenderers,
+};
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
@@ -61,7 +69,11 @@ fn loop_test_config() -> Arc<AppConfig> {
 struct Fixture {
     persistence: Arc<PostgresPersistence>,
     pool: sqlx::PgPool,
-    threads: ThreadUseCases,
+    threads: Arc<ThreadUseCases>,
+    /// The production email sender, with the thread use cases wired in as its internal relay --
+    /// which is what makes a hop to a same-company channel an in-process ingest rather than SMTP.
+    sender: EmailSender,
+    deliveries: DeliveryComposer,
     company: crate::entities::company::Company,
     channel_a: Channel,
     channel_b: Channel,
@@ -71,6 +83,27 @@ struct Fixture {
 impl Fixture {
     fn address(&self, channel: &Channel) -> String {
         format!("{}@{}.{}", channel.slug, self.company.slug, APP_DOMAIN)
+    }
+
+    /// The one thread a channel has, once a hop has opened it.
+    async fn thread_on(&self, channel_id: Uuid) -> Option<crate::entities::thread::Thread> {
+        let id: Option<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM threads WHERE channel_id = $1 ORDER BY created_at LIMIT 1",
+        )
+        .bind(channel_id)
+        .fetch_optional(&self.pool)
+        .await
+        .expect("threads are readable")
+        .flatten();
+        match id {
+            Some(id) => crate::use_cases::thread::ThreadPersistence::get_thread_by_id(
+                self.persistence.as_ref(),
+                id,
+            )
+            .await
+            .expect("the thread is readable"),
+            None => None,
+        }
     }
 
     async fn tasks_for(&self, channel_id: Uuid) -> Vec<crate::entities::task::BackgroundTask> {
@@ -169,20 +202,38 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
         );
     }
 
-    let threads = ThreadUseCases::new(
-        persistence.clone(),
-        persistence.clone(),
-        persistence.clone(),
-        persistence.clone(),
-        persistence.clone(),
-        InboundIngestPorts {
-            committer: persistence.clone(),
-            correlation: persistence.clone(),
-            bindings: persistence.clone(),
-        },
-        loop_test_config(),
-    )
-    .with_agent_persistence(persistence.clone());
+    let config = loop_test_config();
+    let renderers = Arc::new(
+        TransportRenderers::new()
+            .register(Arc::new(EmailRenderer::new(&config.app_domain_name)))
+            .expect("one renderer registers"),
+    );
+    let threads = Arc::new(
+        ThreadUseCases::new(
+            ThreadStores {
+                threads: persistence.clone(),
+                channels: persistence.clone(),
+                companies: persistence.clone(),
+                participants: persistence.clone(),
+                tasks: persistence.clone(),
+            },
+            InboundIngestPorts {
+                committer: persistence.clone(),
+                correlation: persistence.clone(),
+                bindings: persistence.clone(),
+            },
+            renderers.clone(),
+            config,
+        )
+        .with_agent_persistence(persistence.clone()),
+    );
+    // SMTP would refuse anyway (`smtp.invalid`), which is the point: every hop this test makes has
+    // to be recognised as internal and relayed, or the send fails visibly.
+    let sender = EmailSender::new(
+        Arc::new(crate::services::outbound_dispatcher::DisabledMailTransport),
+        threads.clone(),
+    );
+    let deliveries = DeliveryComposer::new(renderers, persistence.clone());
 
     let channel_b = channels.pop().expect("the supplier channel exists");
     let channel_a = channels.pop().expect("the coordinator channel exists");
@@ -190,6 +241,8 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
         persistence,
         pool,
         threads,
+        sender,
+        deliveries,
         company,
         channel_a,
         channel_b,
@@ -210,54 +263,177 @@ fn inbound(from: &str, to: &str, message_id: &str, subject: &str) -> RawInboundP
     }
 }
 
-/// Drive one queued outbox row through exactly the sequence `TaskWorker::deliver_outbox_email`
-/// uses for a platform recipient, and return the ingest verdict for the receiving side.
-async fn deliver_internally(
-    fixture: &Fixture,
-    outbox_id: Uuid,
-    email: OutboundEmail,
-    idempotency_key: &str,
-) -> InboundIngestResult {
-    let worker_id = Uuid::new_v4();
-    let prepared = fixture
-        .threads
-        .prepare_internal_channel_delivery(email, Some(idempotency_key))
+/// One hop this test wants to make, as a producer would compose it.
+struct Hop<'a> {
+    source: &'a Channel,
+    recipient: &'a str,
+    subject: &'a str,
+    body: &'a str,
+    in_reply_to: MessageId,
+    references: Vec<MessageId>,
+    hop_count: u32,
+    trace_channels: Vec<Uuid>,
+    task_id: Option<Uuid>,
+    source_key: String,
+    purpose: DeliveryPurpose,
+}
+
+impl Fixture {
+    /// Compose one hop the way a producer does: mint the message id, freeze the mail, and record
+    /// the question under the provider key it will go out under.
+    ///
+    /// That last part is what makes an answer findable. A reply from B quotes nothing but the
+    /// question A asked, so the question has to carry the `Message-ID` the relay will deliver it
+    /// under -- which the renderer can name before anything is sent.
+    ///
+    /// Nothing is written here: the caller commits both with whatever durable state they belong
+    /// to, which is the whole point of the split.
+    async fn compose_hop(&self, hop: Hop<'_>, thread_id: Uuid) -> (MessageWrite, NewDelivery) {
+        let message_id = CanonicalMessageId::random();
+        let subject = hop.subject.to_string();
+        let body = hop.body.to_string();
+        let composed = self.compose(hop, message_id).await;
+
+        let message = MessageWrite {
+            id: message_id,
+            ..MessageWrite::internal(
+                thread_id,
+                MessageAuthorWrite::Platform,
+                subject,
+                body.clone(),
+                MessageDirection::Outbound,
+                MessageRole::Agent,
+                CorrelationId::new(),
+            )
+        }
+        .with_correlation(crate::use_cases::thread::MessageCorrelation::Email(
+            crate::entities::email_message::EmailMessageMetadata::new(MessageId::from(
+                composed
+                    .provider_key
+                    .as_ref()
+                    .expect("mail can name its own Message-ID before it is sent")
+                    .as_str()
+                    .to_string(),
+            ))
+            .raw_bodies(Some(body), None),
+        ));
+        (message, composed.delivery)
+    }
+
+    /// Compose one delivery through the production composer and renderer.
+    async fn compose(&self, hop: Hop<'_>, message_id: CanonicalMessageId) -> ComposedDelivery {
+        let content = CanonicalContent::parse(hop.subject, hop.body).expect("bounded test content");
+        self.deliveries
+            .compose(DeliveryRequest {
+                company_id: self.company.id,
+                channel_id: hop.source.id,
+                message_id,
+                task_id: hop.task_id,
+                correlation_id: CorrelationId::new(),
+                purpose: hop.purpose,
+                source_key: hop.source_key.clone(),
+                content: &content,
+                context: DeliveryContext::Email(EmailDeliveryContext {
+                    from: crate::entities::channel::Channel::address_for(
+                        &hop.source.slug,
+                        &self.company.slug,
+                        APP_DOMAIN,
+                    ),
+                    from_name: Some(hop.source.name.clone()),
+                    recipient_to: hop.recipient.into(),
+                    recipients_cc: Vec::new(),
+                    in_reply_to: Some(hop.in_reply_to.clone()),
+                    references: hop.references.clone(),
+                    relay: Some(EmailRelayTrace {
+                        source_channel_id: hop.source.id,
+                        hop_count: hop.hop_count,
+                        trace_channels: hop.trace_channels.clone(),
+                    }),
+                }),
+            })
+            .await
+            .expect("the channel has an email interface to compose against")
+    }
+
+    /// Send one queued delivery through the real [`EmailSender`], which reaches the internal relay
+    /// before SMTP, and record the provider key it went out under.
+    ///
+    /// The queue transition is written directly rather than claimed: `claim_deliveries` is global
+    /// by design, and this test shares a database with everything else running in parallel. What
+    /// the fenced claim protocol does with the same outcome is
+    /// `src/adapters/persistence/delivery/tests.rs`'s subject, not this file's.
+    async fn deliver(&self, delivery: &NewDelivery) -> MessageId {
+        let record = self.record_of(delivery.id).await;
+        let part = &delivery.parts[0];
+        let outcome = self.sender.send(&record, part).await;
+        let provider_key = match outcome {
+            ProviderSendOutcome::Delivered { provider_key } => {
+                provider_key.expect("an email delivery names the Message-ID it went out under")
+            }
+            other => panic!(
+                "a same-company hop must be relayed internally, got {other:?} for {}",
+                delivery.idempotency_key
+            ),
+        };
+
+        sqlx::query(
+            "UPDATE message_delivery_parts
+                SET status = 'delivered', provider_message_key = $2,
+                    request_started_at = CURRENT_TIMESTAMP, delivered_at = CURRENT_TIMESTAMP
+              WHERE delivery_id = $1",
+        )
+        .bind(delivery.id.as_uuid())
+        .bind(provider_key.as_str())
+        .execute(&self.pool)
         .await
-        .expect("the internal destination resolves")
-        .expect("a same-company channel is delivered internally, not over SMTP");
-
-    fixture
-        .threads
-        .record_outreach_outbound_message(outbox_id, &prepared)
+        .expect("the part records what the provider said");
+        sqlx::query(
+            "UPDATE message_deliveries
+                SET status = 'delivered', delivered_at = CURRENT_TIMESTAMP
+              WHERE id = $1",
+        )
+        .bind(delivery.id.as_uuid())
+        .execute(&self.pool)
         .await
-        .expect("the outbound message is recorded in the sender's thread");
+        .expect("the delivery settles");
 
-    let ingested = fixture
-        .threads
-        .ingest_prepared_internal_message(&prepared)
+        MessageId::from(provider_key.as_str().to_string())
+    }
+
+    /// The durable identity the sender is handed, read back the way a claim would build it.
+    async fn record_of(&self, delivery_id: DeliveryId) -> crate::transport::DeliveryRecord {
+        crate::transport::DeliveryRecord {
+            id: delivery_id,
+            company_id: self.company.id,
+            channel_id: self.channel_a.id,
+            message_id: CanonicalMessageId::random(),
+            source_binding_id: self.binding_of(self.channel_a.id).await,
+            destination_binding_id: self.binding_of(self.channel_a.id).await,
+            external_destination: None,
+            task_id: None,
+            correlation_id: CorrelationId::new(),
+            transport: TransportKind::Email,
+            purpose: DeliveryPurpose::Reply,
+            idempotency_key: crate::transport::DeliveryKey::parse("test:record")
+                .expect("a short key"),
+            attempt_count: 0,
+            max_attempts: crate::transport::MAX_DELIVERY_ATTEMPTS,
+        }
+    }
+
+    async fn binding_of(&self, channel_id: Uuid) -> crate::entities::transport::ChannelBindingId {
+        crate::use_cases::integration::ChannelBindingPersistence::active_bindings_for_channel(
+            self.persistence.as_ref(),
+            self.company.id,
+            channel_id,
+        )
         .await
-        .expect("the trusted internal message is ingested");
-
-    // The worker marks the row sent with the Message-ID it went out under. Reply correlation
-    // matches on exactly that value, and without it a return hop reads as an unexplained cycle.
-    TaskPersistence::claim_outbox_emails(
-        fixture.persistence.as_ref(),
-        worker_id,
-        Utc::now() + chrono::Duration::minutes(5),
-        10,
-    )
-    .await
-    .expect("the outbox row is claimable");
-    TaskPersistence::mark_outbox_email_sent(
-        fixture.persistence.as_ref(),
-        outbox_id,
-        worker_id,
-        prepared.outbound_message_id.as_str(),
-    )
-    .await
-    .expect("the outbox row is marked sent");
-
-    ingested
+        .expect("interfaces are readable")
+        .into_iter()
+        .find(|binding| binding.transport == TransportKind::Email)
+        .expect("a channel has its canonical email interface")
+        .id
+    }
 }
 
 #[tokio::test]
@@ -298,22 +474,22 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         .expect("the task is claimable")
     );
 
-    let outbox_to_b = Uuid::new_v4();
-    let request_to_b = OutboundEmail {
-        correlation_id: CorrelationId::new(),
-        channel_id: fx.channel_a.id,
-        channel_name: fx.channel_a.name.clone(),
-        channel_slug: fx.channel_a.slug.clone(),
-        company_slug: fx.company.slug.clone(),
-        trigger_message_id: "<m0@example.com>".into(),
-        thread_references: Vec::new(),
-        recipient_to: address_b.clone().into(),
-        recipients_cc: Vec::new(),
-        subject: "Acquire supplier capacity data".into(),
-        body_text: "Return the earliest delivery date.".into(),
+    // The question A asks B: one canonical message, and one delivery carrying it. Both are written
+    // by the transaction that parks A's task, exactly as the outreach tool composes them.
+    let hop_to_b = Hop {
+        source: &fx.channel_a,
+        recipient: &address_b,
+        subject: "Acquire supplier capacity data",
+        body: "Return the earliest delivery date.",
+        in_reply_to: "<m0@example.com>".into(),
+        references: Vec::new(),
         hop_count: 0,
         trace_channels: Vec::new(),
+        task_id: Some(task_a),
+        source_key: format!("task:{task_a}:outreach:0"),
+        purpose: DeliveryPurpose::Outreach,
     };
+    let (question_to_b, request_to_b) = fx.compose_hop(hop_to_b, thread_a.id).await;
     let progress = TaskPersistence::create_outreach_and_pause(
         fx.persistence.as_ref(),
         CreateOutreachRequest {
@@ -330,8 +506,8 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
             body: "Return the earliest delivery date.".into(),
             targets: vec![OutreachTargetRequest {
                 email: address_b.clone().into(),
-                outbox_id: outbox_to_b,
-                outbox_payload: serde_json::to_value(&request_to_b).expect("payload serializes"),
+                request: question_to_b,
+                delivery: request_to_b.clone(),
             }],
         },
     )
@@ -343,17 +519,15 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         TaskStatus::WaitingForThirdPartyReply
     );
 
-    // M1: A → B over the trusted internal transport. No SMTP is involved.
-    let to_b = deliver_internally(
-        &fx,
-        outbox_to_b,
-        request_to_b,
-        &format!("outreach:{outbox_to_b}:target:0"),
-    )
-    .await;
-    assert!(to_b.accepted, "M1 rejected: {:?}", to_b.reason());
+    // M1: A → B through the real sender, which recognises a same-company address and relays it in
+    // process. No SMTP is involved; the configured relay is `smtp.invalid`, so a hop that reached
+    // it would fail visibly rather than pass quietly.
+    let m1_message_id = fx.deliver(&request_to_b).await;
 
-    let thread_b = to_b.thread.expect("M1 opens a thread on B");
+    let thread_b = fx
+        .thread_on(fx.channel_b.id)
+        .await
+        .expect("M1 opens a thread on B");
     assert_ne!(thread_b.id, thread_a.id, "B must get its own thread");
     assert_eq!(thread_b.channel_id, fx.channel_b.id);
 
@@ -366,43 +540,31 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         "A stays parked while B works"
     );
 
-    let m1_envelope = to_b
-        .envelope
-        .as_deref()
-        .expect("M1 carries its canonical envelope");
-    let m1_message_id = to_b
-        .inbound_message
-        .as_ref()
-        .expect("M1 is stored on B's thread")
-        .rfc_message_id()
-        .expect("mail carried M1, so it has a Message-ID")
-        .clone();
-
-    // M4: B answers A, quoting M1 so the reply correlates to A's outstanding outreach.
-    let outbox_to_a = Uuid::new_v4();
-    let answer_to_a = OutboundEmail {
-        correlation_id: CorrelationId::new(),
-        channel_id: fx.channel_b.id,
-        channel_name: fx.channel_b.name.clone(),
-        channel_slug: fx.channel_b.slug.clone(),
-        company_slug: fx.company.slug.clone(),
-        trigger_message_id: m1_message_id.clone(),
-        thread_references: vec![m1_message_id.clone()],
-        recipient_to: address_a.clone().into(),
-        recipients_cc: Vec::new(),
-        subject: "Re: Acquire supplier capacity data".into(),
-        body_text: "Earliest delivery is 14 March.".into(),
-        hop_count: m1_envelope.directives.hop_count,
-        trace_channels: m1_envelope.directives.trace_channels.clone(),
+    // M4: B answers A, quoting M1 so the reply correlates to A's outstanding outreach. The hop
+    // budget is carried, not reset: the relay stamped `hop_count + 1` onto M1, and B's answer
+    // continues from there.
+    let hop_to_a = Hop {
+        source: &fx.channel_b,
+        recipient: &address_a,
+        subject: "Re: Acquire supplier capacity data",
+        body: "Earliest delivery is 14 March.",
+        in_reply_to: m1_message_id.clone(),
+        references: vec![m1_message_id.clone()],
+        hop_count: 1,
+        trace_channels: vec![fx.channel_a.id],
+        task_id: Some(b_tasks[0].id),
+        source_key: format!("task:{}:reply", b_tasks[0].id),
+        purpose: DeliveryPurpose::Reply,
     };
-    let to_a = deliver_internally(
-        &fx,
-        outbox_to_a,
-        answer_to_a,
-        &format!("task:{}:agent-reply", b_tasks[0].id),
+    let (answer, answer_to_a) = fx.compose_hop(hop_to_a, thread_b.id).await;
+    crate::use_cases::thread::ThreadPersistence::create_message_with_deliveries(
+        fx.persistence.as_ref(),
+        &answer,
+        std::slice::from_ref(&answer_to_a),
     )
-    .await;
-    assert!(to_a.accepted, "M4 rejected: {:?}", to_a.reason());
+    .await
+    .expect("B's answer and its delivery land together");
+    fx.deliver(&answer_to_a).await;
 
     // The invariants the design doc names.
     assert_eq!(
@@ -418,11 +580,21 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         a_tasks.iter().map(|t| t.status).collect::<Vec<_>>()
     );
     assert_eq!(a_tasks[0].id, task_a);
-    assert_eq!(
-        to_a.thread.as_ref().expect("M4 lands somewhere").id,
-        thread_a.id,
-        "B's answer belongs in A's original thread"
-    );
+    // And it landed in A's own conversation rather than opening a third one.
+    let in_a: i64 = sqlx::query_scalar(
+        r#"SELECT COUNT(*)
+             FROM thread_messages AS association
+             JOIN messages AS message
+               ON (message.company_id, message.id) =
+                  (association.company_id, association.message_id)
+            WHERE association.thread_id = $1 AND message.direction = 'inbound'
+              AND message.clean_text_body LIKE '%14 March%'"#,
+    )
+    .bind(thread_a.id)
+    .fetch_one(&fx.pool)
+    .await
+    .expect("A's thread is readable");
+    assert_eq!(in_a, 1, "B's answer belongs in A's original thread");
 
     CompanyPersistence::delete(fx.persistence.as_ref(), fx.company.id)
         .await

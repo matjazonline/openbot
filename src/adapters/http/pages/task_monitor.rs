@@ -39,7 +39,7 @@ pub struct TaskDetailPane<'a> {
     ///
     /// The task never fails because a delivery failed — composition and transport are separate
     /// processes — so this is the only place an undelivered reply becomes visible.
-    pub deliveries: &'a [OutboxEntry],
+    pub deliveries: &'a [DeliveryEntry],
     /// A delivery read failure is different from a task that produced no mail.
     pub delivery_error: Option<&'a str>,
     /// Durable history for every run, including failures overwritten by a later task payload.
@@ -856,45 +856,48 @@ fn task_deliveries(pane: &TaskDetailPane<'_>) -> String {
     )
 }
 
-/// One queued email, as a link into the Outbox workspace — this row says *that* something went
+/// One delivery, as a link into the Deliveries workspace — this row says *that* something went
 /// wrong, and that workspace says what.
-fn delivery_row(company_id: Uuid, delivery: &OutboxEntry) -> String {
-    // A pending row is waiting out its backoff; a failed one has exhausted every attempt and is
-    // the case this whole section exists to surface.
+fn delivery_row(company_id: Uuid, delivery: &DeliveryEntry) -> String {
+    // A queued row is waiting out its backoff; the two terminal-but-unfinished states are the case
+    // this whole section exists to surface, and they are different problems.
     let detail = match delivery.status {
-        OutboxStatus::Sent => match delivery.sent_at {
-            Some(sent_at) => format!("sent {}", super::format_time(sent_at)),
-            None => "sent".to_string(),
+        DeliveryStatus::Delivered => match delivery.delivered_at {
+            Some(delivered_at) => format!("delivered {}", super::format_time(delivered_at)),
+            None => "delivered".to_string(),
         },
-        OutboxStatus::Sending => "delivering now".to_string(),
-        OutboxStatus::Failed => "gave up after every attempt".to_string(),
-        OutboxStatus::Pending => {
+        DeliveryStatus::Sending => "delivering now".to_string(),
+        DeliveryStatus::DeadLetter => "gave up after every attempt".to_string(),
+        DeliveryStatus::OutcomeUnknown => "the provider outcome was never confirmed".to_string(),
+        DeliveryStatus::Pending | DeliveryStatus::Retryable => {
             format!("next attempt {}", super::format_time(delivery.available_at))
         }
     };
 
-    let attempts = if delivery.retry_count > 0 {
+    let attempts = if delivery.attempt_count > 0 {
         format!(
-            r##"<span class="opacity-60">· {} failed attempt(s)</span>"##,
-            delivery.retry_count
+            r##"<span class="opacity-60">· {} of {} attempts spent</span>"##,
+            delivery.attempt_count, delivery.max_attempts
         )
     } else {
         String::new()
     };
 
-    let error = match delivery.last_error.as_deref() {
-        Some(error) if !error.is_empty() => format!(
-            r##"<div class="mt-1 font-mono text-[11px] opacity-70">{}</div>"##,
-            escape_html_text(error)
+    let error = match delivery.last_error_class {
+        Some(class) => format!(
+            r##"<div class="mt-1 font-mono text-[11px] opacity-70">{class}: {detail}</div>"##,
+            class = escape_html_text(class.as_str()),
+            detail = escape_html_text(delivery.last_error_detail.as_deref().unwrap_or("")),
         ),
-        _ => String::new(),
+        None => String::new(),
     };
 
     format!(
         r##"<a class="block rounded-box border border-base-300 bg-base-200 px-4 py-2 text-xs hover:border-primary"
-                        href="/ui/outbox?company_id={company_id}&entry_id={entry_id}">
+                        href="/ui/deliveries?company_id={company_id}&entry_id={entry_id}">
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="badge badge-sm {style}">{label}</span>
+                            <span class="badge badge-xs badge-ghost">{transport}</span>
                             <span class="min-w-0 truncate">{subject}</span>
                             <span class="opacity-60">{detail}</span>
                             {attempts}
@@ -902,9 +905,10 @@ fn delivery_row(company_id: Uuid, delivery: &OutboxEntry) -> String {
                         {error}
                     </a>"##,
         entry_id = delivery.id,
-        style = outbox_status_style(delivery.status),
+        style = delivery_status_style(delivery.status),
         label = delivery.status.label(),
-        subject = escape_html_text(delivery.subject().unwrap_or("(no subject)")),
+        transport = escape_html_text(delivery.transport.label()),
+        subject = escape_html_text(&delivery.subject),
     )
 }
 

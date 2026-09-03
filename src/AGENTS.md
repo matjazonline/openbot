@@ -218,7 +218,7 @@ behavior.
 
 Initialize structured tracing before configuration validation, migrations, storage checks, or any
 other fallible startup work. Accept or create one correlation id at ingress, echo it where the
-protocol permits, and carry it as structured data through the message, task, agent, and outbox
+protocol permits, and carry it as structured data through the message, task, agent, and delivery
 stages. Log identifiers and state transitions as fields, not as opaque interpolated sentences.
 
 Never record secrets, credentials, session or approval tokens, raw authorization headers, full

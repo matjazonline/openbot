@@ -12,21 +12,30 @@
 //! dependency-direction test in `dependency_tests.rs` is what stops that returning.
 
 pub mod bounded;
+pub mod compose;
 pub mod delivery;
 pub mod ingress;
 pub mod lease;
 pub mod ports;
+pub mod queue;
 pub mod task_payload;
 
-/// Addressing role is domain transport vocabulary; re-exported here so the transport module reads
-/// as one place.
-pub use crate::entities::transport::{RecipientRole, UnknownRecipientRole};
+/// Addressing role and the delivery state machine are domain transport vocabulary; re-exported
+/// here so the transport module reads as one place.
+pub use crate::entities::transport::{
+    DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, FailureClass, RecipientRole,
+    UnknownRecipientRole, aggregate_parent_status,
+};
 pub use bounded::{BoundedVec, BoundsError};
+pub use compose::{
+    ComposedDelivery, DeliveryComposer, DeliveryRequest, delivery_key, email_context,
+};
 pub use delivery::{
-    ContentDigest, DELIVERY_ENVELOPE_VERSION, DeliveryCandidate, DeliveryDestination,
-    DeliveryEnvelope, DeliveryIntent, DeliveryKey, DeliveryPlanRequest, DeliveryPurpose,
-    FailureClass, FailureDetail, MAX_DELIVERY_PARTS, MAX_PART_PAYLOAD_BYTES, PartIndex, PartKey,
-    PayloadError, ProviderSendOutcome, RenderedPart, TransportPayload, plan_deliveries,
+    CanonicalContentV1, ContentDigest, ContextMismatch, DELIVERY_ENVELOPE_VERSION,
+    DeliveryCandidate, DeliveryContext, DeliveryDestination, DeliveryEnvelope, DeliveryIntent,
+    DeliveryKey, DeliveryPlanRequest, EmailDeliveryContext, EmailRelayTrace, FailureDetail,
+    MAX_DELIVERY_PARTS, MAX_PART_PAYLOAD_BYTES, PartIndex, PartKey, PartTransition, PayloadError,
+    ProviderSendOutcome, RenderedPart, TransportPayload, plan_deliveries,
 };
 pub use ingress::{
     AddressedIdentity, AddressedRecipient, AddressedTarget, CanonicalContent, CommitDisposition,
@@ -39,9 +48,15 @@ pub use ingress::{
 };
 pub use lease::{ExecutionId, ExecutionLease, WorkerId};
 pub use ports::{
-    DeliveryPlanner, ExternalCorrelationStore, InboundMessageCommitter, PolicyDeliveryPlanner,
-    RegisteredTransport, TransportRegistrationError, TransportRegistry, TransportRenderer,
+    DeliveryPlanner, ExternalCorrelationStore, InboundMessageCommitter, InternalMailRelay,
+    InternalRelayMail, PolicyDeliveryPlanner, RegisteredTransport, RelayDisposition,
+    TransportRegistrationError, TransportRegistry, TransportRenderer, TransportRenderers,
     TransportSender,
+};
+pub use queue::{
+    ClaimedDelivery, DELIVERY_CLAIM_BATCH, DELIVERY_LEASE_SECONDS, DeliveryBackoff,
+    DeliveryCreation, DeliveryFailure, DeliveryOutcome, DeliveryQueue, DeliveryReaping,
+    DeliveryRecord, Disposition, MAX_DELIVERY_ATTEMPTS, NewDelivery, PartResult, StoredPart,
 };
 pub use task_payload::{InboundTaskPayload, InboundTaskPayloadV1};
 

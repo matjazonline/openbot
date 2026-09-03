@@ -10,18 +10,19 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use uuid::Uuid;
+
 use crate::{
     entities::{
+        correlation::CorrelationId,
         message::CanonicalMessageId,
         transport::{
-            BindingDeliveryPolicy, ChannelBinding, ChannelBindingId, DeliveryId,
-            ExternalDestination, ExternalMessageKey, TransportKind, bounded_string,
+            ChannelBinding, ChannelBindingId, DeliveryId, DeliveryPartStatus, DeliveryPurpose,
+            ExternalDestination, ExternalMessageKey, FailureClass, TransportKind, bounded_string,
         },
+        value_objects::{EmailAddress, MessageId},
     },
-    transport::{
-        bounded::{BoundedVec, BoundsError},
-        ingress::CanonicalContent,
-    },
+    transport::{bounded::BoundsError, ingress::CanonicalContent},
 };
 
 /// The most parts one logical delivery may be split into. Email renders one; a chat provider with
@@ -56,60 +57,6 @@ impl ContentDigest {
     }
 }
 
-/// Why this delivery exists.
-///
-/// A closed set, because "should this message go out?" must be answered by an explicit policy
-/// entry rather than inferred from direction or role -- the heuristic route is how a system starts
-/// mirroring a category nobody decided to mirror.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DeliveryPurpose {
-    /// The answer to something that arrived on this binding.
-    Reply,
-    /// The same message exposed through another eligible binding.
-    Mirror,
-    /// The agent opening a conversation with a third party.
-    Outreach,
-    /// A platform notice: a bounce, an approval request, a stop notice.
-    Notification,
-}
-
-impl DeliveryPurpose {
-    pub const ALL: &'static [Self] = &[
-        Self::Reply,
-        Self::Mirror,
-        Self::Outreach,
-        Self::Notification,
-    ];
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Reply => "reply",
-            Self::Mirror => "mirror",
-            Self::Outreach => "outreach",
-            Self::Notification => "notification",
-        }
-    }
-
-    /// Whether this purpose starts a conversation rather than continuing one.
-    ///
-    /// A binding whose policy is [`BindingDeliveryPolicy::ReplyOnly`] carries the continuing kinds
-    /// and refuses the starting kind; that is the entire meaning of the policy, stated once.
-    pub const fn initiates_conversation(self) -> bool {
-        match self {
-            Self::Outreach => true,
-            Self::Reply | Self::Mirror | Self::Notification => false,
-        }
-    }
-
-    pub const fn permitted_by(self, policy: BindingDeliveryPolicy) -> bool {
-        match policy {
-            BindingDeliveryPolicy::ReplyAndInitiate => true,
-            BindingDeliveryPolicy::ReplyOnly => !self.initiates_conversation(),
-        }
-    }
-}
-
 /// Where a delivery is going.
 ///
 /// Either a binding this platform owns -- which is how a message reaches a channel's own interface
@@ -127,7 +74,7 @@ impl DeliveryDestination {
     ///
     /// Case-folded for the transports whose addressing is case-insensitive, so the same recipient
     /// written two ways derives one key rather than two deliveries.
-    fn key_fragment(&self) -> String {
+    pub(crate) fn key_fragment(&self) -> String {
         match self {
             Self::Binding(binding_id) => format!("binding:{binding_id}"),
             Self::External(ExternalDestination::Email(address)) => {
@@ -166,12 +113,7 @@ impl DeliveryIntent {
         message_id: CanonicalMessageId,
         destination: &DeliveryDestination,
     ) -> DeliveryKey {
-        DeliveryKey::parse(format!(
-            "{}:{message_id}:{}",
-            purpose.as_str(),
-            destination.key_fragment()
-        ))
-        .expect("a purpose, a UUID and a bounded destination fit the delivery key bound")
+        super::compose::delivery_key(purpose, &format!("message:{message_id}"), destination)
     }
 
     /// The destination binding, when this delivery goes through one.
@@ -423,36 +365,126 @@ pub struct RenderedPart {
     pub digest: ContentDigest,
 }
 
-/// A delivery with its destination resolved and its parts frozen, ready for one transport.
+/// The transport-specific facts a renderer needs on top of the canonical content.
+///
+/// An enum rather than a bag of optional fields, for the same reason
+/// [`crate::transport::IngressPolicyFacts`] is one: there is no way to spell "this Slack post has
+/// a Cc line", because there is no way to attach mail addressing to anything but the email
+/// variant. Each arm is owned by the application because the delivery worker assembles it; the
+/// adapter that consumes it reads its own arm and nothing else.
+///
+/// Deliberately *not* persisted. Parts are rendered and frozen before the first provider call, so
+/// this exists only between resolving a destination and freezing what will be sent -- which is
+/// what keeps the delivery row down to identifiers and the part payload down to wire content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DeliveryContext {
+    Email(EmailDeliveryContext),
+}
+
+impl DeliveryContext {
+    /// The transport this context can be rendered for. A renderer compares it against its own
+    /// kind rather than assuming the worker handed it the right arm.
+    pub const fn transport(&self) -> TransportKind {
+        match self {
+            Self::Email(_) => TransportKind::Email,
+        }
+    }
+
+    pub const fn email(&self) -> Option<&EmailDeliveryContext> {
+        match self {
+            Self::Email(context) => Some(context),
+        }
+    }
+}
+
+/// Everything mail addressing needs that a canonical message does not carry.
+///
+/// The `From` mailbox arrives already resolved from the sending interface. The adapter this
+/// replaces rebuilt it from a channel slug, a company slug and the configured domain at send time,
+/// which meant a renderer could invent an address for a channel that had none.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmailDeliveryContext {
+    pub from: EmailAddress,
+    /// The display name on the `From:` line: the channel's name, or the platform's for a notice.
+    pub from_name: Option<String>,
+    pub recipient_to: EmailAddress,
+    pub recipients_cc: Vec<EmailAddress>,
+    pub in_reply_to: Option<MessageId>,
+    pub references: Vec<MessageId>,
+    /// Loop control for mail that one channel's agent sends, absent for a platform notice.
+    ///
+    /// `None` is what makes a bounce or a stop notice unanswerable: without it the renderer emits
+    /// no `X-MailAgents-*` headers, so the receiving side has no hop count to continue and the
+    /// notice ends the chain instead of extending it.
+    pub relay: Option<EmailRelayTrace>,
+}
+
+/// The inter-channel hop budget one piece of mail carries on the wire.
+///
+/// A struct rather than three loose fields because `hop_count` and the channel ids travel
+/// together: a trace without its hop count is a loop with no bound on it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmailRelayTrace {
+    /// The channel this mail goes out as, which is also the channel a recipient must not be.
+    pub source_channel_id: Uuid,
+    /// Hops already taken. The renderer stamps `hop_count + 1`; ingress refuses beyond
+    /// [`crate::transport::MAX_INGRESS_HOPS`].
+    pub hop_count: u32,
+    pub trace_channels: Vec<Uuid>,
+}
+
+/// A delivery with its destination resolved, ready for one transport's renderer.
 ///
 /// Produced only after destination resolution: the point of the split is that a renderer is handed
 /// a real endpoint rather than being left to invent a channel name or an address, which is what the
-/// adapter this replaces did.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// adapter this replaces did. It carries no parts -- rendering them is what it is *for*.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeliveryEnvelope {
     pub version: u8,
     pub delivery_id: DeliveryId,
     pub intent: DeliveryIntent,
     pub transport: TransportKind,
+    /// The chain this delivery belongs to, inherited from whatever produced it and stamped onto
+    /// the wire where the protocol permits, so a recipient stays on the same trail.
+    pub correlation_id: CorrelationId,
     pub content: CanonicalContentV1,
-    pub parts: BoundedVec<RenderedPart, MAX_DELIVERY_PARTS>,
+    pub context: DeliveryContext,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("a {transport} renderer cannot read a {context} delivery context")]
+pub struct ContextMismatch {
+    pub transport: TransportKind,
+    pub context: TransportKind,
 }
 
 impl DeliveryEnvelope {
+    /// Refuses an envelope whose context does not match the transport it names, rather than
+    /// leaving the renderer to discover it: the two arrive from different places -- the transport
+    /// from the stored row, the context from whatever resolved the destination -- and a mismatch
+    /// means the worker paired the wrong adapter with the wrong endpoint.
     pub fn new(
         delivery_id: DeliveryId,
         intent: DeliveryIntent,
         transport: TransportKind,
+        correlation_id: CorrelationId,
         content: &CanonicalContent,
-        parts: Vec<RenderedPart>,
-    ) -> Result<Self, BoundsError> {
+        context: DeliveryContext,
+    ) -> Result<Self, ContextMismatch> {
+        if context.transport() != transport {
+            return Err(ContextMismatch {
+                transport,
+                context: context.transport(),
+            });
+        }
         Ok(Self {
             version: DELIVERY_ENVELOPE_VERSION,
             delivery_id,
             intent,
             transport,
+            correlation_id,
             content: CanonicalContentV1::from(content),
-            parts: BoundedVec::parse("delivery parts", parts)?,
+            context,
         })
     }
 }
@@ -476,28 +508,6 @@ impl From<&CanonicalContent> for CanonicalContentV1 {
             body_text: content.body_text().to_string(),
         }
     }
-}
-
-/// Why a send did not succeed, in the terms a queue transition needs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum FailureClass {
-    /// The credential was refused. Retrying with the same credential cannot help.
-    Authentication,
-    /// The provider asked us to slow down.
-    RateLimited,
-    /// The provider rejected what we sent. Re-sending the same bytes cannot help.
-    InvalidPayload,
-    /// The destination is gone.
-    DestinationUnavailable,
-    /// The request did not complete: connection, DNS, TLS.
-    Network,
-    /// The request timed out. Whether the provider acted on it is unknown.
-    Timeout,
-    /// The provider reported a fault of its own.
-    ProviderFault,
-    /// Something on our side of the call broke.
-    Internal,
 }
 
 /// What one external request produced.
@@ -560,6 +570,82 @@ impl ProviderSendOutcome {
             | Self::Retryable { class, .. }
             | Self::OutcomeUnknown { class, .. }
             | Self::Terminal { class, .. } => Some(*class),
+        }
+    }
+}
+
+/// How one provider outcome moves the part it answers, and what that costs the delivery.
+///
+/// The mapping is stated here, once, rather than inside the SQL that applies it: which outcomes
+/// are safe to send again, which are terminal, and which cost an attempt is a policy decision, and
+/// a policy decision spread across four `UPDATE` statements is one that drifts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PartTransition {
+    pub status: DeliveryPartStatus,
+    /// The provider's key for what it stored, when the outcome carried one.
+    pub provider_key: Option<ExternalMessageKey>,
+    pub class: Option<FailureClass>,
+    pub detail: Option<FailureDetail>,
+    /// Whether this outcome spends one of the delivery's attempts.
+    ///
+    /// A provider that asked us to wait does not: it refused to act, named its own deadline, and
+    /// charging the delivery for having been rate-limited is how a busy hour exhausts a retry
+    /// budget that was meant for real failures.
+    pub consumes_attempt: bool,
+    /// The provider's own deadline, when it named one. Overrides the computed backoff, because a
+    /// `Retry-After` is an instruction rather than a hint.
+    pub retry_after: Option<Duration>,
+}
+
+impl PartTransition {
+    pub fn of(outcome: &ProviderSendOutcome) -> Self {
+        match outcome {
+            ProviderSendOutcome::Delivered { provider_key } => Self {
+                status: DeliveryPartStatus::Delivered,
+                provider_key: provider_key.clone(),
+                class: None,
+                detail: None,
+                consumes_attempt: false,
+                retry_after: None,
+            },
+            ProviderSendOutcome::RetryAfter {
+                retry_after,
+                class,
+                detail,
+            } => Self {
+                status: DeliveryPartStatus::Retryable,
+                provider_key: None,
+                class: Some(*class),
+                detail: Some(detail.clone()),
+                consumes_attempt: false,
+                retry_after: Some(*retry_after),
+            },
+            ProviderSendOutcome::Retryable { class, detail } => Self {
+                status: DeliveryPartStatus::Retryable,
+                provider_key: None,
+                class: Some(*class),
+                detail: Some(detail.clone()),
+                consumes_attempt: true,
+                retry_after: None,
+            },
+            // Never retryable, and never terminal either: the provider may hold this part, so it
+            // waits for a reconciler rather than being re-sent or written off.
+            ProviderSendOutcome::OutcomeUnknown { class, detail } => Self {
+                status: DeliveryPartStatus::OutcomeUnknown,
+                provider_key: None,
+                class: Some(*class),
+                detail: Some(detail.clone()),
+                consumes_attempt: true,
+                retry_after: None,
+            },
+            ProviderSendOutcome::Terminal { class, detail } => Self {
+                status: DeliveryPartStatus::Dead,
+                provider_key: None,
+                class: Some(*class),
+                detail: Some(detail.clone()),
+                consumes_attempt: true,
+                retry_after: None,
+            },
         }
     }
 }

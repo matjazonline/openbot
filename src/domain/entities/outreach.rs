@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::entities::{correlation::CorrelationId, value_objects::EmailAddress};
+use crate::entities::value_objects::EmailAddress;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -66,32 +66,6 @@ impl OutreachProgress {
             self.response_count as f64 * 100.0 / self.target_count as f64
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct OutreachTargetRequest {
-    pub email: EmailAddress,
-    pub outbox_id: Uuid,
-    pub outbox_payload: serde_json::Value,
-}
-
-#[derive(Debug, Clone)]
-pub struct CreateOutreachRequest {
-    pub id: Uuid,
-    pub task_id: Uuid,
-    pub company_id: Uuid,
-    /// The channel every target email goes out as.
-    pub channel_id: Uuid,
-    /// The chain the outreaching task belongs to, so the emails this sends out and the replies
-    /// they provoke stay on the same trail as the run that asked for them.
-    pub correlation_id: CorrelationId,
-    pub worker_id: Uuid,
-    pub outreach_key: String,
-    pub required_threshold_percent: f64,
-    pub expires_at: DateTime<Utc>,
-    pub subject: String,
-    pub body: String,
-    pub targets: Vec<OutreachTargetRequest>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

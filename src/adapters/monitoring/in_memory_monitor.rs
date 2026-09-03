@@ -7,7 +7,7 @@ use std::sync::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// A gauge's identity is its name *and* its labels. Folding the labels into the key keeps
-/// `stuck_work{kind="dead_lettered"}` from overwriting `stuck_work{kind="outbox_failed"}`.
+/// `stuck_work{kind="dead_lettered"}` from overwriting `stuck_work{kind="delivery_overdue"}`.
 fn gauge_key(name: &str, labels: &[(&str, &str)]) -> String {
     if labels.is_empty() {
         return name.to_string();

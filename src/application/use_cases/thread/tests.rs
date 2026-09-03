@@ -1,6 +1,6 @@
 use super::*;
 use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
-use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit, OutboundSend};
+use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit};
 use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::domain::monitoring::MonitoringService;
 use crate::entities::agent::Agent;
@@ -8,9 +8,11 @@ use crate::entities::channel::{Channel, ChannelAccessMode};
 use crate::entities::company::CompanyAccess;
 use crate::entities::company_member::CompanyMembership;
 use crate::entities::correlation::CorrelationId;
+use crate::entities::message::MessageDirection;
 use crate::entities::task::NewTask;
 use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
 use crate::transport::MAX_INGRESS_HOPS;
+use crate::transport::{DeliveryCreation, NewDelivery};
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::CompanyWrite;
@@ -248,14 +250,85 @@ struct MockTaskPersistence {
     /// multi-channel pipeline's whole point is that the run answers on more than one, and a double
     /// that forgot them would let a pipeline test pass with a single-channel run.
     task_targets: Mutex<HashMap<Uuid, Vec<crate::entities::task::TaskTarget>>>,
-    /// Every send this double was asked to queue, whether on its own or as part of a dispatch
+    /// Every delivery this double was asked to queue, whether on its own or as part of a dispatch
     /// commit. A double that does not record cannot prove a send was *not* made -- which is
     /// exactly what the failed-run tests assert.
-    outbox: Mutex<Vec<OutboundSend>>,
+    deliveries: Mutex<Vec<NewDelivery>>,
     /// Reply messages committed through `commit_agent_dispatch`. They arrive here rather than at
-    /// the thread double because the dispatch commits them as one transaction with the outbox
-    /// row and the task payload.
+    /// the thread double because the dispatch commits them as one transaction with the
+    /// deliveries and the task payload.
     committed_replies: Mutex<Vec<MessageWrite>>,
+}
+
+/// One inter-channel hop, as the email sender hands it to the relay.
+///
+/// The relay is reached through [`InternalMailRelay`] with the mail already frozen. The shape this
+/// replaces rendered an `OutboundEmail` to RFC 5322 first, purely so the ingress path had
+/// something email-shaped to read back -- so a test had to build a full outbound email to exercise
+/// a hop budget.
+struct InternalHop {
+    source_channel_id: Uuid,
+    from: EmailAddress,
+    to: EmailAddress,
+    subject: String,
+    body: String,
+    message_id: MessageId,
+    in_reply_to: Option<MessageId>,
+    references: Vec<MessageId>,
+    /// The hop count this message *carries*, which is what the sender hands the relay: the
+    /// renderer has already added one for the hop the mail itself is.
+    hop_count: u32,
+    trace_channels: Vec<Uuid>,
+    correlation_id: CorrelationId,
+}
+
+impl InternalHop {
+    fn new(source_channel_id: Uuid, from: &str, to: &str, subject: &str, body: &str) -> Self {
+        Self {
+            source_channel_id,
+            from: EmailAddress::from(from),
+            to: EmailAddress::from(to),
+            subject: subject.to_string(),
+            body: body.to_string(),
+            message_id: MessageId::from(format!("<{}@mailagents.com>", Uuid::new_v4())),
+            in_reply_to: None,
+            references: Vec::new(),
+            hop_count: 0,
+            trace_channels: Vec::new(),
+            correlation_id: CorrelationId::new(),
+        }
+    }
+}
+
+/// Hand one hop to the relay, the way the email sender does before reaching SMTP.
+async fn relay_hop(
+    use_cases: &ThreadUseCases,
+    hop: &InternalHop,
+) -> crate::transport::RelayDisposition {
+    use_cases
+        .relay_internal(&crate::transport::InternalRelayMail {
+            from: &hop.from,
+            recipient_to: &hop.to,
+            subject: &hop.subject,
+            body_text: &hop.body,
+            message_id: &hop.message_id,
+            in_reply_to: hop.in_reply_to.as_ref(),
+            references: &hop.references,
+            source_channel_id: hop.source_channel_id,
+            hop_count: hop.hop_count,
+            trace: hop.trace_channels.clone(),
+            correlation_id: hop.correlation_id,
+        })
+        .await
+        .expect("the relay reached a verdict")
+}
+
+/// The refusal a relayed hop carries, or `None` when it was accepted.
+fn refusal(disposition: &crate::transport::RelayDisposition) -> Option<&str> {
+    match disposition {
+        crate::transport::RelayDisposition::Refused(reason) => Some(reason.as_str()),
+        _ => None,
+    }
 }
 
 struct MockAgentPersistence {
@@ -298,7 +371,7 @@ impl TaskPersistence for MockTaskPersistence {
     /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
     async fn record_outreach_request_message(
         &self,
-        _outbox_id: Uuid,
+        _delivery_id: crate::entities::transport::DeliveryId,
         _write: &crate::use_cases::thread::MessageWrite,
     ) -> AppResult<crate::entities::message::CanonicalMessageId> {
         unreachable!("no fixture here sends an outreach")
@@ -333,11 +406,12 @@ impl TaskPersistence for MockTaskPersistence {
             .lock()
             .unwrap()
             .push(commit.reply.message.clone());
-        let outbox_id = commit.outbound.map(|send| {
-            self.outbox.lock().unwrap().push(send);
-            Uuid::new_v4()
-        });
-        Ok(DispatchCommit::Committed { outbox_id })
+        let mut queued = Vec::with_capacity(commit.deliveries.len());
+        for delivery in commit.deliveries {
+            queued.push(DeliveryCreation::Created(delivery.id));
+            self.deliveries.lock().unwrap().push(delivery);
+        }
+        Ok(DispatchCommit::Committed { deliveries: queued })
     }
 
     async fn renew_task_lease(
@@ -348,11 +422,11 @@ impl TaskPersistence for MockTaskPersistence {
         Ok(true)
     }
 
-    /// Records instead of accepting silently, so a test can assert nothing was queued.
-    async fn enqueue_outbound_send(&self, send: OutboundSend) -> AppResult<Option<Uuid>> {
-        let id = Uuid::new_v4();
-        self.outbox.lock().unwrap().push(send);
-        Ok(Some(id))
+    /// Records instead of refusing, so a test can assert nothing was queued.
+    async fn enqueue_delivery(&self, delivery: NewDelivery) -> AppResult<DeliveryCreation> {
+        let created = DeliveryCreation::Created(delivery.id);
+        self.deliveries.lock().unwrap().push(delivery);
+        Ok(created)
     }
 
     async fn find_correlated_outreach_reply(
@@ -780,34 +854,28 @@ async fn test_inter_channel_hop_limit_rejection() {
         config,
     );
 
-    let prepared = thread_use_cases
-        .prepare_internal_channel_delivery(
-            OutboundEmail {
-                correlation_id: CorrelationId::new(),
-                channel_id: source_channel_id,
-                channel_name: "Source Flow".to_string(),
-                channel_slug: "source".into(),
-                company_slug: "acme".into(),
-                trigger_message_id: "<source@example.com>".into(),
-                thread_references: Vec::new(),
-                recipient_to: "inbound@acme.mailagents.com".into(),
-                recipients_cc: Vec::new(),
-                subject: "Test Inter Channel".to_string(),
-                body_text: "Hello".to_string(),
-                hop_count: MAX_INGRESS_HOPS - 1,
-                trace_channels: Vec::new(),
-            },
-            Some("hop-limit-test"),
-        )
-        .await
-        .unwrap()
-        .unwrap();
-    let result = thread_use_cases
-        .ingest_prepared_internal_message(&prepared)
-        .await
-        .unwrap();
-    assert!(!result.accepted);
-    assert_eq!(result.reason(), Some("Max inter-channel hop count reached"));
+    let disposition = relay_hop(
+        &thread_use_cases,
+        &InternalHop {
+            hop_count: MAX_INGRESS_HOPS,
+            in_reply_to: Some("<source@example.com>".into()),
+            ..InternalHop::new(
+                source_channel_id,
+                "source@acme.mailagents.com",
+                "inbound@acme.mailagents.com",
+                "Test Inter Channel",
+                "Hello",
+            )
+        },
+    )
+    .await;
+
+    // Refused, and definitely so: the receiving channel will say the same thing next time, so the
+    // sender records a terminal outcome rather than spending five attempts on it.
+    assert_eq!(
+        refusal(&disposition),
+        Some("Max inter-channel hop count reached")
+    );
 }
 
 #[tokio::test]
@@ -2565,41 +2633,31 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
         .unwrap();
     let parent_task_id = initial.task_id.unwrap();
     let thread_a = initial.thread.unwrap();
-    let call = use_cases
-        .prepare_internal_channel_delivery(
-            OutboundEmail {
-                correlation_id: CorrelationId::new(),
-                channel_id: channel_a_id,
-                channel_name: "Agent A".to_string(),
-                channel_slug: "agent-a".into(),
-                company_slug: "acme".into(),
-                trigger_message_id: "<human-request@example.com>".into(),
-                thread_references: Vec::new(),
-                recipient_to: "agent-b@acme.mailagents.com".into(),
-                recipients_cc: Vec::new(),
-                subject: "Acquire data".to_string(),
-                body_text: "Obtain supplier data".to_string(),
-                hop_count: 0,
-                trace_channels: Vec::new(),
-            },
-            Some("agent-a-call"),
+    // The frozen hop agent A sends to agent B. The sender chooses the `Message-ID` before it
+    // relays, which is exactly what lets the calling thread record the question it asked.
+    let call = InternalHop {
+        in_reply_to: Some("<human-request@example.com>".into()),
+        ..InternalHop::new(
+            channel_a_id,
+            "agent-a@acme.mailagents.com",
+            "agent-b@acme.mailagents.com",
+            "Acquire data",
+            "Obtain supplier data",
         )
-        .await
-        .unwrap()
-        .unwrap();
-    let call_message_id = call.outbound_message_id.clone();
+    };
+    let call_message_id = call.message_id.clone();
     thread_persistence
         .create_message(&email_write(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id: thread_a.id,
             message_id: call_message_id.clone(),
-            in_reply_to: Some(call.in_reply_to.clone()),
+            in_reply_to: call.in_reply_to.clone(),
             references_list: call.references.clone(),
-            sender: call.from_address.clone(),
-            recipients_to: call.recipients_to.clone(),
-            recipients_cc: call.recipients_cc.clone(),
+            sender: call.from.clone(),
+            recipients_to: vec![call.to.clone()],
+            recipients_cc: Vec::new(),
             subject: call.subject.clone(),
-            clean_text_body: call.body_text.clone(),
+            clean_text_body: call.body.clone(),
             raw_text_body: None,
             raw_html_body: None,
             attachments: None,
@@ -2626,49 +2684,49 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
         });
         parent_task.status = crate::entities::task::TaskStatus::WaitingForThirdPartyReply;
     }
-    let delegated = use_cases
-        .ingest_prepared_internal_message(&call)
-        .await
-        .unwrap();
-    assert!(delegated.accepted);
-    assert!(delegated.task_id.is_some());
-    assert_ne!(delegated.thread.as_ref().unwrap().id, thread_a.id);
-    assert_eq!(delegated.thread.as_ref().unwrap().channel_id, channel_b_id);
+    assert_eq!(
+        relay_hop(&use_cases, &call).await,
+        crate::transport::RelayDisposition::Relayed
+    );
+    let delegated_threads = thread_persistence.threads();
+    let delegated = delegated_threads
+        .iter()
+        .find(|thread| thread.channel_id == channel_b_id)
+        .expect("the hop opened a thread on the receiving channel");
+    assert_ne!(delegated.id, thread_a.id);
+    assert_eq!(
+        task_persistence.tasks.lock().unwrap().len(),
+        2,
+        "the delegated hop earned the receiving channel a run of its own"
+    );
 
-    let prepared = use_cases
-        .prepare_internal_channel_delivery(
-            OutboundEmail {
-                correlation_id: CorrelationId::new(),
-                channel_id: channel_b_id,
-                channel_name: "Agent B".to_string(),
-                channel_slug: "agent-b".into(),
-                company_slug: "acme".into(),
-                trigger_message_id: call_message_id.clone(),
-                thread_references: vec![
-                    "<human-request@example.com>".into(),
-                    call_message_id.clone(),
-                ],
-                recipient_to: "agent-a@acme.mailagents.com".into(),
-                recipients_cc: Vec::new(),
-                subject: "Acquire data".to_string(),
-                body_text: "Supplier confirmed 2,000 units".to_string(),
+    // And agent B's answer, back over the same relay.
+    assert_eq!(
+        relay_hop(
+            &use_cases,
+            &InternalHop {
                 hop_count: 1,
                 trace_channels: vec![channel_a_id],
-            },
-            Some("agent-b-result"),
+                in_reply_to: Some(call_message_id.clone()),
+                references: vec![
+                    "<human-request@example.com>".into(),
+                    call_message_id.clone()
+                ],
+                ..InternalHop::new(
+                    channel_b_id,
+                    "agent-b@acme.mailagents.com",
+                    "agent-a@acme.mailagents.com",
+                    "Acquire data",
+                    "Supplier confirmed 2,000 units",
+                )
+            }
         )
-        .await
-        .unwrap()
-        .unwrap();
-    let callback = use_cases
-        .ingest_prepared_internal_message(&prepared)
-        .await
-        .unwrap();
+        .await,
+        crate::transport::RelayDisposition::Relayed
+    );
 
-    assert!(callback.accepted);
-    assert!(callback.task_id.is_none());
-    assert_eq!(callback.thread.unwrap().id, thread_a.id);
-    assert_eq!(callback.inbound_message.unwrap().role, MessageRole::Agent);
+    // The answer lands in the *calling* thread rather than opening a third one, and it resumes the
+    // parked run rather than starting another: agent A asked, agent B answered, one chain.
     assert_eq!(
         task_persistence
             .get_task_by_id(parent_task_id)
@@ -2758,36 +2816,28 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
         internal_test_config(),
     );
 
-    let unsolicited_prepared = use_cases
-        .prepare_internal_channel_delivery(
-            OutboundEmail {
-                correlation_id: CorrelationId::new(),
-                channel_id: channel_b_id,
-                channel_name: "Agent B".to_string(),
-                channel_slug: "agent-b".into(),
-                company_slug: "acme".into(),
-                trigger_message_id: "<unsolicited@example.com>".into(),
-                thread_references: vec!["<unsolicited@example.com>".into()],
-                recipient_to: "agent-a@acme.mailagents.com".into(),
-                recipients_cc: Vec::new(),
-                subject: "Unsolicited message".to_string(),
-                body_text: "Spontaneous message".to_string(),
-                hop_count: 1,
-                trace_channels: vec![channel_a_id],
-            },
-            None,
-        )
-        .await
-        .unwrap()
-        .unwrap();
+    let disposition = relay_hop(
+        &use_cases,
+        &InternalHop {
+            hop_count: 1,
+            trace_channels: vec![channel_a_id],
+            in_reply_to: Some("<unsolicited@example.com>".into()),
+            references: vec!["<unsolicited@example.com>".into()],
+            ..InternalHop::new(
+                channel_b_id,
+                "agent-b@acme.mailagents.com",
+                "agent-a@acme.mailagents.com",
+                "Unsolicited message",
+                "Spontaneous message",
+            )
+        },
+    )
+    .await;
 
-    let result = use_cases
-        .ingest_prepared_internal_message(&unsolicited_prepared)
-        .await
-        .unwrap();
-
-    assert!(!result.accepted);
-    assert_eq!(result.reason(), Some("Inter-channel loop cycle detected"));
+    assert_eq!(
+        refusal(&disposition),
+        Some("Inter-channel loop cycle detected")
+    );
 }
 
 #[tokio::test]
@@ -2867,36 +2917,26 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
         internal_test_config(),
     );
 
-    let max_hop_prepared = use_cases
-        .prepare_internal_channel_delivery(
-            OutboundEmail {
-                correlation_id: CorrelationId::new(),
-                channel_id: channel_a_id,
-                channel_name: "Agent A".to_string(),
-                channel_slug: "agent-a".into(),
-                company_slug: "acme".into(),
-                trigger_message_id: "<msg@example.com>".into(),
-                thread_references: Vec::new(),
-                recipient_to: "agent-b@acme.mailagents.com".into(),
-                recipients_cc: Vec::new(),
-                subject: "Deep loop".to_string(),
-                body_text: "Exceeding max hops".to_string(),
-                hop_count: MAX_INGRESS_HOPS,
-                trace_channels: Vec::new(),
-            },
-            None,
-        )
-        .await
-        .unwrap()
-        .unwrap();
+    let disposition = relay_hop(
+        &use_cases,
+        &InternalHop {
+            hop_count: MAX_INGRESS_HOPS,
+            in_reply_to: Some("<msg@example.com>".into()),
+            ..InternalHop::new(
+                channel_a_id,
+                "agent-a@acme.mailagents.com",
+                "agent-b@acme.mailagents.com",
+                "Deep loop",
+                "Exceeding max hops",
+            )
+        },
+    )
+    .await;
 
-    let result = use_cases
-        .ingest_prepared_internal_message(&max_hop_prepared)
-        .await
-        .unwrap();
-
-    assert!(!result.accepted);
-    assert_eq!(result.reason(), Some("Max inter-channel hop count reached"));
+    assert_eq!(
+        refusal(&disposition),
+        Some("Max inter-channel hop count reached")
+    );
 }
 
 #[tokio::test]
@@ -4449,12 +4489,12 @@ async fn an_agent_cannot_use_help_to_enumerate_its_company() {
 ///
 /// This is the regression for the shape where `run_agents` turned an `Err` into an `AgentOutput`
 /// whose content was `"Agent execution failed: .."`. That string became the reply body, was
-/// written into every matched thread as an agent message, and was queued in the outbox for
+/// written into every matched thread as an agent message, and was queued for
 /// delivery -- and only afterwards was the failure reported to the worker for retry. So a
 /// transient provider blip both emailed the error to the customer and left a message the retry
 /// then had to reconcile with.
 #[tokio::test]
-async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
+async fn a_failed_agent_run_commits_no_reply_message_and_no_delivery() {
     let company_id = Uuid::new_v4();
     let channel_id = Uuid::new_v4();
 
@@ -4575,7 +4615,7 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
         "a failed run must commit no reply through the dispatch commit either"
     );
     assert!(
-        task_persistence.outbox.lock().unwrap().is_empty(),
+        task_persistence.deliveries.lock().unwrap().is_empty(),
         "a failed run must queue no email"
     );
 }

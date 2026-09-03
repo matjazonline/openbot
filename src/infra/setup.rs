@@ -3,6 +3,7 @@ use crate::{
         http::{app_state::AppState, session::SessionAuthority},
         memory::{hindsight::HindsightProvider, hydradb::HydraDbProvider},
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
+        protocols::email::{EmailRenderer, EmailSender},
         smtp::LettreMailTransport,
         storage::{FileStorage, gcs::GcsFileStorage},
     },
@@ -22,6 +23,7 @@ use crate::{
         outbound_dispatcher::{MailTransport, OutboundDispatcher, SmtpConfirmationSender},
         runtime_metrics::MemoryProviderActivity,
     },
+    transport::{DeliveryComposer, TransportRegistry, TransportRenderers},
     use_cases::{
         agent::AgentUseCases,
         approval::ApprovalUseCases,
@@ -30,7 +32,7 @@ use crate::{
         company_invite::CompanyInviteUseCases,
         memory::MemoryUseCases,
         schedule::ScheduleUseCases,
-        thread::{InboundIngestPorts, ThreadUseCases},
+        thread::{InboundIngestPorts, ThreadStores, ThreadUseCases},
         user::{EmailConfirmation, UserUseCases},
     },
 };
@@ -145,34 +147,62 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         },
     );
 
+    // Renderers first, then the use cases that freeze parts with them, then the senders -- one of
+    // which needs those use cases as its internal relay. Building the pair in that order is what
+    // keeps the wiring acyclic; see `TransportRenderers`.
+    let email_renderer = Arc::new(EmailRenderer::new(&config.app_domain_name));
+    let renderers = Arc::new(
+        TransportRenderers::new()
+            .register(email_renderer.clone())
+            .map_err(|error| anyhow::anyhow!("Could not register the email renderer: {error}"))?,
+    );
+    let delivery_composer = DeliveryComposer::new(renderers.clone(), postgres_arc.clone());
+
     let approval_use_cases = Arc::new(ApprovalUseCases::new(
         postgres_arc.clone(),
         postgres_arc.clone(),
         postgres_arc.clone(),
+        delivery_composer.clone(),
         config.clone(),
     ));
 
     let thread_use_cases = Arc::new(
         ThreadUseCases::new(
-            postgres_arc.clone(),
-            postgres_arc.clone(),
-            postgres_arc.clone(),
-            postgres_arc.clone(),
-            postgres_arc.clone(),
+            ThreadStores {
+                threads: postgres_arc.clone(),
+                channels: postgres_arc.clone(),
+                companies: postgres_arc.clone(),
+                participants: postgres_arc.clone(),
+                tasks: postgres_arc.clone(),
+            },
             InboundIngestPorts {
                 committer: postgres_arc.clone(),
                 correlation: postgres_arc.clone(),
                 bindings: postgres_arc.clone(),
             },
+            renderers.clone(),
             config.clone(),
         )
         .with_agent_run_timeout(agent_run_timeout)
-        .with_mail_transport(mail_transport)
+        .with_mail_transport(mail_transport.clone())
         .with_agent_persistence(postgres_arc.clone())
         .with_agent_channel_provisioning(postgres_arc.clone())
         .with_approval_use_cases(approval_use_cases.clone())
         .with_monitoring(monitoring.clone())
         .with_memory(memory_coordinator),
+    );
+
+    // The email sender reaches the internal relay before SMTP, so a channel answering another
+    // channel of the same company never leaves the building.
+    let transports = Arc::new(
+        TransportRegistry::new()
+            .register(
+                // The same renderer instance the producers freeze parts with, so a queued part and
+                // a re-render can never disagree about the deployment's own domain.
+                email_renderer,
+                Arc::new(EmailSender::new(mail_transport, thread_use_cases.clone())),
+            )
+            .map_err(|error| anyhow::anyhow!("Could not register the email transport: {error}"))?,
     );
 
     let schedule_use_cases = Arc::new(ScheduleUseCases::new(
@@ -205,6 +235,9 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         memory_provider_activity,
         sessions,
         file_storage,
+        transports,
+        deliveries: postgres_arc.clone(),
+        delivery_queue: postgres_arc.clone(),
         events: MailboxEvents::new(),
     })
 }

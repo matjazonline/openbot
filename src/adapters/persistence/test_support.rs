@@ -3,10 +3,10 @@
 //! # Why these tests do not use the development database
 //!
 //! The queue operations under test are deliberately unscoped: `claim_pending_tasks` and
-//! `claim_outbox_emails` sweep every row in the database, because that is what a real worker does.
+//! `claim_deliveries` sweep every row in the database, because that is what a real worker does.
 //! Pointed at the development database, a test run therefore competes with — and claims rows out
-//! from under — a `cargo run` server polling the same queues twice a second, and can mark real
-//! deliveries failed through `reap_expired_outbox_leases`.
+//! from under — a `cargo run` server polling the same queues twice a second, and can charge real
+//! deliveries an attempt through `reap_expired_deliveries`.
 //!
 //! So the tests get their own database, derived from `DATABASE_URL` by suffixing the database name.
 //! The command `src/adapters/persistence/AGENTS.md` tells you to run is unchanged; it just lands
@@ -33,6 +33,27 @@
 
 use sqlx::PgPool;
 use tokio::sync::{Mutex, OnceCell};
+use uuid::Uuid;
+
+use crate::{
+    adapters::persistence::PostgresPersistence,
+    entities::{
+        correlation::CorrelationId,
+        message::{CanonicalMessageId, MessageDirection, MessageRole},
+        transport::{
+            ChannelBindingId, DeliveryId, DeliveryPurpose, ExternalDestination, TransportKind,
+        },
+        value_objects::EmailAddress,
+    },
+    transport::{
+        ContentDigest, DeliveryKey, MAX_DELIVERY_ATTEMPTS, NewDelivery, PartIndex, PartKey,
+        RenderedPart, TransportPayload,
+    },
+    use_cases::{
+        integration::ChannelBindingPersistence,
+        thread::{MessageAuthorWrite, MessageWrite, ThreadPersistence},
+    },
+};
 
 /// The suffix that separates the tests' database from the one you develop against.
 const TEST_DB_SUFFIX: &str = "_test";
@@ -197,6 +218,140 @@ pub async fn test_pool() -> Option<PgPool> {
         .await;
 
     Some(pool)
+}
+
+/// One canonical message and one delivery carrying it, on the channel's own email interface.
+///
+/// Shared because three test modules need the same four rows -- a message, its thread association,
+/// the interface, and the queue row -- and because a delivery's foreign keys make "just insert a
+/// row" impossible: every one of them has to be a real, same-company row.
+pub struct DeliveryFixture {
+    pub delivery: NewDelivery,
+    pub message_id: CanonicalMessageId,
+    pub binding_id: ChannelBindingId,
+}
+
+/// What a fixture delivery should look like. Defaults to a plain email reply to one recipient.
+pub struct DeliveryFixtureRequest<'a> {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub thread_id: Uuid,
+    pub task_id: Option<Uuid>,
+    /// Distinguishes one fixture delivery from another within the same interface, which is what
+    /// the unique index is over.
+    pub source_key: &'a str,
+    pub recipient: &'a str,
+    pub subject: &'a str,
+    pub body: &'a str,
+    pub purpose: DeliveryPurpose,
+    /// How many parts to freeze. Email renders one; more than one exercises the aggregation rule
+    /// that a parent is delivered only when every part is.
+    pub parts: u16,
+    pub depends_on: Option<DeliveryId>,
+}
+
+impl<'a> DeliveryFixtureRequest<'a> {
+    pub fn new(company_id: Uuid, channel_id: Uuid, thread_id: Uuid, source_key: &'a str) -> Self {
+        Self {
+            company_id,
+            channel_id,
+            thread_id,
+            task_id: None,
+            source_key,
+            recipient: "customer@example.com",
+            subject: "Re: order",
+            body: "On its way.",
+            purpose: DeliveryPurpose::Reply,
+            parts: 1,
+            depends_on: None,
+        }
+    }
+}
+
+/// Write the message and return the delivery that carries it, ready to insert.
+///
+/// The delivery is *not* written: callers insert it through the path they are testing -- the
+/// dispatch commit, the outreach transaction, or `enqueue_delivery` -- which is the whole point of
+/// the exercise.
+pub async fn delivery_fixture(
+    persistence: &PostgresPersistence,
+    request: DeliveryFixtureRequest<'_>,
+) -> DeliveryFixture {
+    let binding = ChannelBindingPersistence::active_bindings_for_channel(
+        persistence,
+        request.company_id,
+        request.channel_id,
+    )
+    .await
+    .expect("the channel's interfaces are readable")
+    .into_iter()
+    .find(|binding| binding.transport == TransportKind::Email)
+    .expect("a channel is created with its canonical email interface");
+
+    let write = MessageWrite::internal(
+        request.thread_id,
+        MessageAuthorWrite::Platform,
+        request.subject.to_string(),
+        request.body.to_string(),
+        MessageDirection::Outbound,
+        MessageRole::Agent,
+        CorrelationId::new(),
+    );
+    let message_id = write.id;
+    ThreadPersistence::create_message(persistence, &write)
+        .await
+        .expect("the fixture message is stored");
+
+    let destination = ExternalDestination::Email(EmailAddress::from(request.recipient));
+    let key = crate::transport::delivery_key(
+        request.purpose,
+        request.source_key,
+        &crate::transport::DeliveryDestination::External(destination.clone()),
+    );
+
+    DeliveryFixture {
+        message_id,
+        binding_id: binding.id,
+        delivery: NewDelivery {
+            id: DeliveryId::random(),
+            company_id: request.company_id,
+            channel_id: request.channel_id,
+            message_id,
+            source_binding_id: binding.id,
+            destination_binding_id: binding.id,
+            external_destination: Some(destination),
+            task_id: request.task_id,
+            depends_on_delivery_id: request.depends_on,
+            correlation_id: CorrelationId::new(),
+            transport: TransportKind::Email,
+            purpose: request.purpose,
+            idempotency_key: key.clone(),
+            max_attempts: MAX_DELIVERY_ATTEMPTS,
+            parts: NewDelivery::frozen_parts(
+                (0..request.parts)
+                    .map(|index| fixture_part(&key, index, request.body))
+                    .collect(),
+            )
+            .expect("a fixture freezes at least one part and fewer than the bound"),
+        },
+    }
+}
+
+/// One frozen part, keyed the way the email renderer keys its own: from the delivery's stable
+/// idempotency key, so a re-render addresses the part that already exists.
+fn fixture_part(key: &DeliveryKey, index: u16, body: &str) -> RenderedPart {
+    RenderedPart {
+        index: PartIndex::new(index),
+        key: PartKey::parse(format!("email:{}:{index}", key.as_str()))
+            .expect("a fixture part key is within its bound"),
+        payload: TransportPayload::encode(
+            TransportKind::Email,
+            crate::adapters::protocols::email::OUTBOUND_EMAIL_VERSION,
+            &serde_json::json!({ "fixture": index }),
+        )
+        .expect("a small object encodes"),
+        digest: ContentDigest::sha256_of(body.as_bytes()),
+    }
 }
 
 #[cfg(test)]

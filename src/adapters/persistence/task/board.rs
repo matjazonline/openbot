@@ -11,6 +11,7 @@ use tracing::warn;
 use uuid::Uuid;
 
 use super::*;
+use crate::adapters::persistence::delivery::read::deliveries_for_tasks;
 use crate::app_error::{AppError, AppResult};
 use crate::entities::{
     correlation::CorrelationId,
@@ -27,7 +28,7 @@ use crate::entities::{
 /// push an aggregate predicate below its own grouping — so on its own the window filter runs
 /// *after* the scan it was meant to bound, over every task the company has ever run. These are the
 /// same three conditions written at row level, where an index can serve them: unfinished work,
-/// unresolved work, or anything touched since the cutoff. The outbox arm also closes a real gap —
+/// unresolved work, or anything touched since the cutoff. The delivery arm also closes a real gap —
 /// a chain whose only recent activity is a delivery was previously selected only incidentally.
 pub(crate) const BOARD_ELIGIBLE_RECENT: &str = r#"
                    SELECT correlation_id FROM (
@@ -39,9 +40,10 @@ pub(crate) const BOARD_ELIGIBLE_RECENT: &str = r#"
                               OR updated_at >= $3)
                        UNION
                        SELECT correlation_id
-                       FROM email_outbox
+                       FROM message_deliveries
                        WHERE company_id = $1
-                         AND (status IN ('pending', 'sending', 'failed')
+                         AND (status IN ('pending', 'sending', 'retryable',
+                                         'outcome_unknown', 'dead_letter')
                               OR updated_at >= $3)
                    ) AS recent
                    WHERE $2::uuid IS NULL OR EXISTS (
@@ -80,14 +82,14 @@ pub(crate) const BOARD_ELIGIBLE_EVERY_CHAIN: &str = r#"
 /// `debug_assert`, is what keeps the two rung-for-rung identical in a release build.
 pub(crate) const CHAIN_STAGE_SQL_CASE: &str = r#"CASE
                               WHEN failed > 0 OR dead_letter > 0 OR stopped > 0
-                                   OR expired_processing > 0 OR delivery_failed > 0
+                                   OR expired_processing > 0 OR delivery_unresolved > 0
                                   THEN 'needs_attention'
                               WHEN pending_approval > 0 THEN 'waiting_approval'
                               WHEN processing > 0 OR delivery_sending > 0 THEN 'running'
                               WHEN waiting_reply > 0 THEN 'waiting_reply'
-                              WHEN pending > 0 OR delivery_pending > 0 THEN 'queued'
+                              WHEN pending > 0 OR delivery_queued > 0 THEN 'queued'
                               WHEN total_tasks > 0 AND completed = total_tasks
-                                   AND delivery_sent = total_deliveries THEN 'completed'
+                                   AND delivery_delivered = total_deliveries THEN 'completed'
                               ELSE 'needs_attention'
                           END"#;
 
@@ -169,22 +171,28 @@ pub(crate) fn board_query_sql(eligible: &str) -> String {
                    GROUP BY task.correlation_id
                ),
                delivery_rollup AS (
-                   SELECT outbox.correlation_id,
+                   SELECT delivery.correlation_id,
                           COUNT(*)::bigint AS total_deliveries,
-                          COUNT(*) FILTER (WHERE outbox.status = 'pending')::bigint
-                              AS delivery_pending,
-                          COUNT(*) FILTER (WHERE outbox.status = 'sending')::bigint
+                          COUNT(*) FILTER (
+                              WHERE delivery.status IN ('pending', 'retryable')
+                          )::bigint AS delivery_queued,
+                          COUNT(*) FILTER (WHERE delivery.status = 'sending')::bigint
                               AS delivery_sending,
-                          COUNT(*) FILTER (WHERE outbox.status = 'sent')::bigint AS delivery_sent,
-                          COUNT(*) FILTER (WHERE outbox.status = 'failed')::bigint
-                              AS delivery_failed,
-                          MAX(outbox.updated_at) AS delivery_last_activity,
-                          MIN(outbox.available_at) FILTER (WHERE outbox.status = 'pending')
-                              AS delivery_next_action
-                   FROM email_outbox AS outbox
-                   JOIN eligible ON eligible.correlation_id = outbox.correlation_id
-                   WHERE outbox.company_id = $1
-                   GROUP BY outbox.correlation_id
+                          COUNT(*) FILTER (WHERE delivery.status = 'delivered')::bigint
+                              AS delivery_delivered,
+                          -- Dead letters and unconfirmed outcomes together: both need a human,
+                          -- and a chain holding either did not finish.
+                          COUNT(*) FILTER (
+                              WHERE delivery.status IN ('dead_letter', 'outcome_unknown')
+                          )::bigint AS delivery_unresolved,
+                          MAX(delivery.updated_at) AS delivery_last_activity,
+                          MIN(delivery.available_at) FILTER (
+                              WHERE delivery.status IN ('pending', 'retryable')
+                          ) AS delivery_next_action
+                   FROM message_deliveries AS delivery
+                   JOIN eligible ON eligible.correlation_id = delivery.correlation_id
+                   WHERE delivery.company_id = $1
+                   GROUP BY delivery.correlation_id
                ),
                combined AS (
                    SELECT task_rollup.correlation_id, task_rollup.title,
@@ -194,10 +202,10 @@ pub(crate) fn board_query_sql(eligible: &str) -> String {
                           task_rollup.waiting_reply, task_rollup.completed, task_rollup.failed,
                           task_rollup.dead_letter, task_rollup.stopped,
                           COALESCE(delivery_rollup.total_deliveries, 0) AS total_deliveries,
-                          COALESCE(delivery_rollup.delivery_pending, 0) AS delivery_pending,
+                          COALESCE(delivery_rollup.delivery_queued, 0) AS delivery_queued,
                           COALESCE(delivery_rollup.delivery_sending, 0) AS delivery_sending,
-                          COALESCE(delivery_rollup.delivery_sent, 0) AS delivery_sent,
-                          COALESCE(delivery_rollup.delivery_failed, 0) AS delivery_failed,
+                          COALESCE(delivery_rollup.delivery_delivered, 0) AS delivery_delivered,
+                          COALESCE(delivery_rollup.delivery_unresolved, 0) AS delivery_unresolved,
                           task_rollup.created_at,
                           GREATEST(
                               task_rollup.task_last_activity,
@@ -208,11 +216,11 @@ pub(crate) fn board_query_sql(eligible: &str) -> String {
                           task_rollup.retry_count, task_rollup.failure_summary,
                           (task_rollup.pending + task_rollup.processing
                               + task_rollup.pending_approval + task_rollup.waiting_reply
-                              + COALESCE(delivery_rollup.delivery_pending, 0)
+                              + COALESCE(delivery_rollup.delivery_queued, 0)
                               + COALESCE(delivery_rollup.delivery_sending, 0)) > 0 AS is_active,
                           (task_rollup.failed + task_rollup.dead_letter
                               + task_rollup.expired_processing
-                              + COALESCE(delivery_rollup.delivery_failed, 0)) > 0 AS is_unresolved
+                              + COALESCE(delivery_rollup.delivery_unresolved, 0)) > 0 AS is_unresolved
                    FROM task_rollup
                    JOIN participant_rollup
                      ON participant_rollup.correlation_id = task_rollup.correlation_id
@@ -240,8 +248,8 @@ pub(crate) fn board_query_sql(eligible: &str) -> String {
                SELECT correlation_id, stage, title, channel_names, agent_names,
                       total_tasks, pending, processing, expired_processing, pending_approval,
                       waiting_reply, completed, failed, dead_letter, stopped,
-                      total_deliveries, delivery_pending, delivery_sending, delivery_sent,
-                      delivery_failed, created_at, last_activity_at, next_action_at, retry_count,
+                      total_deliveries, delivery_queued, delivery_sending, delivery_delivered,
+                      delivery_unresolved, created_at, last_activity_at, next_action_at, retry_count,
                       failure_summary, stage_total
                FROM ranked
                WHERE stage_rank <= $4
@@ -525,32 +533,21 @@ pub(crate) async fn chain_detail_on(
             .collect::<AppResult<Vec<_>>>()?,
     );
 
-    let mut delivery_rows = sqlx::query_as::<_, OutboxEntryDb>(&format!(
-        "SELECT {OUTBOX_COLUMNS} FROM email_outbox
-          WHERE company_id = $1 AND task_id = ANY($2)
-          ORDER BY task_id, created_at, id
-          LIMIT $3"
-    ))
-    .bind(company_id)
-    .bind(&task_ids)
-    .bind(probe_limit(CHAIN_DETAIL_MAX_DELIVERIES))
-    .fetch_all(pool)
-    .await
-    .map_err(AppError::from)?;
+    let mut delivery_rows = deliveries_for_tasks(
+        pool,
+        company_id,
+        &task_ids,
+        probe_limit(CHAIN_DETAIL_MAX_DELIVERIES),
+    )
+    .await?;
     truncated |= trim_to_limit(&mut delivery_rows, CHAIN_DETAIL_MAX_DELIVERIES);
     let mut deliveries = group_by_task(
         delivery_rows
             .into_iter()
-            .map(|row| {
-                // `task_id = ANY($2)` is what selected these rows, so the column cannot be
-                // null here; the entry carries it as an `Option` because an outbox row in
-                // general need not belong to a task.
-                let entry = OutboxEntry::try_from(row)?;
-                Ok(entry.task_id.map(|task_id| (task_id, entry)))
-            })
-            .collect::<AppResult<Vec<_>>>()?
-            .into_iter()
-            .flatten(),
+            // `task_id = ANY(..)` is what selected these rows, so the column cannot be null here;
+            // the entry carries it as an `Option` because a delivery in general need not belong to
+            // a task -- an approval notice does not.
+            .filter_map(|entry| entry.task_id.map(|task_id| (task_id, entry))),
     );
 
     let tasks = task_rows

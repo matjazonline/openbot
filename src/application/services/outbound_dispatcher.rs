@@ -40,7 +40,9 @@ pub trait MailTransport: Send + Sync {
     async fn send(&self, message: MailMessage) -> AppResult<()>;
 }
 
-struct DisabledMailTransport;
+/// A transport that logs and drops. What a deployment with SMTP switched off sends through, and
+/// what a test that must never reach a relay uses.
+pub struct DisabledMailTransport;
 
 #[async_trait]
 impl MailTransport for DisabledMailTransport {

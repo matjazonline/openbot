@@ -42,6 +42,7 @@ use std::{
 };
 use uuid::Uuid;
 
+use crate::adapters::persistence::delivery::enqueue::insert_delivery_on;
 use crate::adapters::persistence::participant::resolve_or_create_external_identity_on;
 use crate::adapters::protocols::email::EmailIdentity;
 use crate::{
@@ -58,6 +59,7 @@ use crate::{
         transport::PrincipalId,
         value_objects::{EmailAddress, ThreadIndex},
     },
+    transport::{DeliveryCreation, NewDelivery},
     use_cases::{
         participant::IdentityObservation,
         thread::{MessageWrite, ThreadPersistence},
@@ -532,6 +534,33 @@ impl ThreadPersistence for PostgresPersistence {
         let inserted = insert_message_on(&mut tx, write).await?;
         tx.commit().await.map_err(AppError::from)?;
         load_message(&self.pool, inserted.association_id).await
+    }
+
+    async fn create_message_with_deliveries(
+        &self,
+        write: &MessageWrite,
+        deliveries: &[NewDelivery],
+    ) -> AppResult<(Message, Vec<DeliveryCreation>)> {
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let inserted = insert_message_on(&mut tx, write).await?;
+        let mut created = Vec::with_capacity(deliveries.len());
+        for delivery in deliveries {
+            if delivery.message_id != inserted.canonical_id {
+                // A delivery naming a different message than the one just written would either
+                // fail its foreign key or, worse, attach to some other message entirely. Refused
+                // here because the caller minted both ids and can only have crossed them.
+                return Err(AppError::Internal(format!(
+                    "Delivery '{}' names message {} but this transaction stored {}",
+                    delivery.idempotency_key, delivery.message_id, inserted.canonical_id
+                )));
+            }
+            created.push(insert_delivery_on(&mut tx, delivery).await?);
+        }
+        tx.commit().await.map_err(AppError::from)?;
+        Ok((
+            load_message(&self.pool, inserted.association_id).await?,
+            created,
+        ))
     }
 
     async fn find_outbound_reply_after(

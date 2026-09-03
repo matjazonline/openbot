@@ -26,8 +26,8 @@ use crate::{
     },
     transport::{
         bounded::{BoundedVec, BoundsError, bounded_text},
-        delivery::DeliveryIntent,
         lease::ExecutionLease,
+        queue::NewDelivery,
     },
 };
 
@@ -627,7 +627,13 @@ pub struct InboundCommitRequest {
     pub claimed_event: Option<ExecutionLease<InboundEventId>>,
     pub associations: BoundedVec<ThreadAssociation, MAX_THREAD_ASSOCIATIONS>,
     pub task: Option<InboundTaskRequest>,
-    pub deliveries: Vec<DeliveryIntent>,
+    /// The fan-out this message is immediately owed, already composed and frozen.
+    ///
+    /// Composed rather than planned: a delivery names the parts it will send, and freezing them
+    /// here is what makes a retry send the bytes this commit agreed to. The planner produces
+    /// intents; the caller turns them into deliveries before it commits, so the queue rows and the
+    /// message become visible together.
+    pub deliveries: Vec<NewDelivery>,
     /// Whether the answer this message earns should actually be sent.
     ///
     /// Part of the commit because it has to reach the worker, and the durable task payload is

@@ -1,6 +1,6 @@
 //! Ownership of one durable row, for the workers that claim them.
 //!
-//! Every queue in this system -- the inbound inbox, the delivery outbox -- has the same shape: a
+//! Every queue in this system -- the inbound inbox, the delivery queue -- has the same shape: a
 //! claimant takes a row, mints a fresh execution id, and every later write it makes is fenced on
 //! that id so a superseded run cannot report a result. The types live here, with the workers that
 //! consume them, rather than in the SQL adapter that happens to implement the claim.

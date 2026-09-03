@@ -6,7 +6,7 @@ channel ID, and then performs internal delivery. A platform email address is one
 syntax for producing that selector; it is not the identity of the destination channel.
 
 The current compatibility path preserves email-style message metadata and reuses the existing
-thread, task, outreach, target, and outbox records. New application contracts follow the
+thread, task, outreach, target, and delivery records. New application contracts follow the
 [Transport Architecture Contract](transport_architecture.md) and must not manufacture an email
 address merely to call another channel.
 
@@ -37,7 +37,7 @@ Human -> Agent A channel
 |---|---|
 | Agent A conversation | `threads`, `email_messages`, `thread_messages` |
 | Agent A wait state | `task_outreaches`, `task_outreach_targets` |
-| Durable A to B request | `email_outbox` |
+| Durable A to B request | `message_deliveries` + `message_delivery_parts` |
 | Agent B conversation | A new row in `threads` |
 | Agent B execution | A normal `background_tasks` row |
 | Agent B external wait | `task_outreaches`, `task_outreach_targets` |
@@ -47,8 +47,8 @@ The A to B relationship can be followed through the existing identifiers:
 
 ```text
 A outreach target
-  -> outreach outbox
-  -> outbox provider_message_id
+  -> outreach delivery
+  -> delivery part provider_message_key
   -> B background_tasks.source_message_id
 ```
 
@@ -182,8 +182,8 @@ M5  A -> Human
 
 1. `M0` creates Agent A thread `TA` and task `tA`.
 2. Agent A calls the outreach tool with Agent B as the only target.
-3. `M1` is queued in `email_outbox`, and `tA` changes to `waiting_for_third_party_reply`.
-4. The outbox worker recognizes B as a same-company channel and performs trusted in-process delivery instead of SMTP.
+3. `M1` is queued in `message_deliveries`, and `tA` changes to `waiting_for_third_party_reply`.
+4. The email sender recognizes B as a same-company channel and performs trusted in-process delivery instead of SMTP.
 5. `M1` is outbound in `TA`, inbound in a new Agent B thread `TB`, and creates task `tB`.
 6. Agent B can use ordinary external outreach. `M2` and `M3` stay in `TB`, and only `tB` is suspended and resumed.
 7. Agent B's normal response `M4` is addressed to the original sender, Agent A's channel.
@@ -233,14 +233,14 @@ Normal repeated-channel traces are rejected. A return from B to A is allowed onl
 ```text
 destination company + channel + thread
 sender principal/channel == resolved outreach target channel
-In-Reply-To or References contains the A-to-B outbox Message-ID
+In-Reply-To or References contains the provider key the A-to-B delivery went out under
 ```
 
 The accepted return is context-only and resumes the existing task, so it cannot start an A to B to A task loop.
 
 ## Idempotency
 
-Outreach requests retain the existing `(task_id, outreach_key)` idempotency behavior. Internal outbox messages use deterministic message IDs based on the outbox ID. Normal task responses use deterministic message IDs based on the task ID.
+Outreach requests retain the existing `(task_id, outreach_key)` idempotency behavior. Every delivery derives its `Message-ID` from its own stable idempotency key, so a retried send goes out under the `Message-ID` the first attempt chose and the message recorded in the thread still matches the mail that arrives.
 
 Outbound messages created by outreach are excluded from the worker's final-response idempotency check. Without this exclusion, the A-to-B request could be mistaken for A's final human response, or B's third-party outreach could be mistaken for B's final result.
 

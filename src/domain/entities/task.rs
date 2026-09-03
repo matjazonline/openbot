@@ -943,7 +943,7 @@ impl ChainStage {
             || counts.dead_letter > 0
             || counts.stopped > 0
             || counts.expired_processing > 0
-            || counts.delivery_failed > 0
+            || counts.delivery_unresolved > 0
         {
             Self::NeedsAttention
         } else if counts.pending_approval > 0 {
@@ -952,11 +952,11 @@ impl ChainStage {
             Self::Running
         } else if counts.waiting_reply > 0 {
             Self::WaitingReply
-        } else if counts.pending > 0 || counts.delivery_pending > 0 {
+        } else if counts.pending > 0 || counts.delivery_queued > 0 {
             Self::Queued
         } else if counts.total_tasks > 0
             && counts.completed == counts.total_tasks
-            && counts.delivery_sent == counts.total_deliveries
+            && counts.delivery_delivered == counts.total_deliveries
         {
             Self::Completed
         } else {
@@ -994,10 +994,13 @@ pub struct TaskChainCounts {
     pub dead_letter: i64,
     pub stopped: i64,
     pub total_deliveries: i64,
-    pub delivery_pending: i64,
+    /// Waiting for a claimant: queued, or backed off after a failed attempt.
+    pub delivery_queued: i64,
     pub delivery_sending: i64,
-    pub delivery_sent: i64,
-    pub delivery_failed: i64,
+    pub delivery_delivered: i64,
+    /// Dead-lettered, or left with an outcome nobody has confirmed. Both need a human, and both
+    /// mean the chain did not finish, which is why they count as one figure on the board.
+    pub delivery_unresolved: i64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1055,7 +1058,7 @@ impl TaskBoardFilter {
 pub struct TaskChainTaskDetail {
     pub task: BackgroundTask,
     pub attempts: Vec<TaskAttemptRecord>,
-    pub deliveries: Vec<crate::entities::outbox::OutboxEntry>,
+    pub deliveries: Vec<crate::entities::delivery::DeliveryEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1306,7 +1309,7 @@ mod tests {
                     total_tasks: 1,
                     completed: 1,
                     total_deliveries: 1,
-                    delivery_sent: 1,
+                    delivery_delivered: 1,
                     ..Default::default()
                 },
                 ChainStage::Completed,
@@ -1330,7 +1333,7 @@ mod tests {
         assert_eq!(ChainStage::derive(&counts), ChainStage::WaitingApproval);
 
         let attention = TaskChainCounts {
-            delivery_failed: 1,
+            delivery_unresolved: 1,
             ..counts.clone()
         };
         assert_eq!(ChainStage::derive(&attention), ChainStage::NeedsAttention);
@@ -1348,7 +1351,7 @@ mod tests {
             total_tasks: 2,
             completed: 2,
             total_deliveries: 1,
-            delivery_pending: 1,
+            delivery_queued: 1,
             ..Default::default()
         };
         assert_eq!(ChainStage::derive(&incomplete_delivery), ChainStage::Queued);

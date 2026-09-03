@@ -185,7 +185,7 @@ fn task_chain_card(
     let delivery = if card.counts.total_deliveries > 0 {
         format!(
             r##"<span class="badge badge-xs">Delivery {}/{}</span>"##,
-            card.counts.delivery_sent, card.counts.total_deliveries
+            card.counts.delivery_delivered, card.counts.total_deliveries
         )
     } else {
         String::new()
@@ -384,8 +384,13 @@ fn chain_timeline(detail: &TaskChainDetail) -> String {
                 kind: TimelineKind::Delivery,
                 sequence: index as i32,
                 html: format!(
-                    r##"<li class="border-l-2 border-base-300 pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>Delivery {}</strong></div><div class="text-[11px] opacity-65">{} retries</div></li>"##,
-                    format_time(delivery.updated_at), &item.task.id.to_string()[..8], delivery.status.label(), delivery.retry_count
+                    r##"<li class="border-l-2 border-base-300 pl-3"><div class="text-[11px] opacity-55">{} · task {}</div><div class="text-xs"><strong>{} delivery {}</strong></div><div class="text-[11px] opacity-65">{} of {} attempts spent</div></li>"##,
+                    format_time(delivery.updated_at),
+                    &item.task.id.to_string()[..8],
+                    delivery.transport.label(),
+                    delivery.status.label(),
+                    delivery.attempt_count,
+                    delivery.max_attempts
                 ),
             });
         }

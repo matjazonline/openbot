@@ -48,9 +48,9 @@ use crate::{
         value_objects::{EmailAddress, MessageId, ThreadIndex},
     },
     transport::{
-        CommitDisposition, ExternalCorrelationStore, InboundCommitOutcome, InboundCommitRequest,
-        InboundEnvelope, InboundMessageCommitter, InboundTaskPayload, InboundTaskPayloadV1,
-        ThreadTarget,
+        CommitDisposition, DeliveryCreation, ExternalCorrelationStore, InboundCommitOutcome,
+        InboundCommitRequest, InboundEnvelope, InboundMessageCommitter, InboundTaskPayload,
+        InboundTaskPayloadV1, NewDelivery, ThreadTarget,
     },
     use_cases::{
         integration::{
@@ -124,6 +124,9 @@ struct Store {
     /// Association ids whose outbound message an outreach sent, so the idempotency guard can skip
     /// them the way the real query does.
     outreach_sent: Vec<CanonicalMessageId>,
+    /// Deliveries queued alongside a message, so a test can assert that an answer was not only
+    /// recorded but actually handed to a transport.
+    deliveries: Vec<NewDelivery>,
 }
 
 /// An in-memory [`ThreadPersistence`].
@@ -131,6 +134,13 @@ struct Store {
 pub struct InMemoryThreads {
     store: Arc<Mutex<Store>>,
     company_id: Uuid,
+}
+
+impl InMemoryThreads {
+    /// Every delivery queued through [`ThreadPersistence::create_message_with_deliveries`].
+    pub fn queued_deliveries(&self) -> Vec<NewDelivery> {
+        self.store.lock().unwrap().deliveries.clone()
+    }
 }
 
 impl InMemoryThreads {
@@ -468,7 +478,10 @@ impl ThreadPersistence for InMemoryThreads {
         let channel_id = Self::thread_channel(&store, write.thread_id)?;
 
         let incoming = Canonical {
-            id: CanonicalMessageId::random(),
+            // The producer's own id, exactly as `insert_message_on` uses it. Minting one here
+            // instead made every delivery a producer built against `write.id` name a message this
+            // double had not stored.
+            id: write.id,
             author,
             subject: write.subject.clone(),
             clean_text_body: write.clean_text_body.clone(),
@@ -532,6 +545,46 @@ impl ThreadPersistence for InMemoryThreads {
             .expect("the association was just written");
         bump_thread(&mut store, write.thread_id);
         Ok(message)
+    }
+
+    async fn create_message_with_deliveries(
+        &self,
+        write: &MessageWrite,
+        deliveries: &[NewDelivery],
+    ) -> AppResult<(Message, Vec<DeliveryCreation>)> {
+        let stored = self.create_message(write).await?;
+        let mut created = Vec::with_capacity(deliveries.len());
+        {
+            let mut store = self.store.lock().unwrap();
+            for delivery in deliveries {
+                if delivery.message_id != stored.canonical_id {
+                    return Err(AppError::Internal(format!(
+                        "Delivery '{}' names message {} but this transaction stored {}",
+                        delivery.idempotency_key, delivery.message_id, stored.canonical_id
+                    )));
+                }
+                // The real store's unique index, in one line: whoever gets there first owns the
+                // key, and a second call with the same key is absorbed onto the first delivery
+                // rather than queueing a second send.
+                let key = (
+                    delivery.destination_binding_id,
+                    delivery.idempotency_key.clone(),
+                );
+                match store.deliveries.iter().find(|queued| {
+                    (
+                        queued.destination_binding_id,
+                        queued.idempotency_key.clone(),
+                    ) == key
+                }) {
+                    Some(existing) => created.push(DeliveryCreation::Absorbed(existing.id)),
+                    None => {
+                        created.push(DeliveryCreation::Created(delivery.id));
+                        store.deliveries.push(delivery.clone());
+                    }
+                }
+            }
+        }
+        Ok((stored, created))
     }
 
     async fn associate_message(

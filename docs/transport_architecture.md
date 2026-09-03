@@ -305,8 +305,9 @@ an email address as the identity or internal routing mechanism for another chann
 | Durable inbound adapter boundary | `inbound_events` | Bounded authenticated raw event, safe header facts, lease/fence, classification | Credentials, signature headers, long-term canonical history |
 | Generic delivery queue | `message_deliveries`, `message_delivery_parts` | Destination intent, frozen provider payload, lease/fence, per-part result | Secret credentials; a single result field for multipart delivery |
 
-Legacy `email_messages`, email-keyed participant columns, and `email_outbox` are migration sources,
-not exceptions to this ownership model. They remain only for an explicitly bounded
+`email_outbox` is gone: the generic delivery queue replaced it outright on the clean-reset premise,
+so there is no email-shaped queue left to be an exception to this model. Legacy `email_messages` and
+email-keyed participant columns remain only for an explicitly bounded
 expand-backfill-cutover-contract transition.
 
 ## Tenancy and composite foreign keys
@@ -499,6 +500,30 @@ A parent is `delivered` only when every part is delivered. Any unknown part keep
 `outcome_unknown`; a dead part makes the parent `dead_letter`. Reconciliation and manual override
 retain the original stable part ID, index, payload, and digest. Automatic retry of an unknown Slack
 part is forbidden.
+
+### Two decisions the email implementation settled
+
+**`pending` and `retryable` are both claimable.** A failed attempt lands in `retryable` with its
+backoff on `available_at`, rather than being reset to `pending`. The two are one claim predicate --
+`DeliveryStatus::is_claimable`, which the partial index `message_deliveries_claimable_idx` and a
+test are both derived from -- but they are distinct rows to a reader and to the stuck-work census:
+"queued and never tried" and "tried and failed" are different things for a human to look at.
+
+**Three notices deliberately stay off the queue.** A delivery row names a company, a channel, an
+interface and a canonical message, and all four are `NOT NULL` so the composite foreign keys can
+prove tenancy. A bounce, a reply from a reserved `_` address, and an account confirmation code have
+none of them: the first two answer a message this deployment *refused* -- nothing was stored and no
+channel was matched, which is what a bounce is -- and all three go out from the deployment's own
+mailbox rather than any channel's interface. They stay on the direct `OutboundDispatcher` path,
+which is fire-and-forget by design: a relay that is down must not turn an undeliverable message
+into retried work. Making four columns nullable to accommodate them would weaken every invariant
+the table exists to hold, for three messages that have no channel to be attributed to.
+
+Everything with a channel behind it *is* on the queue, including the notices that used to be
+fire-and-forget: an approval request and a stop notice are now written as system-authored canonical
+messages in the thread they concern, in the transaction that queues their delivery. A task parked
+on an approval nobody was told about is not a state this can reach any more, and the conversation
+shows that a human was asked.
 
 ## Required sequence traces
 

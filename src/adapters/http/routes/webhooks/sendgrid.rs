@@ -580,7 +580,7 @@ mod tests {
         /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
         async fn record_outreach_request_message(
             &self,
-            _outbox_id: Uuid,
+            _delivery_id: crate::entities::transport::DeliveryId,
             _write: &crate::use_cases::thread::MessageWrite,
         ) -> AppResult<crate::entities::message::CanonicalMessageId> {
             unreachable!("no fixture here sends an outreach")
@@ -617,7 +617,9 @@ mod tests {
             commit: AgentDispatchCommit<'_>,
         ) -> AppResult<DispatchCommit> {
             let _ = commit;
-            Ok(DispatchCommit::Committed { outbox_id: None })
+            Ok(DispatchCommit::Committed {
+                deliveries: Vec::new(),
+            })
         }
 
         async fn renew_task_lease(
@@ -953,7 +955,7 @@ mod tests {
             &self,
             _company_id: Uuid,
             _channel_id: Uuid,
-            _thread_id: Option<Uuid>,
+            _thread_id: Uuid,
             _step_key: &str,
         ) -> AppResult<Option<crate::entities::approval::HumanApproval>> {
             Ok(None)
@@ -1181,10 +1183,29 @@ mod tests {
             config.clone(),
         ));
 
+        // The same renderer and the same synthetic email bindings the thread doubles use, so an
+        // approval composed here freezes exactly what production would.
+        let renderers = Arc::new(
+            crate::transport::ports::TransportRenderers::new()
+                .register(Arc::new(
+                    crate::adapters::protocols::email::EmailRenderer::new(&config.app_domain_name),
+                ))
+                .expect("one renderer registers"),
+        );
+        let delivery_composer = crate::transport::DeliveryComposer::new(
+            renderers.clone(),
+            crate::use_cases::thread::test_support::InMemoryIngress::ports(
+                thread_persistence.clone(),
+                task_persistence.clone(),
+            )
+            .bindings,
+        );
+
         let approval_use_cases = Arc::new(crate::use_cases::approval::ApprovalUseCases::new(
             Arc::new(MockApprovalPersistence),
             task_persistence.clone(),
             thread_persistence.clone(),
+            delivery_composer,
             config.clone(),
         ));
 
@@ -1229,6 +1250,15 @@ mod tests {
                 )),
             ),
             dashboard_sse_connections: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            transports: Arc::new(crate::transport::TransportRegistry::new()),
+            deliveries: Arc::new(crate::adapters::persistence::PostgresPersistence::new(
+                sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                    .expect("valid lazy pool url"),
+            )),
+            delivery_queue: Arc::new(crate::adapters::persistence::PostgresPersistence::new(
+                sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                    .expect("valid lazy pool url"),
+            )),
             runtime_metrics: Arc::new(crate::adapters::persistence::PostgresPersistence::new(
                 sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
                     .expect("valid lazy pool url"),

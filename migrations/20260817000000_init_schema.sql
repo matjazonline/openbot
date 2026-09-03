@@ -414,6 +414,18 @@ RETURN reason IN (
     'access_revoked', 'channel_disabled', 'provider_drift'
 );
 
+-- Why a delivery attempt did not succeed. One list, because both `message_deliveries` and
+-- `message_delivery_parts` classify the same failures and an operator alert reads across both.
+-- Mirrored in Rust by `FailureClass`; the equivalence is a test rather than a comment.
+CREATE FUNCTION valid_delivery_failure_class(class TEXT) RETURNS BOOLEAN
+LANGUAGE SQL
+IMMUTABLE
+RETURN class IN (
+    'authentication', 'rate_limited', 'invalid_payload', 'destination_unavailable',
+    'network', 'timeout', 'provider_fault', 'internal',
+    'dependency_failed', 'superseded', 'lease_expired'
+);
+
 -- One provider account a company has installed. No token is stored here: the broad entity is
 -- listed in the UI, logged, and serialized, so the secret lives one table over in
 -- `integration_credentials` and is only ever read through an exact-scope query.
@@ -703,6 +715,10 @@ CREATE TABLE channel_bindings (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT channel_bindings_company_id_id_key UNIQUE (company_id, id),
+    -- Carries the transport into the referencing key, so `message_deliveries` proves its stored
+    -- `transport` is the one its destination interface actually speaks rather than re-asserting a
+    -- literal. Same shape, same reason as `integration_installations_company_transport_key`.
+    CONSTRAINT channel_bindings_company_transport_key UNIQUE (company_id, id, transport),
     CONSTRAINT channel_bindings_channel_fk
         FOREIGN KEY (company_id, channel_id)
         REFERENCES channels(company_id, id) ON DELETE CASCADE,
@@ -1051,9 +1067,11 @@ CREATE TABLE external_messages (
     external_message_key TEXT NOT NULL,
     message_id UUID NOT NULL,
     -- Which part of an outbound delivery produced this provider message. A long answer is sent as
-    -- several provider messages, so the mapping is per part rather than per message. Step 9
-    -- introduces `message_delivery_parts` and the foreign key onto it; until then this records
-    -- nothing and is written by no path.
+    -- several provider messages, so the mapping is per part rather than per message: several rows
+    -- here can point at one canonical message while each names the part that carried it.
+    --
+    -- `NULL` for an inbound mapping, which is every message that arrived from outside. The
+    -- reference is added at the end of the file, after `message_delivery_parts` exists.
     delivery_part_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1437,7 +1455,10 @@ CREATE TABLE human_approvals (
     id UUID PRIMARY KEY,
     company_id UUID NOT NULL,
     channel_id UUID NOT NULL,
-    thread_id UUID,
+    -- The conversation the approval concerns. Not nullable: the request is written as a system
+    -- message in this thread and delivered from it, so an approval with no thread is one nobody
+    -- could be told about.
+    thread_id UUID NOT NULL,
     task_id UUID,
     step_key TEXT NOT NULL,
     approver_email CITEXT NOT NULL,
@@ -1450,7 +1471,7 @@ CREATE TABLE human_approvals (
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT human_approvals_thread_step_key UNIQUE NULLS NOT DISTINCT
+    CONSTRAINT human_approvals_thread_step_key UNIQUE
         (company_id, channel_id, thread_id, step_key),
     CONSTRAINT human_approvals_channel_fk
         FOREIGN KEY (company_id, channel_id)
@@ -1474,80 +1495,293 @@ CREATE INDEX human_approvals_pending_expiry_idx
 CREATE INDEX human_approvals_task_idx
     ON human_approvals (task_id) WHERE task_id IS NOT NULL;
 
-CREATE TABLE email_outbox (
+-- One durable attempt to expose one canonical message through one protocol interface.
+--
+-- This is the generic replacement for the email-shaped `email_outbox`. What made that table
+-- email-shaped was not the payload column but the assumptions around it: one provider result per
+-- row (`provider_message_id`), a single flat status vocabulary that could not tell "the provider
+-- refused this" from "the connection dropped after the request went out", and a lease that lived
+-- on the same row as the thing being sent. A chat provider splits one answer into several posts,
+-- each with its own provider key, and its ambiguous outcomes must never be blind-retried.
+--
+-- So a delivery owns the lease and the retry budget; `message_delivery_parts` owns the provider
+-- results. There is exactly one leased object per provider call chain, which is what keeps a
+-- multi-part send from growing a second ownership state machine.
+--
+-- `transport` is stored rather than derived at read time so a claim does not have to join the
+-- binding to know which adapter to hand the row to; `message_deliveries_transport_matches_binding`
+-- proves the copy agrees with the binding it came from.
+CREATE TABLE message_deliveries (
     id UUID PRIMARY KEY,
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    -- The business channel whose interface carries this. Not nullable: a delivery with no channel
+    -- has no policy behind it and nothing to attribute it to. Deleting the channel deletes the
+    -- delivery, because the canonical message and thread go with it.
+    channel_id UUID NOT NULL,
+    -- The canonical message being exposed. Not nullable: a delivery is one attempt to expose one
+    -- stored message, and a queue row whose content lived only in its own payload column is what
+    -- made the table this replaces email-shaped. A platform notice -- an approval request, a stop
+    -- notice -- is therefore written as a system-authored message first, which also puts it in the
+    -- thread whose participants are reading it.
+    message_id UUID NOT NULL,
+    -- The interface the message came from, or that its producing channel speaks through. Recorded
+    -- so fan-out can exclude it: delivering a message back to its own interface is an echo.
+    source_binding_id UUID NOT NULL,
+    -- The interface that actually carries this delivery. Deduplication is scoped to it.
+    destination_binding_id UUID NOT NULL,
+    -- The recipient named inside the destination interface's own namespace, when the destination
+    -- is an address rather than the interface itself: an outreach recipient, the customer a reply
+    -- answers. `NULL` means the interface *is* the destination, which is what a mirror is.
+    external_destination TEXT,
+    -- The task whose work produced this. Carries no lifecycle meaning -- it is the join the task
+    -- view uses to show delivery state, and nothing writes back through it.
     task_id UUID,
-    -- Inherited from the task whose work produced this email. `task_id` is cleared when the task
-    -- is deleted, so this is what keeps a delivered email attached to the chain that sent it.
+    -- The delivery that has to land first. A chat mirror cannot post a reply until the root post
+    -- it threads under exists, and the claim below refuses this row until that one is delivered.
+    depends_on_delivery_id UUID,
+    -- Inherited from whatever produced this. Unlike `task_id` it is never cleared, so a delivered
+    -- message stays attached to its trail even after the task row is gone.
     correlation_id UUID NOT NULL,
-    idempotency_key TEXT NOT NULL UNIQUE,
-    payload JSONB NOT NULL,
+    transport TEXT NOT NULL,
+    purpose TEXT NOT NULL,
+    -- Stable across every attempt at the same logical delivery, and derived from the purpose, the
+    -- message and the destination rather than from the attempt. It is the lock that makes creation
+    -- idempotent, and what the delivered provider key is derived from.
+    idempotency_key TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
-    provider_message_id TEXT,
-    retry_count INTEGER NOT NULL DEFAULT 0,
-    last_error TEXT,
-    worker_id UUID,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL,
+    available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Why the last attempt ended, as a typed class plus a bounded detail. Typed because an
+    -- operator alert has to tell a revoked credential from a rate limit, and because recovering
+    -- that by matching substrings of a free-text error is not classification.
+    last_error_class TEXT,
+    last_error_detail TEXT,
+    -- The fence. Minted fresh by every claim, and named in the `WHERE` clause of every renewal,
+    -- part transition, completion and failure, so a superseded run cannot report a result over
+    -- the execution that replaced it.
+    execution_id UUID,
+    owner_worker_id UUID,
     locked_at TIMESTAMPTZ,
     lock_expires_at TIMESTAMPTZ,
-    available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    sent_at TIMESTAMPTZ,
+    delivered_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- The channel an outbound email goes out as, a real column rather than a JSONB payload field:
-    -- the payload is the poller's data, not a queryable dimension, and filtering the outbox by
-    -- channel through it meant an unindexed JSONB scan.
-    channel_id UUID,
-    CONSTRAINT email_outbox_status_check CHECK (status IN ('pending', 'sending', 'sent', 'failed')),
-    CONSTRAINT email_outbox_task_fk
+    CONSTRAINT message_deliveries_company_id_id_key UNIQUE (company_id, id),
+    -- One logical delivery per destination interface. The destination is already inside
+    -- `idempotency_key`, so this absorbs a retried planning step rather than enqueuing a second
+    -- send, while two outreach recipients on one message stay two rows.
+    CONSTRAINT message_deliveries_destination_key_key
+        UNIQUE (destination_binding_id, idempotency_key),
+    -- Every composite reference proves the referenced row belongs to the same company, so a
+    -- delivery cannot name another tenant's channel, message, interface or task.
+    CONSTRAINT message_deliveries_channel_fk
+        FOREIGN KEY (company_id, channel_id)
+        REFERENCES channels(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT message_deliveries_message_fk
+        FOREIGN KEY (company_id, message_id)
+        REFERENCES messages(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT message_deliveries_source_binding_fk
+        FOREIGN KEY (company_id, source_binding_id)
+        REFERENCES channel_bindings(company_id, id) ON DELETE CASCADE,
+    -- Carried, not re-asserted: the pair proves the destination interface both belongs to this
+    -- company *and* speaks the transport this row says it does, so a claim can trust the stored
+    -- `transport` without joining.
+    CONSTRAINT message_deliveries_destination_binding_fk
+        FOREIGN KEY (company_id, destination_binding_id, transport)
+        REFERENCES channel_bindings(company_id, id, transport) ON DELETE CASCADE,
+    CONSTRAINT message_deliveries_task_fk
         FOREIGN KEY (company_id, task_id)
         REFERENCES background_tasks(company_id, id) ON DELETE SET NULL (task_id),
-    -- Compound, like `email_outbox_task_fk`: the channel must belong to the same company as the
-    -- email. Deleting a channel must not delete the record that mail was queued for it, hence
-    -- SET NULL.
-    CONSTRAINT email_outbox_channel_fk
-        FOREIGN KEY (company_id, channel_id)
-        REFERENCES channels(company_id, id) ON DELETE SET NULL (channel_id),
-    CONSTRAINT email_outbox_retry_check CHECK (retry_count >= 0),
-    CONSTRAINT email_outbox_payload_object_check CHECK (jsonb_typeof(payload) = 'object'),
-    -- Lease metadata belongs to 'sending' and to nothing else. Without the second arm a row that
-    -- failed or was sent keeps the worker id that last touched it, and a stale lease on a
-    -- terminal row reads as an in-flight delivery to anything sweeping for expired ones.
-    CONSTRAINT email_outbox_lease_check CHECK (
+    -- Self-referential and same-company. A dependency in another company would let one tenant's
+    -- stuck root hold another tenant's delivery closed for ever.
+    CONSTRAINT message_deliveries_dependency_fk
+        FOREIGN KEY (company_id, depends_on_delivery_id)
+        REFERENCES message_deliveries(company_id, id) ON DELETE SET NULL (depends_on_delivery_id),
+    CONSTRAINT message_deliveries_no_self_dependency_check
+        CHECK (depends_on_delivery_id IS NULL OR depends_on_delivery_id <> id),
+    CONSTRAINT message_deliveries_transport_check CHECK (transport IN ('email', 'slack')),
+    CONSTRAINT message_deliveries_purpose_check
+        CHECK (purpose IN ('reply', 'mirror', 'outreach', 'notification')),
+    CONSTRAINT message_deliveries_status_check CHECK (status IN (
+        'pending', 'sending', 'retryable', 'delivered', 'outcome_unknown', 'dead_letter'
+    )),
+    CONSTRAINT message_deliveries_attempt_check
+        CHECK (attempt_count >= 0 AND max_attempts > 0 AND attempt_count <= max_attempts),
+    CONSTRAINT message_deliveries_idempotency_key_check CHECK (
+        btrim(idempotency_key) <> '' AND octet_length(idempotency_key) <= 512
+    ),
+    CONSTRAINT message_deliveries_external_destination_check CHECK (
+        external_destination IS NULL
+        OR (btrim(external_destination) <> '' AND octet_length(external_destination) <= 998)
+    ),
+    CONSTRAINT message_deliveries_error_check CHECK (
+        (last_error_class IS NULL OR valid_delivery_failure_class(last_error_class))
+        AND (last_error_detail IS NULL OR octet_length(last_error_detail) <= 512)
+        -- A detail with no class is an unclassified failure wearing a sentence, which is the shape
+        -- `src/adapters/persistence/AGENTS.md` forbids for an audited transition.
+        AND (last_error_detail IS NULL OR last_error_class IS NOT NULL)
+    ),
+    -- Lease metadata belongs to 'sending' and to nothing else. Without the second arm a terminal
+    -- row keeps the worker id that last touched it, and a stale lease on a finished row reads as
+    -- an in-flight delivery to anything sweeping for expired ones.
+    CONSTRAINT message_deliveries_lease_check CHECK (
         (status = 'sending'
-         AND worker_id IS NOT NULL
+         AND execution_id IS NOT NULL
+         AND owner_worker_id IS NOT NULL
          AND locked_at IS NOT NULL
          AND lock_expires_at IS NOT NULL
          AND lock_expires_at > locked_at)
         OR
         (status <> 'sending'
-         AND worker_id IS NULL
+         AND execution_id IS NULL
+         AND owner_worker_id IS NULL
          AND locked_at IS NULL
          AND lock_expires_at IS NULL)
+    ),
+    -- Only a delivered row has a delivery time, and it must have one.
+    CONSTRAINT message_deliveries_delivered_at_check
+        CHECK ((status = 'delivered') = (delivered_at IS NOT NULL))
+);
+
+-- The claim's own index: `status IN ('pending','retryable') AND available_at <= now`, ordered by
+-- `(available_at, id)`. Both claimable statuses share one partial index because the claim takes
+-- them together -- a row that failed and backed off is the same work as one that never ran.
+CREATE INDEX message_deliveries_claimable_idx
+    ON message_deliveries (available_at, id)
+    WHERE status IN ('pending', 'retryable');
+CREATE INDEX message_deliveries_sending_lease_idx
+    ON message_deliveries (lock_expires_at, id) WHERE status = 'sending';
+CREATE INDEX message_deliveries_company_created_idx
+    ON message_deliveries (company_id, created_at DESC, id DESC);
+CREATE INDEX message_deliveries_company_channel_created_idx
+    ON message_deliveries (company_id, channel_id, created_at DESC, id DESC);
+CREATE INDEX message_deliveries_correlation_idx
+    ON message_deliveries (correlation_id, created_at);
+CREATE INDEX message_deliveries_task_idx
+    ON message_deliveries (task_id) WHERE task_id IS NOT NULL;
+-- The board's delivery-side recency arm and its unfinished arm; see
+-- `background_tasks_company_updated_idx`. Both are needed for the board's
+-- `status IN (...) OR updated_at >= cutoff` disjunction to come out as a BitmapOr of two index
+-- scans rather than a sequential scan.
+CREATE INDEX message_deliveries_company_updated_idx
+    ON message_deliveries (company_id, updated_at DESC);
+CREATE INDEX message_deliveries_company_status_idx
+    ON message_deliveries (company_id, status);
+CREATE INDEX message_deliveries_message_idx
+    ON message_deliveries (company_id, message_id);
+-- Read by the claim (per candidate row) and by the sweep that dead-letters descendants of a
+-- dependency that can never be delivered.
+CREATE INDEX message_deliveries_dependency_idx
+    ON message_deliveries (depends_on_delivery_id)
+    WHERE depends_on_delivery_id IS NOT NULL;
+
+-- One frozen piece of a delivery, and what its provider said about it.
+--
+-- Parts are rendered and written before the first provider call, so a retry sends the bytes that
+-- were frozen rather than re-rendering against a display name or a policy that has since changed.
+-- They own no lease: every transition here is fenced on the parent's live `execution_id`, which is
+-- why `begin_part`/`complete_part` take the parent's execution rather than a claim of their own.
+CREATE TABLE message_delivery_parts (
+    id UUID PRIMARY KEY,
+    company_id UUID NOT NULL,
+    delivery_id UUID NOT NULL,
+    part_index INTEGER NOT NULL,
+    -- Stable across re-renders of the same delivery, and derived from the delivery's idempotency
+    -- key rather than from its id: whoever froze these parts computed the key before the row
+    -- existed, and an outbound RFC Message-ID is derived from it so a queuer can record the
+    -- message it will send under before it is sent.
+    part_key TEXT NOT NULL,
+    -- The rendered wire payload, in the owning adapter's own shape. Versioned and transport-tagged
+    -- inside the object and decoded fallibly, so a payload written by a newer renderer is an error
+    -- at the seam rather than a misread field halfway through a provider call. Never a credential
+    -- and never an authorization header.
+    payload JSONB NOT NULL,
+    status TEXT NOT NULL DEFAULT 'prepared',
+    -- The provider's own key for what it stored: an RFC Message-ID, a chat timestamp. One per
+    -- part, because a long answer is several provider messages.
+    provider_message_key TEXT,
+    -- What a reconciliation lookup compares against when a provider outcome was ambiguous. Derived
+    -- from the rendered body alone, so it is safe to carry in provider metadata.
+    content_digest TEXT NOT NULL,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    last_error_class TEXT,
+    last_error_detail TEXT,
+    -- Committed immediately before the external call, and the whole reason a crash can be
+    -- classified. A part whose lease lapsed without this set never reached the provider and is
+    -- retryable; one with it set may have been accepted and becomes `outcome_unknown`.
+    request_started_at TIMESTAMPTZ,
+    delivered_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT message_delivery_parts_company_id_id_key UNIQUE (company_id, id),
+    CONSTRAINT message_delivery_parts_delivery_index_key UNIQUE (delivery_id, part_index),
+    CONSTRAINT message_delivery_parts_delivery_key_key UNIQUE (delivery_id, part_key),
+    CONSTRAINT message_delivery_parts_delivery_fk
+        FOREIGN KEY (company_id, delivery_id)
+        REFERENCES message_deliveries(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT message_delivery_parts_index_check
+        CHECK (part_index >= 0 AND part_index < 50),
+    CONSTRAINT message_delivery_parts_status_check CHECK (status IN (
+        'prepared', 'sending', 'delivered', 'outcome_unknown', 'retryable', 'dead'
+    )),
+    CONSTRAINT message_delivery_parts_key_check CHECK (
+        btrim(part_key) <> '' AND octet_length(part_key) <= 200
+    ),
+    CONSTRAINT message_delivery_parts_digest_check CHECK (
+        btrim(content_digest) <> '' AND octet_length(content_digest) <= 128
+    ),
+    CONSTRAINT message_delivery_parts_provider_key_check CHECK (
+        provider_message_key IS NULL
+        OR (btrim(provider_message_key) <> '' AND octet_length(provider_message_key) <= 998)
+    ),
+    -- Bounded here as well as in Rust: the payload is read back into memory by whichever instance
+    -- claims the row, and a bound only the writer enforces is not a bound.
+    CONSTRAINT message_delivery_parts_payload_check CHECK (
+        jsonb_typeof(payload) = 'object'
+        AND jsonb_typeof(payload->'transport') = 'string'
+        AND jsonb_typeof(payload->'version') = 'number'
+        AND octet_length(payload::text) <= 262144
+    ),
+    CONSTRAINT message_delivery_parts_attempt_check CHECK (attempt_count >= 0),
+    CONSTRAINT message_delivery_parts_error_check CHECK (
+        (last_error_class IS NULL OR valid_delivery_failure_class(last_error_class))
+        AND (last_error_detail IS NULL OR octet_length(last_error_detail) <= 512)
+        AND (last_error_detail IS NULL OR last_error_class IS NOT NULL)
+    ),
+    -- A delivered part has a delivery time and nothing else does; and a part cannot claim the
+    -- provider accepted it without having started the request that carried it.
+    CONSTRAINT message_delivery_parts_delivered_at_check
+        CHECK ((status = 'delivered') = (delivered_at IS NOT NULL)),
+    CONSTRAINT message_delivery_parts_started_check CHECK (
+        status <> 'delivered' OR request_started_at IS NOT NULL
     )
 );
 
-CREATE INDEX email_outbox_pending_idx
-    ON email_outbox (available_at, id) WHERE status = 'pending';
-CREATE INDEX email_outbox_sending_lease_idx
-    ON email_outbox (lock_expires_at, id) WHERE status = 'sending';
-CREATE INDEX email_outbox_company_created_idx
-    ON email_outbox (company_id, created_at DESC, id DESC);
-CREATE INDEX email_outbox_correlation_idx
-    ON email_outbox (correlation_id, created_at);
+-- Delivery resumes at the first unfinished part, in order.
+CREATE INDEX message_delivery_parts_delivery_idx
+    ON message_delivery_parts (delivery_id, part_index);
+CREATE INDEX message_delivery_parts_unfinished_idx
+    ON message_delivery_parts (delivery_id, part_index)
+    WHERE status IN ('prepared', 'retryable');
+-- The reply guard matches a third party's `References:` against the provider key an outreach went
+-- out under, so this is read per candidate rather than scanned.
+CREATE UNIQUE INDEX message_delivery_parts_provider_key_idx
+    ON message_delivery_parts (company_id, provider_message_key)
+    WHERE provider_message_key IS NOT NULL;
 
-CREATE INDEX email_outbox_task_idx
-    ON email_outbox (task_id) WHERE task_id IS NOT NULL;
-CREATE INDEX email_outbox_company_channel_created_idx
-    ON email_outbox (company_id, channel_id, created_at DESC, id DESC);
--- The board's delivery-side recency arm; see background_tasks_company_updated_idx.
-CREATE INDEX email_outbox_company_updated_idx
-    ON email_outbox (company_id, updated_at DESC);
--- Its unfinished arm. Added on measurement rather than symmetry: over 10k chains the board's
--- `status IN (...) OR updated_at >= cutoff` still sequentially scanned the outbox without it, and
--- only with both is the disjunction a BitmapOr of two index scans.
-CREATE INDEX email_outbox_company_status_idx
-    ON email_outbox (company_id, status);
+-- Declared here rather than inside `external_messages`, which is created several hundred lines
+-- earlier: the mapping table has to exist before the ingress path can write an inbound row, and
+-- the part table has to exist before this reference can be made. Composite, so a provider mapping
+-- cannot name another tenant's delivery part, and `SET NULL` so retiring a delivery leaves the
+-- provider mapping that proves the message went out.
+ALTER TABLE external_messages
+    ADD CONSTRAINT external_messages_delivery_part_fk
+    FOREIGN KEY (company_id, delivery_part_id)
+    REFERENCES message_delivery_parts(company_id, id) ON DELETE SET NULL (delivery_part_id);
+
+CREATE INDEX external_messages_delivery_part_idx
+    ON external_messages (delivery_part_id) WHERE delivery_part_id IS NOT NULL;
 
 CREATE TABLE task_outreaches (
     id UUID PRIMARY KEY,
@@ -1588,14 +1822,16 @@ CREATE TABLE task_outreach_targets (
     email CITEXT NOT NULL,
     responded_at TIMESTAMPTZ,
     response_message_id UUID,
-    outbox_id UUID REFERENCES email_outbox(id) ON DELETE SET NULL,
+    -- The delivery that carried this outreach's question. `SET NULL` so closing a company's
+    -- deliveries does not erase the record that this target was asked.
+    delivery_id UUID REFERENCES message_deliveries(id) ON DELETE SET NULL,
     -- The canonical message this outreach *asked* with.
     --
     -- Recorded so that "is this outbound message the agent's answer, or the agent asking somebody
     -- else a question?" is answered by a canonical relation. The reply guard used to answer it by
-    -- joining `email_outbox.provider_message_id` back to an RFC `Message-ID` on the message, which
-    -- made a purely internal decision depend on an SMTP header -- and gave the wrong answer for
-    -- any transport that has none.
+    -- joining a delivery's provider key back to an RFC `Message-ID` on the message, which made a
+    -- purely internal decision depend on an SMTP header -- and gave the wrong answer for any
+    -- transport that has none.
     request_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     PRIMARY KEY (outreach_id, email),
     CONSTRAINT task_outreach_targets_response_message_id_fkey
@@ -1615,8 +1851,8 @@ CREATE INDEX task_outreach_targets_response_message_idx
 CREATE INDEX task_outreach_targets_request_message_idx
     ON task_outreach_targets (request_message_id)
     WHERE request_message_id IS NOT NULL;
-CREATE UNIQUE INDEX task_outreach_targets_outbox_idx
-    ON task_outreach_targets (outbox_id) WHERE outbox_id IS NOT NULL;
+CREATE UNIQUE INDEX task_outreach_targets_delivery_idx
+    ON task_outreach_targets (delivery_id) WHERE delivery_id IS NOT NULL;
 
 -- Immutable, metadata-only history for every background-task status transition.
 CREATE TABLE task_status_events (
@@ -1789,11 +2025,12 @@ BEGIN
     -- `UPDATE OF status` fires whenever the column appears in a SET list, whether or not the value
     -- moved. A write that leaves the status alone changes nothing the board draws, so it must not
     -- wake every connected viewer of the company. This suppresses no real transition:
-    -- `pending -> sending -> sent` is three material changes and still emits three notifications,
+    -- `pending -> sending -> delivered` is three material changes and still emits three
+    -- notifications,
     -- which the stream coalesces on its own. The checks are per table because these are the only
     -- notifying tables that have a `status` column at all.
     IF TG_OP = 'UPDATE' THEN
-        IF TG_TABLE_NAME = 'email_outbox' THEN
+        IF TG_TABLE_NAME = 'message_deliveries' THEN
             IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
                 RETURN NULL;
             END IF;
@@ -1811,7 +2048,7 @@ BEGIN
     IF TG_TABLE_NAME = 'task_status_events' THEN
         notified_company_id := NEW.company_id;
         notified_correlation_id := NEW.correlation_id;
-    ELSIF TG_TABLE_NAME = 'email_outbox' THEN
+    ELSIF TG_TABLE_NAME = 'message_deliveries' THEN
         notified_company_id := NEW.company_id;
         notified_correlation_id := NEW.correlation_id;
     ELSIF TG_TABLE_NAME = 'human_approvals' THEN
@@ -1847,8 +2084,8 @@ CREATE TRIGGER task_status_events_notify_chain
 AFTER INSERT ON task_status_events
 FOR EACH ROW EXECUTE FUNCTION notify_task_chain_changed();
 
-CREATE TRIGGER email_outbox_notify_chain
-AFTER INSERT OR UPDATE OF status ON email_outbox
+CREATE TRIGGER message_deliveries_notify_chain
+AFTER INSERT OR UPDATE OF status ON message_deliveries
 FOR EACH ROW EXECUTE FUNCTION notify_task_chain_changed();
 
 CREATE TRIGGER human_approvals_notify_chain

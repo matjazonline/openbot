@@ -2,7 +2,7 @@
 //!
 //! A message arriving over SMTP, through the SendGrid webhook, or composed in the mailbox is the
 //! start of a causal chain: it is stored, it enqueues a task, that task runs an agent, the agent
-//! calls tools, and something goes out through the outbox. Each of those stages already writes a
+//! calls tools, and something goes out through the delivery queue. Each of those stages already writes a
 //! durable row, but until now nothing tied the rows together, so answering "what happened to this
 //! email?" meant joining five tables by hand and hoping the timestamps lined up.
 //!

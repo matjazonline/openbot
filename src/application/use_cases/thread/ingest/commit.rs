@@ -11,9 +11,9 @@ use crate::{
     app_error::AppResult,
     entities::{outreach::OutreachReplyMatch, value_objects::EmailAddress},
     transport::{
-        BoundedVec, CanonicalContent, DeliveryIntent, InboundCommitRequest, InboundDraft,
-        InboundEnvelope, InboundTaskRequest, InboundTaskTarget, MAX_THREAD_ASSOCIATIONS,
-        MessageDisposition, ThreadAssociation, ThreadTarget,
+        BoundedVec, CanonicalContent, InboundCommitRequest, InboundDraft, InboundEnvelope,
+        InboundTaskRequest, InboundTaskTarget, MAX_THREAD_ASSOCIATIONS, MessageDisposition,
+        NewDelivery, ThreadAssociation, ThreadTarget,
     },
     use_cases::thread::ingest::{AGENT_DISPATCH_TASK, ReplyDelivery, routing::ResolvedAddresses},
 };
@@ -52,7 +52,7 @@ pub(crate) struct CommitPlan {
     envelope: InboundEnvelope,
     associations: BoundedVec<ThreadAssociation, MAX_THREAD_ASSOCIATIONS>,
     task: Option<InboundTaskRequest>,
-    deliveries: Vec<DeliveryIntent>,
+    deliveries: Vec<NewDelivery>,
     prepared: PreparedChannels,
     disposition: MessageDisposition,
     reply_delivery: ReplyDelivery,
@@ -117,10 +117,10 @@ impl CommitPlan {
                 task_type: AGENT_DISPATCH_TASK.to_string(),
                 targets,
             }),
-            // Inbound fan-out onto a channel's *other* interfaces arrives with the delivery queue
-            // in step 9. Email is the only transport a channel speaks until then, and delivering a
-            // message back to the interface it arrived on is an echo, so this is correctly empty
-            // rather than unimplemented.
+            // Inbound fan-out onto a channel's *other* interfaces has a durable queue now, but
+            // nothing to fan out to: email is the only transport a channel speaks, and delivering
+            // a message back to the interface it arrived on is an echo. So this is correctly empty
+            // rather than unimplemented, and the commit writes whatever it is given.
             deliveries: Vec::new(),
             prepared,
             disposition,

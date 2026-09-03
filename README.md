@@ -74,7 +74,8 @@ Email clients append the entire historical thread below newly typed text. Feedin
 
 ### 3.4 Background Task Queue & Worker
 - **Durable Task Store (`background_tasks`):** Ingests inbound emails synchronously and enqueues background processing tasks, allowing the webhook to return `HTTP 200 OK` in < 100ms.
-- **Task Worker Poller (`TaskWorker`):** Independent loops keep long agent runs from holding up mail delivery. The task loop continuously fills up to `TASK_WORKER_CONCURRENCY` execution slots (default 4), polling an empty queue every 500ms and refilling a slot immediately when a task finishes. The outbox loop claims and sends up to 10 emails every 500ms; a maintenance loop reaps expired delivery leases and checks quorum timeouts every 30 seconds. A failed poll backs off for 5 seconds. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
+- **Task Worker Poller (`TaskWorker`):** Independent loops keep long agent runs from holding up anything else. The task loop continuously fills up to `TASK_WORKER_CONCURRENCY` execution slots (default 4), polling an empty queue every 500ms and refilling a slot immediately when a task finishes. A schedule loop fires due recurring runs every 2 seconds, and a maintenance loop reaps expired task leases and checks quorum timeouts every 30 seconds. A failed poll backs off for 5 seconds. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
+- **Delivery Worker (`DeliveryWorker`):** A queue of its own, because a delivery outlives the task that produced it and plenty of deliveries have no task behind them. It claims up to 20 deliveries every 500ms, orders the batch round-robin across companies so one tenant's burst cannot fill it, and for each delivery walks its frozen parts through the registered transport. Every write is fenced on the execution the claim minted. A sweep every 30 seconds charges an attempt to leases that expired and dead-letters deliveries whose predecessor can never land.
 - **Leased Execution:** Claims use `FOR UPDATE SKIP LOCKED` and a 15-minute lease. Background executions renew the lease every 5 minutes, and an expired lease can be reclaimed by another worker.
 - **Shutdown:** `Ctrl+C` or SIGTERM stops admission, cancels in-flight provider work, records leased durable tasks as retryable, and joins the task worker, SMTP listener, mailbox listener, memory worker, and runtime sampler within the bounded drain window.
 
@@ -117,15 +118,20 @@ flowchart TD
     subgraph Worker[TaskWorker poll loops]
         TASK_TICK[Task loop<br/>every 500ms]
         CLAIM[Atomically claim tasks for free worker slots<br/>FOR UPDATE SKIP LOCKED]
-        OUTBOX_TICK[Outbox loop<br/>every 500ms]
-        OUTBOX_STEP[Claim and send up to 10 outbox emails]
         MAINT_TICK[Maintenance loop<br/>every 30s]
-        REAP[Reap expired delivery leases]
+        REAP[Reap expired task leases]
         QUORUM[Check up to 100 due quorum waits]
 
         TASK_TICK --> CLAIM
-        OUTBOX_TICK --> OUTBOX_STEP
         MAINT_TICK --> REAP --> QUORUM
+    end
+
+    subgraph Deliveries[DeliveryWorker poll loop]
+        DEL_TICK[Delivery loop<br/>every 500ms]
+        DEL_STEP[Claim up to 20 deliveries<br/>round-robin across companies]
+        DEL_SWEEP[Sweep expired leases and orphaned dependencies<br/>every 30s]
+
+        DEL_TICK --> DEL_STEP
     end
 
     PENDING -->|due| CLAIM
@@ -186,21 +192,26 @@ flowchart TD
     APPROVAL -.-> STOP
     WAITING -.-> STOP
 
-    subgraph Outbox[Approval email outbox]
-        OUT_PENDING[(pending or expired sending)]
-        OUT_SENDING[(sending<br/>15-minute lease)]
-        OUT_SENT[(sent)]
-        OUT_FAILED[(failed after 5 attempts)]
-        OUT_RETRY{Send result}
+    subgraph Delivery[Generic delivery queue]
+        OUT_PENDING[(pending)]
+        OUT_RETRYABLE[(retryable<br/>backed off)]
+        OUT_SENDING[(sending<br/>2-minute lease)]
+        OUT_SENT[(delivered)]
+        OUT_UNKNOWN[(outcome_unknown<br/>never auto-retried)]
+        OUT_FAILED[(dead_letter after 5 attempts)]
+        OUT_RETRY{Provider outcome}
 
         OUT_PENDING -->|worker claim| OUT_SENDING --> OUT_RETRY
-        OUT_RETRY -->|success| OUT_SENT
-        OUT_RETRY -->|failure before attempt 5<br/>delayed retry| OUT_PENDING
-        OUT_RETRY -->|fifth failure| OUT_FAILED
+        OUT_RETRYABLE -->|available_at reached| OUT_SENDING
+        OUT_RETRY -->|every part delivered| OUT_SENT
+        OUT_RETRY -->|definitely refused| OUT_RETRYABLE
+        OUT_RETRY -->|acceptance ambiguous| OUT_UNKNOWN
+        OUT_RETRY -->|terminal, or fifth attempt| OUT_FAILED
     end
 
     APPROVAL -->|queue approval notification| OUT_PENDING
-    OUTBOX_STEP -. drives .-> OUT_PENDING
+    DEL_STEP -. drives .-> OUT_PENDING
+    DEL_SWEEP -. charges an attempt .-> OUT_SENDING
 
     subgraph Direct[Direct simulation path]
         DIRECT_CLAIM[Claim the newly enqueued task directly<br/>with a separate 15-minute lease]

@@ -421,7 +421,7 @@ pub(super) fn canonical_message_hash(
 /// Store one message and attach it to its thread, on a caller-supplied connection.
 ///
 /// Extracted so that a caller which must land this write together with others -- the agent
-/// dispatch commits its reply, its outbox row and its task payload as one transaction -- can reuse
+/// dispatch commits its reply, its delivery and its task payload as one transaction -- can reuse
 /// exactly this path rather than keep a second copy of it in step with this one.
 ///
 /// Returns both identities the write produced: the canonical payload and its association with

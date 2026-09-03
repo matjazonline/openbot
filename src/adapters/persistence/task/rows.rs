@@ -135,10 +135,10 @@ pub(crate) struct TaskChainCardDb {
     pub(crate) dead_letter: i64,
     pub(crate) stopped: i64,
     pub(crate) total_deliveries: i64,
-    pub(crate) delivery_pending: i64,
+    pub(crate) delivery_queued: i64,
     pub(crate) delivery_sending: i64,
-    pub(crate) delivery_sent: i64,
-    pub(crate) delivery_failed: i64,
+    pub(crate) delivery_delivered: i64,
+    pub(crate) delivery_unresolved: i64,
     pub(crate) created_at: DateTime<Utc>,
     pub(crate) last_activity_at: DateTime<Utc>,
     pub(crate) next_action_at: Option<DateTime<Utc>>,
@@ -169,10 +169,10 @@ impl TryFrom<TaskChainCardDb> for (TaskChainCard, i64) {
             dead_letter: db.dead_letter,
             stopped: db.stopped,
             total_deliveries: db.total_deliveries,
-            delivery_pending: db.delivery_pending,
+            delivery_queued: db.delivery_queued,
             delivery_sending: db.delivery_sending,
-            delivery_sent: db.delivery_sent,
-            delivery_failed: db.delivery_failed,
+            delivery_delivered: db.delivery_delivered,
+            delivery_unresolved: db.delivery_unresolved,
         };
         Ok((
             TaskChainCard {

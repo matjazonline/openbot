@@ -1,14 +1,27 @@
 use crate::{
-    adapters::persistence::task::TaskPersistence,
+    adapters::persistence::task::{CreateOutreachRequest, OutreachTargetRequest, TaskPersistence},
     adapters::protocols::email::{EmailChannelSelectorParser, EmailRecipientDestination},
+    app_error::AppResult,
     entities::{
+        channel::Channel,
         correlation::CorrelationId,
-        outreach::{CreateOutreachRequest, OutreachTargetRequest},
+        email_message::EmailMessageMetadata,
+        message::CanonicalMessageId,
+        message::{MessageDirection, MessageParticipantKind, MessageRole},
         transport::{ChannelSelector, ExternalDestination},
         value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId},
     },
-    services::outbound_dispatcher::OutboundEmail,
-    use_cases::channel::{ChannelPersistence, InternalTargetOutcome, resolve_internal_target},
+    transport::{
+        CanonicalContent, DeliveryComposer, DeliveryContext, DeliveryPurpose, DeliveryRequest,
+        EmailDeliveryContext, EmailRelayTrace,
+    },
+    use_cases::{
+        channel::{ChannelPersistence, InternalTargetOutcome, resolve_internal_target},
+        thread::{
+            MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
+            qualified_email_identity,
+        },
+    },
 };
 use ai_agents::{
     Tool, ToolResult,
@@ -44,6 +57,10 @@ pub struct OutreachToolContext {
     pub channel_name: String,
     pub channel_slug: ChannelSlug,
     pub company_slug: CompanySlug,
+    /// The conversation the outreach belongs to. Every question is recorded here as a message
+    /// before it is sent, which is what tells the reply guard that an outbound message was the
+    /// agent asking rather than the agent answering.
+    pub thread_id: Uuid,
     pub trigger_message_id: MessageId,
     pub thread_references: Vec<MessageId>,
     pub hop_count: u32,
@@ -92,6 +109,9 @@ struct OutreachOutput {
 pub struct OutreachAndAwaitQuorumTool {
     persistence: Arc<dyn TaskPersistence>,
     channel_persistence: Arc<dyn ChannelPersistence>,
+    /// Freezes each question's mail so the outreach, its target rows, the questions themselves and
+    /// their deliveries all land in one transaction.
+    deliveries: DeliveryComposer,
     context: OutreachToolContext,
     suspended: Arc<AtomicBool>,
 }
@@ -100,12 +120,14 @@ impl OutreachAndAwaitQuorumTool {
     pub fn new(
         persistence: Arc<dyn TaskPersistence>,
         channel_persistence: Arc<dyn ChannelPersistence>,
+        deliveries: DeliveryComposer,
         context: OutreachToolContext,
         suspended: Arc<AtomicBool>,
     ) -> Self {
         Self {
             persistence,
             channel_persistence,
+            deliveries,
             context,
             suspended,
         }
@@ -184,7 +206,7 @@ impl Tool for OutreachAndAwaitQuorumTool {
             Err(error) => return ToolResult::error(error),
         };
 
-        let targets = match self.build_target_requests(&resolved, &request) {
+        let targets = match self.build_target_requests(&resolved, &request).await {
             Ok(targets) => targets,
             Err(error) => return ToolResult::error(error),
         };
@@ -315,40 +337,116 @@ impl<'a> ValidatedOutreach<'a> {
 }
 
 impl OutreachAndAwaitQuorumTool {
-    /// One queued email per target, each carrying the originating channel's identity so replies
-    /// land back on the same thread.
-    fn build_target_requests(
+    /// One question and one queued mail per target, each carrying the originating channel's
+    /// identity so replies land back on the same thread.
+    async fn build_target_requests(
         &self,
         targets: &[NormalizedOutreachTarget],
         request: &ValidatedOutreach<'_>,
     ) -> Result<Vec<OutreachTargetRequest>, String> {
-        targets
-            .iter()
-            .map(|target| {
-                let email = target.delivery_address().clone();
-                let payload = serde_json::to_value(OutboundEmail {
-                    channel_id: self.context.channel_id,
-                    channel_name: self.context.channel_name.clone(),
-                    channel_slug: self.context.channel_slug.clone(),
-                    company_slug: self.context.company_slug.clone(),
-                    trigger_message_id: self.context.trigger_message_id.clone(),
-                    thread_references: self.context.thread_references.clone(),
-                    recipient_to: email.clone(),
-                    recipients_cc: Vec::new(),
-                    subject: request.subject.to_string(),
-                    body_text: request.body.to_string(),
-                    hop_count: self.context.hop_count,
-                    trace_channels: self.context.trace_channels.clone(),
-                    correlation_id: self.context.correlation_id,
-                })
-                .map_err(|error| format!("Failed to serialize outreach email: {error}"))?;
-                Ok(OutreachTargetRequest {
-                    email,
-                    outbox_id: Uuid::new_v4(),
-                    outbox_payload: payload,
-                })
+        let mut built = Vec::with_capacity(targets.len());
+        for (position, target) in targets.iter().enumerate() {
+            built.push(
+                self.target_request(target, request, position)
+                    .await
+                    .map_err(|error| format!("Failed to prepare an outreach target: {error}"))?,
+            );
+        }
+        Ok(built)
+    }
+
+    async fn target_request(
+        &self,
+        target: &NormalizedOutreachTarget,
+        request: &ValidatedOutreach<'_>,
+        position: usize,
+    ) -> AppResult<OutreachTargetRequest> {
+        let email = target.delivery_address().clone();
+        let from = Channel::address_for(
+            &self.context.channel_slug,
+            &self.context.company_slug,
+            &self.context.app_domain_name,
+        );
+
+        let context = EmailDeliveryContext {
+            from: from.clone(),
+            from_name: Some(self.context.channel_name.clone()),
+            recipient_to: email.clone(),
+            recipients_cc: Vec::new(),
+            in_reply_to: Some(self.context.trigger_message_id.clone()),
+            references: self.context.thread_references.clone(),
+            // An outreach continues the run's chain into someone else's mailbox, so it carries the
+            // hop budget: a question delegated to another channel must not be able to loop.
+            relay: Some(EmailRelayTrace {
+                source_channel_id: self.context.channel_id,
+                hop_count: self.context.hop_count,
+                trace_channels: self.context.trace_channels.clone(),
+            }),
+        };
+        let content = CanonicalContent::parse(request.subject, request.body)?;
+
+        // The message id is minted here so the delivery can name it, and the *provider* key comes
+        // back from the composer so the question can be recorded under the key it will go out
+        // under. That is what lets the answer -- which quotes nothing else -- find this thread.
+        let message_id = CanonicalMessageId::random();
+        let composed = self
+            .deliveries
+            .compose(DeliveryRequest {
+                company_id: self.context.company_id,
+                channel_id: self.context.channel_id,
+                message_id,
+                task_id: Some(self.context.task_id),
+                correlation_id: self.context.correlation_id,
+                purpose: DeliveryPurpose::Outreach,
+                // The task and the target's position, so an agent retrying the same tool call
+                // re-derives the keys the first call used and mails nobody twice. The recipient is
+                // already part of the key the composer builds, so two targets never collide.
+                source_key: format!("task:{}:outreach:{position}", self.context.task_id),
+                content: &content,
+                context: DeliveryContext::Email(context),
             })
-            .collect()
+            .await?;
+
+        // The question, recorded in the thread as the agent asking. Its participants are the real
+        // sender and recipient, so the conversation shows who was asked without anyone having to
+        // read a delivery payload -- and its provider key is what a reply quoting it resolves
+        // through.
+        let mut message = MessageWrite {
+            id: message_id,
+            ..MessageWrite::internal(
+                self.context.thread_id,
+                MessageAuthorWrite::Platform,
+                request.subject.to_string(),
+                request.body.to_string(),
+                MessageDirection::Outbound,
+                MessageRole::Agent,
+                self.context.correlation_id,
+            )
+        }
+        .with_participants(vec![
+            MessageParticipantWrite::new(
+                MessageParticipantKind::Sender,
+                qualified_email_identity(from.as_str())?,
+            ),
+            MessageParticipantWrite::new(
+                MessageParticipantKind::To,
+                qualified_email_identity(email.as_str())?,
+            ),
+        ]);
+        if let Some(provider_key) = composed.provider_key.as_ref() {
+            message = message.with_correlation(MessageCorrelation::Email(
+                EmailMessageMetadata::new(MessageId::from(provider_key.as_str().to_string()))
+                    .in_reply_to(Some(self.context.trigger_message_id.clone()))
+                    .references(self.context.thread_references.clone())
+                    .raw_bodies(Some(request.body.to_string()), None),
+            ));
+        }
+
+        Ok(OutreachTargetRequest {
+            email,
+            request: message,
+            delivery: composed.delivery,
+        })
     }
 }
 
@@ -650,6 +748,7 @@ mod tests {
             worker_id: Uuid::new_v4(),
             company_id,
             channel_id: source_channel_id,
+            thread_id: Uuid::new_v4(),
             channel_name: "Source".into(),
             channel_slug: "source".into(),
             company_slug: "acme".into(),

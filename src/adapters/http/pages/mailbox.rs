@@ -39,7 +39,7 @@ pub enum UiSection {
     Agents,
     Schedules,
     Tasks,
-    Outbox,
+    Deliveries,
     Companies,
     Invites,
     /// The signed-in account's own details. Reached from the account menu rather than the rail --
@@ -1505,10 +1505,10 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
         ),
         (UiSection::Tasks, "/ui/tasks", Icon::Gear, "Tasks"),
         (
-            UiSection::Outbox,
-            "/ui/outbox",
+            UiSection::Deliveries,
+            "/ui/deliveries",
             Icon::PaperAirplane,
-            "Outbox",
+            "Deliveries",
         ),
         (
             UiSection::Dashboard,
@@ -1564,7 +1564,7 @@ fn rail_section_visible(user: &MailboxUser<'_>, section: UiSection) -> bool {
         | UiSection::Agents
         | UiSection::Schedules
         | UiSection::Tasks
-        | UiSection::Outbox => user.company_membership.manages_company_operations(),
+        | UiSection::Deliveries => user.company_membership.manages_company_operations(),
         UiSection::Dashboard => {
             user.company_membership.manages_company_operations() || user.is_operator
         }
@@ -1787,7 +1787,7 @@ pub fn channel_actions(
 
 /// One `<option>` per channel for a `/ui` sidebar filter, with the current one marked.
 ///
-/// Shared by the Tasks and Outbox workspaces: both filter the same company's channels the same
+/// Shared by the Tasks and Deliveries workspaces: both filter the same company's channels the same
 /// way, and a channel must not read differently depending on which queue you are looking at. The
 /// "All channels" option is left to the caller, since only it knows what "all" is called there.
 pub(crate) fn channel_filter_options(channels: &[Channel], selected: Option<Uuid>) -> String {

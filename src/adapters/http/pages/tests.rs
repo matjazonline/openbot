@@ -1,5 +1,6 @@
 use super::*;
 use crate::entities::correlation::CorrelationId;
+use crate::entities::delivery::{DeliveryPartEntry, DeliveryQuery};
 use crate::entities::message::CanonicalMessageId;
 use crate::entities::message_view::{AuthorView, ExternalMessageRef};
 use crate::entities::schedule::ScheduleRunAsChoices;
@@ -7,7 +8,9 @@ use crate::entities::task::{
     TaskAttemptRecord, TaskAttemptRecordStatus, TaskStatusEvent, TaskStopReason,
     TaskTransitionActorKind, TaskTransitionReason,
 };
-use crate::entities::transport::{ChannelBindingId, ExternalMessageKey, PrincipalId};
+use crate::entities::transport::{
+    ChannelBindingId, DeliveryId, DeliveryPartId, ExternalMessageKey, FailureClass, PrincipalId,
+};
 use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email_view};
 use crate::use_cases::user::LoginMethods;
 use chrono::Utc;
@@ -33,7 +36,7 @@ fn legacy_approval_prompts_escape_every_external_field() {
         id: Uuid::new_v4(),
         company_id: Uuid::new_v4(),
         channel_id: Uuid::new_v4(),
-        thread_id: None,
+        thread_id: Uuid::new_v4(),
         task_id: None,
         step_key: "step".into(),
         approver_email: r#"approver" onmouseover="alert(1)@example.com"#.into(),
@@ -983,7 +986,7 @@ fn the_icon_rail_only_advertises_company_workspaces_the_role_can_open() {
         "/ui/agents",
         "/ui/schedules",
         "/ui/tasks",
-        "/ui/outbox",
+        "/ui/deliveries",
         "/ui/dashboard",
     ] {
         assert!(!member.contains(&link(path)), "member rail exposed {path}");
@@ -996,7 +999,7 @@ fn the_icon_rail_only_advertises_company_workspaces_the_role_can_open() {
         "/ui/agents",
         "/ui/schedules",
         "/ui/tasks",
-        "/ui/outbox",
+        "/ui/deliveries",
         "/ui/dashboard",
         "/ui/companies",
     ] {
@@ -4663,11 +4666,12 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
         ..monitored_task(company.id, channel.id, TaskStatus::Completed)
     };
 
-    let failed = OutboxEntry {
-        status: OutboxStatus::Failed,
-        retry_count: 5,
-        last_error: Some("connection refused".to_string()),
-        ..queued_email(company.id, Some(channel.id), Some(task.id))
+    let failed = DeliveryEntry {
+        status: DeliveryStatus::DeadLetter,
+        attempt_count: 5,
+        last_error_class: Some(FailureClass::Network),
+        last_error_detail: Some("connection refused".to_string()),
+        ..queued_delivery(company.id, channel.id, Some(task.id))
     };
 
     let html = task_detail_pane(&TaskDetailPane {
@@ -4687,10 +4691,10 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
     assert!(html.contains("badge-error"));
     assert!(html.contains("gave up after every attempt"));
     assert!(html.contains("connection refused"));
-    assert!(html.contains("5 failed attempt(s)"));
-    // And it is a way in, not just a report: the row opens the email in the Outbox workspace.
+    assert!(html.contains("5 of 5 attempts spent"));
+    // And it is a way in, not just a report: the row opens it in the Deliveries workspace.
     assert!(html.contains(&format!(
-        r##"href="/ui/outbox?company_id={}&entry_id={}""##,
+        r##"href="/ui/deliveries?company_id={}&entry_id={}""##,
         company.id, failed.id
     )));
 
@@ -4708,54 +4712,55 @@ fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
     assert!(!quiet.contains("Delivery"));
 }
 
-/// One queued email, as the poller would have stored it.
-fn queued_email(company_id: Uuid, channel_id: Option<Uuid>, task_id: Option<Uuid>) -> OutboxEntry {
-    OutboxEntry {
-        id: Uuid::new_v4(),
+/// One queued delivery, as the producer would have written it.
+fn queued_delivery(company_id: Uuid, channel_id: Uuid, task_id: Option<Uuid>) -> DeliveryEntry {
+    DeliveryEntry {
+        id: DeliveryId::random(),
         company_id,
         channel_id,
+        message_id: CanonicalMessageId::random(),
         task_id,
-        status: OutboxStatus::Pending,
-        idempotency_key: "task:reply".to_string(),
-        payload: json!({
-            "channel_name": "Support",
-            "recipient_to": "customer@example.com",
-            "recipients_cc": ["cc@example.com"],
-            "subject": "Re: order <script>",
-            "body_text": "On its way.",
-            "api_key": "sk-do-not-render-me",
-        }),
-        retry_count: 0,
-        last_error: None,
-        provider_message_id: None,
+        correlation_id: CorrelationId::new(),
+        transport: TransportKind::Email,
+        purpose: DeliveryPurpose::Reply,
+        status: DeliveryStatus::Pending,
+        idempotency_key: "reply:task:reply:email:customer@example.com".to_string(),
+        destination_label: "support@acme".to_string(),
+        external_destination: Some("customer@example.com".to_string()),
+        subject: "Re: order <script>".to_string(),
+        attempt_count: 0,
+        max_attempts: 5,
+        last_error_class: None,
+        last_error_detail: None,
+        parts: Vec::new(),
         available_at: Utc::now(),
-        sent_at: None,
+        delivered_at: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
     }
 }
 
-fn outbox_filter() -> OutboxFilter {
-    OutboxFilter::new(None, None, false, None, None)
+fn delivery_filter() -> DeliveryFilter {
+    DeliveryFilter::new(DeliveryQuery::default())
 }
 
 #[test]
-fn outbox_page_lists_queued_email_and_escapes_its_subject() {
+fn deliveries_page_lists_queued_work_and_escapes_its_subject() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
-    let entry = queued_email(company.id, Some(channel.id), None);
+    let entry = queued_delivery(company.id, channel.id, None);
     let email = mailbox_account_email();
-    let filter = outbox_filter();
+    let filter = delivery_filter();
 
-    let list = OutboxList {
+    let list = DeliveryList {
         company: &company,
         entries: std::slice::from_ref(&entry),
         filter: &filter,
         has_next: false,
-        selected_entry_id: Some(entry.id),
+        selected_entry_id: Some(entry.id.as_uuid()),
     };
-    let pane = outbox_empty_pane("Select an email.", FragmentSwap::Inline);
-    let html = outbox_page(&OutboxPage {
+    let pane = delivery_empty_pane("Select a delivery.", FragmentSwap::Inline);
+    let html = deliveries_page(&DeliveriesPage {
         user: &mailbox_user(&email),
         companies: std::slice::from_ref(&company),
         channels: std::slice::from_ref(&channel),
@@ -4767,31 +4772,36 @@ fn outbox_page_lists_queued_email_and_escapes_its_subject() {
     // The shell carries its own <script> tag, so this pins the subject rather than the document.
     assert!(!html.contains("order <script>"));
     assert!(html.contains("customer@example.com"));
-    // A queued email is an unsent one, and the summary says so before anything is clicked.
-    assert!(html.contains("1 email · 1 unsent · page 1"));
+    // The transport and the purpose are columns of their own now, not payload archaeology.
+    assert!(html.contains("Email · Reply · customer@example.com"));
+    // A queued delivery is an undelivered one, and the summary says so before anything is clicked.
+    assert!(html.contains("1 delivery · 1 undelivered · page 1"));
     assert!(html.contains("menu-active"));
     assert!(html.contains(&format!(
-        r##"hx-get="/ui/outbox/{}?company_id={}""##,
+        r##"hx-get="/ui/deliveries/{}?company_id={}""##,
         entry.id, company.id
     )));
     // The rail lights the workspace the response belongs to.
-    assert!(html.contains(r##"title="Outbox""##));
+    assert!(html.contains(r##"title="Deliveries""##));
     // The channel filter is what the channel_id column and its index exist to serve.
     assert!(html.contains(r##"<option value="">All channels</option>"##));
     assert!(html.contains(&format!(
         r##"<option value="{}">Inbox</option>"##,
         channel.id
     )));
+    // And a transport filter, which is the whole reason the workspace stopped being email-shaped.
+    assert!(html.contains(r##"<option value="">All transports</option>"##));
+    assert!(html.contains(r##"<option value="slack">Slack</option>"##));
 }
 
 #[test]
-fn outbox_pane_links_a_queued_email_to_the_task_that_wrote_it() {
+fn delivery_pane_links_to_the_task_that_produced_it() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
     let task = monitored_task(company.id, channel.id, TaskStatus::Completed);
-    let entry = queued_email(company.id, Some(channel.id), Some(task.id));
+    let entry = queued_delivery(company.id, channel.id, Some(task.id));
 
-    let html = outbox_detail_pane(&OutboxDetailPane {
+    let html = delivery_detail_pane(&DeliveryDetailPane {
         company_id: company.id,
         entry: &entry,
         task: Some(&task),
@@ -4801,29 +4811,89 @@ fn outbox_pane_links_a_queued_email_to_the_task_that_wrote_it() {
     let task_url = format!("/ui/tasks?company_id={}&task_id={}", company.id, task.id);
     assert!(html.contains(&task_url));
     assert!(html.contains("Open Task"));
-    // The task completed; the email has still not gone out, which is the whole point of the join.
+    // The task completed; the message has still not gone out, which is the point of the join.
     assert!(html.contains(task_status_label(TaskStatus::Completed)));
     assert!(html.contains("Queued · next attempt"));
-    // The live channel names itself, rather than the stale name in the payload.
     assert!(html.contains(">Inbox<"));
-    assert!(!html.contains(">Support<"));
-    assert!(html.contains("cc@example.com"));
-    assert!(html.contains("task:reply"));
-    // The payload is shown, but secrets in it are not.
-    assert!(html.contains("***masked***"));
-    assert!(!html.contains("sk-do-not-render-me"));
+    assert!(html.contains(&entry.idempotency_key));
+}
+
+/// An ambiguous outcome is not a failure and not a success, and the pane has to say which -- a
+/// reader who treats it as a failure will re-send it by hand, which is the duplicate the whole
+/// state exists to prevent.
+#[test]
+fn delivery_pane_distinguishes_an_unconfirmed_outcome_from_a_dead_letter() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let entry = DeliveryEntry {
+        status: DeliveryStatus::OutcomeUnknown,
+        last_error_class: Some(FailureClass::Timeout),
+        last_error_detail: Some("the relay never acknowledged".to_string()),
+        ..queued_delivery(company.id, channel.id, None)
+    };
+
+    let html = delivery_detail_pane(&DeliveryDetailPane {
+        company_id: company.id,
+        entry: &entry,
+        task: None,
+        channel: Some(&channel),
+    });
+
+    assert!(html.contains("Unconfirmed"));
+    assert!(html.contains("deliberately not retried"));
+    assert!(html.contains("timeout"));
+    assert!(html.contains("the relay never acknowledged"));
+    assert!(!html.contains("Every attempt was used up"));
+}
+
+/// A multi-part delivery earns one provider key per part. The single `provider_message_id` this
+/// replaces could show only the last of them.
+#[test]
+fn delivery_pane_lists_every_part_and_its_provider_key() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let part = |index: u16, status: DeliveryPartStatus, key: Option<&str>| DeliveryPartEntry {
+        id: DeliveryPartId::random(),
+        index,
+        status,
+        provider_message_key: key.map(str::to_string),
+        attempt_count: 1,
+        last_error_class: None,
+        last_error_detail: None,
+        delivered_at: None,
+    };
+    let entry = DeliveryEntry {
+        parts: vec![
+            part(0, DeliveryPartStatus::Delivered, Some("<one@example.com>")),
+            part(1, DeliveryPartStatus::Prepared, None),
+        ],
+        ..queued_delivery(company.id, channel.id, None)
+    };
+
+    let html = delivery_detail_pane(&DeliveryDetailPane {
+        company_id: company.id,
+        entry: &entry,
+        task: None,
+        channel: Some(&channel),
+    });
+
+    assert!(html.contains("Provider messages · 1 of 2 confirmed"));
+    assert!(html.contains("&lt;one@example.com&gt;"));
+    assert!(html.contains("Part 0"));
+    assert!(html.contains("Part 1"));
 }
 
 #[test]
-fn outbox_pane_without_a_task_offers_no_link_to_one() {
+fn delivery_pane_without_a_task_offers_no_link_to_one() {
     let company = mailbox_company();
-    let entry = OutboxEntry {
-        status: OutboxStatus::Sent,
-        sent_at: Some(Utc::now()),
-        ..queued_email(company.id, None, None)
+    let channel = mailbox_channel(company.id);
+    let entry = DeliveryEntry {
+        status: DeliveryStatus::Delivered,
+        delivered_at: Some(Utc::now()),
+        ..queued_delivery(company.id, channel.id, None)
     };
 
-    let html = outbox_detail_pane(&OutboxDetailPane {
+    let html = delivery_detail_pane(&DeliveryDetailPane {
         company_id: company.id,
         entry: &entry,
         task: None,
@@ -4834,19 +4904,20 @@ fn outbox_pane_without_a_task_offers_no_link_to_one() {
     assert!(!html.contains("/ui/tasks?"));
     assert!(html.contains("Delivered"));
     assert!(html.contains("alert-success"));
-    // With no channel to resolve, the pane falls back to the name the payload recorded.
-    assert!(html.contains(">Support<"));
+    // With no channel to resolve, the pane falls back to the interface's own label.
+    assert!(html.contains("support@acme"));
 }
 
 #[test]
-fn outbox_pane_names_a_task_it_cannot_read() {
+fn delivery_pane_names_a_task_it_cannot_read() {
     let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
     let task_id = Uuid::new_v4();
-    let entry = queued_email(company.id, None, Some(task_id));
+    let entry = queued_delivery(company.id, channel.id, Some(task_id));
 
     // The row points at a task, but the caller could not load it — the pane says so rather than
-    // pretending the email came from nowhere.
-    let html = outbox_detail_pane(&OutboxDetailPane {
+    // pretending the delivery came from nowhere.
+    let html = delivery_detail_pane(&DeliveryDetailPane {
         company_id: company.id,
         entry: &entry,
         task: None,
@@ -4859,12 +4930,13 @@ fn outbox_pane_names_a_task_it_cannot_read() {
 }
 
 #[test]
-fn outbox_list_says_when_nothing_matches_and_pages_only_when_there_is_more() {
+fn delivery_list_says_when_nothing_matches_and_pages_only_when_there_is_more() {
     let company = mailbox_company();
-    let filter = outbox_filter();
+    let channel = mailbox_channel(company.id);
+    let filter = delivery_filter();
 
-    let empty = outbox_list(
-        &OutboxList {
+    let empty = delivery_list(
+        &DeliveryList {
             company: &company,
             entries: &[],
             filter: &filter,
@@ -4873,12 +4945,12 @@ fn outbox_list_says_when_nothing_matches_and_pages_only_when_there_is_more() {
         },
         FragmentSwap::Inline,
     );
-    assert!(empty.contains("No queued email matches these filters."));
+    assert!(empty.contains("No delivery matches these filters."));
     assert!(!empty.contains("Older <svg"));
 
-    let entry = queued_email(company.id, None, None);
-    let paged = outbox_list(
-        &OutboxList {
+    let entry = queued_delivery(company.id, channel.id, None);
+    let paged = delivery_list(
+        &DeliveryList {
             company: &company,
             entries: std::slice::from_ref(&entry),
             filter: &filter,
@@ -4890,30 +4962,33 @@ fn outbox_list_says_when_nothing_matches_and_pages_only_when_there_is_more() {
     assert!(paged.contains("Older <svg"));
     assert!(paged.contains(r##"hx-swap-oob="outerHTML""##));
     assert!(paged.contains("page=2"));
-    assert!(paged.contains("hx-sync=\"#outbox-list:replace\""));
+    assert!(paged.contains("hx-sync=\"#delivery-list:replace\""));
 }
 
 #[test]
-fn outbox_query_carries_only_what_was_chosen() {
+fn delivery_query_carries_only_what_was_chosen() {
     let company_id = Uuid::new_v4();
     let entry_id = Uuid::new_v4();
 
-    let bare = outbox_query(company_id, &outbox_filter(), None);
+    let bare = delivery_query(company_id, &delivery_filter(), None);
     assert_eq!(bare, format!("company_id={company_id}"));
 
     let channel_id = Uuid::new_v4();
-    let filtered = OutboxFilter::new(
-        Some(channel_id),
-        Some(OutboxStatus::Failed),
-        true,
-        Some(3),
-        Some(10),
-    );
-    let full = outbox_query(company_id, &filtered, Some(entry_id));
+    let filtered = DeliveryFilter::new(DeliveryQuery {
+        channel_id: Some(channel_id),
+        status: Some(DeliveryStatus::DeadLetter),
+        transport: Some(TransportKind::Slack),
+        purpose: Some(DeliveryPurpose::Outreach),
+        sort_asc: true,
+        page: Some(3),
+        limit: Some(10),
+    });
+    let full = delivery_query(company_id, &filtered, Some(entry_id));
     assert_eq!(
         full,
         format!(
-            "company_id={company_id}&channel_id={channel_id}&status=failed&sort=asc&limit=10&page=3&entry_id={entry_id}"
+            "company_id={company_id}&channel_id={channel_id}&status=dead_letter&transport=slack\
+             &purpose=outreach&sort=asc&limit=10&page=3&entry_id={entry_id}"
         )
     );
 }
@@ -5010,7 +5085,7 @@ fn no_pane_leaks_a_placeholder_constant_into_its_markup() {
         company_settings_empty_pane("Select a company.", FragmentSwap::Inline),
         team_settings_empty_pane("Select a member.", FragmentSwap::Inline),
         task_monitor_empty_pane("Select a task.", FragmentSwap::Inline),
-        outbox_empty_pane("Select an email.", FragmentSwap::Inline),
+        delivery_empty_pane("Select a delivery.", FragmentSwap::Inline),
     ];
 
     for pane in panes {
@@ -5118,22 +5193,23 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         tasks_html.contains(r##"<h2 class="text-base font-semibold leading-tight">Tasks</h2>"##)
     );
 
-    let outbox_filter_val = outbox_filter();
-    let outbox_html = outbox_page(&OutboxPage {
+    let deliveries_filter = delivery_filter();
+    let deliveries_html = deliveries_page(&DeliveriesPage {
         user: &user,
         companies: &companies,
         channels: &[],
-        list: &OutboxList {
+        list: &DeliveryList {
             company: &company,
             entries: &[],
-            filter: &outbox_filter_val,
+            filter: &deliveries_filter,
             has_next: false,
             selected_entry_id: None,
         },
         pane_html: "",
     });
     assert!(
-        outbox_html.contains(r##"<h2 class="text-base font-semibold leading-tight">Outbox</h2>"##)
+        deliveries_html
+            .contains(r##"<h2 class="text-base font-semibold leading-tight">Deliveries</h2>"##)
     );
 
     let dashboard_html = dashboard_page(&DashboardShell {
