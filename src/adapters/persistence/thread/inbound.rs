@@ -110,7 +110,7 @@ async fn commit_on(
 
     let task_id = create_task(tx, request, &threads, stored.id).await?;
     let delivery_ids = create_deliveries(tx, request).await?;
-    complete_claimed_event(request)?;
+    complete_claimed_event(tx, request).await?;
 
     Ok(InboundCommitOutcome {
         disposition: CommitDisposition::Created,
@@ -165,6 +165,7 @@ async fn recognise_redelivery(
         )?;
     }
 
+    complete_claimed_event(tx, request).await?;
     Ok(InboundCommitOutcome {
         disposition: CommitDisposition::Duplicate,
         message_id,
@@ -693,19 +694,24 @@ async fn create_deliveries(
     Ok(created)
 }
 
-/// Mark the durable inbound event this commit consumed as complete.
-///
-/// Email has none: the SMTP transaction is the claim and it is held open until this returns, so
-/// there is nothing to fence. A transport with a durable inbox supplies one in step 10, and it is
-/// refused here rather than ignored, because an event that stays claimed is work that never runs
-/// again.
-fn complete_claimed_event(request: &InboundCommitRequest) -> AppResult<()> {
-    match request.claimed_event {
-        None => Ok(()),
-        Some(_) => Err(AppError::Internal(
-            "Inbound event completion has no durable inbox until the generic queue exists".into(),
-        )),
+/// Complete the durable event under the same transaction and execution fence as its canonical
+/// rows. If the lease lapsed during this commit, the zero-row update turns the whole transaction
+/// into a rollback; a replacement execution can then retry without observing partial effects.
+async fn complete_claimed_event(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+) -> AppResult<()> {
+    let Some(fence) = request.claimed_event.as_ref() else {
+        // SMTP holds its request open through this commit and therefore has no inbox claim.
+        return Ok(());
+    };
+    if crate::adapters::persistence::inbound_event::complete_inbound_event_on(tx, fence).await? {
+        return Ok(());
     }
+    Err(AppError::Conflict(format!(
+        "Inbound event {} lost execution ownership before canonical commit",
+        fence.row
+    )))
 }
 
 /// The canonical message, as the producer vocabulary states it.

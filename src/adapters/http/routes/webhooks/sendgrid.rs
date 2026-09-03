@@ -1250,6 +1250,20 @@ mod tests {
         let memory_providers =
             Arc::new(crate::services::memory_provider::MemoryProviderRegistry::default());
         let monitoring = Arc::new(crate::adapters::monitoring::InMemoryMonitor::new());
+        let inbound_persistence = Arc::new(crate::adapters::persistence::PostgresPersistence::new(
+            sqlx::PgPool::connect_lazy("postgres://localhost/mail_agents_test")
+                .expect("valid lazy pool url"),
+        ));
+        let inbound_event_wakeups =
+            crate::services::inbound_event_worker::InboundEventWakeups::new();
+        let inbound_event_worker = Arc::new(
+            crate::services::inbound_event_worker::InboundEventWorker::new(
+                inbound_persistence.clone(),
+                inbound_persistence.clone(),
+                Arc::new(crate::transport::InboundEventDecoderRegistry::new()),
+                inbound_event_wakeups.clone(),
+            ),
+        );
         let app_state = AppState {
             memory_provider_activity: Default::default(),
             // Lazy: this test drives mocked persistence and never opens a connection.
@@ -1339,6 +1353,9 @@ mod tests {
                 memory_providers,
                 monitoring,
             )),
+            inbound_event_worker,
+            inbound_event_inbox: inbound_persistence,
+            inbound_event_wakeups,
             events: crate::infra::events::MailboxEvents::new(),
         };
 

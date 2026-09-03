@@ -31,6 +31,7 @@ use mail_agents::{
     },
     services::{
         delivery_worker::DeliveryWorker,
+        inbound_event_worker::InboundEventWorker,
         runtime_metrics::{ActiveTaskExecutions, RuntimeMetricSampler},
         task_worker::TaskWorker,
     },
@@ -151,6 +152,7 @@ async fn serve() -> anyhow::Result<()> {
     let task_worker_concurrency = task_worker_concurrency_from_env();
     let app_state = init_app_state().await?;
     let memory_worker = app_state.memory_worker.clone();
+    let inbound_event_worker: Arc<InboundEventWorker> = app_state.inbound_event_worker.clone();
 
     // Create broadcast channel for background worker graceful shutdown
     let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel(1);
@@ -182,6 +184,8 @@ async fn serve() -> anyhow::Result<()> {
 
     let task_worker_handle = tokio::spawn(task_worker.start_worker_loop(shutdown_rx.resubscribe()));
     let mut memory_worker_handle = tokio::spawn(memory_worker.run(shutdown_rx.resubscribe()));
+    let mut inbound_event_worker_handle =
+        tokio::spawn(inbound_event_worker.run(shutdown_rx.resubscribe()));
 
     // The delivery queue is drained by its own worker rather than by the task loop. A delivery
     // outlives the task that produced it, plenty of deliveries have no task behind them at all,
@@ -209,6 +213,7 @@ async fn serve() -> anyhow::Result<()> {
     let mailbox_listener_handle = tokio::spawn(run_mailbox_event_listener(
         app_state.db.clone(),
         app_state.events.clone(),
+        app_state.inbound_event_wakeups.clone(),
         shutdown_rx.resubscribe(),
     ));
 
@@ -254,6 +259,7 @@ async fn serve() -> anyhow::Result<()> {
     tokio::join!(
         join_background("runtime metric sampler", &mut runtime_sampler_handle),
         join_background("memory worker", &mut memory_worker_handle),
+        join_background("inbound event worker", &mut inbound_event_worker_handle),
         join_background("task worker", &mut task_worker_handle),
         join_background("delivery worker", &mut delivery_worker_handle),
         join_background("SMTP listener", &mut smtp_handle),

@@ -7,6 +7,7 @@
 use super::test_support::*;
 use super::*;
 use crate::adapters::persistence::task::TaskPersistence;
+use crate::adapters::persistence::test_support::UNSCOPED_CLAIM;
 use crate::entities::{
     correlation::CorrelationId,
     email_message::EmailMessageMetadata,
@@ -15,16 +16,19 @@ use crate::entities::{
     task::NewTask,
     transport::{
         ChannelBindingId, ExternalEventKey, ExternalMessageKey, ExternalThreadKey,
-        IdentityNamespace, IdentitySubject, InboundSource, QualifiedIdentity, TransportKind,
+        IdentityNamespace, IdentitySubject, InboundEventId, InboundSource, QualifiedIdentity,
+        TransportKind,
     },
     value_objects::MessageId,
 };
 use crate::transport::{
-    AddressedIdentity, BoundedVec, CanonicalContent, CommitDisposition, ExternalCorrelationStore,
-    InboundCommitOutcome, InboundCommitRequest, InboundEnvelope, InboundMessageCommitter,
-    InboundOutreachTransition, InboundTaskRequest, InboundTaskTarget, IngressDirectives,
-    IngressPolicyFacts, PipelineStep, ProtocolExtension, RecipientRole, ReplyDelivery,
-    ThreadAssociation, ThreadPrincipalIntent, ThreadTarget,
+    AddressedIdentity, AuthenticatedInboundEvent, BoundedVec, CanonicalContent,
+    ClaimedInboundEvent, CommitDisposition, ExternalCorrelationStore, InboundCommitOutcome,
+    InboundCommitRequest, InboundEnvelope, InboundEventInbox, InboundEventPayload,
+    InboundEventQueue, InboundMessageCommitter, InboundOutreachTransition, InboundTaskRequest,
+    InboundTaskTarget, IngressDirectives, IngressPolicyFacts, PipelineStep, ProtocolExtension,
+    RecipientRole, ReplyDelivery, SafeHeaderFacts, ThreadAssociation, ThreadPrincipalIntent,
+    ThreadTarget, WorkerId,
 };
 use crate::use_cases::participant::{IdentityDirectory, IdentityObservation};
 
@@ -166,6 +170,88 @@ async fn count(fixture: &Fixture, sql: &str) -> i64 {
     sqlx::query_scalar(sql)
         .bind(fixture.company_id)
         .fetch_one(&fixture.pool)
+        .await
+        .unwrap()
+}
+
+/// Store one authenticated inbox event for `request` and point the request at it.
+///
+/// Every inbox test needs the same producer half — the key on the envelope, the same key on the
+/// protocol extension, and a stored row — before it can say anything about the transition it is
+/// actually testing.
+async fn store_event(
+    fixture: &Fixture,
+    request: &mut InboundCommitRequest,
+    key: &str,
+) -> InboundEventId {
+    let event_key = ExternalEventKey::parse(key).unwrap();
+    request.envelope.source.event_key = Some(event_key.clone());
+    request.envelope.extension =
+        ProtocolExtension::stored_event(request.envelope.source.binding_id, event_key.clone());
+    fixture
+        .persistence
+        .store_authenticated(AuthenticatedInboundEvent {
+            transport: TransportKind::Email,
+            company_id: fixture.company_id,
+            installation_id: None,
+            external_event_key: event_key,
+            correlation_id: request.envelope.correlation_id,
+            payload: InboundEventPayload::parse(br#"{"event":"message"}"#.to_vec()).unwrap(),
+            content_type: None,
+            safe_header_facts: SafeHeaderFacts::default(),
+            received_at: chrono::Utc::now(),
+        })
+        .await
+        .unwrap()
+        .event_id()
+}
+
+/// Claim a stored event now, whatever backoff a previous attempt left on it.
+async fn claim_stored(fixture: &Fixture, event_id: InboundEventId) -> ClaimedInboundEvent {
+    sqlx::query(
+        "UPDATE inbound_events SET available_at = CURRENT_TIMESTAMP - INTERVAL '1 day' \
+         WHERE id = $1",
+    )
+    .bind(event_id.as_uuid())
+    .execute(fixture.persistence.pool())
+    .await
+    .unwrap();
+    fixture
+        .persistence
+        .claim_inbound_events(WorkerId::random(), std::time::Duration::from_secs(120), 1)
+        .await
+        .unwrap()
+        .into_iter()
+        .next()
+        .expect("the stored event is claimable")
+}
+
+/// Age a held lease past its expiry, which is what a crashed worker leaves behind.
+async fn expire_lease(fixture: &Fixture, event_id: InboundEventId) {
+    sqlx::query(
+        r#"UPDATE inbound_events
+              SET locked_at = CURRENT_TIMESTAMP - INTERVAL '2 minutes',
+                  lock_expires_at = CURRENT_TIMESTAMP - INTERVAL '1 minute'
+            WHERE id = $1"#,
+    )
+    .bind(event_id.as_uuid())
+    .execute(fixture.persistence.pool())
+    .await
+    .unwrap();
+}
+
+async fn event_status(fixture: &Fixture, event_id: InboundEventId) -> String {
+    sqlx::query_scalar("SELECT status FROM inbound_events WHERE id = $1")
+        .bind(event_id.as_uuid())
+        .fetch_one(fixture.persistence.pool())
+        .await
+        .unwrap()
+}
+
+async fn event_attempts(fixture: &Fixture, event_id: InboundEventId) -> i32 {
+    sqlx::query_scalar("SELECT attempt_count FROM inbound_events WHERE id = $1")
+        .bind(event_id.as_uuid())
+        .fetch_one(fixture.persistence.pool())
         .await
         .unwrap()
 }
@@ -1129,24 +1215,137 @@ async fn a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_b
     fixture.cleanup().await;
 }
 
-/// A claimed inbound event has no durable inbox until step 10, so the commit refuses one rather
-/// than completing it silently. An event that stays claimed is work that never runs again.
 #[tokio::test]
-async fn work_this_build_has_no_durable_queue_for_is_refused_rather_than_dropped() {
+async fn canonical_rows_and_inbox_completion_commit_together() {
+    let _claim_guard = UNSCOPED_CLAIM.lock().await;
     let Some(fixture) = Fixture::new("inbound_unsupported").await else {
         return;
     };
-    let rfc = format!("<unsupported-{}@example.com>", fixture.suffix);
-
+    let rfc = format!("<event-{}@example.com>", fixture.suffix);
     let mut request = request(&fixture, &rfc, "Anyone there?").await;
-    request.claimed_event = Some(crate::transport::ExecutionLease::new(
-        crate::entities::transport::InboundEventId::random(),
-        crate::transport::WorkerId::random(),
-        chrono::Utc::now() + chrono::Duration::minutes(5),
-    ));
+    let stored = store_event(&fixture, &mut request, &format!("Ev{}", fixture.suffix)).await;
+    request.claimed_event = Some(claim_stored(&fixture, stored).await.lease);
+
+    assert!(fixture.persistence.commit_inbound(request).await.is_ok());
+    assert_eq!(message_count(&fixture).await, 1);
+    assert_eq!(event_status(&fixture, stored).await, "completed");
+
+    fixture.cleanup().await;
+}
+
+#[tokio::test]
+async fn a_crash_at_any_inbox_phase_recovers_without_a_duplicate_canonical_message() {
+    let _claim_guard = UNSCOPED_CLAIM.lock().await;
+    let Some(fixture) = Fixture::new("inbound_crash").await else {
+        return;
+    };
+    let rfc = format!("<crash-{}@example.com>", fixture.suffix);
+    let mut request = request(&fixture, &rfc, "Survives every crash").await;
+    let stored = store_event(
+        &fixture,
+        &mut request,
+        &format!("EvCrash{}", fixture.suffix),
+    )
+    .await;
+
+    // A crash between acknowledgement and the first claim: the acknowledged event is simply
+    // still waiting, and holds no lease for the reaper to charge an attempt for.
+    assert_eq!(event_status(&fixture, stored).await, "pending");
+    assert_eq!(
+        fixture
+            .persistence
+            .reap_expired_inbound_events()
+            .await
+            .unwrap()
+            .leases_expired,
+        0
+    );
+    assert_eq!(event_attempts(&fixture, stored).await, 0);
+
+    // A crash immediately after claiming, one partway through decode, and one after decode but
+    // before the canonical commit are the same durable state: a lease nobody will renew, and no
+    // canonical row anywhere. Each recovers by expiry, and each costs exactly one attempt.
+    for expected_attempt in 1..=3 {
+        let claimed = claim_stored(&fixture, stored).await;
+        assert_eq!(event_status(&fixture, stored).await, "processing");
+        expire_lease(&fixture, stored).await;
+        drop(claimed);
+
+        assert!(
+            fixture
+                .persistence
+                .reap_expired_inbound_events()
+                .await
+                .unwrap()
+                .leases_expired
+                >= 1
+        );
+        assert_eq!(event_status(&fixture, stored).await, "retryable");
+        assert_eq!(event_attempts(&fixture, stored).await, expected_attempt);
+        assert_eq!(message_count(&fixture).await, 0);
+    }
+
+    // The replacement execution that finally commits produces one message, not four.
+    request.claimed_event = Some(claim_stored(&fixture, stored).await.lease);
+    let correlation_id = request.envelope.correlation_id;
+    assert!(fixture.persistence.commit_inbound(request).await.is_ok());
+    assert_eq!(event_status(&fixture, stored).await, "completed");
+    assert_eq!(message_count(&fixture).await, 1);
+    assert_eq!(task_count(&fixture).await, 1);
+
+    // A crash after the commit cannot be recovered *into* a second message. The completed row is
+    // outside every claimable and reapable predicate, and a provider redelivery of the same key
+    // deduplicates onto it rather than opening a fresh attempt.
+    assert_eq!(
+        fixture
+            .persistence
+            .reap_expired_inbound_events()
+            .await
+            .unwrap()
+            .leases_expired,
+        0
+    );
+    let redelivered = fixture
+        .persistence
+        .store_authenticated(AuthenticatedInboundEvent {
+            transport: TransportKind::Email,
+            company_id: fixture.company_id,
+            installation_id: None,
+            external_event_key: ExternalEventKey::parse(format!("EvCrash{}", fixture.suffix))
+                .unwrap(),
+            correlation_id,
+            payload: InboundEventPayload::parse(br#"{"event":"message"}"#.to_vec()).unwrap(),
+            content_type: None,
+            safe_header_facts: SafeHeaderFacts::default(),
+            received_at: chrono::Utc::now(),
+        })
+        .await
+        .unwrap();
+    assert!(!redelivered.was_stored());
+    assert_eq!(redelivered.event_id(), stored);
+    assert_eq!(event_status(&fixture, stored).await, "completed");
+    assert_eq!(message_count(&fixture).await, 1);
+
+    fixture.cleanup().await;
+}
+
+#[tokio::test]
+async fn lease_loss_at_final_commit_rolls_back_every_canonical_effect() {
+    let _claim_guard = UNSCOPED_CLAIM.lock().await;
+    let Some(fixture) = Fixture::new("inbound_lost_fence").await else {
+        return;
+    };
+    let rfc = format!("<lost-{}@example.com>", fixture.suffix);
+    let mut request = request(&fixture, &rfc, "Must roll back").await;
+    let stored = store_event(&fixture, &mut request, &format!("EvLost{}", fixture.suffix)).await;
+    request.claimed_event = Some(claim_stored(&fixture, stored).await.lease);
+    expire_lease(&fixture, stored).await;
 
     assert!(fixture.persistence.commit_inbound(request).await.is_err());
     assert_eq!(message_count(&fixture).await, 0);
+    // The row keeps the lapsed lease rather than settling itself: the reaper owns that decision,
+    // and it is the only place an attempt is charged for a lease nobody renewed.
+    assert_eq!(event_status(&fixture, stored).await, "processing");
 
     fixture.cleanup().await;
 }

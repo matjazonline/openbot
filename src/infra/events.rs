@@ -13,6 +13,7 @@
 //! Events carry identifiers, never bodies — subscribers re-query. See
 //! [`crate::use_cases::thread::ThreadUseCases::get_thread_messages_after`].
 
+use crate::services::inbound_event_worker::InboundEventWakeups;
 use serde::Deserialize;
 use sqlx::PgPool;
 use sqlx::postgres::PgListener;
@@ -29,6 +30,13 @@ const ACTIVITY_CHANNEL: &str = "thread_activity";
 
 /// Correlation-chain changes used by the Tasks board.
 const TASK_CHAIN_CHANNEL: &str = "task_chain_changed";
+
+/// The channel the `inbound_events_notify_ready` trigger announces claimable inbox rows on.
+///
+/// This carries no payload the worker needs: it re-reads and claims durably, so a dropped or
+/// duplicated notification costs at most one poll interval. It shares this connection rather than
+/// opening its own because a pure latency hint does not justify a second dedicated listener.
+const INBOUND_EVENT_CHANNEL: &str = "inbound_event_ready";
 
 /// How many events a slow subscriber may fall behind before it is marked lagged. Lag is not data
 /// loss here — a lagged subscriber re-queries from its cursor and catches up in one round trip —
@@ -143,6 +151,7 @@ impl Default for MailboxEvents {
 pub async fn run_mailbox_event_listener(
     pool: PgPool,
     events: MailboxEvents,
+    inbound_events: InboundEventWakeups,
     mut shutdown: broadcast::Receiver<()>,
 ) {
     loop {
@@ -151,7 +160,7 @@ pub async fn run_mailbox_event_listener(
                 info!("Thread message listener shutting down");
                 return;
             }
-            result = listen_until_error(&pool, &events) => {
+            result = listen_until_error(&pool, &events, &inbound_events) => {
                 // `listen_until_error` only returns on failure; `PgListener` handles ordinary
                 // reconnects internally without surfacing them here.
                 if let Err(err) = result {
@@ -167,16 +176,31 @@ pub async fn run_mailbox_event_listener(
     }
 }
 
-async fn listen_until_error(pool: &PgPool, events: &MailboxEvents) -> Result<(), sqlx::Error> {
+async fn listen_until_error(
+    pool: &PgPool,
+    events: &MailboxEvents,
+    inbound_events: &InboundEventWakeups,
+) -> Result<(), sqlx::Error> {
     let mut listener = PgListener::connect_with(pool).await?;
-    // One connection serves both channels; `PgListener` re-issues every LISTEN on reconnect.
+    // One connection serves every channel; `PgListener` re-issues each LISTEN on reconnect.
     listener
-        .listen_all([MESSAGE_CHANNEL, ACTIVITY_CHANNEL, TASK_CHAIN_CHANNEL])
+        .listen_all([
+            MESSAGE_CHANNEL,
+            ACTIVITY_CHANNEL,
+            TASK_CHAIN_CHANNEL,
+            INBOUND_EVENT_CHANNEL,
+        ])
         .await?;
     info!("Listening for mailbox notifications");
 
     loop {
         let notification = listener.recv().await?;
+        // The inbox wake-up is not a `MailboxEvent` and has no payload to parse: it only shortens
+        // the idle poll of a worker that may be in another process entirely.
+        if notification.channel() == INBOUND_EVENT_CHANNEL {
+            inbound_events.notify();
+            continue;
+        }
         let parsed = match notification.channel() {
             MESSAGE_CHANNEL => serde_json::from_str::<ThreadScope>(notification.payload())
                 .map(MailboxEvent::MessageCommitted),

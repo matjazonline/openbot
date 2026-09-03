@@ -13,10 +13,11 @@ use crate::{
     infra::{config::AppConfig, events::MailboxEvents},
     services::{
         database_query_health::DatabaseQueryHealthService,
+        inbound_event_worker::{InboundEventWakeups, InboundEventWorker},
         memory_worker::MemoryWorker,
         runtime_metrics::{MemoryProviderActivity, RuntimeMetricPersistence},
     },
-    transport::{DeliveryQueue, TransportRegistry},
+    transport::{DeliveryQueue, InboundEventInbox, TransportRegistry},
     use_cases::{
         agent::AgentUseCases, approval::ApprovalUseCases, channel::ChannelUseCases,
         company::CompanyUseCases, company_invite::CompanyInviteUseCases, delivery::DeliveryReader,
@@ -40,6 +41,12 @@ pub struct AppState {
     pub approval_use_cases: Arc<ApprovalUseCases>,
     pub memory_use_cases: Arc<MemoryUseCases>,
     pub memory_worker: Arc<MemoryWorker>,
+    /// Owns claims on authenticated provider events. Routes only store and wake it.
+    pub inbound_event_worker: Arc<InboundEventWorker>,
+    /// Producer-only view used by future fast-ack webhook routes.
+    pub inbound_event_inbox: Arc<dyn InboundEventInbox>,
+    /// A latency hint after durable storage; polling remains authoritative.
+    pub inbound_event_wakeups: InboundEventWakeups,
     /// Read-only aggregates behind `/ui/dashboard`.
     pub dashboard_persistence: Arc<dyn DashboardPersistence>,
     /// Shared across tabs so the operator query-statistics cache is process-wide.
@@ -85,6 +92,18 @@ impl FromRef<AppState> for Arc<AppConfig> {
 impl FromRef<AppState> for Arc<dyn MonitoringService> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.monitoring.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn InboundEventInbox> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.inbound_event_inbox.clone()
+    }
+}
+
+impl FromRef<AppState> for InboundEventWakeups {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.inbound_event_wakeups.clone()
     }
 }
 

@@ -4,11 +4,13 @@
 //! qualification and bounds unavoidable once a value crosses into the domain.
 
 mod delivery;
+mod inbound;
 mod integration;
 
 pub use delivery::{
     DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, FailureClass, aggregate_parent_status,
 };
+pub use inbound::{InboundEventErrorClass, InboundEventIgnoreReason, InboundEventStatus};
 pub use integration::{
     BindingAccessPolicy, BindingAccessSnapshot, BindingAuditAction, BindingAuditEvent,
     BindingAuditMetadata, BindingChangeReason, BindingDeliveryPolicy, BindingStatus,

@@ -14,6 +14,7 @@ pub mod credentials;
 pub mod dashboard;
 pub mod database_query_health;
 pub mod delivery;
+pub mod inbound_event;
 pub mod integration;
 pub mod memory;
 pub mod participant;

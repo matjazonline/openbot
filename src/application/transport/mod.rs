@@ -14,6 +14,7 @@
 pub mod bounded;
 pub mod compose;
 pub mod delivery;
+pub mod inbox;
 pub mod ingress;
 pub mod lease;
 pub mod ports;
@@ -38,6 +39,17 @@ pub use delivery::{
     MAX_DELIVERY_PARTS, MAX_PART_PAYLOAD_BYTES, PartIndex, PartKey, PartTransition, PayloadError,
     ProviderSendOutcome, RenderedPart, StandaloneDeliveryEnvelope, TransportPayload,
     plan_deliveries,
+};
+pub use inbox::{
+    AuthenticatedInboundEvent, ClaimedInboundEvent, DuplicateInboundDecoder,
+    INBOUND_EVENT_CLAIM_BATCH, INBOUND_EVENT_LEASE_SECONDS, InboundContentType, InboundDigestError,
+    InboundEventCensus, InboundEventDecodeOutcome, InboundEventDecoder,
+    InboundEventDecoderRegistry, InboundEventFailure, InboundEventInbox, InboundEventPayload,
+    InboundEventQueue, InboundEventReaping, InboundEventRecord, InboundEventRetention,
+    InboundEventStoreOutcome, InboundEventTransition, InboundFailureDetail, InboundPayloadDigest,
+    InboundPayloadError, InboundRetentionPolicy, MAX_INBOUND_EVENT_ATTEMPTS,
+    MAX_INBOUND_EVENT_PAYLOAD_BYTES, MonitoredInboundEventInbox, SafeHeaderFacts,
+    SafeHeaderFactsError,
 };
 pub use ingress::{
     AddressedIdentity, AddressedRecipient, AddressedTarget, CanonicalContent, CommitDisposition,

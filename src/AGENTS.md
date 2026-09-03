@@ -90,6 +90,10 @@ level and makes the stack worse.** What actually reduces it, in order:
    runtime, the parent then holds a pointer rather than the whole state machine. Say why in a
    comment — these read as noise and get tidied away otherwise.
 
+For enums crossing an async phase boundary, box every payload large enough to dominate the enum;
+boxing only the currently largest variant can merely make the next variant oversized. Keep
+`clippy::large_enum_variant` enabled as the early failure signal.
+
 The chain above is now 347 KiB. `scripts/stack-frames.sh` prints what each frame costs: measure
 before and after rather than reasoning about it.
 

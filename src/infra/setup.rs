@@ -17,13 +17,17 @@ use crate::{
     },
     services::{
         database_query_health::DatabaseQueryHealthService,
+        inbound_event_worker::{InboundEventWakeups, InboundEventWorker},
         memory_coordinator::MemoryCoordinator,
         memory_provider::{ConfiguredMemoryProviders, MemoryProviderRegistry},
         memory_worker::MemoryWorker,
         outbound_dispatcher::{MailTransport, OutboundDispatcher, SmtpConfirmationSender},
         runtime_metrics::MemoryProviderActivity,
     },
-    transport::{DeliveryComposer, TransportRegistry, TransportRenderers},
+    transport::{
+        DeliveryComposer, InboundEventDecoderRegistry, MonitoredInboundEventInbox,
+        TransportRegistry, TransportRenderers,
+    },
     use_cases::{
         agent::AgentUseCases,
         approval::ApprovalUseCases,
@@ -193,6 +197,24 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         .with_memory(memory_coordinator),
     );
 
+    // The generic inbox exists before any webhook uses it. Slack adds its decoder to this
+    // registry in the transport phase; an empty registry is safe because no route can enqueue a
+    // Slack event yet, while startup reconciliation is already supervised and exercised.
+    let inbound_event_wakeups = InboundEventWakeups::new();
+    let inbound_event_worker = Arc::new(
+        InboundEventWorker::new(
+            postgres_arc.clone(),
+            postgres_arc.clone(),
+            Arc::new(InboundEventDecoderRegistry::new()),
+            inbound_event_wakeups.clone(),
+        )
+        .with_monitoring(monitoring.clone()),
+    );
+    let inbound_event_inbox = Arc::new(MonitoredInboundEventInbox::new(
+        postgres_arc.clone(),
+        monitoring.clone(),
+    ));
+
     // The email sender reaches the internal relay before SMTP, so a channel answering another
     // channel of the same company never leaves the building.
     let transports = Arc::new(
@@ -228,6 +250,9 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         approval_use_cases,
         memory_use_cases,
         memory_worker,
+        inbound_event_worker,
+        inbound_event_inbox,
+        inbound_event_wakeups,
         dashboard_persistence: postgres_arc.clone(),
         database_query_health,
         dashboard_sse_connections: Arc::new(std::sync::atomic::AtomicU64::new(0)),
