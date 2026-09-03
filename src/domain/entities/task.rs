@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::entities::correlation::CorrelationId;
 use crate::entities::message::CanonicalMessageId;
+use crate::entities::transport::RecipientRole;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -469,6 +470,18 @@ impl TaskSource {
     }
 }
 
+/// One channel-and-thread pair a task's run drives, in pipeline order.
+///
+/// Stated by whoever enqueues the task. The previous shape re-read them out of the payload JSON,
+/// which meant the queue understood the *shape* of one producer's payload and quietly enqueued a
+/// single-channel run for anything else.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TaskTarget {
+    pub channel_id: Uuid,
+    pub thread_id: Uuid,
+    pub recipient_role: RecipientRole,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct NewTask {
     pub company_id: Uuid,
@@ -476,6 +489,9 @@ pub struct NewTask {
     pub thread_id: Option<Uuid>,
     pub task_type: String,
     pub payload: serde_json::Value,
+    /// Every channel this run answers on. Empty means the task's own channel and thread, which is
+    /// what a schedule or an approval resume drives.
+    pub targets: Vec<TaskTarget>,
     /// What this task is the work for, when redelivering that thing must not run it twice.
     pub source: TaskSource,
     /// The chain this task belongs to.
@@ -506,6 +522,7 @@ impl NewTask {
             thread_id,
             task_type: task_type.into(),
             payload,
+            targets: Vec::new(),
             source: TaskSource::Unattributed,
             correlation_id: CorrelationId::new(),
         }
@@ -525,6 +542,7 @@ impl NewTask {
             thread_id,
             task_type: task_type.into(),
             payload,
+            targets: Vec::new(),
             source: TaskSource::Unattributed,
             correlation_id: parent.correlation_id,
         }

@@ -17,7 +17,10 @@ use std::{fmt, str::FromStr};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::entities::value_objects::{ChannelSlug, CompanySlug, EmailAddress};
+use crate::entities::{
+    message::MessageParticipantKind,
+    value_objects::{ChannelSlug, CompanySlug, EmailAddress},
+};
 
 /// A deliberately supported transport. Adding a variant requires an adapter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -248,6 +251,59 @@ bounded_string!(IdentitySubject, MAX_IDENTITY_SUBJECT_BYTES);
 bounded_string!(ExternalEventKey, MAX_EXTERNAL_EVENT_KEY_BYTES);
 bounded_string!(ExternalThreadKey, MAX_EXTERNAL_THREAD_KEY_BYTES);
 bounded_string!(ExternalMessageKey, MAX_EXTERNAL_MESSAGE_KEY_BYTES);
+
+/// Which addressing role one identity held on a message.
+///
+/// Transport vocabulary: what an adapter states about an arriving message, what the reply planner
+/// reads back, and what a queued run records about each channel it drives. It lives in the domain
+/// because `background_tasks`' channel targets carry it, and the domain may not reach upward for a
+/// type its own entities hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RecipientRole {
+    To,
+    Cc,
+}
+
+impl RecipientRole {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::To => "to",
+            Self::Cc => "cc",
+        }
+    }
+
+    /// The role a stored `to`/`cc` string names.
+    ///
+    /// Fallible rather than defaulting to `To`: a row whose role this build does not recognise is
+    /// a schema/deploy mismatch, and silently treating it as a direct recipient would run an agent
+    /// for a channel that was only copied.
+    pub fn parse(value: &str) -> Result<Self, UnknownRecipientRole> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "to" => Ok(Self::To),
+            "cc" => Ok(Self::Cc),
+            _ => Err(UnknownRecipientRole(value.to_string())),
+        }
+    }
+
+    /// How this role is stored on the canonical message.
+    pub const fn participant_kind(self) -> MessageParticipantKind {
+        match self {
+            Self::To => MessageParticipantKind::To,
+            Self::Cc => MessageParticipantKind::Cc,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("unknown recipient role '{0}'")]
+pub struct UnknownRecipientRole(String);
+
+impl From<UnknownRecipientRole> for crate::app_error::AppError {
+    fn from(error: UnknownRecipientRole) -> Self {
+        Self::Internal(error.to_string())
+    }
+}
 
 /// A provider identity qualified by the scope in which its subject is unique.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

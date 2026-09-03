@@ -1,8 +1,8 @@
+use crate::entities::channel::{RESERVED_SLUG_SUFFIXES, RESERVED_SUFFIX_SEPARATORS};
 use crate::entities::{
     transport::{ChannelSelector, ExternalDestination},
     value_objects::{ChannelSlug, CompanySlug, EmailAddress},
 };
-use crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES;
 
 /// Email-only delivery behavior encoded in an otherwise ordinary recipient address.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -150,8 +150,8 @@ fn angle_address(value: &str) -> &str {
 
 fn strip_context_suffix(raw: &str) -> (String, bool) {
     let lower = raw.trim().to_ascii_lowercase();
-    for suffix in RESERVED_CONTEXT_SUFFIXES {
-        for separator in ['.', '+', '-', '_'] {
+    for suffix in RESERVED_SLUG_SUFFIXES {
+        for separator in RESERVED_SUFFIX_SEPARATORS {
             let marker = format!("{separator}{suffix}");
             if let Some(base) = lower.strip_suffix(&marker)
                 && !base.trim().is_empty()
@@ -169,6 +169,7 @@ fn strip_context_suffix(raw: &str) -> (String, bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transport::SystemAddress;
 
     #[test]
     fn platform_addresses_produce_qualified_selectors() {
@@ -206,6 +207,49 @@ mod tests {
         }
     }
 
+    #[test]
+    fn only_an_exact_underscore_prefixed_name_is_a_system_address() {
+        assert_eq!(SystemAddress::parse("_help"), Some(SystemAddress::Help));
+        assert_eq!(SystemAddress::parse("_HELP"), Some(SystemAddress::Help));
+        assert_eq!(
+            SystemAddress::parse("help"),
+            None,
+            "without the underscore it is a slug a customer may own"
+        );
+        assert_eq!(SystemAddress::parse("_helpdesk"), None);
+        assert_eq!(SystemAddress::parse("support"), None);
+    }
+
+    #[test]
+    fn no_system_address_can_be_shadowed_by_a_channel_or_a_context_suffix() {
+        for system in SystemAddress::ALL {
+            let local = system.local_part();
+
+            assert!(
+                local.starts_with('_'),
+                "'{local}' is only safe to reserve because channel_slugs_format forbids a leading \
+                 underscore"
+            );
+            assert!(
+                crate::use_cases::channel::validate_slug(
+                    local,
+                    crate::use_cases::channel::SlugKind::ChannelAddress
+                )
+                .is_ok(),
+                "if validate_slug ever rejects '{local}', the reason must not be a reserved \
+                 context suffix -- see the assertion below"
+            );
+
+            let parsed = EmailChannelSelectorParser::new("mailagents.com")
+                .parse(&format!("{local}@acme.mailagents.com"))
+                .expect("a reserved system address still has platform address syntax");
+            assert!(
+                !parsed.delivery().is_context_only() && parsed.primary().channel() == local,
+                "'{local}' collides with a reserved context suffix and would be eaten before \
+                 SystemAddress::parse ever saw it"
+            );
+        }
+    }
     #[test]
     fn external_recipients_are_explicit_destinations() {
         let parser = EmailChannelSelectorParser::new("mailagents.com");

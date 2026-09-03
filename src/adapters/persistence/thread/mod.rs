@@ -7,6 +7,7 @@
 
 mod email_metadata;
 mod external;
+mod inbound;
 mod message;
 
 #[cfg(test)]
@@ -20,6 +21,10 @@ mod tests;
 #[cfg(test)]
 #[path = "read_tests.rs"]
 mod read_tests;
+
+#[cfg(test)]
+#[path = "inbound_tests.rs"]
+mod inbound_tests;
 
 pub(crate) use message::insert_message_on;
 
@@ -43,7 +48,7 @@ use crate::{
         participant::{IdentityClaimMetadata, IdentityProvenance, ThreadPrincipalRole},
         thread::{Thread, ThreadParticipantProjection},
         transport::PrincipalId,
-        value_objects::{EmailAddress, MessageId, ThreadIndex},
+        value_objects::{EmailAddress, ThreadIndex},
     },
     use_cases::{
         participant::IdentityObservation,
@@ -130,13 +135,6 @@ async fn load_message(pool: &PgPool, association_id: Uuid) -> AppResult<Message>
         .await
         .map_err(AppError::from)?
         .try_into()
-}
-
-async fn load_thread_by_id_on(pool: &PgPool, id: Option<Uuid>) -> AppResult<Option<Thread>> {
-    match id {
-        Some(id) => load_thread(pool, id).await,
-        None => Ok(None),
-    }
 }
 
 fn normalized_participants(participants: &[EmailAddress]) -> Vec<String> {
@@ -457,29 +455,6 @@ impl ThreadPersistence for PostgresPersistence {
             .ok_or_else(|| AppError::Internal("Updated thread was not found".into()))
     }
 
-    /// Which conversation these provider keys belong to, through the external maps.
-    ///
-    /// Two lookups because there are two ways a key can already be known: the conversation itself
-    /// may be bound (`external_threads`), or one of its messages may be
-    /// (`external_messages`). The conversation binding is tried first -- it is the answer that
-    /// survives reply-before-root, where the root's own id was recorded as the conversation key
-    /// before any message carrying it existed.
-    async fn find_thread_by_message_ids(
-        &self,
-        channel_id: Uuid,
-        message_ids: &[MessageId],
-    ) -> AppResult<Option<Thread>> {
-        let keys: Vec<&str> = message_ids.iter().map(MessageId::as_str).collect();
-        if let Some(thread_id) =
-            external::find_thread_by_external_thread_keys(&self.pool, channel_id, &keys).await?
-        {
-            return load_thread(&self.pool, thread_id).await;
-        }
-        let thread_id =
-            external::find_thread_by_external_message_keys(&self.pool, channel_id, &keys).await?;
-        load_thread_by_id_on(&self.pool, thread_id).await
-    }
-
     async fn find_thread_by_thread_index(
         &self,
         channel_id: Uuid,
@@ -525,6 +500,23 @@ impl ThreadPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
         Ok(count as usize)
+    }
+
+    async fn get_thread_message(
+        &self,
+        thread_id: Uuid,
+        message_id: CanonicalMessageId,
+    ) -> AppResult<Option<Message>> {
+        let query = format!(
+            "{MESSAGE_SELECT} WHERE association.thread_id = $1 AND association.message_id = $2"
+        );
+        let db = sqlx::query_as::<_, MessageDb>(&query)
+            .bind(thread_id)
+            .bind(message_id.as_uuid())
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        db.map(Message::try_from).transpose()
     }
 
     async fn create_message(&self, write: &MessageWrite) -> AppResult<Message> {

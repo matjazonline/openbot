@@ -230,7 +230,9 @@ reverses. Its exception list is the remaining work, each entry naming the step t
 
 | Contract | What it is | Who produces it | Who consumes it |
 |---|---|---|---|
-| `InboundEnvelope` | One inbound provider message: qualified author, addressed identities, bounded canonical content, attachment metadata, binding-qualified event/message/thread keys, reply candidates, typed policy facts, correlation ID, protocol extension | Protocol ingress adapter | Ingest use case |
+| `InboundDraft` | The same message before the interface that carried it is resolved: identical content, with the provider keys still unqualified. Email forces the split — one mail addressed to `support+billing@…` arrives on two bindings, so *which* is the source is a routing conclusion. `InboundDraft::bind` is the only way to qualify the keys | Protocol ingress adapter | Ingest use case |
+| `InboundRouting` | What each recipient addresses: an ordered channel pipeline, a reserved platform name, or a person. The whole address grammar is applied producing this and none of it survives | Protocol ingress adapter | Address resolution phase |
+| `InboundEnvelope` | One inbound provider message: qualified author, addressed identities, bounded canonical content, attachment metadata, binding-qualified event/message/thread keys, reply candidates, typed policy facts, correlation ID, protocol extension | `InboundDraft::bind` | Canonical commit, agent dispatch |
 | `IngressPolicyFacts` | `Email(EmailIngressFacts)` / `TrustedApplication` / `InstalledConversation` | Protocol ingress adapter | Ingress guard phase |
 | `ProtocolExtension` | Bounded, versioned email metadata, or a reference to an already-durable stored event | Protocol ingress adapter | Canonical commit |
 | `InboundCommitRequest` / `InboundCommitOutcome` | Every row one accepted message makes durable together: claimed-event fence, thread associations, task, delivery intents | Ingest use case | `InboundMessageCommitter` |
@@ -249,6 +251,35 @@ has no binding id to separate it from another recipient of the same message.
 Durable task payloads carry canonical identifiers only (`InboundTaskPayloadV1`: company, channel,
 thread, source message, correlation). Workers reload current entities with tenant-scoped queries.
 No entity snapshot, parsed email, or raw provider content enters `background_tasks.payload`.
+
+The payload carries three non-identifier fields, and the line is deliberate: hop count, traced
+channels and the reply-delivery choice are properties of the *delivery* rather than of the message,
+so no stored row holds them. Guessing any of them breaks loop protection or mails out an answer a
+user asked to keep in the app. Everything the commit wrote — body, author, recipients, headers,
+threads — is reloaded, so a queued run can never replay a stale copy of it.
+
+## The inbound commit
+
+One accepted message is one transaction (`adapters/persistence/thread/inbound.rs`). In dependency
+order it takes a transaction-scoped advisory lock on `(binding_id, message_key)`, recognises a
+redelivery under that lock, then resolves or opens each thread, binds each interface's conversation
+key, inserts the canonical payload with its participants and email extension, associates it with
+every thread, writes one binding-qualified message mapping per interface, creates or reuses the
+agent-dispatch task by canonical source message ID, and creates the immediate delivery fan-out.
+They become visible together or not at all.
+
+The lock is what makes the redelivery check safe: "is this already stored?" followed by an insert
+is a check-then-act, and two simultaneous SMTP sessions would otherwise both pass the check. A
+redelivery returns the first delivery's canonical and task IDs, opens no thread and enqueues
+nothing; a repeated key carrying *different* content is a typed collision rather than a rewrite of
+a message agents have already answered.
+
+SMTP answers only after this commit returns. A message the platform decided not to route (an
+auto-reply, a reserved-address answer, a thread past its turn limit) is accepted and dropped,
+because a 5xx would make the sending server retry or bounce and both make the loop worse; a message
+refused on its merits is a permanent 5xx; a failure of ours — a database outage above all — is a
+transient 4xx, because the message is still in the sending server's queue and a 250 there would
+acknowledge something nothing had stored.
 
 ## Slack representation and routing
 

@@ -9,10 +9,12 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
-        channel::{Channel, PUBLIC_PARTICIPANT},
+        channel::{
+            Channel, PUBLIC_PARTICIPANT, RESERVED_SLUG_SUFFIXES, RESERVED_SUFFIX_SEPARATORS,
+        },
         company::Company,
         creation::CreationProvenance,
-        participant::PrincipalAccessContext,
+        participant::{IdentityProvenance, PrincipalAccessContext},
         transport::ChannelSelector,
         user::Viewer,
         value_objects::{ChannelSlug, CompanySlug},
@@ -21,7 +23,8 @@ use crate::{
     use_cases::agent::{AgentWrite, SpamScanning},
     use_cases::company::{CompanyPersistence, managed_company},
     use_cases::memory::{ActiveMemoryBinding, MemoryBindingPersistence},
-    use_cases::participant::{ParticipantPersistence, observe_email_access_context},
+    use_cases::participant::{ParticipantPersistence, observe_access_context},
+    use_cases::thread::qualified_email_identity,
 };
 use serde::{Deserialize, Serialize};
 
@@ -516,10 +519,11 @@ impl ChannelUseCases {
                 // that re-implemented the participant rule would drift out of sync with it.
                 let sender_authorized = match (company.as_ref(), channel.as_ref()) {
                     (Some(comp), Some(ch)) => {
-                        let context = observe_email_access_context(
+                        let context = observe_access_context(
                             self.participant_persistence.as_ref(),
                             comp.id,
-                            &sender_email,
+                            &qualified_email_identity(sender_email.clone())?,
+                            IdentityProvenance::EmailIngress,
                         )
                         .await?;
                         ch.participant_access(context).authorized
@@ -637,25 +641,19 @@ pub fn validate_slug(slug: &str, kind: SlugKind) -> AppResult<()> {
         )));
     }
 
-    for suffix in crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES {
-        let dot_s = format!(".{}", suffix);
-        let plus_s = format!("+{}", suffix);
-        let dash_s = format!("-{}", suffix);
-        let underscore_s = format!("_{}", suffix);
-
-        if slug_clean == *suffix
-            || slug_clean.ends_with(&dot_s)
-            || slug_clean.ends_with(&plus_s)
-            || slug_clean.ends_with(&dash_s)
-            || slug_clean.ends_with(&underscore_s)
-        {
+    for suffix in RESERVED_SLUG_SUFFIXES {
+        let reserved = slug_clean == *suffix
+            || RESERVED_SUFFIX_SEPARATORS
+                .iter()
+                .any(|separator| slug_clean.ends_with(&format!("{separator}{suffix}")));
+        if reserved {
             return Err(AppError::BadRequest(format!(
                 "Invalid {} '{}': it cannot be, or end with, one of the reserved suffixes {} \
                  (optionally preceded by '.', '+', '-' or '_'). Those mark an address as \
                  context-only, so a channel named after one could never be replied to.",
                 kind.noun(),
                 slug_clean,
-                crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES.join(", ")
+                RESERVED_SLUG_SUFFIXES.join(", ")
             )));
         }
     }
@@ -675,39 +673,6 @@ pub(crate) fn parse_platform_address(
 ) -> Option<(CompanySlug, String)> {
     // TODO(slack-step-11): compatibility shim for system-address parsing.
     EmailChannelSelectorParser::new(app_domain_name).parse_platform_address(to_str)
-}
-
-/// A local part the server answers itself instead of routing to a channel.
-///
-/// The leading underscore is what makes this namespace safe to reserve: `channel_slugs_format` and
-/// `companies_slug_format` both constrain slugs to `^[a-z0-9]...`, so no customer can create a
-/// channel or company that shadows one of these names. Adding a variant needs no blocklist and no
-/// migration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SystemAddress {
-    /// `_help@{company}.{app_domain}` — replies with the sender's channels and the address syntax.
-    Help,
-}
-
-impl SystemAddress {
-    /// Every reserved local part, so tests can assert the whole set at once.
-    pub const ALL: &'static [SystemAddress] = &[SystemAddress::Help];
-
-    pub fn local_part(self) -> &'static str {
-        match self {
-            SystemAddress::Help => "_help",
-        }
-    }
-
-    /// Match a raw local part, exactly. Must be given the address *before* any pipeline or
-    /// context-suffix handling; see [`parse_platform_address`].
-    pub fn parse(local_part: &str) -> Option<Self> {
-        let candidate = local_part.trim().to_lowercase();
-        Self::ALL
-            .iter()
-            .copied()
-            .find(|system| system.local_part() == candidate)
-    }
 }
 
 pub(crate) fn parse_recipient_address_pipeline(
@@ -1944,45 +1909,5 @@ mod tests {
         assert!(parser.is_platform_domain("acme.mailagents.com"));
         assert!(!parser.is_platform_domain("elsewhere.com"));
         assert!(!parser.is_platform_domain("notmailagents.com"));
-    }
-
-    #[test]
-    fn only_an_exact_underscore_prefixed_name_is_a_system_address() {
-        assert_eq!(SystemAddress::parse("_help"), Some(SystemAddress::Help));
-        assert_eq!(SystemAddress::parse("_HELP"), Some(SystemAddress::Help));
-        assert_eq!(
-            SystemAddress::parse("help"),
-            None,
-            "without the underscore it is a slug a customer may own"
-        );
-        assert_eq!(SystemAddress::parse("_helpdesk"), None);
-        assert_eq!(SystemAddress::parse("support"), None);
-    }
-
-    #[test]
-    fn no_system_address_can_be_shadowed_by_a_channel_or_a_context_suffix() {
-        for system in SystemAddress::ALL {
-            let local = system.local_part();
-
-            assert!(
-                local.starts_with('_'),
-                "'{local}' is only safe to reserve because channel_slugs_format forbids a leading \
-                 underscore"
-            );
-            assert!(
-                validate_slug(local, SlugKind::ChannelAddress).is_ok(),
-                "if validate_slug ever rejects '{local}', the reason must not be a reserved \
-                 context suffix -- see the assertion below"
-            );
-
-            let parsed = EmailChannelSelectorParser::new("mailagents.com")
-                .parse(&format!("{local}@acme.mailagents.com"))
-                .expect("a reserved system address still has platform address syntax");
-            assert!(
-                !parsed.delivery().is_context_only() && parsed.primary().channel() == local,
-                "'{local}' collides with a reserved context suffix and would be eaten before \
-                 SystemAddress::parse ever saw it"
-            );
-        }
     }
 }

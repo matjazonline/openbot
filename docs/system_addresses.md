@@ -45,21 +45,25 @@ bounce.
 
 | Rule | Why |
 |---|---|
-| Matched against the **raw** local part | `strip_context_suffix_from_slug` turns a bare reserved suffix into an empty slug, so a future `_msg` would be eaten before `SystemAddress::parse` ever saw it |
+| Matched against the **raw** local part | Context-suffix stripping turns a bare reserved suffix into an empty slug, so a future `_msg` would be eaten before `SystemAddress::parse` ever saw it |
 | Never answered on the internal channel path | An agent has `list_company_agents`; keeping reserved addresses off that path keeps them out of the trace and the trust model |
 | Answered only for the company's team | A reply would otherwise confirm that a company exists to anyone who guessed the domain |
 | Skipped by channel routing, never bounced | Lets `_help` be CC'd on a real message without bouncing it; and a bounce's fuzzy suggestions could offer a stranger a real channel named `help` |
-| The reply carries `Auto-Submitted: auto-replied` | `check_inbound_guards` refuses inbound auto-replies, so an auto-responder on the other end cannot ping-pong |
+| The reply carries `Auto-Submitted: auto-replied` | `guard_ingress` refuses inbound auto-replies, so an auto-responder on the other end cannot ping-pong |
 
 ## Adding one
 
-1. Add a variant to `SystemAddress` in `src/application/use_cases/channel.rs` and its local part to
+1. Add a variant to `SystemAddress` in `src/application/transport/ingress.rs` and its local part to
    `SystemAddress::ALL`. The name must start with `_` and must not collide with
-   `RESERVED_CONTEXT_SUFFIXES` — `no_system_address_can_be_shadowed_by_a_channel_or_a_context_suffix`
+   `RESERVED_SLUG_SUFFIXES` — `no_system_address_can_be_shadowed_by_a_channel_or_a_context_suffix`
    fails if it does.
-2. Add the arm to the `match system` in `ThreadUseCases::answer_one_system_address`
-   (`thread/ingest.rs`). It is exhaustive, so a missing arm is a compile error.
+2. Add the arm to the `match system` in `ThreadUseCases::send_system_reply`
+   (`thread/ingest/routing.rs`). It is exhaustive, so a missing arm is a compile error.
 3. Write the body as a pure `format!`-style function next to `format_help_email_body` in
    `thread/mod.rs`, so it unit-tests with no mocks.
+
+Recognising which reserved name an address carries is the mail adapter's job — it owns the address
+grammar — and *answering* one is the application's. The adapter classifies each recipient into an
+`AddressedTarget::System { company, address }`; the ingest phase answers it.
 
 Nothing else needs changing: delivery, the team-only rule, and the routing skip are shared.

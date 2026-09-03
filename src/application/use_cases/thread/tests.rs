@@ -1,6 +1,7 @@
 use super::*;
 use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
 use crate::adapters::persistence::task::{AgentDispatchCommit, DispatchCommit, OutboundSend};
+use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::domain::monitoring::MonitoringService;
 use crate::entities::agent::Agent;
 use crate::entities::channel::{Channel, ChannelAccessMode};
@@ -9,7 +10,7 @@ use crate::entities::company_member::CompanyMembership;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::task::NewTask;
 use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
-use crate::services::email_parser::{EmailParser, MAX_CHANNEL_HOPS};
+use crate::transport::MAX_INGRESS_HOPS;
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::CompanyWrite;
@@ -243,6 +244,10 @@ impl ChannelPersistence for MockChannelPersistence {
 #[derive(Default)]
 struct MockTaskPersistence {
     tasks: Mutex<Vec<crate::entities::task::BackgroundTask>>,
+    /// The channels each enqueued run drives, as its producer stated them. Recorded because a
+    /// multi-channel pipeline's whole point is that the run answers on more than one, and a double
+    /// that forgot them would let a pipeline test pass with a single-channel run.
+    task_targets: Mutex<HashMap<Uuid, Vec<crate::entities::task::TaskTarget>>>,
     /// Every send this double was asked to queue, whether on its own or as part of a dispatch
     /// commit. A double that does not record cannot prove a send was *not* made -- which is
     /// exactly what the failed-run tests assert.
@@ -290,6 +295,27 @@ impl AgentPersistence for MockAgentPersistence {
 
 #[async_trait]
 impl TaskPersistence for MockTaskPersistence {
+    async fn list_task_channel_targets(
+        &self,
+        _company_id: Uuid,
+        task_id: Uuid,
+    ) -> AppResult<Vec<crate::use_cases::thread::TaskChannelTarget>> {
+        Ok(self
+            .task_targets
+            .lock()
+            .unwrap()
+            .get(&task_id)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|target| crate::use_cases::thread::TaskChannelTarget {
+                channel_id: target.channel_id,
+                thread_id: target.thread_id,
+                recipient_role: target.recipient_role,
+            })
+            .collect())
+    }
+
     async fn commit_agent_dispatch(
         &self,
         commit: AgentDispatchCommit<'_>,
@@ -382,6 +408,7 @@ impl TaskPersistence for MockTaskPersistence {
             thread_id,
             task_type,
             payload,
+            targets,
             source: _,
             correlation_id,
         }: NewTask,
@@ -406,6 +433,7 @@ impl TaskPersistence for MockTaskPersistence {
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
+        self.task_targets.lock().unwrap().insert(task.id, targets);
         self.tasks.lock().unwrap().push(task.clone());
         Ok(task)
     }
@@ -600,39 +628,34 @@ impl TaskPersistence for MockTaskPersistence {
 /// "in-app" would silently swallow a real customer's reply.
 #[test]
 fn a_payload_that_does_not_state_its_delivery_choice_is_refused() {
-    let without_choice = serde_json::json!({
-        "accepted": true,
-        "reason": null,
-        "thread": null,
-        "inbound_message": null,
-        "company": null,
-        "channel": null,
-        "parsed_email": null,
-        "normalized_message": null,
-        "task_id": null,
-    });
-    assert!(serde_json::from_value::<InboundIngestResult>(without_choice).is_err());
+    use crate::transport::{InboundTaskPayload, InboundTaskPayloadV1};
 
-    let mut stated = serde_json::json!({
-        "accepted": true,
-        "reason": null,
-        "thread": null,
-        "inbound_message": null,
-        "company": null,
-        "channel": null,
-        "parsed_email": null,
-        "normalized_message": null,
-        "task_id": null,
-        "reply_delivery": "in_app_only",
-    });
-    let in_app: InboundIngestResult =
-        serde_json::from_value(stated.clone()).expect("an in-app-only payload must deserialize");
-    assert_eq!(in_app.reply_delivery, ReplyDelivery::InAppOnly);
+    let complete = InboundTaskPayloadV1 {
+        company_id: Uuid::new_v4(),
+        channel_id: Uuid::new_v4(),
+        thread_id: Uuid::new_v4(),
+        source_message_id: crate::entities::message::CanonicalMessageId::random(),
+        correlation_id: CorrelationId::new(),
+        hop_count: 0,
+        trace_channels: Vec::new(),
+        is_forwarded: false,
+        reply_delivery: ReplyDelivery::InAppOnly,
+    };
+    let encoded = InboundTaskPayload::v1(complete).encode().unwrap();
+    assert_eq!(
+        InboundTaskPayload::decode(&encoded)
+            .unwrap()
+            .identifiers()
+            .reply_delivery,
+        ReplyDelivery::InAppOnly
+    );
 
-    stated["reply_delivery"] = serde_json::Value::String("send".into());
-    let sending: InboundIngestResult =
-        serde_json::from_value(stated).expect("a sending payload must deserialize");
-    assert_eq!(sending.reply_delivery, ReplyDelivery::Send);
+    let mut without_choice = encoded.clone();
+    without_choice
+        .as_object_mut()
+        .unwrap()
+        .remove("reply_delivery");
+    assert!(InboundTaskPayload::decode(&without_choice).is_err());
 }
 
 #[tokio::test]
@@ -739,7 +762,7 @@ async fn test_inter_channel_hop_limit_rejection() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
@@ -762,7 +785,7 @@ async fn test_inter_channel_hop_limit_rejection() {
                 recipients_cc: Vec::new(),
                 subject: "Test Inter Channel".to_string(),
                 body_text: "Hello".to_string(),
-                hop_count: MAX_CHANNEL_HOPS - 1,
+                hop_count: MAX_INGRESS_HOPS - 1,
                 trace_channels: Vec::new(),
             },
             Some("hop-limit-test"),
@@ -775,10 +798,7 @@ async fn test_inter_channel_hop_limit_rejection() {
         .await
         .unwrap();
     assert!(!result.accepted);
-    assert_eq!(
-        result.reason.as_deref(),
-        Some("Max inter-channel hop count reached")
-    );
+    assert_eq!(result.reason(), Some("Max inter-channel hop count reached"));
 }
 
 #[tokio::test]
@@ -859,7 +879,7 @@ async fn test_spf_authentication_failure_rejection() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
@@ -880,14 +900,11 @@ async fn test_spf_authentication_failure_rejection() {
     };
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(raw_payload)
+        .ingest_test_email(raw_payload)
         .await
         .unwrap();
     assert!(!result.accepted);
-    assert_eq!(
-        result.reason.as_deref(),
-        Some("DMARC authentication did not pass")
-    );
+    assert_eq!(result.reason(), Some("DMARC authentication did not pass"));
 }
 
 #[tokio::test]
@@ -968,7 +985,7 @@ async fn test_high_spam_score_rejection() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
@@ -987,14 +1004,11 @@ async fn test_high_spam_score_rejection() {
     };
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(raw_payload)
+        .ingest_test_email(raw_payload)
         .await
         .unwrap();
     assert!(!result.accepted);
-    assert_eq!(
-        result.reason.as_deref(),
-        Some("Spam score threshold exceeded")
-    );
+    assert_eq!(result.reason(), Some("Spam score threshold exceeded"));
 }
 
 #[tokio::test]
@@ -1075,7 +1089,7 @@ async fn test_dmarc_authentication_failure_rejection() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
@@ -1094,14 +1108,11 @@ async fn test_dmarc_authentication_failure_rejection() {
     };
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(raw_payload)
+        .ingest_test_email(raw_payload)
         .await
         .unwrap();
     assert!(!result.accepted);
-    assert_eq!(
-        result.reason.as_deref(),
-        Some("DMARC authentication did not pass")
-    );
+    assert_eq!(result.reason(), Some("DMARC authentication did not pass"));
 }
 
 #[tokio::test]
@@ -1182,7 +1193,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
@@ -1201,15 +1212,12 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
     };
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(raw_payload)
+        .ingest_test_email(raw_payload)
         .await
         .unwrap();
 
     assert!(!result.accepted);
-    assert_eq!(
-        result.reason.as_deref(),
-        Some("Sender unauthorized for channel")
-    );
+    assert_eq!(result.reason(), Some("Sender unauthorized for channel"));
 }
 
 #[tokio::test]
@@ -1290,7 +1298,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
@@ -1310,7 +1318,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
     };
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(raw_payload)
+        .ingest_test_email(raw_payload)
         .await
         .unwrap();
 
@@ -1396,7 +1404,7 @@ async fn test_channel_in_cc_resolves_properly() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
@@ -1415,13 +1423,13 @@ async fn test_channel_in_cc_resolves_properly() {
     };
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(raw_payload)
+        .ingest_test_email(raw_payload)
         .await
         .unwrap();
 
     assert!(result.accepted);
     assert!(result.task_id.is_none());
-    assert!(result.parsed_email.as_ref().unwrap().is_context_only);
+    assert!(!result.answers());
     assert_eq!(result.channel_matches.len(), 1);
     assert_eq!(result.channel_matches[0].recipient_role, RecipientRole::Cc);
     assert_eq!(thread_persistence.messages().len(), 1);
@@ -1532,7 +1540,7 @@ async fn test_multi_channel_to_and_cc_execution() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
@@ -1551,7 +1559,7 @@ async fn test_multi_channel_to_and_cc_execution() {
     };
 
     let ingest = thread_use_cases
-        .ingest_and_save_inbound_message(raw_payload)
+        .ingest_test_email(raw_payload)
         .await
         .unwrap();
 
@@ -1567,11 +1575,19 @@ async fn test_multi_channel_to_and_cc_execution() {
     assert_eq!(threads.len(), 2);
     drop(threads);
 
+    // One task, driving only the channel that was actually asked something. The `Cc`'d channel
+    // has the message on its history; it is not a target, because a copy is not a question.
     let tasks = task_persistence.tasks.lock().unwrap();
     assert_eq!(tasks.len(), 1);
-    let task_matches = tasks[0].payload["channel_matches"].as_array().unwrap();
-    assert_eq!(task_matches.len(), 1);
-    assert_eq!(task_matches[0]["channel"]["slug"], "support");
+    let targets = task_persistence.task_targets.lock().unwrap();
+    let targets = targets
+        .get(&tasks[0].id)
+        .expect("the task states its targets");
+    assert_eq!(targets.len(), 1);
+    assert_eq!(targets[0].channel_id, ingest.channel_matches[0].channel.id);
+    // Identifiers only: no entity, no provider content, nothing a rename could break.
+    assert_eq!(tasks[0].payload["version"], "1");
+    assert!(tasks[0].payload.get("channel_matches").is_none());
 }
 
 #[tokio::test]
@@ -1702,7 +1718,7 @@ async fn test_pipeline_address_chaining_execution() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
@@ -1720,7 +1736,7 @@ async fn test_pipeline_address_chaining_execution() {
     };
 
     let ingest = thread_use_cases
-        .ingest_and_save_inbound_message(raw_payload)
+        .ingest_test_email(raw_payload)
         .await
         .unwrap();
 
@@ -1841,7 +1857,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
@@ -1860,21 +1876,21 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     };
 
     let ingest_single = thread_use_cases
-        .ingest_and_save_inbound_message(raw_payload_single)
+        .ingest_test_email(raw_payload_single)
         .await
         .unwrap();
 
     assert!(!ingest_single.accepted);
     assert_eq!(
-        ingest_single.reason.as_deref(),
+        ingest_single.reason(),
         Some("Channel address not found or misspelled")
     );
-    let bounce_single = ingest_single.bounce_info.unwrap();
+    let bounce_single = ingest_single.bounce_info().unwrap();
     assert_eq!(bounce_single.invalid_slugs, vec!["suppport"]);
     assert_eq!(bounce_single.suggestions[0].suggestions, vec!["support"]);
 
     // Verify bounce email body formatting
-    let bounce_body = format_bounce_email_body(&bounce_single, "mailagents.com");
+    let bounce_body = format_bounce_email_body(bounce_single, "mailagents.com");
     assert!(bounce_body.contains("suppport@acme.mailagents.com"));
     assert!(bounce_body.contains("support@acme.mailagents.com"));
 
@@ -1888,12 +1904,12 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     };
 
     let ingest_pipeline = thread_use_cases
-        .ingest_and_save_inbound_message(raw_payload_pipeline)
+        .ingest_test_email(raw_payload_pipeline)
         .await
         .unwrap();
 
     assert!(!ingest_pipeline.accepted);
-    let bounce_pipeline = ingest_pipeline.bounce_info.unwrap();
+    let bounce_pipeline = ingest_pipeline.bounce_info().unwrap();
     assert_eq!(bounce_pipeline.invalid_slugs, vec!["biling"]);
     assert_eq!(bounce_pipeline.suggestions[0].suggestions, vec!["billing"]);
 }
@@ -1976,7 +1992,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
@@ -1998,7 +2014,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
     };
 
     let res1 = thread_use_cases
-        .ingest_and_save_inbound_message(raw_first_email)
+        .ingest_test_email(raw_first_email)
         .await
         .unwrap();
 
@@ -2021,7 +2037,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
     };
 
     let res2 = thread_use_cases
-        .ingest_and_save_inbound_message(raw_reply_email)
+        .ingest_test_email(raw_reply_email)
         .await
         .unwrap();
 
@@ -2042,7 +2058,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
     };
 
     let res3 = thread_use_cases
-        .ingest_and_save_inbound_message(raw_fwd_email)
+        .ingest_test_email(raw_fwd_email)
         .await
         .unwrap();
 
@@ -2182,7 +2198,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
@@ -2193,7 +2209,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
 
     // 1. Team-only flow: Team member accepted
     let res1 = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             to: "team-only@acme.mailagents.com".to_string(),
             from: "team_member@acme.com".to_string(),
             subject: Some("Team msg".to_string()),
@@ -2206,7 +2222,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
 
     // 2. Team-only flow: External sender rejected
     let res2 = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             to: "team-only@acme.mailagents.com".to_string(),
             from: "external@other.com".to_string(),
             subject: Some("External msg".to_string()),
@@ -2216,14 +2232,11 @@ async fn test_participant_modes_company_team_public_and_explicit() {
         .await
         .unwrap();
     assert!(!res2.accepted);
-    assert_eq!(
-        res2.reason.as_deref(),
-        Some("Sender unauthorized for channel")
-    );
+    assert_eq!(res2.reason(), Some("Sender unauthorized for channel"));
 
     // 3. Public flow: External sender accepted
     let res3 = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             to: "public-flow@acme.mailagents.com".to_string(),
             from: "external@other.com".to_string(),
             subject: Some("Public msg".to_string()),
@@ -2236,7 +2249,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
 
     // 4. Explicit list flow: Allowed sender accepted, non-allowed rejected
     let res4 = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             to: "explicit-flow@acme.mailagents.com".to_string(),
             from: "allowed@external.com".to_string(),
             subject: Some("Explicit allowed".to_string()),
@@ -2248,7 +2261,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
     assert!(res4.accepted);
 
     let res5 = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             to: "explicit-flow@acme.mailagents.com".to_string(),
             from: "notallowed@external.com".to_string(),
             subject: Some("Explicit blocked".to_string()),
@@ -2258,10 +2271,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
         .await
         .unwrap();
     assert!(!res5.accepted);
-    assert_eq!(
-        res5.reason.as_deref(),
-        Some("Sender unauthorized for channel")
-    );
+    assert_eq!(res5.reason(), Some("Sender unauthorized for channel"));
 }
 
 #[tokio::test]
@@ -2342,7 +2352,7 @@ async fn test_sender_verification_and_delegation_target_check() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
@@ -2353,7 +2363,7 @@ async fn test_sender_verification_and_delegation_target_check() {
 
     // 1. Initial email from client creates thread
     let res1 = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             headers: Some("Message-ID: <msg-client-1@external.com>\n".to_string()),
             to: "support@acme.mailagents.com".to_string(),
             from: "client@external.com".to_string(),
@@ -2395,7 +2405,7 @@ async fn test_sender_verification_and_delegation_target_check() {
 
     // 3. Unauthorized third-party attacker tries to inject message into thread using In-Reply-To
     let res_attacker = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             headers: Some(
                 "Message-ID: <msg-attacker-1@evil.com>\nIn-Reply-To: <msg-client-1@external.com>\n"
                     .to_string(),
@@ -2409,14 +2419,14 @@ async fn test_sender_verification_and_delegation_target_check() {
         .await
         .unwrap();
     assert!(!res_attacker.accepted);
-    assert!(res_attacker.bounce_info.is_some());
+    assert!(res_attacker.bounce_info().is_some());
     assert_eq!(
-        res_attacker.reason.as_deref(),
+        res_attacker.reason(),
         Some("Sender is not an authorized participant or delegation target for this thread")
     );
 
     // 4. Authorized vendor replies to their exact outreach Message-ID.
-    let res_vendor = thread_use_cases.ingest_and_save_inbound_message(RawInboundPayload {
+    let res_vendor = thread_use_cases.ingest_test_email(RawInboundPayload {
             headers: Some("Message-ID: <msg-vendor-1@supplier.com>\nIn-Reply-To: <outreach-vendor@mailagents.com>\nReferences: <msg-client-1@external.com>\n".to_string()),
             to: "support@acme.mailagents.com".to_string(),
             from: "vendor@supplier.com".to_string(),
@@ -2440,7 +2450,7 @@ async fn test_sender_verification_and_delegation_target_check() {
     // Outreach authorization is scoped to the correlated outbound message and does not
     // permanently promote the target to a thread participant.
     let res_uncorrelated = thread_use_cases
-            .ingest_and_save_inbound_message(RawInboundPayload {
+            .ingest_test_email(RawInboundPayload {
                 headers: Some(
                     "Message-ID: <msg-vendor-2@supplier.com>\nIn-Reply-To: <msg-client-1@external.com>\n"
                         .to_string(),
@@ -2524,7 +2534,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
     });
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
     let task_persistence = Arc::new(MockTaskPersistence::default());
-    let use_cases = ThreadUseCases::new(
+    let use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
@@ -2534,7 +2544,7 @@ async fn internal_channel_callback_resumes_original_task_without_new_task() {
     );
 
     let initial = use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             headers: Some("Message-ID: <human-request@example.com>\n".to_string()),
             to: "agent-a@acme.mailagents.com".to_string(),
             from: "human@example.com".to_string(),
@@ -2730,7 +2740,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
     });
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
     let task_persistence = Arc::new(MockTaskPersistence::default());
-    let use_cases = ThreadUseCases::new(
+    let use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
@@ -2768,10 +2778,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
         .unwrap();
 
     assert!(!result.accepted);
-    assert_eq!(
-        result.reason.as_deref(),
-        Some("Inter-channel loop cycle detected")
-    );
+    assert_eq!(result.reason(), Some("Inter-channel loop cycle detected"));
 }
 
 #[tokio::test]
@@ -2842,7 +2849,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
     });
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
     let task_persistence = Arc::new(MockTaskPersistence::default());
-    let use_cases = ThreadUseCases::new(
+    let use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
@@ -2865,7 +2872,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 recipients_cc: Vec::new(),
                 subject: "Deep loop".to_string(),
                 body_text: "Exceeding max hops".to_string(),
-                hop_count: MAX_CHANNEL_HOPS,
+                hop_count: MAX_INGRESS_HOPS,
                 trace_channels: Vec::new(),
             },
             None,
@@ -2880,10 +2887,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
         .unwrap();
 
     assert!(!result.accepted);
-    assert_eq!(
-        result.reason.as_deref(),
-        Some("Max inter-channel hop count reached")
-    );
+    assert_eq!(result.reason(), Some("Max inter-channel hop count reached"));
 }
 
 #[tokio::test]
@@ -2967,7 +2971,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
@@ -2978,7 +2982,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
 
     // 1. Team member (workflow participant) sends email to channel with third-party in CC
     let res1 = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             headers: Some("Message-ID: <msg-team-1@acme.com>\n".to_string()),
             to: "support@acme.mailagents.com".to_string(),
             cc: Some("client@external.com".to_string()),
@@ -3002,7 +3006,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
 
     // 2. Third-party client replies to thread -> ACCEPTED because they were added to thread participants
     let res_reply = thread_use_cases
-            .ingest_and_save_inbound_message(RawInboundPayload {
+            .ingest_test_email(RawInboundPayload {
                 headers: Some(
                     "Message-ID: <msg-client-reply-1@external.com>\nIn-Reply-To: <msg-team-1@acme.com>\n"
                         .to_string(),
@@ -3020,7 +3024,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
 
     // 3. Third-party client tries to send a NEW email to channel without thread reference -> REJECTED
     let res_unauth = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             headers: Some("Message-ID: <msg-client-new-1@external.com>\n".to_string()),
             to: "support@acme.mailagents.com".to_string(),
             from: "client@external.com".to_string(),
@@ -3032,14 +3036,11 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
         .unwrap();
 
     assert!(!res_unauth.accepted);
-    assert_eq!(
-        res_unauth.reason.as_deref(),
-        Some("Sender unauthorized for channel")
-    );
+    assert_eq!(res_unauth.reason(), Some("Sender unauthorized for channel"));
 
     // 4. Team member replies to existing thread, adding another third party (vendor@supplier.com) in To
     let res_expand = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             headers: Some(
                 "Message-ID: <msg-team-2@acme.com>\nIn-Reply-To: <msg-team-1@acme.com>\n"
                     .to_string(),
@@ -3065,7 +3066,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
 
     // 5. vendor@supplier.com replies to thread -> ACCEPTED
     let res_vendor_reply = thread_use_cases
-            .ingest_and_save_inbound_message(RawInboundPayload {
+            .ingest_test_email(RawInboundPayload {
                 headers: Some(
                     "Message-ID: <msg-vendor-reply-1@supplier.com>\nIn-Reply-To: <msg-team-2@acme.com>\n"
                         .to_string(),
@@ -3083,7 +3084,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
 
     // 6. External non-team-member (client@external.com) replies and tries to CC unauthorized@other.com -> unauthorized@other.com is NOT added
     let res_external_cc = thread_use_cases
-            .ingest_and_save_inbound_message(RawInboundPayload {
+            .ingest_test_email(RawInboundPayload {
                 headers: Some(
                     "Message-ID: <msg-client-reply-2@external.com>\nIn-Reply-To: <msg-team-1@acme.com>\n"
                         .to_string(),
@@ -3190,7 +3191,7 @@ async fn test_context_only_quiet_mode_ingestion() {
 
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
@@ -3201,7 +3202,7 @@ async fn test_context_only_quiet_mode_ingestion() {
 
     // 1. Ingest email with .quiet suffix in address -> accepted, task_id is None (agent execution skipped)
     let res_quiet_addr = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             headers: Some("Message-ID: <msg-quiet-1@acme.com>\n".to_string()),
             to: "support.quiet@acme.mailagents.com".to_string(),
             from: "team@acme.com".to_string(),
@@ -3214,11 +3215,11 @@ async fn test_context_only_quiet_mode_ingestion() {
 
     assert!(res_quiet_addr.accepted);
     assert!(res_quiet_addr.task_id.is_none());
-    assert!(res_quiet_addr.parsed_email.unwrap().is_context_only);
+    assert!(!res_quiet_addr.answers());
 
     // 2. Ingest email with [[quiet]] body tag -> accepted, task_id is None, tag stripped from text
     let res_quiet_body = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             headers: Some(
                 "Message-ID: <msg-quiet-2@acme.com>\nIn-Reply-To: <msg-quiet-1@acme.com>\n"
                     .to_string(),
@@ -3234,9 +3235,16 @@ async fn test_context_only_quiet_mode_ingestion() {
 
     assert!(res_quiet_body.accepted);
     assert!(res_quiet_body.task_id.is_none());
-    let parsed_body = res_quiet_body.parsed_email.unwrap();
-    assert!(parsed_body.is_context_only);
-    assert_eq!(parsed_body.clean_text_body, "Additional background note");
+    assert!(!res_quiet_body.answers());
+    assert_eq!(
+        res_quiet_body
+            .envelope
+            .as_deref()
+            .unwrap()
+            .content
+            .body_text(),
+        "Additional background note"
+    );
 }
 
 /// The `support` channel one of these fixtures builds.
@@ -3334,7 +3342,7 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
         }]),
     });
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         Arc::new(InMemoryThreads::for_company(company_id)),
         channel_persistence,
         company_persistence.clone(),
@@ -3350,7 +3358,7 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
 async fn authenticated_application_message_does_not_require_dmarc() {
     let (use_cases, _) = use_cases_with_channel(TestChannel::default());
     let result = use_cases
-        .queue_authenticated_inbound_for_agent(
+        .ingest_test_email_as(
             RawInboundPayload {
                 to: "support@acme.mailagents.com".to_string(),
                 from: "team@acme.com".to_string(),
@@ -3361,19 +3369,19 @@ async fn authenticated_application_message_does_not_require_dmarc() {
                 dmarc: crate::entities::auth::AuthVerdict::Unknown,
                 ..Default::default()
             },
-            ReplyDelivery::InAppOnly,
+            IngressOrigin::TrustedApplication,
         )
         .await
         .unwrap();
 
-    assert!(result.accepted, "{:?}", result.reason);
+    assert!(result.accepted, "{:?}", result.reason());
 }
 
 #[tokio::test]
 async fn authenticated_application_origin_does_not_bypass_participant_authorization() {
     let (use_cases, _) = use_cases_with_channel(TestChannel::default());
     let result = use_cases
-        .queue_authenticated_inbound_for_agent(
+        .ingest_test_email_as(
             RawInboundPayload {
                 // Treat every payload field as hostile even though the HTTP route normally derives
                 // this value from the authenticated account.
@@ -3384,16 +3392,13 @@ async fn authenticated_application_origin_does_not_bypass_participant_authorizat
                 dmarc: crate::entities::auth::AuthVerdict::Unknown,
                 ..Default::default()
             },
-            ReplyDelivery::InAppOnly,
+            IngressOrigin::TrustedApplication,
         )
         .await
         .unwrap();
 
     assert!(!result.accepted);
-    assert_eq!(
-        result.reason.as_deref(),
-        Some("Sender unauthorized for channel")
-    );
+    assert_eq!(result.reason(), Some("Sender unauthorized for channel"));
 }
 
 /// A message from a team member that copies someone outside the platform.
@@ -3438,7 +3443,7 @@ async fn a_cc_d_channel_runs_when_its_email_is_mentioned() {
     let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(cc_message(
+        .ingest_test_email(cc_message(
             "cc-email-mention",
             "Please ask SUPPORT@ACME.MAILAGENTS.COM to help.",
             "support@acme.mailagents.com",
@@ -3448,7 +3453,7 @@ async fn a_cc_d_channel_runs_when_its_email_is_mentioned() {
 
     assert!(result.accepted);
     assert!(result.task_id.is_some());
-    assert!(!result.parsed_email.as_ref().unwrap().is_context_only);
+    assert!(result.answers());
 }
 
 #[tokio::test]
@@ -3459,11 +3464,7 @@ async fn a_cc_d_channel_runs_for_a_plain_channel_or_alias_mention() {
     ] {
         let (thread_use_cases, _) = use_cases_with_channel_aliases(vec!["helpdesk".into()]);
         let result = thread_use_cases
-            .ingest_and_save_inbound_message(cc_message(
-                message_id,
-                body,
-                "helpdesk@acme.mailagents.com",
-            ))
+            .ingest_test_email(cc_message(message_id, body, "helpdesk@acme.mailagents.com"))
             .await
             .unwrap();
 
@@ -3504,7 +3505,7 @@ async fn a_cc_d_channel_runs_for_its_assigned_agent_slug() {
         }));
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(cc_message(
+        .ingest_test_email(cc_message(
             "cc-agent-mention",
             "Please ask @triage-bot.",
             "support@acme.mailagents.com",
@@ -3520,7 +3521,7 @@ async fn a_cc_d_channel_runs_for_its_assigned_agent_slug() {
 async fn a_mention_only_in_quoted_history_does_not_activate_a_cc_d_channel() {
     let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
     let first = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             headers: Some("Message-ID: <quoted-mention-root@acme.com>\n".to_string()),
             to: "support@acme.mailagents.com".to_string(),
             from: "team@acme.com".to_string(),
@@ -3533,7 +3534,7 @@ async fn a_mention_only_in_quoted_history_does_not_activate_a_cc_d_channel() {
     assert!(first.task_id.is_some());
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             headers: Some(
                 "Message-ID: <quoted-mention-reply@acme.com>\nIn-Reply-To: <quoted-mention-root@acme.com>\n"
                     .to_string(),
@@ -3553,7 +3554,7 @@ async fn a_mention_only_in_quoted_history_does_not_activate_a_cc_d_channel() {
 
     assert!(result.accepted);
     assert!(result.task_id.is_none());
-    assert!(result.parsed_email.as_ref().unwrap().is_context_only);
+    assert!(!result.answers());
 }
 
 #[tokio::test]
@@ -3561,7 +3562,7 @@ async fn an_explicit_quiet_trigger_wins_over_a_cc_mention() {
     let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(cc_message(
+        .ingest_test_email(cc_message(
             "quiet-cc-mention",
             "[quiet] Please ask @support.",
             "support@acme.mailagents.com",
@@ -3571,7 +3572,7 @@ async fn an_explicit_quiet_trigger_wins_over_a_cc_mention() {
 
     assert!(result.accepted);
     assert!(result.task_id.is_none());
-    assert!(result.parsed_email.as_ref().unwrap().is_context_only);
+    assert!(!result.answers());
 }
 
 /// The flag off makes the channel internal: the CC'd outsider is not recorded on the thread, and
@@ -3584,7 +3585,7 @@ async fn a_closed_channel_keeps_cc_d_outsiders_off_the_thread() {
     });
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(message_to_support_cc_outsider())
+        .ingest_test_email(message_to_support_cc_outsider())
         .await
         .unwrap();
 
@@ -3599,7 +3600,7 @@ async fn an_open_channel_still_adds_cc_d_outsiders_to_the_thread() {
     let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(message_to_support_cc_outsider())
+        .ingest_test_email(message_to_support_cc_outsider())
         .await
         .unwrap();
 
@@ -3622,7 +3623,7 @@ async fn an_untrusted_sender_cannot_add_outsiders_even_with_the_flag_on() {
     });
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             headers: Some("Message-ID: <stranger@external.com>\n".to_string()),
             to: "support@acme.mailagents.com".to_string(),
             cc: Some("accomplice@external.com".to_string()),
@@ -3656,20 +3657,17 @@ async fn a_closed_channel_refuses_the_outsider_s_own_reply() {
     });
 
     thread_use_cases
-        .ingest_and_save_inbound_message(message_to_support_cc_outsider())
+        .ingest_test_email(message_to_support_cc_outsider())
         .await
         .unwrap();
 
     let reply = thread_use_cases
-        .ingest_and_save_inbound_message(outsider_reply())
+        .ingest_test_email(outsider_reply())
         .await
         .unwrap();
 
     assert!(!reply.accepted);
-    assert_eq!(
-        reply.reason.as_deref(),
-        Some("Sender unauthorized for channel")
-    );
+    assert_eq!(reply.reason(), Some("Sender unauthorized for channel"));
 }
 
 /// Where the channel ACL does admit the sender, the thread is consulted, and refusing them there
@@ -3683,17 +3681,17 @@ async fn a_closed_public_channel_bounces_the_outsider_s_own_reply() {
     });
 
     thread_use_cases
-        .ingest_and_save_inbound_message(message_to_support_cc_outsider())
+        .ingest_test_email(message_to_support_cc_outsider())
         .await
         .unwrap();
 
     let reply = thread_use_cases
-        .ingest_and_save_inbound_message(outsider_reply())
+        .ingest_test_email(outsider_reply())
         .await
         .unwrap();
 
     assert!(!reply.accepted);
-    assert!(reply.bounce_info.is_some(), "the sender must be told why");
+    assert!(reply.bounce_info().is_some(), "the sender must be told why");
 }
 
 /// The CC'd outsider answering the message that copied them.
@@ -3721,19 +3719,21 @@ async fn a_closed_channel_drops_outsiders_from_the_reply_cc() {
         ..TestChannel::default()
     });
 
+    // Both kinds on one `Cc` line: the outsider the channel refuses to copy, and a platform
+    // address, which rides the Cc line for pipeline steps and must survive the filter.
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(message_to_support_cc_outsider())
+        .ingest_test_email(RawInboundPayload {
+            cc: Some("client@external.com, support@acme.mailagents.com".to_string()),
+            ..message_to_support_cc_outsider()
+        })
         .await
         .unwrap();
 
-    let mut parsed = result.parsed_email.clone().unwrap();
-    parsed.recipients_cc = vec![
-        "client@external.com".to_string(),
-        "support@acme.mailagents.com".to_string(),
-    ];
-
     let cc = thread_use_cases
-        .outbound_cc_for(&result.channel_matches[0], &parsed)
+        .outbound_cc_for(
+            &result.channel_matches[0],
+            result.envelope.as_deref().unwrap(),
+        )
         .await
         .unwrap();
 
@@ -3746,13 +3746,15 @@ async fn an_open_channel_keeps_outsiders_on_the_reply_cc() {
     let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(message_to_support_cc_outsider())
+        .ingest_test_email(message_to_support_cc_outsider())
         .await
         .unwrap();
 
-    let parsed = result.parsed_email.clone().unwrap();
     let cc = thread_use_cases
-        .outbound_cc_for(&result.channel_matches[0], &parsed)
+        .outbound_cc_for(
+            &result.channel_matches[0],
+            result.envelope.as_deref().unwrap(),
+        )
         .await
         .unwrap();
 
@@ -3774,15 +3776,15 @@ async fn disabled_channel_bounces_inbound_mail() {
     let (thread_use_cases, _) = use_cases_with_channel_enabled(false);
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(message_to_support())
+        .ingest_test_email(message_to_support())
         .await
         .unwrap();
 
     assert!(!result.accepted);
-    assert_eq!(result.reason.as_deref(), Some("Channel is disabled"));
+    assert_eq!(result.reason(), Some("Channel is disabled"));
 
     let bounce = result
-        .bounce_info
+        .bounce_info()
         .expect("a disabled channel bounces rather than dropping the message");
     assert_eq!(bounce.disabled_slugs, vec![ChannelSlug::from("support")]);
     assert!(
@@ -3791,7 +3793,7 @@ async fn disabled_channel_bounces_inbound_mail() {
     );
     assert_eq!(bounce.recipient_to, EmailAddress::from("team@acme.com"));
 
-    let body = format_bounce_email_body(&bounce, "mailagents.com");
+    let body = format_bounce_email_body(bounce, "mailagents.com");
     assert!(body.contains("support@acme.mailagents.com"));
     assert!(body.contains("switched off"));
     assert!(!body.contains("Did you mean"));
@@ -3802,11 +3804,11 @@ async fn enabled_channel_still_accepts_the_same_message() {
     let (thread_use_cases, channel_id) = use_cases_with_channel_enabled(true);
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(message_to_support())
+        .ingest_test_email(message_to_support())
         .await
         .unwrap();
 
-    assert!(result.accepted, "reason: {:?}", result.reason);
+    assert!(result.accepted, "reason: {:?}", result.reason());
     assert_eq!(result.thread.unwrap().channel_id, channel_id);
 }
 
@@ -3815,14 +3817,14 @@ async fn alias_address_reaches_the_channel_and_is_replied_from() {
     let (thread_use_cases, channel_id) = use_cases_with_channel_aliases(vec!["sales".into()]);
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             to: "sales@acme.mailagents.com".to_string(),
             ..message_to_support()
         })
         .await
         .unwrap();
 
-    assert!(result.accepted, "reason: {:?}", result.reason);
+    assert!(result.accepted, "reason: {:?}", result.reason());
     assert_eq!(result.channel_matches.len(), 1);
 
     let matched = &result.channel_matches[0];
@@ -3837,14 +3839,14 @@ async fn alias_and_canonical_slug_in_one_pipeline_ingest_once() {
     let (thread_use_cases, channel_id) = use_cases_with_channel_aliases(vec!["sales".into()]);
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             to: "sales+support@acme.mailagents.com".to_string(),
             ..message_to_support()
         })
         .await
         .unwrap();
 
-    assert!(result.accepted, "reason: {:?}", result.reason);
+    assert!(result.accepted, "reason: {:?}", result.reason());
     assert_eq!(
         result.channel_matches.len(),
         1,
@@ -3863,7 +3865,7 @@ async fn unknown_slug_is_still_a_bounce_when_the_channel_has_aliases() {
     let (thread_use_cases, _) = use_cases_with_channel_aliases(vec!["sales".into()]);
 
     let result = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             to: "salez@acme.mailagents.com".to_string(),
             ..message_to_support()
         })
@@ -3871,7 +3873,10 @@ async fn unknown_slug_is_still_a_bounce_when_the_channel_has_aliases() {
         .unwrap();
 
     assert!(!result.accepted);
-    let bounce = result.bounce_info.expect("a misspelled alias bounces");
+    let bounce = result
+        .bounce_info()
+        .cloned()
+        .expect("a misspelled alias bounces");
     assert_eq!(bounce.invalid_slugs, vec![ChannelSlug::from("salez")]);
     assert!(
         bounce
@@ -3960,7 +3965,7 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
         })
         .collect();
 
-    ThreadUseCases::new(
+    ThreadUseCases::for_test(
         Arc::new(InMemoryThreads::for_company(company_id)),
         Arc::new(MockChannelPersistence {
             channels: Mutex::new(channels),
@@ -3984,25 +3989,44 @@ fn misspelled_message_from(sender: &str) -> RawInboundPayload {
     }
 }
 
-#[test]
-fn malformed_durable_thread_index_is_observed_and_removed_at_the_boundary() {
+/// A `Thread-Index` the adapter cannot canonicalize is dropped, counted, and never guessed at.
+///
+/// The split is the point: the adapter *parses* and reports what it could not use, and the
+/// application decides that a discarded header is worth a counter. Neither side reaches into the
+/// other -- the parser holds no monitoring handle, and the ingest never sees a header.
+#[tokio::test]
+async fn a_malformed_thread_index_is_dropped_at_the_boundary_and_counted_by_ingest() {
     let monitor = Arc::new(InMemoryMonitor::new());
     let use_cases =
         use_cases_with_directory(Vec::new(), Vec::new()).with_monitoring(monitor.clone());
-    let mut parsed = EmailParser::parse(
-        RawInboundPayload {
-            headers: Some("Thread-Index: legacy-invalid".to_string()),
-            ..Default::default()
-        },
-        "mailagents.com",
+
+    let accepted = crate::adapters::protocols::email::EmailIngressAdapter::new("mailagents.com")
+        .accept(
+            RawInboundPayload {
+                headers: Some("Thread-Index: legacy-invalid".to_string()),
+                to: "support@acme.mailagents.com".to_string(),
+                from: "team@acme.com".to_string(),
+                ..Default::default()
+            },
+            crate::adapters::protocols::email::EmailIngressTrust::Application,
+        )
+        .unwrap();
+    assert!(
+        accepted
+            .draft
+            .extension
+            .email_metadata()
+            .unwrap()
+            .thread_index
+            .is_none(),
+        "an unusable header is dropped rather than stored"
     );
 
-    // Transparent JSON remains compatible with old queued payloads.
-    let json = serde_json::to_string(&parsed.thread_index).unwrap();
-    parsed.thread_index = serde_json::from_str(&json).unwrap();
-    use_cases.canonicalize_thread_index(&mut parsed);
+    use_cases
+        .ingest(accepted.into_inbound(IngressOrigin::TrustedApplication, ReplyDelivery::Send))
+        .await
+        .unwrap();
 
-    assert!(parsed.thread_index.is_none());
     let stats = monitor.get_stats_json();
     assert_eq!(stats["custom_counters"]["thread_index_rejected_total"], 1);
     assert_eq!(
@@ -4013,17 +4037,18 @@ fn malformed_durable_thread_index_is_observed_and_removed_at_the_boundary() {
 
 async fn bounce_for(use_cases: &ThreadUseCases, sender: &str) -> BounceInfo {
     let result = use_cases
-        .ingest_and_save_inbound_message(misspelled_message_from(sender))
+        .ingest_test_email(misspelled_message_from(sender))
         .await
         .unwrap();
 
-    assert!(!result.accepted, "reason: {:?}", result.reason);
+    assert!(!result.accepted, "reason: {:?}", result.reason());
     assert_eq!(
-        result.reason.as_deref(),
+        result.reason(),
         Some("Channel address not found or misspelled")
     );
     result
-        .bounce_info
+        .bounce_info()
+        .cloned()
         .expect("an unknown channel slug bounces rather than dropping the message")
 }
 
@@ -4239,7 +4264,7 @@ async fn a_team_member_writing_to_help_is_answered_and_nothing_is_routed() {
     );
 
     let result = use_cases
-        .ingest_and_save_inbound_message(help_message_from(
+        .ingest_test_email(help_message_from(
             "team@acme.com",
             "_help@acme.mailagents.com",
         ))
@@ -4247,11 +4272,14 @@ async fn a_team_member_writing_to_help_is_answered_and_nothing_is_routed() {
         .unwrap();
 
     assert!(!result.accepted);
-    assert_eq!(result.reason.as_deref(), Some(SYSTEM_ADDRESS_ANSWERED));
+    assert_eq!(
+        result.reason(),
+        Some(IngestRejection::SystemAddressAnswered.as_str())
+    );
     assert!(result.thread.is_none(), "a help request opens no thread");
     assert!(result.task_id.is_none(), "and runs no agent");
     assert!(
-        result.bounce_info.is_none(),
+        result.bounce_info().is_none(),
         "a reserved address is answered, not bounced"
     );
 }
@@ -4269,7 +4297,7 @@ async fn help_discloses_nothing_to_someone_outside_the_company() {
     );
 
     let result = use_cases
-        .ingest_and_save_inbound_message(help_message_from(
+        .ingest_test_email(help_message_from(
             "stranger@elsewhere.com",
             "_help@acme.mailagents.com",
         ))
@@ -4278,12 +4306,12 @@ async fn help_discloses_nothing_to_someone_outside_the_company() {
 
     assert!(!result.accepted);
     assert_ne!(
-        result.reason.as_deref(),
-        Some(SYSTEM_ADDRESS_ANSWERED),
+        result.reason(),
+        Some(IngestRejection::SystemAddressAnswered.as_str()),
         "an outsider is never told that the reserved address did anything"
     );
     assert!(
-        result.bounce_info.is_none(),
+        result.bounce_info().is_none(),
         "a reserved address never bounces: a bounce would confirm the company exists, and the \
          fuzzy suggestions on it could name a real channel to a stranger"
     );
@@ -4303,7 +4331,7 @@ async fn help_cc_d_alongside_a_real_channel_still_reaches_that_channel() {
     );
 
     let result = use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             headers: Some("Message-ID: <help-cc@acme.com>\n".to_string()),
             to: "support@acme.mailagents.com".to_string(),
             cc: Some("_help@acme.mailagents.com".to_string()),
@@ -4318,7 +4346,7 @@ async fn help_cc_d_alongside_a_real_channel_still_reaches_that_channel() {
     assert!(
         result.accepted,
         "a CC'd reserved address must not bounce the message: {:?}",
-        result.reason
+        result.reason()
     );
     assert_eq!(
         result.thread.unwrap().channel_id,
@@ -4341,7 +4369,7 @@ fn the_help_body_lists_channels_and_teaches_the_address_syntax() {
     assert!(body.contains("support+billing@acme.mailagents.com"));
     assert!(body.contains("support+quiet@acme.mailagents.com"));
     assert!(body.contains("[[quiet]]"));
-    for suffix in crate::services::email_parser::RESERVED_CONTEXT_SUFFIXES {
+    for suffix in crate::entities::channel::RESERVED_SLUG_SUFFIXES {
         assert!(body.contains(suffix), "the body should name '{suffix}'");
     }
 }
@@ -4369,50 +4397,43 @@ async fn an_agent_cannot_use_help_to_enumerate_its_company() {
         Vec::new(),
     );
 
-    let source = InternalChannelSource {
-        company_id: Uuid::new_v4(),
-        channel_id: Uuid::new_v4(),
-    };
-    let norm = NormalizedInboundMessage {
-        correlation_id: CorrelationId::new(),
-        message_id: MessageId::from("<internal-help@acme.com>"),
-        thread_ref: None,
-        references: Vec::new(),
-        thread_index: None,
-        sender: qualified_email_identity("support@acme.mailagents.com").unwrap(),
-        recipients_to: vec![qualified_email_identity("_help@acme.mailagents.com").unwrap()],
-        recipients_cc: Vec::new(),
-        subject: "List the channels".to_string(),
-        clean_text: "What can I reach?".to_string(),
-        raw_text: None,
-        raw_html: None,
-        attachments: Vec::new(),
-        is_auto_reply: false,
-        is_forwarded: false,
-        channel_id_header: Some(source.channel_id),
-        hop_count: 1,
-        trace_channels: vec![source.channel_id],
-        transport: TransportKind::Email,
-        spf_status: Default::default(),
-        dkim_status: Default::default(),
-        dmarc_status: Default::default(),
-        spam_score: None,
-        is_context_only: false,
-    };
+    let source_channel_id = Uuid::new_v4();
+    let company_id = Uuid::new_v4();
+    let draft = crate::adapters::protocols::email::EmailIngressAdapter::new("mailagents.com")
+        .accept(
+            RawInboundPayload {
+                from: "support@acme.mailagents.com".to_string(),
+                to: "_help@acme.mailagents.com".to_string(),
+                subject: Some("List the channels".to_string()),
+                text: Some("What can I reach?".to_string()),
+                headers: Some(format!(
+                    "Message-ID: <internal-help@acme.com>\nX-MailAgents-Channel-Id: \
+                     {source_channel_id}\nX-MailAgents-Hop-Count: 1\nX-MailAgents-Trace: \
+                     {source_channel_id}"
+                )),
+                ..RawInboundPayload::default()
+            },
+            crate::adapters::protocols::email::EmailIngressTrust::Application,
+        )
+        .unwrap();
 
     let result = use_cases
-        .ingest_normalized_message_with_source(
-            norm,
-            Some(source),
-            InboundOrigin::InternalChannel,
+        .ingest(draft.into_inbound(
+            IngressOrigin::InternalChannel {
+                company_id,
+                channel_id: source_channel_id,
+            },
             ReplyDelivery::Send,
-        )
+        ))
         .await
         .unwrap();
 
     // The reserved address is simply not seen on the internal path; whatever happens to this
     // message, it is never the help reply. Agents have `list_company_agents` for the directory.
-    assert_ne!(result.reason.as_deref(), Some(SYSTEM_ADDRESS_ANSWERED));
+    assert_ne!(
+        result.reason(),
+        Some(IngestRejection::SystemAddressAnswered.as_str())
+    );
 }
 
 /// A provider failure must leave no trace a customer could see.
@@ -4471,7 +4492,7 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
     let task_persistence = Arc::new(MockTaskPersistence::default());
 
-    let thread_use_cases = ThreadUseCases::new(
+    let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
@@ -4481,7 +4502,7 @@ async fn a_failed_agent_run_commits_no_reply_message_and_no_outbox_row() {
     );
 
     let ingest = thread_use_cases
-        .ingest_and_save_inbound_message(RawInboundPayload {
+        .ingest_test_email(RawInboundPayload {
             to: "support@acme.mailagents.com".to_string(),
             from: "customer@client.com".to_string(),
             subject: Some("Help please".to_string()),

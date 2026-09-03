@@ -14,11 +14,23 @@ use serde::{Deserialize, Serialize};
 use tracing::{instrument, warn};
 
 use crate::{
-    adapters::http::app_state::AppState,
-    adapters::protocols::email::EmailIngressAdapter,
-    services::email_parser::{MAX_INBOUND_MESSAGE_BYTES, RawAttachmentData, RawInboundPayload},
-    use_cases::thread::ThreadUseCases,
+    adapters::{
+        http::app_state::AppState,
+        protocols::email::{
+            EmailIngressAdapter, EmailIngressTrust, VerifiedEmailAuth,
+            parser::{MAX_INBOUND_MESSAGE_BYTES, RawAttachmentData, RawInboundPayload},
+        },
+        storage::FileStorage,
+    },
+    use_cases::thread::{IngressOrigin, ReplyDelivery, ThreadUseCases},
 };
+
+/// The largest request body this endpoint reads.
+///
+/// The mail itself is bounded by [`MAX_INBOUND_MESSAGE_BYTES`], the same limit the SMTP listener
+/// enforces; the extra megabyte is the multipart framing the provider wraps it in. Bounding the
+/// request and the message with two unrelated numbers is how one of them stops being enforced.
+const MAX_REQUEST_BODY_BYTES: usize = MAX_INBOUND_MESSAGE_BYTES + 1024 * 1024;
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/webhooks/email/sendgrid", post(sendgrid_inbound_webhook))
@@ -45,9 +57,10 @@ struct SendGridEnvelope {
     pub from: Option<String>,
 }
 
-#[instrument(skip(thread_use_cases, headers))]
+#[instrument(skip_all, fields(provider = "sendgrid"))]
 async fn sendgrid_inbound_webhook(
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(file_storage): State<Option<Arc<dyn FileStorage>>>,
     headers: HeaderMap,
     req: axum::extract::Request,
 ) -> Result<impl IntoResponse, StatusCode> {
@@ -56,7 +69,7 @@ async fn sendgrid_inbound_webhook(
         return Err(StatusCode::NOT_FOUND);
     };
     let (parts, body) = req.into_parts();
-    let body = to_bytes(body, 21 * 1024 * 1024)
+    let body = to_bytes(body, MAX_REQUEST_BODY_BYTES)
         .await
         .map_err(|_| StatusCode::PAYLOAD_TOO_LARGE)?;
     verify_sendgrid_signature(&headers, &body, sendgrid_config)?;
@@ -168,22 +181,28 @@ async fn sendgrid_inbound_webhook(
         auth.dmarc,
     );
 
-    // Synchronous Ingestion: Parse MIME into normalized message, resolve thread, verify ACL, and save inbound message
-    let norm_payload = EmailIngressAdapter::parse_and_store(
-        raw_payload,
-        thread_use_cases.config(),
-        thread_use_cases.file_storage(),
-    )
-    .await
-    .map_err(|error| {
-        warn!("Error parsing inbound email identities: {error}");
-        StatusCode::UNPROCESSABLE_ENTITY
-    })?;
-    let ingest = thread_use_cases
-        .ingest_normalized_message(norm_payload)
+    // The verdicts are this boundary's: they come from verifying the raw MIME against the sending
+    // IP above, never from the provider's own `spf`/`dkim` form fields, which anyone who can reach
+    // this route could set.
+    let trust = EmailIngressTrust::Verified(VerifiedEmailAuth {
+        spf: raw_payload.spf,
+        dkim: raw_payload.dkim,
+        dmarc: raw_payload.dmarc,
+        spam_score: raw_payload.spam_score,
+    });
+    let accepted = EmailIngressAdapter::for_config(config)
+        .store_and_accept(raw_payload, config, file_storage.as_deref(), trust)
         .await
-        .map_err(|err| {
-            warn!("Error ingesting inbound email: {err}");
+        .map_err(|error| {
+            warn!(%error, "Refusing an inbound message this adapter could not read");
+            StatusCode::UNPROCESSABLE_ENTITY
+        })?;
+
+    let ingest = thread_use_cases
+        .ingest(accepted.into_inbound(IngressOrigin::ExternalTransport, ReplyDelivery::Send))
+        .await
+        .map_err(|error| {
+            warn!(%error, "Could not ingest an inbound message");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
@@ -197,7 +216,7 @@ async fn sendgrid_inbound_webhook(
 
     let result = serde_json::json!({
         "processed": ingest.accepted,
-        "reason": ingest.reason,
+        "reason": ingest.reason(),
         "thread_id": ingest.thread.as_ref().map(|t| t.id),
         "inbound_message_id": ingest
             .inbound_message
@@ -558,6 +577,32 @@ mod tests {
 
     #[async_trait]
     impl crate::adapters::persistence::task::TaskPersistence for MockTaskPersistence {
+        /// The task's own channel and thread. These fixtures never enqueue a multi-channel run, so
+        /// stating one target is the honest answer rather than an empty list the worker would read
+        /// as "answer nowhere".
+        async fn list_task_channel_targets(
+            &self,
+            _company_id: Uuid,
+            task_id: Uuid,
+        ) -> AppResult<Vec<crate::use_cases::thread::TaskChannelTarget>> {
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|task| task.id == task_id)
+                .and_then(|task| {
+                    task.thread_id
+                        .map(|thread_id| crate::use_cases::thread::TaskChannelTarget {
+                            channel_id: task.channel_id,
+                            thread_id,
+                            recipient_role: crate::transport::RecipientRole::To,
+                        })
+                })
+                .into_iter()
+                .collect())
+        }
+
         async fn commit_agent_dispatch(
             &self,
             commit: AgentDispatchCommit<'_>,
@@ -579,6 +624,7 @@ mod tests {
                 company_id,
                 channel_id,
                 thread_id,
+                targets: _,
                 task_type,
                 payload,
                 source: _,
@@ -1117,7 +1163,7 @@ mod tests {
             tasks: Mutex::new(Vec::new()),
         });
 
-        let thread_use_cases = Arc::new(ThreadUseCases::new(
+        let thread_use_cases = Arc::new(ThreadUseCases::for_test(
             thread_persistence.clone(),
             channel_persistence.clone(),
             company_persistence.clone(),

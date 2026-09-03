@@ -125,6 +125,7 @@ async fn task_chain_board_groups_by_correlation_and_keeps_complete_chain_under_c
         .unwrap();
     let nested = persistence
         .enqueue_task(NewTask {
+            targets: Vec::new(),
             source: TaskSource::Unattributed,
             company_id: company.id,
             channel_id: second_channel.id,
@@ -3368,6 +3369,7 @@ async fn chain_detail_attaches_every_attempt_and_delivery_to_its_own_task() {
         tasks.push(
             persistence
                 .enqueue_task(NewTask {
+                    targets: Vec::new(),
                     source: TaskSource::Unattributed,
                     company_id: company.id,
                     channel_id: channel.id,
@@ -4107,6 +4109,7 @@ async fn a_chain_is_inherited_by_children_and_readable_in_one_query() {
 
     let parent = persistence
         .enqueue_task(NewTask {
+            targets: Vec::new(),
             source: TaskSource::Unattributed,
             company_id: company.id,
             channel_id: channel.id,
@@ -4134,6 +4137,7 @@ async fn a_chain_is_inherited_by_children_and_readable_in_one_query() {
 
     let unrelated = persistence
         .enqueue_task(NewTask {
+            targets: Vec::new(),
             source: TaskSource::Unattributed,
             company_id: company.id,
             channel_id: channel.id,
@@ -4207,6 +4211,7 @@ async fn a_redelivered_message_rejoins_its_original_chain() {
 
     let first = persistence
         .enqueue_task(NewTask {
+            targets: Vec::new(),
             source: TaskSource::Message(message.canonical_id),
             company_id: company.id,
             channel_id: channel.id,
@@ -4222,6 +4227,7 @@ async fn a_redelivered_message_rejoins_its_original_chain() {
     // already stored -- so the queue must hand back the task that message already has.
     let second = persistence
         .enqueue_task(NewTask {
+            targets: Vec::new(),
             source: TaskSource::Message(message.canonical_id),
             company_id: company.id,
             channel_id: channel.id,

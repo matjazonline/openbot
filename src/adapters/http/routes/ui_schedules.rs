@@ -32,6 +32,7 @@ use crate::{
             ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
         },
     },
+    adapters::protocols::email::parser::RawInboundPayload,
     app_error::{AppError, AppResult},
     entities::{
         company::Company,
@@ -40,7 +41,6 @@ use crate::{
     },
     infra::config::AppConfig,
     infra::events::MailboxEvents,
-    services::email_parser::RawInboundPayload,
     use_cases::{
         agent::AgentUseCases, channel::ChannelUseCases, company::CompanyUseCases,
         schedule::ScheduleUseCases, thread::ReplyDelivery, thread::ThreadUseCases,
@@ -605,16 +605,18 @@ async fn reply_in_thread(
         ..Default::default()
     };
 
-    let ingest = workspace
-        .thread_use_cases
-        .queue_authenticated_inbound_for_agent(payload, ReplyDelivery::InAppOnly)
-        .await?;
+    let ingest = crate::adapters::http::routes::channel::compose_and_ingest(
+        &workspace.thread_use_cases,
+        payload,
+        ReplyDelivery::InAppOnly,
+    )
+    .await?;
 
     if ingest.thread.is_none() {
         let reason = ingest
-            .reason
-            .unwrap_or_else(|| "The channel rejected this message.".to_string());
-        return Err(AppError::BadRequest(reason));
+            .reason()
+            .unwrap_or("The channel rejected this message.");
+        return Err(AppError::BadRequest(reason.to_string()));
     }
 
     // Load full messages

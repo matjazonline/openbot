@@ -23,8 +23,10 @@ struct KnownException {
 /// The upward imports that remain, each with the plan step that deletes it.
 ///
 /// Every entry here is a port trait or a protocol helper declared in `src/adapters` and consumed
-/// by the application. Steps 7 and 9 move the email parser and the selector into the email
-/// adapter; steps 9 to 11 move the queue ports next to the workers that drive them.
+/// by the application. Step 7 moved the mail parser, attachment storage and identity
+/// normalization into the email adapter; what remains is the *egress* side -- the reply renderer
+/// and the outreach tool still ask an email parser whether an address is one of ours -- plus the
+/// queue ports, which move next to their workers with the delivery outbox.
 const KNOWN_EXCEPTIONS: &[KnownException] = &[
     KnownException {
         file: "use_cases/thread/mod.rs",
@@ -33,13 +35,8 @@ const KNOWN_EXCEPTIONS: &[KnownException] = &[
     },
     KnownException {
         file: "use_cases/thread/mod.rs",
-        fragment: "adapters::storage::FileStorage",
-        removed_by: "step 7: attachment storage becomes an application port",
-    },
-    KnownException {
-        file: "use_cases/thread/mod.rs",
         fragment: "adapters::protocols::email::{",
-        removed_by: "step 7: email parsing and selection move behind the ingress adapter",
+        removed_by: "step 9: the reply renderer stops resolving addresses for itself",
     },
     KnownException {
         file: "use_cases/thread/dispatch.rs",
@@ -59,12 +56,7 @@ const KNOWN_EXCEPTIONS: &[KnownException] = &[
     KnownException {
         file: "use_cases/channel.rs",
         fragment: "adapters::protocols::email::EmailChannelSelectorParser",
-        removed_by: "step 7: address parsing moves into the email adapter",
-    },
-    KnownException {
-        file: "use_cases/participant/mod.rs",
-        fragment: "adapters::protocols::email::EmailIdentity",
-        removed_by: "step 7: identity normalization moves into the email adapter",
+        removed_by: "step 9: outreach and reply Cc stop asking whether an address is ours",
     },
     KnownException {
         file: "services/agent_runner.rs",
@@ -74,7 +66,7 @@ const KNOWN_EXCEPTIONS: &[KnownException] = &[
     KnownException {
         file: "services/agent_runner.rs",
         fragment: "adapters::protocols::email::{EmailChannelSelectorParser, EmailRecipientDestination}",
-        removed_by: "step 7: channel selection stops being an email-address decision",
+        removed_by: "step 8: channel selection stops being an email-address decision",
     },
     KnownException {
         file: "services/task_worker.rs",
@@ -89,17 +81,12 @@ const KNOWN_EXCEPTIONS: &[KnownException] = &[
     KnownException {
         file: "services/outreach_tool.rs",
         fragment: "adapters::protocols::email::{EmailChannelSelectorParser, EmailRecipientDestination}",
-        removed_by: "step 7: outreach addresses a channel selector, not an email address",
+        removed_by: "step 8: outreach addresses a channel selector, not an email address",
     },
     KnownException {
         file: "services/outreach_tool.rs",
         fragment: "use lettre::message::Mailbox;",
-        removed_by: "step 7: mailbox validation belongs to the email adapter",
-    },
-    KnownException {
-        file: "services/attachment_store.rs",
-        fragment: "adapters::storage::{BucketKind, FileStorage}",
-        removed_by: "step 7: attachment storage becomes an application port",
+        removed_by: "step 8: mailbox validation belongs to the email adapter",
     },
 ];
 

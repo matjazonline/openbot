@@ -1,31 +1,49 @@
+//! MIME and RFC 5322 parsing: the syntax only mail has.
+//!
+//! This lives in the email adapter rather than in `src/application/services` because everything it
+//! produces is email-shaped. [`ParsedEmail`] is the adapter's own working value -- it never leaves
+//! this module's crate neighbourhood, and no application or domain function accepts or returns
+//! one. What crosses the boundary is the [`InboundEnvelope`](crate::transport::InboundEnvelope)
+//! that [`super::ingress`] builds out of it.
+
 use htmd::HtmlToMarkdown;
 use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::entities::{
-    auth::AuthVerdict,
-    message::AttachmentMetadata,
-    value_objects::{ObjectKey, ThreadIndex},
+use crate::{
+    entities::{
+        auth::AuthVerdict,
+        channel::RESERVED_SLUG_SUFFIXES,
+        correlation::{CORRELATION_HEADER, CorrelationId},
+        message::AttachmentMetadata,
+        value_objects::{ObjectKey, ThreadIndex, ThreadIndexParseError},
+    },
+    transport::SMALL_INLINE_IMAGE_BYTES,
 };
 
 use serde::{Deserialize, Serialize};
 
-pub const MAX_CHANNEL_HOPS: u32 = 5;
 /// Maximum untouched RFC 5322 message accepted by every public mail ingress.
 pub const MAX_INBOUND_MESSAGE_BYTES: usize = 20 * 1024 * 1024;
-pub const RESERVED_CONTEXT_SUFFIXES: &[&str] = &["noagent", "quiet", "message", "msg", "na"];
-
-/// Inline images below this size are treated as signature/decoration rather than content, and are
-/// left out of the agent prompt.
-pub const SMALL_INLINE_IMAGE_BYTES: usize = 10_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedEmail {
     pub message_id: String,
     pub in_reply_to: Option<String>,
     pub references: Vec<String>,
+    /// The canonicalized Outlook conversation index, when the header carried a usable one.
     pub thread_index: Option<ThreadIndex>,
+    /// Why a `Thread-Index` header was discarded, so the caller can count it. Parsing is the
+    /// adapter's job; deciding whether a rejected header is worth a metric is not.
+    #[serde(skip)]
+    pub thread_index_rejection: Option<ThreadIndexParseError>,
+    /// How long the discarded header was, for the same gauge.
+    #[serde(skip)]
+    pub thread_index_raw_bytes: usize,
+    /// The chain this message already belongs to, or a fresh one. Read from the correlation header
+    /// here so nothing downstream parses headers a second time.
+    pub correlation_id: CorrelationId,
     pub sender: String,
     pub recipients_to: Vec<String>,
     pub recipients_cc: Vec<String>,
@@ -58,6 +76,7 @@ struct ParsedHeaders {
     hop_count: u32,
     trace_channels: Vec<Uuid>,
     is_context_only: bool,
+    correlation_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -123,7 +142,7 @@ impl EmailParser {
         let trimmed = text.trim_start();
         let lower = trimmed.to_lowercase();
 
-        for suffix in RESERVED_CONTEXT_SUFFIXES {
+        for suffix in RESERVED_SLUG_SUFFIXES {
             let double_bracket = format!("[[{}]]", suffix);
             let single_bracket = format!("[{}]", suffix);
 
@@ -150,6 +169,7 @@ impl EmailParser {
             hop_count,
             trace_channels,
             is_context_only: is_context_from_headers,
+            correlation_id: supplied_correlation_id,
         } = payload
             .headers
             .as_deref()
@@ -158,7 +178,15 @@ impl EmailParser {
 
         let message_id = extracted_msg_id
             .unwrap_or_else(|| format!("<{}.inbound@{}>", Uuid::new_v4(), app_domain));
-        let thread_index = raw_thread_index.map(ThreadIndex::from);
+        let thread_index_raw_bytes = raw_thread_index.as_ref().map_or(0, String::len);
+        let (thread_index, thread_index_rejection) = match raw_thread_index
+            .as_deref()
+            .map(ThreadIndex::parse)
+            .transpose()
+        {
+            Ok(index) => (index, None),
+            Err(error) => (None, Some(error)),
+        };
 
         let sender = extract_email(&payload.from);
         let recipients_to = parse_email_list(&payload.to);
@@ -207,8 +235,8 @@ impl EmailParser {
 
         for att in payload.attachments_data {
             let size = att.content.len();
-            let is_small_image =
-                att.content_type.to_lowercase().starts_with("image/") && size < 10_000;
+            let is_small_image = att.content_type.to_lowercase().starts_with("image/")
+                && size < SMALL_INLINE_IMAGE_BYTES;
 
             let mut hasher = Sha256::new();
             hasher.update(&att.content);
@@ -244,6 +272,9 @@ impl EmailParser {
             in_reply_to,
             references,
             thread_index,
+            thread_index_rejection,
+            thread_index_raw_bytes,
+            correlation_id: CorrelationId::parse_or_new(supplied_correlation_id.as_deref()),
             sender,
             recipients_to,
             recipients_cc,
@@ -281,7 +312,9 @@ impl EmailParser {
         let mut hop_count = 0u32;
         let mut trace_channels = Vec::new();
         let mut is_context_only = false;
+        let mut correlation_id = None;
 
+        let correlation_header = CORRELATION_HEADER.to_lowercase();
         let mut collecting_thread_index = false;
         for raw_line in headers_str.split('\n') {
             if raw_line.starts_with(' ') || raw_line.starts_with('\t') {
@@ -349,6 +382,8 @@ impl EmailParser {
                 }
             } else if lower.starts_with("x-auto-response-suppress:") {
                 is_auto_reply = true;
+            } else if lower.starts_with(&format!("{correlation_header}:")) {
+                correlation_id = Some(line[correlation_header.len() + 1..].trim().to_string());
             } else if lower.starts_with("x-mailagents-context-only:")
                 || lower.starts_with("x-no-agent:")
                 || lower.starts_with("x-context-only:")
@@ -376,6 +411,7 @@ impl EmailParser {
             hop_count,
             trace_channels,
             is_context_only,
+            correlation_id,
         }
     }
 
@@ -401,83 +437,6 @@ impl EmailParser {
         let lower_body = body.to_lowercase();
         lower_body.contains("---------- forwarded message ---------")
             || lower_body.contains("-----original message-----")
-    }
-
-    pub fn strip_quotes_heuristic(text: &str) -> String {
-        let mut result_lines = Vec::new();
-
-        for line in text.lines() {
-            let trimmed = line.trim();
-
-            // Blockquote marker
-            if trimmed.starts_with('>') {
-                break;
-            }
-
-            // Divider / Original Message splitters
-            let lower = trimmed.to_lowercase();
-            if lower.contains("-----original message-----")
-                || lower.contains("-----forwarded message-----")
-                || lower.starts_with("___________")
-            {
-                break;
-            }
-
-            // Pattern: On <date>, <user> wrote:
-            if (lower.starts_with("on ") || lower.starts_with("am ") || lower.starts_with("le "))
-                && lower.ends_with("wrote:")
-            {
-                break;
-            }
-
-            // Header blocks in forwards/replies
-            if lower.starts_with("from:")
-                && (lower.contains("sent:") || lower.contains("date:") || lower.contains("to:"))
-            {
-                break;
-            }
-
-            result_lines.push(line);
-        }
-
-        result_lines.join("\n").trim().to_string()
-    }
-
-    /// Fallback quote stripping by subtracting previous DB thread message lines from new message
-    pub fn strip_historical_quotes_fallback(
-        clean_text: &str,
-        history_clean_bodies: &[String],
-    ) -> String {
-        if history_clean_bodies.is_empty() {
-            return clean_text.to_string();
-        }
-
-        let new_lines: Vec<&str> = clean_text.lines().collect();
-        let mut filtered_lines = Vec::new();
-
-        for line in new_lines {
-            let trimmed = line.trim();
-            if trimmed.is_empty() {
-                filtered_lines.push(line);
-                continue;
-            }
-
-            // Check if this line exists verbatim in previous messages
-            let exists_in_history = history_clean_bodies.iter().any(|prev_body| {
-                prev_body
-                    .lines()
-                    .any(|prev_line| prev_line.trim() == trimmed)
-            });
-
-            if exists_in_history {
-                // We reached quoted text from history
-                break;
-            }
-
-            filtered_lines.push(line);
-        }
-
-        filtered_lines.join("\n").trim().to_string()
     }
 }
 
@@ -596,29 +555,6 @@ Subject: Test Email
             "Normal Subject",
             "Hello agent"
         ));
-    }
-
-    #[test]
-    fn test_quote_stripping_heuristic() {
-        let text = r#"Hello agent!
-Can you summarize this report?
-
-On Mon, Aug 10, 2026 at 10:00 AM User <user@example.com> wrote:
-> Older email content here...
-> Multi line blockquote
-"#;
-
-        let cleaned = EmailParser::strip_quotes_heuristic(text);
-        assert_eq!(cleaned, "Hello agent!\nCan you summarize this report?");
-    }
-
-    #[test]
-    fn test_quote_stripping_fallback() {
-        let new_text = "Thanks for the update!\n\nHello agent!\nCan you summarize this report?";
-        let history = vec!["Hello agent!\nCan you summarize this report?".to_string()];
-
-        let cleaned = EmailParser::strip_historical_quotes_fallback(new_text, &history);
-        assert_eq!(cleaned, "Thanks for the update!");
     }
 
     #[test]

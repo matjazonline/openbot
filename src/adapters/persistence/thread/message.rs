@@ -232,7 +232,7 @@ fn decode_attachments(value: Option<Value>) -> AppResult<Option<Vec<AttachmentMe
     Ok(Some(stored.into_items()))
 }
 
-fn encode_attachments(attachments: &[AttachmentMetadata]) -> AppResult<Option<Value>> {
+pub(super) fn encode_attachments(attachments: &[AttachmentMetadata]) -> AppResult<Option<Value>> {
     if attachments.is_empty() {
         return Ok(None);
     }
@@ -242,14 +242,14 @@ fn encode_attachments(attachments: &[AttachmentMetadata]) -> AppResult<Option<Va
 }
 
 /// The author of a message, once the handle a producer stated has been resolved to an actor.
-struct ResolvedAuthor {
+pub(super) struct ResolvedAuthor {
     principal_id: PrincipalId,
     identity_id: Option<ParticipantIdentityId>,
     identity: Option<QualifiedIdentity>,
 }
 
 /// One participant, once its handle has been resolved and given its position.
-struct ResolvedParticipant {
+pub(super) struct ResolvedParticipant {
     kind: MessageParticipantKind,
     position: u16,
     identity_id: ParticipantIdentityId,
@@ -281,7 +281,7 @@ pub(super) async fn thread_scope(
         .ok_or_else(|| AppError::NotFound(format!("Thread {thread_id} was not found")))
 }
 
-async fn resolve_author(
+pub(super) async fn resolve_author(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
     author: &MessageAuthorWrite,
@@ -314,7 +314,7 @@ async fn resolve_author(
 ///
 /// A handle repeated in the same role keeps its first position and is not written twice: the
 /// `To:` header of a message that named someone twice still renders them once.
-async fn resolve_participants(
+pub(super) async fn resolve_participants(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
     write: &MessageWrite,
@@ -358,7 +358,7 @@ async fn resolve_participants(
 /// would turn ordinary fan-out into a redelivery collision. Everything the sender actually sent --
 /// subject, raw bodies, headers, attachments, who it was from and to -- is in here, which is what
 /// makes a changed redelivery detectable.
-fn canonical_message_hash(
+pub(super) fn canonical_message_hash(
     write: &MessageWrite,
     author: &ResolvedAuthor,
     participants: &[ResolvedParticipant],
@@ -494,12 +494,12 @@ pub(super) async fn associate_message_on(
 /// Everything about one message that is already resolved by the time it is stored, so the
 /// correlation branches take one value rather than five positional arguments of which three are
 /// slices.
-struct StoredPayload<'a> {
-    write: &'a MessageWrite,
-    author: &'a ResolvedAuthor,
-    participants: &'a [ResolvedParticipant],
-    attachments: Option<&'a Value>,
-    content_hash: &'a [u8],
+pub(super) struct StoredPayload<'a> {
+    pub write: &'a MessageWrite,
+    pub author: &'a ResolvedAuthor,
+    pub participants: &'a [ResolvedParticipant],
+    pub attachments: Option<&'a Value>,
+    pub content_hash: &'a [u8],
 }
 
 /// Store a message mail carried, and bind the conversation it belongs to.
@@ -572,17 +572,17 @@ async fn store_email_correlated(
     Ok(canonical_id)
 }
 
-fn bounded_message_key(value: &str) -> AppResult<ExternalMessageKey> {
+pub(super) fn bounded_message_key(value: &str) -> AppResult<ExternalMessageKey> {
     ExternalMessageKey::parse(value)
         .map_err(|error| AppError::BadRequest(format!("Unusable provider message key: {error}")))
 }
 
-fn bounded_thread_key(value: &str) -> AppResult<ExternalThreadKey> {
+pub(super) fn bounded_thread_key(value: &str) -> AppResult<ExternalThreadKey> {
     ExternalThreadKey::parse(value)
         .map_err(|error| AppError::BadRequest(format!("Unusable provider thread key: {error}")))
 }
 
-async fn insert_canonical_message(
+pub(super) async fn insert_canonical_message(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
     write: &MessageWrite,
@@ -616,7 +616,7 @@ async fn insert_canonical_message(
     Ok(id)
 }
 
-async fn insert_participants(
+pub(super) async fn insert_participants(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
     message_id: CanonicalMessageId,
@@ -645,12 +645,12 @@ async fn insert_participants(
 /// Just the two facts an association row needs of its own, so both callers -- a fresh message and
 /// a message being attached to a further thread -- reach the same statement.
 #[derive(Clone, Copy)]
-struct AssociationWrite {
-    thread_id: Uuid,
-    created_at: DateTime<Utc>,
+pub(super) struct AssociationWrite {
+    pub thread_id: Uuid,
+    pub created_at: DateTime<Utc>,
 }
 
-async fn insert_thread_association(
+pub(super) async fn insert_thread_association(
     connection: &mut sqlx::PgConnection,
     scope: ThreadScope,
     write: AssociationWrite,

@@ -30,7 +30,7 @@ use crate::{
         company_invite::CompanyInviteUseCases,
         memory::MemoryUseCases,
         schedule::ScheduleUseCases,
-        thread::ThreadUseCases,
+        thread::{InboundIngestPorts, ThreadUseCases},
         user::{EmailConfirmation, UserUseCases},
     },
 };
@@ -159,6 +159,11 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             postgres_arc.clone(),
             postgres_arc.clone(),
             postgres_arc.clone(),
+            InboundIngestPorts {
+                committer: postgres_arc.clone(),
+                correlation: postgres_arc.clone(),
+                bindings: postgres_arc.clone(),
+            },
             config.clone(),
         )
         .with_agent_run_timeout(agent_run_timeout)
@@ -167,7 +172,6 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         .with_agent_channel_provisioning(postgres_arc.clone())
         .with_approval_use_cases(approval_use_cases.clone())
         .with_monitoring(monitoring.clone())
-        .with_file_storage(file_storage.clone())
         .with_memory(memory_coordinator),
     );
 

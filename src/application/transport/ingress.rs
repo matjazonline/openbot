@@ -16,12 +16,13 @@ use crate::{
         auth::AuthVerdict,
         correlation::CorrelationId,
         email_message::EmailMessageMetadata,
-        message::{AttachmentMetadata, CanonicalMessageId, MessageParticipantKind},
+        message::{AttachmentMetadata, CanonicalMessageId},
         transport::{
-            ChannelBindingId, ExternalEventKey, InboundEventId, InboundSource, QualifiedIdentity,
+            ChannelBindingId, ChannelSelector, ExternalEventKey, ExternalMessageKey,
+            ExternalThreadKey, InboundEventId, InboundSource, QualifiedIdentity, RecipientRole,
             ReplyMessageKeyCandidate, ReplyThreadKeyCandidate,
         },
-        value_objects::EmailAddress,
+        value_objects::{CompanySlug, EmailAddress},
     },
     transport::{
         bounded::{BoundedVec, BoundsError, bounded_text},
@@ -50,33 +51,27 @@ pub const MAX_REPLY_CANDIDATES: usize = 100;
 /// The most channels one inbound message may be associated with in a single commit.
 pub const MAX_THREAD_ASSOCIATIONS: usize = 20;
 
-/// Which addressing role one identity held on a message.
+/// How many times one message may be relayed from one channel of this platform into another before
+/// the chain is refused.
 ///
-/// Lives here rather than in the thread use case because it is transport vocabulary: it is what an
-/// adapter states about an arriving message, and what the reply planner reads back.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum RecipientRole {
-    To,
-    Cc,
-}
+/// Transport-neutral by nature: any transport whose reply can re-enter another channel's ingress
+/// can cycle, so the bound belongs beside the directives that carry the count rather than inside
+/// the mail parser that used to own it.
+pub const MAX_INGRESS_HOPS: u32 = 5;
 
-impl RecipientRole {
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::To => "to",
-            Self::Cc => "cc",
-        }
-    }
+/// Inline images below this size are signature decoration rather than content, and are left out of
+/// the agent prompt.
+///
+/// A statement about what a prompt is worth spending tokens on, which is why it is application
+/// policy: the mail parser only reports the size it measured.
+pub const SMALL_INLINE_IMAGE_BYTES: usize = 10_000;
 
-    /// How this role is stored on the canonical message.
-    pub const fn participant_kind(self) -> MessageParticipantKind {
-        match self {
-            Self::To => MessageParticipantKind::To,
-            Self::Cc => MessageParticipantKind::Cc,
-        }
-    }
-}
+/// The most recipients one inbound message may name before it is refused.
+///
+/// Distinct from [`MAX_ADDRESSED_IDENTITIES`], which bounds what an accepted envelope may carry:
+/// this bounds what an adapter may allocate while deciding, so an oversized `To:` line is rejected
+/// before the addresses are parsed rather than after.
+pub const MAX_ADDRESSED_TARGETS: usize = MAX_ADDRESSED_IDENTITIES;
 
 /// One identity a message was addressed to, and how.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,6 +117,20 @@ impl CanonicalContent {
     }
 }
 
+/// Whether the agent's reply to a message should actually leave the building.
+///
+/// A property of the *message*, not of the run, which is why it survives into the durable payload:
+/// the worker that eventually answers is a different process from the one that took the message
+/// in, and it has no other way to know what was asked for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReplyDelivery {
+    /// Answer for real. Every message that arrived over a transport, and every internal hop.
+    Send,
+    /// Run the agent but keep the answer in the app -- a send the user marked as a test.
+    InAppOnly,
+}
+
 /// Whether this message asks for an answer at all.
 ///
 /// A `+quiet` address suffix and a `[[quiet]]` body marker both mean "file it on the thread, do
@@ -154,6 +163,14 @@ pub struct IngressDirectives {
     pub disposition: MessageDisposition,
     /// The channel this message provably came from, when a trusted internal transport carried it.
     pub source_channel_id: Option<Uuid>,
+    /// Whether the message announced itself as machine-generated -- a vacation reply, a bounce.
+    ///
+    /// Here rather than in [`EmailIngressFacts`] because it is a *content* marker, not a verdict:
+    /// a transport with no such marker states `false` truthfully, which is exactly what a
+    /// fabricated `AuthVerdict::Pass` would not be.
+    pub is_auto_reply: bool,
+    /// Whether the body is a forwarded conversation rather than one this sender wrote.
+    pub is_forwarded: bool,
 }
 
 impl Default for IngressDirectives {
@@ -169,6 +186,8 @@ impl Default for IngressDirectives {
             trace_channels: Vec::new(),
             disposition: MessageDisposition::Answer,
             source_channel_id: None,
+            is_auto_reply: false,
+            is_forwarded: false,
         }
     }
 }
@@ -185,8 +204,6 @@ pub struct EmailIngressFacts {
     pub dmarc: AuthVerdict,
     /// `None` when no scanner ran, which is not the same as a score of zero.
     pub spam_score: Option<f64>,
-    pub is_auto_reply: bool,
-    pub is_forwarded: bool,
 }
 
 /// How this message was authenticated, and therefore which policy questions can be asked of it.
@@ -294,6 +311,68 @@ impl ReplyCandidates {
     }
 }
 
+/// One inbound message as its adapter parsed it, before the interface that carried it is resolved.
+///
+/// Email is what forces this split. A mail arrives at the deployment's MX addressed to
+/// `support+billing@acme.example.com`, and each of those channels owns its own binding: *which*
+/// binding is the source is a routing conclusion, not a parsing one. A transport whose event
+/// arrives on one already-known binding -- a Slack event names its installation and conversation --
+/// builds the envelope directly and never holds a draft.
+///
+/// The provider keys here are deliberately unqualified. [`InboundDraft::bind`] is the only way to
+/// qualify them, so there is no path that stores a bare provider key as if it were unique on its
+/// own.
+#[derive(Debug, Clone)]
+pub struct InboundDraft {
+    pub event_key: Option<ExternalEventKey>,
+    pub message_key: ExternalMessageKey,
+    pub thread_key: ExternalThreadKey,
+    pub reply_message_keys: BoundedVec<ExternalMessageKey, MAX_REPLY_CANDIDATES>,
+    pub reply_thread_keys: BoundedVec<ExternalThreadKey, MAX_REPLY_CANDIDATES>,
+    pub author: QualifiedIdentity,
+    pub addressed: BoundedVec<AddressedIdentity, MAX_ADDRESSED_IDENTITIES>,
+    pub content: CanonicalContent,
+    pub attachments: BoundedVec<AttachmentMetadata, MAX_ATTACHMENTS>,
+    pub directives: IngressDirectives,
+    pub policy: IngressPolicyFacts,
+    pub correlation_id: CorrelationId,
+    pub extension: ProtocolExtension,
+}
+
+impl InboundDraft {
+    /// Bind this message to the interface that carried it, qualifying every provider key by it.
+    pub fn bind(self, binding_id: ChannelBindingId) -> InboundEnvelope {
+        let qualify_message = |message_key| ReplyMessageKeyCandidate {
+            binding_id,
+            message_key,
+        };
+        let qualify_thread = |thread_key| ReplyThreadKeyCandidate {
+            binding_id,
+            thread_key,
+        };
+        InboundEnvelope {
+            source: InboundSource {
+                binding_id,
+                event_key: self.event_key,
+                message_key: self.message_key,
+                thread_key: self.thread_key,
+            },
+            author: self.author,
+            addressed: self.addressed,
+            content: self.content,
+            attachments: self.attachments,
+            reply_candidates: ReplyCandidates {
+                messages: self.reply_message_keys.map(qualify_message),
+                threads: self.reply_thread_keys.map(qualify_thread),
+            },
+            directives: self.directives,
+            policy: self.policy,
+            correlation_id: self.correlation_id,
+            extension: self.extension,
+        }
+    }
+}
+
 /// One inbound provider message, as the application understands it.
 ///
 /// Every field is already validated: the identities are qualified, the content is bounded, the
@@ -331,20 +410,139 @@ impl InboundEnvelope {
     }
 }
 
-/// Which thread an association targets: one that exists, or one this commit must create.
+/// A reserved platform address that the platform answers itself instead of routing to a channel.
+///
+/// The leading underscore is what makes this namespace safe to reserve: `channel_slugs_format` and
+/// `companies_slug_format` both constrain slugs to `^[a-z0-9]...`, so no customer can create a
+/// channel or company that shadows one of these names. Adding a variant needs no blocklist and no
+/// migration.
+///
+/// Declared with the ingress vocabulary rather than in the mail adapter because *answering* one is
+/// application work: the adapter only recognises which reserved name an address carried.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SystemAddress {
+    /// `_help@{company}.{app_domain}` -- replies with the sender's channels and the address syntax.
+    Help,
+}
+
+impl SystemAddress {
+    /// Every reserved local part, so tests can assert the whole set at once.
+    pub const ALL: &'static [SystemAddress] = &[SystemAddress::Help];
+
+    pub const fn local_part(self) -> &'static str {
+        match self {
+            Self::Help => "_help",
+        }
+    }
+
+    /// Match a raw local part, exactly. Must be given the local part *before* any pipeline or
+    /// context-suffix handling, or a future `_msg` would be eaten by suffix stripping.
+    pub fn parse(local_part: &str) -> Option<Self> {
+        let candidate = local_part.trim().to_lowercase();
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|system| system.local_part() == candidate)
+    }
+}
+
+/// What one recipient of an inbound message addresses.
+///
+/// The adapter classifies; the application routes. An email adapter reads
+/// `support+billing.quiet@acme.example.com` and states "an ordered two-channel pipeline in `acme`,
+/// filed rather than answered"; a chat adapter states the one conversation the post arrived in.
+/// Neither hands the application a string to re-parse, which is what keeps address syntax in the
+/// one place that owns it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AddressedTarget {
+    /// An ordered pipeline of business channels, in the order the address named them.
+    Channels(Vec<ChannelSelector>),
+    /// A reserved platform address that the platform answers itself.
+    System {
+        company: CompanySlug,
+        address: SystemAddress,
+    },
+    /// Someone with no channel behind them: a person copied on the message.
+    Outsider,
+}
+
+/// One recipient, as the adapter classified it.
+///
+/// `handle` is kept because two decisions still speak in it -- whether a Cc'd channel was mentioned
+/// in the body, and what a bounce reports -- but nothing routes on it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AddressedRecipient {
+    pub role: RecipientRole,
+    pub handle: QualifiedIdentity,
+    pub target: AddressedTarget,
+    /// What this particular address asked for. An address may ask to be filed even when its
+    /// siblings ask for an answer, so the disposition is per recipient and folded afterwards.
+    pub disposition: MessageDisposition,
+}
+
+/// Everything an adapter states about where one inbound message was addressed.
+///
+/// Separate from [`InboundEnvelope`] because it is a *routing* statement rather than message
+/// content: the envelope is what gets stored, this is what decides where.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InboundRouting {
+    pub recipients: Vec<AddressedRecipient>,
+}
+
+impl InboundRouting {
+    pub fn parse(recipients: Vec<AddressedRecipient>) -> Result<Self, BoundsError> {
+        if recipients.len() > MAX_ADDRESSED_TARGETS {
+            return Err(BoundsError::TooMany {
+                field: "recipients",
+                actual: recipients.len(),
+                max: MAX_ADDRESSED_TARGETS,
+            });
+        }
+        Ok(Self { recipients })
+    }
+
+    /// Every channel pipeline named, `To:` before `Cc:`, in address order.
+    pub fn channel_pipelines(
+        &self,
+    ) -> impl Iterator<Item = (&AddressedRecipient, &[ChannelSelector])> {
+        self.recipients
+            .iter()
+            .filter_map(|recipient| match &recipient.target {
+                AddressedTarget::Channels(selectors) => Some((recipient, selectors.as_slice())),
+                AddressedTarget::System { .. } | AddressedTarget::Outsider => None,
+            })
+    }
+
+    /// Every reserved address named, with the company it belongs to.
+    pub fn system_addresses(&self) -> impl Iterator<Item = (&CompanySlug, SystemAddress)> {
+        self.recipients
+            .iter()
+            .filter_map(|recipient| match &recipient.target {
+                AddressedTarget::System { company, address } => Some((company, *address)),
+                AddressedTarget::Channels(_) | AddressedTarget::Outsider => None,
+            })
+    }
+
+    /// The handles of everyone addressed who is not a platform interface.
+    pub fn outsiders(&self) -> impl Iterator<Item = &QualifiedIdentity> {
+        self.recipients.iter().filter_map(|recipient| {
+            matches!(recipient.target, AddressedTarget::Outsider).then_some(&recipient.handle)
+        })
+    }
+
+    /// Whether any address asked for the message to be filed rather than answered.
+    pub fn any_files_only(&self) -> bool {
+        self.recipients
+            .iter()
+            .any(|recipient| !recipient.disposition.answers())
+    }
+}
+
+/// Which thread an association targets: one that exists, or one this commit must open.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ThreadTarget {
     Existing(Uuid),
-    Create(NewThread),
-}
-
-/// The thread to open when resolution found none.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NewThread {
-    pub subject: String,
-    /// The people the thread starts with, as email handles. Superseded by principal participation
-    /// as the canonical model; kept here because the thread projection still renders from it.
-    pub participants: Vec<EmailAddress>,
+    Create { subject: String },
 }
 
 /// Where one match sits in a multi-channel pipeline.
@@ -363,25 +561,56 @@ impl PipelineStep {
     }
 }
 
-/// One thread this message must be associated with, and why.
+/// One thread this message must be associated with, and the interface it reached it through.
+///
+/// `binding_id` is stated rather than derived inside the commit: one mail addressed to three
+/// channels is three bindings, and a committer that resolved them itself would have to know that
+/// email's binding is "the channel's one deployment binding" -- an email rule in the one place
+/// that must stay transport-neutral.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ThreadAssociation {
     pub channel_id: Uuid,
+    pub binding_id: ChannelBindingId,
     pub target: ThreadTarget,
     pub role: RecipientRole,
     pub step: PipelineStep,
+    /// The handles this message adds to the thread's participant projection.
+    ///
+    /// Stated rather than derived inside the commit: whether the sender joins at all, and whether
+    /// the outsiders they copied are pulled in, is channel policy -- `add_3rd_party` and the
+    /// sender's trust -- and a transaction is not where policy is decided. For a thread this
+    /// commit opens, it is the complete starting set.
+    pub participants: Vec<EmailAddress>,
+}
+
+/// One channel an agent-dispatch run drives.
+///
+/// Named by channel rather than by thread because the thread may not exist yet: a message that
+/// opens a conversation has its thread created by the same commit that creates this task, and the
+/// committer resolves the pair from the association it just wrote. A target with no association is
+/// therefore unrepresentable rather than merely unlikely.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InboundTaskTarget {
+    pub channel_id: Uuid,
+    pub role: RecipientRole,
 }
 
 /// The agent-dispatch task this message should create, if any.
 ///
-/// It names the channel and thread the run belongs to; the canonical message id is not known until
-/// the commit assigns one, which is exactly why the committer -- not the caller -- builds the
+/// It names the channels the run drives, first one primary; the canonical message id is not known
+/// until the commit assigns one, which is exactly why the committer -- not the caller -- builds the
 /// durable payload.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InboundTaskRequest {
     pub task_type: String,
-    pub channel_id: Uuid,
-    pub thread_id: Option<Uuid>,
+    /// In pipeline order. The first is the run's own channel and thread.
+    pub targets: Vec<InboundTaskTarget>,
+}
+
+impl InboundTaskRequest {
+    pub fn primary(&self) -> Option<InboundTaskTarget> {
+        self.targets.first().copied()
+    }
 }
 
 /// Everything one accepted inbound message must make durable, together or not at all.
@@ -399,6 +628,12 @@ pub struct InboundCommitRequest {
     pub associations: BoundedVec<ThreadAssociation, MAX_THREAD_ASSOCIATIONS>,
     pub task: Option<InboundTaskRequest>,
     pub deliveries: Vec<DeliveryIntent>,
+    /// Whether the answer this message earns should actually be sent.
+    ///
+    /// Part of the commit because it has to reach the worker, and the durable task payload is
+    /// written here: a run that had to guess would either mail a user's test or swallow a real
+    /// reply.
+    pub reply_delivery: ReplyDelivery,
 }
 
 /// Whether this commit stored a new message or recognised one already stored.
@@ -450,8 +685,6 @@ mod tests {
             dkim: AuthVerdict::Pass,
             dmarc: AuthVerdict::Pass,
             spam_score: None,
-            is_auto_reply: false,
-            is_forwarded: false,
         });
         assert_eq!(
             email.email().map(|facts| facts.dmarc),

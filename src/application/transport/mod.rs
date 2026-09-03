@@ -18,6 +18,9 @@ pub mod lease;
 pub mod ports;
 pub mod task_payload;
 
+/// Addressing role is domain transport vocabulary; re-exported here so the transport module reads
+/// as one place.
+pub use crate::entities::transport::{RecipientRole, UnknownRecipientRole};
 pub use bounded::{BoundedVec, BoundsError};
 pub use delivery::{
     ContentDigest, DELIVERY_ENVELOPE_VERSION, DeliveryCandidate, DeliveryDestination,
@@ -26,12 +29,13 @@ pub use delivery::{
     PayloadError, ProviderSendOutcome, RenderedPart, TransportPayload, plan_deliveries,
 };
 pub use ingress::{
-    AddressedIdentity, CanonicalContent, CommitDisposition, EmailIngressFacts,
-    InboundCommitOutcome, InboundCommitRequest, InboundEnvelope, InboundTaskRequest,
-    IngressDirectives, IngressPolicyFacts, MAX_ADDRESSED_IDENTITIES, MAX_ATTACHMENTS,
-    MAX_BODY_BYTES, MAX_REPLY_CANDIDATES, MAX_SUBJECT_BYTES, MAX_THREAD_ASSOCIATIONS,
-    MessageDisposition, NewThread, PipelineStep, ProtocolExtension, RecipientRole, ReplyCandidates,
-    ThreadAssociation, ThreadTarget,
+    AddressedIdentity, AddressedRecipient, AddressedTarget, CanonicalContent, CommitDisposition,
+    EmailIngressFacts, InboundCommitOutcome, InboundCommitRequest, InboundDraft, InboundEnvelope,
+    InboundRouting, InboundTaskRequest, InboundTaskTarget, IngressDirectives, IngressPolicyFacts,
+    MAX_ADDRESSED_IDENTITIES, MAX_ADDRESSED_TARGETS, MAX_ATTACHMENTS, MAX_BODY_BYTES,
+    MAX_INGRESS_HOPS, MAX_REPLY_CANDIDATES, MAX_SUBJECT_BYTES, MAX_THREAD_ASSOCIATIONS,
+    MessageDisposition, PipelineStep, ProtocolExtension, ReplyCandidates, ReplyDelivery,
+    SMALL_INLINE_IMAGE_BYTES, SystemAddress, ThreadAssociation, ThreadTarget,
 };
 pub use lease::{ExecutionId, ExecutionLease, WorkerId};
 pub use ports::{
@@ -40,6 +44,9 @@ pub use ports::{
     TransportSender,
 };
 pub use task_payload::{InboundTaskPayload, InboundTaskPayloadV1};
+
+#[cfg(test)]
+pub mod test_support;
 
 #[cfg(test)]
 mod tests;

@@ -4,13 +4,15 @@
 
 use super::test_support::*;
 use super::*;
+use crate::entities::value_objects::MessageId;
 use crate::entities::{
     correlation::CorrelationId,
     email_message::EmailMessageMetadata,
     message::{AttachmentMetadata, MessageDirection, MessageParticipantKind, MessageRole},
     participant::IdentityProvenance,
-    transport::ExternalThreadKey,
+    transport::{ExternalMessageKey, ExternalThreadKey},
 };
+use crate::transport::ExternalCorrelationStore;
 use crate::use_cases::{
     company::CompanyPersistence,
     thread::{MessageAuthorWrite, MessageCorrelation, MessageWrite},
@@ -249,23 +251,23 @@ async fn a_reply_arriving_before_its_root_creates_the_thread_the_root_joins() {
         .await
         .unwrap();
 
-    // The root now arrives. Its own id is its conversation key, which is the key the reply already
-    // registered -- so thread resolution finds the reply's thread.
+    // The root now arrives. Its own id is its *conversation* key, which is the key the reply
+    // already registered -- so thread resolution finds the reply's thread before it ever looks at
+    // a message key, which is the order `resolve_thread` walks.
     let found = fixture
         .persistence
-        .find_thread_by_message_ids(fixture.channel_id, &[MessageId::from(root_id.clone())])
+        .thread_for_thread_keys(
+            fixture.email_binding_of(fixture.channel_id).await,
+            &[ExternalThreadKey::parse(root_id.as_str()).unwrap()],
+        )
         .await
         .unwrap()
         .expect("the reply's conversation must be findable by the root's id");
-    assert_eq!(found.id, fixture.thread.id);
+    assert_eq!(found, fixture.thread.id);
 
     fixture
         .persistence
-        .create_message(&inbound_email(
-            found.id,
-            email_metadata(&root_id),
-            "The root",
-        ))
+        .create_message(&inbound_email(found, email_metadata(&root_id), "The root"))
         .await
         .unwrap();
 
@@ -352,21 +354,25 @@ async fn provider_message_keys_collide_only_inside_one_binding() {
     assert_eq!(
         fixture
             .persistence
-            .find_thread_by_message_ids(fixture.channel_id, &[MessageId::from(rfc.clone())])
+            .thread_for_message_keys(
+                fixture.email_binding_of(fixture.channel_id).await,
+                &[ExternalMessageKey::parse(rfc.as_str()).unwrap()],
+            )
             .await
             .unwrap()
-            .unwrap()
-            .id,
+            .unwrap(),
         fixture.thread.id
     );
     assert_eq!(
         fixture
             .persistence
-            .find_thread_by_message_ids(second_channel, &[MessageId::from(rfc.clone())])
+            .thread_for_message_keys(
+                fixture.email_binding_of(second_channel).await,
+                &[ExternalMessageKey::parse(rfc.as_str()).unwrap()],
+            )
             .await
             .unwrap()
-            .unwrap()
-            .id,
+            .unwrap(),
         second_thread.id
     );
 

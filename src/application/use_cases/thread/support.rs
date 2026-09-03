@@ -14,33 +14,33 @@ use crate::{
         agent::Agent,
         channel::Channel,
         company::Company,
+        email_message::EmailMessageMetadata,
         message::{AttachmentMetadata, Message},
-        message_contract::NormalizedInboundMessage,
         participant::PrincipalAccessContext,
-        value_objects::{CompanySlug, MessageId, ThreadIndex, ThreadIndexParseError},
+        quoted_text,
+        transport::QualifiedIdentity,
+        value_objects::{CompanySlug, MessageId},
     },
-    services::email_parser::{
-        EmailParser, MAX_CHANNEL_HOPS, ParsedEmail, SMALL_INLINE_IMAGE_BYTES,
-    },
+    transport::{InboundDraft, InboundEnvelope, SMALL_INLINE_IMAGE_BYTES},
 };
 
-use super::{InboundIngestResult, InboundOrigin, InternalChannelSource, ThreadUseCases};
+use super::ThreadUseCases;
 
 /// Memoized directory lookups for a single ingest run.
 ///
 /// The ingest pipeline resolves the same company, channel list and team membership repeatedly
 /// while walking `To`/`Cc` pipelines. This owns those caches so the pipeline body never
 /// hand-rolls a `get`/`insert` dance, and so every cache key is built in exactly one place.
-pub(super) struct DirectoryCache<'a> {
+pub(crate) struct DirectoryCache<'a> {
     use_cases: &'a ThreadUseCases,
     companies: HashMap<String, Option<Company>>,
     channels: HashMap<Uuid, Vec<Channel>>,
-    access_contexts: HashMap<(Uuid, String), PrincipalAccessContext>,
+    access_contexts: HashMap<(Uuid, QualifiedIdentity), PrincipalAccessContext>,
     agents: HashMap<Uuid, Option<Agent>>,
 }
 
 impl<'a> DirectoryCache<'a> {
-    pub(super) fn new(use_cases: &'a ThreadUseCases) -> Self {
+    pub(crate) fn new(use_cases: &'a ThreadUseCases) -> Self {
         Self {
             use_cases,
             companies: HashMap::new(),
@@ -50,7 +50,7 @@ impl<'a> DirectoryCache<'a> {
         }
     }
 
-    pub(super) async fn company(&mut self, slug: &CompanySlug) -> AppResult<Option<Company>> {
+    pub(crate) async fn company(&mut self, slug: &CompanySlug) -> AppResult<Option<Company>> {
         let key = slug.to_lowercase();
         if let Some(cached) = self.companies.get(&key) {
             return Ok(cached.clone());
@@ -60,7 +60,7 @@ impl<'a> DirectoryCache<'a> {
         Ok(loaded)
     }
 
-    pub(super) async fn channels(&mut self, company_id: Uuid) -> AppResult<Vec<Channel>> {
+    pub(crate) async fn channels(&mut self, company_id: Uuid) -> AppResult<Vec<Channel>> {
         if let Some(cached) = self.channels.get(&company_id) {
             return Ok(cached.clone());
         }
@@ -75,18 +75,18 @@ impl<'a> DirectoryCache<'a> {
 
     /// Resolve one transport identity to its stable principal and membership. The observation is
     /// idempotent and confers no grant; it only ensures all later decisions use the same actor id.
-    pub(super) async fn access_context(
+    pub(crate) async fn access_context(
         &mut self,
         company_id: Uuid,
-        sender: &str,
+        identity: &QualifiedIdentity,
     ) -> AppResult<PrincipalAccessContext> {
-        let key = (company_id, sender.trim().to_lowercase());
+        let key = (company_id, identity.clone());
         if let Some(cached) = self.access_contexts.get(&key) {
             return Ok(*cached);
         }
         let loaded = self
             .use_cases
-            .observe_email_access_context(company_id, sender)
+            .observe_ingress_identity(company_id, identity)
             .await?;
         self.access_contexts.insert(key, loaded);
         Ok(loaded)
@@ -94,7 +94,7 @@ impl<'a> DirectoryCache<'a> {
 
     /// One configured agent, cached because several channel matches may reference the same
     /// library definition.
-    pub(super) async fn agent(&mut self, id: Uuid) -> AppResult<Option<Agent>> {
+    pub(crate) async fn agent(&mut self, id: Uuid) -> AppResult<Option<Agent>> {
         if let Some(cached) = self.agents.get(&id) {
             return Ok(cached.clone());
         }
@@ -107,169 +107,55 @@ impl<'a> DirectoryCache<'a> {
     }
 }
 
-/// Message-IDs that point at *other* messages in the conversation (`In-Reply-To` + `References`).
-pub(super) fn reference_ids(parsed: &ParsedEmail) -> Vec<MessageId> {
-    let mut ids = Vec::with_capacity(parsed.references.len() + 1);
-    if let Some(ref reply_id) = parsed.in_reply_to {
-        ids.push(MessageId::from(reply_id.clone()));
-    }
-    ids.extend(parsed.references.iter().cloned().map(MessageId::from));
-    ids
-}
-
 /// The `References` chain to put on a reply: the inbound chain, extended with the message it
-/// answers. Ordering differs from [`reference_ids`] because this one goes out on the wire.
-pub(super) fn outbound_reference_ids(parsed: &ParsedEmail) -> Vec<String> {
-    let mut references = parsed.references.clone();
-    if let Some(ref reply_to) = parsed.in_reply_to
-        && !references.contains(reply_to)
+/// answers.
+///
+/// Ordered for the wire, oldest first, which is the opposite of the nearest-ancestor order
+/// [`EmailMessageMetadata::reference_candidates`] uses for thread lookup.
+pub(super) fn outbound_reference_ids(envelope: &InboundEnvelope) -> Vec<MessageId> {
+    let Some(metadata) = envelope.extension.email_metadata() else {
+        return Vec::new();
+    };
+    let mut references = metadata.references.clone();
+    if let Some(in_reply_to) = metadata.in_reply_to.as_ref()
+        && !references.contains(in_reply_to)
     {
-        references.push(reply_to.clone());
+        references.push(in_reply_to.clone());
     }
     references
 }
 
-/// Reference IDs plus this message's own ID, for locating the thread it belongs to.
-pub(super) fn thread_lookup_ids(parsed: &ParsedEmail) -> Vec<MessageId> {
-    let mut ids = vec![MessageId::from(parsed.message_id.clone())];
-    ids.extend(reference_ids(parsed));
-    ids
-}
-
-pub(super) fn thread_index_of(
-    parsed: &ParsedEmail,
-) -> Result<Option<ThreadIndex>, ThreadIndexParseError> {
-    parsed
-        .thread_index
-        .as_deref()
-        .map(ThreadIndex::parse)
-        .transpose()
-}
-
-/// Cheap rejections that need no I/O: identity, authentication, and loop protection.
-///
-/// Runs before any persistence work so a forged or looping message costs a single parse.
-pub(super) fn check_inbound_guards(
-    parsed: &ParsedEmail,
-    internal_source: Option<InternalChannelSource>,
-    origin: InboundOrigin,
-) -> Option<InboundIngestResult> {
-    let is_inter_channel = internal_source.is_some();
-
-    if let Some(source) = internal_source
-        && parsed.channel_id_header != Some(source.channel_id)
-    {
-        return Some(InboundIngestResult::rejected(
-            "Internal source channel identity mismatch",
-        ));
-    }
-
-    // Trusted internal transport is authenticated by channel identity, not by SPF/DKIM/DMARC.
-    if !is_inter_channel
-        && matches!(origin, InboundOrigin::ExternalEmail)
-        && external_dmarc_rejection(parsed.dmarc_status).is_some()
-    {
-        tracing::warn!(sender = %parsed.sender, verdict = ?parsed.dmarc_status,
-                "External message rejected because DMARC did not pass");
-        return Some(InboundIngestResult::rejected(
-            "DMARC authentication did not pass",
-        ));
-    }
-
-    if is_inter_channel && parsed.hop_count >= MAX_CHANNEL_HOPS {
-        tracing::warn!(
-            "Max inter-channel hop count ({}) reached for Message-ID: {}",
-            parsed.hop_count,
-            parsed.message_id
-        );
-        return Some(InboundIngestResult::rejected(
-            "Max inter-channel hop count reached",
-        ));
-    }
-
-    if !is_inter_channel && parsed.is_auto_reply {
-        tracing::warn!(
-            "External auto-reply loop detected for Message-ID: {}, dropping message",
-            parsed.message_id
-        );
-        return Some(InboundIngestResult::rejected(
-            "External auto-reply loop detected",
-        ));
-    }
-
-    None
-}
-
-fn external_dmarc_rejection(verdict: crate::entities::auth::AuthVerdict) -> Option<&'static str> {
-    match verdict {
-        crate::entities::auth::AuthVerdict::Pass => None,
-        crate::entities::auth::AuthVerdict::Fail
-        | crate::entities::auth::AuthVerdict::SoftFail
-        | crate::entities::auth::AuthVerdict::Neutral
-        | crate::entities::auth::AuthVerdict::TempError
-        | crate::entities::auth::AuthVerdict::PermError
-        | crate::entities::auth::AuthVerdict::Unavailable
-        | crate::entities::auth::AuthVerdict::Unknown => Some("DMARC authentication did not pass"),
-    }
-}
-
-/// Projection of the protocol-neutral inbound message onto the email-shaped view the rest of the
-/// ingest pipeline works with.
-pub(super) fn parsed_email_from_normalized(norm: &NormalizedInboundMessage) -> ParsedEmail {
-    ParsedEmail {
-        message_id: norm.message_id.clone().into_string(),
-        in_reply_to: norm.thread_ref.clone().map(MessageId::into_string),
-        references: norm
-            .references
-            .iter()
-            .cloned()
-            .map(MessageId::into_string)
-            .collect(),
-        thread_index: norm.thread_index.clone(),
-        sender: norm.sender.subject().as_str().to_string(),
-        recipients_to: norm
-            .recipients_to
-            .iter()
-            .map(|identity| identity.subject().as_str().to_string())
-            .collect(),
-        recipients_cc: norm
-            .recipients_cc
-            .iter()
-            .map(|identity| identity.subject().as_str().to_string())
-            .collect(),
-        subject: norm.subject.clone(),
-        clean_text_body: norm.clean_text.clone(),
-        raw_text_body: norm.raw_text.clone(),
-        raw_html_body: norm.raw_html.clone(),
-        attachments: norm.attachments.clone(),
-        prompt_text: norm.clean_text.clone(),
-        is_auto_reply: norm.is_auto_reply,
-        is_forwarded: norm.is_forwarded,
-        channel_id_header: norm.channel_id_header,
-        hop_count: norm.hop_count,
-        trace_channels: norm.trace_channels.clone(),
-        spf_status: norm.spf_status,
-        dkim_status: norm.dkim_status,
-        dmarc_status: norm.dmarc_status,
-        spam_score: norm.spam_score,
-        is_context_only: norm.is_context_only,
-    }
+/// The RFC id this message will be answered `In-Reply-To`, when mail carried it.
+pub(super) fn rfc_message_id(envelope: &InboundEnvelope) -> Option<&MessageId> {
+    envelope
+        .extension
+        .email_metadata()
+        .map(|metadata: &EmailMessageMetadata| &metadata.rfc_message_id)
 }
 
 /// Strip quoted history from a reply, falling back to matching against the thread's own stored
 /// bodies when the heuristic can't find a quote marker.
-pub(super) fn strip_quoted_history(parsed: &ParsedEmail, history: &[Message]) -> String {
-    if parsed.is_forwarded || history.is_empty() {
-        return parsed.clean_text_body.clone();
+pub(super) fn strip_quoted_history(draft: &InboundDraft, history: &[Message]) -> String {
+    let body = draft.content.body_text();
+    if draft.directives.is_forwarded || history.is_empty() {
+        return body.to_string();
     }
-    let history_bodies: Vec<String> = history.iter().map(|m| m.clean_text_body.clone()).collect();
-    let heuristic_clean = EmailParser::strip_quotes_heuristic(&parsed.clean_text_body);
-    EmailParser::strip_historical_quotes_fallback(&heuristic_clean, &history_bodies)
+    let history_bodies: Vec<&str> = history
+        .iter()
+        .map(|message| message.clean_text_body.as_str())
+        .collect();
+    quoted_text::strip(body, &history_bodies)
 }
 
 /// The prompt handed to the agent: the cleaned body plus a description of every attachment worth
 /// mentioning (tiny inline images are signature decorations, not content).
-pub(super) fn build_prompt_text(clean_body: &str, attachments: &[AttachmentMetadata]) -> String {
+pub(super) fn build_prompt_text(envelope: &InboundEnvelope) -> String {
+    prompt_text(envelope.content.body_text(), &envelope.attachments)
+}
+
+/// The prompt handed to the agent: the cleaned body plus a description of every attachment worth
+/// mentioning.
+fn prompt_text(clean_body: &str, attachments: &[AttachmentMetadata]) -> String {
     let attachment_prompts: Vec<String> = attachments
         .iter()
         .filter(|att| {
@@ -288,6 +174,35 @@ pub(super) fn build_prompt_text(clean_body: &str, attachments: &[AttachmentMetad
         clean_body.to_string()
     } else {
         format!("{}\n\n{}", clean_body, attachment_prompts.join("\n"))
+    }
+}
+
+impl ThreadUseCases {
+    /// Whether this address belongs to someone outside the platform.
+    ///
+    /// The single definition of "third party" on the *egress* side: it decides who is dropped from
+    /// an agent reply's `Cc` when a channel has `add_3rd_party` off. Ingress no longer asks -- the
+    /// adapter already classified every recipient before the application saw it -- and this goes
+    /// with the reply renderer in step 9.
+    pub(super) async fn is_third_party_address(
+        &self,
+        address: &str,
+        sender: &str,
+        directory: &mut DirectoryCache<'_>,
+    ) -> AppResult<bool> {
+        let address = address.trim();
+        if address.is_empty() || address.eq_ignore_ascii_case(sender) {
+            return Ok(false);
+        }
+        let Some((company_slug, _, _)) =
+            crate::use_cases::channel::parse_recipient_address_pipeline(
+                address,
+                &self.config.app_domain_name,
+            )
+        else {
+            return Ok(true);
+        };
+        Ok(directory.company(&company_slug).await?.is_none())
     }
 }
 
@@ -352,24 +267,7 @@ fn is_slug_token_char(ch: char) -> bool {
 
 #[cfg(test)]
 mod mention_tests {
-    use super::{body_mentions_email, body_mentions_slug, external_dmarc_rejection};
-    use crate::entities::auth::AuthVerdict;
-
-    #[test]
-    fn only_a_dmarc_pass_authorizes_external_mail() {
-        assert_eq!(external_dmarc_rejection(AuthVerdict::Pass), None);
-        for verdict in [
-            AuthVerdict::Fail,
-            AuthVerdict::SoftFail,
-            AuthVerdict::Neutral,
-            AuthVerdict::TempError,
-            AuthVerdict::PermError,
-            AuthVerdict::Unavailable,
-            AuthVerdict::Unknown,
-        ] {
-            assert!(external_dmarc_rejection(verdict).is_some(), "{verdict:?}");
-        }
-    }
+    use super::{body_mentions_email, body_mentions_slug};
 
     #[test]
     fn email_mentions_are_case_insensitive_and_bounded() {

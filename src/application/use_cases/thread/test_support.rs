@@ -21,26 +21,42 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::{
+    adapters::persistence::task::TaskPersistence,
     app_error::{AppError, AppResult},
     entities::participant::{IdentityClaimMetadata, IdentityProvenance},
     entities::{
         correlation::CorrelationId,
+        creation::CreationProvenance,
         cursor::{MessageCursor, ThreadCursor},
         email_message::EmailMessageMetadata,
         message::{
             AttachmentMetadata, CanonicalMessageId, Message, MessageAuthor, MessageDirection,
             MessageParticipant, MessageParticipantKind, MessageRole,
         },
+        task::{NewTask, TaskSource, TaskTarget},
         thread::{Thread, ThreadParticipantProjection},
-        transport::{ParticipantIdentityId, PrincipalId, QualifiedIdentity},
+        transport::{
+            BindingAccessPolicy, BindingAccessSnapshot, BindingAuditEvent, BindingDeliveryPolicy,
+            BindingStatus, ChannelBinding, ChannelBindingId, EndpointNamespace,
+            ExternalEndpointKey, ExternalMessageKey, ExternalThreadKey, ParticipantIdentityId,
+            PrincipalId, QualifiedIdentity, TransportKind,
+        },
         value_objects::{EmailAddress, MessageId, ThreadIndex},
     },
+    transport::{
+        CommitDisposition, ExternalCorrelationStore, InboundCommitOutcome, InboundCommitRequest,
+        InboundEnvelope, InboundMessageCommitter, InboundTaskPayload, InboundTaskPayloadV1,
+        ThreadTarget,
+    },
     use_cases::{
+        integration::{
+            BindingStatusChange, BindingWrite, ChannelBindingPersistence, InboundEndpoint,
+        },
         participant::IdentityObservation,
         participant::test_support::{principal_for_email, principal_for_identity},
         thread::{
-            MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
-            ThreadPersistence,
+            InboundIngestPorts, MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite,
+            MessageWrite, ThreadPersistence,
         },
     },
 };
@@ -358,51 +374,19 @@ impl ThreadPersistence for InMemoryThreads {
         Ok(thread.clone())
     }
 
-    async fn find_thread_by_message_ids(
+    async fn get_thread_message(
         &self,
-        channel_id: Uuid,
-        message_ids: &[MessageId],
-    ) -> AppResult<Option<Thread>> {
+        thread_id: Uuid,
+        message_id: CanonicalMessageId,
+    ) -> AppResult<Option<Message>> {
         let store = self.store.lock().unwrap();
-        // Conversation bindings first, then message keys: the same order the real reader uses, so
-        // reply-before-root resolves here too.
-        for message_id in message_ids {
-            let key = ProviderKey {
-                channel_id,
-                key: message_id.as_str().to_string(),
-            };
-            if let Some(thread_id) = store.external_threads.get(&key) {
-                let thread_id = *thread_id;
-                return Ok(store
-                    .threads
-                    .iter()
-                    .find(|thread| thread.id == thread_id)
-                    .cloned());
-            }
-        }
-        for message_id in message_ids {
-            let key = ProviderKey {
-                channel_id,
-                key: message_id.as_str().to_string(),
-            };
-            let Some(canonical_id) = store.external_messages.get(&key).copied() else {
-                continue;
-            };
-            let thread_id = store
-                .associations
-                .iter()
-                .filter(|association| association.message_id == canonical_id)
-                .max_by_key(|association| association.created_at)
-                .map(|association| association.thread_id);
-            if let Some(thread_id) = thread_id {
-                return Ok(store
-                    .threads
-                    .iter()
-                    .find(|thread| thread.id == thread_id)
-                    .cloned());
-            }
-        }
-        Ok(None)
+        Ok(store
+            .associations
+            .iter()
+            .find(|association| {
+                association.thread_id == thread_id && association.message_id == message_id
+            })
+            .and_then(|association| self.read(&store, association)))
     }
 
     async fn find_thread_by_thread_index(
@@ -790,5 +774,431 @@ pub fn email_write(draft: EmailMessageDraft) -> MessageWrite {
                 .raw_bodies(draft.raw_text_body, draft.raw_html_body),
         ),
         created_at: draft.created_at,
+    }
+}
+
+impl InMemoryThreads {
+    /// Which conversation these provider keys belong to, through the external maps.
+    ///
+    /// Conversation bindings first, then message keys: the same order the SQL reader uses, so
+    /// reply-before-root resolves here too.
+    fn find_thread_by_keys(&self, channel_id: Uuid, keys: &[String]) -> Option<Thread> {
+        let store = self.store.lock().unwrap();
+        for key in keys {
+            let key = ProviderKey {
+                channel_id,
+                key: key.clone(),
+            };
+            if let Some(thread_id) = store.external_threads.get(&key).copied() {
+                return store
+                    .threads
+                    .iter()
+                    .find(|thread| thread.id == thread_id)
+                    .cloned();
+            }
+        }
+        for key in keys {
+            let key = ProviderKey {
+                channel_id,
+                key: key.clone(),
+            };
+            let Some(canonical_id) = store.external_messages.get(&key).copied() else {
+                continue;
+            };
+            let thread_id = store
+                .associations
+                .iter()
+                .filter(|association| association.message_id == canonical_id)
+                .max_by_key(|association| association.created_at)
+                .map(|association| association.thread_id);
+            if let Some(thread_id) = thread_id {
+                return store
+                    .threads
+                    .iter()
+                    .find(|thread| thread.id == thread_id)
+                    .cloned();
+            }
+        }
+        None
+    }
+
+    /// The canonical message a provider key already names in one channel.
+    fn message_for_key(&self, channel_id: Uuid, key: &str) -> Option<CanonicalMessageId> {
+        self.store
+            .lock()
+            .unwrap()
+            .external_messages
+            .get(&ProviderKey {
+                channel_id,
+                key: key.to_string(),
+            })
+            .copied()
+    }
+}
+
+/// The ingest ports, backed by the same in-memory stores a fixture asserts against.
+///
+/// **Not transactional, and deliberately so.** Atomicity is a property of the SQL committer and is
+/// tested against a real database; what this double provides is the same *ordering* and the same
+/// dedup rule, so a policy test can run the whole pipeline without one. A test that cares whether
+/// a partial commit is possible is a database test by definition.
+///
+/// One synthetic email binding per channel, with the channel's own id, so a binding-qualified key
+/// and a channel-qualified key are the same fact here -- which is exactly what production means by
+/// "email is a deployment transport and every channel has one interface".
+#[derive(Clone)]
+pub struct InMemoryIngress {
+    threads: Arc<InMemoryThreads>,
+    tasks: Arc<dyn TaskPersistence>,
+}
+
+impl InMemoryIngress {
+    pub fn new(threads: Arc<InMemoryThreads>, tasks: Arc<dyn TaskPersistence>) -> Self {
+        Self { threads, tasks }
+    }
+
+    /// The ports [`ThreadUseCases::for_test`] wires, all reading the stores given here.
+    pub fn ports(
+        threads: Arc<InMemoryThreads>,
+        tasks: Arc<dyn TaskPersistence>,
+    ) -> InboundIngestPorts {
+        let ingress = Arc::new(Self::new(threads, tasks));
+        InboundIngestPorts {
+            committer: ingress.clone(),
+            correlation: ingress.clone(),
+            bindings: ingress,
+        }
+    }
+
+    /// The channel a synthetic binding stands for.
+    fn channel_of(binding_id: ChannelBindingId) -> Uuid {
+        binding_id.as_uuid()
+    }
+
+    fn binding_of(channel_id: Uuid) -> ChannelBinding {
+        ChannelBinding {
+            id: ChannelBindingId::new(channel_id),
+            company_id: Uuid::nil(),
+            channel_id,
+            installation_id: None,
+            transport: TransportKind::Email,
+            namespace: EndpointNamespace::parse("email").expect("a valid namespace"),
+            external_endpoint_key: ExternalEndpointKey::parse(channel_id.to_string())
+                .expect("a UUID is a valid endpoint key"),
+            display_label: format!("{channel_id}@test"),
+            access_policy: BindingAccessPolicy::ChannelAcl,
+            delivery_policy: BindingDeliveryPolicy::ReplyAndInitiate,
+            status: BindingStatus::Active,
+            disabled_reason: None,
+            created_by: CreationProvenance::system(),
+            access_snapshot: BindingAccessSnapshot::deployment_endpoint(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+}
+
+#[async_trait]
+impl ChannelBindingPersistence for InMemoryIngress {
+    async fn create_binding(&self, _write: BindingWrite) -> AppResult<ChannelBinding> {
+        Err(AppError::Internal(
+            "This double serves the one email interface every channel already has".into(),
+        ))
+    }
+
+    async fn active_bindings_for_channel(
+        &self,
+        _company_id: Uuid,
+        channel_id: Uuid,
+    ) -> AppResult<Vec<ChannelBinding>> {
+        Ok(vec![Self::binding_of(channel_id)])
+    }
+
+    async fn find_active_binding_by_endpoint(
+        &self,
+        _endpoint: &InboundEndpoint,
+    ) -> AppResult<Option<ChannelBinding>> {
+        Ok(None)
+    }
+
+    async fn list_bindings_for_company(&self, _company_id: Uuid) -> AppResult<Vec<ChannelBinding>> {
+        Ok(Vec::new())
+    }
+
+    async fn get_binding(
+        &self,
+        _company_id: Uuid,
+        binding_id: ChannelBindingId,
+    ) -> AppResult<Option<ChannelBinding>> {
+        Ok(Some(Self::binding_of(Self::channel_of(binding_id))))
+    }
+
+    async fn set_binding_status(&self, _change: BindingStatusChange) -> AppResult<ChannelBinding> {
+        Err(AppError::Internal(
+            "This double does not change binding status".into(),
+        ))
+    }
+
+    async fn list_binding_audit_events(
+        &self,
+        _company_id: Uuid,
+        _binding_id: ChannelBindingId,
+        _limit: i64,
+    ) -> AppResult<Vec<BindingAuditEvent>> {
+        Ok(Vec::new())
+    }
+}
+
+#[async_trait]
+impl ExternalCorrelationStore for InMemoryIngress {
+    async fn thread_for_thread_keys(
+        &self,
+        binding_id: ChannelBindingId,
+        thread_keys: &[ExternalThreadKey],
+    ) -> AppResult<Option<Uuid>> {
+        let keys: Vec<String> = thread_keys
+            .iter()
+            .map(|key| key.as_str().to_string())
+            .collect();
+        Ok(self
+            .threads
+            .find_thread_by_keys(Self::channel_of(binding_id), &keys)
+            .map(|thread| thread.id))
+    }
+
+    async fn thread_for_message_keys(
+        &self,
+        binding_id: ChannelBindingId,
+        message_keys: &[ExternalMessageKey],
+    ) -> AppResult<Option<Uuid>> {
+        let keys: Vec<String> = message_keys
+            .iter()
+            .map(|key| key.as_str().to_string())
+            .collect();
+        Ok(self
+            .threads
+            .find_thread_by_keys(Self::channel_of(binding_id), &keys)
+            .map(|thread| thread.id))
+    }
+
+    async fn message_for_external_key(
+        &self,
+        binding_id: ChannelBindingId,
+        message_key: &ExternalMessageKey,
+    ) -> AppResult<Option<CanonicalMessageId>> {
+        Ok(self
+            .threads
+            .message_for_key(Self::channel_of(binding_id), message_key.as_str()))
+    }
+}
+
+#[async_trait]
+impl InboundMessageCommitter for InMemoryIngress {
+    async fn commit_inbound(
+        &self,
+        request: InboundCommitRequest,
+    ) -> AppResult<InboundCommitOutcome> {
+        let mut thread_ids = Vec::with_capacity(request.associations.len());
+        for association in &request.associations {
+            let thread_id = match &association.target {
+                ThreadTarget::Existing(thread_id) => {
+                    if !association.participants.is_empty() {
+                        let thread = self
+                            .threads
+                            .get_thread_by_id(*thread_id)
+                            .await?
+                            .ok_or_else(|| AppError::NotFound("Thread was not found".into()))?;
+                        let mut participants =
+                            thread.participant_projection.email_addresses.clone();
+                        for handle in &association.participants {
+                            if !participants
+                                .iter()
+                                .any(|existing| existing.eq_ignore_ascii_case(handle))
+                            {
+                                participants.push(handle.clone());
+                            }
+                        }
+                        self.threads
+                            .update_thread_participants(*thread_id, &participants)
+                            .await?;
+                    }
+                    *thread_id
+                }
+                ThreadTarget::Create { subject } => {
+                    self.threads
+                        .create_thread(association.channel_id, subject, &association.participants)
+                        .await?
+                        .id
+                }
+            };
+            thread_ids.push(thread_id);
+        }
+
+        let envelope = &request.envelope;
+        // Asked before the write, because `create_message` returns the stored message either way:
+        // whether this delivery is the first one is what the caller needs to know.
+        let already_stored = self
+            .threads
+            .message_for_key(
+                Self::channel_of(envelope.source.binding_id),
+                envelope.source.message_key.as_str(),
+            )
+            .is_some();
+        let write = inbound_message_write(envelope, thread_ids[0]);
+        // `create_message` is where the double's dedup lives: a repeated provider key returns the
+        // stored message, and one carrying different content is refused.
+        let stored = self.threads.create_message(&write).await?;
+        for thread_id in thread_ids.iter().skip(1) {
+            self.threads
+                .associate_message(*thread_id, stored.canonical_id)
+                .await?;
+        }
+
+        let mut task_id = None;
+        if let Some(task) = request.task.as_ref() {
+            let thread_of: std::collections::HashMap<Uuid, Uuid> = request
+                .associations
+                .iter()
+                .map(|association| association.channel_id)
+                .zip(thread_ids.iter().copied())
+                .collect();
+            let targets: Vec<TaskTarget> = task
+                .targets
+                .iter()
+                .map(|target| {
+                    Ok(TaskTarget {
+                        channel_id: target.channel_id,
+                        thread_id: *thread_of.get(&target.channel_id).ok_or_else(|| {
+                            AppError::Internal("A task target has no association".into())
+                        })?,
+                        recipient_role: target.role,
+                    })
+                })
+                .collect::<AppResult<_>>()?;
+            let primary = *targets
+                .first()
+                .ok_or_else(|| AppError::Internal("An inbound task names no channel".into()))?;
+            let payload = InboundTaskPayload::v1(InboundTaskPayloadV1 {
+                company_id: request.company_id,
+                channel_id: primary.channel_id,
+                thread_id: primary.thread_id,
+                source_message_id: stored.canonical_id,
+                correlation_id: envelope.correlation_id,
+                hop_count: envelope.directives.hop_count,
+                trace_channels: envelope.directives.trace_channels.clone(),
+                is_forwarded: envelope.directives.is_forwarded,
+                reply_delivery: request.reply_delivery,
+            })
+            .encode()?;
+            let created = self
+                .tasks
+                .enqueue_task(NewTask {
+                    company_id: request.company_id,
+                    channel_id: primary.channel_id,
+                    thread_id: Some(primary.thread_id),
+                    task_type: task.task_type.clone(),
+                    payload,
+                    targets,
+                    source: TaskSource::Message(stored.canonical_id),
+                    correlation_id: envelope.correlation_id,
+                })
+                .await?;
+            task_id = Some(created.id);
+        }
+
+        Ok(InboundCommitOutcome {
+            disposition: if already_stored {
+                CommitDisposition::Duplicate
+            } else {
+                CommitDisposition::Created
+            },
+            message_id: stored.canonical_id,
+            thread_ids,
+            task_id,
+            delivery_ids: Vec::new(),
+        })
+    }
+}
+
+/// The producer vocabulary for one arriving message, mirroring what the SQL committer projects.
+fn inbound_message_write(envelope: &InboundEnvelope, thread_id: Uuid) -> MessageWrite {
+    let mut participants = vec![MessageParticipantWrite::new(
+        MessageParticipantKind::Sender,
+        envelope.author.clone(),
+    )];
+    for addressed in &envelope.addressed {
+        participants.push(MessageParticipantWrite::new(
+            addressed.role.participant_kind(),
+            addressed.identity.clone(),
+        ));
+    }
+    MessageWrite {
+        thread_id,
+        author: MessageAuthorWrite::Observed(IdentityObservation {
+            identity: envelope.author.clone(),
+            display_label: None,
+            claim_metadata: IdentityClaimMetadata::observation(),
+            provenance: IdentityProvenance::EmailIngress,
+        }),
+        subject: envelope.content.subject().to_string(),
+        clean_text_body: envelope.content.body_text().to_string(),
+        attachments: envelope.attachments.to_vec(),
+        direction: MessageDirection::Inbound,
+        role: if envelope.directives.source_channel_id.is_some() {
+            MessageRole::Agent
+        } else {
+            MessageRole::Human
+        },
+        correlation_id: envelope.correlation_id,
+        participants,
+        correlation: match envelope.extension.email_metadata() {
+            Some(metadata) => MessageCorrelation::Email(metadata.clone()),
+            None => MessageCorrelation::Internal,
+        },
+        created_at: Utc::now(),
+    }
+}
+
+impl crate::use_cases::thread::ThreadUseCases {
+    /// Ingest one mail exactly as the SMTP listener does: through the email adapter, with the
+    /// verdicts a verifying boundary established, as external transport traffic.
+    ///
+    /// Tests reach for this rather than assembling an envelope by hand so that the address
+    /// grammar, the bounds and the policy facts are the ones production applies -- a fixture that
+    /// built its own envelope could not fail the way a real message fails.
+    pub async fn ingest_test_email(
+        &self,
+        payload: crate::adapters::protocols::email::parser::RawInboundPayload,
+    ) -> AppResult<crate::use_cases::thread::InboundIngestResult> {
+        self.ingest_test_email_as(
+            payload,
+            crate::use_cases::thread::IngressOrigin::ExternalTransport,
+        )
+        .await
+    }
+
+    /// The same, for a message an authenticated route composed instead.
+    pub async fn ingest_test_email_as(
+        &self,
+        payload: crate::adapters::protocols::email::parser::RawInboundPayload,
+        origin: crate::use_cases::thread::IngressOrigin,
+    ) -> AppResult<crate::use_cases::thread::InboundIngestResult> {
+        use crate::adapters::protocols::email::{
+            EmailIngressAdapter, EmailIngressTrust, VerifiedEmailAuth,
+        };
+        let trust = match origin {
+            crate::use_cases::thread::IngressOrigin::ExternalTransport => {
+                EmailIngressTrust::Verified(VerifiedEmailAuth {
+                    spf: payload.spf,
+                    dkim: payload.dkim,
+                    dmarc: payload.dmarc,
+                    spam_score: payload.spam_score,
+                })
+            }
+            _ => EmailIngressTrust::Application,
+        };
+        let accepted = EmailIngressAdapter::for_config(self.config()).accept(payload, trust)?;
+        self.ingest(accepted.into_inbound(origin, crate::use_cases::thread::ReplyDelivery::Send))
+            .await
     }
 }

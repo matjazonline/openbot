@@ -17,10 +17,19 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{correlation::CorrelationId, message::CanonicalMessageId},
+    transport::ingress::ReplyDelivery,
 };
 
-/// The canonical, transport-neutral identifiers one agent-dispatch task needs to reload its world.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// The canonical, transport-neutral identifiers one agent-dispatch task needs to reload its world,
+/// plus the few delivery facts no row holds.
+///
+/// The line between the two is deliberate. Anything the commit wrote -- the body, the author, the
+/// recipients, the headers, the threads it landed in -- is *reloaded*, so a task can never replay a
+/// stale copy of it. What is copied here is only what was true of the delivery rather than of the
+/// message: how many relay hops it had taken, which channels it had already passed through, and
+/// whether the answer was asked to stay in the app. None of those is recoverable from a stored row,
+/// and guessing any of them breaks loop protection or sends mail a user asked not to send.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InboundTaskPayloadV1 {
     pub company_id: Uuid,
     pub channel_id: Uuid,
@@ -31,6 +40,14 @@ pub struct InboundTaskPayloadV1 {
     pub source_message_id: CanonicalMessageId,
     /// The chain this task belongs to, inherited from the message rather than minted here.
     pub correlation_id: CorrelationId,
+    /// How many times this message had already been relayed between channels.
+    pub hop_count: u32,
+    /// The channels it had already passed through, so a reply cannot cycle back into one.
+    pub trace_channels: Vec<Uuid>,
+    /// Whether the body is a forwarded conversation, which decides whether the sender's trust
+    /// extends to the words inside it.
+    pub is_forwarded: bool,
+    pub reply_delivery: ReplyDelivery,
 }
 
 /// The stored payload, tagged by the version that wrote it.
@@ -38,7 +55,7 @@ pub struct InboundTaskPayloadV1 {
 /// Same shape as [`crate::entities::message::MessageAttachments`]: the tag is structural, so a
 /// payload from a writer this process does not know fails to decode instead of being read as V1
 /// with missing fields.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "version")]
 pub enum InboundTaskPayload {
     #[serde(rename = "1")]
@@ -84,6 +101,10 @@ mod tests {
             thread_id: Uuid::new_v4(),
             source_message_id: CanonicalMessageId::random(),
             correlation_id: CorrelationId::new(),
+            hop_count: 0,
+            trace_channels: Vec::new(),
+            is_forwarded: false,
+            reply_delivery: ReplyDelivery::Send,
         })
     }
 

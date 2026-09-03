@@ -1,0 +1,311 @@
+//! Inbound ingest: one canonical message, one atomic commit.
+//!
+//! The pipeline is named phases, in this order:
+//!
+//! 1. [`policy::guard_ingress`] -- pure rejections: authentication, hops, loops, auto-replies.
+//! 2. [`ThreadUseCases::resolve_addresses`] -- selectors to tenant-scoped channels and bindings,
+//!    with the principal/ACL decision folded into the same walk over the addresses.
+//! 3. [`ThreadUseCases::prepare_channels`] -- the thread each channel continues or opens, and the
+//!    pure participant, third-party and turn-limit policy that goes with it.
+//! 4. [`commit::CommitPlan`] -- one `InboundCommitRequest` naming every row that must agree,
+//!    handed to the committer in a single call.
+//! 5. [`ThreadUseCases::assemble_result`] -- read back what was committed, for the caller that is
+//!    about to run the agent in-process.
+//!
+//! Nothing before the commit writes anything. An authorization or validation rejection therefore
+//! leaves no message, no mapping, no thread and no task behind, which is the property the previous
+//! shape -- a `create_thread` here, a `create_message` there, an `enqueue_task` at the end -- could
+//! not state.
+//!
+//! The I/O phases stay `async` and the decisions do not: everything in [`policy`] is a free
+//! function over already-loaded values, which is what lets those rules be unit-tested with no
+//! database and no mocks, and what keeps this chain's stack frames shallow.
+
+pub(crate) mod commit;
+pub(crate) mod policy;
+mod routing;
+
+use std::{
+    sync::Arc,
+    sync::atomic::{AtomicU64, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+use tracing::{info, instrument, warn};
+
+use crate::{
+    app_error::{AppError, AppResult},
+    entities::value_objects::ThreadIndexParseError,
+    transport::{InboundCommitOutcome, InboundDraft, InboundRouting, ReplyDelivery},
+    use_cases::thread::{
+        ChannelMatch, InboundIngestResult, ThreadUseCases, ingest::commit::CommitPlan,
+        support::DirectoryCache,
+    },
+};
+
+pub use policy::{IngestRejection, IngressOrigin};
+
+/// The one task type this pipeline produces.
+pub(super) const AGENT_DISPATCH_TASK: &str = "email_agent_dispatch";
+
+/// One inbound message offered to the application, whatever transport carried it.
+///
+/// The adapter states the first two fields; only the code path that actually authenticated the
+/// message can state `origin`, which is what keeps a header from claiming to be a trusted internal
+/// relay.
+#[derive(Debug, Clone)]
+pub struct InboundMessage {
+    pub draft: InboundDraft,
+    pub routing: InboundRouting,
+    pub origin: IngressOrigin,
+    pub reply_delivery: ReplyDelivery,
+    /// Hints the adapter parsed but could not use, for the counters that watch them.
+    pub unusable_hints: Vec<UnusableHint>,
+}
+
+impl InboundMessage {
+    /// A message that arrived over a verifying transport and expects a real answer.
+    pub fn arriving(draft: InboundDraft, routing: InboundRouting, origin: IngressOrigin) -> Self {
+        Self {
+            draft,
+            routing,
+            origin,
+            reply_delivery: ReplyDelivery::Send,
+            unusable_hints: Vec::new(),
+        }
+    }
+
+    pub fn with_unusable_hints(mut self, hints: Vec<UnusableHint>) -> Self {
+        self.unusable_hints = hints;
+        self
+    }
+
+    pub fn with_reply_delivery(mut self, reply_delivery: ReplyDelivery) -> Self {
+        self.reply_delivery = reply_delivery;
+        self
+    }
+}
+
+impl ThreadUseCases {
+    /// Take one inbound message all the way from "an adapter parsed it" to "it is durable".
+    #[instrument(skip(self, message), fields(origin = ?message.origin))]
+    pub async fn ingest(&self, message: InboundMessage) -> AppResult<InboundIngestResult> {
+        let InboundMessage {
+            draft,
+            routing,
+            origin,
+            reply_delivery,
+            unusable_hints,
+        } = message;
+
+        self.record_unusable_hints(&unusable_hints);
+        if let Err(rejection) = policy::guard_ingress(&draft, origin) {
+            warn!(%rejection, "Refusing an inbound message at the ingress guard");
+            return Ok(InboundIngestResult::rejected(rejection));
+        }
+
+        let mut directory = DirectoryCache::new(self);
+
+        // Answered before routing, so a `_help` copied onto a real message still gets its reply and
+        // a message that named nothing else reports the answer rather than an unknown address.
+        let answered_system = self
+            .answer_system_addresses(&draft, &routing, origin, &mut directory)
+            .await?;
+
+        let resolved = match self
+            .resolve_addresses(&draft, &routing, origin, &mut directory)
+            .await?
+        {
+            Ok(resolved) => resolved,
+            Err(IngestRejection::UnknownRecipient) if answered_system => {
+                return Ok(InboundIngestResult::rejected(
+                    IngestRejection::SystemAddressAnswered,
+                ));
+            }
+            Err(rejection) => return Ok(InboundIngestResult::rejected(rejection)),
+        };
+
+        let prepared = match self
+            .prepare_channels(&draft, &routing, &resolved, &mut directory)
+            .await?
+        {
+            Ok(prepared) => prepared,
+            Err(rejection) => return Ok(InboundIngestResult::rejected(rejection)),
+        };
+
+        let plan = CommitPlan::build(&draft, &resolved, prepared, reply_delivery)?;
+        info!(
+            company_id = %resolved.company.id,
+            channels = plan.channels(),
+            disposition = ?plan.disposition(),
+            "Committing an inbound message"
+        );
+
+        let outcome = self.committer.commit_inbound(plan.request()).await?;
+        self.assemble_result(plan, outcome).await
+    }
+
+    /// Count the conversation hints an adapter parsed but could not use.
+    ///
+    /// Parsing belongs to the adapter and metrics belong here, so the adapter reports the failure
+    /// as data instead of reaching for a monitoring handle it has no business holding. The warning
+    /// is rate-limited per reason because a single misbehaving client can produce thousands a
+    /// minute and the useful signal is "this is still happening", not every instance.
+    fn record_unusable_hints(&self, hints: &[UnusableHint]) {
+        for hint in hints {
+            let UnusableHint::ThreadIndex(error, encoded_length) = hint;
+            let reason = error.metric_reason();
+            if let Some(monitoring) = self.monitoring.as_ref() {
+                monitoring.increment_counter(
+                    "thread_index_rejected_total",
+                    1,
+                    &[("reason", reason)],
+                );
+                monitoring.record_gauge(
+                    "thread_index_rejected_encoded_bytes",
+                    *encoded_length as f64,
+                    &[("reason", reason)],
+                );
+            }
+            if should_warn_about_thread_index(*error) {
+                warn!(
+                    target: "mail_agents::thread_index",
+                    reason,
+                    encoded_length,
+                    "Ignoring a malformed Thread-Index header"
+                );
+            }
+        }
+    }
+
+    /// Phase 6: read back what the commit made durable.
+    ///
+    /// The commit returns identifiers only, so the threads and the stored message are loaded here
+    /// rather than handed back through the port. That keeps the transaction boundary free of
+    /// read-model shapes, and it means the caller about to run the agent in-process is looking at
+    /// rows that are actually committed rather than at values it hoped were written.
+    async fn assemble_result(
+        &self,
+        plan: CommitPlan,
+        outcome: InboundCommitOutcome,
+    ) -> AppResult<InboundIngestResult> {
+        let envelope = Arc::new(plan.envelope().clone());
+        let disposition = plan.disposition();
+        let reply_delivery = plan.reply_delivery();
+        let prepared = plan.into_prepared();
+
+        let mut channel_matches = Vec::with_capacity(prepared.channels.len());
+        for (prepared_channel, thread_id) in prepared.channels.iter().zip(&outcome.thread_ids) {
+            let thread = self
+                .thread_persistence
+                .get_thread_by_id(*thread_id)
+                .await?
+                .ok_or_else(|| {
+                    AppError::Internal(format!("Thread {thread_id} vanished after its own commit"))
+                })?;
+            // The commit returns thread ids in association order, so the pairing above is
+            // positional. Checked rather than trusted: a mispaired thread would attribute one
+            // channel's conversation to another, and the redelivery path builds its list from the
+            // associations the *first* delivery wrote rather than from this request's.
+            if thread.channel_id != prepared_channel.candidate.channel.id {
+                return Err(AppError::Internal(format!(
+                    "Committed thread {thread_id} belongs to channel {} rather than {}",
+                    thread.channel_id, prepared_channel.candidate.channel.id
+                )));
+            }
+            let inbound_message = self
+                .thread_persistence
+                .get_thread_message(*thread_id, outcome.message_id)
+                .await?
+                .ok_or_else(|| {
+                    AppError::Internal(format!(
+                        "Message {} vanished after its own commit",
+                        outcome.message_id
+                    ))
+                })?;
+            channel_matches.push(ChannelMatch {
+                company: prepared_channel.candidate.company.clone(),
+                channel: prepared_channel.candidate.channel.clone(),
+                matched_slug: Some(prepared_channel.candidate.matched_slug.clone()),
+                thread,
+                inbound_message,
+                recipient_role: prepared_channel.candidate.role,
+                step: prepared_channel.candidate.step,
+            });
+        }
+
+        // Recording the reply closes the outreach the channel was waiting on.
+        //
+        // Deliberately after the commit and not inside it: an outreach is a *task* fact, and the
+        // worst a crash here can do is leave the outreach open, which the agent's next turn
+        // reconciles. The rows whose disagreement would lose or duplicate a message are the ones
+        // the commit holds together. Step 9 folds this into the delivery state machine.
+        if !outcome.disposition.is_duplicate() {
+            for (prepared_channel, matched_channel) in
+                prepared.channels.iter().zip(&channel_matches)
+            {
+                if let Some(matched) = prepared_channel.outreach.as_ref() {
+                    self.task_persistence
+                        .record_outreach_reply(matched, matched_channel.inbound_message.id)
+                        .await?;
+                }
+            }
+        }
+
+        let primary = channel_matches
+            .first()
+            .cloned()
+            .ok_or_else(|| AppError::Internal("An accepted message reached no thread".into()))?;
+        if !disposition.answers() {
+            info!(
+                message_id = %outcome.message_id,
+                thread_id = %primary.thread.id,
+                "Filed an inbound message without running an agent"
+            );
+        }
+
+        Ok(InboundIngestResult {
+            accepted: true,
+            rejection: None,
+            thread: Some(primary.thread.clone()),
+            inbound_message: Some(primary.inbound_message.clone()),
+            company: Some(primary.company.clone()),
+            channel: Some(primary.channel.clone()),
+            envelope: Some(envelope),
+            task_id: outcome.task_id,
+            reply_delivery,
+            channel_matches,
+        })
+    }
+}
+
+/// A conversation hint an adapter parsed but could not use.
+///
+/// Carried as data rather than logged where it was found, so the adapter needs no monitoring
+/// handle and the application decides what is worth a counter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnusableHint {
+    /// An Outlook `Thread-Index` that would not canonicalize, and the encoded bytes it occupied.
+    ThreadIndex(ThreadIndexParseError, usize),
+}
+
+const THREAD_INDEX_WARNING_INTERVAL_SECS: u64 = 60;
+static LAST_THREAD_INDEX_WARNING_WINDOWS: [AtomicU64; 6] = [
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+];
+
+fn should_warn_about_thread_index(error: ThreadIndexParseError) -> bool {
+    let window = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        / THREAD_INDEX_WARNING_INTERVAL_SECS
+        + 1;
+    LAST_THREAD_INDEX_WARNING_WINDOWS[error.warning_slot()].swap(window, Ordering::Relaxed)
+        != window
+}

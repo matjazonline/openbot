@@ -12,6 +12,7 @@ use crate::entities::{
     message::{MessageDirection, MessageParticipantKind, MessageRole},
     participant::{IdentityClaimMetadata, IdentityProvenance},
     transport::ChannelBindingId,
+    value_objects::MessageId,
 };
 use crate::use_cases::{
     channel::{ChannelPersistence, ChannelWrite},
@@ -126,6 +127,18 @@ impl Fixture {
         .fetch_one(&self.pool)
         .await
         .unwrap()
+    }
+
+    /// Any channel's canonical email binding, for the multi-channel correlation cases.
+    pub(super) async fn email_binding_of(&self, channel_id: Uuid) -> ChannelBindingId {
+        let id: Uuid = sqlx::query_scalar(
+            "SELECT id FROM channel_bindings WHERE channel_id = $1 AND transport = 'email'",
+        )
+        .bind(channel_id)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap();
+        ChannelBindingId::new(id)
     }
 
     /// A second, differently-transported binding on the same channel, so a thread can be reached

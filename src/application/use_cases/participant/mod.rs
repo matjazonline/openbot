@@ -11,15 +11,13 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::{
-    adapters::protocols::email::EmailIdentity,
-    app_error::{AppError, AppResult},
+    app_error::AppResult,
     entities::{
         participant::{
             IdentityClaimMetadata, IdentityProvenance, ParticipantIdentity, Principal,
             PrincipalAccessContext,
         },
         transport::{PrincipalId, QualifiedIdentity, TransportKind},
-        value_objects::EmailAddress,
     },
 };
 
@@ -92,14 +90,12 @@ impl<T> ParticipantPersistence for T where T: IdentityDirectory + PrincipalAcces
 /// The sighting is recorded first so that ingress, channel policy and thread participation all
 /// agree on the principal for a mailbox they may never have seen before. Observing an address
 /// grants nothing; it only makes the actor addressable.
-pub async fn observe_email_access_context(
+pub async fn observe_access_context(
     participants: &dyn ParticipantPersistence,
     company_id: Uuid,
-    address: &str,
+    identity: &QualifiedIdentity,
+    provenance: IdentityProvenance,
 ) -> AppResult<PrincipalAccessContext> {
-    let identity = EmailIdentity::parse(EmailAddress::from(address))
-        .map(EmailIdentity::qualify_default)
-        .map_err(|error| AppError::BadRequest(format!("Invalid email identity: {error}")))?;
     participants
         .resolve_or_create_external_identity(
             company_id,
@@ -107,11 +103,11 @@ pub async fn observe_email_access_context(
                 identity: identity.clone(),
                 display_label: None,
                 claim_metadata: IdentityClaimMetadata::observation(),
-                provenance: IdentityProvenance::EmailIngress,
+                provenance,
             },
         )
         .await?;
     participants
-        .access_context_for_identity(company_id, &identity)
+        .access_context_for_identity(company_id, identity)
         .await
 }

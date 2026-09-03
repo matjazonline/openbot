@@ -18,15 +18,19 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
+    adapters::protocols::email::{
+        EmailIngressAdapter, EmailIngressTrust, parser::RawInboundPayload,
+    },
     app_error::{AppError, AppResult},
     entities::{channel::Channel, cursor::ThreadCursor, thread::Thread},
     infra::{config::AppConfig, events::MailboxEvents},
-    services::email_parser::RawInboundPayload,
     use_cases::{
         agent::AgentUseCases,
         channel::{ChannelUseCases, ChannelWrite, parse_recipient_address_pipeline},
         company::CompanyUseCases,
-        thread::{ReplyDelivery, SimulationMode, ThreadUseCases},
+        thread::{
+            InboundIngestResult, IngressOrigin, ReplyDelivery, SimulationMode, ThreadUseCases,
+        },
         user::UserUseCases,
     },
 };
@@ -988,9 +992,12 @@ async fn simulate_channel_handler(
 
             // Queued like any other message: the worker runs the agent and the view below fills
             // itself in over its own stream.
-            let ingest = match thread_use_cases
-                .queue_authenticated_inbound_for_agent(raw_payload, delivery_for(mode))
-                .await
+            let ingest = match compose_and_ingest(
+                &thread_use_cases,
+                raw_payload,
+                delivery_for(mode),
+            )
+            .await
             {
                 Ok(ingest) => ingest,
                 Err(err) => {
@@ -1002,9 +1009,9 @@ async fn simulate_channel_handler(
             };
             let Some(thread) = ingest.thread.as_ref() else {
                 let reason = ingest
-                    .reason
-                    .unwrap_or_else(|| "The channel rejected this message.".to_string());
-                return failure_fragment(&sender, reason);
+                    .reason()
+                    .unwrap_or("The channel rejected this message.");
+                return failure_fragment(&sender, reason.to_string());
             };
 
             match load_simulation_thread_fragment(
@@ -1109,6 +1116,30 @@ async fn simulation_stream(
     };
 
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+}
+
+/// Take in a message an authenticated route composed, and queue its agent run.
+///
+/// Returns as soon as the message is committed; the worker picks the task up on its next poll and
+/// the reply reaches the open thread over the message stream -- the same route every piece of real
+/// inbound mail takes.
+///
+/// The trust statement is the whole point of this being a separate entry. There is no email
+/// transport at this boundary, so there is no DMARC result: the signed-in principal is the
+/// authentication, and [`EmailIngressTrust::Application`] says so instead of handing the ingress
+/// guard a `Pass` nobody verified. Callers must still derive the sender from the authenticated
+/// account -- ingest enforces channel participant access, so a fabricated sender is refused, but it
+/// is refused as a stranger rather than caught as a forgery.
+pub(crate) async fn compose_and_ingest(
+    thread_use_cases: &ThreadUseCases,
+    payload: RawInboundPayload,
+    delivery: ReplyDelivery,
+) -> AppResult<InboundIngestResult> {
+    let accepted = EmailIngressAdapter::for_config(thread_use_cases.config())
+        .accept(payload, EmailIngressTrust::Application)?;
+    thread_use_cases
+        .ingest(accepted.into_inbound(IngressOrigin::TrustedApplication, delivery))
+        .await
 }
 
 /// A simulation asks for a real send only in `Run` mode; `RunTest` keeps the answer in-app.

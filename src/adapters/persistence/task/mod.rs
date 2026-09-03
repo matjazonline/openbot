@@ -33,7 +33,8 @@ use crate::{
         },
         value_objects::MessageId,
     },
-    use_cases::thread::MessageWrite,
+    transport::RecipientRole,
+    use_cases::thread::{MessageWrite, TaskChannelTarget},
 };
 
 mod board;
@@ -410,17 +411,16 @@ pub trait TaskPersistence: Send + Sync {
         Ok(Vec::new())
     }
 
-    /// The task an email already caused, found through the canonical message it was stored as.
+    /// The channels one queued run drives, in the order its ingest resolved them.
     ///
-    /// The lookup goes through `email_message_metadata` rather than a text column on the task, so
-    /// "have we run this message" and "have we stored this message" are the same fact.
-    async fn find_task_for_email_message(
+    /// No default: a double that answered "no targets" would let a multi-channel dispatch quietly
+    /// answer on one channel and never on the others, which reads as a routing bug rather than as
+    /// a missing test double.
+    async fn list_task_channel_targets(
         &self,
-        _company_id: Uuid,
-        _rfc_message_id: &MessageId,
-    ) -> AppResult<Option<BackgroundTask>> {
-        Ok(None)
-    }
+        company_id: Uuid,
+        task_id: Uuid,
+    ) -> AppResult<Vec<TaskChannelTarget>>;
 
     async fn update_task_payload(&self, id: Uuid, payload: Value) -> AppResult<()>;
 

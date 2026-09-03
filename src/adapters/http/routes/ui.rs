@@ -29,6 +29,7 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
+    adapters::protocols::email::parser::RawInboundPayload,
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
@@ -44,7 +45,6 @@ use crate::{
         config::AppConfig,
         events::{MailboxEvent, MailboxEvents},
     },
-    services::email_parser::RawInboundPayload,
     use_cases::{
         agent::AgentUseCases,
         channel::ChannelUseCases,
@@ -950,19 +950,22 @@ async fn create_thread(
         text: Some(message_body(&text_body, quiet)),
         ..Default::default()
     };
-    let ingest = match thread_use_cases
-        .queue_authenticated_inbound_for_agent(payload, delivery_mode(deliver))
-        .await
+    let ingest = match crate::adapters::http::routes::channel::compose_and_ingest(
+        &thread_use_cases,
+        payload,
+        delivery_mode(deliver),
+    )
+    .await
     {
         Ok(ingest) => ingest,
         Err(err) => return Ok(compose_error(format!("Failed to send message: {err}"))),
     };
 
-    let Some(thread) = ingest.thread else {
+    let Some(thread) = ingest.thread.clone() else {
         let reason = ingest
-            .reason
-            .unwrap_or_else(|| "The channel rejected this message.".to_string());
-        return Ok(compose_error(reason));
+            .reason()
+            .unwrap_or("The channel rejected this message.");
+        return Ok(compose_error(reason.to_string()));
     };
 
     let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
@@ -1106,19 +1109,22 @@ async fn send_reply(
         ..Default::default()
     };
 
-    let ingest = match thread_use_cases
-        .queue_authenticated_inbound_for_agent(payload, delivery_mode(deliver))
-        .await
+    let ingest = match crate::adapters::http::routes::channel::compose_and_ingest(
+        &thread_use_cases,
+        payload,
+        delivery_mode(deliver),
+    )
+    .await
     {
         Ok(ingest) => ingest,
         Err(err) => return Ok(reply_error(format!("Failed to send message: {err}"))),
     };
 
-    let Some(sent_thread) = ingest.thread else {
+    let Some(sent_thread) = ingest.thread.clone() else {
         let reason = ingest
-            .reason
-            .unwrap_or_else(|| "The channel rejected this message.".to_string());
-        return Ok(reply_error(reason));
+            .reason()
+            .unwrap_or("The channel rejected this message.");
+        return Ok(reply_error(reason.to_string()));
     };
 
     let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;

@@ -13,9 +13,11 @@ use sha2::{Digest, Sha256};
 use tracing::warn;
 
 use crate::{
-    adapters::storage::{BucketKind, FileStorage},
+    adapters::{
+        protocols::email::parser::RawAttachmentData,
+        storage::{BucketKind, FileStorage},
+    },
     entities::{upload::ImageFormat, value_objects::ObjectKey},
-    services::email_parser::RawAttachmentData,
 };
 
 /// What an attachment with no recognizable type is stored and served as.

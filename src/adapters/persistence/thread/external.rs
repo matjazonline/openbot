@@ -9,11 +9,13 @@
 use uuid::Uuid;
 
 use crate::{
+    adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
         message::{CanonicalMessageId, ExternalMessageCollision},
         transport::{ChannelBindingId, ExternalMessageKey, ExternalThreadKey},
     },
+    transport::ExternalCorrelationStore,
 };
 
 /// What a provider key already names, and the content it named it with.
@@ -25,9 +27,10 @@ pub(super) struct ExistingExternalMessage {
 /// The email interface of one channel.
 ///
 /// Email is a deployment transport, so every channel has exactly one of these from the moment it
-/// is created -- see `write_canonical_email_binding`. Resolving it here rather than threading it
-/// down from ingress keeps the binding a property of the channel; step 7 hands the resolved
-/// binding in from the ingress path, where a channel may carry several.
+/// is created -- see `write_canonical_email_binding`. The inbound commit does *not* use this: it is
+/// handed the binding each association arrived on, because a channel may carry several. This
+/// remains for the producers that have only a channel in hand -- an agent reply, a schedule -- and
+/// for those the channel's own email interface is the honest answer.
 pub(super) async fn canonical_email_binding(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
@@ -158,63 +161,90 @@ pub(super) async fn upsert_external_thread(
     Ok(())
 }
 
-/// The thread one of these conversation keys is already bound to, on any of the channel's
-/// bindings. Candidates are tried in the order given, nearest ancestor first.
-pub(super) async fn find_thread_by_external_thread_keys(
-    executor: impl sqlx::PgExecutor<'_>,
-    channel_id: Uuid,
-    keys: &[&str],
-) -> AppResult<Option<Uuid>> {
-    if keys.is_empty() {
-        return Ok(None);
+/// Read-only provider-key resolution, for the decisions that happen before the commit.
+///
+/// Everything correctness-critical lives inside the inbound commit; this exists so a policy phase
+/// can *decide* which conversation an arriving message continues, where a stale answer costs an
+/// extra thread rather than a lost or duplicated message.
+#[async_trait::async_trait]
+impl ExternalCorrelationStore for PostgresPersistence {
+    async fn thread_for_thread_keys(
+        &self,
+        binding_id: ChannelBindingId,
+        thread_keys: &[ExternalThreadKey],
+    ) -> AppResult<Option<Uuid>> {
+        let keys = key_strings(thread_keys, ExternalThreadKey::as_str);
+        if keys.is_empty() {
+            return Ok(None);
+        }
+        sqlx::query_scalar(
+            r#"SELECT mapping.thread_id
+               FROM external_threads AS mapping
+               WHERE mapping.binding_id = $1 AND mapping.external_thread_key = ANY($2)
+               ORDER BY array_position($2, mapping.external_thread_key)
+               LIMIT 1"#,
+        )
+        .bind(binding_id.as_uuid())
+        .bind(&keys)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)
     }
-    sqlx::query_scalar(
-        r#"SELECT mapping.thread_id
-           FROM external_threads AS mapping
-           JOIN channel_bindings AS binding
-             ON (binding.company_id, binding.id) = (mapping.company_id, mapping.binding_id)
-           WHERE binding.channel_id = $1 AND mapping.external_thread_key = ANY($2)
-           ORDER BY array_position($2, mapping.external_thread_key)
-           LIMIT 1"#,
-    )
-    .bind(channel_id)
-    .bind(keys)
-    .fetch_optional(executor)
-    .await
-    .map_err(AppError::from)
+
+    /// The newest association wins among equal-ranked candidates, which is what a reader means by
+    /// "the conversation this belongs to".
+    async fn thread_for_message_keys(
+        &self,
+        binding_id: ChannelBindingId,
+        message_keys: &[ExternalMessageKey],
+    ) -> AppResult<Option<Uuid>> {
+        let keys = key_strings(message_keys, ExternalMessageKey::as_str);
+        if keys.is_empty() {
+            return Ok(None);
+        }
+        sqlx::query_scalar(
+            r#"SELECT association.thread_id
+               FROM external_messages AS mapping
+               JOIN channel_bindings AS binding
+                 ON (binding.company_id, binding.id) = (mapping.company_id, mapping.binding_id)
+               JOIN thread_messages AS association
+                 ON (association.company_id, association.message_id) =
+                    (mapping.company_id, mapping.message_id)
+                AND association.channel_id = binding.channel_id
+               WHERE mapping.binding_id = $1 AND mapping.external_message_key = ANY($2)
+               ORDER BY array_position($2, mapping.external_message_key),
+                        association.created_at DESC
+               LIMIT 1"#,
+        )
+        .bind(binding_id.as_uuid())
+        .bind(&keys)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)
+    }
+
+    async fn message_for_external_key(
+        &self,
+        binding_id: ChannelBindingId,
+        message_key: &ExternalMessageKey,
+    ) -> AppResult<Option<CanonicalMessageId>> {
+        let stored: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT mapping.message_id
+               FROM external_messages AS mapping
+               WHERE mapping.binding_id = $1 AND mapping.external_message_key = $2"#,
+        )
+        .bind(binding_id.as_uuid())
+        .bind(message_key.as_str())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(stored.map(CanonicalMessageId::new))
+    }
 }
 
-/// The thread that already holds one of these provider messages, on any of the channel's bindings.
-///
-/// The newest association wins among equal-ranked candidates, matching what a reader means by
-/// "the conversation this belongs to".
-pub(super) async fn find_thread_by_external_message_keys(
-    executor: impl sqlx::PgExecutor<'_>,
-    channel_id: Uuid,
-    keys: &[&str],
-) -> AppResult<Option<Uuid>> {
-    if keys.is_empty() {
-        return Ok(None);
-    }
-    sqlx::query_scalar(
-        r#"SELECT association.thread_id
-           FROM external_messages AS mapping
-           JOIN channel_bindings AS binding
-             ON (binding.company_id, binding.id) = (mapping.company_id, mapping.binding_id)
-           JOIN thread_messages AS association
-             ON (association.company_id, association.message_id) =
-                (mapping.company_id, mapping.message_id)
-            AND association.channel_id = binding.channel_id
-           WHERE binding.channel_id = $1 AND mapping.external_message_key = ANY($2)
-           ORDER BY array_position($2, mapping.external_message_key),
-                    association.created_at DESC
-           LIMIT 1"#,
-    )
-    .bind(channel_id)
-    .bind(keys)
-    .fetch_optional(executor)
-    .await
-    .map_err(AppError::from)
+/// Candidate keys as the text `= ANY($2)` compares against, in the order they were offered.
+fn key_strings<T>(keys: &[T], as_str: fn(&T) -> &str) -> Vec<String> {
+    keys.iter().map(|key| as_str(key).to_string()).collect()
 }
 
 #[cfg(test)]

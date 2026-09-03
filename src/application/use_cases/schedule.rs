@@ -614,6 +614,7 @@ impl ScheduleUseCases {
         let task = self
             .task_persistence
             .enqueue_task(NewTask {
+                targets: Vec::new(),
                 company_id: company.id,
                 channel_id: channel.id,
                 thread_id: Some(thread.id),
@@ -1153,6 +1154,32 @@ mod tests {
 
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        /// The task's own channel and thread. These fixtures never enqueue a multi-channel run, so
+        /// stating one target is the honest answer rather than an empty list the worker would read
+        /// as "answer nowhere".
+        async fn list_task_channel_targets(
+            &self,
+            _company_id: Uuid,
+            task_id: Uuid,
+        ) -> AppResult<Vec<crate::use_cases::thread::TaskChannelTarget>> {
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|task| task.id == task_id)
+                .and_then(|task| {
+                    task.thread_id
+                        .map(|thread_id| crate::use_cases::thread::TaskChannelTarget {
+                            channel_id: task.channel_id,
+                            thread_id,
+                            recipient_role: crate::transport::RecipientRole::To,
+                        })
+                })
+                .into_iter()
+                .collect())
+        }
+
         async fn commit_agent_dispatch(
             &self,
             commit: AgentDispatchCommit<'_>,
@@ -1175,6 +1202,7 @@ mod tests {
                 company_id,
                 channel_id,
                 thread_id,
+                targets: _,
                 task_type,
                 payload,
                 source: _,

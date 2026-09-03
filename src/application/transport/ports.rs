@@ -51,11 +51,14 @@ pub trait InboundMessageCommitter: Send + Sync {
 /// or duplicated message.
 #[async_trait]
 pub trait ExternalCorrelationStore: Send + Sync {
-    /// The internal thread a provider conversation key maps to, within one binding.
-    async fn thread_for_external_key(
+    /// The internal thread one of these provider conversation keys maps to, within one binding.
+    ///
+    /// Ordered, and a list rather than a single key, because a transport may offer more than one
+    /// candidate root for the same conversation and the nearest one wins.
+    async fn thread_for_thread_keys(
         &self,
         binding_id: ChannelBindingId,
-        thread_key: &ExternalThreadKey,
+        thread_keys: &[ExternalThreadKey],
     ) -> AppResult<Option<Uuid>>;
 
     /// The internal thread reached through any of these provider message keys, nearest candidate

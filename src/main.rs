@@ -185,6 +185,7 @@ async fn serve() -> anyhow::Result<()> {
     // Initialize Incoming SMTP Server loop
     let smtp_server = Arc::new(
         SmtpServer::new(app_state.thread_use_cases.clone(), app_state.config.clone())
+            .with_file_storage(app_state.file_storage.clone())
             .with_monitoring(app_state.monitoring.clone()),
     );
 

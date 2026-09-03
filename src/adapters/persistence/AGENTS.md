@@ -196,27 +196,23 @@ DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" sqlx migrate run
 
 Then confirm the shape you think you wrote is the shape that exists: `psql "$DATABASE_URL" -c '\d <table>'`.
 
-# 2. The entity field needs `#[serde(default)]` — this is load-bearing
+# 2. Nothing but identifiers goes into a durable payload
 
-Entities are not only rows. `Company`, `Channel`, `Thread` and `Message` are serialized whole into
-the `background_tasks.payload` JSONB column (`durable_ingest_payload`, `thread/mod.rs`) and read back
-with `serde_json::from_value::<InboundIngestResult>` in `task_worker.rs`.
+`background_tasks.payload` used to hold whole `Company`, `Channel`, `Thread` and `Message` values,
+read back with `serde_json::from_value::<InboundIngestResult>`. That made every queued row a
+snapshot of the domain model: a field added without a serde default made every already-queued task
+undeserializable — silently, since the task did not error, it simply stopped re-hydrating — and a
+task that *did* re-hydrate replayed configuration as it was hours earlier.
 
-**A new field without a serde default makes every already-queued task undeserializable.** The task
-does not error loudly; it fails to re-hydrate, and the work silently stops happening. Nothing in the
-type system or the test suite catches this.
+It now carries `InboundTaskPayloadV1`: company, channel, thread, source message, correlation, and
+the three delivery facts no row holds (hop count, traced channels, reply-delivery choice). The
+worker reloads everything else with tenant-scoped queries. The version tag is structural, so a
+payload written by a deployment this process does not know fails to decode rather than being read
+as V1 with defaulted fields.
 
-```rust
-#[serde(default = "enabled_by_default")]   // a non-`Default::default()` default
-pub enabled: bool,
-
-#[serde(default)]                          // when the type's own default is right
-pub alias_slugs: Vec<ChannelSlug>,
-```
-
-Same rule for anything reachable from a durable payload — `BounceInfo.disabled_slugs` needed it for
-exactly this reason. Removing or renaming a field is the mirror image: old payloads still carry the
-old key, so keep it deserializable (or migrate the stored JSON) rather than assuming a clean cutover.
+**So: do not add an entity, a parsed provider message, or raw provider content to a payload.** If a
+worker needs a fact, either store it on a row and reload it, or state why it is a property of the
+delivery rather than of the message and add it to the versioned payload deliberately.
 
 # 3. Row struct and queries move together
 

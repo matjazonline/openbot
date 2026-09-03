@@ -980,33 +980,32 @@ impl TaskPersistence for PostgresPersistence {
     ) -> AppResult<Option<TaskChainDetail>> {
         chain_detail_on(&self.pool, company_id, correlation_id).await
     }
-    async fn find_task_for_email_message(
+    async fn list_task_channel_targets(
         &self,
         company_id: Uuid,
-        rfc_message_id: &MessageId,
-    ) -> AppResult<Option<BackgroundTask>> {
-        let db = sqlx::query_as::<_, BackgroundTaskDb>(
-            r#"SELECT task.id, task.company_id, task.channel_id, task.thread_id, task.correlation_id,
-                      task.task_type, task.status, task.payload, task.retry_count, task.max_retries,
-                      task.last_error, task.worker_id, task.execution_generation, task.locked_at,
-                      task.lock_expires_at, task.run_at, task.created_at, task.updated_at
-               FROM background_tasks AS task
-               JOIN email_message_metadata AS email
-                 ON (email.company_id, email.message_id) =
-                    (task.company_id, task.source_message_uuid)
-               WHERE task.company_id = $1 AND email.rfc_message_id = $2
-               -- A Message-ID is not a company-wide identity: the same mail can be one message on
-               -- each of several channels' bindings. The oldest task is the run this delivery
-               -- already caused, and the one a redelivery must not duplicate.
-               ORDER BY task.created_at, task.id
-               LIMIT 1"#,
+        task_id: Uuid,
+    ) -> AppResult<Vec<TaskChannelTarget>> {
+        let rows: Vec<(Uuid, Uuid, String)> = sqlx::query_as(
+            r#"SELECT target.channel_id, target.thread_id, target.recipient_role
+               FROM task_channel_targets AS target
+               WHERE target.company_id = $1 AND target.task_id = $2
+               ORDER BY target.position, target.channel_id"#,
         )
         .bind(company_id)
-        .bind(rfc_message_id.as_str())
-        .fetch_optional(&self.pool)
+        .bind(task_id)
+        .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)?;
-        db.map(TryInto::try_into).transpose()
+
+        rows.into_iter()
+            .map(|(channel_id, thread_id, recipient_role)| {
+                Ok(TaskChannelTarget {
+                    channel_id,
+                    thread_id,
+                    recipient_role: RecipientRole::parse(&recipient_role)?,
+                })
+            })
+            .collect()
     }
 
     async fn update_task_payload(&self, id: Uuid, payload: Value) -> AppResult<()> {

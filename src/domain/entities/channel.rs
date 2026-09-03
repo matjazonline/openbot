@@ -9,6 +9,18 @@ use crate::entities::{
 };
 use std::str::FromStr;
 
+/// Words a channel or company slug may neither be nor end with.
+///
+/// Transports use them as modifiers on an address that otherwise names a channel -- mail reads
+/// `support+quiet@…` as "file it on the thread, do not run the agent" -- so a channel actually
+/// *named* `quiet` could be addressed but never replied to. The list is a naming rule about
+/// slugs, which is why it is stated here rather than inside whichever adapter happens to spell
+/// the modifier first; the mail adapter's address grammar reads it, and so does slug validation.
+pub const RESERVED_SLUG_SUFFIXES: &[&str] = &["noagent", "quiet", "message", "msg", "na"];
+
+/// The separators a transport may put between a slug and one of [`RESERVED_SLUG_SUFFIXES`].
+pub const RESERVED_SUFFIX_SEPARATORS: &[char] = &['.', '+', '-', '_'];
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Channel {
     pub id: Uuid,

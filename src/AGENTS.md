@@ -2,7 +2,8 @@ These rules apply to code you write *and* to code you touch. When you edit a fun
 already breaks one of them, don't extend the violation — extract the part you're changing into a
 well-shaped helper and leave the rest alone. Do not treat the longest function nearby as the house
 style: `ingest_normalized_message_with_source` and `execute_agent_and_dispatch_inner` in
-`src/application/use_cases/thread.rs` are the anti-examples these rules were written from.
+`src/application/use_cases/thread.rs` are the anti-examples these rules were written from. Both are
+gone — `thread/ingest/` is what the first one became — but the rules they earned are not.
 
 # Newtypes over bare `String`
 
@@ -41,11 +42,13 @@ Trigger to act, not to debate: a function past **~80 lines**, past **3 levels of
 carrying more than **~6 live `let mut` accumulators**. Any of those means it should be split now,
 while you're in it.
 
-The seam is almost always already marked. `ingest_normalized_message_with_source` contains
+The seam is almost always already marked. `ingest_normalized_message_with_source` contained
 `// Global SPF / DKIM / DMARC ...`, `// Inter-channel hop limit check`, `// ACL & Participant
 Restriction Check`, `// Thread Resolution`, `// Thread Turn Limit Check` — each of those comments
-is a function that wasn't extracted. **A section comment inside a function body is a naming
-opportunity: turn it into a `fn` name and delete the comment.**
+was a function that had not been extracted, and each is now one (`guard_ingress`,
+`resolve_addresses`, `authorize_channel`, `resolve_thread`, `exceeds_turn_limit`). **A section
+comment inside a function body is a naming opportunity: turn it into a `fn` name and delete the
+comment.**
 
 The decomposition that fits this codebase, in order:
 
@@ -150,7 +153,7 @@ an explicit `Err(e) => { warn!(...); <fallback> }` arm so the choice is visible 
 
 A 5,000-line module is a merge-conflict magnet and blows past what can be held in context at once.
 When a file crosses **~1,000 lines**, split it into a directory module (`thread/mod.rs` +
-`thread/ingest.rs` + `thread/dispatch.rs`) along the phase boundaries above.
+`thread/ingest/` + `thread/dispatch.rs`) along the phase boundaries above.
 
 Inline `#[cfg(test)] mod tests` is the convention here — keep it. But when the test module itself
 crosses **~500 lines**, move it to a sibling file (`#[cfg(test)] #[path = "thread_tests.rs"] mod

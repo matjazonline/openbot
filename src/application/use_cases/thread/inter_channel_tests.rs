@@ -12,7 +12,7 @@
 use super::*;
 use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::test_support::test_pool;
-use crate::entities::message_contract::NormalizedInboundMessage;
+use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::entities::outreach::{CreateOutreachRequest, OutreachTargetRequest};
 use crate::entities::task::TaskStatus;
 use crate::services::outbound_dispatcher::OutboundEmail;
@@ -175,6 +175,11 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
         persistence.clone(),
         persistence.clone(),
         persistence.clone(),
+        InboundIngestPorts {
+            committer: persistence.clone(),
+            correlation: persistence.clone(),
+            bindings: persistence.clone(),
+        },
         loop_test_config(),
     )
     .with_agent_persistence(persistence.clone());
@@ -192,32 +197,16 @@ async fn fixture(pool: sqlx::PgPool) -> Fixture {
     }
 }
 
-fn inbound(from: &str, to: &str, message_id: &str, subject: &str) -> NormalizedInboundMessage {
-    NormalizedInboundMessage {
-        correlation_id: CorrelationId::new(),
-        message_id: message_id.into(),
-        thread_ref: None,
-        references: Vec::new(),
-        thread_index: None,
-        sender: qualified_email_identity(from).unwrap(),
-        recipients_to: vec![qualified_email_identity(to).unwrap()],
-        recipients_cc: Vec::new(),
-        subject: subject.to_string(),
-        clean_text: "Please find out the earliest delivery date.".to_string(),
-        raw_text: None,
-        raw_html: None,
-        attachments: Vec::new(),
-        is_auto_reply: false,
-        is_forwarded: false,
-        channel_id_header: None,
-        hop_count: 0,
-        trace_channels: Vec::new(),
-        transport: TransportKind::Email,
-        spf_status: crate::entities::auth::AuthVerdict::Pass,
-        dkim_status: crate::entities::auth::AuthVerdict::Pass,
-        dmarc_status: crate::entities::auth::AuthVerdict::Pass,
+/// One arriving mail, through the same adapter the SMTP listener uses.
+fn inbound(from: &str, to: &str, message_id: &str, subject: &str) -> RawInboundPayload {
+    RawInboundPayload {
+        from: from.to_string(),
+        to: to.to_string(),
+        subject: Some(subject.to_string()),
+        text: Some("Please find out the earliest delivery date.".to_string()),
+        headers: Some(format!("Message-ID: {message_id}")),
         spam_score: Some(0.0),
-        is_context_only: false,
+        ..RawInboundPayload::default()
     }
 }
 
@@ -283,7 +272,7 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
     // M0: the human writes to A.
     let m0 = fx
         .threads
-        .ingest_normalized_message(inbound(
+        .ingest_test_email(inbound(
             &fx.owner_email,
             &address_a,
             "<m0@example.com>",
@@ -291,7 +280,7 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         ))
         .await
         .expect("the inbound message is ingested");
-    assert!(m0.accepted, "M0 rejected: {:?}", m0.reason);
+    assert!(m0.accepted, "M0 rejected: {:?}", m0.reason());
     let thread_a = m0.thread.expect("M0 opens a thread on A");
     let task_a = m0.task_id.expect("M0 enqueues a dispatch task for A");
 
@@ -362,7 +351,7 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         &format!("outreach:{outbox_to_b}:target:0"),
     )
     .await;
-    assert!(to_b.accepted, "M1 rejected: {:?}", to_b.reason);
+    assert!(to_b.accepted, "M1 rejected: {:?}", to_b.reason());
 
     let thread_b = to_b.thread.expect("M1 opens a thread on B");
     assert_ne!(thread_b.id, thread_a.id, "B must get its own thread");
@@ -377,10 +366,10 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         "A stays parked while B works"
     );
 
-    let m1_norm = to_b
-        .normalized_message
-        .as_ref()
-        .expect("M1 carries its normalized form");
+    let m1_envelope = to_b
+        .envelope
+        .as_deref()
+        .expect("M1 carries its canonical envelope");
     let m1_message_id = to_b
         .inbound_message
         .as_ref()
@@ -403,8 +392,8 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         recipients_cc: Vec::new(),
         subject: "Re: Acquire supplier capacity data".into(),
         body_text: "Earliest delivery is 14 March.".into(),
-        hop_count: m1_norm.hop_count,
-        trace_channels: m1_norm.trace_channels.clone(),
+        hop_count: m1_envelope.directives.hop_count,
+        trace_channels: m1_envelope.directives.trace_channels.clone(),
     };
     let to_a = deliver_internally(
         &fx,
@@ -413,7 +402,7 @@ async fn agent_a_delegates_to_agent_b_and_b_s_answer_resumes_a_s_original_task()
         &format!("task:{}:agent-reply", b_tasks[0].id),
     )
     .await;
-    assert!(to_a.accepted, "M4 rejected: {:?}", to_a.reason);
+    assert!(to_a.accepted, "M4 rejected: {:?}", to_a.reason());
 
     // The invariants the design doc names.
     assert_eq!(

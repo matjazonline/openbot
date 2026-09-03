@@ -38,12 +38,13 @@ use crate::{
         outbound_dispatcher::{OutboundEmail, agent_response_email_body},
         runtime_metrics::ActiveTaskExecutions,
     },
+    transport::InboundTaskPayload,
     use_cases::{
         participant::IdentityObservation,
         schedule::{SCHEDULED_AGENT_RUN_TASK, ScheduleUseCases},
         thread::{
-            DispatchOutcome, InboundIngestResult, MessageAuthorWrite, MessageCorrelation,
-            MessageParticipantWrite, MessageWrite, ThreadUseCases, qualified_email_identity,
+            DispatchOutcome, MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite,
+            MessageWrite, ThreadUseCases, qualified_email_identity,
         },
     },
 };
@@ -834,12 +835,13 @@ impl TaskWorker {
                 .ingest_prepared_internal_message(&sent)
                 .await
                 .map_err(DeliveryFailure::retryable)?;
-            if !ingest.accepted
-                && ingest.reason.as_deref() != Some("Duplicate Message-ID already processed")
-            {
-                return Err(DeliveryFailure::Retryable(ingest.reason.unwrap_or_else(
-                    || "Internal channel delivery was rejected".into(),
-                )));
+            if !ingest.accepted {
+                return Err(DeliveryFailure::Retryable(
+                    ingest
+                        .reason()
+                        .unwrap_or("Internal channel delivery was rejected")
+                        .to_string(),
+                ));
             }
             info!(
                 "Delivered outreach outbox {} through trusted internal channel transport",
@@ -910,16 +912,7 @@ impl TaskWorker {
             return Ok(());
         };
 
-        let ingest: InboundIngestResult =
-            serde_json::from_value(task.payload.clone()).map_err(|error| error.to_string())?;
-        let first_match = ingest.channel_matches.first();
-        let channel = ingest
-            .channel
-            .or_else(|| first_match.map(|matched| matched.channel.clone()));
-        let company = ingest
-            .company
-            .or_else(|| first_match.map(|matched| matched.company.clone()));
-        let (Some(channel), Some(company)) = (channel, company) else {
+        let Some((company, channel)) = self.task_scope(&task).await? else {
             return Ok(());
         };
 
@@ -1048,33 +1041,27 @@ impl TaskWorker {
             return Ok(TaskExecutionOutcome::Replied);
         }
 
-        // A payload that will not parse will not parse on the next attempt either.
-        let mut ingest: InboundIngestResult = serde_json::from_value(task.payload.clone())
-            .map_err(|e| RunFailure::Terminal(format!("Invalid task payload JSON: {e}")))?;
-
-        self.thread_use_cases
-            .hydrate_ingest_configuration(&mut ingest)
+        // A payload that will not decode will not decode on the next attempt either.
+        let payload = InboundTaskPayload::decode(&task.payload)
+            .map_err(|error| RunFailure::Terminal(format!("Invalid task payload: {error}")))?;
+        // Everything the run needs is reloaded here rather than replayed from the payload, so a
+        // task queued an hour ago answers against the channel's current configuration.
+        let ingest = self
+            .thread_use_cases
+            .load_inbound_task(task.id, payload.identifiers())
             .await
-            .map_err(|e| e.to_string())?;
-
-        if !ingest.accepted {
-            return Ok(TaskExecutionOutcome::Replied);
-        }
+            .map_err(|error| RunFailure::Terminal(error.to_string()))?;
 
         let inbound_msg = ingest.inbound_message.as_ref().ok_or_else(|| {
-            RunFailure::Terminal("Missing inbound message in task payload".to_string())
+            RunFailure::Terminal("The message this task answers no longer exists".to_string())
         })?;
 
         // Idempotency Guard: Check if an outbound email for this triggering message was already sent
-        let target_thread_ids: Vec<_> = if ingest.channel_matches.is_empty() {
-            vec![inbound_msg.thread_id]
-        } else {
-            ingest
-                .channel_matches
-                .iter()
-                .map(|channel_match| channel_match.thread.id)
-                .collect()
-        };
+        let target_thread_ids: Vec<_> = ingest
+            .channel_matches
+            .iter()
+            .map(|channel_match| channel_match.thread.id)
+            .collect();
         let mut outbound_reply = None;
         let mut missing_threads = Vec::new();
         for thread_id in target_thread_ids {
@@ -1523,6 +1510,120 @@ impl TaskWorker {
         }
     }
 
+    /// The company and channel one task belongs to, reloaded.
+    ///
+    /// `Ok(None)` only when a row this task names is gone, which is a stopped or deleted channel
+    /// rather than a fault: the notice is skipped and the caller carries on.
+    async fn task_scope(
+        &self,
+        task: &BackgroundTask,
+    ) -> Result<
+        Option<(
+            crate::entities::company::Company,
+            crate::entities::channel::Channel,
+        )>,
+        String,
+    > {
+        let company = self
+            .thread_use_cases
+            .company_persistence()
+            .get_by_id(task.company_id)
+            .await
+            .map_err(|error| error.to_string())?;
+        let channel = self
+            .thread_use_cases
+            .channel_persistence()
+            .get_by_id(task.channel_id)
+            .await
+            .map_err(|error| error.to_string())?;
+        Ok(company
+            .zip(channel)
+            .filter(|(company, channel)| channel.company_id == company.id))
+    }
+
+    /// Tell the people on a stopped task's thread that it will not answer.
+    ///
+    /// Addressed from the thread rather than from a copy of the message the task carried: the
+    /// participants are on the thread, and the message the run was answering is in it.
+    async fn notify_stopped_task(&self, task: &BackgroundTask) -> Result<(), String> {
+        let Some((company, channel)) = self.task_scope(task).await? else {
+            return Ok(());
+        };
+        let Some(thread_id) = task.thread_id else {
+            return Ok(());
+        };
+        let Some(thread) = self
+            .thread_use_cases
+            .get_thread(thread_id)
+            .await
+            .map_err(|error| error.to_string())?
+        else {
+            return Ok(());
+        };
+        let history = self
+            .thread_use_cases
+            .get_thread_history(thread_id)
+            .await
+            .map_err(|error| error.to_string())?;
+        let Some(latest) = history.last() else {
+            return Ok(());
+        };
+        let Some(recipient) = latest.author.email_address() else {
+            return Ok(());
+        };
+
+        let stop_email = OutboundEmail {
+            channel_id: channel.id,
+            channel_name: channel.name.clone(),
+            channel_slug: channel.slug.clone(),
+            company_slug: company.slug.clone(),
+            trigger_message_id: latest
+                .rfc_message_id()
+                .cloned()
+                .unwrap_or_else(|| latest.canonical_id.to_string().into()),
+            thread_references: latest
+                .email
+                .as_ref()
+                .map(|metadata| metadata.references.clone())
+                .unwrap_or_default(),
+            recipient_to: recipient,
+            recipients_cc: latest.email_recipients(MessageParticipantKind::Cc),
+            subject: format!("[STOPPED] Re: {}", thread.subject),
+            body_text: format!(
+                "Notice: The automated channel processing for thread '{}' has been manually \
+                 stopped by the system administrator.",
+                thread.subject
+            ),
+            // The notice ends the chain rather than continuing it, so it takes no further hop and
+            // traces through no channel: nothing may answer it.
+            hop_count: 0,
+            trace_channels: Vec::new(),
+            correlation_id: task.correlation_id,
+        };
+
+        match self
+            .thread_use_cases
+            .prepare_internal_channel_delivery(stop_email.clone(), None)
+            .await
+        {
+            Ok(Some(prepared)) => {
+                let _ = self
+                    .thread_use_cases
+                    .ingest_prepared_internal_message(&prepared)
+                    .await;
+            }
+            Ok(None) => {
+                let _ = self
+                    .thread_use_cases
+                    .mail_dispatcher()
+                    .send(stop_email)
+                    .await;
+            }
+            Err(error) => warn!(%error, "Could not prepare a stop notification"),
+        }
+        Ok(())
+    }
+
     pub async fn stop_task_and_notify(
         &self,
         task_id: uuid::Uuid,
@@ -1534,60 +1635,10 @@ impl TaskWorker {
             .await
             .map_err(|error| error.to_string())?;
 
-        // Parse payload to notify participants
-        if let Ok(ingest) = serde_json::from_value::<InboundIngestResult>(task.payload)
-            && let (Some(channel), Some(company), Some(parsed)) =
-                (ingest.channel, ingest.company, ingest.parsed_email)
-        {
-            let stop_email = OutboundEmail {
-                channel_id: channel.id,
-                channel_name: channel.name.clone(),
-                channel_slug: channel.slug.clone(),
-                company_slug: company.slug.clone(),
-                trigger_message_id: parsed.message_id.clone().into(),
-                thread_references: parsed
-                    .references
-                    .iter()
-                    .cloned()
-                    .map(crate::entities::value_objects::MessageId::from)
-                    .collect(),
-                recipient_to: parsed.sender.clone().into(),
-                recipients_cc: parsed
-                    .recipients_cc
-                    .iter()
-                    .cloned()
-                    .map(crate::entities::value_objects::EmailAddress::from)
-                    .collect(),
-                subject: format!("[STOPPED] Re: {}", parsed.subject),
-                body_text: format!(
-                    "Notice: The automated channel processing for thread '{}' has been manually stopped by the system administrator.",
-                    parsed.subject
-                ),
-                hop_count: parsed.hop_count,
-                trace_channels: parsed.trace_channels,
-                correlation_id: task.correlation_id,
-            };
-
-            match self
-                .thread_use_cases
-                .prepare_internal_channel_delivery(stop_email.clone(), None)
-                .await
-            {
-                Ok(Some(prepared)) => {
-                    let _ = self
-                        .thread_use_cases
-                        .ingest_prepared_internal_message(&prepared)
-                        .await;
-                }
-                Ok(None) => {
-                    let _ = self
-                        .thread_use_cases
-                        .mail_dispatcher()
-                        .send(stop_email)
-                        .await;
-                }
-                Err(error) => warn!("Failed to prepare stop notification: {error}"),
-            }
+        // The notice is addressed from ids, not from a copy of the message: the stopped task's
+        // own thread is what its participants are reading, and the thread holds the message.
+        if let Err(error) = self.notify_stopped_task(&task).await {
+            warn!(task_id = %task.id, %error, "Could not deliver a stop notification");
         }
 
         Ok(())
@@ -1612,8 +1663,7 @@ mod tests {
     use crate::entities::task::NewTask;
     use crate::entities::task::TaskLeaseRef;
     use crate::use_cases::participant::test_support::{InMemoryParticipantDirectory, TeamFixture};
-    use crate::use_cases::thread::test_support::InMemoryThreads;
-    use crate::use_cases::thread::test_support::{EmailMessageDraft, email_write, stored_email};
+    use crate::use_cases::thread::test_support::{EmailMessageDraft, InMemoryThreads, email_write};
     use async_trait::async_trait;
     use chrono::Utc;
     use std::sync::{
@@ -1822,6 +1872,32 @@ mod tests {
 
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        /// The task's own channel and thread. These fixtures never enqueue a multi-channel run, so
+        /// stating one target is the honest answer rather than an empty list the worker would read
+        /// as "answer nowhere".
+        async fn list_task_channel_targets(
+            &self,
+            _company_id: Uuid,
+            task_id: Uuid,
+        ) -> AppResult<Vec<crate::use_cases::thread::TaskChannelTarget>> {
+            Ok(self
+                .tasks
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|task| task.id == task_id)
+                .and_then(|task| {
+                    task.thread_id
+                        .map(|thread_id| crate::use_cases::thread::TaskChannelTarget {
+                            channel_id: task.channel_id,
+                            thread_id,
+                            recipient_role: crate::transport::RecipientRole::To,
+                        })
+                })
+                .into_iter()
+                .collect())
+        }
+
         async fn commit_agent_dispatch(
             &self,
             commit: AgentDispatchCommit<'_>,
@@ -1855,6 +1931,7 @@ mod tests {
                 company_id,
                 channel_id,
                 thread_id,
+                targets: _,
                 task_type,
                 payload,
                 source: _,
@@ -2472,7 +2549,7 @@ mod tests {
             operator_emails: Vec::new(),
         });
 
-        let thread_use_cases = Arc::new(ThreadUseCases::new(
+        let thread_use_cases = Arc::new(ThreadUseCases::for_test(
             thread_persistence,
             channel_persistence,
             company_persistence.clone(),
@@ -2531,7 +2608,7 @@ mod tests {
         let agent_id = Uuid::new_v4();
 
         let task_persistence = Arc::new(MockTaskPersistence::default());
-        let thread_persistence = Arc::new(InMemoryThreads::new());
+        let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
         let company = crate::entities::company::Company {
             channel_defaults: Default::default(),
@@ -2608,8 +2685,8 @@ mod tests {
         });
 
         let thread_use_cases = Arc::new(
-            ThreadUseCases::new(
-                thread_persistence,
+            ThreadUseCases::for_test(
+                thread_persistence.clone(),
                 channel_persistence,
                 company_persistence.clone(),
                 Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
@@ -2623,66 +2700,46 @@ mod tests {
 
         let worker = TaskWorker::new(task_persistence.clone(), thread_use_cases, config);
 
-        let raw = crate::services::email_parser::RawInboundPayload {
-            headers: Some("Message-ID: <msg1@test.com>\n".to_string()),
-            subject: Some("Help".to_string()),
-            text: Some("Need help".to_string()),
-            html: None,
-            from: "user@test.com".to_string(),
-            to: "support@test.mailagents.com".to_string(),
-            cc: None,
-            spam_score: None,
-            attachments_data: vec![],
-            spf: Default::default(),
-            dkim: Default::default(),
-            dmarc: Default::default(),
-        };
-        let parsed_email = crate::services::email_parser::EmailParser::parse(raw, "mailagents.com");
-
-        let ingest = crate::use_cases::thread::InboundIngestResult {
-            accepted: true,
-            reason: None,
-            thread: Some(crate::entities::thread::Thread {
-                id: thread_id,
-                channel_id,
-                subject: "Help".to_string(),
-                participant_principal_ids: Vec::new(),
-                participant_projection: crate::entities::thread::ThreadParticipantProjection {
-                    email_addresses: vec!["user@test.com".into()],
-                },
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
-            }),
-            inbound_message: Some(stored_email(EmailMessageDraft {
-                id: Uuid::new_v4(),
+        // The task carries ids; the message it answers is in the store. Building the fixture the
+        // way ingest builds it is the point -- a payload assembled by hand could not fail the way
+        // a real one does.
+        thread_persistence.insert_thread(crate::entities::thread::Thread {
+            id: thread_id,
+            channel_id,
+            subject: "Help".to_string(),
+            participant_principal_ids: Vec::new(),
+            participant_projection: crate::entities::thread::ThreadParticipantProjection {
+                email_addresses: vec!["user@test.com".into()],
+            },
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        });
+        let stored = thread_persistence
+            .create_message(&email_write(EmailMessageDraft {
                 thread_id,
                 message_id: "<msg1@test.com>".into(),
-                in_reply_to: None,
-                references_list: vec![],
                 sender: "user@test.com".into(),
                 recipients_to: vec!["support@test.mailagents.com".into()],
-                recipients_cc: vec![],
                 subject: "Help".to_string(),
                 clean_text_body: "Need help".to_string(),
-                raw_text_body: None,
-                raw_html_body: None,
-                attachments: None,
-                direction: crate::entities::message::MessageDirection::Inbound,
-                role: crate::entities::message::MessageRole::Human,
-                thread_index: Some("1".into()),
-                created_at: chrono::Utc::now(),
-            })),
-            company: Some(company),
-            channel: Some(channel),
-            parsed_email: Some(parsed_email),
-            normalized_message: None,
-            task_id: None,
-            reply_delivery: crate::use_cases::thread::ReplyDelivery::Send,
-            channel_matches: vec![],
-            bounce_info: None,
-        };
+                ..EmailMessageDraft::default()
+            }))
+            .await
+            .unwrap();
 
-        let payload_json = serde_json::to_value(&ingest).unwrap();
+        let payload_json = InboundTaskPayload::v1(crate::transport::InboundTaskPayloadV1 {
+            company_id,
+            channel_id,
+            thread_id,
+            source_message_id: stored.canonical_id,
+            correlation_id: crate::entities::correlation::CorrelationId::new(),
+            hop_count: 0,
+            trace_channels: Vec::new(),
+            is_forwarded: false,
+            reply_delivery: crate::use_cases::thread::ReplyDelivery::Send,
+        })
+        .encode()
+        .unwrap();
         let task = task_persistence
             .enqueue_task(NewTask::starting_new_chain(
                 company_id,
@@ -2792,7 +2849,7 @@ mod tests {
         });
 
         let thread_use_cases = Arc::new(
-            ThreadUseCases::new(
+            ThreadUseCases::for_test(
                 thread_persistence.clone(),
                 Arc::new(MockChannelPersistence {
                     channel: Some(channel.clone()),
@@ -2975,7 +3032,7 @@ mod tests {
         });
 
         let thread_use_cases = Arc::new(
-            ThreadUseCases::new(
+            ThreadUseCases::for_test(
                 thread_persistence.clone(),
                 Arc::new(MockChannelPersistence {
                     channel: Some(channel.clone()),

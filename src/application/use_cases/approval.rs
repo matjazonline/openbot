@@ -709,6 +709,16 @@ mod tests {
     struct MockTaskPersistence;
     #[async_trait]
     impl TaskPersistence for MockTaskPersistence {
+        /// This fixture enqueues no task, so a run that asked for targets would be a bug in the
+        /// test rather than an empty conversation.
+        async fn list_task_channel_targets(
+            &self,
+            _company_id: Uuid,
+            _task_id: Uuid,
+        ) -> AppResult<Vec<crate::use_cases::thread::TaskChannelTarget>> {
+            Ok(Vec::new())
+        }
+
         async fn commit_agent_dispatch(
             &self,
             commit: AgentDispatchCommit<'_>,

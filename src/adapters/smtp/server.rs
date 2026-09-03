@@ -11,15 +11,23 @@ use tokio::time::timeout;
 use tracing::{error, info, warn};
 
 use crate::{
-    adapters::protocols::email::EmailIngressAdapter,
+    adapters::{
+        protocols::email::{
+            EmailIngressAdapter, EmailIngressTrust, VerifiedEmailAuth,
+            parser::{
+                MAX_INBOUND_MESSAGE_BYTES, RawAttachmentData, RawInboundPayload, extract_email,
+            },
+        },
+        storage::FileStorage,
+    },
     application::use_cases::channel::parse_recipient_address,
-    application::use_cases::thread::ThreadUseCases,
+    application::use_cases::thread::{
+        InboundIngestResult, IngestRejection, IngressOrigin, ReplyDelivery, ThreadUseCases,
+        qualified_email_identity,
+    },
     domain::monitoring::{MonitoringService, SmtpConnectionMetrics, SmtpStatus},
     entities::auth::AuthVerdict,
     infra::config::AppConfig,
-    services::email_parser::{
-        MAX_INBOUND_MESSAGE_BYTES, RawAttachmentData, RawInboundPayload, extract_email,
-    },
 };
 
 static MAIL_FROM_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
@@ -91,6 +99,12 @@ pub async fn check_dnsbl(ip: IpAddr, dnsbl_servers: &[String]) -> Option<String>
 pub struct SmtpServer {
     thread_use_cases: Arc<ThreadUseCases>,
     config: Arc<AppConfig>,
+    /// Parses what arrives on the wire. Held rather than built per message: the app domain is
+    /// deployment configuration read once, and the parser is the only thing on this path that
+    /// understands the platform's address grammar.
+    ingress: EmailIngressAdapter,
+    /// Where inbound attachments are kept; `None` on a deployment with no private bucket.
+    file_storage: Option<Arc<dyn FileStorage>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
     /// Live connection count per client IP, enforcing `smtp_rate_limit_conns_per_ip`.
     ///
@@ -108,7 +122,9 @@ impl SmtpServer {
     pub fn new(thread_use_cases: Arc<ThreadUseCases>, config: Arc<AppConfig>) -> Self {
         Self {
             thread_use_cases,
+            ingress: EmailIngressAdapter::for_config(&config),
             config,
+            file_storage: None,
             monitoring: None,
             active_conns: Arc::new(RwLock::new(HashMap::new())),
             connection_slots: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
@@ -117,6 +133,13 @@ impl SmtpServer {
 
     pub fn with_monitoring(mut self, monitoring: Arc<dyn MonitoringService>) -> Self {
         self.monitoring = Some(monitoring);
+        self
+    }
+
+    /// Where attachments on arriving mail are stored. Without it mail still arrives; its
+    /// attachments are recorded but their bytes are not kept.
+    pub fn with_file_storage(mut self, file_storage: Option<Arc<dyn FileStorage>>) -> Self {
+        self.file_storage = file_storage;
         self
     }
 
@@ -527,54 +550,59 @@ impl SmtpServer {
             self.apply_spam_score(session, &mut raw_payload).await;
         }
 
-        let norm_payload = EmailIngressAdapter::parse_and_store(
-            raw_payload,
-            &self.config,
-            self.thread_use_cases.file_storage(),
-        )
-        .await;
-        let ingest_result = match norm_payload {
-            Ok(norm_payload) => {
+        // The verdicts are this boundary's, established above from the connection and the
+        // signatures. Nothing in the message itself can claim them.
+        let trust = EmailIngressTrust::Verified(VerifiedEmailAuth {
+            spf: raw_payload.spf,
+            dkim: raw_payload.dkim,
+            dmarc: raw_payload.dmarc,
+            spam_score: raw_payload.spam_score,
+        });
+        let accepted = self
+            .ingress
+            .store_and_accept(
+                raw_payload,
+                &self.config,
+                self.file_storage.as_deref(),
+                trust,
+            )
+            .await;
+        let ingest_result = match accepted {
+            Ok(accepted) => {
                 self.thread_use_cases
-                    .ingest_normalized_message(norm_payload)
+                    .ingest(
+                        accepted
+                            .into_inbound(IngressOrigin::ExternalTransport, ReplyDelivery::Send),
+                    )
                     .await
             }
-            Err(error) => Err(error),
+            // A message this adapter could not turn into a canonical one will not parse on a
+            // retry either, so it is a permanent rejection rather than a transient failure.
+            Err(error) => Err(error.into()),
         };
         match ingest_result {
             Ok(ingest) => {
+                let answer = SmtpAnswer::for_ingest(&ingest);
                 self.record_connection(
                     client_ip,
-                    ingest_status(&ingest),
+                    answer.status,
                     start_time,
                     session.mailfrom.clone(),
                     session.rcpts.first().cloned(),
                 );
-
-                if ingest.accepted {
-                    writer
-                        .write_all(b"250 2.0.0 Message queued for delivery\r\n")
-                        .await?;
-                } else {
-                    let msg = format!(
-                        "550 5.7.1 Message rejected ({})\r\n",
-                        ingest.reason.as_deref().unwrap_or("ok")
-                    );
-                    writer.write_all(msg.as_bytes()).await?;
-                }
+                writer.write_all(answer.line().as_bytes()).await?;
             }
-            Err(err) => {
-                warn!("Error ingesting SMTP email: {err}");
+            Err(error) => {
+                let answer = SmtpAnswer::for_error(&error);
+                warn!(%error, permanent = answer.is_permanent(), "Could not ingest an SMTP message");
                 self.record_connection(
                     client_ip,
-                    SmtpStatus::Error,
+                    answer.status,
                     start_time,
                     session.mailfrom.clone(),
                     session.rcpts.first().cloned(),
                 );
-                writer
-                    .write_all(b"451 4.3.0 Local error in processing\r\n")
-                    .await?;
+                writer.write_all(answer.line().as_bytes()).await?;
             }
         }
         writer.flush().await?;
@@ -605,10 +633,12 @@ impl SmtpServer {
             return true;
         };
 
-        let sender = raw_payload.from.trim();
+        let Ok(sender) = qualified_email_identity(extract_email(&raw_payload.from)) else {
+            return true;
+        };
         let context = match self
             .thread_use_cases
-            .observe_email_access_context(company.id, sender)
+            .observe_ingress_identity(company.id, &sender)
             .await
         {
             Ok(context) => context,
@@ -822,25 +852,85 @@ fn extract_command_address(re: &regex::Regex, arg: &str) -> Option<String> {
     Some(extract_email(raw))
 }
 
-/// Map an ingest rejection reason onto the connection metric it should be counted as.
-fn ingest_status(ingest: &crate::use_cases::thread::InboundIngestResult) -> SmtpStatus {
-    if ingest.accepted {
-        return SmtpStatus::Accepted;
+/// What this session answers, and what the answer is counted as.
+///
+/// The three-way split is the point. A message this platform *decided* not to route is accepted
+/// and dropped, because a 5xx would make the sending server retry or bounce -- and for an
+/// auto-reply or a thread already ping-ponging, both make the loop worse. A message that was
+/// refused on its merits gets a permanent 5xx so the sender learns. A message that failed for a
+/// reason of ours gets a transient 4xx so the sending server keeps it: answering 250 there would
+/// accept a message nothing had stored.
+struct SmtpAnswer {
+    code: &'static str,
+    detail: String,
+    status: SmtpStatus,
+}
+
+impl SmtpAnswer {
+    fn accepted() -> Self {
+        Self {
+            code: "250 2.0.0",
+            detail: "Message queued for delivery".into(),
+            status: SmtpStatus::Accepted,
+        }
     }
-    match ingest.reason.as_deref() {
-        // The server answered a reserved `_` address itself. Nothing was routed, but nothing went
-        // wrong either, so this must not be counted as an SMTP error.
-        //
-        // Matching on the reason *string* is the coupling `src/AGENTS.md` warns about, and several
-        // arms below already miscategorize ("Company or Channel not found" lands on `Error`).
-        // Turning `InboundIngestResult::reason` into an enum is the real fix, and is not this
-        // change's job.
-        Some(crate::use_cases::thread::SYSTEM_ADDRESS_ANSWERED) => SmtpStatus::Accepted,
-        Some("DMARC authentication did not pass") => SmtpStatus::RejectedDmarc,
-        Some("Spam score threshold exceeded") => SmtpStatus::RejectedSpamScore,
-        Some(r) if r.contains("rate limit") => SmtpStatus::BlockedRateLimit,
-        Some(r) if r.contains("DNSBL") => SmtpStatus::BlockedDnsbl,
-        _ => SmtpStatus::Error,
+
+    fn for_ingest(ingest: &InboundIngestResult) -> Self {
+        let Some(rejection) = ingest.rejection.as_ref() else {
+            return Self::accepted();
+        };
+        let status = match rejection {
+            IngestRejection::AuthenticationFailed => SmtpStatus::RejectedDmarc,
+            IngestRejection::SpamScore => SmtpStatus::RejectedSpamScore,
+            IngestRejection::SystemAddressAnswered
+            | IngestRejection::AutoReply
+            | IngestRejection::ThreadTurnLimit => SmtpStatus::Accepted,
+            _ => SmtpStatus::Error,
+        };
+        match rejection {
+            // Decided, not failed: the message reached the platform and the platform chose not to
+            // route it. Telling the sender's server to retry would be a lie, and telling it to
+            // bounce would answer a machine with another machine.
+            IngestRejection::SystemAddressAnswered
+            | IngestRejection::AutoReply
+            | IngestRejection::ThreadTurnLimit => Self {
+                status,
+                ..Self::accepted()
+            },
+            _ => Self {
+                code: "550 5.7.1",
+                detail: format!("Message rejected ({rejection})"),
+                status,
+            },
+        }
+    }
+
+    /// A failure of ours, or of the message's own syntax.
+    ///
+    /// Only malformed input is permanent. Everything else -- a database outage above all -- is
+    /// transient, because the message is still in the sending server's queue and will be offered
+    /// again; a 250 here would be an acknowledgement of something nothing had written.
+    fn for_error(error: &crate::app_error::AppError) -> Self {
+        match error {
+            crate::app_error::AppError::BadRequest(detail) => Self {
+                code: "550 5.6.0",
+                detail: format!("Message rejected ({detail})"),
+                status: SmtpStatus::Error,
+            },
+            _ => Self {
+                code: "451 4.3.0",
+                detail: "Local error in processing".into(),
+                status: SmtpStatus::Error,
+            },
+        }
+    }
+
+    fn is_permanent(&self) -> bool {
+        self.code.starts_with('5')
+    }
+
+    fn line(&self) -> String {
+        format!("{} {}\r\n", self.code, self.detail)
     }
 }
 
@@ -957,6 +1047,105 @@ pub fn parse_raw_mime_to_payload(
             dmarc: dmarc_status,
             ..Default::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod answer_tests {
+    use super::*;
+    use crate::app_error::AppError;
+    use crate::use_cases::thread::{BounceInfo, InboundIngestResult, IngestRejection};
+
+    fn rejected(rejection: IngestRejection) -> InboundIngestResult {
+        InboundIngestResult::rejected(rejection)
+    }
+
+    fn accepted() -> InboundIngestResult {
+        let mut result = InboundIngestResult::rejected(IngestRejection::AutoReply);
+        result.accepted = true;
+        result.rejection = None;
+        result
+    }
+
+    fn bounce() -> BounceInfo {
+        BounceInfo {
+            recipient_to: "sender@example.com".into(),
+            company_slug: None,
+            invalid_slugs: Vec::new(),
+            disabled_slugs: Vec::new(),
+            suggestions: Vec::new(),
+            available_channels: Vec::new(),
+            original_subject: "Hello".to_string(),
+        }
+    }
+
+    #[test]
+    fn an_accepted_message_is_queued() {
+        let answer = SmtpAnswer::for_ingest(&accepted());
+        assert!(answer.line().starts_with("250 "));
+        assert_eq!(answer.status, SmtpStatus::Accepted);
+    }
+
+    /// The three the platform *decided* not to route. A 5xx would make the sending server retry
+    /// or bounce, and for a machine-generated message or a thread already ping-ponging, both make
+    /// the loop worse -- which is the loop these rejections exist to stop.
+    #[test]
+    fn a_message_the_platform_chose_not_to_route_is_accepted_and_dropped() {
+        for rejection in [
+            IngestRejection::SystemAddressAnswered,
+            IngestRejection::AutoReply,
+            IngestRejection::ThreadTurnLimit,
+        ] {
+            let answer = SmtpAnswer::for_ingest(&rejected(rejection.clone()));
+            assert!(
+                answer.line().starts_with("250 "),
+                "{rejection:?} answered {}",
+                answer.line().trim()
+            );
+            assert_eq!(answer.status, SmtpStatus::Accepted, "{rejection:?}");
+        }
+    }
+
+    /// Everything refused on its merits is permanent, and the two the connection metric
+    /// distinguishes are counted as themselves rather than as a generic error.
+    #[test]
+    fn a_message_refused_on_its_merits_is_a_permanent_rejection() {
+        for (rejection, status) in [
+            (
+                IngestRejection::AuthenticationFailed,
+                SmtpStatus::RejectedDmarc,
+            ),
+            (IngestRejection::SpamScore, SmtpStatus::RejectedSpamScore),
+            (IngestRejection::UnknownRecipient, SmtpStatus::Error),
+            (IngestRejection::Unauthorized, SmtpStatus::Error),
+            (IngestRejection::HopLimitReached, SmtpStatus::Error),
+            (
+                IngestRejection::ThreadInjection(Box::new(bounce())),
+                SmtpStatus::Error,
+            ),
+        ] {
+            let answer = SmtpAnswer::for_ingest(&rejected(rejection.clone()));
+            assert!(answer.is_permanent(), "{rejection:?}");
+            assert!(answer.line().contains(rejection.as_str()), "{rejection:?}");
+            assert_eq!(answer.status, status, "{rejection:?}");
+        }
+    }
+
+    /// The case a synchronous transport must not get wrong. The message is still in the sending
+    /// server's queue; answering 250 for a database outage accepts something nothing stored.
+    #[test]
+    fn a_failure_of_ours_is_transient_and_a_malformed_message_is_not() {
+        let outage = SmtpAnswer::for_error(&AppError::Internal("connection refused".into()));
+        assert!(
+            outage.line().starts_with("451 "),
+            "{}",
+            outage.line().trim()
+        );
+        assert!(!outage.is_permanent());
+
+        let malformed = SmtpAnswer::for_error(&AppError::BadRequest("unusable sender".into()));
+        assert!(malformed.line().starts_with("550 "));
+        assert!(malformed.is_permanent());
     }
 }
 
@@ -1156,6 +1345,16 @@ mod tests {
 
     #[async_trait]
     impl crate::adapters::persistence::task::TaskPersistence for MockTaskPersistence {
+        /// This fixture enqueues no task, so a run that asked for targets would be a bug in the
+        /// test rather than an empty conversation.
+        async fn list_task_channel_targets(
+            &self,
+            _company_id: Uuid,
+            _task_id: Uuid,
+        ) -> AppResult<Vec<crate::use_cases::thread::TaskChannelTarget>> {
+            Ok(Vec::new())
+        }
+
         async fn commit_agent_dispatch(
             &self,
             commit: AgentDispatchCommit<'_>,
@@ -1177,6 +1376,7 @@ mod tests {
                 company_id,
                 channel_id,
                 thread_id,
+                targets: _,
                 task_type,
                 payload,
                 source: _,
@@ -1377,7 +1577,7 @@ mod tests {
             operator_emails: Vec::new(),
         });
 
-        let thread_use_cases = Arc::new(ThreadUseCases::new(
+        let thread_use_cases = Arc::new(ThreadUseCases::for_test(
             thread_persistence.clone(),
             channel_persistence,
             company_persistence.clone(),
@@ -1609,7 +1809,7 @@ regis";
             operator_emails: Vec::new(),
         });
 
-        let thread_use_cases = Arc::new(ThreadUseCases::new(
+        let thread_use_cases = Arc::new(ThreadUseCases::for_test(
             thread_persistence.clone(),
             channel_persistence,
             company_persistence.clone(),
@@ -1738,7 +1938,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
 
         let monitor = Arc::new(InMemoryMonitor::new());
 
-        let thread_use_cases = Arc::new(ThreadUseCases::new(
+        let thread_use_cases = Arc::new(ThreadUseCases::for_test(
             thread_persistence.clone(),
             channel_persistence,
             company_persistence.clone(),

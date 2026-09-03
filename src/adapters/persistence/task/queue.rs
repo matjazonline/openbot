@@ -4,7 +4,6 @@
 //! The row-local transition attribution lives here too, beside the status-changing statements that
 //! are required to write it.
 
-use serde_json::Value;
 use sqlx::Postgres;
 use uuid::Uuid;
 
@@ -15,7 +14,7 @@ use crate::{
         message::CanonicalMessageId,
         task::{
             BackgroundTask, NewTask, ResumeActor, StopActor, TaskFailure, TaskSource,
-            TaskStopReason, TaskTransitionReason, TransitionActor,
+            TaskStopReason, TaskTarget, TaskTransitionReason, TransitionActor,
         },
     },
 };
@@ -281,11 +280,12 @@ pub(crate) async fn insert_task(
         thread_id,
         task_type,
         payload,
+        targets,
         source,
         correlation_id,
     } = new_task;
     let id = Uuid::new_v4();
-    let targets = task_targets(&payload, company_id, channel_id, thread_id)?;
+    let targets = stated_or_own_channel(targets, channel_id, thread_id);
     // Two `ON CONFLICT` targets cannot be named in one statement, and only one of the two source
     // columns is ever set, so the conflict target follows the source the caller stated. An
     // unattributed task has nothing to collide on and always inserts.
@@ -337,7 +337,7 @@ pub(crate) async fn insert_task(
         .bind(company_id)
         .bind(target.channel_id)
         .bind(target.thread_id)
-        .bind(target.recipient_role)
+        .bind(target.recipient_role.as_str())
         .bind(position as i32)
         .execute(&mut **tx)
         .await
@@ -347,70 +347,27 @@ pub(crate) async fn insert_task(
     db.try_into()
 }
 
-pub(crate) struct TaskTarget {
-    pub(crate) channel_id: Uuid,
-    pub(crate) thread_id: Uuid,
-    pub(crate) recipient_role: String,
-}
-
-pub(crate) fn task_targets(
-    payload: &Value,
-    company_id: Uuid,
-    primary_channel_id: Uuid,
-    primary_thread_id: Option<Uuid>,
-) -> AppResult<Vec<TaskTarget>> {
-    let Some(matches) = payload.get("channel_matches").and_then(Value::as_array) else {
-        return Ok(primary_thread_id
-            .map(|thread_id| {
-                vec![TaskTarget {
-                    channel_id: primary_channel_id,
-                    thread_id,
-                    recipient_role: "to".to_string(),
-                }]
-            })
-            .unwrap_or_default());
-    };
-
-    if matches.is_empty() {
-        return Ok(primary_thread_id
-            .map(|thread_id| {
-                vec![TaskTarget {
-                    channel_id: primary_channel_id,
-                    thread_id,
-                    recipient_role: "to".to_string(),
-                }]
-            })
-            .unwrap_or_default());
+/// The channels this run drives: the ones the producer stated, or its own if it stated none.
+///
+/// A schedule and an approval resume answer in exactly one place and say nothing; an inbound
+/// message states every channel its ingest authorized. Reading them out of the payload JSON -- what
+/// this replaces -- made the queue depend on one producer's payload shape and silently enqueued a
+/// single-channel run for every other.
+fn stated_or_own_channel(
+    stated: Vec<TaskTarget>,
+    channel_id: Uuid,
+    thread_id: Option<Uuid>,
+) -> Vec<TaskTarget> {
+    if !stated.is_empty() {
+        return stated;
     }
-
-    matches
-        .iter()
-        .map(|entry| {
-            let target_company = json_uuid(entry, "/company/id")?;
-            if target_company != company_id {
-                return Err(AppError::Internal(
-                    "A task cannot target channels from multiple companies".into(),
-                ));
-            }
-
-            Ok(TaskTarget {
-                channel_id: json_uuid(entry, "/channel/id")?,
-                thread_id: json_uuid(entry, "/thread/id")?,
-                recipient_role: entry
-                    .get("recipient_role")
-                    .and_then(Value::as_str)
-                    .unwrap_or("to")
-                    .to_string(),
-            })
+    thread_id
+        .map(|thread_id| {
+            vec![TaskTarget {
+                channel_id,
+                thread_id,
+                recipient_role: RecipientRole::To,
+            }]
         })
-        .collect()
-}
-
-pub(crate) fn json_uuid(value: &Value, pointer: &str) -> AppResult<Uuid> {
-    let raw = value
-        .pointer(pointer)
-        .and_then(Value::as_str)
-        .ok_or_else(|| AppError::Internal(format!("Missing task target field {pointer}")))?;
-    Uuid::parse_str(raw)
-        .map_err(|_| AppError::Internal(format!("Invalid task target UUID at {pointer}")))
+        .unwrap_or_default()
 }

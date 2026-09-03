@@ -76,6 +76,13 @@ impl<T, const MAX: usize> BoundedVec<T, MAX> {
     pub fn into_inner(self) -> Vec<T> {
         self.0
     }
+
+    /// Rebuild the list one element at a time. The length cannot grow, so the bound still holds
+    /// and there is nothing to re-check -- which is what makes this safe to expose where a
+    /// `into_inner().into_iter().map(..).collect()` round trip would silently drop the type.
+    pub fn map<U>(self, transform: impl FnMut(T) -> U) -> BoundedVec<U, MAX> {
+        BoundedVec(self.0.into_iter().map(transform).collect())
+    }
 }
 
 impl<T, const MAX: usize> Default for BoundedVec<T, MAX> {
